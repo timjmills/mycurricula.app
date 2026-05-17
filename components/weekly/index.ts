@@ -2,3 +2,5 @@
 // Consumers import from `@/components/weekly`, never from deep files.
 
 export { WeeklyBoard } from "./weekly-board";
+export { WeeklyLessonCard } from "./weekly-lesson-card";
+export type { ContextAction, ContextActionPayload } from "./weekly-lesson-card";

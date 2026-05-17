@@ -30,11 +30,8 @@
 import type { DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { useState } from "react";
 import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
-import { LessonCard } from "@/components/lesson-card";
-import type {
-  ContextAction,
-  ContextActionPayload,
-} from "@/components/lesson-card";
+import { WeeklyLessonCard } from "@/components/weekly";
+import type { ContextAction, ContextActionPayload } from "@/components/weekly";
 import type { CellLayout, DropRegion } from "@/lib/cell-layout";
 import type { CellShade } from "./unitShading";
 import type { CellNavProps } from "./useGridNavigation";
@@ -174,14 +171,16 @@ export function GridCell({
         ? `${lessonCount} lesson${lessonCount === 1 ? "" : "s"}, expanded`
         : `${lessonCount} lesson${lessonCount === 1 ? "" : "s"}, collapsed`;
 
-  // Build a LessonCard node for a given lesson — reused in both the
+  // Build a WeeklyLessonCard node for a given lesson — reused in both the
   // default CardStack path and the split-slot layout path.
+  // Note: WeeklyLessonCard is a drop-in for LessonCard (same props) and does
+  // not accept a `dense` prop — the grid width (~190px) naturally constrains
+  // the card to a compact footprint.
   function renderCard(lesson: Lesson): ReactNode {
     return (
       <div key={lesson.id} className={styles.cardSlot}>
-        <LessonCard
+        <WeeklyLessonCard
           lesson={lesson}
-          dense
           expanded={expandedIds.has(lesson.id)}
           selected={selectedId === lesson.id}
           dragging={draggingId === lesson.id}
@@ -344,11 +343,14 @@ export function GridCell({
        * CellDropZones overlays the cell during a drag to show the teacher
        * where their lesson will land. onPick fires with the chosen region
        * and takes priority over the native onDrop fallback above.
-       * Rendered unconditionally so the sibling component can manage its
-       * own visibility; visible prop gates the visual affordance.
+       *
+       * `visible` is gated on BOTH a drag being active AND the pointer
+       * being over this specific cell (dragOver). Without this guard the
+       * overlay mounts on every cell the moment any drag begins, dimming
+       * the whole grid and stacking overlapping zone labels (~40 cells).
        */}
       <CellDropZones
-        visible={!!draggingId}
+        visible={!!draggingId && dragOver}
         hasLessons={!isEmpty}
         onPick={handleRegionPick}
       />

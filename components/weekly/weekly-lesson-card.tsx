@@ -135,14 +135,15 @@ export function WeeklyLessonCard({
   };
 
   // ── Card shell ────────────────────────────────────────────────────────────
-  // White base (quiet/calm) or subject-tint base (vivid) — matching the
-  // existing LessonCard surface convention. The header band is always
-  // subject-tinted regardless of style.
+  // Body is always neutral/paper so the header band's subject-color fill
+  // reads as a strongly distinct zone regardless of the style axis. In vivid
+  // mode the card border picks up a subject-tint; quiet/calm stay ink-150.
   const isVivid = style === "vivid";
 
   const cardSurface: CSSProperties = {
     position: "relative",
-    background: isVivid ? color.bg : "var(--paper)",
+    // Body surface is always neutral so header color contrast is maximum.
+    background: "var(--paper)",
     border: selected
       ? `1.5px solid ${color.stripe}`
       : isVivid
@@ -160,6 +161,12 @@ export function WeeklyLessonCard({
     filter: done ? "saturate(45%)" : "none",
     paddingInlineStart: 5,
   };
+
+  // ── Header band ───────────────────────────────────────────────────────────
+  // The band paints with the subject's original Vivid card gradient — a
+  // confident colored zone above the neutral (paper) body. A color-matched
+  // hard border + drop shadow keep the header/body boundary unmistakable.
+  const bandSeparatorColor = `color-mix(in oklch, ${color.stripe} 55%, transparent)`;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -230,13 +237,19 @@ export function WeeklyLessonCard({
       <div aria-hidden style={stripeStyle} />
 
       {/* ── Header band ─────────────────────────────────────────────────── */}
-      {/* Subject-tint fill (`--cl`) with deep text (`--cd`). Always tinted
-          regardless of the card style axis — this is the Weekly-view contract.
+      {/* Deeply-tinted subject fill (noticeably deeper than the body) with
+          deep text (`--cd`). Always tinted regardless of the style axis —
+          this is the Weekly-view design contract. The hard bottom border plus
+          drop shadow make the header/body boundary unmistakable at a glance.
           The band carries: subject name, time label, move/modified indicators,
           drag handle, ⋯ affordance, and the lesson title below them. */}
       <div
         className={styles.band}
-        style={{ background: color.cl }}
+        style={{
+          background: color.gradient,
+          borderBottom: `2px solid ${bandSeparatorColor}`,
+          boxShadow: `0 2px 6px color-mix(in oklch, ${color.stripe} 18%, transparent)`,
+        }}
         onClick={toggleExpand}
         role="button"
         tabIndex={-1}
@@ -258,12 +271,13 @@ export function WeeklyLessonCard({
             />
           </div>
 
-          {/* Subject · time meta — the two identifiers at a glance */}
+          {/* Subject eyebrow + time — grouped identifier row.
+              Subject name: uppercase eyebrow label (strong, compact).
+              Time: tabular-numeric, slightly softer weight, separated by
+              a thin vertical rule so the two pieces read as one unit. */}
           <div className={styles.bandMeta} style={{ color: color.cd }}>
             <span className={styles.bandSubject}>{subject.name}</span>
-            <span className={styles.bandDot} aria-hidden>
-              ·
-            </span>
+            <span className={styles.bandMetaSep} aria-hidden />
             <span className={styles.bandTime}>{timeLabel}</span>
           </div>
 
@@ -333,7 +347,9 @@ export function WeeklyLessonCard({
           </div>
         </div>
 
-        {/* Lesson title — second line of the band */}
+        {/* Lesson title — prominent second line of the band. Weight 600,
+            one size step up from before, so it reads as the headline of
+            the labeled zone rather than a secondary detail. */}
         <h3
           className={styles.bandTitle}
           style={{
@@ -358,10 +374,7 @@ export function WeeklyLessonCard({
       <div className={styles.body}>
         {/* Collapsed: 2-line preview only. Expanded: full section rows. */}
         {!expanded ? (
-          <p
-            className={styles.preview}
-            style={{ color: isVivid ? color.deep : "var(--ink-500)" }}
-          >
+          <p className={styles.preview} style={{ color: "var(--ink-700)" }}>
             {lesson.preview}
           </p>
         ) : (

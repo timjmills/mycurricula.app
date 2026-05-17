@@ -22,8 +22,12 @@
 .overlay {
   position: absolute;
   inset: 0;
-  /* Sit above the CardStack (z-index 2) and the collapse button (z-index 2). */
-  z-index: 20;
+  /* z-index 3: above the cell's cards and collapse button (z-index 2),
+     but below the sticky day headers (z-index 5), the sticky subject headers
+     (z-index 4), and the navbar bars (z-index 19–20). Because the overlay is
+     absolutely positioned inside the cell (position: relative), it is already
+     contained in the cell's stacking context and cannot bleed over the headers. */
+  z-index: 3;
   border-radius: var(--r-12);
   overflow: hidden;
   /* Three rows: thin top strip | flex middle | thin bottom strip */
@@ -121,7 +125,8 @@
 .zoneFull {
   position: absolute;
   inset: 0;
-  z-index: 20;
+  /* Same stacking rationale as .overlay — above cards, below sticky headers. */
+  z-index: 3;
   border-radius: var(--r-12);
   display: flex;
   align-items: center;
