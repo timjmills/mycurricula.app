@@ -155,10 +155,10 @@ export function WeeklyLessonCard({
         ? "0 4px 14px rgba(20,22,32,0.10)"
         : "var(--shadow-card)",
     transform: dragging ? "rotate(-1.2deg)" : "none",
-    // Fade the whole card when done; the CSS filter also desaturates so the
-    // subject color recedes, making "done" immediately scannable in the grid.
-    opacity: done ? 0.52 : 1,
-    filter: done ? "saturate(45%)" : "none",
+    // Done cards recede but stay readable — a gentle fade with only a light
+    // desaturation, so "done" scans at a glance without going washed-out.
+    opacity: done ? 0.66 : 1,
+    filter: done ? "saturate(72%)" : "none",
     paddingInlineStart: 5,
   };
 
