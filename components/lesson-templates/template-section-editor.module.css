@@ -1,0 +1,254 @@
+/* template-section-editor.module.css — lesson-flow template section editor.
+ *
+ * Renders an ordered list of section cards, each with label + prompt inputs,
+ * move-up/down buttons, and a remove button. A "+ Add section" button sits
+ * below the list.
+ *
+ * Layout: each card is a horizontal flex row — index pill on the left, fields
+ * column in the center (flex: 1), icon control column on the right. On
+ * narrow viewports the controls drop below the fields.
+ *
+ * All colors via var(--token). No hard-coded hex or px font sizes.
+ */
+
+/* ── Root ────────────────────────────────────────────────────────────── */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Section list ────────────────────────────────────────────────────── */
+/* <ol> reset: numbers are rendered as custom index pills, not native
+   list counters, so we strip the default list presentation. */
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Section card ────────────────────────────────────────────────────── */
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 12px 14px 14px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-150);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.card:hover {
+  border-color: var(--ink-200);
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 2px var(--ink-100);
+}
+
+/* ── Index pill ──────────────────────────────────────────────────────── */
+/* Numbered circle showing the section's position in the list. */
+.index {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink-100);
+  color: var(--ink-500);
+  font-size: var(--t-12);
+  font-weight: 700;
+  line-height: 1;
+  /* Nudge so the pill sits level with the first field's label. */
+  margin-top: 2px;
+  user-select: none;
+}
+
+/* ── Fields column ───────────────────────────────────────────────────── */
+.fields {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Each label + input pair */
+.fieldRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Field label — visually small, always present for screen readers */
+.fieldLabel {
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-400);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  line-height: 1;
+  user-select: none;
+}
+
+/* ── Text inputs ─────────────────────────────────────────────────────── */
+/* Base shared by both input and textarea. */
+.input,
+.textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--r-6);
+  border: 1px solid var(--ink-200);
+  background: var(--ink-50);
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  line-height: 1.45;
+  /* Inherit font from .cp-root; matched in tokens.css. */
+  font-family: inherit;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+  /* Box-sizing is set by .cp-root * but set explicitly here for safety. */
+  box-sizing: border-box;
+}
+
+.input:hover,
+.textarea:hover {
+  border-color: var(--ink-300);
+  background: var(--paper);
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--ink-400);
+  background: var(--paper);
+}
+
+.input:focus-visible,
+.textarea:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* ── Controls column ─────────────────────────────────────────────────── */
+/* Stack of icon buttons: move-up, move-down, remove. */
+.controls {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Align top of controls stack with top of fields column. */
+  padding-top: 2px;
+}
+
+/* Shared icon button */
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* ≥44px touch target per WCAG 2.5.5; a 44×44 square. */
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-6);
+  border: none;
+  background: transparent;
+  color: var(--ink-400);
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.iconBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.iconBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Disabled state — move-up at top, move-down at bottom, remove when only 1 */
+.iconBtn:disabled {
+  color: var(--ink-200);
+  cursor: not-allowed;
+  background: transparent;
+}
+
+/* Remove button gets a destructive tint on hover */
+.removeBtn:not(:disabled):hover {
+  background: var(--urgent-bg);
+  color: var(--urgent);
+}
+
+/* ── Add section button ──────────────────────────────────────────────── */
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* ≥44px touch target height */
+  min-height: 44px;
+  padding: 0 14px;
+  margin-top: 10px;
+  border-radius: var(--r-8);
+  border: 1.5px dashed var(--ink-200);
+  background: transparent;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-500);
+  cursor: pointer;
+  align-self: flex-start;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+  /* Inherit font from .cp-root. */
+  font-family: inherit;
+}
+
+.addBtn:hover {
+  border-color: var(--ink-400);
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+.addBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Narrow viewport: controls row below fields ──────────────────────── */
+/* On very narrow surfaces the icon column wraps to a horizontal row
+   beneath the fields so the card doesn't become too cramped. */
+@media (max-width: 420px) {
+  .card {
+    flex-wrap: wrap;
+  }
+
+  .fields {
+    width: 100%;
+  }
+
+  .controls {
+    flex-direction: row;
+    width: 100%;
+    padding-top: 0;
+    /* Push controls flush to the trailing edge. */
+    justify-content: flex-end;
+  }
+}
