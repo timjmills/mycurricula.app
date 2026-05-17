@@ -83,7 +83,8 @@ export function SubjectColors({
 
   const swatchIdFor = (subjectId: string): string =>
     scope === "team"
-      ? (mapping[subjectId] ?? DEFAULT_SUBJECT_MAPPING[
+      ? (mapping[subjectId] ??
+        DEFAULT_SUBJECT_MAPPING[
           subjectId as keyof typeof DEFAULT_SUBJECT_MAPPING
         ])
       : (personalMapping[subjectId] ?? "ocean");
@@ -104,8 +105,7 @@ export function SubjectColors({
   };
 
   const editingName =
-    editingSubject &&
-    subjects.find((s) => s.id === editingSubject)?.name;
+    editingSubject && subjects.find((s) => s.id === editingSubject)?.name;
 
   return (
     <SettingsCard
@@ -147,9 +147,7 @@ export function SubjectColors({
                   borderRadius: 6,
                   background: active ? "#fff" : "transparent",
                   color: active ? "var(--ink-900)" : "var(--ink-500)",
-                  boxShadow: active
-                    ? "0 1px 2px rgba(20,22,32,.06)"
-                    : "none",
+                  boxShadow: active ? "0 1px 2px rgba(20,22,32,.06)" : "none",
                   cursor: "pointer",
                 }}
               >
@@ -251,9 +249,7 @@ export function SubjectColors({
                 type="button"
                 disabled={locked}
                 aria-expanded={editing}
-                onClick={() =>
-                  setEditingSubject(editing ? null : subject.id)
-                }
+                onClick={() => setEditingSubject(editing ? null : subject.id)}
                 className="cp-focusable"
                 style={{
                   padding: "8px 14px",

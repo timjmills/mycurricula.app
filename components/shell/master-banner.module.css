@@ -1,0 +1,70 @@
+/* master-banner.module.css — Master-mode warning banner.
+ *
+ * Two states share this file:
+ *   1. .headsUp  — the pulsing full-size warning shown on master-mode entry
+ *                  (fades in/out for ~3 s then transitions out).
+ *   2. .persistent — the slim non-pulsing strip that replaces the heads-up
+ *                    and remains visible for the whole master-mode session.
+ *
+ * Color: var(--core-mode) background, white text.
+ * Reduced-motion: animations collapse to near-instant via the
+ * tokens.css rule; the persistent banner is never animated regardless.
+ */
+
+/* ── Shared surface ─────────────────────────────────────────────────── */
+.banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--core-mode);
+  color: var(--paper);
+  font-weight: 600;
+  text-align: center;
+  /* Pin at viewport top, above the top-bar (z-index 30). */
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+/* ── Heads-up (full-size, pulsing) ──────────────────────────────────── */
+.headsUp {
+  padding: 10px 20px;
+  font-size: var(--t-14);
+  animation: bannerPulse 1.2s ease-in-out infinite;
+}
+
+/* ── Persistent (slim, static) ──────────────────────────────────────── */
+.persistent {
+  padding: 5px 16px;
+  font-size: var(--t-12);
+  /* No animation — persists calmly. */
+}
+
+/* ── Warning icon ───────────────────────────────────────────────────── */
+.icon {
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+
+/* ── Pulse animation — core-mode tinted glow ────────────────────────── */
+@keyframes bannerPulse {
+  0%,
+  100% {
+    opacity: 1;
+    background: var(--core-mode);
+  }
+  50% {
+    opacity: 0.78;
+    background: var(--core-mode-deep);
+  }
+}
+
+/* ── Reduced-motion override — handled globally by tokens.css, but we
+   explicitly disable the animation here too for belt-and-suspenders. ─ */
+@media (prefers-reduced-motion: reduce) {
+  .headsUp {
+    animation: none;
+  }
+}

@@ -1,0 +1,478 @@
+/* right-panel.module.css — scoped styles for the contextual right panel
+ * (RightPanel). Three possible jobs: to-do slide-out, comments browser,
+ * lesson detail. Renders null when none apply.
+ *
+ * Tokens from app/tokens.css — no raw hex or px font sizes.
+ */
+
+/* ── Panel root ────────────────────────────────────────────────────────── */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  background: var(--paper);
+  border-left: var(--line);
+  flex: 0 0 auto;
+  overflow: hidden;
+  /* Slide in from the right — ~250 ms per motion budget. */
+  animation: panelEnter 0.2s ease;
+}
+
+@keyframes panelEnter {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}
+
+/* ── Shared header ─────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: var(--line);
+  flex: 0 0 auto;
+}
+
+.headerTitle {
+  flex: 1;
+  font-size: var(--t-16);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--ink-900);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-6);
+  color: var(--ink-500);
+  flex: 0 0 auto;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.closeBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}
+
+/* ── Scrollable body ───────────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   TO-DO PANEL
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Tabs row under the header */
+.todoTabs {
+  display: flex;
+  border-bottom: var(--line);
+  flex: 0 0 auto;
+}
+
+.todoTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px 9px;
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-500);
+  border-bottom: 2px solid transparent;
+  transition:
+    color 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.todoTab:hover {
+  color: var(--ink-900);
+}
+
+.todoTab:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}
+
+.todoTabActive {
+  color: var(--ink-900);
+  border-color: var(--math);
+}
+
+.todoTabCount {
+  font-size: var(--t-11);
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--ink-100);
+  color: var(--ink-500);
+}
+
+.todoTabCountActive {
+  background: color-mix(in oklch, var(--math) 16%, white);
+  color: var(--math);
+}
+
+/* Section date group header */
+.todoGroup {
+  padding: 8px 16px 5px;
+  font-size: var(--t-11);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-500);
+  background: var(--paper);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid var(--ink-100);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.todoGroupCount {
+  font-weight: 500;
+  color: var(--ink-300);
+}
+
+/* Individual to-do row */
+.todoRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.todoRowOverdue {
+  background: color-mix(in oklch, var(--catchup) 4%, transparent);
+}
+
+/* Checkbox slot — keeps the touch target padded to ≥44 px area. */
+.checkSlot {
+  padding-top: 1px;
+  flex: 0 0 auto;
+}
+
+.todoCheck {
+  width: 15px;
+  height: 15px;
+  border-radius: var(--r-2);
+  border: 1.4px solid var(--ink-300);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: transparent;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+  /* Expand touch target without shifting layout */
+  padding: 14px;
+  margin: -14px;
+}
+
+.todoCheck:hover {
+  border-color: var(--done);
+}
+
+.todoCheck:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 3px;
+}
+
+.todoCheckDone {
+  background: var(--done);
+  border-color: var(--done);
+  color: var(--paper);
+}
+
+/* Text block */
+.todoContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.todoTitle {
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-900);
+  line-height: 1.4;
+}
+
+.todoTitleDone {
+  color: var(--ink-400);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-300);
+}
+
+.todoMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+
+.todoScopeKind {
+  font-size: var(--t-11);
+  color: var(--ink-400);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 500;
+}
+
+/* Tag pill */
+.tagPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px 1px 5px;
+  border-radius: 999px;
+  font-size: var(--t-11);
+  font-weight: 500;
+}
+
+.tagDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+/* Empty state */
+.emptyState {
+  padding: 40px 24px;
+  text-align: center;
+  font-size: var(--t-12);
+  color: var(--ink-400);
+  line-height: 1.5;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   COMMENTS PANEL
+   ──────────────────────────────────────────────────────────────────────── */
+
+.commentRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ink-100);
+  transition: background 0.1s ease;
+  cursor: default;
+}
+
+.commentRow:hover {
+  background: var(--ink-50);
+}
+
+.commentSubjectDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  margin-top: 5px;
+}
+
+.commentContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.commentTitle {
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-900);
+  line-height: 1.3;
+}
+
+.commentSubjectName {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  margin-top: 2px;
+}
+
+.commentCounts {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.commentTotal {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+}
+
+.commentUnreadBadge {
+  font-size: var(--t-11);
+  font-weight: 600;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--math);
+  color: var(--paper);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   LESSON DETAIL PANEL
+   ──────────────────────────────────────────────────────────────────────── */
+
+.detailSubjectStripe {
+  height: 3px;
+  flex: 0 0 auto;
+}
+
+.detailSection {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.detailSubjectLabel {
+  font-size: var(--t-11);
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.detailTitle {
+  font-size: var(--t-16);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--ink-900);
+  line-height: 1.25;
+  margin-bottom: 4px;
+}
+
+.detailObjective {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.detailLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-400);
+  margin-bottom: 6px;
+}
+
+.detailBody {
+  font-size: var(--t-13);
+  color: var(--ink-700);
+  line-height: 1.55;
+}
+
+.detailNoteBody {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  line-height: 1.5;
+  background: var(--ink-50);
+  border-left: 3px solid var(--ink-200);
+  padding: 8px 10px;
+  border-radius: 0 var(--r-4) var(--r-4) 0;
+}
+
+/* Resource row in lesson detail */
+.detailResource {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: var(--r-4);
+  font-size: var(--t-12);
+  color: var(--ink-700);
+  transition: background 0.1s ease;
+}
+
+.detailResource:hover {
+  background: var(--ink-50);
+}
+
+.detailResourceLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Standard row in lesson detail */
+.detailStdRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.detailStdCode {
+  font-family: var(--font-mono);
+  font-size: var(--t-11);
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: var(--r-2);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.detailStdDesc {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  line-height: 1.4;
+  flex: 1;
+}
+
+/* Status badge at the bottom of the detail panel */
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: var(--t-12);
+  font-weight: 600;
+}

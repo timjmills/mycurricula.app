@@ -1,0 +1,461 @@
+/* top-bar.module.css — app shell top bar chrome.
+ *
+ * Restrained neutral surface: var(--paper) background, var(--line) bottom
+ * border. All interactive controls use the token system only — no hard-coded
+ * colors or sizes.
+ *
+ * Layout: a single flex row (left → right) at ~52px tall. At narrower
+ * viewports the bar scrolls horizontally rather than collapsing, since the
+ * main layout is desktop-first at 1280px+.
+ */
+
+/* ── Outer bar ──────────────────────────────────────────────────────── */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: 52px;
+  background: var(--paper);
+  border-bottom: var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  /* Allow horizontal scroll on narrow screens rather than crushing controls. */
+  overflow-x: auto;
+  overflow-y: visible;
+  /* Hide scrollbar on desktop; power users can still scroll if needed. */
+  scrollbar-width: none;
+}
+.bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Wordmark ───────────────────────────────────────────────────────── */
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 0 0 auto;
+  text-decoration: none;
+  color: inherit;
+  margin-right: 4px;
+}
+
+.wordmarkApp {
+  font-size: var(--t-16);
+  font-weight: 700;
+  color: var(--ink-900);
+  letter-spacing: -0.4px;
+  white-space: nowrap;
+}
+
+.wordmarkGrade {
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-400);
+  white-space: nowrap;
+}
+
+/* ── Divider ────────────────────────────────────────────────────────── */
+.divider {
+  width: 1px;
+  height: 22px;
+  background: var(--ink-150);
+  flex: 0 0 auto;
+  margin: 0 2px;
+}
+
+/* ── Icon button — shared base for collapse toggle, to-do, comments ── */
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-8);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.iconBtn:hover {
+  background: var(--ink-50);
+  border-color: var(--ink-150);
+  color: var(--ink-900);
+}
+
+.iconBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.iconBtn:active {
+  background: var(--ink-100);
+}
+
+/* Active state: panel open */
+.iconBtnActive {
+  background: var(--ink-100);
+  border-color: var(--ink-200);
+  color: var(--ink-900);
+}
+
+/* ── View switcher ──────────────────────────────────────────────────── */
+.viewSwitcher {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+/* Live-route tab */
+.viewTab {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-6);
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-500);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.viewTab:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+.viewTab:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Active/current route */
+.viewTabActive {
+  background: var(--ink-900);
+  color: var(--paper);
+  border-color: var(--ink-900);
+}
+
+.viewTabActive:hover {
+  background: var(--ink-700);
+  color: var(--paper);
+}
+
+/* Disabled soon-tab — visible but not interactive */
+.viewTabSoon {
+  color: var(--ink-300);
+  cursor: default;
+  pointer-events: none;
+}
+
+.soonLabel {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--ink-300);
+  margin-left: 4px;
+}
+
+/* ── Week jumper ────────────────────────────────────────────────────── */
+.weekJumper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.weekChevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-6);
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  color: var(--ink-700);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.weekChevron:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.weekChevron:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.weekChevron:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.weekLabel {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-700);
+  white-space: nowrap;
+  padding: 0 4px;
+  min-width: 58px;
+  text-align: center;
+}
+
+.thisWeekBtn {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--r-6);
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-700);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.thisWeekBtn:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.thisWeekBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.thisWeekBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Master / Personal segmented control ───────────────────────────── */
+.editToggle {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-200);
+  background: var(--ink-50);
+  padding: 2px;
+  gap: 1px;
+  flex: 0 0 auto;
+}
+
+.editToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: var(--r-6);
+  border: none;
+  background: transparent;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-500);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.editToggleBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.editToggleBtnActive {
+  background: var(--paper);
+  color: var(--ink-900);
+  box-shadow: 0 1px 2px rgba(20, 22, 32, 0.08);
+}
+
+/* Master mode carries a warning color when active. */
+.editToggleBtnMaster {
+  color: var(--core-mode);
+}
+
+.editToggleBtnMasterActive {
+  background: var(--core-mode);
+  color: var(--paper);
+  box-shadow: 0 1px 2px rgba(227, 107, 126, 0.25);
+}
+
+/* Small warning dot — always present on the Master button as a visual cue. */
+.masterDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+/* ── View-mode pill (Simple | Task | Advanced) ──────────────────────── */
+.viewModePill {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-200);
+  background: var(--ink-50);
+  padding: 2px;
+  gap: 1px;
+  flex: 0 0 auto;
+}
+
+.viewModeBtn {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-6);
+  border: none;
+  background: transparent;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-500);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.viewModeBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.viewModeBtnActive {
+  background: var(--paper);
+  color: var(--ink-900);
+  box-shadow: 0 1px 2px rgba(20, 22, 32, 0.08);
+}
+
+/* ── Search ─────────────────────────────────────────────────────────── */
+.searchWrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 120px;
+  max-width: 240px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-400);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px 0 30px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-200);
+  background: var(--ink-50);
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  outline: none;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.searchInput::placeholder {
+  color: var(--ink-400);
+}
+
+.searchInput:focus {
+  border-color: var(--ink-400);
+  background: var(--paper);
+}
+
+/* ── Badge wrapper — for comments button ───────────────────────────── */
+.badgeWrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--urgent);
+  color: var(--paper);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+  /* Sits above the icon. */
+  z-index: 1;
+}
+
+/* ── Profile avatar ─────────────────────────────────────────────────── */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ink-150);
+  color: var(--ink-700);
+  font-size: var(--t-12);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-decoration: none;
+  flex: 0 0 auto;
+  transition: background 0.12s ease;
+}
+
+.avatar:hover {
+  background: var(--ink-200);
+}
+
+.avatar:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Spacer — flex push ──────────────────────────────────────────────── */
+.spacer {
+  flex: 1 1 auto;
+  min-width: 4px;
+}

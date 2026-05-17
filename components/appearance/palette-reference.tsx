@@ -44,7 +44,10 @@ function ChipWithHex({
           flex: "0 0 auto",
         }}
       />
-      <span className="cp-mono" style={{ fontSize: 11, color: "var(--ink-500)" }}>
+      <span
+        className="cp-mono"
+        style={{ fontSize: 11, color: "var(--ink-500)" }}
+      >
         {hex}
       </span>
     </div>

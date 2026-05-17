@@ -7,7 +7,13 @@
 // submenu in place. The menu is positioned at a viewport point and clamps
 // itself inside the window; it closes on outside-click, Esc, or selection.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { Icon } from "./icon";
 import { STATUS_LABEL } from "./status";
@@ -170,7 +176,11 @@ export function LessonContextMenu({
             label: "Copy to my personal",
             onSelect: () => fire("copy-to-personal"),
           },
-      { label: "Mark status…", chevron: true, onSelect: () => setSub("status") },
+      {
+        label: "Mark status…",
+        chevron: true,
+        onSelect: () => setSub("status"),
+      },
       { kind: "divider" },
       { label: "Add to to-do list", onSelect: () => fire("add-to-todo") },
       { label: "See standards", onSelect: () => fire("see-standards") },

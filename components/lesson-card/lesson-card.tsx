@@ -107,9 +107,9 @@ export function LessonCard({
   // Per-task completion is card-local: the mock fixture is immutable and
   // there is no task-level persistence handler, so the card owns the
   // three-state cycle for its own task rows. Keyed by task id.
-  const [taskStatus, setTaskStatus] = useState<
-    Record<string, LessonStatus>
-  >({});
+  const [taskStatus, setTaskStatus] = useState<Record<string, LessonStatus>>(
+    {},
+  );
 
   const isVivid = style === "vivid";
   const isCalm = style === "calm";
@@ -643,7 +643,9 @@ export function LessonCard({
 
       {/* "Why not done" reason — only when the teacher recorded one */}
       {lesson.reasonNotDone && lesson.status !== "done" && (
-        <div style={{ padding: `0 ${padX}px ${dense ? 8 : 9}px ${padX + 3}px` }}>
+        <div
+          style={{ padding: `0 ${padX}px ${dense ? 8 : 9}px ${padX + 3}px` }}
+        >
           <div
             style={{
               display: "flex",

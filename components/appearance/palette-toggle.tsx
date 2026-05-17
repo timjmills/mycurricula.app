@@ -82,9 +82,7 @@ export function PaletteToggle(): ReactNode {
                 cursor: "pointer",
               }}
             >
-              <span
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-              >
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <RadioDot selected={selected} />
                 <span
                   style={{

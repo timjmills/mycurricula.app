@@ -18,6 +18,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useState } from "react";
 import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
+import { useAppState } from "@/lib/app-state";
 import { useTheme } from "@/lib/theme";
 import { useSubjectColor } from "@/lib/palette";
 import {
@@ -50,23 +51,20 @@ function weekBounds(lessons: Lesson[]): { min: number; max: number } {
 
 export function WeeklyGrid(): ReactNode {
   const { style } = useTheme();
+  // The visible week is shared planner state — the top-bar week jumper and
+  // this view's WeekNavigator both drive it.
+  const { week, setWeek } = useAppState();
 
   // All lessons live in local state so drag-to-move and the completion
   // checkbox can mutate copies without touching the imported fixture.
   const [lessons, setLessons] = useState<Lesson[]>(() => [...LESSONS]);
-  const [week, setWeek] = useState<number>(CURRENT_WEEK);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // Inline expansion is grid-owned per spec §6.5: Weekly cards expand in
   // place. Expansion is sticky and multiple cards may be open at once.
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const { min: minWeek, max: maxWeek } = useMemo(
-    () => weekBounds(LESSONS),
-    [],
-  );
+  const { min: minWeek, max: maxWeek } = useMemo(() => weekBounds(LESSONS), []);
 
   // Lessons for the visible week, bucketed by subject then day.
   // bySubjectDay[subjectId][dayIndex] → Lesson[].
@@ -164,9 +162,7 @@ export function WeeklyGrid(): ReactNode {
     nextStatus: LessonStatus,
   ): void {
     setLessons((prev) =>
-      prev.map((l) =>
-        l.id === lessonId ? { ...l, status: nextStatus } : l,
-      ),
+      prev.map((l) => (l.id === lessonId ? { ...l, status: nextStatus } : l)),
     );
   }
 
@@ -242,7 +238,7 @@ export function WeeklyGrid(): ReactNode {
   }
 
   return (
-    <main className={`cp-root ${styles.page}`}>
+    <div className={styles.page}>
       <WeekNavigator
         week={week}
         currentWeek={CURRENT_WEEK}
@@ -264,9 +260,7 @@ export function WeeklyGrid(): ReactNode {
               key={dayName}
               role="columnheader"
               className={`${styles.dayHead} ${
-                week === CURRENT_WEEK && dayIdx === 0
-                  ? styles.dayHeadToday
-                  : ""
+                week === CURRENT_WEEK && dayIdx === 0 ? styles.dayHeadToday : ""
               }`}
             >
               <span>{dayName}</span>
@@ -304,7 +298,7 @@ export function WeeklyGrid(): ReactNode {
           ))}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 

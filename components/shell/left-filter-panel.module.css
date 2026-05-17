@@ -1,0 +1,359 @@
+/* left-filter-panel.module.css — scoped styles for the collapsible left
+ * filter panel (LeftFilterPanel).
+ *
+ * Tokens come from app/tokens.css; no hex values or raw px font sizes here.
+ * The collapsed "rail" state is a narrow strip that holds just the toggle
+ * chevron. The expanded state is ~240 px.
+ */
+
+/* ── Panel root ────────────────────────────────────────────────────────── */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  background: var(--paper);
+  border-right: var(--line);
+  flex: 0 0 auto;
+  overflow: hidden;
+  /* Slide open/close — ~250 ms matches the planning doc motion budget. */
+  transition:
+    width 0.2s ease,
+    opacity 0.15s ease;
+}
+
+.panelClosed {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+  border-right: none;
+}
+
+/* ── Panel header ──────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 10px;
+  border-bottom: var(--line);
+  flex: 0 0 auto;
+}
+
+.headerTitle {
+  font-size: var(--t-12);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ink-500);
+}
+
+.clearBtn {
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-400);
+  padding: 2px 6px;
+  border-radius: var(--r-4);
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.clearBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.clearBtn:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}
+
+/* ── Scrollable body ───────────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Section ───────────────────────────────────────────────────────────── */
+
+.section {
+  padding: 12px 14px;
+  border-bottom: var(--line);
+}
+
+.sectionLabel {
+  font-size: var(--t-11);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-400);
+  margin-bottom: 8px;
+}
+
+/* ── Chip list (subjects, statuses) ────────────────────────────────────── */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* Base chip */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: var(--t-12);
+  font-weight: 500;
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  color: var(--ink-700);
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
+  cursor: pointer;
+  min-height: 28px;
+}
+
+.chip:hover {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}
+
+/* Active state — chip is toggled on. */
+.chipActive {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+  color: var(--paper);
+}
+
+.chipActive:hover {
+  background: var(--ink-700);
+  border-color: var(--ink-700);
+  color: var(--paper);
+}
+
+/* Color dot inside subject chips — driven by inline style. */
+.chipDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+/* ── Unit list ─────────────────────────────────────────────────────────── */
+
+.unitList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.unitItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: var(--r-6);
+  font-size: var(--t-12);
+  color: var(--ink-700);
+  background: transparent;
+  border: 1px solid transparent;
+  text-align: left;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.unitItem:hover {
+  background: var(--ink-50);
+}
+
+.unitItem:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}
+
+.unitItemActive {
+  background: var(--ink-100);
+  border-color: var(--ink-200);
+}
+
+.unitItemActive:hover {
+  background: var(--ink-100);
+}
+
+.unitCheck {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-2);
+  border: 1.4px solid var(--ink-300);
+  background: transparent;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: transparent;
+}
+
+.unitCheckActive {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+  color: var(--paper);
+}
+
+.unitWeeks {
+  margin-left: auto;
+  font-size: var(--t-11);
+  color: var(--ink-400);
+  white-space: nowrap;
+}
+
+/* ── Standards list ────────────────────────────────────────────────────── */
+
+.standardList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.standardItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 5px 7px;
+  border-radius: var(--r-6);
+  font-size: var(--t-12);
+  color: var(--ink-700);
+  background: transparent;
+  border: 1px solid transparent;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+  min-height: 32px;
+}
+
+.standardItem:hover {
+  background: var(--ink-50);
+}
+
+.standardItem:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}
+
+.standardItemActive {
+  background: var(--ink-100);
+  border-color: var(--ink-200);
+}
+
+.standardCode {
+  font-family: var(--font-mono);
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-700);
+  background: var(--ink-100);
+  padding: 1px 5px;
+  border-radius: var(--r-2);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.standardCodeActive {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+.standardDesc {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  line-height: 1.35;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Holiday switch ────────────────────────────────────────────────────── */
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.switchLabel {
+  flex: 1;
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-900);
+}
+
+.switchSub {
+  display: block;
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  font-weight: 400;
+}
+
+/* Toggle switch track */
+.switchTrack {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--ink-200);
+  flex: 0 0 auto;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+
+.switchTrackOn {
+  background: var(--done);
+}
+
+.switchThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 0 1px 2px rgba(20, 22, 32, 0.2);
+  transition: left 0.15s ease;
+}
+
+.switchThumbOn {
+  left: 16px;
+}
+
+/* Hidden real checkbox — accessible, but visually hidden in favor of the
+   custom toggle above. */
+.switchInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.switchInput:focus-visible + .switchTrack {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}

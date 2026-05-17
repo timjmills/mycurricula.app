@@ -42,3 +42,6 @@ next-env.d.ts
 
 # dev server logs
 /dev-*.log
+
+# claude code (agent worktrees, local state)
+/.claude/

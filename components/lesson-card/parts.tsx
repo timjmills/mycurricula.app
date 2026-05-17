@@ -59,14 +59,18 @@ export function CompletionCheck({
     glyph = <Icon name="check" size={size - 5} />;
   } else if (skipped) {
     glyph = (
-      <span style={{ fontSize: size * 0.7, color: "var(--ink-400)", lineHeight: 1 }}>
+      <span
+        style={{ fontSize: size * 0.7, color: "var(--ink-400)", lineHeight: 1 }}
+      >
         –
       </span>
     );
   } else if (carried) {
     border = "1.4px solid var(--catchup)";
     glyph = (
-      <span style={{ fontSize: size * 0.7, color: "var(--catchup)", lineHeight: 1 }}>
+      <span
+        style={{ fontSize: size * 0.7, color: "var(--catchup)", lineHeight: 1 }}
+      >
         ↻
       </span>
     );
@@ -121,7 +125,12 @@ interface MonogramProps {
   size?: number;
 }
 
-export function SubjectMonogram({ glyph, fill, ink, size = 32 }: MonogramProps) {
+export function SubjectMonogram({
+  glyph,
+  fill,
+  ink,
+  size = 32,
+}: MonogramProps) {
   return (
     <span
       aria-hidden
@@ -162,7 +171,10 @@ const RES_ICON: Record<LessonResource["type"], IconName> = {
 };
 
 const RES_TINT: Record<LessonResource["type"], { bg: string; fg: string }> = {
-  pdf: { bg: "color-mix(in oklch, var(--urgent) 16%, white)", fg: "var(--urgent)" },
+  pdf: {
+    bg: "color-mix(in oklch, var(--urgent) 16%, white)",
+    fg: "var(--urgent)",
+  },
   youtube: { bg: "color-mix(in oklch, #e53935 18%, white)", fg: "#b71c1c" },
   slides: {
     bg: "color-mix(in oklch, var(--important) 22%, white)",
@@ -406,7 +418,11 @@ export function StandardsList({ codes }: { codes: string[] }) {
             {code}
           </span>
           <span
-            style={{ fontSize: 12, color: "var(--ink-600, var(--ink-700))", lineHeight: 1.45 }}
+            style={{
+              fontSize: 12,
+              color: "var(--ink-600, var(--ink-700))",
+              lineHeight: 1.45,
+            }}
           >
             {describeStandard(code)}
           </span>
