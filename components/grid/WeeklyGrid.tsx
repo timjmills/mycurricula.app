@@ -63,6 +63,8 @@ export function WeeklyGrid(): ReactNode {
   // place. Expansion is sticky and multiple cards may be open at once.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // maximizedCell — only one cell is expanded at a time. Key = `${subjectId}:${day}`.
+  const [maximizedCell, setMaximizedCell] = useState<string | null>(null);
 
   const { min: minWeek, max: maxWeek } = useMemo(() => weekBounds(LESSONS), []);
 
@@ -171,6 +173,16 @@ export function WeeklyGrid(): ReactNode {
       else next.add(lessonId);
       return next;
     });
+  }
+
+  /**
+   * Toggle the maximized state of a cell. Clicking an already-maximized cell
+   * collapses it; clicking any other cell replaces the current one — only one
+   * cell is ever open at a time.
+   */
+  function handleToggleMaximize(subjectId: SubjectId, day: number): void {
+    const key = `${subjectId}:${day}`;
+    setMaximizedCell((prev) => (prev === key ? null : key));
   }
 
   /** Completion checkbox cycle — done → partial → not_done. */
@@ -303,6 +315,7 @@ export function WeeklyGrid(): ReactNode {
               draggingId={draggingId}
               expandedIds={expandedIds}
               selectedId={selectedId}
+              maximizedCell={maximizedCell}
               cellProps={gridNav.cellProps}
               onDragStart={handleDragStart}
               onDragEnd={() => setDraggingId(null)}
@@ -311,6 +324,7 @@ export function WeeklyGrid(): ReactNode {
               onSelect={handleSelect}
               onToggleComplete={handleToggleComplete}
               onContextAction={handleContextAction}
+              onToggleMaximize={handleToggleMaximize}
             />
           ))}
         </div>
@@ -332,6 +346,8 @@ interface SubjectRowProps {
   draggingId: string | null;
   expandedIds: Set<string>;
   selectedId: string | null;
+  /** Key of the currently maximized cell (`${subjectId}:${day}`), or null. */
+  maximizedCell: string | null;
   /** Builds the roving-tabindex props for a cell at (row, col). */
   cellProps: (row: number, col: number) => CellNavProps;
   onDragStart: (id: string) => void;
@@ -345,6 +361,7 @@ interface SubjectRowProps {
     id: string,
     payload?: ContextActionPayload,
   ) => void;
+  onToggleMaximize: (subjectId: SubjectId, day: number) => void;
 }
 
 function SubjectRow({
@@ -355,6 +372,7 @@ function SubjectRow({
   draggingId,
   expandedIds,
   selectedId,
+  maximizedCell,
   cellProps,
   onDragStart,
   onDragEnd,
@@ -363,6 +381,7 @@ function SubjectRow({
   onSelect,
   onToggleComplete,
   onContextAction,
+  onToggleMaximize,
 }: SubjectRowProps): ReactNode {
   const color = useSubjectColor(subjectId);
   const subject = SUBJECTS.find((s) => s.id === subjectId)!;
@@ -397,6 +416,7 @@ function SubjectRow({
           draggingId={draggingId}
           expandedIds={expandedIds}
           selectedId={selectedId}
+          maximized={maximizedCell === `${subjectId}:${day}`}
           navProps={cellProps(rowIndex, day)}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
@@ -405,6 +425,7 @@ function SubjectRow({
           onSelect={onSelect}
           onToggleComplete={onToggleComplete}
           onContextAction={onContextAction}
+          onToggleMaximize={onToggleMaximize}
         />
       ))}
     </>

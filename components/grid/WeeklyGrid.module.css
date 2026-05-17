@@ -345,6 +345,72 @@
   outline-offset: 2px;
 }
 
+/* ── Maximized / collapsed cell states ──────────────────────────────
+   .cellCollapsed  — default: cell height is capped so rows stay short.
+                     CardStack shows one card + stacked-deck affordance.
+   .cellMaximized  — one cell at a time: auto height so all cards show.
+                     A subtle ring marks the open cell.
+   The cell wrapper itself is `position: relative` so the collapse
+   button can be pinned to its top-right corner. */
+.cellCollapsed {
+  /* Cap collapsed cells so rows don't blow out when a sibling is tall.
+     The height is advisory (min-height keeps single-card cells full);
+     CardStack enforces the single-card view internally. */
+  max-height: var(--cell-collapsed-max, 160px);
+  overflow: hidden;
+}
+
+.cellMaximized {
+  max-height: none;
+  overflow: visible;
+  /* Subtle accent ring to mark the open cell. */
+  border-color: var(--cell-accent, var(--ink-300));
+  box-shadow: 0 0 0 2px
+    color-mix(in oklch, var(--cell-accent, var(--ink-300)) 30%, transparent);
+  /* Sit on top so the expanded content overlaps adjacent rows. */
+  position: relative;
+  z-index: 10;
+}
+
+/* Collapse affordance button — pinned to the top-right of the cell.
+   Visible only when the cell is maximized; animated out otherwise. */
+.collapseBtn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-4);
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  color: var(--ink-500);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+  z-index: 2;
+}
+
+.cellMaximized .collapseBtn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.collapseBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.collapseBtn:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}
+
 /* ── Card slot ──────────────────────────────────────────────────────
    One slot per stacked lesson. The LessonCard renders its own grab
    affordance (fed `dragHandleProps` by the grid) and its own surface,

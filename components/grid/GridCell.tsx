@@ -8,13 +8,19 @@
 // populated cells show a faint inline add button on hover so a teacher
 // can drop a second lesson into an already-used slot.
 //
+// When a cell holds multiple lessons it defaults to a collapsed view:
+// CardStack renders one card + a stacked-deck affordance with prev/next
+// arrows. Clicking the cell's non-card area (or the collapse button when
+// open) toggles the cell between collapsed and maximized. Only one cell
+// is maximized at a time — that is enforced by the parent WeeklyGrid.
+//
 // Drag-and-drop is native HTML5 DnD (no extra dependency). The LessonCard
 // renders its own grab affordance; the grid feeds it `dragHandleProps`
 // (`draggable` + `onDragStart`/`onDragEnd`), so that handle — and only
 // that handle — initiates the drag. The card body stays free for
 // click-to-expand, satisfying the touch-conflict note in the brief.
 
-import type { DragEvent, ReactNode } from "react";
+import type { DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { useState } from "react";
 import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import { LessonCard } from "@/components/lesson-card";
@@ -24,6 +30,7 @@ import type {
 } from "@/components/lesson-card";
 import type { CellShade } from "./unitShading";
 import type { CellNavProps } from "./useGridNavigation";
+import { CardStack } from "./card-stack";
 import styles from "./WeeklyGrid.module.css";
 
 interface GridCellProps {
@@ -39,6 +46,11 @@ interface GridCellProps {
   expandedIds: Set<string>;
   /** Currently selected lesson id. */
   selectedId: string | null;
+  /**
+   * Whether this cell is currently maximized (showing all lessons).
+   * When false with >1 lesson, CardStack collapses to a single-card view.
+   */
+  maximized: boolean;
   /** Start dragging a lesson out of this cell. */
   onDragStart: (lessonId: string) => void;
   /** Dragging ended without (or after) a drop. */
@@ -59,6 +71,11 @@ interface GridCellProps {
   ) => void;
   /** Roving-tabindex + arrow-key props for this cell (subject×day). */
   navProps: CellNavProps;
+  /**
+   * Request to toggle the maximized state of this cell. WeeklyGrid
+   * enforces single-cell-maximized; this cell just asks.
+   */
+  onToggleMaximize: (subjectId: SubjectId, day: number) => void;
 }
 
 /** A single day/subject cell: drop target, card stack, empty affordance. */
@@ -70,6 +87,7 @@ export function GridCell({
   draggingId,
   expandedIds,
   selectedId,
+  maximized,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -78,9 +96,12 @@ export function GridCell({
   onToggleComplete,
   onContextAction,
   navProps,
+  onToggleMaximize,
 }: GridCellProps): ReactNode {
   const [dragOver, setDragOver] = useState(false);
   const isEmpty = lessons.length === 0;
+  // Multi-lesson cells collapse by default; only maximized ones show all cards.
+  const hasMultiple = lessons.length > 1;
 
   // Unit shading + subject accent are passed to the cell as custom props
   // so the CSS module can tint the background and the hover/drop border.
@@ -108,14 +129,79 @@ export function GridCell({
   const cellLabel =
     lessonCount === 0
       ? "Empty cell"
-      : `${lessonCount} lesson${lessonCount === 1 ? "" : "s"}`;
+      : maximized
+        ? `${lessonCount} lesson${lessonCount === 1 ? "" : "s"}, expanded`
+        : `${lessonCount} lesson${lessonCount === 1 ? "" : "s"}, collapsed`;
+
+  // Build the CardStack children once — each LessonCard is wrapped in its
+  // own slot div so the card's own handlers (select, expand, drag) remain
+  // fully independent of the cell's maximize click.
+  const cardNodes: ReactNode[] = lessons.map((lesson) => (
+    <div key={lesson.id} className={styles.cardSlot}>
+      <LessonCard
+        lesson={lesson}
+        dense
+        expanded={expandedIds.has(lesson.id)}
+        selected={selectedId === lesson.id}
+        dragging={draggingId === lesson.id}
+        onSelect={onSelect}
+        onToggleExpand={onSelect}
+        onToggleComplete={onToggleComplete}
+        // Forward the full context-action payload (e.g. the target
+        // day for "Move to day") straight through to the grid.
+        onContextAction={onContextAction}
+        dragHandleProps={{
+          draggable: true,
+          onDragStart: (e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", lesson.id);
+            onDragStart(lesson.id);
+          },
+          onDragEnd,
+        }}
+      />
+    </div>
+  ));
+
+  // Clicking the cell background (not a card, not a button) maximizes it.
+  // We only fire when the click lands directly on the cell wrapper or on
+  // non-interactive chrome — stopPropagation on the LessonCard and the
+  // CardStack arrows keeps card interactions clean.
+  function handleCellClick(e: MouseEvent<HTMLDivElement>): void {
+    if (isEmpty || !hasMultiple) return;
+    // Ignore clicks that already hit a button/interactive child; those
+    // handlers stop propagation themselves.
+    if (
+      (e.target as HTMLElement).closest(
+        "button, a, [role='button'], [data-card-interactive]",
+      )
+    )
+      return;
+    onToggleMaximize(subjectId, day);
+  }
+
+  // Space/Enter on the cell wrapper also toggles maximize (keyboard parity).
+  function handleCellKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
+    if ((e.key === "Enter" || e.key === " ") && hasMultiple) {
+      e.preventDefault();
+      onToggleMaximize(subjectId, day);
+    }
+  }
+
+  const stateClass =
+    !isEmpty && hasMultiple
+      ? maximized
+        ? styles.cellMaximized
+        : styles.cellCollapsed
+      : "";
 
   return (
     <div
-      className={`${styles.cell} ${dragOver ? styles.cellDragOver : ""}`}
+      className={`${styles.cell} ${stateClass} ${dragOver ? styles.cellDragOver : ""}`}
       style={cssVars}
       role="gridcell"
       aria-label={cellLabel}
+      aria-expanded={hasMultiple ? maximized : undefined}
       {...navProps}
       onDragOver={handleDragOver}
       onDragEnter={() => draggingId && setDragOver(true)}
@@ -127,6 +213,8 @@ export function GridCell({
         }
       }}
       onDrop={handleDrop}
+      onClick={handleCellClick}
+      onKeyDown={handleCellKeyDown}
     >
       {isEmpty ? (
         <div className={styles.emptyCell}>
@@ -142,37 +230,38 @@ export function GridCell({
         </div>
       ) : (
         <>
-          {lessons.map((lesson) => (
-            <div key={lesson.id} className={styles.cardSlot}>
-              <LessonCard
-                lesson={lesson}
-                dense
-                expanded={expandedIds.has(lesson.id)}
-                selected={selectedId === lesson.id}
-                dragging={draggingId === lesson.id}
-                onSelect={onSelect}
-                onToggleExpand={onSelect}
-                onToggleComplete={onToggleComplete}
-                // Forward the full context-action payload (e.g. the target
-                // day for "Move to day") straight through to the grid.
-                onContextAction={onContextAction}
-                dragHandleProps={{
-                  draggable: true,
-                  onDragStart: (e) => {
-                    e.dataTransfer.effectAllowed = "move";
-                    e.dataTransfer.setData("text/plain", lesson.id);
-                    onDragStart(lesson.id);
-                  },
-                  onDragEnd,
-                }}
-              />
-            </div>
-          ))}
+          {/* Collapse button — visible when maximized; pinned top-right. */}
+          {hasMultiple && (
+            <button
+              type="button"
+              className={styles.collapseBtn}
+              onClick={(e) => {
+                // Stop so the cell's own click handler doesn't fire too.
+                e.stopPropagation();
+                onToggleMaximize(subjectId, day);
+              }}
+              aria-label={maximized ? "Collapse cards" : "Expand all cards"}
+            >
+              {maximized ? <CollapseIcon /> : <ExpandIcon />}
+            </button>
+          )}
+
+          {/*
+           * CardStack wraps all lesson cards.
+           *   maximized=false + >1 card → one card + stacked affordance + arrows
+           *   maximized=true           → all cards visible
+           *   0 or 1 card              → renders children directly, no chrome
+           */}
+          <CardStack cards={cardNodes} maximized={maximized} />
+
           {/* Faint add button so a populated cell can still take another. */}
           <button
             type="button"
             className={styles.cellAddInline}
-            onClick={() => onAdd(subjectId, day)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd(subjectId, day);
+            }}
             aria-label="Add another lesson to this day"
           >
             <PlusIcon small />
@@ -198,6 +287,44 @@ function PlusIcon({ small = false }: { small?: boolean }): ReactNode {
       aria-hidden="true"
     >
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+/** Up-chevron: collapse the maximized cell back to single-card view. */
+function CollapseIcon(): ReactNode {
+  return (
+    <svg
+      width={12}
+      height={12}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 15l-6-6-6 6" />
+    </svg>
+  );
+}
+
+/** Down-chevron: expand the cell to show all cards. */
+function ExpandIcon(): ReactNode {
+  return (
+    <svg
+      width={12}
+      height={12}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 9l6 6 6-6" />
     </svg>
   );
 }

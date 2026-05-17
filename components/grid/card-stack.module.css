@@ -1,0 +1,142 @@
+/* card-stack.module.css — stacked-deck pager for multi-lesson cells.
+ *
+ * Collapsed (cards.length > 1): one active card is shown with 1–2 thin
+ * offset layers peeking behind it, giving the "deck" illusion. Prev/next
+ * arrows page through cards; a "{i} of {n}" counter keeps orientation.
+ *
+ * Maximized: all cards are shown in a plain vertical list — same result
+ * a simple .map() would produce.
+ *
+ * All color/type/spacing values come from app/tokens.css custom props.
+ * Never hard-code hex or px here.
+ */
+
+/* ── Maximized stack — plain vertical list ──────────────────────────── */
+.stackMax {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Collapsed single card (no stack chrome) ────────────────────────── */
+.stackSingle {
+  /* No extra wrapper chrome — just the card itself. */
+}
+
+/* ── Collapsed deck wrapper ─────────────────────────────────────────── */
+.stackDeck {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* The card staging area: relative context so the pseudo-deck layers can
+   be absolutely positioned behind the active card. */
+.deckStage {
+  position: relative;
+  /* The pseudo-layers peek out by 3px top/bottom; add that to the stage's
+     padding so the true card inside never clips them. */
+  padding-bottom: 6px;
+}
+
+/* Layer 1 (furthest back) — thinnest sliver. */
+.deckStage::before,
+.deckStage::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: var(--r-8);
+  background: var(--ink-100);
+  border: 1px solid var(--ink-150);
+  pointer-events: none;
+}
+
+/* Layer 1: 5px taller than the card, offset 3px down from the card bottom. */
+.deckStage::before {
+  height: 6px;
+  bottom: 0;
+  margin-inline: 4px;
+  z-index: 0;
+}
+
+/* Layer 2: sits between layer 1 and the card, slightly less offset. */
+.deckStage::after {
+  height: 4px;
+  bottom: 3px;
+  margin-inline: 2px;
+  background: var(--ink-150);
+  z-index: 1;
+}
+
+/* The real active card sits above both pseudo-layers. */
+.activeCard {
+  position: relative;
+  z-index: 2;
+}
+
+/* ── Nav bar: arrows + position counter ────────────────────────────── */
+.navBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Keep the nav bar tight — cells should stay short. */
+  height: 26px;
+  gap: 4px;
+}
+
+/* Prev/next arrow buttons — 44×44 touch target via negative margin trick
+   so the visual footprint stays compact inside the cell. */
+.arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Visual size: 22×22. Touch target: 44×44 via padding. */
+  width: 22px;
+  height: 22px;
+  padding: 11px;
+  /* Box-model trick: padding inflates the hit area while margin pulls the
+     layout back so neighbours are unaffected. */
+  margin: -11px;
+  border-radius: var(--r-4);
+  border: none;
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+  transition:
+    color 0.1s ease,
+    background 0.1s ease;
+  /* Reset box-sizing so the padding trick works cleanly. */
+  box-sizing: content-box;
+}
+
+.arrow:hover:not(:disabled) {
+  color: var(--ink-900);
+  background: var(--ink-100);
+}
+
+.arrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.arrow:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+  border-radius: var(--r-4);
+}
+
+/* Position indicator: "{i} of {n}" */
+.counter {
+  flex: 1;
+  text-align: center;
+  font-size: var(--t-10);
+  font-weight: 600;
+  color: var(--ink-400);
+  letter-spacing: 0.3px;
+  /* Block pointer events on the text itself; the parent navBar handles the
+     stopPropagation wrapper. */
+  pointer-events: none;
+  user-select: none;
+}
