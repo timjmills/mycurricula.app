@@ -166,7 +166,7 @@
 }
 
 .soonLabel {
-  font-size: 9px;
+  font-size: var(--t-10);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -418,7 +418,7 @@
   border-radius: 999px;
   background: var(--urgent);
   color: var(--paper);
-  font-size: 9px;
+  font-size: var(--t-10);
   font-weight: 700;
   line-height: 16px;
   text-align: center;

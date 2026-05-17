@@ -79,7 +79,7 @@
 }
 
 .closeBtn:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--ink-900);
   outline-offset: 2px;
 }
 
@@ -121,7 +121,7 @@
 }
 
 .todoTab:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--ink-900);
   outline-offset: 2px;
 }
 
@@ -196,7 +196,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
+  font-size: var(--t-10);
   color: transparent;
   cursor: pointer;
   transition:
@@ -212,7 +212,7 @@
 }
 
 .todoCheck:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--ink-900);
   outline-offset: 3px;
 }
 

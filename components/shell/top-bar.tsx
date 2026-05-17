@@ -64,7 +64,7 @@ export function TopBar(): ReactNode {
   const unreadCount = LESSONS.reduce((n, l) => n + (l.unreadComments ?? 0), 0);
 
   return (
-    <div className={styles.bar} role="banner">
+    <header className={styles.bar}>
       {/* ── Wordmark ──────────────────────────────────────────────── */}
       <Link
         href="/weekly"
@@ -276,7 +276,7 @@ export function TopBar(): ReactNode {
       >
         {ME.initials}
       </Link>
-    </div>
+    </header>
   );
 }
 

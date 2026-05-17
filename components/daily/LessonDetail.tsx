@@ -270,7 +270,14 @@ export function LessonDetail({
   onToggleComplete,
 }: LessonDetailProps): ReactNode {
   const subj = SUBJECT_BY_ID[lesson.subject];
-  const unit = UNITS[lesson.subject];
+  // Fix #4: guard the UNITS lookup so a missing entry can't crash the render.
+  const unit = UNITS[lesson.subject] ?? {
+    name: "—",
+    id: "",
+    subject: lesson.subject,
+    weeks: "",
+    shade: 1,
+  };
 
   // Collapsible directions — open by default.
   const [dirOpen, setDirOpen] = useState(true);

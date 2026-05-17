@@ -67,8 +67,8 @@ export function MasterBanner(): ReactNode {
       className={`${styles.banner} ${
         isHeadsUp ? styles.headsUp : styles.persistent
       }`}
-      role="status"
-      aria-live="polite"
+      role={isHeadsUp ? "alert" : "status"}
+      aria-live={isHeadsUp ? "assertive" : "polite"}
       aria-atomic="true"
     >
       <span className={styles.icon} aria-hidden="true">

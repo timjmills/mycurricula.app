@@ -65,7 +65,7 @@
 }
 
 .clearBtn:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--ink-900);
   outline-offset: 2px;
 }
 
@@ -127,7 +127,7 @@
 }
 
 .chip:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--ink-900);
   outline-offset: 2px;
 }
 
@@ -183,7 +183,7 @@
 }
 
 .unitItem:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--ink-900);
   outline-offset: 2px;
 }
 
@@ -206,7 +206,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
+  font-size: var(--t-10);
   color: transparent;
 }
 
@@ -254,7 +254,7 @@
 }
 
 .standardItem:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--ink-900);
   outline-offset: 2px;
 }
 
@@ -353,7 +353,7 @@
   pointer-events: none;
 }
 
-.switchInput:focus-visible + .switchTrack {
-  outline: 2px solid var(--math);
+.switchInput:focus-visible ~ .switchTrack {
+  outline: 2px solid var(--ink-900);
   outline-offset: 2px;
 }

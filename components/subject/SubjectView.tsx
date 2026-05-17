@@ -41,6 +41,9 @@ function weekToMonth(week: number): number {
 }
 
 // ── Resource type metadata ──────────────────────────────────────────────
+// Background/foreground use neutral ink tokens — resource type is a
+// functional category, not a subject, so subject-palette colors must
+// not be used here (CLAUDE.md: color carries meaning, never decoration).
 
 const RESOURCE_TYPE_META: Record<
   LessonResource["type"],
@@ -48,44 +51,44 @@ const RESOURCE_TYPE_META: Record<
 > = {
   slides: {
     label: "Slides",
-    bg: "var(--math-light)",
-    fg: "var(--math-deep)",
+    bg: "var(--ink-100)",
+    fg: "var(--ink-700)",
     glyph: "▤",
   },
   pdf: {
     label: "PDF",
-    bg: "var(--ufli-light)",
-    fg: "var(--ufli-deep)",
+    bg: "var(--ink-100)",
+    fg: "var(--ink-700)",
     glyph: "⊞",
   },
   doc: {
     label: "Doc",
-    bg: "var(--reading-light)",
-    fg: "var(--reading-deep)",
+    bg: "var(--ink-100)",
+    fg: "var(--ink-700)",
     glyph: "⊟",
   },
   image: {
     label: "Image",
-    bg: "var(--explorers-light)",
-    fg: "var(--explorers-deep)",
+    bg: "var(--ink-100)",
+    fg: "var(--ink-700)",
     glyph: "⊡",
   },
   youtube: {
     label: "Video",
-    bg: "var(--spelling-light)",
-    fg: "var(--spelling-deep)",
+    bg: "var(--ink-100)",
+    fg: "var(--ink-700)",
     glyph: "▷",
   },
   website: {
     label: "Website",
-    bg: "var(--grammar-light)",
-    fg: "var(--grammar-deep)",
+    bg: "var(--ink-100)",
+    fg: "var(--ink-700)",
     glyph: "⊕",
   },
   link: {
     label: "Link",
-    bg: "var(--sel-light)",
-    fg: "var(--sel-deep)",
+    bg: "var(--ink-100)",
+    fg: "var(--ink-700)",
     glyph: "⊗",
   },
 };
@@ -283,9 +286,10 @@ function LessonRowItem({
           </span>
         )}
 
-        {/* Standards chips — show first two */}
-        {lesson.standards.slice(0, 2).map((s) => (
-          <span key={s} className={styles.standardChip}>
+        {/* Standards chips — show first two; index included so duplicate codes
+            in the same lesson don't produce duplicate keys. */}
+        {lesson.standards.slice(0, 2).map((s, idx) => (
+          <span key={`${s}-${idx}`} className={styles.standardChip}>
             {s}
           </span>
         ))}
@@ -316,8 +320,8 @@ function LessonRowItem({
           </p>
           {lesson.standards.length > 0 && (
             <div className={styles.lessonStandards}>
-              {lesson.standards.map((s) => (
-                <span key={s} className={styles.lessonStdChip}>
+              {lesson.standards.map((s, idx) => (
+                <span key={`${s}-${idx}`} className={styles.lessonStdChip}>
                   {s}
                 </span>
               ))}
@@ -341,56 +345,50 @@ interface GroupData {
   lessons: LessonRowData[];
 }
 
-function GroupBlock({ group }: { group: GroupData }): ReactNode {
-  const [isOpen, setIsOpen] = useState(
-    group.isCurrent || group.tag.startsWith("W"),
-  );
-  const [expandedLessons, setExpandedLessons] = useState<Set<string>>(
-    () => new Set(),
-  );
+// GroupBlock state is now lifted to SubjectPane (fix #1) so that filter /
+// grouping changes don't discard the teacher's expanded-collapsed state.
 
+interface GroupBlockProps {
+  group: GroupData;
+  isOpen: boolean;
+  onToggleOpen: () => void;
+  expandedLessons: Set<string>;
+  onToggleLesson: (id: string) => void;
+  onToggleAllLessons: () => void;
+}
+
+function GroupBlock({
+  group,
+  isOpen,
+  onToggleOpen,
+  expandedLessons,
+  onToggleLesson,
+  onToggleAllLessons,
+}: GroupBlockProps): ReactNode {
   const doneCount = group.lessons.filter((l) => l.status === "done").length;
   const allExpanded =
     group.lessons.length > 0 &&
     group.lessons.every((l) => expandedLessons.has(l.id));
 
-  function toggleLesson(id: string): void {
-    setExpandedLessons((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAllLessons(e: React.MouseEvent): void {
+  function handleExpandAll(e: React.MouseEvent): void {
+    // Prevent the click from bubbling up to the group header button.
     e.stopPropagation();
-    if (allExpanded) {
-      setExpandedLessons(new Set());
-    } else {
-      setExpandedLessons(new Set(group.lessons.map((l) => l.id)));
-    }
+    onToggleAllLessons();
   }
 
   return (
     <div className={styles.group}>
-      <div
+      {/* Native <button> handles Space/Enter natively — no manual onKeyDown
+          needed (fix #4). */}
+      <button
         className={[
           styles.groupHeader,
           group.isCurrent ? styles.groupHeaderCurrent : "",
         ]
           .filter(Boolean)
           .join(" ")}
-        onClick={() => setIsOpen((v) => !v)}
-        role="button"
+        onClick={onToggleOpen}
         aria-expanded={isOpen}
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setIsOpen((v) => !v);
-          }
-        }}
       >
         <span
           className={[
@@ -414,11 +412,11 @@ function GroupBlock({ group }: { group: GroupData }): ReactNode {
         </span>
 
         {isOpen && (
-          <button className={styles.groupExpandBtn} onClick={toggleAllLessons}>
+          <button className={styles.groupExpandBtn} onClick={handleExpandAll}>
             {allExpanded ? "Close all" : "Expand all"}
           </button>
         )}
-      </div>
+      </button>
 
       {isOpen && (
         <div className={styles.groupBody}>
@@ -428,7 +426,7 @@ function GroupBlock({ group }: { group: GroupData }): ReactNode {
                 key={lesson.id}
                 lesson={lesson}
                 isExpanded={expandedLessons.has(lesson.id)}
-                onToggle={() => toggleLesson(lesson.id)}
+                onToggle={() => onToggleLesson(lesson.id)}
               />
             ))}
           </div>
@@ -507,15 +505,18 @@ function ResourceSection({
         })}
       </div>
 
-      {/* Resource list */}
-      <div className={styles.resourceList} style={{ marginTop: 10 }}>
+      {/* Resource list — margin comes from the CSS module (fix #7). */}
+      <div className={styles.resourceList}>
         {filtered.length === 0 && (
           <div className={styles.empty}>No resources of this type.</div>
         )}
         {filtered.map((r, i) => {
           const meta = RESOURCE_TYPE_META[r.type];
+          // Stable key: lesson title + type + label. Index appended as
+          // a tiebreaker in case two identical resources exist (fix #8).
+          const rowKey = `${r.lessonTitle}|${r.type}|${r.label}|${i}`;
           return (
-            <div key={i} className={styles.resourceRow}>
+            <div key={rowKey} className={styles.resourceRow}>
               <span
                 className={styles.resourceTypeIcon}
                 style={{ background: meta.bg, color: meta.fg }}
@@ -589,11 +590,24 @@ interface SubjectPaneProps {
 function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
   const color = useSubjectColor(subjectId);
   const subject = SUBJECTS.find((s) => s.id === subjectId)!;
+  // NOTE: The mock data has one active unit per subject — all lessons for a
+  // subject share that unit id. This is a mock-data constraint, not a product
+  // limitation; the UI is ready for multi-unit subjects.
   const unit = UNITS[subjectId];
 
   // Local UI state
   const [period, setPeriod] = useState<PeriodFilter>("All");
   const [groupMode, setGroupMode] = useState<GroupMode>("unit");
+
+  // Lifted group state (fix #1) — keyed by group.key so filter/grouping
+  // changes that rebuild the group list don't reset the teacher's
+  // expanded-collapsed state.
+  const [groupOpenState, setGroupOpenState] = useState<Map<string, boolean>>(
+    () => new Map(),
+  );
+  const [groupExpandedLessons, setGroupExpandedLessons] = useState<
+    Map<string, Set<string>>
+  >(() => new Map());
 
   // Derive this subject's lessons from the fixture
   const allLessons = useMemo(
@@ -642,7 +656,24 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
       if (l.week === CURRENT_WEEK) entry.isCurrent = true;
       map.set(l.unit, entry);
     }
-    return [...map.values()];
+    return [...map.entries()].map(([unitId, data]) => ({ unitId, ...data }));
+  }, [allLessons]);
+
+  // Progress-bar tick labels derived from the actual week range of this
+  // subject's lessons — never hard-coded calendar months (fix #2).
+  const progressTickLabels = useMemo((): string[] => {
+    if (allLessons.length === 0) return [];
+    const weeks = allLessons.map((l) => l.week);
+    const minWk = Math.min(...weeks);
+    const maxWk = Math.max(...weeks);
+    if (minWk === maxWk) return [`Wk ${minWk}`];
+    // Show up to 6 evenly-spaced week labels across the range.
+    const span = maxWk - minWk;
+    const steps = Math.min(6, span + 1);
+    return Array.from(
+      { length: steps },
+      (_, i) => `Wk ${Math.round(minWk + (span * i) / Math.max(steps - 1, 1))}`,
+    );
   }, [allLessons]);
 
   // Build lesson rows for the filtered set
@@ -725,6 +756,57 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
     );
   }, [allLessons]);
 
+  // ── Lifted group-state callbacks (fix #1) ──────────────────────────────
+  // Derive the default open state for a group the first time it appears
+  // (current group or week-mode groups open by default); thereafter preserve
+  // whatever the teacher set explicitly.
+  function getGroupIsOpen(
+    groupKey: string,
+    isCurrent: boolean,
+    tag: string,
+  ): boolean {
+    if (groupOpenState.has(groupKey)) return groupOpenState.get(groupKey)!;
+    return isCurrent || tag.startsWith("W");
+  }
+
+  function handleToggleGroupOpen(
+    groupKey: string,
+    isCurrent: boolean,
+    tag: string,
+  ): void {
+    setGroupOpenState((prev) => {
+      const next = new Map(prev);
+      next.set(groupKey, !getGroupIsOpen(groupKey, isCurrent, tag));
+      return next;
+    });
+  }
+
+  function getGroupExpanded(groupKey: string): Set<string> {
+    return groupExpandedLessons.get(groupKey) ?? new Set();
+  }
+
+  function handleToggleLesson(groupKey: string, lessonId: string): void {
+    setGroupExpandedLessons((prev) => {
+      const next = new Map(prev);
+      const cur = new Set(prev.get(groupKey) ?? []);
+      if (cur.has(lessonId)) cur.delete(lessonId);
+      else cur.add(lessonId);
+      next.set(groupKey, cur);
+      return next;
+    });
+  }
+
+  function handleToggleAllLessons(groupKey: string, lessonIds: string[]): void {
+    setGroupExpandedLessons((prev) => {
+      const next = new Map(prev);
+      const cur = prev.get(groupKey) ?? new Set();
+      const allExpanded =
+        lessonIds.length > 0 && lessonIds.every((id) => cur.has(id));
+      next.set(groupKey, allExpanded ? new Set() : new Set(lessonIds));
+      return next;
+    });
+  }
+
   return (
     <div className={`${styles.main} cp-subj ${subjectId}`}>
       {/* Subject header */}
@@ -774,9 +856,9 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
             aria-valuemin={0}
             aria-valuemax={100}
           >
-            {unitGroups.map((u, i) => (
+            {unitGroups.map((u) => (
               <div
-                key={i}
+                key={u.unitId}
                 className={styles.progressUnit}
                 style={{ flex: u.total }}
               >
@@ -795,13 +877,12 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
               </div>
             ))}
           </div>
+          {/* Tick labels derived from actual lesson week range — not hard-coded
+              calendar months (fix #2). */}
           <div className={styles.progressLabels} aria-hidden="true">
-            <span>Aug</span>
-            <span>Oct</span>
-            <span>Dec</span>
-            <span>Feb</span>
-            <span>Apr</span>
-            <span>Jun</span>
+            {progressTickLabels.map((label) => (
+              <span key={label}>{label}</span>
+            ))}
           </div>
         </div>
       </header>
@@ -841,16 +922,39 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
         </div>
       </div>
 
-      {/* Lesson list */}
-      <div
-        className={styles.listArea}
-        role="list"
-        aria-label={`${subject.name} lessons`}
-      >
+      {/* Lesson list — collapsible tree structure, not a flat list, so
+          role="list" is omitted to avoid AT announcing an empty list when
+          children are group containers, not listitem elements (fix #5). */}
+      <div className={styles.listArea} aria-label={`${subject.name} lessons`}>
         {groups.length === 0 ? (
           <div className={styles.empty}>No lessons for this period.</div>
         ) : (
-          groups.map((group) => <GroupBlock key={group.key} group={group} />)
+          groups.map((group) => {
+            const isOpen = getGroupIsOpen(
+              group.key,
+              group.isCurrent,
+              group.tag,
+            );
+            const expandedLessons = getGroupExpanded(group.key);
+            return (
+              <GroupBlock
+                key={group.key}
+                group={group}
+                isOpen={isOpen}
+                onToggleOpen={() =>
+                  handleToggleGroupOpen(group.key, group.isCurrent, group.tag)
+                }
+                expandedLessons={expandedLessons}
+                onToggleLesson={(id) => handleToggleLesson(group.key, id)}
+                onToggleAllLessons={() =>
+                  handleToggleAllLessons(
+                    group.key,
+                    group.lessons.map((l) => l.id),
+                  )
+                }
+              />
+            );
+          })
         )}
       </div>
 

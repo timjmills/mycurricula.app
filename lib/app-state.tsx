@@ -60,7 +60,9 @@ export interface AppStateValue {
   week: number;
   setWeek: (w: number) => void;
 
-  /** Day index 0–4 (Sun–Thu) — the Daily view's focused day. */
+  /** Day index into the configured school week (0-based) — the Daily view's
+   * focused day. The day count comes from the school-week config, not a
+   * fixed 5. */
   selectedDay: number;
   setSelectedDay: (d: number) => void;
 

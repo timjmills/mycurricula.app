@@ -84,10 +84,6 @@
   flex-shrink: 0;
 }
 
-.notesBannerEmpty {
-  display: none;
-}
-
 .noteItem {
   display: flex;
   align-items: flex-start;
@@ -177,7 +173,7 @@
   padding: 4px 8px 16px;
 }
 
-/* Lesson row in the left pane */
+/* Lesson row in the left pane — now a div wrapper, not a button. */
 .lessonRow {
   display: flex;
   align-items: center;
@@ -185,8 +181,6 @@
   width: 100%;
   padding: 8px 9px;
   border-radius: var(--r-4);
-  text-align: left;
-  cursor: pointer;
   border: 1px solid transparent;
   margin-bottom: 1px;
   transition:
@@ -197,6 +191,20 @@
 
 .lessonRow:hover {
   background: color-mix(in oklch, var(--paper) 70%, var(--ink-100));
+}
+
+/* The clickable select area inside the row — expands to fill available space. */
+.lessonRowSelectBtn {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .lessonRowSelected {
@@ -211,11 +219,6 @@
   border-radius: 1px;
   background: var(--c, var(--ink-300));
   flex-shrink: 0;
-}
-
-.lessonRowContent {
-  flex: 1;
-  min-width: 0;
 }
 
 .lessonSubjectLabel {
@@ -367,7 +370,7 @@
 
 .detailTitle {
   margin: 8px 0 0;
-  font-size: 19px;
+  font-size: var(--t-20);
   font-weight: 600;
   letter-spacing: -0.2px;
   line-height: 1.25;
@@ -387,7 +390,7 @@
 }
 
 .detailObjectiveBadge {
-  font-size: 9.5px;
+  font-size: var(--t-10);
   font-weight: 700;
   letter-spacing: 0.5px;
   padding: 2px 6px;
@@ -576,13 +579,6 @@
   line-height: 1.4;
 }
 
-/* Divider line */
-.divider {
-  border: none;
-  border-top: 1px solid var(--ink-100);
-  margin: 0 0 16px;
-}
-
 /* ── Today dashboard panel ────────────────────────────────────────────── */
 
 .dashRoot {
@@ -608,7 +604,7 @@
 
 .dashTitle {
   margin: 4px 0 0;
-  font-size: 22px;
+  font-size: var(--t-22);
   font-weight: 600;
   letter-spacing: -0.4px;
   line-height: 1.1;
@@ -640,7 +636,7 @@
 }
 
 .progressCount {
-  font-size: 28px;
+  font-size: var(--t-28);
   font-weight: 600;
   letter-spacing: -0.6px;
   font-variant-numeric: tabular-nums;
@@ -679,7 +675,7 @@
 
 .progressLabel {
   flex: 1;
-  font-size: 9px;
+  font-size: var(--t-10);
   color: var(--ink-400);
   text-align: center;
   text-transform: uppercase;
@@ -704,7 +700,8 @@
 
 .dashSectionAction {
   font-size: var(--t-11);
-  color: var(--math);
+  /* Fix #8: replaced subject color var(--math) with neutral ink token. */
+  color: var(--ink-500);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -726,7 +723,7 @@
 
 .todoTitle {
   flex: 1;
-  font-size: 12.5px;
+  font-size: var(--t-12);
   line-height: 1.4;
   color: var(--ink-900);
 }
@@ -770,7 +767,7 @@
 }
 
 .statLabel {
-  font-size: 10px;
+  font-size: var(--t-10);
   color: var(--ink-400);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -778,7 +775,7 @@
 }
 
 .statValue {
-  font-size: 20px;
+  font-size: var(--t-20);
   font-weight: 600;
   letter-spacing: -0.3px;
   font-variant-numeric: tabular-nums;
@@ -797,23 +794,6 @@
   border-radius: 999px;
   display: inline-block;
   flex-shrink: 0;
-}
-
-/* Icon button generic */
-.iconBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  border-radius: var(--r-4);
-  cursor: pointer;
-  color: var(--ink-500);
-  transition: background 0.1s;
-}
-
-.iconBtn:hover {
-  background: var(--ink-100);
-  color: var(--ink-700);
 }
 
 /* ── Responsive: narrow (≤640px) ─────────────────────────────────────── */

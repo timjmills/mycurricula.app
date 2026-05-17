@@ -34,7 +34,7 @@
 }
 
 .sidebarLabel {
-  font-size: 10px;
+  font-size: var(--t-10);
   color: var(--ink-400);
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -42,7 +42,8 @@
   padding: 0 6px 6px;
 }
 
-/* Each subject entry — 44px minimum touch target. */
+/* Each subject entry — 44px minimum touch target (CLAUDE.md: ≥44px on
+   primary nav actions). */
 .subjectBtn {
   display: flex;
   align-items: center;
@@ -57,7 +58,7 @@
   transition:
     background 0.1s ease,
     border-color 0.1s ease;
-  min-height: 34px;
+  min-height: 44px;
 }
 
 .subjectBtn:hover {
@@ -94,7 +95,7 @@
 }
 
 .subjectBtnCount {
-  font-size: 10px;
+  font-size: var(--t-10);
   color: var(--ink-400);
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
@@ -126,7 +127,7 @@
 }
 
 .headerEyebrow {
-  font-size: 11px;
+  font-size: var(--t-11);
   color: var(--c);
   font-weight: 500;
   letter-spacing: 0.6px;
@@ -145,7 +146,7 @@
 }
 
 .headerTitle {
-  font-size: 26px;
+  font-size: var(--t-26);
   font-weight: 600;
   letter-spacing: -0.5px;
   margin-top: 2px;
@@ -175,7 +176,7 @@
 }
 
 .statLabel {
-  font-size: 10px;
+  font-size: var(--t-10);
   color: var(--ink-400);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -183,7 +184,7 @@
 }
 
 .statValue {
-  font-size: 22px;
+  font-size: var(--t-22);
   font-weight: 600;
   letter-spacing: -0.4px;
   font-variant-numeric: tabular-nums;
@@ -222,7 +223,7 @@
   display: flex;
   justify-content: space-between;
   margin-top: 6px;
-  font-size: 10px;
+  font-size: var(--t-10);
   color: var(--ink-400);
 }
 
@@ -239,7 +240,7 @@
 }
 
 .filterLabel {
-  font-size: 11px;
+  font-size: var(--t-11);
   color: var(--ink-400);
   font-weight: 500;
   text-transform: uppercase;
@@ -335,16 +336,21 @@
   flex-direction: column;
 }
 
+/* groupHeader is now a native <button> (fix #4) — reset browser defaults
+   then apply the same visual style as before. */
 .groupHeader {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 10px 12px;
   border-radius: var(--r-6);
   cursor: pointer;
   user-select: none;
   border: 1px solid var(--ink-100);
   background: var(--ink-50);
+  text-align: left;
+  font: inherit;
   transition:
     background 0.1s ease,
     border-color 0.1s ease;
@@ -367,7 +373,7 @@
 }
 
 .groupTag {
-  font-size: 10px;
+  font-size: var(--t-10);
   font-family: var(--font-mono);
   color: var(--c);
   background: var(--paper);
@@ -390,7 +396,7 @@
 }
 
 .nowPill {
-  font-size: 10px;
+  font-size: var(--t-10);
   padding: 1px 7px;
   background: var(--c);
   color: var(--paper);
@@ -402,14 +408,16 @@
 }
 
 .groupProgress {
-  font-size: 11px;
+  font-size: var(--t-11);
   color: var(--ink-500);
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
 }
 
+/* groupExpandBtn: 32px min-height — secondary control within a primary button,
+   not a primary action itself, so 32px rather than 44px is appropriate. */
 .groupExpandBtn {
-  font-size: 11px;
+  font-size: var(--t-11);
   color: var(--ink-500);
   padding: 2px 8px;
   border: 1px solid var(--ink-200);
@@ -420,7 +428,7 @@
   transition:
     background 0.1s ease,
     border-color 0.1s ease;
-  min-height: 22px;
+  min-height: 32px;
 }
 
 .groupExpandBtn:hover {
@@ -435,69 +443,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-/* ── Week sub-group within a unit group ─────────────────────────────── */
-.weekHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 5px 10px;
-  font-size: var(--t-12);
-  color: var(--ink-700);
-  text-align: left;
-  background: transparent;
-  border: none;
-  border-radius: var(--r-4);
-  cursor: pointer;
-  transition: background 0.1s ease;
-}
-
-.weekHeader:hover,
-.weekHeaderOpen {
-  background: var(--ink-50);
-}
-
-.weekHeaderChevron {
-  display: inline-flex;
-  color: var(--ink-400);
-  transition: transform 0.15s ease;
-  flex: 0 0 auto;
-}
-
-.weekHeaderChevronOpen {
-  transform: rotate(90deg);
-}
-
-.weekTag {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-500);
-  width: 32px;
-  flex: 0 0 auto;
-}
-
-.weekSummary {
-  flex: 1;
-  font-weight: 500;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.weekPreview {
-  color: var(--ink-400);
-  font-weight: 400;
-  margin-left: 6px;
-}
-
-.weekCount {
-  font-size: 10.5px;
-  color: var(--ink-400);
-  font-variant-numeric: tabular-nums;
-  flex: 0 0 auto;
 }
 
 /* ── Lesson rows ────────────────────────────────────────────────────── */
@@ -602,14 +547,13 @@
   min-width: 0;
 }
 
-.lessonTitleDone,
-.lessonTitleSkipped {
+.lessonTitleDone {
   text-decoration: line-through;
   text-decoration-color: var(--ink-300);
 }
 
 .personalPill {
-  font-size: 9px;
+  font-size: var(--t-10);
   font-weight: 600;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -621,7 +565,7 @@
 }
 
 .subEventsBadge {
-  font-size: 9.5px;
+  font-size: var(--t-10);
   font-weight: 600;
   letter-spacing: 0.3px;
   padding: 1px 7px 1px 5px;
@@ -642,7 +586,7 @@
 }
 
 .standardChip {
-  font-size: 9px;
+  font-size: var(--t-10);
   font-family: var(--font-mono);
   padding: 1px 5px;
   border: 1px solid var(--ink-200);
@@ -652,7 +596,7 @@
 }
 
 .currentDot {
-  font-size: 10px;
+  font-size: var(--t-10);
   color: var(--c);
   font-weight: 600;
   flex: 0 0 auto;
@@ -679,7 +623,7 @@
 }
 
 .lessonStdChip {
-  font-size: 10px;
+  font-size: var(--t-10);
   font-family: var(--font-mono);
   color: var(--ink-700);
   background: var(--paper);
@@ -712,7 +656,7 @@
 }
 
 .resourceCount {
-  font-size: 11px;
+  font-size: var(--t-11);
   color: var(--ink-400);
   font-variant-numeric: tabular-nums;
 }
@@ -729,7 +673,7 @@
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--t-11);
   font-weight: 500;
   cursor: pointer;
   border: 1px solid var(--ink-200);
@@ -763,23 +707,18 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+  /* margin-top moved from inline style in ResourceSection (fix #7) */
+  margin-top: 10px;
 }
 
+/* resourceRow is a non-interactive display element (links come in a later
+   phase) — no hover styling to avoid a false affordance (fix #9). */
 .resourceRow {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 7px 8px;
   border-radius: var(--r-4);
-  border: 1px solid transparent;
-  transition:
-    background 0.1s ease,
-    border-color 0.1s ease;
-}
-
-.resourceRow:hover {
-  background: var(--ink-50);
-  border-color: var(--ink-100);
 }
 
 .resourceTypeIcon {
@@ -803,7 +742,7 @@
 }
 
 .resourceLesson {
-  font-size: 11px;
+  font-size: var(--t-11);
   color: var(--ink-400);
   flex: 0 0 auto;
   white-space: nowrap;
@@ -821,14 +760,15 @@
 }
 
 /* ── Focus visible ──────────────────────────────────────────────────── */
+/* Outline uses var(--c) so the ring follows the active subject color rather
+   than hard-coding a single subject's color (fix #6a). */
 .subjectBtn:focus-visible,
 .groupHeader:focus-visible,
 .lessonRow:focus-visible,
-.weekHeader:focus-visible,
 .groupExpandBtn:focus-visible,
 .chip:focus-visible,
 .groupBtn:focus-visible,
 .resourceFilterChip:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--c);
   outline-offset: 2px;
 }

@@ -10,6 +10,7 @@
 // CSS Modules in right-panel.module.css.
 // All colors and sizing come from CSS custom properties (tokens.css).
 
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
 import {
@@ -109,8 +110,12 @@ function CheckIcon() {
 // The to-do panel groups items by scope (personal vs. team) and renders each
 // with a done checkbox and tag pills.
 
+type TodoScope = "personal" | "team";
+
 function TodoPanel(): ReactNode {
   const { toggleTodoPanel } = useAppState();
+  // Active scope tab — "personal" or "team".
+  const [activeScope, setActiveScope] = useState<TodoScope>("personal");
 
   const personal = TODOS.filter((t) => t.scope === "personal");
   const team = TODOS.filter((t) => t.scope === "team");
@@ -118,6 +123,14 @@ function TodoPanel(): ReactNode {
   // Counts for the scope tabs — undone items only (what needs attention).
   const personalOpen = personal.filter((t) => !t.done).length;
   const teamOpen = team.filter((t) => !t.done).length;
+
+  // Items to display in the scrollable list.
+  const visibleItems = activeScope === "personal" ? personal : team;
+  const visibleOpen = activeScope === "personal" ? personalOpen : teamOpen;
+  const emptyMessage =
+    activeScope === "personal"
+      ? "No personal to-dos yet."
+      : "No team to-dos yet.";
 
   function renderGroup(
     label: string,
@@ -141,13 +154,13 @@ function TodoPanel(): ReactNode {
                   : styles.todoRow
               }
             >
-              {/* Done checkbox — purely visual state in the prototype; a real
-                  implementation would call a mutation. */}
+              {/* Done checkbox — real <button> so it is keyboard-operable.
+                  Purely visual state in the prototype; a real implementation
+                  would call a mutation here. */}
               <span className={styles.checkSlot}>
-                <span
-                  role="checkbox"
-                  aria-checked={todo.done}
-                  tabIndex={0}
+                <button
+                  type="button"
+                  aria-pressed={todo.done}
                   aria-label={`Mark "${todo.title}" as ${todo.done ? "not done" : "done"}`}
                   className={
                     todo.done
@@ -156,7 +169,7 @@ function TodoPanel(): ReactNode {
                   }
                 >
                   {todo.done && <CheckIcon />}
-                </span>
+                </button>
               </span>
 
               {/* Title + meta row */}
@@ -218,35 +231,68 @@ function TodoPanel(): ReactNode {
         </button>
       </div>
 
-      {/* Scope tabs */}
+      {/* Scope tabs — real buttons so both tabs are keyboard-operable. */}
       <div className={styles.todoTabs} role="tablist">
-        <span
-          className={`${styles.todoTab} ${styles.todoTabActive}`}
+        <button
+          type="button"
           role="tab"
-          aria-selected="true"
+          aria-selected={activeScope === "personal"}
+          className={
+            activeScope === "personal"
+              ? `${styles.todoTab} ${styles.todoTabActive}`
+              : styles.todoTab
+          }
+          onClick={() => setActiveScope("personal")}
         >
           Personal
           <span
-            className={`${styles.todoTabCount} ${styles.todoTabCountActive}`}
+            className={
+              activeScope === "personal"
+                ? `${styles.todoTabCount} ${styles.todoTabCountActive}`
+                : styles.todoTabCount
+            }
           >
             {personalOpen}
           </span>
-        </span>
-        <span className={styles.todoTab} role="tab" aria-selected="false">
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeScope === "team"}
+          className={
+            activeScope === "team"
+              ? `${styles.todoTab} ${styles.todoTabActive}`
+              : styles.todoTab
+          }
+          onClick={() => setActiveScope("team")}
+        >
           Team
-          <span className={styles.todoTabCount}>{teamOpen}</span>
-        </span>
+          <span
+            className={
+              activeScope === "team"
+                ? `${styles.todoTabCount} ${styles.todoTabCountActive}`
+                : styles.todoTabCount
+            }
+          >
+            {teamOpen}
+          </span>
+        </button>
       </div>
 
-      {/* Scrollable list */}
-      <div className={styles.body} role="table" aria-label="Personal to-dos">
-        {personal.length > 0 ? (
-          renderGroup("Personal", personal, personalOpen)
+      {/* Scrollable list — shows only the active scope's items. */}
+      <div
+        className={styles.body}
+        role="table"
+        aria-label={`${activeScope === "personal" ? "Personal" : "Team"} to-dos`}
+      >
+        {visibleItems.length > 0 ? (
+          renderGroup(
+            activeScope === "personal" ? "Personal" : "Team",
+            visibleItems,
+            visibleOpen,
+          )
         ) : (
-          <p className={styles.emptyState}>No personal to-dos yet.</p>
-        )}
-        {team.length > 0 && (
-          <div role="rowgroup">{renderGroup("Team", team, teamOpen)}</div>
+          <p className={styles.emptyState}>{emptyMessage}</p>
         )}
       </div>
     </div>
@@ -369,6 +415,10 @@ function LessonDetailPanel({ lessonId }: { lessonId: string }): ReactNode {
   }
 
   const subj = SUBJECT_BY_ID[lesson.subject];
+
+  // Guard: subject not found in lookup (e.g. stale mock data).
+  if (!subj) return null;
+
   const statusColors = STATUS_COLORS[lesson.status];
 
   return (
@@ -450,7 +500,7 @@ function LessonDetailPanel({ lessonId }: { lessonId: string }): ReactNode {
                     <span
                       style={{
                         flex: "0 0 auto",
-                        fontSize: "var(--t-10, var(--t-11))",
+                        fontSize: "var(--t-10)",
                         color: "var(--ink-400)",
                         textTransform: "uppercase",
                         letterSpacing: "0.4px",

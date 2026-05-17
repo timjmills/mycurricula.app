@@ -118,6 +118,10 @@ function LessonCheckbox({ status }: { status: LessonStatus }): ReactNode {
 // ── Lesson row in the left pane ──────────────────────────────────────────
 // A dedicated component keeps the subject-color hook call at a stable
 // position — the same pattern used by WeeklyGrid's SubjectRow.
+//
+// Fix #3: the row is a <div role="listitem"> so no interactive element is
+// nested inside another interactive element. The row-select area and the
+// completion checkbox are siblings, not parent/child.
 
 interface LessonRowProps {
   lesson: Lesson;
@@ -145,37 +149,63 @@ function LessonRow({
     onToggleComplete(lesson.id, next);
   }
 
+  function handleCheckKey(e: React.KeyboardEvent): void {
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      const next: LessonStatus =
+        lesson.status === "not_done"
+          ? "done"
+          : lesson.status === "done"
+            ? "partial"
+            : "not_done";
+      onToggleComplete(lesson.id, next);
+    }
+  }
+
   return (
-    <button
+    <div
+      role="listitem"
       className={`${styles.lessonRow} ${selected ? styles.lessonRowSelected : ""} cp-subj ${lesson.subject}`}
-      onClick={() => onSelect(lesson.id)}
-      aria-pressed={selected}
-      aria-label={`${subj.name}: ${lesson.title}, ${lesson.status}`}
     >
       {/* 3px subject-color left stripe */}
       <span className={styles.lessonStripe} aria-hidden="true" />
 
-      {/* Completion checkbox — click handled separately */}
-      <span
+      {/* Completion checkbox — independent interactive element, sibling to the select button */}
+      <button
+        type="button"
         role="checkbox"
         aria-checked={lesson.status === "done"}
         aria-label={`Mark ${lesson.title} done`}
-        tabIndex={-1}
         onClick={handleCheckClick}
-        style={{ flexShrink: 0, display: "inline-flex" }}
+        onKeyDown={handleCheckKey}
+        style={{
+          flexShrink: 0,
+          display: "inline-flex",
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+        }}
       >
         <LessonCheckbox status={lesson.status} />
-      </span>
+      </button>
 
-      {/* Subject label + lesson title */}
-      <div className={styles.lessonRowContent}>
+      {/* Row select area: subject label + lesson title */}
+      <button
+        type="button"
+        className={styles.lessonRowSelectBtn}
+        onClick={() => onSelect(lesson.id)}
+        aria-pressed={selected}
+        aria-label={`${subj.name}: ${lesson.title}, ${lesson.status}`}
+      >
         <div className={styles.lessonSubjectLabel}>{subj.name}</div>
         <div
           className={`${styles.lessonTitle} ${lesson.status === "done" ? styles.lessonTitleDone : ""}`}
         >
           {lesson.title}
         </div>
-      </div>
+      </button>
 
       {/* Personal fork indicator */}
       {lesson.isPersonal && (
@@ -195,7 +225,7 @@ function LessonRow({
           aria-hidden="true"
         />
       )}
-    </button>
+    </div>
   );
 }
 
@@ -207,30 +237,28 @@ interface NotesBannerProps {
 }
 
 function NotesBanner({ day }: NotesBannerProps): ReactNode {
-  const notes = notesForDay(day);
+  // Fix #1: filter to personal reminders only (spec §5.3).
+  const notes = notesForDay(day).filter((n) => n.scope === "personal");
   if (notes.length === 0) return null;
 
   return (
     <div className={styles.notesBanner} role="region" aria-label="Daily notes">
-      {notes.map((n, i) => (
-        <div
-          key={i}
-          className={`${styles.noteItem} ${n.priority === "urgent" ? "cp-pulse" : ""}`}
-          data-priority={n.priority}
-          role="alert"
-          aria-live={n.priority === "urgent" ? "assertive" : "polite"}
-        >
-          <span
-            className={styles.noteItemBody}
-            style={{ fontStyle: n.scope === "personal" ? "italic" : "normal" }}
+      {notes.map((n) => {
+        // Fix #2: role="alert"/assertive only for urgent; status/polite otherwise.
+        const isUrgent = n.priority === "urgent";
+        return (
+          <div
+            // Fix #9: stable key from note fields instead of array index.
+            key={`${n.day}-${n.author}-${n.priority}`}
+            className={`${styles.noteItem} ${isUrgent ? "cp-pulse" : ""}`}
+            data-priority={n.priority}
+            role={isUrgent ? "alert" : "status"}
+            aria-live={isUrgent ? "assertive" : "polite"}
           >
-            {n.body}
-          </span>
-          <span className={styles.noteItemScope}>
-            {n.scope === "shared" ? "team" : "mine"}
-          </span>
-        </div>
-      ))}
+            <span className={styles.noteItemBody}>{n.body}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -255,11 +283,14 @@ function DayBar({ selectedDay, onSelect }: DayBarProps): ReactNode {
   return (
     <div className={styles.dayBar} role="tablist" aria-label="Day selector">
       {WEEK_DAYS.map((day, i) => {
-        const dayNotes = notesForDay(i);
+        // Fix #6: show personal-only notes in dot row (consistent with banner).
+        const dayNotes = notesForDay(i).filter((n) => n.scope === "personal");
         const isActive = i === selectedDay;
         return (
           <button
             key={day}
+            // Fix #6: give each tab an id so the panel can reference it via aria-labelledby.
+            id={`daily-tab-${i}`}
             role="tab"
             aria-selected={isActive}
             aria-controls="daily-pane-body"
@@ -267,7 +298,7 @@ function DayBar({ selectedDay, onSelect }: DayBarProps): ReactNode {
             onClick={() => onSelect(i)}
           >
             <span>{WEEK_DAYS_SHORT[i]}</span>
-            {/* Priority dot row — visual indicator for notes on that day */}
+            {/* Priority dot row — visual indicator for personal notes on that day */}
             {dayNotes.length > 0 && (
               <span className={styles.dayBtnDotWrap} aria-hidden="true">
                 {dayNotes.slice(0, 3).map((n, j) => (
@@ -303,8 +334,10 @@ export function DailyView(): ReactNode {
     [lessons, week, selectedDay],
   );
 
+  // Fix #5: derive initial selection from the component's own `lessons` state
+  // (already initialised above), not from the raw imported LESSONS fixture.
   const [selectedId, setSelectedId] = useState<string | null>(() => {
-    const first = LESSONS.find(
+    const first = lessons.find(
       (l) => l.week === week && l.day === selectedDay && l.status !== "done",
     );
     return first?.id ?? null;
@@ -343,7 +376,13 @@ export function DailyView(): ReactNode {
       <NotesBanner day={selectedDay} />
 
       {/* ── Two-pane body ─────────────────────────────────────────── */}
-      <div id="daily-pane-body" className={styles.body} role="tabpanel">
+      {/* Fix #6: aria-labelledby links the panel back to the active tab button. */}
+      <div
+        id="daily-pane-body"
+        className={styles.body}
+        role="tabpanel"
+        aria-labelledby={`daily-tab-${selectedDay}`}
+      >
         {/* ── Left pane: lesson list ─────────────────────────────── */}
         <div className={styles.leftPane}>
           {/* Day name + done count */}

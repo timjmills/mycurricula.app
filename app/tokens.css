@@ -21,13 +21,18 @@
     var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
 
   /* Size scale (§6.3) */
+  --t-28: 28px;
+  --t-26: 26px;
+  --t-24: 24px;
   --t-22: 22px;
+  --t-20: 20px;
   --t-18: 18px;
   --t-16: 16px;
   --t-14: 14px; /* lesson titles */
   --t-13: 13px; /* body */
   --t-12: 12px;
   --t-11: 11px; /* standards codes */
+  --t-10: 10px; /* micro labels */
 
   /* ── Surface neutrals ─────────────────────────────────────────────── */
   --ink-900: #14141a; /* primary text */

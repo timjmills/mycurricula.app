@@ -70,12 +70,11 @@ function toggleArrayItem<T>(arr: T[], item: T): T[] {
 export function LeftFilterPanel(): ReactNode {
   const { filters, updateFilters, resetFilters, leftPanelOpen } = useAppState();
 
-  // When the panel is closed, render nothing — the shell layout animates
-  // the width to 0 via .panelClosed; hiding here removes the element from
-  // the accessibility tree as well.
-  const panelClass = leftPanelOpen
-    ? styles.panel
-    : `${styles.panel} ${styles.panelClosed}`;
+  // When the panel is closed, return null — keeps the element entirely out
+  // of the accessibility tree so screen readers cannot tab into hidden content.
+  if (!leftPanelOpen) return null;
+
+  const panelClass = styles.panel;
 
   // ── Active state helpers ───────────────────────────────────────────────
 
