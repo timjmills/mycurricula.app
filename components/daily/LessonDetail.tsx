@@ -3,42 +3,37 @@
 // LessonDetail.tsx — Right pane: full lesson detail for a selected lesson.
 //
 // Shown when a lesson is selected in the Daily view's left pane. Displays
-// title, "I Can" objective, collapsible directions, hover-revealed teacher
-// notes, a resource list, and the standards block with inline descriptions.
+// title, "I Can" objective, the structured lesson-flow editor (replacing the
+// former flat directions block), an editable teacher-notes field, a resource
+// list, and the standards block with inline descriptions.
 //
 // Subject color is injected via cp-subj + subjectId class so the CSS
 // variable cascade (--c / --cl / --cd) flows through every token reference
 // without prop drilling.
+//
+// Lesson sections are per-session local state keyed by lesson.id — the
+// component re-instantiates them from the default template when the selected
+// lesson changes. Persistence will arrive with the Supabase backend.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import type { Lesson } from "@/lib/types";
 import { SUBJECT_BY_ID, UNITS, describeStandard } from "@/lib/mock";
+import { LessonFlow } from "@/components/lesson-flow";
+import { RichTextEditor } from "@/components/rich-text";
+import { instantiateSections } from "@/lib/lesson-flow";
+import type { LessonSectionContent } from "@/lib/lesson-flow";
+import {
+  LESSON_TEMPLATE_BY_ID,
+  DEFAULT_LESSON_TEMPLATE_ID,
+} from "@/lib/lesson-templates";
 import styles from "./DailyView.module.css";
+import detailStyles from "./lesson-detail.module.css";
 
 // ── Small inline icon set ────────────────────────────────────────────────
 // SVG micro-icons used only within this panel — no dependency on lesson-card
 // icons to keep the component self-contained. Paths are simplified geometric
 // forms matching the artboard's style.
-
-function ChevronIcon({ open }: { open: boolean }): ReactNode {
-  return (
-    <span
-      className={`${styles.chevronIcon} ${open ? styles.chevronOpen : ""}`}
-      aria-hidden="true"
-    >
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-        <path
-          d="M3 2l4 3-4 3"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
-  );
-}
 
 function ResourceTypeIcon({ type }: { type: string }): ReactNode {
   // A minimal icon per resource type — enough to differentiate at a glance.
@@ -256,6 +251,15 @@ function StatusCheckbox({
   );
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+/** Build the initial sections array from the default lesson-flow template. */
+function buildInitialSections(): LessonSectionContent[] {
+  return instantiateSections(
+    LESSON_TEMPLATE_BY_ID[DEFAULT_LESSON_TEMPLATE_ID],
+  ) as LessonSectionContent[];
+}
+
 // ── Props ────────────────────────────────────────────────────────────────
 
 interface LessonDetailProps {
@@ -279,9 +283,22 @@ export function LessonDetail({
     shade: 1,
   };
 
-  // Collapsible directions — open by default.
-  const [dirOpen, setDirOpen] = useState(true);
-  // Notes hover-reveal: the teacher's private notes are blurred until hover.
+  // ── Lesson-flow sections — local state, re-instantiated on lesson change.
+  // Section content is per-session only; Supabase persistence comes later.
+  const [sections, setSections] =
+    useState<LessonSectionContent[]>(buildInitialSections);
+
+  // ── Teacher notes — editable rich text, seeded from lesson.notes.
+  const [notesHtml, setNotesHtml] = useState<string>(lesson.notes ?? "");
+
+  // Re-instantiate both section state and notes when the selected lesson
+  // changes. Keying on lesson.id ensures a clean slate for each lesson.
+  useEffect(() => {
+    setSections(buildInitialSections());
+    setNotesHtml(lesson.notes ?? "");
+  }, [lesson.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Notes hover-reveal: the editor is blurred until hover.
   const [notesHovered, setNotesHovered] = useState(false);
 
   // Cycle: not_done → done → partial → not_done
@@ -425,67 +442,112 @@ export function LessonDetail({
 
       {/* ── Scrollable body ─────────────────────────────────────────── */}
       <div className={styles.detailBody}>
-        {/* Directions — collapsible */}
+        {/* ── Lesson Flow — structured, editable sections ─────────── */}
+        {/* Replaces the former flat "Directions" block. Sections come from
+            the default lesson-flow template and are re-instantiated fresh
+            each time a different lesson is selected. The key prop ensures
+            LessonFlow's own internal drag state also resets. */}
         <section className={styles.detailSection}>
-          <button
-            className={`${styles.detailSectionHead} ${styles.detailSectionHeadBtn}`}
-            onClick={() => setDirOpen((o) => !o)}
-            aria-expanded={dirOpen}
-          >
-            <ChevronIcon open={dirOpen} />
-            Directions
-          </button>
-          {dirOpen && (
-            <div className={styles.detailDirections}>{lesson.directions}</div>
-          )}
+          <div className={styles.detailSectionHead}>
+            {/* Flow icon */}
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 11 11"
+              fill="none"
+              aria-hidden="true"
+            >
+              <rect
+                x="0.75"
+                y="0.75"
+                width="9.5"
+                height="3"
+                rx="1"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+              <rect
+                x="0.75"
+                y="7.25"
+                width="9.5"
+                height="3"
+                rx="1"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+              <line
+                x1="5.5"
+                y1="3.75"
+                x2="5.5"
+                y2="7.25"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+            </svg>
+            Lesson Flow
+          </div>
+          <div className={detailStyles.lessonFlowWrap}>
+            <LessonFlow
+              key={lesson.id}
+              sections={sections}
+              onChange={setSections}
+            />
+          </div>
         </section>
 
-        {/* Notes — hover reveal */}
-        {lesson.notes && (
-          <section
-            className={styles.detailSection}
-            onMouseEnter={() => setNotesHovered(true)}
-            onMouseLeave={() => setNotesHovered(false)}
-          >
-            <div className={styles.detailSectionHead}>
-              {/* Eye icon */}
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 11 11"
-                fill="none"
-                aria-hidden="true"
-              >
-                <ellipse
-                  cx="5.5"
-                  cy="5.5"
-                  rx="5"
-                  ry="3.5"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                />
-                <circle cx="5.5" cy="5.5" r="1.8" fill="currentColor" />
-              </svg>
-              My notes
-              <span
-                style={{
-                  color: "var(--ink-300)",
-                  textTransform: "none",
-                  letterSpacing: 0,
-                  fontWeight: 400,
-                }}
-              >
-                (hover to reveal)
-              </span>
-            </div>
-            <div
-              className={`${styles.detailNotes} ${notesHovered ? styles.detailNotesVisible : styles.detailNotesHidden}`}
-              aria-label="Teacher notes"
+        {/* ── Teacher Notes — editable rich text, hover-revealed ───── */}
+        {/* RichTextEditor is always rendered (not gated on lesson.notes)
+            so teachers can add notes to any lesson. Reveal on hover
+            preserves the existing "private by default" UX. */}
+        <section
+          className={styles.detailSection}
+          onMouseEnter={() => setNotesHovered(true)}
+          onMouseLeave={() => setNotesHovered(false)}
+          onFocusCapture={() => setNotesHovered(true)}
+          onBlurCapture={() => setNotesHovered(false)}
+        >
+          <div className={styles.detailSectionHead}>
+            {/* Eye icon */}
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 11 11"
+              fill="none"
+              aria-hidden="true"
             >
-              {lesson.notes}
-            </div>
-          </section>
-        )}
+              <ellipse
+                cx="5.5"
+                cy="5.5"
+                rx="5"
+                ry="3.5"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+              <circle cx="5.5" cy="5.5" r="1.8" fill="currentColor" />
+            </svg>
+            My notes
+            <span
+              style={{
+                color: "var(--ink-300)",
+                textTransform: "none",
+                letterSpacing: 0,
+                fontWeight: 400,
+              }}
+            >
+              (hover to reveal)
+            </span>
+          </div>
+          <div
+            className={`${detailStyles.notesEditorWrap} ${notesHovered ? detailStyles.notesEditorVisible : detailStyles.notesEditorHidden}`}
+          >
+            <RichTextEditor
+              value={notesHtml}
+              onChange={setNotesHtml}
+              placeholder="Add private notes for yourself…"
+              ariaLabel="Teacher notes"
+            />
+          </div>
+        </section>
 
         {/* Resources */}
         {lesson.resources.length > 0 && (

@@ -1,0 +1,341 @@
+/* rich-text-editor.module.css
+   Floating dark toolbar + borderless contentEditable region.
+
+   Design language:
+     • Toolbar: near-black pill surface (--ink-900), compact 32px buttons,
+       white glyphs, popover shadow. Appears above the selection.
+     • Swatches: 16×16 rounded squares, 2-column grid in the popover.
+     • Editor: no border itself — the parent card/field provides the frame.
+     • All sizing via var(--t-*) and var(--r-*) tokens; no hard-coded px on
+       colors, fonts, or semantic spacing.
+
+   Touch targets: toolbar buttons are 32px visual / 36px touch (comfortable
+   for a dense formatting bar — see CLAUDE.md §toolbar note). Swatch buttons
+   are 28×28 touch targets with 16×16 visual swatches inside.
+*/
+
+/* ── Root wrapper ──────────────────────────────────────────────────────────── */
+.root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Floating toolbar ─────────────────────────────────────────────────────── */
+.toolbar {
+  position: fixed; /* fixed so it floats above all stacking contexts */
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: var(--ink-900);
+  border-radius: var(--r-8);
+  box-shadow: var(--shadow-popover);
+  user-select: none;
+  /* Entrance: fade + small upward lift */
+  animation: tbReveal 0.14s ease both;
+}
+
+@keyframes tbReveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar {
+    animation: none;
+  }
+}
+
+/* ── Toolbar button ────────────────────────────────────────────────────────── */
+.tbBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 28px;
+  min-height: 28px;
+  /* Expand touch target to 36px without inflating the visual toolbar size */
+  padding: 4px 5px;
+  border-radius: var(--r-4);
+  background: transparent;
+  color: var(--ink-300);
+  border: none;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.tbBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--paper);
+}
+
+.tbBtn:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: -2px;
+}
+
+.tbBtnActive {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--paper);
+}
+
+/* ── Format glyphs ─────────────────────────────────────────────────────────── */
+.iconB {
+  font-size: var(--t-13);
+  font-weight: 700;
+  font-family: var(--font-sans);
+  line-height: 1;
+}
+
+.iconI {
+  font-size: var(--t-13);
+  font-style: italic;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.iconU {
+  font-size: var(--t-13);
+  text-decoration: underline;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.iconColor {
+  font-size: var(--t-13);
+  font-weight: 700;
+  font-family: var(--font-sans);
+  line-height: 1;
+  /* Gradient suggestion of "color" — stops use literal values since
+     CSS gradient in a var() can't reference other vars reliably. */
+  background: linear-gradient(135deg, #2b6cff 0%, #d4488f 50%, #e26a3a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.iconHighlight {
+  font-size: var(--t-13);
+  font-weight: 700;
+  font-family: var(--font-sans);
+  line-height: 1;
+  /* Yellow-tinted to suggest highlight */
+  background: linear-gradient(135deg, #fdf3d2 20%, #e8a91a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.iconFont {
+  font-size: var(--t-12);
+  font-weight: 500;
+  font-family: var(--font-sans);
+  line-height: 1;
+  color: inherit;
+}
+
+.iconCaret {
+  font-size: 8px;
+  color: var(--ink-400);
+  line-height: 1;
+  margin-top: 1px;
+}
+
+/* ── Divider ───────────────────────────────────────────────────────────────── */
+.divider {
+  display: block;
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
+/* ── Palette groups (trigger + popover) ────────────────────────────────────── */
+.paletteGroup {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── Palette popover ───────────────────────────────────────────────────────── */
+.palettePopover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding: 8px;
+  background: var(--ink-900);
+  border-radius: var(--r-8);
+  box-shadow: var(--shadow-popover);
+  animation: tbReveal 0.12s ease both;
+  /* Wide enough for 6 × (16 + 4) + padding */
+  min-width: 148px;
+  z-index: 10000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .palettePopover {
+    animation: none;
+  }
+}
+
+/* ── Swatch button ─────────────────────────────────────────────────────────── */
+.swatch {
+  /* 28×28 touch target containing a 16×16 visual swatch */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-4);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    border-color 0.1s ease;
+  position: relative;
+}
+
+.swatch:hover {
+  transform: scale(1.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 1px;
+}
+
+/* "No highlight" swatch — shows the classic remove/null symbol */
+.swatchNone {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-style: dashed;
+}
+
+.swatchNone::before,
+.swatchNone::after {
+  content: "";
+  position: absolute;
+  width: 1.5px;
+  height: 14px;
+  background: var(--ink-400);
+  border-radius: 1px;
+}
+
+.swatchNone::before {
+  transform: rotate(45deg);
+}
+
+.swatchNone::after {
+  transform: rotate(-45deg);
+}
+
+/* ── Font picker popover ───────────────────────────────────────────────────── */
+.fontPopover {
+  grid-template-columns: 1fr;
+  gap: 2px;
+  min-width: 120px;
+  padding: 6px;
+}
+
+.fontOption {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 9px;
+  border-radius: var(--r-4);
+  background: transparent;
+  border: none;
+  color: var(--ink-300);
+  font-size: var(--t-13);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+  white-space: nowrap;
+}
+
+.fontOption:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--paper);
+}
+
+.fontOption:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: -2px;
+}
+
+/* ── Editor wrapper + placeholder ─────────────────────────────────────────── */
+.editorWrap {
+  position: relative;
+  width: 100%;
+}
+
+/* Placeholder — layered behind the editable content. Uses the same font
+   metrics as the editor so it aligns perfectly. */
+.placeholder {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--ink-300);
+  font-size: inherit;
+  line-height: inherit;
+  font-family: inherit;
+  /* Prevent double-display if the empty editor still has a <br> */
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+
+/* ── Editable region ───────────────────────────────────────────────────────── */
+.editor {
+  position: relative;
+  width: 100%;
+  min-height: 1.4em; /* at least one line tall */
+  outline: none;
+  /* Inherits font-size, font-family, color from parent context.
+     The editor intentionally has no border — the surrounding element provides
+     the frame (card border, field border, etc.). */
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  caret-color: var(--ink-900);
+}
+
+/* Focus ring on the editor wrapper when the inner div is focused.
+   We style the wrapper so the ring appears outside the content area. */
+.editorWrap:focus-within {
+  /* No visible ring by default — the floating toolbar is the focus indicator
+     for rich-text interactions. Add a subtle caret-color change instead. */
+}
+
+/* For keyboard-only nav: show a ring when the editable div is focused via
+   keyboard. :focus-visible on contentEditable is supported in modern browsers. */
+.editor:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+  border-radius: var(--r-2);
+}
+
+/* Single-line variant — clamp to one line, suppress visible overflow */
+.editorSingleLine {
+  white-space: nowrap;
+  overflow: hidden;
+}

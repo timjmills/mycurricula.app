@@ -117,6 +117,17 @@ export function WeeklyGrid(): ReactNode {
     onCollapse: collapseAll,
   });
 
+  /**
+   * Drag start — collapse every expanded card so the calendar compacts to
+   * its minimum height. A lesson (whose expanded card can be tall once it
+   * shows its lesson-flow sections) can then be dragged up, down, or across
+   * weeks without scrolling the grid.
+   */
+  function handleDragStart(id: string): void {
+    setDraggingId(id);
+    setExpandedIds((prev) => (prev.size === 0 ? prev : new Set()));
+  }
+
   /** Move the dragged lesson into the target cell (subject row + day). */
   function handleDrop(subjectId: SubjectId, day: number): void {
     if (!draggingId) return;
@@ -287,7 +298,7 @@ export function WeeklyGrid(): ReactNode {
               expandedIds={expandedIds}
               selectedId={selectedId}
               cellProps={gridNav.cellProps}
-              onDragStart={setDraggingId}
+              onDragStart={handleDragStart}
               onDragEnd={() => setDraggingId(null)}
               onDrop={handleDrop}
               onAdd={handleAdd}

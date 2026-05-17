@@ -1,0 +1,54 @@
+/* lesson-detail.module.css
+   Additional scoped styles for LessonDetail.tsx only — new rules added when
+   integrating the lesson-flow editor and rich-text notes editor.
+   All tokens are read from tokens.css via var(); no hard-coded values.
+   Do not modify DailyView.module.css for new additions; they belong here. */
+
+/* ── Lesson flow wrapper ─────────────────────────────────────────────────
+   Provides a clean inset surface for the <LessonFlow> component so it
+   sits visually contained within the detail section body. */
+
+.lessonFlowWrap {
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-6);
+  overflow: hidden;
+  /* Ensure the flow component's internal scroll does not fight the
+     parent detailBody scroller. */
+  min-height: 0;
+}
+
+/* ── Teacher notes editor wrapper ───────────────────────────────────────
+   Mirrors the blur/reveal pattern of the former read-only notes block,
+   adapted for the <RichTextEditor> component. Reveal is triggered by
+   pointer hover or keyboard focus anywhere inside the section. */
+
+.notesEditorWrap {
+  border-radius: 0 var(--r-4) var(--r-4) 0;
+  transition:
+    filter 0.18s,
+    background 0.18s,
+    border-color 0.18s;
+}
+
+.notesEditorHidden {
+  filter: blur(3.5px);
+  background: var(--ink-50);
+  border-left: 2px solid var(--ink-200);
+  /* Prevent selecting hidden notes text via keyboard. */
+  user-select: none;
+  pointer-events: none;
+}
+
+.notesEditorVisible {
+  filter: none;
+  background: var(--important-bg);
+  border-left: 2px solid var(--important);
+  pointer-events: auto;
+}
+
+/* Respect prefers-reduced-motion for the reveal transition. */
+@media (prefers-reduced-motion: reduce) {
+  .notesEditorWrap {
+    transition: none;
+  }
+}

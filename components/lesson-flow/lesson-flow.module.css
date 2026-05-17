@@ -1,0 +1,391 @@
+/* lesson-flow.module.css — per-lesson section editor.
+ *
+ * Layout overview:
+ *   .root           → flex column container
+ *   .list           → <ol> of section .card items
+ *   .card           → single section card (flex column)
+ *   .cardHeader     → drag handle + index badge + remove button (flex row)
+ *   .headingRow     → RichTextEditor (singleLine) for the section heading
+ *   .bodyRow        → RichTextEditor (multi-line) for the section body
+ *   .resourcesArea  → drop zone: resource chips + "+ Add resource" button
+ *   .resourceChips  → flex-wrap list of .chip items
+ *   .chip           → resource type icon + label + remove button
+ *   .addSectionBtn  → footer "+ Add section" button
+ *
+ * All color, type, and spacing via var(--token).
+ * No hard-coded hex values or px font sizes.
+ */
+
+/* ── Root ────────────────────────────────────────────────────────────── */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Section list ────────────────────────────────────────────────────── */
+/* <ol> reset — numbers rendered as custom pills, not native counters. */
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Section card ────────────────────────────────────────────────────── */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 14px 16px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-150);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.card:hover {
+  border-color: var(--ink-200);
+}
+
+/* Ghost appearance while dragging this card */
+.cardDragging {
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+/* Highlighted drop slot when a section is dragged over it */
+.cardDropTarget {
+  border-color: var(--ink-400);
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 2px var(--ink-150);
+}
+
+/* ── Card header: drag handle + index pill + remove ─────────────────── */
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Drag handle ─────────────────────────────────────────────────────── */
+/* ≥44px touch target; mouse cursor shows the grab affordance. */
+.dragHandle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 44×44 touch target — same spec as every primary button */
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-6);
+  border: none;
+  background: transparent;
+  color: var(--ink-300);
+  cursor: grab;
+  flex: 0 0 auto;
+  /* Slightly smaller rendered area inside the touch target. */
+  padding: 0;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.dragHandle:hover {
+  background: var(--ink-100);
+  color: var(--ink-500);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Section index pill ──────────────────────────────────────────────── */
+.sectionIndex {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ink-100);
+  color: var(--ink-500);
+  font-size: var(--t-11);
+  font-weight: 700;
+  line-height: 1;
+  flex: 0 0 auto;
+  user-select: none;
+}
+
+/* Remove button pushed to the trailing end */
+.cardHeader .removeBtn {
+  margin-left: auto;
+}
+
+/* ── Shared icon button ──────────────────────────────────────────────── */
+/* ≥44px touch target; used for remove-section and chip remove. */
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-6);
+  border: none;
+  background: transparent;
+  color: var(--ink-400);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.iconBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.iconBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.iconBtn:disabled {
+  color: var(--ink-200);
+  cursor: not-allowed;
+  background: transparent;
+}
+
+/* Remove button: destructive tint on hover */
+.removeBtn:not(:disabled):hover {
+  background: var(--urgent-bg);
+  color: var(--urgent);
+}
+
+/* ── Heading row ─────────────────────────────────────────────────────── */
+/* Thin wrapper — border styled here so the heading feels distinct from
+   the body editor below it, but the RichTextEditor provides its own
+   internal chrome. We don't add extra padding here to avoid double-spacing
+   when the editor has its own padding. */
+.headingRow {
+  /* Decorative left accent bar aligned with the section's heading. */
+  border-left: 3px solid var(--ink-150);
+  padding-left: 10px;
+}
+
+/* ── Body row ────────────────────────────────────────────────────────── */
+.bodyRow {
+  /* Inset from the left accent so body content sits inside the heading's
+     visual column. */
+  padding-left: 13px;
+}
+
+/* ── Resources area ──────────────────────────────────────────────────── */
+/* Drop target for resource chips dragged from another section. */
+.resourcesArea {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-6);
+  border: 1.5px dashed var(--ink-150);
+  background: var(--ink-50);
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+  /* Inset with the body column */
+  margin-left: 13px;
+}
+
+/* Highlighted when a resource chip is dragged over this area */
+.resourcesAreaOver {
+  border-color: var(--ink-400);
+  background: var(--ink-100);
+}
+
+/* ── Resource chip list ──────────────────────────────────────────────── */
+.resourceChips {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ── Resource chip ───────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 240px;
+  height: 30px;
+  padding: 0 6px 0 8px;
+  border-radius: var(--r-6);
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  font-size: var(--t-12);
+  color: var(--ink-700);
+  cursor: grab;
+  box-shadow: var(--shadow-card);
+  transition:
+    border-color 0.1s ease,
+    box-shadow 0.1s ease;
+  /* Prevent the chip list from wrapping awkwardly */
+  white-space: nowrap;
+}
+
+.chip:hover {
+  border-color: var(--ink-300);
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 1px var(--ink-150);
+}
+
+.chip:active {
+  cursor: grabbing;
+}
+
+/* Type icon inside the chip */
+.chipIcon {
+  display: flex;
+  align-items: center;
+  color: var(--ink-400);
+  flex: 0 0 auto;
+}
+
+/* Label text — truncate if overlong */
+.chipLabel {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Remove button inside the chip — smaller than the main icon buttons */
+.chipRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 28px within the 30px chip — still comfortably tappable. */
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-4);
+  border: none;
+  background: transparent;
+  color: var(--ink-300);
+  cursor: pointer;
+  flex: 0 0 auto;
+  padding: 0;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.chipRemove:hover {
+  background: var(--urgent-bg);
+  color: var(--urgent);
+}
+
+.chipRemove:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Add resource button ─────────────────────────────────────────────── */
+/* Compact inline add affordance inside the resource area. */
+.addResourceBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  /* ≥44px touch target height */
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: var(--r-6);
+  border: none;
+  background: transparent;
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-400);
+  cursor: pointer;
+  align-self: flex-start;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+  font-family: inherit;
+}
+
+.addResourceBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.addResourceBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Add section button ──────────────────────────────────────────────── */
+/* Footer affordance, full-width dashed placeholder style. */
+.addSectionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* ≥44px touch target height */
+  min-height: 44px;
+  padding: 0 14px;
+  margin-top: 12px;
+  border-radius: var(--r-8);
+  border: 1.5px dashed var(--ink-200);
+  background: transparent;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-500);
+  cursor: pointer;
+  align-self: flex-start;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+  font-family: inherit;
+}
+
+.addSectionBtn:hover {
+  border-color: var(--ink-400);
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+.addSectionBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+/* Transitions are stripped to near-instant under prefers-reduced-motion;
+   the .cp-root rule in tokens.css already covers child elements, but we
+   mirror it here for elements that sit outside .cp-root scope. */
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .dragHandle,
+  .iconBtn,
+  .chip,
+  .chipRemove,
+  .addResourceBtn,
+  .addSectionBtn,
+  .resourcesArea {
+    transition-duration: 0.001ms !important;
+  }
+}
