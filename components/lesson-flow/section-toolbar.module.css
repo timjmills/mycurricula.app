@@ -1,0 +1,188 @@
+/* section-toolbar.module.css — padlet-style hover toolbar for lesson sections.
+ *
+ * The toolbar is a compact floating pill of icon buttons that appears when
+ * a section card is hovered or has keyboard focus inside it. It sits in the
+ * top-right corner of the card, overlaying the card surface.
+ *
+ * Visibility is controlled by a CSS custom property --toolbar-visible
+ * (0 = hidden, 1 = visible) toggled from the parent card wrapper via
+ * data-toolbar-visible. This keeps the show/hide purely in CSS so the
+ * keyboard focus path (FocusWithin) also works without JS re-renders.
+ *
+ * Layout:
+ *   .toolbar       → the floating pill container (flex row)
+ *   .btn           → each icon button (tooltip on hover)
+ *   .tooltip       → the small dark label revealed on button hover
+ *   .btnActive     → active (pressed/toggled) variant for the globe button
+ *   .btnDanger     → danger variant for the delete button
+ *   .divider       → a thin vertical rule separating button groups
+ *
+ * All color, type, and spacing via var(--token).
+ * No hard-coded hex values or px font sizes.
+ */
+
+/* ── Toolbar container ───────────────────────────────────────────────── */
+/* Floats in the top-right corner of the card, revealed on hover/focus. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-150);
+  background: var(--paper);
+  box-shadow: var(--shadow-popover);
+
+  /* Visibility: animated fade + tiny upward slide.
+     The parent wrapper sets data-toolbar-visible to "true" on hover/focus;
+     the card wrapper CSS uses the [data-toolbar-visible="true"] selector. */
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+
+  /* Stacking: above card content */
+  position: relative;
+  z-index: 10;
+}
+
+/* Revealed state — parent wrapper applies this via data attribute */
+.toolbarVisible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* ── Icon button ─────────────────────────────────────────────────────── */
+/* Comfortably tappable; tooltip via sibling .tooltip. */
+.btn {
+  /* Visual */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-6);
+  border: none;
+  background: transparent;
+  color: var(--ink-400);
+  cursor: pointer;
+  flex: 0 0 auto;
+
+  /* Touch target expansion — the button is 30px but touch spec is ≥44px.
+     We expand the tap area via padding / margin trick without breaking layout.
+     Horizontal: keep 30px visual; Vertical: expand to 44px tap area. */
+  padding: 7px 0;
+  margin: -7px 0;
+
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+
+  /* Tooltip anchor */
+  position: relative;
+}
+
+.btn:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  color: var(--ink-200);
+  cursor: not-allowed;
+  background: transparent;
+}
+
+/* ── Active / toggled button (globe "Show on Class Website") ─────────── */
+.btnActive {
+  color: var(--fyi);
+  background: var(--fyi-bg);
+}
+
+.btnActive:hover {
+  color: var(--fyi);
+  background: var(--fyi-bg);
+  filter: brightness(0.95);
+}
+
+/* ── Danger button (delete) ─────────────────────────────────────────── */
+.btnDanger:not(:disabled):hover {
+  background: var(--urgent-bg);
+  color: var(--urgent);
+}
+
+/* ── Tooltip ─────────────────────────────────────────────────────────── */
+/* Small dark label that appears below the button on hover — matches the
+   Padlet "Show on Class Website" tooltip style in the reference. */
+.tooltip {
+  position: absolute;
+  /* Appear below the button */
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+
+  /* Dark pill label */
+  background: var(--ink-900);
+  color: var(--paper);
+  font-size: var(--t-11);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  padding: 5px 8px;
+  border-radius: var(--r-4);
+
+  /* Hidden until button is hovered */
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+
+  /* Stacking: above everything */
+  z-index: 100;
+}
+
+/* Small up-pointing notch */
+.tooltip::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-bottom-color: var(--ink-900);
+}
+
+/* Reveal the tooltip on button hover or focus-visible */
+.btn:hover .tooltip,
+.btn:focus-visible .tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Group divider ───────────────────────────────────────────────────── */
+/* Thin vertical rule between logical button groups. */
+.divider {
+  width: 1px;
+  height: 18px;
+  background: var(--ink-150);
+  flex: 0 0 auto;
+  margin: 0 2px;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .toolbar,
+  .btn,
+  .tooltip {
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -23,6 +23,27 @@
   gap: 0;
 }
 
+/* ── Section card wrapper ────────────────────────────────────────────── */
+/* Positions the SectionToolbar in the top-right corner of the card while
+   keeping the card itself in normal flow. The wrapper is the hover/focus
+   boundary — hover or focus-within on the wrapper reveals the toolbar. */
+.cardWrapper {
+  position: relative;
+}
+
+/* ── Toolbar anchor ──────────────────────────────────────────────────── */
+/* Absolutely positioned in the top-right corner of the card wrapper so the
+   toolbar floats above the card without shifting the card's own content. */
+.toolbarAnchor {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 10;
+  /* Pointer events off by default; toolbar.module.css turns them back on
+     when the toolbar is visible. */
+  pointer-events: none;
+}
+
 /* ── Section list ────────────────────────────────────────────────────── */
 /* <ol> reset — numbers rendered as custom pills, not native counters. */
 .list {
@@ -359,28 +380,49 @@
   outline-offset: 2px;
 }
 
+/* ── Add section row ─────────────────────────────────────────────────── */
+/* Padlet-style footer: a full-width row with a centered "+" pill and
+   optional between-section affordances. */
+.addSectionRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.addSectionRow::before,
+.addSectionRow::after {
+  content: "";
+  flex: 1 1 0;
+  height: 1px;
+  background: var(--ink-150);
+  border-radius: 1px;
+}
+
 /* ── Add section button ──────────────────────────────────────────────── */
-/* Footer affordance, full-width dashed placeholder style. */
+/* Padlet-style centered pill — grows to fill the row between the two
+   decorative rules. */
 .addSectionBtn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   /* ≥44px touch target height */
   min-height: 44px;
-  padding: 0 14px;
-  margin-top: 12px;
+  padding: 0 18px;
   border-radius: var(--r-8);
   border: 1.5px dashed var(--ink-200);
-  background: transparent;
+  background: var(--paper);
   font-size: var(--t-13);
   font-weight: 600;
   color: var(--ink-500);
   cursor: pointer;
-  align-self: flex-start;
+  flex: 0 0 auto;
+  white-space: nowrap;
   transition:
     border-color 0.12s ease,
     background 0.12s ease,
-    color 0.12s ease;
+    color 0.12s ease,
+    box-shadow 0.12s ease;
   font-family: inherit;
 }
 
@@ -388,6 +430,7 @@
   border-color: var(--ink-400);
   background: var(--ink-50);
   color: var(--ink-900);
+  box-shadow: var(--shadow-card);
 }
 
 .addSectionBtn:focus-visible {

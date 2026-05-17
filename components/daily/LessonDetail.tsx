@@ -2,23 +2,25 @@
 
 // LessonDetail.tsx — Right pane: full lesson detail for a selected lesson.
 //
-// Shown when a lesson is selected in the Daily view's left pane. Displays
-// title, "I Can" objective, the structured lesson-flow editor (replacing the
-// former flat directions block), an editable teacher-notes field, a resource
-// list, and the standards block with inline descriptions.
+// Redesigned as one cohesive tinted block — the entire surface is tinted in
+// the lesson's subject color (--cl), with a stronger-tinted header band at
+// the top carrying subject · time · title, the "I Can" objective just below,
+// and the lesson sections (via <LessonFlow>) flowing as the body. Notes,
+// resources, and standards are styled as belonging to the same tinted surface
+// rather than separate floating boxes.
 //
-// Subject color is injected via cp-subj + subjectId class so the CSS
-// variable cascade (--c / --cl / --cd) flows through every token reference
-// without prop drilling.
+// Subject color is injected via `cp-subj ${subj.cls}` so the CSS variable
+// cascade (--c / --cl / --cd) flows through every token reference without
+// prop drilling.
 //
-// Lesson sections are per-session local state keyed by lesson.id — the
-// component re-instantiates them from the default template when the selected
-// lesson changes. Persistence will arrive with the Supabase backend.
+// Section and notes state: per-session local state keyed by lesson.id — a
+// clean slate is re-instantiated when the selected lesson changes. Persistence
+// arrives with the Supabase backend.
 
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import type { Lesson } from "@/lib/types";
-import { SUBJECT_BY_ID, UNITS, describeStandard } from "@/lib/mock";
+import { SUBJECT_BY_ID, UNITS, describeStandard, lessonTime } from "@/lib/mock";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
 import { instantiateSections } from "@/lib/lesson-flow";
@@ -27,7 +29,6 @@ import {
   LESSON_TEMPLATE_BY_ID,
   DEFAULT_LESSON_TEMPLATE_ID,
 } from "@/lib/lesson-templates";
-import styles from "./DailyView.module.css";
 import detailStyles from "./lesson-detail.module.css";
 
 // ── Small inline icon set ────────────────────────────────────────────────
@@ -244,7 +245,7 @@ function StatusCheckbox({
         width="12.8"
         height="12.8"
         rx="3"
-        stroke="var(--ink-300)"
+        stroke="currentColor"
         strokeWidth="1.2"
       />
     </svg>
@@ -288,7 +289,7 @@ export function LessonDetail({
   onToggleComplete,
 }: LessonDetailProps): ReactNode {
   const subj = SUBJECT_BY_ID[lesson.subject];
-  // Fix #4: guard the UNITS lookup so a missing entry can't crash the render.
+  // Guard the UNITS lookup so a missing entry can't crash the render.
   const unit = UNITS[lesson.subject] ?? {
     name: "—",
     id: "",
@@ -330,58 +331,77 @@ export function LessonDetail({
     onToggleComplete(lesson.id, next);
   }
 
+  // Time label from the mock schedule (uses lesson.time override if set).
+  const timeLabel = lessonTime(lesson);
+
   return (
     <div
-      className={`${styles.detailRoot} cp-subj ${subj.cls}`}
+      className={`${detailStyles.root} cp-subj ${subj.cls}`}
       role="region"
       aria-label={`Lesson detail: ${lesson.title}`}
     >
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className={styles.detailHeader}>
-        {/* Eyebrow: subject dot · subject name · unit name */}
-        <div className={styles.detailEyebrow}>
-          <span className={styles.detailColorDot} aria-hidden="true" />
-          {subj.name}
-          <span className={styles.detailSep} aria-hidden="true">
+      {/* ── Header band ────────────────────────────────────────────────
+          Stronger subject-tint strip at the top: subject · time · title.
+          The "I Can" objective sits in a softer inset just below. */}
+      <div className={detailStyles.headerBand}>
+        {/* Eyebrow row: color chip · subject name · separator · time */}
+        <div className={detailStyles.eyebrow}>
+          <span className={detailStyles.eyebrowDot} aria-hidden="true" />
+          <span className={detailStyles.eyebrowSubject}>{subj.name}</span>
+          {lesson.isPersonal && (
+            <span className={detailStyles.eyebrowPersonal}>Personal</span>
+          )}
+          <span className={detailStyles.eyebrowSep} aria-hidden="true">
             ·
           </span>
-          <span className={styles.detailUnitName}>{unit.name}</span>
-          {lesson.isPersonal && (
-            <>
-              <span className={styles.detailSep} aria-hidden="true">
-                ·
-              </span>
-              <span
-                style={{
-                  color: "var(--ink-700)",
-                  textTransform: "none",
-                  letterSpacing: 0,
-                  fontWeight: 400,
-                }}
-              >
-                Personal
-              </span>
-            </>
-          )}
+          {/* Clock icon */}
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 11 11"
+            fill="none"
+            aria-hidden="true"
+            className={detailStyles.eyebrowClockIcon}
+          >
+            <circle
+              cx="5.5"
+              cy="5.5"
+              r="4.5"
+              stroke="currentColor"
+              strokeWidth="1.2"
+            />
+            <path
+              d="M5.5 3v2.5l1.8 1.1"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className={detailStyles.eyebrowTime}>{timeLabel}</span>
+          <span className={detailStyles.eyebrowSep} aria-hidden="true">
+            ·
+          </span>
+          <span className={detailStyles.eyebrowUnit}>{unit.name}</span>
         </div>
 
-        {/* Title */}
-        <h2 className={styles.detailTitle}>{lesson.title}</h2>
+        {/* Lesson title */}
+        <h2 className={detailStyles.title}>{lesson.title}</h2>
 
-        {/* "I Can" objective block */}
+        {/* "I Can" objective — inset below the title in the header band */}
         {lesson.objective && (
-          <div className={styles.detailObjective}>
-            <span className={styles.detailObjectiveBadge}>I can</span>
-            <span className={styles.detailObjectiveText}>
+          <div className={detailStyles.objective}>
+            <span className={detailStyles.objectiveBadge}>I can</span>
+            <span className={detailStyles.objectiveText}>
               {lesson.objective.replace(/^I can\s+/i, "")}
             </span>
           </div>
         )}
 
-        {/* Completion actions */}
-        <div className={styles.detailActions}>
+        {/* Action bar — completion controls + utility icons */}
+        <div className={detailStyles.actions}>
           <button
-            className={`${styles.detailActionBtn} ${lesson.status === "done" ? styles.detailActionBtnDone : ""}`}
+            className={`${detailStyles.actionBtn} ${lesson.status === "done" ? detailStyles.actionBtnDone : ""}`}
             onClick={cycleStatus}
             aria-label={
               lesson.status === "done" ? "Mark as not done" : "Mark as done"
@@ -390,8 +410,8 @@ export function LessonDetail({
             <StatusCheckbox status={lesson.status} size={14} />
             {lesson.status === "done" ? "Done" : "Mark done"}
           </button>
-          <button className={styles.detailActionBtn} aria-label="Change status">
-            {/* Dots icon */}
+          <button className={detailStyles.actionBtn} aria-label="Change status">
+            {/* Three-dots icon */}
             <svg
               width="12"
               height="12"
@@ -406,7 +426,8 @@ export function LessonDetail({
             Status
           </button>
           <div style={{ flex: 1 }} />
-          <button className={styles.detailActionIcon} aria-label="Print lesson">
+          <button className={detailStyles.actionIcon} aria-label="Print lesson">
+            {/* Printer icon */}
             <svg
               width="14"
               height="14"
@@ -442,7 +463,8 @@ export function LessonDetail({
               />
             </svg>
           </button>
-          <button className={styles.detailActionIcon} aria-label="More options">
+          <button className={detailStyles.actionIcon} aria-label="More options">
+            {/* Vertical three-dots icon */}
             <svg
               width="14"
               height="14"
@@ -458,15 +480,15 @@ export function LessonDetail({
         </div>
       </div>
 
-      {/* ── Scrollable body ─────────────────────────────────────────── */}
-      <div className={styles.detailBody}>
-        {/* ── Lesson Flow — structured, editable sections ─────────── */}
-        {/* Replaces the former flat "Directions" block. Sections come from
-            the default lesson-flow template and are re-instantiated fresh
-            each time a different lesson is selected. The key prop ensures
-            LessonFlow's own internal drag state also resets. */}
-        <section className={styles.detailSection} aria-label="Lesson flow">
-          <div className={styles.detailSectionHead}>
+      {/* ── Scrollable body ─────────────────────────────────────────────
+          All sections sit on the tinted surface — no inner box borders.
+          Each named section has a small uppercase label above its content. */}
+      <div className={detailStyles.body}>
+        {/* ── Lesson Flow — structured section editor ──────────────── */}
+        {/* Sections from the default template, re-instantiated per lesson.
+            The key prop ensures LessonFlow's drag state also resets. */}
+        <section className={detailStyles.section} aria-label="Lesson flow">
+          <div className={detailStyles.sectionHead}>
             {/* Flow icon */}
             <svg
               width="11"
@@ -504,7 +526,7 @@ export function LessonDetail({
             </svg>
             Lesson Flow
           </div>
-          <div className={detailStyles.lessonFlowWrap}>
+          <div className={detailStyles.flowWrap}>
             <LessonFlow
               key={lesson.id}
               sections={sections}
@@ -513,18 +535,17 @@ export function LessonDetail({
           </div>
         </section>
 
-        {/* ── Teacher Notes — editable rich text, hover-revealed ───── */}
-        {/* RichTextEditor is always rendered (not gated on lesson.notes)
-            so teachers can add notes to any lesson. Reveal on hover
-            preserves the existing "private by default" UX. */}
+        {/* ── Teacher Notes — editable rich text, hover-revealed ──── */}
+        {/* Always rendered (not gated on lesson.notes) so teachers can
+            add notes to any lesson. Blur-on-idle preserves privacy UX. */}
         <section
-          className={styles.detailSection}
+          className={detailStyles.section}
           onMouseEnter={() => setNotesHovered(true)}
           onMouseLeave={() => setNotesHovered(false)}
           onFocusCapture={() => setNotesHovered(true)}
           onBlurCapture={() => setNotesHovered(false)}
         >
-          <div className={styles.detailSectionHead}>
+          <div className={detailStyles.sectionHead}>
             {/* Eye icon */}
             <svg
               width="11"
@@ -544,19 +565,16 @@ export function LessonDetail({
               <circle cx="5.5" cy="5.5" r="1.8" fill="currentColor" />
             </svg>
             My notes
-            <span
-              style={{
-                color: "var(--ink-300)",
-                textTransform: "none",
-                letterSpacing: 0,
-                fontWeight: 400,
-              }}
-            >
+            <span className={detailStyles.sectionHeadHint}>
               (hover to reveal)
             </span>
           </div>
           <div
-            className={`${detailStyles.notesEditorWrap} ${notesHovered ? detailStyles.notesEditorVisible : detailStyles.notesEditorHidden}`}
+            className={`${detailStyles.notesWrap} ${
+              notesHovered
+                ? detailStyles.notesVisible
+                : detailStyles.notesHidden
+            }`}
           >
             <RichTextEditor
               value={notesHtml}
@@ -567,10 +585,10 @@ export function LessonDetail({
           </div>
         </section>
 
-        {/* Resources */}
+        {/* ── Resources ───────────────────────────────────────────── */}
         {lesson.resources.length > 0 && (
-          <section className={styles.detailSection}>
-            <div className={styles.detailSectionHead}>
+          <section className={detailStyles.section}>
+            <div className={detailStyles.sectionHead}>
               {/* Paperclip icon */}
               <svg
                 width="11"
@@ -588,27 +606,28 @@ export function LessonDetail({
               </svg>
               Resources · {lesson.resources.length}
             </div>
-            <div>
+            <div className={detailStyles.resourceList} role="list">
               {lesson.resources.map((r, i) => (
-                <div key={i} className={styles.resourceItem} role="listitem">
+                <div
+                  key={i}
+                  className={detailStyles.resourceItem}
+                  role="listitem"
+                >
                   <span
-                    className={styles.resourceIcon}
+                    className={detailStyles.resourceIcon}
                     style={{
-                      background: `color-mix(in oklch, ${RESOURCE_COLORS[r.type] ?? "var(--ink-300)"} 15%, var(--ink-50))`,
+                      background: `color-mix(in oklch, ${RESOURCE_COLORS[r.type] ?? "var(--ink-300)"} 15%, var(--paper))`,
                       color: RESOURCE_COLORS[r.type] ?? "var(--ink-500)",
                     }}
                     aria-hidden="true"
                   >
                     <ResourceTypeIcon type={r.type} />
                   </span>
-                  <span style={{ flex: 1, fontSize: "var(--t-12)" }}>
-                    {r.label}
-                  </span>
+                  <span className={detailStyles.resourceLabel}>{r.label}</span>
                   <span
+                    className={detailStyles.resourceType}
                     style={{
-                      fontSize: "var(--t-11)",
                       color: RESOURCE_COLORS[r.type] ?? "var(--ink-400)",
-                      fontWeight: 500,
                     }}
                   >
                     {r.type}
@@ -619,10 +638,10 @@ export function LessonDetail({
           </section>
         )}
 
-        {/* Standards */}
+        {/* ── Standards ───────────────────────────────────────────── */}
         {lesson.standards.length > 0 && (
-          <section className={styles.detailSection}>
-            <div className={styles.detailSectionHead}>
+          <section className={detailStyles.section}>
+            <div className={detailStyles.sectionHead}>
               {/* Standards badge icon */}
               <svg
                 width="11"
@@ -659,16 +678,16 @@ export function LessonDetail({
               </svg>
               Standards · {lesson.standards.length}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div className={detailStyles.standardsList}>
               {lesson.standards.map((code) => (
                 <div
                   key={code}
-                  className={`${styles.standardItem} cp-subj ${lesson.subject}`}
+                  className={`${detailStyles.standardItem} cp-subj ${lesson.subject}`}
                 >
-                  <span className={`${styles.standardCode} cp-mono`}>
+                  <span className={`${detailStyles.standardCode} cp-mono`}>
                     {code}
                   </span>
-                  <span className={styles.standardDesc}>
+                  <span className={detailStyles.standardDesc}>
                     {describeStandard(code)}
                   </span>
                 </div>
@@ -676,6 +695,90 @@ export function LessonDetail({
             </div>
           </section>
         )}
+
+        {/* ── Footer affordance row ────────────────────────────────── */}
+        {/* Padlet-style "+ Add section" / "Edit Template" buttons live at
+            the bottom of the tinted surface, visually closing the block. */}
+        <div className={detailStyles.footer}>
+          <button className={detailStyles.footerBtn}>
+            {/* Plus icon */}
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 11 11"
+              fill="none"
+              aria-hidden="true"
+            >
+              <line
+                x1="5.5"
+                y1="1"
+                x2="5.5"
+                y2="10"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+              <line
+                x1="1"
+                y1="5.5"
+                x2="10"
+                y2="5.5"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+            </svg>
+            Add section
+          </button>
+          <button className={detailStyles.footerBtn}>
+            {/* Template / grid icon */}
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 11 11"
+              fill="none"
+              aria-hidden="true"
+            >
+              <rect
+                x="0.75"
+                y="0.75"
+                width="4"
+                height="4"
+                rx="0.8"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+              <rect
+                x="6.25"
+                y="0.75"
+                width="4"
+                height="4"
+                rx="0.8"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+              <rect
+                x="0.75"
+                y="6.25"
+                width="4"
+                height="4"
+                rx="0.8"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+              <rect
+                x="6.25"
+                y="6.25"
+                width="4"
+                height="4"
+                rx="0.8"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+            </svg>
+            Edit Template
+          </button>
+        </div>
       </div>
     </div>
   );

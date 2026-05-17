@@ -14,6 +14,11 @@
 // Keyboard reorder: each section also has Move Up / Move Down buttons so
 // section order is fully operable without a mouse.
 //
+// Padlet-style toolbar: each card shows a SectionToolbar on hover or on
+// keyboard focus-within. The toolbar provides quick-access actions (add
+// resource/image/note, move, duplicate, class-website toggle, delete)
+// without polluting the card's persistent chrome.
+//
 // The component is fully controlled — all mutations call `onChange` with
 // an immutable rebuilt array; section order in local state is never used
 // as the authoritative source.
@@ -23,6 +28,7 @@ import { useState } from "react";
 import type { LessonSectionContent, SectionResource } from "@/lib/lesson-flow";
 import { newLessonSection, newSectionResource } from "@/lib/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
+import { SectionToolbar } from "./section-toolbar";
 import styles from "./lesson-flow.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -63,6 +69,17 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
   const [overSectionId, setOverSectionId] = useState<string | null>(null);
   // Which section card is the drop target for reordering.
   const [overCardId, setOverCardId] = useState<string | null>(null);
+
+  // Toolbar hover state — which section card the mouse is currently over.
+  // This is separate from keyboard focus-within, which is handled via CSS
+  // :focus-within on the card wrapper (no JS needed for that path).
+  const [hoveredSectionId, setHoveredSectionId] = useState<string | null>(null);
+
+  // Per-section "show on class website" toggle — local UI state (no backend yet).
+  // Keyed by section id; absent means false.
+  const [websiteVisible, setWebsiteVisible] = useState<Record<string, boolean>>(
+    {},
+  );
 
   // ── Mutation helpers ─────────────────────────────────────────────────
 
@@ -119,6 +136,55 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
     patchSection(sectionId, {
       resources: section.resources.filter((r) => r.id !== resourceId),
     });
+  }
+
+  /** Append an image resource to a section (toolbar "Add image" action). */
+  function addImageResource(sectionId: string): void {
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    patchSection(sectionId, {
+      resources: [
+        ...section.resources,
+        newSectionResource("image", "New image"),
+      ],
+    });
+  }
+
+  /** Append a note/comment resource to a section (toolbar "Add note" action).
+   *  Uses the "link" type as a lightweight stand-in until a dedicated note
+   *  resource type is added to the data model. */
+  function addNoteResource(sectionId: string): void {
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    patchSection(sectionId, {
+      resources: [...section.resources, newSectionResource("link", "New note")],
+    });
+  }
+
+  /** Duplicate a section — insert a deep copy immediately after it. */
+  function duplicateSection(id: string): void {
+    const idx = sections.findIndex((s) => s.id === id);
+    if (idx === -1) return;
+    const source = sections[idx];
+    // Deep-copy the section with a fresh id so both can be edited independently.
+    const copy: LessonSectionContent = {
+      ...source,
+      id: `lsec-${Date.now().toString(36)}-dup`,
+      heading: source.heading,
+      resources: source.resources.map((r) => ({
+        ...r,
+        id: `res-${Date.now().toString(36)}-${r.id}`,
+      })),
+    };
+    const next = [...sections];
+    next.splice(idx + 1, 0, copy);
+    onChange(next);
+  }
+
+  /** Toggle the "show on class website" flag for a section.
+   *  Local UI state only — no backend write until Phase 1B. */
+  function toggleWebsiteVisible(id: string): void {
+    setWebsiteVisible((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
   // ── Section drag-and-drop ─────────────────────────────────────────────
@@ -306,174 +372,215 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
           const isFirst = idx === 0;
           const isLast = idx === sections.length - 1;
 
+          // Toolbar is visible when the mouse is over this card wrapper OR
+          // when keyboard focus is somewhere inside it (handled via
+          // :focus-within CSS on the wrapper — no JS for the focus path).
+          // We only manage the hover path here in JS state.
+          const toolbarVisible = hoveredSectionId === section.id;
+
           return (
-            <li
+            // Card wrapper — the hover/focus boundary for the toolbar.
+            <div
               key={section.id}
-              className={[
-                styles.card,
-                isDraggingThis ? styles.cardDragging : "",
-                isDropTarget ? styles.cardDropTarget : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onDragOver={(e) => handleCardDragOver(e, section.id)}
-              onDrop={(e) => handleCardDrop(e, section.id)}
-              onDragLeave={(e) => handleCardDragLeave(e, section.id)}
+              className={styles.cardWrapper}
+              onMouseEnter={() => setHoveredSectionId(section.id)}
+              onMouseLeave={() =>
+                setHoveredSectionId((prev) =>
+                  prev === section.id ? null : prev,
+                )
+              }
             >
-              {/* ── Section header: drag handle + index + reorder + remove ── */}
-              <div className={styles.cardHeader}>
-                {/* Drag handle — mouse reorder affordance */}
-                <button
-                  type="button"
-                  className={styles.dragHandle}
-                  draggable
-                  onDragStart={() => handleSectionDragStart(section.id)}
-                  onDragEnd={handleSectionDragEnd}
-                  aria-label={`Drag to reorder section ${idx + 1}`}
-                  title="Drag to reorder"
-                >
-                  <DragIcon />
-                </button>
-
-                <span className={styles.sectionIndex} aria-hidden="true">
-                  {idx + 1}
-                </span>
-
-                {/* Keyboard reorder buttons — move-up / move-down */}
-                <div
-                  className={styles.reorderBtns}
-                  aria-label={`Reorder section ${idx + 1}`}
-                >
-                  <button
-                    type="button"
-                    className={`${styles.iconBtn} ${styles.reorderBtn}`}
-                    onClick={() => moveSectionUp(section.id)}
-                    disabled={isFirst}
-                    aria-label={`Move section ${idx + 1} up`}
-                    title="Move up"
-                  >
-                    <ChevronUpIcon />
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.iconBtn} ${styles.reorderBtn}`}
-                    onClick={() => moveSectionDown(section.id)}
-                    disabled={isLast}
-                    aria-label={`Move section ${idx + 1} down`}
-                    title="Move down"
-                  >
-                    <ChevronDownIcon />
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  className={`${styles.iconBtn} ${styles.removeBtn}`}
-                  onClick={() => removeSection(section.id)}
-                  disabled={sections.length <= 1}
-                  aria-label={`Remove section ${idx + 1}`}
-                  title="Remove section"
-                >
-                  <RemoveIcon />
-                </button>
-              </div>
-
-              {/* ── Section heading — styleable rich text, single line ── */}
-              <div className={styles.headingRow}>
-                <RichTextEditor
-                  value={section.heading}
-                  onChange={(html) =>
-                    patchSection(section.id, { heading: html })
-                  }
-                  singleLine
-                  placeholder="Section heading…"
-                  ariaLabel={`Heading for section ${idx + 1}`}
+              {/* ── Padlet-style hover toolbar ─────────────────────── */}
+              <div className={styles.toolbarAnchor}>
+                <SectionToolbar
+                  visible={toolbarVisible}
+                  onAddResource={() => addResource(section.id)}
+                  onAddImage={() => addImageResource(section.id)}
+                  onAddNote={() => addNoteResource(section.id)}
+                  onMoveUp={() => moveSectionUp(section.id)}
+                  onMoveDown={() => moveSectionDown(section.id)}
+                  onDuplicate={() => duplicateSection(section.id)}
+                  onToggleWebsite={() => toggleWebsiteVisible(section.id)}
+                  onDelete={() => removeSection(section.id)}
+                  websiteVisible={websiteVisible[section.id] ?? false}
+                  canMoveUp={!isFirst}
+                  canMoveDown={!isLast}
                 />
               </div>
 
-              {/* ── Section body ── */}
-              <div className={styles.bodyRow}>
-                <RichTextEditor
-                  value={section.body}
-                  onChange={(html) => patchSection(section.id, { body: html })}
-                  placeholder={section.prompt || "Start writing…"}
-                  ariaLabel={`Body for section ${idx + 1}`}
-                />
-              </div>
-
-              {/* ── Resources area ── */}
-              <div
+              <li
                 className={[
-                  styles.resourcesArea,
-                  isResourceTarget ? styles.resourcesAreaOver : "",
+                  styles.card,
+                  isDraggingThis ? styles.cardDragging : "",
+                  isDropTarget ? styles.cardDropTarget : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                onDragOver={(e) => handleResourceZoneDragOver(e, section.id)}
-                onDrop={(e) => handleResourceZoneDrop(e, section.id)}
-                onDragLeave={(e) => handleResourceZoneDragLeave(e, section.id)}
+                onDragOver={(e) => handleCardDragOver(e, section.id)}
+                onDrop={(e) => handleCardDrop(e, section.id)}
+                onDragLeave={(e) => handleCardDragLeave(e, section.id)}
               >
-                {/* Existing resource chips */}
-                {section.resources.length > 0 && (
-                  <ul
-                    className={styles.resourceChips}
-                    aria-label={`Resources for section ${idx + 1}`}
+                {/* ── Section header: drag handle + index + reorder + remove ── */}
+                <div className={styles.cardHeader}>
+                  {/* Drag handle — mouse reorder affordance */}
+                  <button
+                    type="button"
+                    className={styles.dragHandle}
+                    draggable
+                    onDragStart={() => handleSectionDragStart(section.id)}
+                    onDragEnd={handleSectionDragEnd}
+                    aria-label={`Drag to reorder section ${idx + 1}`}
+                    title="Drag to reorder"
                   >
-                    {section.resources.map((res) => (
-                      <li
-                        key={res.id}
-                        className={styles.chip}
-                        draggable
-                        onDragStart={() =>
-                          handleResourceDragStart(section.id, res)
-                        }
-                        onDragEnd={handleResourceDragEnd}
-                      >
-                        <span className={styles.chipIcon} aria-hidden="true">
-                          <ResourceTypeIcon type={res.type} />
-                        </span>
-                        <span className={styles.chipLabel}>
-                          {res.label || res.type}
-                        </span>
-                        <button
-                          type="button"
-                          className={styles.chipRemove}
-                          onClick={() => removeResource(section.id, res.id)}
-                          aria-label={`Remove resource: ${res.label || res.type}`}
-                          title="Remove resource"
-                        >
-                          <RemoveIcon />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                    <DragIcon />
+                  </button>
 
-                {/* Add resource affordance */}
-                <button
-                  type="button"
-                  className={styles.addResourceBtn}
-                  onClick={() => addResource(section.id)}
-                  aria-label={`Add resource to section ${idx + 1}`}
+                  <span className={styles.sectionIndex} aria-hidden="true">
+                    {idx + 1}
+                  </span>
+
+                  {/* Keyboard reorder buttons — move-up / move-down */}
+                  <div
+                    className={styles.reorderBtns}
+                    aria-label={`Reorder section ${idx + 1}`}
+                  >
+                    <button
+                      type="button"
+                      className={`${styles.iconBtn} ${styles.reorderBtn}`}
+                      onClick={() => moveSectionUp(section.id)}
+                      disabled={isFirst}
+                      aria-label={`Move section ${idx + 1} up`}
+                      title="Move up"
+                    >
+                      <ChevronUpIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.iconBtn} ${styles.reorderBtn}`}
+                      onClick={() => moveSectionDown(section.id)}
+                      disabled={isLast}
+                      aria-label={`Move section ${idx + 1} down`}
+                      title="Move down"
+                    >
+                      <ChevronDownIcon />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    className={`${styles.iconBtn} ${styles.removeBtn}`}
+                    onClick={() => removeSection(section.id)}
+                    disabled={sections.length <= 1}
+                    aria-label={`Remove section ${idx + 1}`}
+                    title="Remove section"
+                  >
+                    <RemoveIcon />
+                  </button>
+                </div>
+
+                {/* ── Section heading — styleable rich text, single line ── */}
+                <div className={styles.headingRow}>
+                  <RichTextEditor
+                    value={section.heading}
+                    onChange={(html) =>
+                      patchSection(section.id, { heading: html })
+                    }
+                    singleLine
+                    placeholder="Section heading…"
+                    ariaLabel={`Heading for section ${idx + 1}`}
+                  />
+                </div>
+
+                {/* ── Section body ── */}
+                <div className={styles.bodyRow}>
+                  <RichTextEditor
+                    value={section.body}
+                    onChange={(html) =>
+                      patchSection(section.id, { body: html })
+                    }
+                    placeholder={section.prompt || "Start writing…"}
+                    ariaLabel={`Body for section ${idx + 1}`}
+                  />
+                </div>
+
+                {/* ── Resources area ── */}
+                <div
+                  className={[
+                    styles.resourcesArea,
+                    isResourceTarget ? styles.resourcesAreaOver : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onDragOver={(e) => handleResourceZoneDragOver(e, section.id)}
+                  onDrop={(e) => handleResourceZoneDrop(e, section.id)}
+                  onDragLeave={(e) =>
+                    handleResourceZoneDragLeave(e, section.id)
+                  }
                 >
-                  <AddIcon />
-                  Add resource
-                </button>
-              </div>
-            </li>
+                  {/* Existing resource chips */}
+                  {section.resources.length > 0 && (
+                    <ul
+                      className={styles.resourceChips}
+                      aria-label={`Resources for section ${idx + 1}`}
+                    >
+                      {section.resources.map((res) => (
+                        <li
+                          key={res.id}
+                          className={styles.chip}
+                          draggable
+                          onDragStart={() =>
+                            handleResourceDragStart(section.id, res)
+                          }
+                          onDragEnd={handleResourceDragEnd}
+                        >
+                          <span className={styles.chipIcon} aria-hidden="true">
+                            <ResourceTypeIcon type={res.type} />
+                          </span>
+                          <span className={styles.chipLabel}>
+                            {res.label || res.type}
+                          </span>
+                          <button
+                            type="button"
+                            className={styles.chipRemove}
+                            onClick={() => removeResource(section.id, res.id)}
+                            aria-label={`Remove resource: ${res.label || res.type}`}
+                            title="Remove resource"
+                          >
+                            <RemoveIcon />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {/* Add resource affordance */}
+                  <button
+                    type="button"
+                    className={styles.addResourceBtn}
+                    onClick={() => addResource(section.id)}
+                    aria-label={`Add resource to section ${idx + 1}`}
+                  >
+                    <AddIcon />
+                    Add resource
+                  </button>
+                </div>
+              </li>
+            </div>
           );
         })}
       </ol>
 
-      {/* ── Add section ─────────────────────────────────────────────── */}
-      <button
-        type="button"
-        className={styles.addSectionBtn}
-        onClick={addSection}
-      >
-        <AddIcon />
-        Add section
-      </button>
+      {/* ── Add section — padlet-style centered pill ─────────────────── */}
+      <div className={styles.addSectionRow}>
+        <button
+          type="button"
+          className={styles.addSectionBtn}
+          onClick={addSection}
+        >
+          <AddIcon />
+          Add section
+        </button>
+      </div>
     </div>
   );
 }

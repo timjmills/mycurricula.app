@@ -1,28 +1,291 @@
 /* lesson-detail.module.css
-   Additional scoped styles for LessonDetail.tsx only — new rules added when
-   integrating the lesson-flow editor and rich-text notes editor.
-   All tokens are read from tokens.css via var(); no hard-coded values.
-   Do not modify DailyView.module.css for new additions; they belong here. */
+   Scoped styles for the redesigned LessonDetail — one cohesive tinted block
+   driven by the lesson's subject color (--cl / --c / --cd).
 
-/* ── Lesson flow wrapper ─────────────────────────────────────────────────
-   Provides a clean inset surface for the <LessonFlow> component so it
-   sits visually contained within the detail section body. */
+   Layout overview:
+     .root          → full-height flex column; subject tint via --cl.
+     .headerBand    → stronger-tinted header at the top: eyebrow · title · "I Can" · actions.
+     .body          → scrollable body; sections + footer flow in the tint.
+     .section       → each named section (lesson flow, notes, resources, standards).
+     .footer        → padlet-style affordance row closing the block.
 
-.lessonFlowWrap {
-  border: 1px solid var(--ink-150);
+   All tokens are read from tokens.css via var(); no hard-coded hex or px values.
+   Do not modify DailyView.module.css — additions for LessonDetail belong here. */
+
+/* ── Root — the single tinted block ─────────────────────────────────────
+   The whole detail pane is one surface tinted in the lesson's subject light
+   color (--cl). A soft inset shadow lifts it off the containing right pane. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* Subject light tint drives the whole surface. */
+  background: var(--cl, var(--ink-50));
+  /* Subtle inner-edge shadow to give depth against the parent bg. */
+  box-shadow: inset 1px 0 0
+    color-mix(in oklch, var(--c, var(--ink-200)) 20%, transparent);
+}
+
+/* ── Header band ─────────────────────────────────────────────────────────
+   A stronger tint of the subject color — clearly set apart from the body.
+   Carries: eyebrow row (subject · time · unit), title, objective, actions. */
+
+.headerBand {
+  padding: 16px 20px 14px;
+  background: color-mix(
+    in oklch,
+    var(--cl, var(--ink-100)) 80%,
+    var(--c, var(--ink-200)) 20%
+  );
+  border-bottom: 1px solid
+    color-mix(in oklch, var(--c, var(--ink-200)) 30%, transparent);
+  flex-shrink: 0;
+}
+
+/* ── Eyebrow row ─────────────────────────────────────────────────────── */
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-11);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--cd, var(--ink-600));
+}
+
+/* Small square subject-color chip on the far left of the eyebrow. */
+.eyebrowDot {
+  width: 8px;
+  height: 8px;
+  background: var(--c, var(--ink-400));
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.eyebrowSubject {
+  color: var(--cd, var(--ink-700));
+  font-weight: 600;
+}
+
+/* "Personal" pill — shown only when lesson.isPersonal is true. */
+.eyebrowPersonal {
+  font-size: var(--t-10);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: none;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: color-mix(in oklch, var(--c, var(--ink-300)) 18%, var(--paper));
+  color: var(--cd, var(--ink-700));
+  border: 1px solid
+    color-mix(in oklch, var(--c, var(--ink-200)) 35%, transparent);
+}
+
+.eyebrowSep {
+  color: color-mix(in oklch, var(--c, var(--ink-300)) 50%, transparent);
+}
+
+/* Clock icon inline with the time label. */
+.eyebrowClockIcon {
+  color: var(--cd, var(--ink-500));
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+.eyebrowTime {
+  color: var(--cd, var(--ink-700));
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrowUnit {
+  color: color-mix(in oklch, var(--cd, var(--ink-500)) 80%, transparent);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+/* ── Title ───────────────────────────────────────────────────────────── */
+
+.title {
+  margin: 8px 0 0;
+  font-size: var(--t-20);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: 1.25;
+  color: var(--ink-900);
+}
+
+/* ── "I Can" objective ───────────────────────────────────────────────── */
+
+.objective {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 8px 11px;
+  background: color-mix(
+    in oklch,
+    var(--paper) 60%,
+    var(--cl, var(--ink-50)) 40%
+  );
+  border: 1px solid
+    color-mix(in oklch, var(--c, var(--ink-200)) 22%, transparent);
   border-radius: var(--r-6);
+}
+
+.objectiveBadge {
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--c, var(--ink-400));
+  color: var(--paper);
+  flex-shrink: 0;
+  margin-top: 2px;
+  text-transform: uppercase;
+}
+
+.objectiveText {
+  font-size: var(--t-13);
+  line-height: 1.5;
+  flex: 1;
+  color: var(--ink-900);
+}
+
+/* ── Action bar ──────────────────────────────────────────────────────── */
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Pill-style action buttons — white surface on tinted bg for legibility. */
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  border: 1px solid
+    color-mix(in oklch, var(--c, var(--ink-200)) 35%, var(--ink-200));
+  border-radius: var(--r-6);
+  font-size: var(--t-12);
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--ink-700);
+  background: var(--paper);
+  transition: background 0.12s;
+  min-height: 44px;
+}
+
+.actionBtn:hover {
+  background: var(--ink-50);
+}
+
+.actionBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Done state — green border + text to distinguish from neutral. */
+.actionBtnDone {
+  border-color: var(--done);
+  color: var(--done);
+}
+
+/* Icon-only utility buttons (print, overflow). */
+.actionIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  color: var(--cd, var(--ink-500));
+  cursor: pointer;
+  border-radius: var(--r-4);
+  transition: background 0.12s;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.actionIcon:hover {
+  background: color-mix(in oklch, var(--c, var(--ink-200)) 15%, transparent);
+}
+
+.actionIcon:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Scrollable body ─────────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Section blocks ──────────────────────────────────────────────────── */
+
+.section {
+  margin-bottom: 20px;
+}
+
+/* Section label row — uppercase, subdued, icon + text. */
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-11);
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--cd, var(--ink-500));
+  padding: 4px 0 7px;
+  /* Faint divider above each section (not the first). */
+  border-top: 1px solid
+    color-mix(in oklch, var(--c, var(--ink-200)) 22%, transparent);
+}
+
+/* Remove the top divider from the very first section — the header band
+   already provides visual separation. */
+.section:first-child .sectionHead {
+  border-top: none;
+}
+
+.sectionHeadHint {
+  font-size: var(--t-11);
+  color: color-mix(in oklch, var(--cd, var(--ink-400)) 55%, transparent);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+/* ── Lesson flow wrapper ─────────────────────────────────────────────── */
+/* A lightly-frosted inset so <LessonFlow>'s cards read as nested within
+   the tinted block without a hard box border. */
+
+.flowWrap {
+  border-radius: var(--r-8);
   overflow: hidden;
-  /* Ensure the flow component's internal scroll does not fight the
-     parent detailBody scroller. */
+  /* Very subtle inner shadow to visually recede from the surface. */
+  box-shadow: 0 0 0 1px
+    color-mix(in oklch, var(--c, var(--ink-200)) 25%, transparent);
   min-height: 0;
 }
 
-/* ── Teacher notes editor wrapper ───────────────────────────────────────
-   Mirrors the blur/reveal pattern of the former read-only notes block,
-   adapted for the <RichTextEditor> component. Reveal is triggered by
-   pointer hover or keyboard focus anywhere inside the section. */
+/* ── Teacher notes editor wrapper ───────────────────────────────────── */
+/* Blur-reveal pattern: hidden by default (private notes), shown on hover
+   or keyboard focus anywhere inside the section. */
 
-.notesEditorWrap {
+.notesWrap {
   border-radius: 0 var(--r-4) var(--r-4) 0;
   transition:
     filter 0.18s,
@@ -30,25 +293,161 @@
     border-color 0.18s;
 }
 
-.notesEditorHidden {
+.notesHidden {
   filter: blur(3.5px);
-  background: var(--ink-50);
-  border-left: 2px solid var(--ink-200);
-  /* Prevent selecting hidden notes text via keyboard. */
+  background: color-mix(in oklch, var(--paper) 40%, var(--cl, var(--ink-100)));
+  border-left: 2px solid
+    color-mix(in oklch, var(--c, var(--ink-200)) 30%, transparent);
   user-select: none;
   pointer-events: none;
 }
 
-.notesEditorVisible {
+.notesVisible {
   filter: none;
-  background: var(--important-bg);
-  border-left: 2px solid var(--important);
+  background: color-mix(in oklch, var(--paper) 80%, var(--cl, var(--ink-50)));
+  border-left: 2px solid var(--c, var(--important));
   pointer-events: auto;
 }
 
 /* Respect prefers-reduced-motion for the reveal transition. */
 @media (prefers-reduced-motion: reduce) {
-  .notesEditorWrap {
+  .notesWrap {
     transition: none;
   }
+}
+
+/* ── Resources ───────────────────────────────────────────────────────── */
+
+.resourceList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.resourceItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: var(--r-4);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.resourceItem:hover {
+  background: color-mix(in oklch, var(--paper) 60%, var(--cl, var(--ink-100)));
+}
+
+.resourceItem:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.resourceIcon {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-4);
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.resourceLabel {
+  flex: 1;
+  font-size: var(--t-12);
+  color: var(--ink-800, var(--ink-900));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resourceType {
+  font-size: var(--t-11);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ── Standards ───────────────────────────────────────────────────────── */
+
+.standardsList {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.standardItem {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  /* Semi-transparent white so the subject tint shows through softly. */
+  background: color-mix(in oklch, var(--paper) 65%, var(--cl, var(--ink-50)));
+  border-radius: var(--r-6);
+  border: 1px solid
+    color-mix(in oklch, var(--c, var(--ink-200)) 18%, transparent);
+}
+
+.standardCode {
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--cd, var(--ink-700));
+  background: var(--cl, var(--ink-100));
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  height: fit-content;
+}
+
+.standardDesc {
+  font-size: var(--t-12);
+  color: var(--ink-600, var(--ink-500));
+  line-height: 1.45;
+}
+
+/* ── Footer affordance row ───────────────────────────────────────────── */
+/* Padlet-style "+ Add section" / "Edit Template" closing the block.
+   Sits at the very bottom of the scrollable body above the padding. */
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 20px;
+  border-top: 1px dashed
+    color-mix(in oklch, var(--c, var(--ink-200)) 35%, transparent);
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+/* Ghost pill buttons — dashed border, no fill, subject-tinted on hover. */
+.footerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--cd, var(--ink-500));
+  border: 1px dashed
+    color-mix(in oklch, var(--c, var(--ink-300)) 50%, var(--ink-200));
+  border-radius: var(--r-6);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+  min-height: 44px;
+}
+
+.footerBtn:hover {
+  background: color-mix(in oklch, var(--c, var(--ink-200)) 12%, var(--paper));
+  border-color: var(--c, var(--ink-300));
+  color: var(--cd, var(--ink-700));
+}
+
+.footerBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
 }
