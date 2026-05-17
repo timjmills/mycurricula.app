@@ -428,3 +428,51 @@
   font-size: var(--t-13);
   padding: 40px 0;
 }
+
+/* ── Split-slot cell layout ─────────────────────────────────────────────
+ *
+ * When a teacher has arranged lessons with a DropRegion, the cell renders
+ * its lessons in an ordered list of rows (see CellLayout in cell-layout.ts).
+ *
+ *   .layoutRow       — a row with one slot, stretching the full cell width.
+ *   .layoutRowSplit  — a row with two slots side-by-side at half width each.
+ *   .layoutSlotFull  — a single slot filling the entire row.
+ *   .layoutSlotHalf  — one of two side-by-side slots; each is ~50% width.
+ *
+ * Half slots keep their own CardStack so each can page independently. The
+ * small gap between halves uses a spacing token so it scales with the grid.
+ *
+ * Collapsed cells stay compact; maximized cells reveal all rows naturally
+ * because .cellMaximized removes the max-height cap.
+ *
+ * Note: context-menu "stack / unstack" to rearrange lessons without dragging
+ * is a planned follow-up. This increment is drag-based arrangement only.
+ */
+
+.layoutRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 4px);
+}
+
+.layoutRowSplit {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-2, 4px);
+  align-items: stretch;
+}
+
+/* Full-width slot — just a positioning context, like .cardSlot. */
+.layoutSlotFull {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Half-width slot: each occupies exactly 50% of the row minus the gap.
+   The small gap (--space-2 ≈ 4px) visually separates the two subjects
+   so their individual color stripes don't bleed together. */
+.layoutSlotHalf {
+  flex: 0 0 calc(50% - var(--space-2, 4px) / 2);
+  min-width: 0;
+  overflow: hidden;
+}

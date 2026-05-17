@@ -14,6 +14,13 @@
 // open) toggles the cell between collapsed and maximized. Only one cell
 // is maximized at a time — that is enforced by the parent WeeklyGrid.
 //
+// Split-slot layout: when a CellLayout is present, the cell renders its
+// arranged row/slot structure instead of the flat CardStack default.
+// CellDropZones overlays drop-region affordances while a drag is active.
+//
+// Context-menu "stack / unstack" is a planned follow-up; this increment
+// is drag-based arrangement only.
+//
 // Drag-and-drop is native HTML5 DnD (no extra dependency). The LessonCard
 // renders its own grab affordance; the grid feeds it `dragHandleProps`
 // (`draggable` + `onDragStart`/`onDragEnd`), so that handle — and only
@@ -28,9 +35,11 @@ import type {
   ContextAction,
   ContextActionPayload,
 } from "@/components/lesson-card";
+import type { CellLayout, DropRegion } from "@/lib/cell-layout";
 import type { CellShade } from "./unitShading";
 import type { CellNavProps } from "./useGridNavigation";
 import { CardStack } from "./card-stack";
+import { CellDropZones } from "./cell-drop-zones";
 import styles from "./WeeklyGrid.module.css";
 
 interface GridCellProps {
@@ -51,12 +60,23 @@ interface GridCellProps {
    * When false with >1 lesson, CardStack collapses to a single-card view.
    */
   maximized: boolean;
+  /**
+   * Arranged layout for this cell, or null for the default CardStack view.
+   * Provided by WeeklyGrid when the teacher has placed lessons with a
+   * DropRegion (half-left/right, above/below, on).
+   */
+  cellLayout: CellLayout | null;
   /** Start dragging a lesson out of this cell. */
   onDragStart: (lessonId: string) => void;
   /** Dragging ended without (or after) a drop. */
   onDragEnd: () => void;
-  /** A card was dropped onto this cell. */
+  /** A card was dropped onto this cell (legacy / simple case). */
   onDrop: (subjectId: SubjectId, day: number) => void;
+  /**
+   * A card was dropped onto this cell with explicit region placement.
+   * CellDropZones fires this via the `onPick` callback.
+   */
+  onDropRegion: (subjectId: SubjectId, day: number, region: DropRegion) => void;
   /** The empty/inline add button was pressed. */
   onAdd: (subjectId: SubjectId, day: number) => void;
   /** A lesson card was clicked — select + toggle inline expand. */
@@ -88,9 +108,11 @@ export function GridCell({
   expandedIds,
   selectedId,
   maximized,
+  cellLayout,
   onDragStart,
   onDragEnd,
   onDrop,
+  onDropRegion,
   onAdd,
   onSelect,
   onToggleComplete,
@@ -116,10 +138,19 @@ export function GridCell({
     e.dataTransfer.dropEffect = "move";
   }
 
-  function handleDrop(e: DragEvent<HTMLDivElement>): void {
+  function handleNativeDrop(e: DragEvent<HTMLDivElement>): void {
     e.preventDefault();
     setDragOver(false);
+    // Native drop without a CellDropZones pick — fall back to simple move.
     if (draggingId) onDrop(subjectId, day);
+  }
+
+  // CellDropZones fires this when the teacher picks a specific region.
+  // It takes priority over the native onDrop handler above because the
+  // CellDropZones overlay covers the cell and stops propagation.
+  function handleRegionPick(region: DropRegion): void {
+    setDragOver(false);
+    onDropRegion(subjectId, day, region);
   }
 
   // The cell is the roving-tabindex focus target for keyboard navigation
@@ -133,35 +164,39 @@ export function GridCell({
         ? `${lessonCount} lesson${lessonCount === 1 ? "" : "s"}, expanded`
         : `${lessonCount} lesson${lessonCount === 1 ? "" : "s"}, collapsed`;
 
-  // Build the CardStack children once — each LessonCard is wrapped in its
-  // own slot div so the card's own handlers (select, expand, drag) remain
-  // fully independent of the cell's maximize click.
-  const cardNodes: ReactNode[] = lessons.map((lesson) => (
-    <div key={lesson.id} className={styles.cardSlot}>
-      <LessonCard
-        lesson={lesson}
-        dense
-        expanded={expandedIds.has(lesson.id)}
-        selected={selectedId === lesson.id}
-        dragging={draggingId === lesson.id}
-        onSelect={onSelect}
-        onToggleExpand={onSelect}
-        onToggleComplete={onToggleComplete}
-        // Forward the full context-action payload (e.g. the target
-        // day for "Move to day") straight through to the grid.
-        onContextAction={onContextAction}
-        dragHandleProps={{
-          draggable: true,
-          onDragStart: (e) => {
-            e.dataTransfer.effectAllowed = "move";
-            e.dataTransfer.setData("text/plain", lesson.id);
-            onDragStart(lesson.id);
-          },
-          onDragEnd,
-        }}
-      />
-    </div>
-  ));
+  // Build a LessonCard node for a given lesson — reused in both the
+  // default CardStack path and the split-slot layout path.
+  function renderCard(lesson: Lesson): ReactNode {
+    return (
+      <div key={lesson.id} className={styles.cardSlot}>
+        <LessonCard
+          lesson={lesson}
+          dense
+          expanded={expandedIds.has(lesson.id)}
+          selected={selectedId === lesson.id}
+          dragging={draggingId === lesson.id}
+          onSelect={onSelect}
+          onToggleExpand={onSelect}
+          onToggleComplete={onToggleComplete}
+          // Forward the full context-action payload (e.g. the target
+          // day for "Move to day") straight through to the grid.
+          onContextAction={onContextAction}
+          dragHandleProps={{
+            draggable: true,
+            onDragStart: (e) => {
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", lesson.id);
+              onDragStart(lesson.id);
+            },
+            onDragEnd,
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Build the default flat card list for the CardStack fallback path.
+  const cardNodes: ReactNode[] = lessons.map((lesson) => renderCard(lesson));
 
   // Clicking the cell background (not a card, not a button) maximizes it.
   // We only fire when the click lands directly on the cell wrapper or on
@@ -195,6 +230,51 @@ export function GridCell({
         : styles.cellCollapsed
       : "";
 
+  // ── Split-slot layout renderer ─────────────────────────────────────────
+  // When a CellLayout is present the cell renders its row/slot structure
+  // rather than the flat CardStack. A row with two slots renders them
+  // side-by-side at half width via the .layoutRow and .layoutSlotHalf CSS
+  // classes. A slot with >1 lesson is paged via CardStack just as before.
+  //
+  // In maximized mode all rows and all slot cards are visible — the teacher
+  // sees the full arranged layout without paging.
+  function renderLayout(layout: CellLayout): ReactNode {
+    return layout.map((row, rowIdx) => {
+      const isSplit = row.length === 2;
+      return (
+        <div
+          key={rowIdx}
+          className={isSplit ? styles.layoutRowSplit : styles.layoutRow}
+        >
+          {row.map((slot, slotIdx) => {
+            // Resolve lessons for this slot from the cell's lesson array.
+            const slotLessons = slot
+              .map((id) => lessons.find((l) => l.id === id))
+              .filter((l): l is Lesson => l !== undefined);
+
+            const slotCards = slotLessons.map((l) => renderCard(l));
+
+            return (
+              <div
+                key={slotIdx}
+                className={
+                  isSplit ? styles.layoutSlotHalf : styles.layoutSlotFull
+                }
+              >
+                {/*
+                 * A slot with >1 lesson pages via CardStack (paged stack).
+                 * A slot with exactly 1 lesson renders it directly.
+                 * maximized=true shows every card in the slot vertically.
+                 */}
+                <CardStack cards={slotCards} maximized={maximized} />
+              </div>
+            );
+          })}
+        </div>
+      );
+    });
+  }
+
   return (
     <div
       className={`${styles.cell} ${stateClass} ${dragOver ? styles.cellDragOver : ""}`}
@@ -212,10 +292,23 @@ export function GridCell({
           setDragOver(false);
         }
       }}
-      onDrop={handleDrop}
+      onDrop={handleNativeDrop}
       onClick={handleCellClick}
       onKeyDown={handleCellKeyDown}
     >
+      {/*
+       * CellDropZones overlays the cell during a drag to show the teacher
+       * where their lesson will land. onPick fires with the chosen region
+       * and takes priority over the native onDrop fallback above.
+       * Rendered unconditionally so the sibling component can manage its
+       * own visibility; visible prop gates the visual affordance.
+       */}
+      <CellDropZones
+        visible={!!draggingId}
+        hasLessons={!isEmpty}
+        onPick={handleRegionPick}
+      />
+
       {isEmpty ? (
         <div className={styles.emptyCell}>
           <p className={styles.emptyHint}>Drag a lesson here or click +</p>
@@ -247,12 +340,20 @@ export function GridCell({
           )}
 
           {/*
-           * CardStack wraps all lesson cards.
+           * Layout path: render the arranged row/slot structure when a
+           * CellLayout is present. Fallback to the default CardStack when
+           * no layout has been applied (most cells most of the time).
+           *
+           * CardStack wraps all lesson cards:
            *   maximized=false + >1 card → one card + stacked affordance + arrows
            *   maximized=true           → all cards visible
            *   0 or 1 card              → renders children directly, no chrome
            */}
-          <CardStack cards={cardNodes} maximized={maximized} />
+          {cellLayout !== null ? (
+            renderLayout(cellLayout)
+          ) : (
+            <CardStack cards={cardNodes} maximized={maximized} />
+          )}
 
           {/* Faint add button so a populated cell can still take another. */}
           <button

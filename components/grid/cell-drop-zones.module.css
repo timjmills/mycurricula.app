@@ -1,0 +1,156 @@
+/* cell-drop-zones.module.css — drag-target overlay for a Weekly-grid cell.
+ *
+ * The overlay sits in absolute inset-0 over the cell contents while a
+ * lesson is being dragged. When the cell already has lessons it divides
+ * into five drop regions:
+ *
+ *   ┌───────────────────────────────┐
+ *   │         ABOVE (top strip)     │
+ *   ├───────────────────────────────┤
+ *   │  LEFT  │    CENTER (on)  │RIGHT│
+ *   │  half  │                 │half │
+ *   ├───────────────────────────────┤
+ *   │         BELOW (bottom strip)  │
+ *   └───────────────────────────────┘
+ *
+ * All color/type/spacing values come from app/tokens.css custom properties.
+ * Never hard-code hex or px here.
+ */
+
+/* ── Overlay container ──────────────────────────────────────────────── */
+/* Covers the cell completely and provides the CSS Grid layout for zones. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  /* Sit above the CardStack (z-index 2) and the collapse button (z-index 2). */
+  z-index: 20;
+  border-radius: var(--r-12);
+  overflow: hidden;
+  /* Three rows: thin top strip | flex middle | thin bottom strip */
+  display: grid;
+  grid-template-rows: 28% 44% 28%;
+  grid-template-columns: 1fr;
+}
+
+/* ── Middle row: left half | center | right half ───────────────────── */
+.middleRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* ── Base zone styles ───────────────────────────────────────────────── */
+/* Every zone shares pointer handling, typography, and focus treatment. */
+.zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 3px;
+  cursor: copy;
+  /* Semi-transparent so cell content hints through. */
+  background: color-mix(in oklch, var(--ink-900) 8%, transparent);
+  /* Crisp interior boundary — zones touch each other. */
+  border: 1.5px solid transparent;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+  /* Keyboard focus ring. */
+  outline: none;
+}
+
+.zone:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: -2px;
+}
+
+/* ── Zone hover / active state ──────────────────────────────────────── */
+.zoneHover {
+  background: color-mix(in oklch, var(--ink-900) 22%, transparent);
+  border-color: var(--ink-400);
+}
+
+/* ── Zone label & icon ──────────────────────────────────────────────── */
+.zoneIcon {
+  /* Icons are decorative SVGs — size from surrounding context. */
+  flex-shrink: 0;
+  color: var(--ink-700);
+  opacity: 0.75;
+}
+
+.zoneLabel {
+  font-size: var(--t-10);
+  font-weight: 600;
+  color: var(--ink-700);
+  text-align: center;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  line-height: 1.2;
+  /* Prevent zone label from driving zone height. */
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Per-region accent colors on hover ──────────────────────────────── */
+/* Directional zones get a warm hint to distinguish them from the center. */
+.zoneAbove.zoneHover,
+.zoneBelow.zoneHover {
+  background: color-mix(in oklch, var(--ink-700) 18%, transparent);
+}
+
+.zoneLeft.zoneHover,
+.zoneRight.zoneHover {
+  background: color-mix(in oklch, var(--ink-700) 18%, transparent);
+}
+
+.zoneOn.zoneHover {
+  background: color-mix(in oklch, var(--ink-900) 28%, transparent);
+  border-color: var(--ink-500);
+}
+
+/* ── Strip zones (above / below) ────────────────────────────────────── */
+/* These are full-width rows with a slightly taller-feeling interior. */
+.zoneAbove,
+.zoneBelow {
+  flex-direction: row;
+  gap: 5px;
+}
+
+/* ── Empty-cell fallback zone ───────────────────────────────────────── */
+/* When the cell has no lessons, a single full-overlay drop target is shown. */
+.zoneFull {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  border-radius: var(--r-12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  cursor: copy;
+  background: color-mix(in oklch, var(--ink-900) 8%, transparent);
+  border: 2px dashed var(--ink-300);
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+  outline: none;
+}
+
+.zoneFull:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: -3px;
+}
+
+.zoneFull.zoneHover {
+  background: color-mix(in oklch, var(--ink-900) 18%, transparent);
+  border-color: var(--ink-500);
+}
+
+/* ── Reduced-motion: collapse all transitions ───────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .zone,
+  .zoneFull {
+    transition: none;
+  }
+}
