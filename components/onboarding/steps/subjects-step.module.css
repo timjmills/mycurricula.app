@@ -1,0 +1,358 @@
+/* subjects-step.module.css — styles for the Subjects onboarding step.
+   All colors and sizes come from tokens.css custom properties.
+   No hard-coded hex values or px font sizes. */
+
+/* ── Heading block ──────────────────────────────────────────────────────── */
+
+.heading {
+  font-size: var(--t-24);
+  font-weight: 700;
+  color: var(--ink-900);
+  margin: 0 0 8px;
+  line-height: 1.25;
+}
+
+.helper {
+  font-size: var(--t-14);
+  color: var(--ink-500);
+  margin: 0 0 28px;
+  line-height: 1.5;
+}
+
+/* ── Subject list ───────────────────────────────────────────────────────── */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+/* ── Single subject row ─────────────────────────────────────────────────── */
+/* The row is a card-like container that groups all three controls. */
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--ink-50);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-8);
+  transition: border-color 0.15s ease;
+}
+
+.row:focus-within {
+  border-color: var(--ink-300);
+}
+
+/* Non-academic rows get a muted treatment — softer background and ink. */
+.rowNonAcademic {
+  background: var(--paper);
+  border-color: var(--ink-150);
+}
+
+.rowNonAcademic .nameInput {
+  color: var(--ink-500);
+}
+
+/* ── Reorder handle / arrows ────────────────────────────────────────────── */
+
+.reorderCol {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.arrowBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  border-radius: var(--r-4);
+  color: var(--ink-400);
+  cursor: pointer;
+  transition:
+    color 0.1s,
+    background 0.1s;
+}
+
+/* Expand touch target to ≥44px without changing layout. */
+.arrowBtn::after {
+  content: "";
+  position: absolute;
+  inset: -11px -10px;
+}
+
+.arrowBtn:hover {
+  color: var(--ink-700);
+  background: var(--ink-150);
+}
+
+.arrowBtn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.arrowBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* ── Name input ─────────────────────────────────────────────────────────── */
+
+.nameCol {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.nameInput {
+  width: 100%;
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--ink-900);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 9px 0;
+  min-height: 44px; /* touch target */
+  border-bottom: 1.5px solid transparent;
+  transition: border-color 0.15s;
+  border-radius: 0;
+}
+
+.nameInput:focus {
+  border-bottom-color: var(--ink-300);
+}
+
+.nameInput:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+  border-radius: var(--r-4);
+}
+
+.nameInput::placeholder {
+  color: var(--ink-400);
+  font-weight: 400;
+}
+
+/* ── Color swatch picker ────────────────────────────────────────────────── */
+
+.colorCol {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.colorLabel {
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  margin-bottom: 2px;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  /* Two rows of 4 — keeps the picker tight. */
+  max-width: calc(4 * 28px + 3 * 5px);
+}
+
+.swatch {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+  padding: 0;
+}
+
+/* Expand the touch hit-area to ≥44px via an invisible pseudo-element so the
+   visual swatch stays 28px but mobile taps register reliably. */
+.swatch::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+.swatch:hover {
+  transform: scale(1.12);
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Checkmark for the selected swatch — inherits paper color via currentColor
+   on the SVG path, so no hard-coded hex needed. */
+.swatchCheck {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: var(--paper);
+}
+
+/* ── Academic / non-academic picker ────────────────────────────────────── */
+
+.planCol {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.planLabel {
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  margin-bottom: 2px;
+}
+
+.segment {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-6);
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.segBtn {
+  flex: 1;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-500);
+  background: transparent;
+  border: none;
+  padding: 8px 10px;
+  min-height: 44px; /* touch target */
+  cursor: pointer;
+  line-height: 1.3;
+  text-align: center;
+  transition:
+    color 0.12s,
+    background 0.12s;
+  white-space: nowrap;
+}
+
+.segBtn + .segBtn {
+  border-left: 1px solid var(--ink-200);
+}
+
+.segBtn:hover:not(.segBtnActive) {
+  background: var(--ink-50);
+  color: var(--ink-700);
+}
+
+.segBtnActive {
+  background: var(--ink-900);
+  color: var(--paper);
+  font-weight: 600;
+}
+
+/* Non-academic active button uses a softer fill to keep the row muted. */
+.segBtnActiveNonAcademic {
+  background: var(--ink-400);
+  color: var(--paper);
+}
+
+.segBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+/* ── Remove button ──────────────────────────────────────────────────────── */
+
+.removeCol {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.removeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-6);
+  color: var(--ink-400);
+  cursor: pointer;
+  transition:
+    color 0.1s,
+    background 0.1s;
+}
+
+.removeBtn:hover {
+  color: var(--urgent);
+  background: var(--urgent-bg);
+}
+
+.removeBtn:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.removeBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Add subject button ─────────────────────────────────────────────────── */
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-500);
+  padding: 10px 12px;
+  min-height: 44px; /* touch target */
+  border-radius: var(--r-6);
+  border: 1.5px dashed var(--ink-200);
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  justify-content: center;
+  transition:
+    color 0.12s,
+    border-color 0.12s,
+    background 0.12s;
+  margin-top: 4px;
+}
+
+.addBtn:hover {
+  color: var(--ink-900);
+  border-color: var(--ink-400);
+  background: var(--ink-50);
+}
+
+.addBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Leading "+" glyph inside the add button — slightly larger than the label. */
+.addIcon {
+  font-size: var(--t-16);
+  line-height: 1;
+}

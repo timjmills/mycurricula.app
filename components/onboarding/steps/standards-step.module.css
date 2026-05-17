@@ -1,0 +1,133 @@
+/* standards-step.module.css — styles for the standards-framework toggle list. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.heading {
+  margin: 0 0 8px;
+  font-size: var(--t-26);
+  font-weight: 700;
+  color: var(--ink-900);
+  letter-spacing: -0.4px;
+  line-height: 1.2;
+}
+
+.helper {
+  margin: 0 0 24px;
+  font-size: var(--t-14);
+  color: var(--ink-500);
+  line-height: 1.5;
+}
+
+/* Unstyled list — semantic grouping without list markers. */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.item {
+  /* Pass-through — layout lives on .row. */
+}
+
+/* Each framework toggle row. ≥44px touch target per accessibility rules. */
+.row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  min-height: 44px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-150);
+  background: var(--paper);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+
+.row:hover {
+  border-color: var(--ink-300);
+  background: var(--ink-50);
+}
+
+/* Selected state — highlighted border + soft ink background. */
+.rowSelected {
+  border: 1.5px solid var(--ink-900);
+  background: var(--ink-100);
+}
+
+.rowSelected:hover {
+  border-color: var(--ink-900);
+  background: var(--ink-150);
+}
+
+/* Custom checkbox square. */
+.check {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-4);
+  border: 2px solid var(--ink-300);
+  background: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+
+/* Filled state via data attribute — avoids JS class juggling. */
+.check[data-checked="true"] {
+  border-color: var(--ink-900);
+  background: var(--ink-900);
+}
+
+/* Checkmark tick drawn with a CSS pseudo-element. */
+.check[data-checked="true"]::after {
+  content: "";
+  display: block;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--paper);
+  border-bottom: 2px solid var(--paper);
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+/* Text stack inside each row. */
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.label {
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--ink-900);
+  line-height: 1.3;
+}
+
+.detail {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  line-height: 1.4;
+}
+
+/* Live selection tally below the list. */
+.tally {
+  margin: 14px 0 0;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-500);
+}

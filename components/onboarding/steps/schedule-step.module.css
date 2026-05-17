@@ -1,0 +1,136 @@
+/* schedule-step.module.css — styles for the typical-day subject-order list. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.heading {
+  margin: 0 0 8px;
+  font-size: var(--t-26);
+  font-weight: 700;
+  color: var(--ink-900);
+  letter-spacing: -0.4px;
+  line-height: 1.2;
+}
+
+.helper {
+  margin: 0 0 24px;
+  font-size: var(--t-14);
+  color: var(--ink-500);
+  line-height: 1.55;
+}
+
+.helper strong {
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
+/* Ordered list — numbers give a clear "period N" feel. */
+.list {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  counter-reset: period;
+}
+
+/* Each period row. ≥44px touch target. */
+.item {
+  counter-increment: period;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  min-height: 44px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-150);
+  background: var(--paper);
+}
+
+/* Period number badge via counter. */
+.item::before {
+  content: counter(period);
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--ink-100);
+  color: var(--ink-500);
+  font-size: var(--t-11);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Subject color swatch — thin left-stripe style. */
+.swatch {
+  flex: 0 0 auto;
+  width: 4px;
+  height: 24px;
+  border-radius: var(--r-2);
+  background: var(--c, var(--ink-300));
+}
+
+.name {
+  flex: 1;
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+/* Up/Down button cluster. */
+.controls {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+/* ≥44px touch region on each arrow button. */
+.moveBtn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-6);
+  border: 1px solid var(--ink-150);
+  font-size: var(--t-14);
+  color: var(--ink-500);
+  background: var(--paper);
+  cursor: pointer;
+  transition:
+    color 0.1s,
+    background 0.1s,
+    border-color 0.1s;
+}
+
+.moveBtn:hover:not(:disabled) {
+  color: var(--ink-900);
+  background: var(--ink-100);
+  border-color: var(--ink-300);
+}
+
+.moveBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Empty-state message when no academic subjects exist. */
+.empty {
+  margin: 0;
+  font-size: var(--t-14);
+  color: var(--ink-400);
+  font-style: italic;
+}
+
+/* Soft note below the list. */
+.note {
+  margin: 16px 0 0;
+  font-size: var(--t-12);
+  color: var(--ink-400);
+  line-height: 1.55;
+}

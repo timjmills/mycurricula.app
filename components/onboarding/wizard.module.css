@@ -1,0 +1,115 @@
+/* Onboarding wizard shell — full-screen, centered card. */
+
+.shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Progress bar pinned to the top of the viewport. */
+.progress {
+  width: 100%;
+  height: 4px;
+  background: var(--ink-150);
+  flex: 0 0 auto;
+}
+.progressFill {
+  height: 100%;
+  background: var(--math);
+  transition: width 0.25s ease;
+}
+
+/* Scrollable step area. */
+.body {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.card {
+  width: 100%;
+  max-width: 720px;
+  padding: 48px 32px 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Step counter above the step content. Receives programmatic focus on step
+   change for screen-reader announcement; outline suppressed — it is not an
+   interactive control. */
+.stepCount {
+  font-size: var(--t-11);
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  margin-bottom: 14px;
+  outline: none;
+}
+
+/* Footer with Back / Skip / Continue. */
+.footer {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 32px 28px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.back {
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-500);
+  /* min-height: 44px satisfies the WCAG 2.5.5 touch-target minimum. */
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: var(--r-6);
+}
+.back:hover {
+  color: var(--ink-900);
+  background: var(--ink-100);
+}
+
+.skip {
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-500);
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: var(--r-6);
+}
+.skip:hover {
+  color: var(--ink-900);
+  background: var(--ink-100);
+}
+
+.continue {
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--paper);
+  background: var(--math);
+  min-height: 44px;
+  padding: 11px 22px;
+  border-radius: var(--r-8);
+}
+.continue:hover {
+  background: var(--math-deep);
+}
+
+.back:focus-visible,
+.skip:focus-visible,
+.continue:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}

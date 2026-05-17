@@ -1,0 +1,390 @@
+/* steps.module.css — shared structural styles for all onboarding step
+   components. Each step renders its own heading, helper text, and controls.
+   The wizard shell (wizard.tsx) owns the progress bar, step counter, and
+   Back / Continue footer — nothing here duplicates that chrome.
+
+   Token rules: all color, size, and spacing via var(--token) from
+   app/tokens.css. Never hard-code hex values or px font sizes. */
+
+/* ── Heading + helper text ──────────────────────────────────────────────── */
+
+.heading {
+  font-size: var(--t-26);
+  font-weight: 700;
+  color: var(--ink-900);
+  line-height: 1.2;
+  margin: 0 0 8px;
+}
+
+.helper {
+  font-size: var(--t-14);
+  color: var(--ink-500);
+  line-height: 1.55;
+  margin: 0 0 28px;
+}
+
+/* ── Name input (WelcomeStep) ───────────────────────────────────────────── */
+
+.fieldLabel {
+  display: block;
+  font-size: var(--t-12);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  margin-bottom: 6px;
+}
+
+.textInput {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  padding: 11px 14px;
+  font-size: var(--t-16);
+  font-family: var(--font-sans);
+  color: var(--ink-900);
+  background: var(--paper);
+  border: 1.5px solid var(--ink-200);
+  border-radius: var(--r-8);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.textInput::placeholder {
+  color: var(--ink-300);
+}
+
+.textInput:focus {
+  border-color: var(--ink-500);
+}
+
+.textInput:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Grade chip grid (GradeStep) ────────────────────────────────────────── */
+
+.chipGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  min-height: 44px;
+  padding: 8px 16px;
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--ink-700);
+  background: var(--paper);
+  border: 1.5px solid var(--ink-200);
+  border-radius: var(--r-8);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.chip:hover {
+  border-color: var(--ink-400);
+  background: var(--ink-50);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.chipSelected {
+  color: var(--paper);
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+}
+
+.chipSelected:hover {
+  background: var(--ink-700);
+  border-color: var(--ink-700);
+  color: var(--paper);
+}
+
+/* Multiple grades chip is wider, so give it a larger min-width. */
+.chipWide {
+  min-width: 140px;
+}
+
+/* ── Preset button row (SchoolWeekStep) ─────────────────────────────────── */
+
+.presetRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.presetBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 60px;
+  padding: 13px 20px;
+  flex: 1 1 180px;
+  background: var(--paper);
+  border: 1.5px solid var(--ink-200);
+  border-radius: var(--r-12);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.presetBtn:hover {
+  border-color: var(--ink-400);
+  background: var(--ink-50);
+}
+
+.presetBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.presetBtnSelected {
+  background: var(--ink-100);
+  border-color: var(--ink-900);
+  border-width: 2px;
+}
+
+.presetBtnSelected:hover {
+  background: var(--ink-100);
+  border-color: var(--ink-900);
+}
+
+.presetLabel {
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.presetSub {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+}
+
+/* ── Weekday toggles (SchoolWeekStep custom) ────────────────────────────── */
+
+.weekdayRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.weekdayToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-500);
+  background: var(--paper);
+  border: 1.5px solid var(--ink-200);
+  border-radius: var(--r-6);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.weekdayToggle:hover {
+  border-color: var(--ink-400);
+  background: var(--ink-50);
+  color: var(--ink-700);
+}
+
+.weekdayToggle:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.weekdayActive {
+  color: var(--paper);
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+}
+
+.weekdayActive:hover {
+  background: var(--ink-700);
+  border-color: var(--ink-700);
+  color: var(--paper);
+}
+
+/* ── Date inputs (SchoolWeekStep) ───────────────────────────────────────── */
+
+.dateRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 4px;
+}
+
+.dateField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 180px;
+}
+
+.dateInput {
+  padding: 11px 14px;
+  font-size: var(--t-14);
+  font-family: var(--font-sans);
+  color: var(--ink-900);
+  background: var(--paper);
+  border: 1.5px solid var(--ink-200);
+  border-radius: var(--r-8);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.dateInput:focus {
+  border-color: var(--ink-500);
+}
+
+.dateInput:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Rotation option cards (RotationStep) ───────────────────────────────── */
+
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.optionCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  min-height: 68px;
+  background: var(--paper);
+  border: 1.5px solid var(--ink-200);
+  border-radius: var(--r-12);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.optionCard:hover {
+  border-color: var(--ink-400);
+  background: var(--ink-50);
+}
+
+.optionCard:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.optionCardSelected {
+  background: var(--ink-100);
+  border-color: var(--ink-900);
+  border-width: 2px;
+}
+
+.optionCardSelected:hover {
+  background: var(--ink-100);
+  border-color: var(--ink-900);
+}
+
+.radioDot {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 2px solid var(--ink-300);
+  background: var(--paper);
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.radioDotSelected {
+  border-color: var(--ink-900);
+  background: var(--ink-900);
+  /* Inset white dot via box-shadow — no pseudo-element needed. */
+  box-shadow: inset 0 0 0 3px var(--paper);
+}
+
+.optionText {
+  flex: 1;
+}
+
+.optionLabel {
+  display: block;
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--ink-900);
+  margin-bottom: 2px;
+}
+
+.optionDesc {
+  display: block;
+  font-size: var(--t-13);
+  color: var(--ink-500);
+  line-height: 1.45;
+}
+
+/* ── Cycle length input (RotationStep numbered cycle) ───────────────────── */
+
+.cycleLengthRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  max-width: 220px;
+}
+
+.numberInput {
+  padding: 11px 14px;
+  font-size: var(--t-16);
+  font-family: var(--font-sans);
+  color: var(--ink-900);
+  background: var(--paper);
+  border: 1.5px solid var(--ink-200);
+  border-radius: var(--r-8);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.numberInput:focus {
+  border-color: var(--ink-500);
+}
+
+.numberInput:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Divider within a step ──────────────────────────────────────────────── */
+
+.divider {
+  height: 1px;
+  background: var(--ink-150);
+  margin: 24px 0;
+}
