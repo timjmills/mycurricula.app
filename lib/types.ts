@@ -76,6 +76,9 @@ export interface LessonTask {
 export interface Lesson {
   id: string;
   subject: SubjectId;
+  /** Time-slot label, e.g. "8:00–8:45". Optional — falls back to the
+   *  subject's typical block when absent. */
+  time?: string;
   /** Unit id this lesson belongs to. */
   unit: string;
   title: string;

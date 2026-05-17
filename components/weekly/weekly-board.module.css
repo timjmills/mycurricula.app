@@ -1,0 +1,330 @@
+/* weekly-board.module.css — layout + style surfaces for the day-column board.
+ *
+ * The board replaces the old subjects × days matrix with a simpler layout:
+ *   – WeekNavigator sticky header
+ *   – Move-mode toolbar sticky below it
+ *   – A row of day columns (one per WEEK_DAYS entry)
+ *
+ * There is NO left subject column. Each lesson card carries its own subject
+ * header, so the column label is redundant. This mirrors the commonplanner.com
+ * pattern where each day column is a vertical, scrollable list of cards.
+ *
+ * Side-by-side "split" slots within a day (two cards sharing one row) are a
+ * planned follow-up. For now, lessons in a day stack vertically.
+ *
+ * Token values come from app/tokens.css. Never hard-code hex or px values
+ * for color, type size, or semantic spacing here — use var(--token).
+ * Spacing utilities from Tailwind (margin, padding via class) are fine;
+ * color, type, and semantic radii come from tokens.
+ *
+ * prefers-reduced-motion: tokens.css sets transition-duration 0.001ms on
+ * .cp-root * under that media query. Transitions declared here are
+ * automatically suppressed in reduced-motion environments.
+ */
+
+/* ── Page shell ──────────────────────────────────────────────────────── */
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--ink-50);
+}
+
+/* ── Week navigator (re-uses WeeklyGrid styles via WeekNavigator) ────── */
+/* WeekNavigator renders into styles.navbar from WeeklyGrid.module.css.
+   We only need to pin the move-mode toolbar below it. */
+
+/* ── Move-mode toolbar ───────────────────────────────────────────────── */
+/* A slim bar immediately below the WeekNavigator's sticky header.
+   Sticky itself so it stays pinned when the board scrolls. z-index is
+   one below the navigator (20) so they layer cleanly. */
+.moveToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 22px;
+  background: var(--ink-50);
+  border-bottom: var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 19;
+}
+
+/* Move-mode toggle button — 44px tall for WCAG touch target. */
+.moveModeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 500;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.moveModeBtn:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.moveModeBtn:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}
+
+/* Active state: tinted to signal move mode is on. */
+.moveModeBtnActive {
+  background: color-mix(in oklch, var(--math) 10%, var(--paper));
+  border-color: color-mix(in oklch, var(--math) 40%, var(--ink-200));
+  color: var(--math-deep);
+}
+
+.moveModeBtnActive:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--math) 16%, var(--paper));
+  border-color: color-mix(in oklch, var(--math) 55%, var(--ink-200));
+}
+
+/* ── Scroll region ───────────────────────────────────────────────────── */
+.scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 20px 40px;
+}
+
+/* ── Day-column board ────────────────────────────────────────────────── */
+/* One column per school-week day, derived at runtime from WEEK_DAYS length.
+   Never hard-code the column count; the CSS grid columns are set via inline
+   style on the .board element using a CSS custom property --day-count.
+   Each column has a minimum width of 220px so cards remain readable; the
+   board scrolls horizontally below ~1100px on a 5-day week. */
+.board {
+  display: grid;
+  grid-template-columns: repeat(var(--day-count, 5), minmax(220px, 1fr));
+  gap: 12px;
+  min-width: calc(
+    var(--day-count, 5) * 220px + (var(--day-count, 5) - 1) * 12px
+  );
+}
+
+/* Compact board: narrower columns so the full week fits without horizontal
+   scrolling during move mode. The min stays at 120px so chips remain legible.
+   The transition animates column-width changes — suppressed under
+   prefers-reduced-motion by tokens.css's .cp-root * rule. */
+.boardCompact {
+  grid-template-columns: repeat(var(--day-count, 5), minmax(120px, 1fr));
+  min-width: calc(
+    var(--day-count, 5) * 120px + (var(--day-count, 5) - 1) * 12px
+  );
+}
+
+/* ── Day column ──────────────────────────────────────────────────────── */
+.dayColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  /* Accept drops — no visual change here; .dayColumnOver handles that. */
+  border-radius: var(--r-12);
+  padding: 0 2px 8px;
+  transition:
+    background 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+/* Drag-over highlight: a subtle tint covers the whole column — NOT the
+   entire board — so only the target column lights up. This is intentionally
+   per-column to avoid the old grid's bug of dimming the entire surface.
+   The highlight uses --ink-200 as a neutral; individual lesson cards carry
+   their own subject color so we don't pick a subject-specific hue here. */
+.dayColumnOver {
+  background: color-mix(in oklch, var(--ink-200) 20%, transparent);
+  box-shadow: inset 0 0 0 2px var(--ink-300);
+}
+
+/* ── Day column header ───────────────────────────────────────────────── */
+/* Sticky within its column so it stays visible as the day's card list
+   scrolls. z-index: 2 keeps it above cards that may overflow. */
+.dayHeader {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 10px 8px 8px;
+  background: var(--ink-50);
+  border-bottom: var(--line);
+  border-radius: var(--r-8) var(--r-8) 0 0;
+}
+
+.dayName {
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--ink-500);
+  letter-spacing: -0.1px;
+}
+
+.dayNameShort {
+  font-size: var(--t-12);
+  font-weight: 400;
+  color: var(--ink-400);
+}
+
+/* Today column: bolder typography on the header, accent underline. */
+.dayHeaderToday .dayName {
+  color: var(--ink-900);
+}
+
+.dayHeaderToday .dayNameShort {
+  color: var(--ink-600, var(--ink-500));
+}
+
+/* Small "TODAY" pill in the today column header. */
+.todayPill {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--paper);
+  background: var(--ink-900);
+  padding: 2px 7px;
+  border-radius: 999px;
+  align-self: center;
+}
+
+/* ── Card list ───────────────────────────────────────────────────────── */
+/* The vertical stack of lesson cards inside a day column. */
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+  /* Allow each day column to scroll independently when its content overflows
+     the viewport height. This keeps the board layout stable regardless of
+     the card count per day. */
+}
+
+/* ── Card slot wrapper ───────────────────────────────────────────────── */
+/* Each lesson card gets a positioning context so drag ghost / z-index
+   compositing works correctly per-card. */
+.cardSlot {
+  position: relative;
+  min-width: 0;
+}
+
+/* ── Compact chip list ───────────────────────────────────────────────── */
+/* In move mode, cards become one-line LessonChips stacked in a tight list.
+   The transition (height contraction) is animated and suppressed under
+   prefers-reduced-motion automatically by tokens.css. */
+.chipList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+/* ── Empty-day affordance ────────────────────────────────────────────── */
+/* When a day has no lessons, show a slim dashed drop-zone so teachers
+   can drag lessons into an empty day without hunting for a target. */
+.emptyDay {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 80px;
+  border-radius: var(--r-8);
+  border: 1px dashed var(--ink-200);
+  background: transparent;
+  color: var(--ink-400);
+  font-size: var(--t-12);
+  font-weight: 500;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+  padding: 16px 8px;
+  text-align: center;
+}
+
+/* Highlight the empty drop zone when a card is being dragged over it. */
+.dayColumnOver .emptyDay {
+  border-color: var(--ink-400);
+  background: color-mix(in oklch, var(--ink-200) 18%, transparent);
+}
+
+/* ── Add-lesson affordance ───────────────────────────────────────────── */
+/* A slim dashed row below a column's cards — visible on hover so
+   populated days can still accept a new lesson. Non-functional stub;
+   lesson creation is out of scope for this increment. */
+.addLesson {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 36px;
+  border-radius: var(--r-6);
+  border: 1px dashed var(--ink-200);
+  background: transparent;
+  color: var(--ink-400);
+  font-size: var(--t-11);
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* Reveal on column hover and on direct focus. */
+.dayColumn:hover .addLesson,
+.addLesson:focus-visible {
+  opacity: 1;
+}
+
+.addLesson:hover {
+  border-color: var(--ink-300);
+  color: var(--ink-500);
+  background: color-mix(in oklch, var(--ink-100) 40%, transparent);
+}
+
+.addLesson:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+/* Hide add affordance in compact/move mode — not needed there. */
+.boardCompact .addLesson {
+  display: none;
+}
+
+/* ── Reorder drop indicator ──────────────────────────────────────────── */
+/* A thin horizontal line between cards shows where a dropped card will land
+   when the teacher is reordering within the same day column. It appears
+   above the card that the pointer is nearest to. */
+.dropIndicator {
+  height: 2px;
+  border-radius: 1px;
+  background: var(--math);
+  margin: -3px 4px;
+  pointer-events: none;
+}
+
+/* ── Empty-week state ────────────────────────────────────────────────── */
+/* Shown when the selected week has no lessons at all. Spans the full
+   board width. */
+.emptyWeek {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--ink-400);
+  font-size: var(--t-13);
+  padding: 40px 0;
+}

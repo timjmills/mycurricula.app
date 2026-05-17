@@ -1,7 +1,7 @@
 // Mock fixture: a typical day's time blocks (Lena, Monday).
 // Ported from the design handoff project/data.jsx (SCHEDULE).
 
-import type { ScheduleBlock } from "../types";
+import type { ScheduleBlock, SubjectId } from "../types";
 
 export const SCHEDULE: readonly ScheduleBlock[] = [
   { start: "07:50", end: "08:10", type: "non_academic", label: "Morning meeting" }, // prettier-ignore
@@ -17,3 +17,25 @@ export const SCHEDULE: readonly ScheduleBlock[] = [
   { start: "14:10", end: "14:50", type: "academic", subject: "explorers", lesson: "e-12-0" }, // prettier-ignore
   { start: "14:50", end: "15:10", type: "non_academic", label: "Pack-up & dismissal" }, // prettier-ignore
 ] as const;
+
+/** Each subject's typical time-slot label, for the Weekly card header.
+ *  A real schedule comes from per-teacher Time Blocks later; this is the
+ *  mock default. */
+export const SUBJECT_TIME: Record<SubjectId, string> = {
+  math: "8:10–9:10",
+  ufli: "9:10–9:40",
+  reading: "10:00–11:00",
+  writing: "12:20–1:10",
+  grammar: "1:10–1:40",
+  spelling: "1:40–2:00",
+  sel: "9:40–10:00",
+  explorers: "2:10–2:50",
+};
+
+/** The time-slot label for a lesson — its own `time`, else the subject default. */
+export function lessonTime(lesson: {
+  subject: SubjectId;
+  time?: string;
+}): string {
+  return lesson.time ?? SUBJECT_TIME[lesson.subject];
+}

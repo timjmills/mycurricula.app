@@ -1,0 +1,454 @@
+/* weekly-lesson-card.module.css — interaction-state and layout CSS for the
+   Weekly Lesson Card. Runtime color values that depend on the resolved palette
+   (subject colors, card surface) live inline in the component. This file owns:
+     • card shape, overflow, shadow transitions, focus ring
+     • header band layout (check · meta · controls · title · caret)
+     • body, section rows, collapsed preview, expanded sections
+     • footer chips, affordances, notes disclosure
+     • done-fade (via the card root's inline opacity/filter — no extra class)
+     • ≥44px touch targets on all primary controls
+     • :focus-visible rings throughout
+     • prefers-reduced-motion guard */
+
+/* ── Card root ──────────────────────────────────────────────────────────── */
+/* `data-style` is on <html>; the card reads it but doesn't need style-
+   specific selector overrides here — inline styles handle per-style color. */
+.card {
+  position: relative;
+  border-radius: var(--r-8);
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    opacity 0.18s ease,
+    filter 0.18s ease;
+  outline: none;
+}
+
+.card:focus-visible {
+  /* Double-ring focus pattern: paper gap + subject-color ring. */
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--c, var(--ink-700));
+}
+
+/* ── Header band ─────────────────────────────────────────────────────────── */
+/* Full-width tinted band; padding-inline-start clears the 5px fork stripe. */
+.band {
+  padding: 8px 10px 7px 13px;
+  cursor: pointer;
+  position: relative;
+  /* Slight inner bottom shadow to separate band from body. */
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* ── Band top row: check · subject·time · right controls ─────────────────── */
+.bandTop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+/* Completion check — ≥44px hit area, pulled back so the band stays compact. */
+.bandCheckWrap :global(.cp-card-check) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  /* Negative margin pulls the oversized target back so layout is tight. */
+  margin: -14px -14px -14px -10px;
+  border-radius: var(--r-6);
+}
+
+/* Subject name · separator · time block. */
+.bandMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  line-height: 1;
+}
+
+.bandSubject {
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bandDot {
+  font-size: var(--t-10);
+  opacity: 0.55;
+  flex: 0 0 auto;
+}
+
+.bandTime {
+  font-size: var(--t-10);
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Right-side controls: indicators + affordances. */
+.bandControls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* Move-arrow indicator badge. */
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-2);
+  font-size: 10px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+/* "Modified" pill. */
+.modifiedPill {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* ── Affordance cluster — drag + ⋯ ────────────────────────────────────────── */
+/* Each affordance is a full 44×44 touch target (iPad minimum).
+   Negative margin on the row pulls targets back so they don't bloat the band.
+   Dim by default, fully visible on hover/focus; touch always full (no hover). */
+.affordanceRow {
+  display: inline-flex;
+  align-items: center;
+  margin: -11px -11px -11px 0;
+}
+
+.affordance {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-6);
+  background: transparent;
+  opacity: 0.5;
+  transition: opacity 0.12s ease;
+}
+
+.affordanceVisual {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cd, var(--ink-500));
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--r-2);
+  padding: 3px;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.card:hover .affordance,
+.card:focus-within .affordance {
+  opacity: 1;
+}
+
+.affordance:hover .affordanceVisual {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.affordance:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--c, var(--ink-700));
+  outline-offset: -4px;
+}
+
+@media (hover: none) {
+  .affordance {
+    opacity: 1;
+  }
+}
+
+/* ── Lesson title — second line of the band ──────────────────────────────── */
+.bandTitle {
+  margin: 5px 0 0;
+  font-size: var(--t-13);
+  font-weight: 500;
+  line-height: 1.3;
+  text-wrap: pretty;
+  /* Leave room for caret (20px) at the right. */
+  padding-right: 20px;
+}
+
+/* ── Expand caret — bottom-right of the band ─────────────────────────────── */
+.caret {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-4);
+  color: var(--cd, var(--ink-500));
+  opacity: 0.6;
+  transition:
+    transform 0.18s ease,
+    opacity 0.12s ease;
+}
+
+.band:hover .caret {
+  opacity: 1;
+}
+
+.caretOpen {
+  transform: rotate(180deg);
+}
+
+/* ── Card body ───────────────────────────────────────────────────────────── */
+/* Padding-inline-start clears the 5px fork stripe; body is purely content. */
+.body {
+  padding: 7px 10px 6px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/* Collapsed 2-line preview. */
+.preview {
+  margin: 0;
+  font-size: var(--t-12);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-wrap: pretty;
+}
+
+/* ── Expanded section rows ───────────────────────────────────────────────── */
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* One labeled section: pill label on top, indented content below. */
+.sectionRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Colored pill label — subject-tinted bg, deep text. */
+.sectionLabel {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: var(--r-4);
+}
+
+.sectionContent {
+  padding-left: 2px;
+}
+
+/* Body text inside a section (directions, objective). */
+.sectionText {
+  margin: 0;
+  font-size: var(--t-12);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* Task list inside the tasks section. */
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Teacher notes disclosure ────────────────────────────────────────────── */
+.notesToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-500);
+  padding: 2px 5px;
+  border-radius: var(--r-4);
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.notesToggle:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+.notesToggle:focus-visible {
+  outline: 2px solid var(--c, var(--ink-700));
+  outline-offset: 1px;
+}
+
+.notesBody {
+  margin: 4px 0 0;
+  font-size: var(--t-12);
+  line-height: 1.5;
+  color: var(--ink-700);
+  background: var(--ink-50);
+  border: 1px solid var(--ink-100);
+  border-radius: var(--r-6);
+  padding: 7px 9px;
+  text-wrap: pretty;
+}
+
+/* ── Expanded footer affordances ─────────────────────────────────────────── */
+.expandedFooter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--ink-100);
+  margin-top: 4px;
+}
+
+/* "+ Add section" / "Edit Template" ghost buttons. */
+.footerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-500);
+  padding: 3px 7px;
+  border-radius: var(--r-4);
+  border: 1px solid var(--ink-200);
+  background: transparent;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease,
+    border-color 0.1s ease;
+  min-height: 28px;
+}
+
+.footerBtn:hover {
+  background: var(--ink-50);
+  color: var(--ink-700);
+  border-color: var(--ink-300);
+}
+
+.footerBtn:focus-visible {
+  outline: 2px solid var(--c, var(--ink-700));
+  outline-offset: 1px;
+}
+
+/* ── Collapsed footer row ────────────────────────────────────────────────── */
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* Tasks count pill. */
+.tasksPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px 1px 4px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* Comment count. */
+.commentBadge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--t-10);
+}
+
+/* Unread comment dot. */
+.unreadDot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--urgent);
+}
+
+/* "Core ↑" / status meta pills. */
+.metaPill {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: var(--r-2);
+}
+
+.carryLabel {
+  font-size: var(--t-10);
+  color: var(--catchup);
+  font-weight: 500;
+}
+
+/* ── "Why not done" reason row ───────────────────────────────────────────── */
+.reasonRow {
+  display: flex;
+  gap: 6px;
+  font-size: var(--t-11);
+  line-height: 1.45;
+  color: var(--catchup);
+  background: var(--catchup-bg);
+  border-radius: var(--r-4);
+  padding: 5px 8px;
+  text-wrap: pretty;
+  margin-top: 2px;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+/* Collapse all decorative transitions; focus rings remain instant always. */
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .caret,
+  .affordance,
+  .affordanceVisual,
+  .notesToggle,
+  .footerBtn {
+    transition-duration: 0.001ms !important;
+  }
+}
