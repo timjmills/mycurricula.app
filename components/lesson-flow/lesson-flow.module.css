@@ -128,6 +128,21 @@
   user-select: none;
 }
 
+/* Keyboard reorder button group — move-up / move-down */
+.reorderBtns {
+  display: flex;
+  gap: 2px;
+}
+
+/* Compact variant of .iconBtn used for the reorder chevrons — 36×36
+   so the pair fits neatly in the header without dominating it, while
+   still exceeding the 44px combined touch height thanks to the card
+   padding above and below. */
+.reorderBtn {
+  width: 36px;
+  height: 36px;
+}
+
 /* Remove button pushed to the trailing end */
 .cardHeader .removeBtn {
   margin-left: auto;
@@ -274,12 +289,17 @@
   text-overflow: ellipsis;
 }
 
-/* Remove button inside the chip — smaller than the main icon buttons */
+/* Remove button inside the chip.
+ *
+ * The chip is only 30px tall so a literal 44px button would break the
+ * layout. We keep the 22×22 visual footprint but expand the tap area to
+ * ≥44px using padding + negative margin so the invisible touch target
+ * reaches the spec without disturbing surrounding layout. */
 .chipRemove {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 28px within the 30px chip — still comfortably tappable. */
+  /* Visual size */
   width: 22px;
   height: 22px;
   border-radius: var(--r-4);
@@ -288,7 +308,9 @@
   color: var(--ink-300);
   cursor: pointer;
   flex: 0 0 auto;
-  padding: 0;
+  /* Expand touch target to ≥44px vertically without affecting layout. */
+  padding: 11px 0;
+  margin: -11px 0;
   transition:
     background 0.1s ease,
     color 0.1s ease;
@@ -381,6 +403,7 @@
   .card,
   .dragHandle,
   .iconBtn,
+  .reorderBtn,
   .chip,
   .chipRemove,
   .addResourceBtn,

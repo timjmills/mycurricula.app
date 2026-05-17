@@ -118,14 +118,20 @@ export function WeeklyGrid(): ReactNode {
   });
 
   /**
-   * Drag start — collapse every expanded card so the calendar compacts to
-   * its minimum height. A lesson (whose expanded card can be tall once it
-   * shows its lesson-flow sections) can then be dragged up, down, or across
-   * weeks without scrolling the grid.
+   * Drag start — record the dragging id immediately (needed by handleDrop),
+   * then collapse every expanded card on the next animation frame.
+   *
+   * Collapsing synchronously inside the dragstart event handler causes the
+   * drag source element to resize while the browser is still capturing the
+   * drag image, which cancels the drag in Chrome and Edge. Deferring to rAF
+   * lets the browser finish the dragstart task (and snapshot the ghost image)
+   * before any DOM mutation occurs.
    */
   function handleDragStart(id: string): void {
     setDraggingId(id);
-    setExpandedIds((prev) => (prev.size === 0 ? prev : new Set()));
+    requestAnimationFrame(() => {
+      setExpandedIds((prev) => (prev.size === 0 ? prev : new Set()));
+    });
   }
 
   /** Move the dragged lesson into the target cell (subject row + day). */

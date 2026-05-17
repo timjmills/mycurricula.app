@@ -11,6 +11,9 @@
 //   • Sections are reorderable by dragging their drag handles.
 //   • Resources can be moved between section resource areas.
 //
+// Keyboard reorder: each section also has Move Up / Move Down buttons so
+// section order is fully operable without a mouse.
+//
 // The component is fully controlled — all mutations call `onChange` with
 // an immutable rebuilt array; section order in local state is never used
 // as the authoritative source.
@@ -82,6 +85,24 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
     onChange(sections.filter((s) => s.id !== id));
   }
 
+  /** Move a section up by one position (keyboard reorder). */
+  function moveSectionUp(id: string): void {
+    const idx = sections.findIndex((s) => s.id === id);
+    if (idx <= 0) return;
+    const next = [...sections];
+    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+    onChange(next);
+  }
+
+  /** Move a section down by one position (keyboard reorder). */
+  function moveSectionDown(id: string): void {
+    const idx = sections.findIndex((s) => s.id === id);
+    if (idx === -1 || idx >= sections.length - 1) return;
+    const next = [...sections];
+    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+    onChange(next);
+  }
+
   /** Append a fresh resource to a section's resource list. */
   function addResource(sectionId: string): void {
     const section = sections.find((s) => s.id === sectionId);
@@ -106,12 +127,24 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
     setDrag({ kind: "section", sectionId });
   }
 
-  function handleSectionDragEnd(): void {
+  /** Clear all drag UI state — called from both dragend and on a cancel. */
+  function clearDragState(): void {
     setDrag(null);
     setOverCardId(null);
+    setOverSectionId(null);
   }
 
-  /** A section card is being dragged over another section card. */
+  function handleSectionDragEnd(): void {
+    clearDragState();
+  }
+
+  /** A section card is being dragged over another section card.
+   *
+   *  dragover fires on children too, so we only set the highlight when the
+   *  drag kind matches. We deliberately do NOT check relatedTarget here —
+   *  dragover fires continuously and keeps the highlight alive even as the
+   *  pointer moves between children of the card.
+   */
   function handleCardDragOver(
     e: React.DragEvent<HTMLLIElement>,
     targetId: string,
@@ -119,11 +152,17 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
     if (!drag) return;
     if (drag.kind === "section") {
       e.preventDefault();
-      setOverCardId(targetId);
+      // Only highlight cards that are not the one being dragged.
+      if (drag.sectionId !== targetId) {
+        setOverCardId(targetId);
+      }
       return;
     }
-    // Resource drag hovering over a card — clear card highlight.
-    setOverCardId(null);
+    if (drag.kind === "resource") {
+      // A resource drag passes over the card — allow so it can reach the
+      // resource zone below.
+      e.preventDefault();
+    }
   }
 
   /** Drop a section onto the target position. */
@@ -137,31 +176,51 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
     if (drag.kind === "section") {
       const fromId = drag.sectionId;
       if (fromId === targetId) {
-        setDrag(null);
-        setOverCardId(null);
+        clearDragState();
         return;
       }
       // Reorder: remove the source, splice it before the target.
+      // After splicing, toIdx accounts for the removed element:
+      //   • if fromIdx < toIdx the splice shifts elements left by 1,
+      //     so we use the raw toIdx (which is now one past what we want
+      //     because the source was ahead of the target — the splice
+      //     corrects this automatically).
+      //   • if fromIdx > toIdx the target position is unaffected.
       const next = [...sections];
       const fromIdx = next.findIndex((s) => s.id === fromId);
       const toIdx = next.findIndex((s) => s.id === targetId);
-      if (fromIdx === -1 || toIdx === -1) return;
+      if (fromIdx === -1 || toIdx === -1) {
+        clearDragState();
+        return;
+      }
       const [moved] = next.splice(fromIdx, 1);
+      // After removing fromIdx, if fromIdx < toIdx the effective target
+      // position has shifted down by 1, so toIdx is now correct (points
+      // at the old targetId). splice(toIdx, 0, moved) inserts *before*
+      // targetId — i.e. "drop above target" semantics.
       next.splice(toIdx, 0, moved);
       onChange(next);
-      setDrag(null);
-      setOverCardId(null);
+      clearDragState();
       return;
     }
 
-    // A resource was dropped onto a section card body area — handled by
-    // the resource drop zone instead; ignore here.
-    setDrag(null);
-    setOverCardId(null);
+    // A resource was dropped onto the card body outside the resource zone.
+    // Treat the whole card as a valid drop target — append the resource to
+    // this section so the drop is never silently lost.
+    if (drag.kind === "resource") {
+      handleResourceZoneDrop(e, targetId);
+    }
   }
 
-  function handleCardDragLeave(): void {
-    setOverCardId(null);
+  /** dragLeave on the card — only clear the highlight when the pointer has
+   *  genuinely left the card (not just moved to a child element). */
+  function handleCardDragLeave(
+    e: React.DragEvent<HTMLLIElement>,
+    cardId: string,
+  ): void {
+    const related = e.relatedTarget as Node | null;
+    if (e.currentTarget.contains(related)) return; // still inside the card
+    if (overCardId === cardId) setOverCardId(null);
   }
 
   // ── Resource drag-and-drop ────────────────────────────────────────────
@@ -174,8 +233,7 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
   }
 
   function handleResourceDragEnd(): void {
-    setDrag(null);
-    setOverSectionId(null);
+    clearDragState();
   }
 
   function handleResourceZoneDragOver(
@@ -188,7 +246,7 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
   }
 
   function handleResourceZoneDrop(
-    e: React.DragEvent<HTMLDivElement>,
+    e: React.DragEvent,
     targetSectionId: string,
   ): void {
     e.preventDefault();
@@ -196,18 +254,21 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
 
     const { sourceSectionId, resource } = drag;
 
-    // Build the next sections array immutably.
+    // Build the next sections array immutably in a single pass.
+    // We handle the case where source === target (move to end of same
+    // section) the same way as a cross-section move — filter then append.
+    // This ensures the resource is always present exactly once in the result.
     const next = sections.map((sec) => {
       if (sec.id === sourceSectionId && sec.id !== targetSectionId) {
-        // Remove from source.
+        // Cross-section: remove from source.
         return {
           ...sec,
           resources: sec.resources.filter((r) => r.id !== resource.id),
         };
       }
       if (sec.id === targetSectionId) {
-        // Append to target (no-op if already in this section and we choose
-        // to keep it in place; we still reorder it to the end).
+        // Add to target (filter first to avoid duplication when
+        // source === target, then append to the end).
         const without = sec.resources.filter((r) => r.id !== resource.id);
         return { ...sec, resources: [...without, resource] };
       }
@@ -215,12 +276,18 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
     });
 
     onChange(next);
-    setDrag(null);
-    setOverSectionId(null);
+    clearDragState();
   }
 
-  function handleResourceZoneDragLeave(): void {
-    setOverSectionId(null);
+  /** dragLeave on the resource zone — only clear when the pointer has
+   *  genuinely left the zone (not just moved to a child chip). */
+  function handleResourceZoneDragLeave(
+    e: React.DragEvent<HTMLDivElement>,
+    sectionId: string,
+  ): void {
+    const related = e.relatedTarget as Node | null;
+    if (e.currentTarget.contains(related)) return; // still inside the zone
+    if (overSectionId === sectionId) setOverSectionId(null);
   }
 
   // ── Render ────────────────────────────────────────────────────────────
@@ -236,6 +303,9 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
           const isResourceTarget =
             drag?.kind === "resource" && overSectionId === section.id;
 
+          const isFirst = idx === 0;
+          const isLast = idx === sections.length - 1;
+
           return (
             <li
               key={section.id}
@@ -248,12 +318,11 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
                 .join(" ")}
               onDragOver={(e) => handleCardDragOver(e, section.id)}
               onDrop={(e) => handleCardDrop(e, section.id)}
-              onDragLeave={handleCardDragLeave}
+              onDragLeave={(e) => handleCardDragLeave(e, section.id)}
             >
-              {/* ── Section header: drag handle + index + remove ── */}
+              {/* ── Section header: drag handle + index + reorder + remove ── */}
               <div className={styles.cardHeader}>
-                {/* Drag handle — mouse-first per spec; keyboard reorder
-                    falls through to keyboard-only affordances. */}
+                {/* Drag handle — mouse reorder affordance */}
                 <button
                   type="button"
                   className={styles.dragHandle}
@@ -269,6 +338,33 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
                 <span className={styles.sectionIndex} aria-hidden="true">
                   {idx + 1}
                 </span>
+
+                {/* Keyboard reorder buttons — move-up / move-down */}
+                <div
+                  className={styles.reorderBtns}
+                  aria-label={`Reorder section ${idx + 1}`}
+                >
+                  <button
+                    type="button"
+                    className={`${styles.iconBtn} ${styles.reorderBtn}`}
+                    onClick={() => moveSectionUp(section.id)}
+                    disabled={isFirst}
+                    aria-label={`Move section ${idx + 1} up`}
+                    title="Move up"
+                  >
+                    <ChevronUpIcon />
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.iconBtn} ${styles.reorderBtn}`}
+                    onClick={() => moveSectionDown(section.id)}
+                    disabled={isLast}
+                    aria-label={`Move section ${idx + 1} down`}
+                    title="Move down"
+                  >
+                    <ChevronDownIcon />
+                  </button>
+                </div>
 
                 <button
                   type="button"
@@ -315,13 +411,13 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
                   .join(" ")}
                 onDragOver={(e) => handleResourceZoneDragOver(e, section.id)}
                 onDrop={(e) => handleResourceZoneDrop(e, section.id)}
-                onDragLeave={handleResourceZoneDragLeave}
+                onDragLeave={(e) => handleResourceZoneDragLeave(e, section.id)}
               >
                 {/* Existing resource chips */}
                 {section.resources.length > 0 && (
                   <ul
                     className={styles.resourceChips}
-                    aria-label="Attached resources"
+                    aria-label={`Resources for section ${idx + 1}`}
                   >
                     {section.resources.map((res) => (
                       <li
@@ -358,6 +454,7 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
                   type="button"
                   className={styles.addResourceBtn}
                   onClick={() => addResource(section.id)}
+                  aria-label={`Add resource to section ${idx + 1}`}
                 >
                   <AddIcon />
                   Add resource
@@ -400,6 +497,42 @@ function DragIcon(): ReactNode {
       <circle cx="15" cy="12" r="1.5" />
       <circle cx="9" cy="17" r="1.5" />
       <circle cx="15" cy="17" r="1.5" />
+    </svg>
+  );
+}
+
+function ChevronUpIcon(): ReactNode {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="18 15 12 9 6 15" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon(): ReactNode {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="6 9 12 15 18 9" />
     </svg>
   );
 }

@@ -15,7 +15,14 @@
 // keystroke — that would reset the caret position.
 //
 // singleLine mode: Enter is suppressed so the field stays one line, but all
-// formatting commands remain available.
+// formatting commands remain available. Multi-line paste is collapsed to a
+// single plain-text line before insertion.
+//
+// XSS note: `value` is written via innerHTML and is teacher-authored content
+// rendered back only to the same teacher. There is no cross-user injection
+// risk in the current single-user prototype. When multi-user persistence
+// lands (Supabase backend), sanitize stored HTML with DOMPurify before
+// trusting it from the server.
 
 import {
   useCallback,
@@ -48,9 +55,9 @@ export interface RichTextEditorProps {
 
 interface ColorSwatch {
   label: string;
-  /** CSS color value — must be a literal (execCommand needs it) or a
-   *  var()-resolved value. We resolve CSS vars at runtime via getComputedStyle
-   *  so execCommand always receives a concrete hex/rgb. */
+  /** CSS custom-property name (e.g. "--ink-900") or a literal color keyword
+   *  ("transparent"). We resolve custom properties at command time via
+   *  getComputedStyle so execCommand always receives a concrete hex/rgb. */
   variable: string;
 }
 
@@ -86,41 +93,50 @@ const HIGHLIGHT_COLORS: ColorSwatch[] = [
 
 interface FontOption {
   label: string;
-  /** Value passed to execCommand fontName. Also used as display label. */
-  value: string;
-  /** CSS font-family string for the preview swatch. */
+  /**
+   * CSS custom-property name (e.g. "--font-sans") or a literal font-family
+   * string. Resolved to a concrete font stack at command time via
+   * getComputedStyle so execCommand('fontName') receives a real face value,
+   * not an unparseable var() string.
+   */
+  variable: string;
+  /** CSS font-family string for the preview swatch in the picker. */
   css: string;
 }
 
 const FONT_OPTIONS: FontOption[] = [
   {
     label: "Sans",
-    value: "var(--font-sans)",
+    variable: "--font-sans",
     css: "var(--font-sans)",
   },
   {
     label: "Mono",
-    value: "var(--font-mono)",
+    variable: "--font-mono",
     css: "var(--font-mono)",
   },
   {
     label: "Serif",
-    value: "Georgia, 'Times New Roman', serif",
+    variable: "Georgia, 'Times New Roman', serif",
     css: "Georgia, 'Times New Roman', serif",
   },
   {
     label: "System",
-    value: "system-ui, sans-serif",
+    variable: "system-ui, sans-serif",
     css: "system-ui, sans-serif",
   },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Resolve a CSS custom property to its computed value on <html>. */
+/**
+ * Resolve a CSS custom property to its computed value on <html>.
+ * Falls back to the string unchanged when it is not a custom-property name
+ * (so literal colors and font stacks pass through unmodified).
+ * Must only be called in browser context — never during SSR render.
+ */
 function resolveCssVar(variable: string): string {
   if (!variable.startsWith("--")) return variable; // already a concrete value
-  if (typeof window === "undefined") return "#000";
   return getComputedStyle(document.documentElement)
     .getPropertyValue(variable)
     .trim();
@@ -131,6 +147,17 @@ function resolveCssVar(variable: string): string {
 function exec(command: string, value = ""): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (document as any).execCommand(command, false, value || undefined);
+}
+
+/**
+ * Returns true when a contentEditable element's innerHTML represents
+ * visually empty content. Browsers may leave behind a lone <br> or a
+ * block wrapper like <div><br></div> after the last character is deleted.
+ */
+function isEditorEmpty(el: HTMLElement): boolean {
+  if ((el.textContent ?? "").trim() !== "") return false;
+  const inner = el.innerHTML;
+  return inner === "" || /^(<br\s*\/?>|<div><br\s*\/?><\/div>)$/i.test(inner);
 }
 
 // ── Toolbar sub-components ────────────────────────────────────────────────────
@@ -202,7 +229,7 @@ export function RichTextEditor({
   // Last value we wrote into the DOM — used to avoid caret-resetting writes.
   const lastWrittenRef = useRef<string>("");
 
-  // Toolbar visibility & position
+  // Toolbar visibility & position (viewport-relative, for position:fixed).
   const [toolbarVisible, setToolbarVisible] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0 });
 
@@ -211,8 +238,11 @@ export function RichTextEditor({
   const [italic, setItalic] = useState(false);
   const [underline, setUnderline] = useState(false);
 
-  // Whether the editor content is empty (for placeholder)
-  const [empty, setEmpty] = useState(() => !value || value === "<br>");
+  // Whether the editor content is empty (for placeholder).
+  // Initial state: treat as empty when value is blank or a bare <br>.
+  const [empty, setEmpty] = useState(
+    () => !value || value === "<br>" || value === "<br/>",
+  );
 
   // Font picker open state
   const [fontOpen, setFontOpen] = useState(false);
@@ -222,7 +252,7 @@ export function RichTextEditor({
     null,
   );
 
-  // ── Sync value → DOM (only when it genuinely differs) ──────────────────
+  // ── Sync value → DOM (only when it genuinely differs) ──────────────
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
@@ -231,7 +261,7 @@ export function RichTextEditor({
       el.innerHTML = value;
       lastWrittenRef.current = value;
     }
-    setEmpty(!value || value === "<br>" || el.innerHTML === "");
+    setEmpty(isEditorEmpty(el));
   }, [value]);
 
   // ── Toolbar positioning & format-state polling ──────────────────────────
@@ -258,26 +288,30 @@ export function RichTextEditor({
     setUnderline(document.queryCommandState("underline"));
 
     // Position toolbar above the selection rect, clamped to viewport.
+    // The toolbar uses position:fixed, so coordinates must be viewport-relative.
+    // getBoundingClientRect() already returns viewport-relative values — do NOT
+    // add window.scrollY / window.scrollX (that would misplace the toolbar on
+    // any scrolled page).
     const rect = range.getBoundingClientRect();
     const toolbarH = 42; // approximate toolbar height
     const toolbarW = 340; // approximate toolbar width
     const gap = 8;
 
-    let top = rect.top - toolbarH - gap + window.scrollY;
-    let left = rect.left + window.scrollX + rect.width / 2 - toolbarW / 2;
+    let top = rect.top - toolbarH - gap;
+    let left = rect.left + rect.width / 2 - toolbarW / 2;
 
     // Clamp so it doesn't escape the viewport horizontally.
     left = Math.max(8, Math.min(left, window.innerWidth - toolbarW - 8));
     // If not enough room above, flip below.
     if (rect.top < toolbarH + gap + 4) {
-      top = rect.bottom + gap + window.scrollY;
+      top = rect.bottom + gap;
     }
 
     setToolbarPos({ top, left });
     setToolbarVisible(true);
   }, []);
 
-  // ── Keyboard handler ────────────────────────────────────────────────────
+  // ── Keyboard handler ────────────────────────────────────────────────
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (singleLine && e.key === "Enter") {
@@ -288,23 +322,23 @@ export function RichTextEditor({
     [singleLine],
   );
 
-  // ── Input handler — report changes, check empty state ──────────────────
+  // ── Input handler — report changes, check empty state ──────────────
   const handleInput = useCallback(() => {
     const el = editorRef.current;
     if (!el) return;
     const html = el.innerHTML;
     lastWrittenRef.current = html;
     onChange(html);
-    setEmpty(html === "" || html === "<br>");
+    setEmpty(isEditorEmpty(el));
   }, [onChange]);
 
-  // ── Selection change → update toolbar ──────────────────────────────────
+  // ── Selection change → update toolbar ──────────────────────────────
   useEffect(() => {
     document.addEventListener("selectionchange", updateToolbar);
     return () => document.removeEventListener("selectionchange", updateToolbar);
   }, [updateToolbar]);
 
-  // ── Close popups when clicking outside toolbar/editor ──────────────────
+  // ── Close popups when clicking outside toolbar/editor ──────────────
   useEffect(() => {
     function handlePointerDown(e: PointerEvent) {
       const target = e.target as Node;
@@ -321,7 +355,7 @@ export function RichTextEditor({
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
-  // ── Format command helpers ──────────────────────────────────────────────
+  // ── Format command helpers ──────────────────────────────────────────
 
   /** Apply a format command while keeping focus in the editor. */
   const applyCommand = useCallback(
@@ -362,19 +396,57 @@ export function RichTextEditor({
   );
 
   const applyFont = useCallback(
-    (e: React.MouseEvent, fontValue: string) => {
-      // execCommand('fontName') sets a <font face="…"> element. We pass the
-      // CSS value directly — browsers will use it as the face attribute.
-      applyCommand(e, "fontName", fontValue);
+    (e: React.MouseEvent, fontVariable: string) => {
+      // execCommand('fontName') wraps the selection in <font face="…">.
+      // Resolve CSS custom properties to their concrete computed value first —
+      // the <font face> attribute does not understand var() syntax, so passing
+      // "var(--font-sans)" would set a literal (invalid) font name.
+      const resolved = resolveCssVar(fontVariable);
+      applyCommand(e, "fontName", resolved);
       setFontOpen(false);
     },
     [applyCommand],
   );
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  // ── Paste handler ───────────────────────────────────────────────────
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLDivElement>) => {
+      if (singleLine) {
+        // In single-line mode, intercept the paste entirely: extract plain
+        // text, collapse all line breaks to a space, and insert it ourselves
+        // so no <br> elements or block wrappers sneak into the editor.
+        e.preventDefault();
+        const text = e.clipboardData
+          .getData("text/plain")
+          .replace(/[\r\n]+/g, " ")
+          .trim();
+        if (text) {
+          exec("insertText", text);
+          const html = editorRef.current?.innerHTML ?? "";
+          lastWrittenRef.current = html;
+          onChange(html);
+          setEmpty(false);
+        }
+        return;
+      }
+
+      // Multi-line mode: let the browser handle the paste, then report.
+      setTimeout(() => {
+        const el = editorRef.current;
+        if (!el) return;
+        const html = el.innerHTML;
+        lastWrittenRef.current = html;
+        onChange(html);
+        setEmpty(isEditorEmpty(el));
+      }, 0);
+    },
+    [singleLine, onChange],
+  );
+
+  // ── Render ──────────────────────────────────────────────────────────
   return (
     <div className={styles.root}>
-      {/* Floating toolbar — rendered in document flow at a fixed position */}
+      {/* Floating toolbar — position:fixed, coordinates are viewport-relative */}
       {toolbarVisible && (
         <div
           ref={toolbarRef}
@@ -426,7 +498,7 @@ export function RichTextEditor({
                 setFontOpen(false);
               }}
             >
-              {/* A colored "A" showing the concept */}
+              {/* A colored "A" suggesting text-color */}
               <span className={styles.iconColor}>A</span>
               <span className={styles.iconCaret} aria-hidden>
                 ▾
@@ -518,13 +590,13 @@ export function RichTextEditor({
               >
                 {FONT_OPTIONS.map((opt) => (
                   <button
-                    key={opt.value}
+                    key={opt.variable}
                     type="button"
                     aria-label={`Font: ${opt.label}`}
                     title={opt.label}
                     className={`${styles.fontOption} cp-focusable`}
                     style={{ fontFamily: opt.css }}
-                    onMouseDown={(e) => applyFont(e, opt.value)}
+                    onMouseDown={(e) => applyFont(e, opt.variable)}
                   >
                     {opt.label}
                   </button>
@@ -547,22 +619,13 @@ export function RichTextEditor({
           ref={editorRef}
           role="textbox"
           aria-multiline={!singleLine}
-          aria-label={ariaLabel}
+          aria-label={ariaLabel ?? placeholder ?? "Text editor"}
           contentEditable
           suppressContentEditableWarning
           className={`${styles.editor} ${singleLine ? styles.editorSingleLine : ""}`}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
-          // After paste, normalize and report.
-          onPaste={() => {
-            // Small timeout lets the browser finish inserting pasted content.
-            setTimeout(() => {
-              const html = editorRef.current?.innerHTML ?? "";
-              lastWrittenRef.current = html;
-              onChange(html);
-              setEmpty(html === "" || html === "<br>");
-            }, 0);
-          }}
+          onPaste={handlePaste}
         />
       </div>
     </div>

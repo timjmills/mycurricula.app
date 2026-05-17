@@ -147,7 +147,7 @@
 }
 
 .iconCaret {
-  font-size: 8px;
+  font-size: var(--t-10);
   color: var(--ink-400);
   line-height: 1;
   margin-top: 1px;

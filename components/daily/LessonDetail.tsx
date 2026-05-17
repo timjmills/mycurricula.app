@@ -253,11 +253,25 @@ function StatusCheckbox({
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-/** Build the initial sections array from the default lesson-flow template. */
+/** Build the initial sections array from the default lesson-flow template.
+ *  Guards the lookup so a missing or misconfigured template id never crashes
+ *  the render — in that case we start with a single blank section. */
 function buildInitialSections(): LessonSectionContent[] {
-  return instantiateSections(
-    LESSON_TEMPLATE_BY_ID[DEFAULT_LESSON_TEMPLATE_ID],
-  ) as LessonSectionContent[];
+  const template = LESSON_TEMPLATE_BY_ID[DEFAULT_LESSON_TEMPLATE_ID];
+  if (!template) {
+    // Defensive fallback: template registry misconfigured — start blank.
+    return [
+      {
+        id: `lsec-fallback-${Date.now().toString(36)}`,
+        templateSectionId: null,
+        heading: "Lesson plan",
+        prompt: "Describe your lesson plan here…",
+        body: "",
+        resources: [],
+      },
+    ];
+  }
+  return instantiateSections(template) as LessonSectionContent[];
 }
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -291,15 +305,19 @@ export function LessonDetail({
   // ── Teacher notes — editable rich text, seeded from lesson.notes.
   const [notesHtml, setNotesHtml] = useState<string>(lesson.notes ?? "");
 
+  // Notes hover-reveal: the editor is blurred until hover or focus enters.
+  // Declared before the lesson-change effect so the setter is unambiguously
+  // in scope when the effect fires.
+  const [notesHovered, setNotesHovered] = useState(false);
+
   // Re-instantiate both section state and notes when the selected lesson
   // changes. Keying on lesson.id ensures a clean slate for each lesson.
+  // Reset notesHovered so the new lesson always starts with notes hidden.
   useEffect(() => {
     setSections(buildInitialSections());
     setNotesHtml(lesson.notes ?? "");
+    setNotesHovered(false);
   }, [lesson.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Notes hover-reveal: the editor is blurred until hover.
-  const [notesHovered, setNotesHovered] = useState(false);
 
   // Cycle: not_done → done → partial → not_done
   function cycleStatus(): void {
@@ -447,7 +465,7 @@ export function LessonDetail({
             the default lesson-flow template and are re-instantiated fresh
             each time a different lesson is selected. The key prop ensures
             LessonFlow's own internal drag state also resets. */}
-        <section className={styles.detailSection}>
+        <section className={styles.detailSection} aria-label="Lesson flow">
           <div className={styles.detailSectionHead}>
             {/* Flow icon */}
             <svg
