@@ -24,7 +24,7 @@
 // per-subject color hook. The grid reads theme — it never sets it.
 
 import type { ReactNode } from "react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { useTheme } from "@/lib/theme";
@@ -75,6 +75,23 @@ export function WeeklyGrid(): ReactNode {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // maximizedCell — only one cell is expanded at a time. Key = `${subjectId}:${day}`.
   const [maximizedCell, setMaximizedCell] = useState<string | null>(null);
+
+  // ── Compact / move-mode state ────────────────────────────────────────
+  // compact is true when either a drag is in progress (draggingId ≠ null)
+  // or the teacher has toggled Move mode on manually.
+  // compactManual persists between drags so the teacher can keep move mode
+  // on while rearranging multiple lessons.
+  const [compactManual, setCompactManual] = useState(false);
+  const compact = compactManual || draggingId !== null;
+
+  // ── Drag auto-scroll ─────────────────────────────────────────────────
+  // A ref to the scroll container so the dragOver handler can read its
+  // bounds without querying the DOM on every event.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // The rAF id for the current scroll loop — cancelled on drag end.
+  const scrollRafRef = useRef<number | null>(null);
+  // Current scroll velocity (px/frame), set by the dragOver proximity check.
+  const scrollVelocityRef = useRef<number>(0);
 
   // Per-cell arranged layouts, keyed by cellKey(subjectId, day).
   // A cell with no entry here renders its default CardStack view.
@@ -152,6 +169,76 @@ export function WeeklyGrid(): ReactNode {
     });
   }
 
+  // ── Drag auto-scroll implementation ─────────────────────────────────
+  //
+  // While a drag is active and the pointer nears the top or bottom edge of
+  // the scroll container, we scroll it automatically so lessons off-screen
+  // can be reached. The scroll loop runs via requestAnimationFrame; the
+  // velocity is set each dragover event and cleared on dragend.
+  //
+  // Edge zone: 80px from the top / bottom of the visible scroll region.
+  // Max speed: 14px per frame (≈ 840px/s at 60fps) — fast but not jarring.
+
+  const SCROLL_EDGE = 80; // px from edge to begin scrolling
+  const SCROLL_MAX = 14; // px per frame at the edge
+
+  // Start the rAF scroll loop if not already running.
+  const startScrollLoop = useCallback(() => {
+    if (scrollRafRef.current !== null) return;
+    function tick() {
+      const v = scrollVelocityRef.current;
+      if (v !== 0 && scrollRef.current) {
+        scrollRef.current.scrollTop += v;
+      }
+      scrollRafRef.current = requestAnimationFrame(tick);
+    }
+    scrollRafRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  // Stop the rAF loop (called on dragend and when velocity drops to 0).
+  const stopScrollLoop = useCallback(() => {
+    if (scrollRafRef.current !== null) {
+      cancelAnimationFrame(scrollRafRef.current);
+      scrollRafRef.current = null;
+    }
+    scrollVelocityRef.current = 0;
+  }, []);
+
+  // Ensure the loop is cleaned up if the component unmounts mid-drag.
+  useEffect(() => stopScrollLoop, [stopScrollLoop]);
+
+  /**
+   * Fired on dragover events on the scroll container. Computes how far
+   * the pointer is from the top/bottom edge and sets the scroll velocity
+   * proportionally, then starts the rAF loop if needed.
+   */
+  function handleScrollDragOver(e: React.DragEvent<HTMLDivElement>): void {
+    if (!draggingId) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const y = e.clientY;
+    const distFromTop = y - rect.top;
+    const distFromBottom = rect.bottom - y;
+
+    let v = 0;
+    if (distFromTop < SCROLL_EDGE) {
+      // Near top — scroll up (negative).
+      v = -SCROLL_MAX * (1 - distFromTop / SCROLL_EDGE);
+    } else if (distFromBottom < SCROLL_EDGE) {
+      // Near bottom — scroll down (positive).
+      v = SCROLL_MAX * (1 - distFromBottom / SCROLL_EDGE);
+    }
+
+    scrollVelocityRef.current = v;
+    if (v !== 0) {
+      startScrollLoop();
+    }
+    // Loop keeps running with v=0 when pointer is in the middle zone —
+    // that is fine: the tick just does nothing at zero velocity. The loop
+    // is stopped cleanly on dragend.
+  }
+
   /** Move the dragged lesson into the target cell (subject row + day). */
   function handleDrop(subjectId: SubjectId, day: number): void {
     if (!draggingId) return;
@@ -169,6 +256,7 @@ export function WeeklyGrid(): ReactNode {
           : l,
       ),
     );
+    stopScrollLoop();
     setDraggingId(null);
   }
 
@@ -437,6 +525,7 @@ export function WeeklyGrid(): ReactNode {
       return next;
     });
 
+    stopScrollLoop();
     setDraggingId(null);
   }
 
@@ -552,6 +641,24 @@ export function WeeklyGrid(): ReactNode {
 
   return (
     <div className={styles.page}>
+      {/*
+       * WeekNavigator is rendered by the WeekNavigator component (which owns
+       * the navbar shell and the prev/next/today controls). The Move-mode
+       * toggle is placed here, in a sibling wrapper inside the same navbar,
+       * because WeekNavigator.tsx is read-only by convention (the agent owns
+       * only WeeklyGrid.tsx, GridCell.tsx, WeeklyGrid.module.css). We render
+       * a separate header row that contains both the WeekNavigator and the
+       * move-mode button so the visual grouping stays correct.
+       *
+       * Implementation note: WeekNavigator renders a full <header> with
+       * class .navbar. Rather than wrapping that, we inject the toggle as an
+       * adjacent element styled to float into the same visual row. A flex
+       * container wraps both and we use CSS to keep them aligned.
+       *
+       * Simpler alternative chosen: render a second sticky bar below the
+       * WeekNavigator's sticky header that holds the toggle. This keeps the
+       * two components fully decoupled.
+       */}
       <WeekNavigator
         week={week}
         currentWeek={CURRENT_WEEK}
@@ -560,9 +667,34 @@ export function WeeklyGrid(): ReactNode {
         onChange={setWeek}
       />
 
-      <div className={styles.scroll}>
+      {/* ── Move-mode toolbar ──────────────────────────────────────────
+          A slim secondary bar beneath the week navigator that holds the
+          compact / move-mode toggle. Sticky so it stays visible while
+          scrolling the grid. The button is 44px tall (WCAG touch target). */}
+      <div className={styles.moveToolbar}>
+        <button
+          type="button"
+          className={`${styles.moveModeBtn} ${compactManual ? styles.moveModeBtnActive : ""}`}
+          onClick={() => setCompactManual((v) => !v)}
+          aria-pressed={compactManual}
+          aria-label={
+            compactManual
+              ? "Exit Move mode (expand cards)"
+              : "Enter Move mode (compact view)"
+          }
+        >
+          <MoveIcon active={compactManual} />
+          {compactManual ? "Exit Move mode" : "Move mode"}
+        </button>
+      </div>
+
+      <div
+        ref={scrollRef}
+        className={styles.scroll}
+        onDragOver={handleScrollDragOver}
+      >
         <div
-          className={styles.grid}
+          className={`${styles.grid} ${compact ? styles.gridCompact : ""}`}
           role="grid"
           aria-label={`Weekly plan, week ${week}`}
         >
@@ -602,8 +734,12 @@ export function WeeklyGrid(): ReactNode {
               maximizedCell={maximizedCell}
               cellLayouts={cellLayouts}
               cellProps={gridNav.cellProps}
+              compact={compact}
               onDragStart={handleDragStart}
-              onDragEnd={() => setDraggingId(null)}
+              onDragEnd={() => {
+                stopScrollLoop();
+                setDraggingId(null);
+              }}
               onDrop={handleDrop}
               onDropRegion={handleDropRegion}
               onAdd={handleAdd}
@@ -638,6 +774,8 @@ interface SubjectRowProps {
   cellLayouts: Record<string, CellLayout>;
   /** Builds the roving-tabindex props for a cell at (row, col). */
   cellProps: (row: number, col: number) => CellNavProps;
+  /** Pass-through of the grid's compact / move-mode state. */
+  compact: boolean;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
   onDrop: (subjectId: SubjectId, day: number) => void;
@@ -665,6 +803,7 @@ function SubjectRow({
   maximizedCell,
   cellLayouts,
   cellProps,
+  compact,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -711,6 +850,7 @@ function SubjectRow({
           maximized={maximizedCell === `${subjectId}:${day}`}
           cellLayout={cellLayouts[cellKey(subjectId, day)] ?? null}
           navProps={cellProps(rowIndex, day)}
+          compact={compact}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
           onDrop={onDrop}
@@ -723,5 +863,28 @@ function SubjectRow({
         />
       ))}
     </>
+  );
+}
+
+// ── Move-mode icon ───────────────────────────────────────────────────────
+// A simple arrows icon (two horizontal arrows) communicating "rearrange".
+// Active state uses a filled/tinted variant (just a stroke-width bump).
+
+function MoveIcon({ active }: { active: boolean }): ReactNode {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={active ? 2.5 : 2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {/* Left-right double arrow */}
+      <path d="M7 16l-4-4 4-4M17 8l4 4-4 4M3 12h18" />
+    </svg>
   );
 }

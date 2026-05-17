@@ -40,6 +40,8 @@ import type { CellShade } from "./unitShading";
 import type { CellNavProps } from "./useGridNavigation";
 import { CardStack } from "./card-stack";
 import { CellDropZones } from "./cell-drop-zones";
+// LessonChip is provided by a sibling agent — imported here, not created here.
+import { LessonChip } from "@/components/grid/lesson-chip";
 import styles from "./WeeklyGrid.module.css";
 
 interface GridCellProps {
@@ -96,6 +98,13 @@ interface GridCellProps {
    * enforces single-cell-maximized; this cell just asks.
    */
   onToggleMaximize: (subjectId: SubjectId, day: number) => void;
+  /**
+   * Compact / move-mode: when true, lessons render as one-line LessonChips
+   * instead of full LessonCards. The cell min-height is also reduced so the
+   * entire grid fits on-screen. Driven by drag-in-progress OR the manual
+   * Move-mode toggle in the grid header.
+   */
+  compact?: boolean;
 }
 
 /** A single day/subject cell: drop target, card stack, empty affordance. */
@@ -119,6 +128,7 @@ export function GridCell({
   onContextAction,
   navProps,
   onToggleMaximize,
+  compact = false,
 }: GridCellProps): ReactNode {
   const [dragOver, setDragOver] = useState(false);
   const isEmpty = lessons.length === 0;
@@ -223,12 +233,46 @@ export function GridCell({
     }
   }
 
-  const stateClass =
-    !isEmpty && hasMultiple
+  // In compact mode the cell is always slim — maximized/collapsed states
+  // are irrelevant and suppressed so expanded chip lists stay readable.
+  const stateClass = compact
+    ? styles.cellCompact
+    : !isEmpty && hasMultiple
       ? maximized
         ? styles.cellMaximized
         : styles.cellCollapsed
       : "";
+
+  // ── Compact chip renderer ──────────────────────────────────────────────
+  // In compact / move-mode each lesson renders as a slim one-line
+  // LessonChip so the teacher can see every slot in the grid at once.
+  // Chips carry `dragHandleProps` so they are still draggable, and
+  // `onSelect` so tapping a chip still selects it.
+  function renderCompactChips(): ReactNode {
+    if (lessons.length === 0) return null;
+    return (
+      <div className={styles.chipList}>
+        {lessons.map((lesson) => (
+          <LessonChip
+            key={lesson.id}
+            lesson={lesson}
+            selected={selectedId === lesson.id}
+            dragging={draggingId === lesson.id}
+            onSelect={onSelect}
+            dragHandleProps={{
+              draggable: true,
+              onDragStart: (e) => {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", lesson.id);
+                onDragStart(lesson.id);
+              },
+              onDragEnd,
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
 
   // ── Split-slot layout renderer ─────────────────────────────────────────
   // When a CellLayout is present the cell renders its row/slot structure
@@ -323,8 +367,8 @@ export function GridCell({
         </div>
       ) : (
         <>
-          {/* Collapse button — visible when maximized; pinned top-right. */}
-          {hasMultiple && (
+          {/* Collapse button — visible when maximized (normal mode only). */}
+          {!compact && hasMultiple && (
             <button
               type="button"
               className={styles.collapseBtn}
@@ -340,22 +384,24 @@ export function GridCell({
           )}
 
           {/*
-           * Layout path: render the arranged row/slot structure when a
-           * CellLayout is present. Fallback to the default CardStack when
-           * no layout has been applied (most cells most of the time).
+           * Compact path: one-line chips for every lesson in the cell.
+           * Drop zones stay active so any chip is a valid drag target.
            *
-           * CardStack wraps all lesson cards:
+           * Normal path: the arranged row/slot structure when a CellLayout
+           * is present, or the default CardStack otherwise.
            *   maximized=false + >1 card → one card + stacked affordance + arrows
            *   maximized=true           → all cards visible
            *   0 or 1 card              → renders children directly, no chrome
            */}
-          {cellLayout !== null ? (
+          {compact ? (
+            renderCompactChips()
+          ) : cellLayout !== null ? (
             renderLayout(cellLayout)
           ) : (
             <CardStack cards={cardNodes} maximized={maximized} />
           )}
 
-          {/* Faint add button so a populated cell can still take another. */}
+          {/* Faint add button — hidden in compact mode via CSS. */}
           <button
             type="button"
             className={styles.cellAddInline}

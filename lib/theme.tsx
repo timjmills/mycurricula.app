@@ -25,8 +25,8 @@ export type ThemeStyle = "quiet" | "calm" | "vivid";
 /** Saturation axis — alias of the palette type. */
 export type ThemePalette = PaletteType;
 
-/** Dev defaults. HIGHLIGHT is the default palette per the design brief. */
-export const DEFAULT_STYLE: ThemeStyle = "quiet";
+/** App defaults — the Vivid style paired with the Highlight palette. */
+export const DEFAULT_STYLE: ThemeStyle = "vivid";
 export const DEFAULT_PALETTE: ThemePalette = "highlight";
 
 interface ThemeContextValue {

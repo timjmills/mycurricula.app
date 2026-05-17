@@ -91,9 +91,23 @@ export function CardStack({ cards, maximized }: CardStackProps): ReactNode {
   return (
     <div className={styles.stackDeck}>
       {/* Stacked-deck stage: the active card floats above two thin pseudo-
-          layers (::before / ::after in the CSS) that simulate a deck. */}
+          layers (::before / ::after in the CSS) that simulate a deck.
+          A prominent stack-count badge floats over the top-right corner so
+          a teacher can see at a glance that multiple lessons are here. */}
       <div className={styles.deckStage}>
         <div className={styles.activeCard}>{cards[activeIdx]}</div>
+
+        {/* Stack-count badge — "⧉ {n}" pinned top-right of the stage.
+            aria-label announced to screen-readers; the visual badge is
+            aria-hidden because the navBar counter also reads the count. */}
+        <div
+          className={styles.stackCountBadge}
+          aria-hidden="true"
+          title={`${cards.length} lessons stacked`}
+        >
+          <StackLayersIcon />
+          {cards.length}
+        </div>
       </div>
 
       {/* Navigation bar: [◀]  {i} of {n}  [▶] */}
@@ -125,6 +139,24 @@ export function CardStack({ cards, maximized }: CardStackProps): ReactNode {
         </button>
       </div>
     </div>
+  );
+}
+
+// ── Stack-count badge icon ───────────────────────────────────────────────────
+
+/** Two overlapping rectangles — universally reads as "stacked layers". */
+function StackLayersIcon(): ReactNode {
+  return (
+    <svg
+      width={11}
+      height={11}
+      viewBox="0 0 12 12"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <rect x="0" y="3" width="9" height="7" rx="1.5" opacity="0.65" />
+      <rect x="3" y="0" width="9" height="7" rx="1.5" />
+    </svg>
   );
 }
 

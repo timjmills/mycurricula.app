@@ -118,9 +118,10 @@ Documents/      Planning docs + design handoff — NOT part of the app, never im
 The visual system has two independent axes, both set as `<html>` data attributes by
 `lib/theme.tsx`:
 
-- `data-style` ∈ `quiet | calm | vivid` — card treatment. **Quiet is the production
-  Phase 1 style.** Vivid is a Phase-2 prototype direction.
-- `data-palette` ∈ `normal | highlight` — subject-color saturation.
+- `data-style` ∈ `quiet | calm | vivid` — card treatment. **The app defaults to
+  `vivid`**; `quiet` and `calm` remain available as teacher preferences.
+- `data-palette` ∈ `normal | highlight` — subject-color saturation. **Defaults to
+  `highlight`.**
 
 **Hard rules:**
 

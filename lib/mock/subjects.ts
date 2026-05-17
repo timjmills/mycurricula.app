@@ -4,16 +4,16 @@
 import type { Subject, SubjectId } from "../types";
 
 export const SUBJECTS: readonly Subject[] = [
-  { id: "math", name: "Math", cls: "math", icon: "÷" },
-  { id: "reading", name: "Reading", cls: "reading", icon: "📖", parent: "literacy" }, // prettier-ignore
+  { id: "math", name: "Math", cls: "math", icon: "Ma" },
+  { id: "reading", name: "Reading", cls: "reading", icon: "Re", parent: "literacy" }, // prettier-ignore
   {
     id: "writing",
     name: "Writing",
     cls: "writing",
-    icon: "✎",
+    icon: "Wr",
     parent: "literacy",
   },
-  { id: "grammar", name: "Grammar", cls: "grammar", icon: "Ag", parent: "literacy" }, // prettier-ignore
+  { id: "grammar", name: "Grammar", cls: "grammar", icon: "Gr", parent: "literacy" }, // prettier-ignore
   { id: "spelling", name: "Spelling", cls: "spelling", icon: "Sp", parent: "literacy" }, // prettier-ignore
   { id: "ufli", name: "UFLI", cls: "ufli", icon: "Uf" },
   { id: "explorers", name: "Explorers", cls: "explorers", icon: "Ex" },

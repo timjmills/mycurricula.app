@@ -31,15 +31,17 @@
 }
 
 /* The card staging area: relative context so the pseudo-deck layers can
-   be absolutely positioned behind the active card. */
+   be absolutely positioned behind the active card.
+   Padding-bottom is generous so the taller layer tabs are fully visible. */
 .deckStage {
   position: relative;
-  /* The pseudo-layers peek out by 3px top/bottom; add that to the stage's
-     padding so the true card inside never clips them. */
-  padding-bottom: 6px;
+  /* Both pseudo-layers extend 10px below the card; we need that space. */
+  padding-bottom: 10px;
 }
 
-/* Layer 1 (furthest back) — thinnest sliver. */
+/* Pseudo-deck layers — two "cards" peeking below the active card.
+   More pronounced than a subtle hint: 4px solid border, warm offset
+   tones, and staggered margins so they read as distinct sheets of paper. */
 .deckStage::before,
 .deckStage::after {
   content: "";
@@ -48,24 +50,26 @@
   right: 0;
   bottom: 0;
   border-radius: var(--r-8);
-  background: var(--ink-100);
-  border: 1px solid var(--ink-150);
+  border: 1.5px solid var(--ink-200);
   pointer-events: none;
 }
 
-/* Layer 1: 5px taller than the card, offset 3px down from the card bottom. */
+/* Layer 1 (furthest back) — widest margin = narrowest visible strip,
+   gives the impression of the bottommost card in the deck. */
 .deckStage::before {
-  height: 6px;
+  height: 10px;
   bottom: 0;
-  margin-inline: 4px;
+  /* Inset 6px each side so both layers are visually distinguishable. */
+  margin-inline: 6px;
+  background: var(--ink-100);
   z-index: 0;
 }
 
-/* Layer 2: sits between layer 1 and the card, slightly less offset. */
+/* Layer 2 — closer to the surface, less margin, slightly darker tint. */
 .deckStage::after {
-  height: 4px;
-  bottom: 3px;
-  margin-inline: 2px;
+  height: 7px;
+  bottom: 4px;
+  margin-inline: 3px;
   background: var(--ink-150);
   z-index: 1;
 }
@@ -74,6 +78,38 @@
 .activeCard {
   position: relative;
   z-index: 2;
+}
+
+/* ── Stack-count badge ──────────────────────────────────────────────────
+   A prominent "⧉ {n}" pill pinned to the top-right corner of the stage.
+   This is the primary at-a-glance signal that multiple lessons are here.
+   It must be unmistakable even on a quick scan of the full grid. */
+.stackCountBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 3; /* above the active card */
+  /* Pill shape */
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px 2px 5px;
+  border-radius: var(--r-4);
+  /* Opaque dark ink so it reads on any card background (vivid/quiet/calm) */
+  background: var(--ink-700);
+  color: var(--paper);
+  /* Tiny type, bold weight, slight spacing */
+  font-family: var(--font-sans);
+  font-size: var(--t-10);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  /* Never capture pointer events — the card beneath stays clickable */
+  pointer-events: none;
+  user-select: none;
+  /* Subtle elevation so it floats above card content */
+  box-shadow: 0 1px 3px rgba(20, 22, 32, 0.2);
 }
 
 /* ── Nav bar: arrows + position counter ────────────────────────────── */

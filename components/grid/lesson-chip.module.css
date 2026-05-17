@@ -1,0 +1,160 @@
+/* lesson-chip.module.css — compact single-line chip for move-mode cells.
+ *
+ * Each chip represents one lesson (or a stack of lessons) at ~28px tall so
+ * the full weekly calendar fits on screen without scrolling. Subject color
+ * drives a left stripe via border-left on the root; the `.cp-subj` class
+ * on the root resolves --c / --cl / --cd from the active palette bridge.
+ *
+ * States:
+ *   default   — subtle white/ink surface, narrow stripe
+ *   selected  — 2px inset ring in --c
+ *   dragging  — elevated shadow, slight rotation
+ *   stackCount > 1 — stack badge (⧉ n) on the right end
+ *
+ * All color / type / spacing via var(--token) from app/tokens.css.
+ * Never hard-code hex or px here.
+ */
+
+/* ── Root chip ─────────────────────────────────────────────────────────── */
+.chip {
+  /* Sizing */
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  /* Gap between stripe-pillar and content */
+  gap: 0;
+  /* Stripe is the 3px solid left border driven by --c */
+  border-left: 3px solid var(--c, var(--ink-300));
+  border-radius: var(--r-4);
+  overflow: hidden;
+  /* Surface */
+  background: var(--paper);
+  border-top: 1px solid var(--ink-150);
+  border-right: 1px solid var(--ink-150);
+  border-bottom: 1px solid var(--ink-150);
+  box-shadow: var(--shadow-card);
+  /* Reset button appearance when rendered as a button */
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--t-12);
+  color: var(--ink-900);
+  text-align: left;
+  /* Transitions — skip under reduced motion (tokens.css @media block) */
+  transition:
+    box-shadow 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.12s ease,
+    background 0.12s ease;
+  /* Ensure at least 44px touch target height via negative margin trick
+     when chips are densely packed; the host layout controls row height. */
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Hover — brighten the fill slightly */
+.chip:hover:not(.dragging) {
+  background: color-mix(in srgb, var(--cl, var(--ink-50)) 30%, var(--paper));
+  box-shadow: 0 2px 8px rgba(20, 22, 32, 0.1);
+}
+
+/* Focus ring — keyboard accessible */
+.chip:focus-visible {
+  outline: 2px solid var(--c, var(--ink-700));
+  outline-offset: 1px;
+}
+
+/* Selected state — inset ring in subject color */
+.selected {
+  border-color: var(--c, var(--ink-700));
+  border-top-color: var(--c, var(--ink-700));
+  border-right-color: var(--c, var(--ink-700));
+  border-bottom-color: var(--c, var(--ink-700));
+  background: color-mix(in srgb, var(--cl, var(--ink-50)) 40%, var(--paper));
+  box-shadow:
+    0 0 0 1px var(--c, var(--ink-700)) inset,
+    var(--shadow-card);
+}
+
+/* Dragging state — elevated, rotated, slightly transparent */
+.dragging {
+  opacity: 0.85;
+  transform: rotate(-1.5deg) scale(1.02);
+  box-shadow: 0 8px 20px rgba(20, 22, 32, 0.18);
+  z-index: 10;
+}
+
+/* ── Inner layout ──────────────────────────────────────────────────────── */
+
+/* Status dot — small circle indicating completion state */
+.dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-inline: 6px 4px;
+}
+
+/* done → filled green */
+.dotDone {
+  background: var(--done);
+  border: 1.5px solid var(--done);
+}
+
+/* partial → amber fill */
+.dotPartial {
+  background: var(--important);
+  border: 1.5px solid var(--important);
+}
+
+/* not_done / other → outline only */
+.dotPending {
+  background: transparent;
+  border: 1.5px solid var(--ink-300);
+}
+
+/* Lesson title — truncated to a single line */
+.title {
+  flex: 1;
+  min-width: 0; /* allow flex truncation */
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+  padding-block: 4px;
+  padding-inline-end: 4px;
+}
+
+/* ── Stack badge ───────────────────────────────────────────────────────── */
+/* Visible when stackCount > 1. Pill shape with layered-card glyph + count.
+   This is the primary signal to a teacher that multiple lessons share this
+   chip — it must be unmistakable at a glance. */
+
+.stackBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  /* Pill */
+  background: var(--c, var(--ink-500));
+  color: var(--paper);
+  border-radius: var(--r-4);
+  font-size: var(--t-10);
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px 2px 4px;
+  margin-inline: 4px;
+  flex-shrink: 0;
+  /* Ensure it never shrinks away */
+  white-space: nowrap;
+  /* Subtle letter spacing for legibility at small size */
+  letter-spacing: 0.2px;
+}
+
+/* The ⧉ glyph rendered as a small SVG badge icon */
+.stackIcon {
+  display: block;
+  flex-shrink: 0;
+}
