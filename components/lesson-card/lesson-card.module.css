@@ -1,0 +1,164 @@
+/* lesson-card.module.css — interaction-state styling for the Lesson Card.
+   Layout/color values that depend on data live inline in the component;
+   this file owns the hover/focus/touch behavior that CSS expresses best:
+   focus rings, ≥44px touch targets, and the hover-revealed affordances. */
+
+/* The card root. `data-style` keys the three style variants; per-style
+   color/fill is set inline because it depends on the resolved palette. */
+.card {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease;
+  outline: none;
+}
+
+.card:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--c, var(--ink-700));
+}
+
+/* Interactive affordance cluster — drag handle, `⋯`, expand caret.
+   Each affordance is a full 44×44 TOUCH TARGET (iPad minimum, §6.6); the
+   44px boxes sit flush so adjacent targets never overlap. The visible
+   bordered icon pill (`.affordanceVisual` / `.caretVisual`) is centered
+   small inside each box, so the header keeps its compact look. A single
+   negative margin on the row pulls the oversized targets back so they
+   don't bloat the card past its padding.
+   Dim by default, full on hover/focus; on touch (no hover) always full,
+   since the brief requires these affordances to show for touch users. */
+.affordanceRow {
+  display: inline-flex;
+  align-items: center;
+  /* Pull the 44px targets back toward the corner so the row footprint
+     stays tight; targets themselves remain a full 44px. */
+  margin: -11px -11px -11px 0;
+}
+
+.affordance {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  background: transparent;
+  opacity: 0.55;
+  transition: opacity 0.12s ease;
+}
+
+.affordanceVisual {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-500);
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: 3px;
+  padding: 3px;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.card:hover .affordance,
+.card:focus-within .affordance {
+  opacity: 1;
+}
+
+.affordance:hover .affordanceVisual {
+  color: var(--ink-900);
+  background: var(--ink-50);
+}
+
+.affordance:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--c, var(--ink-700));
+  outline-offset: -4px;
+}
+
+@media (hover: none) {
+  .affordance {
+    opacity: 1;
+  }
+}
+
+/* Completion checkbox — ≥44px hit area, small visual box centered in it. */
+.cardCheckWrap :global(.cp-card-check) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -14px -15px -14px -15px; /* hit area expands, layout box stays small */
+  border-radius: 6px;
+}
+
+/* Expand caret button — full 44×44 touch target, compact visual glyph.
+   Negative margin keeps the oversized target from widening the header. */
+.caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  margin: -11px -11px -11px -11px;
+  border-radius: 6px;
+  color: var(--ink-500);
+  transition: color 0.12s ease;
+}
+
+.caretVisual {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  transition: background 0.12s ease;
+}
+
+.caret:hover {
+  color: var(--ink-900);
+}
+
+.caret:hover .caretVisual {
+  background: var(--ink-100);
+}
+
+.caret:focus-visible {
+  outline: 2px solid var(--c, var(--ink-700));
+  outline-offset: -2px;
+}
+
+.caretOpen {
+  transform: rotate(180deg);
+}
+
+/* Hover-revealed notes disclosure. */
+.notesToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-500);
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.notesToggle:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+.notesToggle:focus-visible {
+  outline: 2px solid var(--c, var(--ink-700));
+  outline-offset: 1px;
+}

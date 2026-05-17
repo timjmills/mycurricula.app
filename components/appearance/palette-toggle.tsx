@@ -1,0 +1,128 @@
+"use client";
+
+// palette-toggle.tsx — the Normal / Highlight palette chooser (artboard A2).
+//
+// The hue per subject is locked team-wide; this toggle only flips the
+// saturation a teacher views. Selecting calls `setPalette` from
+// `useTheme()`. The current value reflects live `useTheme()` state — the
+// dev default is Highlight, the eventual ship default is Normal.
+
+import type { ReactNode } from "react";
+import { useTheme } from "@/lib/theme";
+import type { ThemePalette } from "@/lib/theme";
+import { PALETTE_20 } from "@/lib/palette";
+import { SettingsCard, RadioDot } from "./settings-card";
+
+interface PaletteOption {
+  id: ThemePalette;
+  label: string;
+  desc: string;
+  /** Six sample swatch hexes from the 20-color pool. */
+  swatches: string[];
+}
+
+// First six swatches of the pool, one row per variant — as in artboard A2.
+const PALETTE_OPTIONS: readonly PaletteOption[] = [
+  {
+    id: "normal",
+    label: "Normal",
+    desc: "Confident, slightly darker. Like a school workbook.",
+    swatches: PALETTE_20.slice(0, 6).map((s) => s.normal),
+  },
+  {
+    id: "highlight",
+    label: "Highlight",
+    desc: "Highlighter-marker bright. Electric, distinct.",
+    swatches: PALETTE_20.slice(0, 6).map((s) => s.highlight),
+  },
+] as const;
+
+export function PaletteToggle(): ReactNode {
+  const { palette, setPalette } = useTheme();
+
+  return (
+    <SettingsCard
+      eyebrow="Palette"
+      title="Color intensity"
+      hint="Personal preference — the hues are set team-wide; only saturation changes."
+    >
+      <div
+        role="radiogroup"
+        aria-label="Color palette"
+        style={{
+          marginTop: 12,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 8,
+        }}
+      >
+        {PALETTE_OPTIONS.map((opt) => {
+          const selected = palette === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => setPalette(opt.id)}
+              className="cp-focusable"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: 8,
+                padding: "12px 14px",
+                minHeight: 44,
+                borderRadius: 10,
+                background: selected ? "var(--ink-100)" : "#fff",
+                border: selected
+                  ? "1.5px solid var(--ink-900)"
+                  : "1px solid var(--ink-150)",
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+            >
+              <span
+                style={{ display: "flex", alignItems: "center", gap: 8 }}
+              >
+                <RadioDot selected={selected} />
+                <span
+                  style={{
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: "var(--ink-900)",
+                  }}
+                >
+                  {opt.label}
+                </span>
+              </span>
+              <span aria-hidden style={{ display: "flex", gap: 3 }}>
+                {opt.swatches.map((hex, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 5,
+                      background: hex,
+                    }}
+                  />
+                ))}
+              </span>
+              <span
+                style={{
+                  fontSize: 11.5,
+                  color: "var(--ink-500)",
+                  lineHeight: 1.45,
+                  textWrap: "pretty",
+                }}
+              >
+                {opt.desc}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </SettingsCard>
+  );
+}

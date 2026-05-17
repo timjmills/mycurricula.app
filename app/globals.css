@@ -1,0 +1,30 @@
+/*
+ * Global stylesheet.
+ *
+ * Tailwind supplies layout/spacing utilities and the preflight reset.
+ * Design tokens (color, type, spacing custom properties) live in
+ * `tokens.css`, imported below — that file is the single source of truth.
+ *
+ * The @import MUST come first: CSS requires `@import` to precede all other
+ * statements, so PostCSS silently drops an `@import` placed after
+ * `@tailwind base`. Tokens are `:root` custom-property declarations and
+ * keyframes — they don't conflict with Tailwind's preflight reset, so
+ * loading them before `@tailwind base` is correct.
+ */
+@import "./tokens.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--t-13);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}

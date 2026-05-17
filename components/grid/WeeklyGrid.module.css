@@ -1,0 +1,364 @@
+/* WeeklyGrid.module.css — layout + style-axis surfaces for the Weekly grid.
+ *
+ * The grid is a CSS Grid with one leading subject-label column and five
+ * day columns (Sun–Thu). Token values come from app/tokens.css; the three
+ * card styles (quiet/calm/vivid) and palette types (normal/highlight) are
+ * driven by `data-style` / `data-palette` on <html> — this file only
+ * styles the grid chrome, never the Lesson Card itself.
+ */
+
+/* ── Page shell ─────────────────────────────────────────────────────── */
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--ink-50);
+}
+
+/* ── Week navigator ─────────────────────────────────────────────────── */
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 22px;
+  background: var(--paper);
+  border-bottom: var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.navTitleWrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.navEyebrow {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.navTitle {
+  font-size: var(--t-18);
+  font-weight: 600;
+  color: var(--ink-900);
+  letter-spacing: -0.3px;
+  margin-top: 2px;
+}
+
+.navTitle .currentTag {
+  margin-left: 8px;
+  font-size: var(--t-11);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--done);
+  background: color-mix(in oklch, var(--done) 12%, transparent);
+  padding: 2px 8px;
+  border-radius: 999px;
+  vertical-align: 2px;
+}
+
+.navControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Prev/next arrows — 44px touch target. */
+.navArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-200);
+  color: var(--ink-700);
+  background: var(--paper);
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.navArrow:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.navArrow:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.navArrow:focus-visible,
+.navToday:focus-visible,
+.cellAdd:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}
+
+.navToday {
+  height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 500;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.navToday:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.navToday:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Scroll region + grid ───────────────────────────────────────────── */
+.scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 20px 28px;
+}
+
+.grid {
+  display: grid;
+  /* Leading subject-label column + 5 day columns. The min day width keeps
+     cards readable; below ~1180px the region scrolls rather than crushes. */
+  grid-template-columns: 132px repeat(5, minmax(190px, 1fr));
+  gap: 8px;
+  /* 132 + 5*190 + 6*8 gaps = 1130 — fits a 1366 viewport without surprise
+     horizontal scroll, scrolls gracefully on narrower screens. */
+  min-width: 1082px;
+}
+
+/* ── Day header row ─────────────────────────────────────────────────── */
+.cornerCell {
+  /* Empty top-left intersection. */
+}
+
+.dayHead {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 4px 8px 8px;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-500);
+  letter-spacing: -0.1px;
+  position: sticky;
+  top: 0;
+  background: var(--ink-50);
+  z-index: 5;
+}
+
+.dayHeadToday {
+  color: var(--ink-900);
+}
+
+.dayHeadDate {
+  font-size: var(--t-12);
+  font-weight: 400;
+  color: var(--ink-400);
+}
+
+.todayPill {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--paper);
+  background: var(--ink-900);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+/* ── Subject row header ─────────────────────────────────────────────── */
+.subjectHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 6px 0 4px;
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--ink-50);
+}
+
+.subjectTile {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  flex: 0 0 auto;
+  letter-spacing: -0.3px;
+}
+
+.subjectName {
+  font-size: var(--t-13);
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  min-width: 0;
+}
+
+.subjectUnit {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-400);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Day / subject cell ─────────────────────────────────────────────── */
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 84px;
+  border-radius: var(--r-12);
+  padding: 4px;
+  /* Unit shading paints the cell background via inline style (--cell-bg). */
+  background: var(--cell-bg, transparent);
+  border: 1.5px solid transparent;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+/* Drop target highlight — subject-tinted border while a card hovers over. */
+.cellDragOver {
+  border-color: var(--cell-accent, var(--ink-400));
+  background: color-mix(
+    in oklch,
+    var(--cell-accent, var(--ink-300)) 12%,
+    var(--cell-bg, var(--paper))
+  );
+}
+
+/* ── Empty-cell affordance ──────────────────────────────────────────── */
+.emptyCell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 76px;
+  border-radius: var(--r-8);
+  border: 1px dashed var(--ink-200);
+  background: transparent;
+  color: var(--ink-400);
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.emptyCell:hover {
+  border-color: var(--cell-accent, var(--ink-300));
+  background: color-mix(
+    in oklch,
+    var(--cell-accent, var(--ink-200)) 8%,
+    transparent
+  );
+}
+
+.emptyHint {
+  font-size: var(--t-11);
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.35;
+  max-width: 150px;
+  padding: 0 6px;
+}
+
+/* 40×40 add button — the explicit empty-cell affordance. */
+.cellAdd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  color: var(--ink-500);
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.cellAdd:hover {
+  background: var(--cell-accent, var(--ink-100));
+  border-color: var(--cell-accent, var(--ink-300));
+  color: var(--paper);
+}
+
+/* A faint add button shown beneath stacked cards so a populated cell can
+   still take another lesson. */
+.cellAddInline {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  border-radius: var(--r-6);
+  border: 1px dashed var(--ink-200);
+  background: transparent;
+  color: var(--ink-400);
+  font-size: var(--t-11);
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.cell:hover .cellAddInline,
+.cellAddInline:focus-visible {
+  opacity: 1;
+}
+
+.cellAddInline:hover {
+  border-color: var(--cell-accent, var(--ink-300));
+  color: var(--cell-accent, var(--ink-500));
+}
+
+.cellAddInline:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}
+
+/* ── Card slot ──────────────────────────────────────────────────────
+   One slot per stacked lesson. The LessonCard renders its own grab
+   affordance (fed `dragHandleProps` by the grid) and its own surface,
+   so the slot is just a positioning context. */
+.cardSlot {
+  position: relative;
+  min-width: 0;
+}
+
+/* ── Empty-week state ───────────────────────────────────────────────── */
+.emptyWeek {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--ink-400);
+  font-size: var(--t-13);
+  padding: 40px 0;
+}

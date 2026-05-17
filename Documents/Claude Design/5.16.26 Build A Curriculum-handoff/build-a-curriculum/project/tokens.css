@@ -1,0 +1,165 @@
+/* Curriculum Planner — Design tokens
+   Grade 5 planning tool. Flat, calm, dense. Color carries meaning.
+
+   This is the single source of truth for visual decisions across the
+   12 prototype components on the design canvas. Adjust here and the
+   whole system follows.
+*/
+
+:root {
+  /* ── Type ─────────────────────────────────────────────────────────── */
+  --font-sans: "Geist", ui-sans-serif, -apple-system, "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Size scale (§6.3) */
+  --t-22: 22px;
+  --t-18: 18px;
+  --t-16: 16px;
+  --t-14: 14px;   /* lesson titles */
+  --t-13: 13px;   /* body */
+  --t-12: 12px;
+  --t-11: 11px;   /* standards codes */
+
+  /* ── Surface neutrals ─────────────────────────────────────────────── */
+  --ink-900: #14141a;     /* primary text */
+  --ink-700: #2e3038;     /* secondary */
+  --ink-500: #5b5e69;     /* tertiary / meta */
+  --ink-400: #8a8d99;
+  --ink-300: #b8bac3;
+  --ink-200: #d8dae2;
+  --ink-150: #e6e8ed;
+  --ink-100: #eef0f4;
+  --ink-50:  #f6f7f9;
+  --paper:   #ffffff;
+
+  /* ── Subject palette (team-wide, fixed) ───────────────────────────── */
+  /* Each subject gets three shade levels for unit cycling. The base
+     (medium) is the canonical color. */
+  --math-light:    #e6efff;
+  --math:          #2b6cff;
+  --math-deep:     #1a3f99;
+
+  --reading-light: #e2f3e8;
+  --reading:       #2a9d57;
+  --reading-deep:  #155f33;
+
+  --writing-light: #ece5fa;
+  --writing:       #6b46c1;
+  --writing-deep:  #432b80;
+
+  --grammar-light: #d8f1f0;
+  --grammar:       #149a8e;
+  --grammar-deep:  #0b5e57;
+
+  --spelling-light:#fbe1ec;
+  --spelling:      #d4488f;
+  --spelling-deep: #872a5a;
+
+  --ufli-light:    #fbe2d8;
+  --ufli:          #e26a3a;
+  --ufli-deep:     #93401e;
+
+  --explorers-light:#fcefd0;
+  --explorers:     #c69220;
+  --explorers-deep:#7a5810;
+
+  --sel-light:     #ebedf1;
+  --sel:           #6c7385;
+  --sel-deep:      #404654;
+
+  /* ── Status / semantic colors ─────────────────────────────────────── */
+  --urgent:        #d92b3c;     /* daily-notes urgent (pulse) */
+  --urgent-bg:     #fde6e8;
+  --important:     #b88300;     /* important — yellow/amber */
+  --important-bg:  #fdf3d2;
+  --fyi:           #1f6fb8;
+  --fyi-bg:        #e0eefb;
+  --done:          #2a9d57;
+  --catchup:       #e0431a;     /* flame red — catch-up */
+  --catchup-bg:    #ffe6dd;
+  /* Core-curriculum mode — soft red/pink, not the dark urgent red.
+     Carries the "this is the shared plan" warning without feeling like
+     an emergency. */
+  --core-mode:     #e36b7e;
+  --core-mode-bg:  #fde6ea;
+  --core-mode-deep:#9a2e42;
+
+  /* ── Tag palette (distinct from subjects) ─────────────────────────── */
+  /* Pills, not stripes. Brighter, more saturated, no muted shade. */
+  --tag-red:    #ef4655;
+  --tag-orange: #f08443;
+  --tag-amber:  #e8a91a;
+  --tag-green:  #38b85a;
+  --tag-teal:   #1ab1a3;
+  --tag-blue:   #3580f0;
+  --tag-indigo: #5660d8;
+  --tag-purple: #8b48d4;
+  --tag-pink:   #e54b94;
+  --tag-gray:   #8b909e;
+
+  /* ── Spacing / radii ──────────────────────────────────────────────── */
+  --r-2: 2px;
+  --r-4: 4px;
+  --r-6: 6px;
+  --r-8: 8px;
+  --r-12: 12px;
+
+  --line: 1px solid var(--ink-150);
+  --line-strong: 1px solid var(--ink-200);
+
+  --shadow-card: 0 1px 2px rgba(20, 22, 32, 0.04), 0 1px 3px rgba(20, 22, 32, 0.06);
+  --shadow-popover: 0 2px 4px rgba(20, 22, 32, 0.06), 0 10px 28px rgba(20, 22, 32, 0.12);
+}
+
+/* ── Base resets scoped to components ─────────────────────────────────── */
+.cp-root, .cp-root * {
+  box-sizing: border-box;
+}
+.cp-root {
+  font-family: var(--font-sans);
+  font-size: var(--t-13);
+  line-height: 1.4;
+  color: var(--ink-900);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+.cp-root button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.cp-root input, .cp-root textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+.cp-mono { font-family: var(--font-mono); font-feature-settings: "ss01"; }
+
+/* Subject color mapping helper — used by .cp-subject--math, etc.,
+   so a single class drives stripe + bg + text color. */
+.cp-subj { --c: var(--ink-500); --cl: var(--ink-100); --cd: var(--ink-700); }
+.cp-subj.math       { --c: var(--math);       --cl: var(--math-light);       --cd: var(--math-deep); }
+.cp-subj.reading    { --c: var(--reading);    --cl: var(--reading-light);    --cd: var(--reading-deep); }
+.cp-subj.writing    { --c: var(--writing);    --cl: var(--writing-light);    --cd: var(--writing-deep); }
+.cp-subj.grammar    { --c: var(--grammar);    --cl: var(--grammar-light);    --cd: var(--grammar-deep); }
+.cp-subj.spelling   { --c: var(--spelling);   --cl: var(--spelling-light);   --cd: var(--spelling-deep); }
+.cp-subj.ufli       { --c: var(--ufli);       --cl: var(--ufli-light);       --cd: var(--ufli-deep); }
+.cp-subj.explorers  { --c: var(--explorers);  --cl: var(--explorers-light);  --cd: var(--explorers-deep); }
+.cp-subj.sel        { --c: var(--sel);        --cl: var(--sel-light);        --cd: var(--sel-deep); }
+
+/* Urgent pulse — used on the most severe daily-note priority. */
+@keyframes cp-urgent-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 43, 60, 0.35); }
+  50%      { box-shadow: 0 0 0 4px rgba(217, 43, 60, 0.0); }
+}
+.cp-pulse { animation: cp-urgent-pulse 2s ease-in-out infinite; }
+
+/* Scrollbar — thin, neutral. Power users see a lot of scroll. */
+.cp-root ::-webkit-scrollbar { width: 10px; height: 10px; }
+.cp-root ::-webkit-scrollbar-thumb { background: var(--ink-200); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+.cp-root ::-webkit-scrollbar-thumb:hover { background: var(--ink-300); background-clip: padding-box; border: 2px solid transparent; }
+.cp-root ::-webkit-scrollbar-track { background: transparent; }

@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Build A Curriculum — Design Exploration</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="tokens.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html,body{margin:0;padding:0;height:100%;font-family:var(--body, "Geist", system-ui, -apple-system, sans-serif);color:var(--ink-900);background:#eceff4}
+  #root{height:100%}
+  .tabshell{display:flex;flex-direction:column;height:100%;min-width:1280px}
+  .tabnav{display:flex;align-items:flex-end;gap:1px;padding:14px 22px 0;background:linear-gradient(180deg,#f5f6fa 0%,#eceff4 100%);border-bottom:1px solid #d8dae2;overflow-x:auto;flex:0 0 auto;scrollbar-width:thin}
+  .tab{display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;padding:9px 16px 11px;border-radius:8px 8px 0 0;font-family:inherit;font-size:13px;font-weight:500;color:#5b5e69;background:transparent;border:1px solid transparent;cursor:pointer;white-space:nowrap;transition:all .12s;flex:0 0 auto;text-align:left}
+  .tab:hover{color:#14141a;background:rgba(0,0,0,0.04)}
+  .tab.active{color:#14141a;background:#ffffff;border:1px solid #d8dae2;border-bottom:1px solid #ffffff;margin-bottom:-1px;font-weight:600}
+  .tab .sub{font-size:10.5px;color:#8a8d99;font-weight:400;letter-spacing:0.2px}
+  .tab.active .sub{color:#5b5e69}
+  .tabbody{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;background:#ffffff;overflow:hidden}
+  .tabbody-inner{flex:1;overflow:auto;padding:18px 22px 28px;background:#f6f7f9}
+  .ab-card{background:#ffffff;border:1px solid #e6e8ed;border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(20,22,32,.04),0 1px 3px rgba(20,22,32,.04);margin-bottom:18px}
+  .ab-header{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #eef0f4;background:#fafbfc;font-size:12px;color:#5b5e69}
+  .ab-header .num{font-family:"Geist Mono", ui-monospace, monospace;color:#8a8d99;font-size:11px;font-weight:500}
+  .ab-header .title{color:#14141a;font-weight:600;font-size:13px;letter-spacing:-0.1px}
+  .ab-header .desc{flex:1;color:#5b5e69;font-size:11.5px;text-wrap:pretty}
+  .ab-frame{position:relative;width:100%;background:#ffffff;overflow:hidden}
+  .tabhint{font-size:12px;color:#5b5e69;margin:-6px 0 14px;background:#fafbfc;padding:8px 14px;border:1px solid #eef0f4;border-radius:8px;display:flex;align-items:center;gap:10px;text-wrap:pretty}
+  .tabhint .pill{background:#14141a;color:#fff;font-size:10px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;padding:2px 7px;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="shared.jsx"></script>
+<script type="text/babel" src="artboards-core.jsx"></script>
+<script type="text/babel" src="artboards-daily.jsx"></script>
+<script type="text/babel" src="artboards-todo.jsx"></script>
+<script type="text/babel" src="artboards-views.jsx"></script>
+<script type="text/babel" src="artboards-extras.jsx"></script>
+<script type="text/babel" src="artboards-resources.jsx"></script>
+<script type="text/babel" src="artboards-new.jsx"></script>
+<script type="text/babel" src="artboards-tasklist.jsx"></script>
+<script type="text/babel" src="artboards-edit.jsx"></script>
+<script type="text/babel" src="artboards-simple.jsx"></script>
+<script type="text/babel" src="artboards-vivid.jsx"></script>
+<script type="text/babel" src="artboards-playful.jsx"></script>
+<script type="text/babel" src="artboards-middle.jsx"></script>
+<script type="text/babel" src="artboards-middle-v1.jsx"></script>
+<script type="text/babel" src="palette.jsx"></script>
+<script type="text/babel" src="artboards-appearance.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+// Tabbed design-exploration shell — replaces the old vertical-stack canvas
+// so the user can jump between major surfaces without scrolling 12 sections.
+// Each tab houses 1–N artboards rendered at their natural size inside a
+// scrollable body. Tab state persists to localStorage so reloads land you
+// back where you were.
+
+const TABS = [
+  { id: "overview",   label: "Overview",       sub: "What's new · tokens" },
+  { id: "card",       label: "Lesson card",    sub: "Atomic states" },
+  { id: "weekly",     label: "Weekly",         sub: "Grid · task list · Vivid" },
+  { id: "daily",      label: "Daily",          sub: "Two-pane states" },
+  { id: "schedule",   label: "Schedule",       sub: "Timeline · task list" },
+  { id: "subject",    label: "Subject / Unit", sub: "Year · units · resources" },
+  { id: "tasks",      label: "Task lists",     sub: "Day · week · unit · missed" },
+  { id: "catchup",    label: "Catch-up",       sub: "Filter · full screen" },
+  { id: "core",       label: "Core mode",      sub: "Banner · toggle" },
+  { id: "standards",  label: "Standards",      sub: "Drill-through" },
+  { id: "todo",       label: "To-do",          sub: "Slide-out + tags" },
+  { id: "extras",     label: "Print · Keys",   sub: "Print preview · shortcuts" },
+  { id: "editing",    label: "Inline edit",    sub: "Color · highlight · bold" },
+  { id: "simple",     label: "Simple mode",    sub: "Low-floor designs · 8 surfaces" },
+  { id: "appearance", label: "Appearance",     sub: "3 styles \u00d7 Normal/Highlight \u00b7 ship spec" },
+  { id: "archive",    label: "Archive",        sub: "Vivid · Playful · Middle iterations" },
+];
+
+const TAB_HINTS = {
+  overview:  "Start here. Notes on the rename + change log + the design tokens that drive every other surface.",
+  card:      "The atomic unit. Every other view is just lesson cards in a different shape.",
+  weekly:    "The default view. Toggle Grid vs. Task list inside the artboard. Vivid is the Phase-2 direction prototype.",
+  daily:     "Three right-pane states on one shell: lesson detail · notes editor · Today dashboard. Plus the standalone surfaces.",
+  schedule:  "Time-blocked timeline of one day, with a Task-list flip for the Personalized schedule.",
+  subject:   "Year-long view per subject with units, weeks, lessons, and personalized events. Plus the Unit summary card variants.",
+  tasks:     "Flat checklist of every event. Day · Week · Unit · Missed scopes. Collapsed by default; click any row to open in place.",
+  catchup:   "Three-layer controls. The full Catch-up screen lives below the dismissable bar pattern.",
+  core:      "Core / Personalized rename in action. Toggle ramps into a flashing heads-up then settles into a slim warm banner.",
+  standards: "Click any CCSS chip to see every lesson tagged with that code, missed events surfaced at top.",
+  todo:      "Mine + Team tabs · tag pills · scope chips. Slide-out is the full management surface.",
+  extras:    "Print template stress-tested at Letter. Cheat-sheet modal for the keyboard power-user toolkit.",
+  editing:   "Click any title, body, or note. A floating dark toolbar pops up with bold / italic / underline, text color swatches, and highlight swatches. Works on every editable text in every view.",
+  simple:    "Three modes (Simple · Task · Advanced) on the same data. The Simple-mode artboards below are redesigned — bigger targets, plain language, one primary action — not the Advanced surface with chrome flag-hidden.",
+  appearance: "The shipping spec. Three card styles (Quiet \u00b7 Mid-Calm \u00b7 Mid-Vivid) paired with a 20-color Normal/Highlight palette. Core Curriculum locks the subject\u2192swatch mapping; each teacher picks style + palette type as a personal preference.",
+  archive:   "Reference only. Earlier theme iterations — Vivid, Playful, Middle v2 (dotted stripes), Middle v1 spectrum — kept for comparison. The shipping decision lives on the Appearance tab.",
+};
+
+function App() {
+  const [active, setActive] = React.useState(() => {
+    try { return localStorage.getItem("bac:tab") || "overview"; } catch { return "overview"; }
+  });
+  React.useEffect(() => {
+    try { localStorage.setItem("bac:tab", active); } catch {}
+  }, [active]);
+
+  return (
+    <div className="tabshell">
+      <nav className="tabnav" role="tablist">
+        {TABS.map(t => (
+          <button key={t.id}
+            role="tab"
+            aria-selected={t.id === active}
+            className={`tab${t.id === active ? " active" : ""}`}
+            onClick={() => setActive(t.id)}>
+            <span>{t.label}</span>
+            <span className="sub">{t.sub}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="tabbody" role="tabpanel">
+        <div className="tabbody-inner">
+          <div className="tabhint">
+            <span className="pill">{TABS.find(t => t.id === active).label}</span>
+            <span>{TAB_HINTS[active]}</span>
+          </div>
+          {active === "overview"  && <TabOverview />}
+          {active === "card"      && <TabCard />}
+          {active === "weekly"    && <TabWeekly />}
+          {active === "daily"     && <TabDaily />}
+          {active === "schedule"  && <TabSchedule />}
+          {active === "subject"   && <TabSubject />}
+          {active === "tasks"     && <TabTasks />}
+          {active === "catchup"   && <TabCatchup />}
+          {active === "core"      && <TabCore />}
+          {active === "standards" && <TabStandards />}
+          {active === "todo"      && <TabTodo />}
+          {active === "extras"    && <TabExtras />}
+          {active === "editing"   && <Artboard num="15" title="Inline editing — color &amp; highlight" desc="Click any text. Floating toolbar with bold / italic / underline, text color, and highlight swatches." h={820}><ABEditingDemo /></Artboard>}
+          {active === "simple"    && <TabSimple />}
+          {active === "appearance" && <TabAppearance />}
+          {active === "archive"   && <TabArchive />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Reusable artboard wrapper ────────────────────────────────────────
+function Artboard({ num, title, desc, w = 1280, h = 820, children }) {
+  return (
+    <div className="ab-card" style={{ maxWidth: w }}>
+      <div className="ab-header">
+        {num && <span className="num">{num}</span>}
+        <span className="title">{title}</span>
+        {desc && <span className="desc">— {desc}</span>}
+      </div>
+      <div className="ab-frame" style={{ height: h }}>{children}</div>
+    </div>
+  );
+}
+
+// ── Tab contents ─────────────────────────────────────────────────────
+function TabOverview() {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 18, maxWidth: 1280 }}>
+      <Artboard title="Read me first" h={680}><CPReadme /></Artboard>
+      <Artboard title="Change log · v2" h={680}><CPChangeLog /></Artboard>
+      <Artboard title="Palette + tokens" h={680}><CPPaletteCard /></Artboard>
+    </div>
+  );
+}
+function TabCard() {
+  return <Artboard num="01" title="Lesson card — all states" desc="The atom. Every state in one artboard, including the three-tier Personalized mod system."><ABLessonCard /></Artboard>;
+}
+function TabWeekly() {
+  return (
+    <>
+      <Artboard num="02a" title="Weekly grid" desc="Default Phase-1 production view. Grid / Task-list toggle inside; right-click anything." h={840}><ABWeeklyGrid /></Artboard>
+      <Artboard num="02b" title="Weekly — Vivid theme" desc="Phase-2 direction prototype. Subject-tint card backgrounds + warmer canvas. One artifact only." h={840}><ABVividWeekly /></Artboard>
+    </>
+  );
+}
+function TabDaily() {
+  return (
+    <>
+      <Artboard num="03a" title="Daily — Lesson detail in right pane" h={820}><ABDailyTwoPane rightPane="lesson" /></Artboard>
+      <Artboard num="03b" title="Daily — Notes editor (non-academic block)" h={820}><ABDailyTwoPane rightPane="notes" /></Artboard>
+      <Artboard num="03c" title="Daily — Today dashboard (no selection)" h={820}><ABDailyTwoPane rightPane="dashboard" /></Artboard>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, maxWidth: 1000 }}>
+        <Artboard num="03d" title="Today dashboard (standalone)" h={780}><ABTodayDashboard /></Artboard>
+        <Artboard num="03e" title="Lesson detail (panel)" h={780}><ABLessonDetailPanel /></Artboard>
+      </div>
+    </>
+  );
+}
+function TabSchedule() {
+  return <Artboard num="04" title="Schedule — time-blocked + Task list" desc="Time-blocked timeline of one day. Toggle to Task list at the top of the artboard." h={840}><ABScheduleView /></Artboard>;
+}
+function TabSubject() {
+  return (
+    <>
+      <Artboard num="05" title="Subject view — Math, full year" desc="Units · weeks · lessons · personalized events. Per-unit Expand all / Close all." h={840}><ABSubjectView /></Artboard>
+      <Artboard num="06" title="Unit summary card (3 variants)" desc="In-progress · upcoming · complete." h={920} w={900}><ABUnitSummaryCard /></Artboard>
+      <Artboard num="07" title="Resources board — Padlet-style" desc="Replaces the team's Padlet boards. Sections + thumbnail cards. Drop files, paste links, embed videos." h={880}><ABResourcesBoard /></Artboard>
+    </>
+  );
+}
+function TabTasks() {
+  return <Artboard num="08" title="Task list views — Day · Week · Unit · Missed" desc="Collapsed rows read like a to-do list. Click any row to open in place." h={860}><ABTaskListViews /></Artboard>;
+}
+function TabCatchup() {
+  return (
+    <>
+      <Artboard num="09a" title="Catch-up filter flow — Off → Menu → On" h={780}><ABCatchupFlow /></Artboard>
+      <Artboard num="09b" title="Catch-up screen (§5.17) — full triage view" desc="Full-page coverage triage with scope chips, status filter, bulk actions, carry-over picker, and an optional 'Add a note' field on every row." h={840}><ABCatchupScreen /></Artboard>
+      <Artboard num="09c" title="Catch-up — Task view (Missed scope)" desc="Same items as a flat checklist. Same Task-list view that lives in the Task lists tab, scoped to Missed." h={840}><ABTaskListViews /></Artboard>
+    </>
+  );
+}
+function TabCore() {
+  return (
+    <>
+      <Artboard num="10a" title="Core mode banner sequence" desc="Toggling to Core flashes a warm heads-up that resolves into a slim persistent banner. Now amber, not red." h={700}><ABCoreModeBanner /></Artboard>
+      <Artboard num="10b" title="Core / Personalized toggle reference" h={780}><ABCorePersonalToggle /></Artboard>
+    </>
+  );
+}
+function TabStandards() {
+  return <Artboard num="11" title="Standards drill-through" desc="Click a CCSS chip from any lesson detail to see every lesson tagged with that code, missed events at top." h={780}><ABStandardsDrillThrough /></Artboard>;
+}
+function TabTodo() {
+  return <Artboard num="12" title="To-do slide-out panel" desc="Mine · Team. Tag pills. Scope chips. Quick-add." h={800}><ABTodoPanel /></Artboard>;
+}
+function TabExtras() {
+  return (
+    <>
+      <Artboard num="13" title="Print preview — Letter" desc="Stress-tested at 7 subjects. Configurable orientation and content toggles." h={800}><ABPrintPreview /></Artboard>
+      <Artboard num="14" title="Keyboard shortcut cheat sheet (?)" desc="Power-user toolkit. j/k navigation · e expand · Space complete · g c catch-up." h={620}><ABKeyboardCheatSheet /></Artboard>
+    </>
+  );
+}
+
+// Appearance tab — the shipping spec.
+// Three card styles × paired Normal/Pastel palette + Settings screen.
+function TabAppearance() {
+  return (
+    <div style={{ maxWidth: 1300 }}>
+      <Artboard num="A0" title="Build directions — updated spec" desc="What we're shipping. The three styles, the 20-color paired palette, the Core/teacher split, and the dashed modified stripe." h={780}><ABBuildDirections /></Artboard>
+      <Artboard num="A1" title="Three styles × two palettes" desc="The same Math lesson rendered in every combination. Subject identity stays locked; only style + saturation flip per teacher." h={1120}><AB3x2Grid /></Artboard>
+      <Artboard num="A2" title="Settings → Appearance" desc="What the teacher sees when they open Appearance settings. Style picker · palette toggle · live preview · per-subject color picker with Core/Personal scope split." h={1300}><ABSettingsAppearance /></Artboard>
+      <Artboard num="A3" title="20-color paired palette reference" desc="Every swatch and its Normal/Pastel pair. The Deep column is the text-on-color hue (same in both palette types for AA contrast)." h={920}><ABPaletteReference /></Artboard>
+    </div>
+  );
+}
+
+// Archive tab — collapsed references to earlier theme experiments.
+function TabArchive() {
+  const [open, setOpen] = React.useState(null);
+  const entries = [
+    { id: "vivid",   label: "Vivid theme — every surface",       hint: "The original Phase-2 direction. Subject tint at 18%, full-saturation stripes, deep-shade titles.",  render: () => React.createElement(window.TabVivid) },
+    { id: "playful", label: "Playful (Toddle) theme — every surface", hint: "Pastel playmats with white cards. Warm and friendly; too soft for long workdays per latest feedback.", render: () => React.createElement(window.TabPlayful) },
+    { id: "middle",  label: "Middle ground v2 (pastel cards)",     hint: "The pastel-pushed middle attempt with drop shadows. Replaced by v1 in the shipping spec.",        render: () => React.createElement(window.TabMiddle) },
+    { id: "middle-v1", label: "Middle ground v1 + 5-way spectrum", hint: "The v1 cards (the ones we picked) shown alongside Quiet/Vivid/Playful in a 5-way comparison.",     render: () => React.createElement(window.TabMiddleV1) },
+  ];
+  return (
+    <div style={{ maxWidth: 1300 }}>
+      <div style={{ background: "var(--paper)", border: "1px solid #e6e8ed", borderRadius: 12, padding: "20px 22px", marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Archive</div>
+        <h2 style={{ margin: "4px 0 6px", fontSize: 20, fontWeight: 700, color: "#0B181E", letterSpacing: -0.3 }}>Earlier theme experiments</h2>
+        <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.55, textWrap: "pretty" }}>
+          These didn't get picked but are kept for reference. The shipping decision is on the <strong>Appearance</strong> tab. Click any entry below to expand the original tab inline.
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {entries.map(e => (
+          <div key={e.id} style={{ background: "#fff", border: "1px solid #ECEFF4", borderRadius: 10, overflow: "hidden" }}>
+            <button onClick={() => setOpen(open === e.id ? null : e.id)} style={{
+              display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 16px",
+              background: "transparent", border: 0, textAlign: "left", cursor: "pointer",
+            }}>
+              <span style={{
+                width: 22, height: 22, borderRadius: 6, background: "#F2F4F8", color: "#475569",
+                display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+                transition: "transform .15s", transform: open === e.id ? "rotate(90deg)" : "none",
+              }}>›</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0B181E", letterSpacing: -0.2 }}>{e.label}</div>
+                <div style={{ fontSize: 12, color: "#64748B", marginTop: 2, lineHeight: 1.45, textWrap: "pretty" }}>{e.hint}</div>
+              </div>
+              <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{open === e.id ? "Close" : "Open"}</span>
+            </button>
+            {open === e.id && (
+              <div style={{ borderTop: "1px solid #ECEFF4", padding: 12, background: "#FAFBFD" }}>
+                {e.render()}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+window.TabMiddleV1 = function TabMiddleV1() {
+  return (
+    <div style={{ maxWidth: 1300 }}>
+      <Artboard num="V1↔V2" title="v1 vs v2 — side-by-side" desc="Same three lessons rendered across all four middle-ground variants so you can A/B the two iterations." h={680}><window.ABMidV1VsV2 /></Artboard>
+
+      <Artboard num="B0·v1" title="Mid-Calm v1 — lesson card" desc="The original: white card, thin 4px subject stripe, rounded square subject tile inside the header. Quietest of all the options." h={760}><window.ABMidCalmCardV1 /></Artboard>
+
+      <Artboard num="B1·v1" title="Mid-Calm v1 — weekly grid" desc="v1 cards in the same weekly skeleton. Reads quietly even with eight subject rows visible." h={880}><window.ABMidCalmWeeklyV1 /></Artboard>
+
+      <Artboard num="C0·v1" title="Mid-Vivid v1 — lesson card" desc="The original: subject color at 7% mix as the card background. Title stays ink-900. Subtle warmth." h={760}><window.ABMidVividCardV1 /></Artboard>
+
+      <Artboard num="C1·v1" title="Mid-Vivid v1 — weekly grid" desc="v1 cards in the same weekly skeleton. The lightest possible Vivid — colour barely registers from across a room." h={880}><window.ABMidVividWeeklyV1 /></Artboard>
+    </div>
+  );
+};
+
+// Middle-ground tab — two intermediate options between the existing
+// themes, with a side-by-side spectrum at the top so you can compare
+// all five points (Quiet · Mid-Calm · Mid-Vivid · Vivid · Playful) on
+// the same three lessons.
+window.TabMiddle = function TabMiddle() {
+  return (
+    <div style={{ maxWidth: 1300 }}>
+      <Artboard num="M→" title="Spectrum: Quiet → Mid-Calm → Mid-Vivid → Vivid → Playful" desc="The same three lessons across all five themes side-by-side. Picks two middle-ground designs out for the rest of the tab to explore." h={620}><ABMidComparison /></Artboard>
+
+      <Artboard num="B0" title="Mid-Calm — lesson card" desc="White cards + thin subject stripe + friendly rounded tile + pastel status pill. Title stays ink-900. The conservative warm-up of Quiet." h={760}><ABMidCalmCard /></Artboard>
+
+      <Artboard num="B1" title="Mid-Calm — weekly grid" desc="Same Quiet skeleton, swapped lesson cards. Subject tile anchors each row; cards keep their soft shadow and rounded corners." h={880}><ABMidCalmWeekly /></Artboard>
+
+      <Artboard num="C0" title="Mid-Vivid — lesson card" desc="Card background is the subject tint at ~7% (not 18%). Title returns to ink-900 for AA-strong contrast. Subject still scans at a glance from stripe + tile + name pill." h={760}><ABMidVividCard /></Artboard>
+
+      <Artboard num="C1" title="Mid-Vivid — weekly grid" desc="Gentle warmth at the row level without sacrificing reading speed. Math row reads as a soft blue band; Writing reads lavender; etc." h={880}><ABMidVividWeekly /></Artboard>
+
+      <Artboard num="M✎" title="Middle ground — modified lessons" desc="Pastel cards · drop shadows · dotted side stripe for personalized lessons. Mid-Calm and Mid-Vivid side-by-side across unedited / modified / moved / done states." h={1020}><ABMidModified /></Artboard>
+
+      <Artboard num="M✓" title="Pick one to build out" desc="Side-by-side decision panel with what's good and trade-offs for each variant." h={680}><ABMidDecision /></Artboard>
+    </div>
+  );
+};
+
+// Playful (Toddle-style) tab — every surface rendered with the
+// pastel-playmat aesthetic so the team can compare against Quiet
+// and Vivid on the same data.
+window.TabPlayful = function TabPlayful() {
+  return (
+    <div style={{ maxWidth: 1300 }}>
+      <div style={{ background: "#fff", border: "1px solid #e6e8ed", borderRadius: 12, padding: "22px 24px", marginBottom: 18 }}>
+        <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Playful direction</div>
+        <h2 style={{ margin: "5px 0 8px", fontSize: 22, fontWeight: 700, color: "#0B181E", letterSpacing: -0.4 }}>Same app, softer aesthetic</h2>
+        <div style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.6, textWrap: "pretty", marginBottom: 14 }}>
+          Borrows the Toddle pattern: every surface sits inside a soft pastel <strong>playmat</strong>, and the actual content lifts off the mat as a <strong>white card</strong> with big radius and a gentle shadow. Subject tiles are rounded squares with two-letter monograms in deep tones. Buttons are pills. Spacing is generous. No mascots, no illustrations — just the warmth.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+          {[
+            { tone: "#DCF4F1", deep: "#0F766E", lbl: "Mint",     use: "Math" },
+            { tone: "#E4F5E1", deep: "#166534", lbl: "Leaf",     use: "Reading" },
+            { tone: "#EBE3FB", deep: "#5B21B6", lbl: "Lavender", use: "Writing" },
+            { tone: "#FCE5D5", deep: "#9A3412", lbl: "Peach",    use: "Grammar" },
+            { tone: "#FCDFEB", deep: "#9D174D", lbl: "Blush",    use: "Spelling" },
+            { tone: "#FCDFD2", deep: "#9A3412", lbl: "Coral",    use: "UFLI" },
+            { tone: "#FEF3C8", deep: "#854D0E", lbl: "Lemon",    use: "Explorers" },
+            { tone: "#DAECFE", deep: "#1E40AF", lbl: "Sky",      use: "SEL" },
+          ].map((s, i) => (
+            <div key={i} style={{ background: s.tone, borderRadius: 12, padding: "10px 12px" }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: s.deep, textTransform: "uppercase", letterSpacing: 0.6 }}>{s.use}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: s.deep, marginTop: 2 }}>{s.lbl}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Artboard num="P0" title="Lesson card — atomic" desc="White card with a friendly subject tile + monogram + plain-language status pill. Every state on a pastel playmat." h={1180}><ABPlayfulLessonCard /></Artboard>
+
+      <Artboard num="P1" title="Weekly grid" desc="Each subject row sits on its own pastel mat. Day headers feel like washi-tape strips. Empty cells show a friendly + add tile." h={1100}><ABPlayfulWeekly /></Artboard>
+
+      <Artboard num="P2" title="Daily — two pane" desc="Left list of subject-tiled rows; selected row brightens to its pastel. Right pane opens with a tinted header block, then quiet body chrome." h={860}><ABPlayfulDaily /></Artboard>
+
+      <Artboard num="P3" title="Schedule — today's timeline" desc="Time-blocked timeline on a peach mat. The current block flips to the hot tint with a '▶ Right now' chip. Breaks render as neutral cards." h={820}><ABPlayfulSchedule /></Artboard>
+
+      <Artboard num="P4" title="Subject view — full year" desc="The whole year framed in the subject's pastel. Each week is a white card on the mat; the current week steps up to a 2px deep-tone border." h={920}><ABPlayfulSubject /></Artboard>
+
+      <Artboard num="P5" title="Task list" desc="Day chips on top, white rows below. Each row carries a subject monogram tile + plain-language status. Tap a row to open the lesson." h={920}><ABPlayfulTasks /></Artboard>
+
+      <Artboard num="P6" title="Catch-up" desc="Coral playmat. Each missed lesson is one white card with pill actions: Move · Mark done · Add a note · Skip for now." h={820}><ABPlayfulCatchup /></Artboard>
+
+      <Artboard num="P7" title="Today dashboard" desc="Green playmat. A welcome card sits on top; today's lessons on the left, pastel stat cards on the right. Carry-overs link straight to catch-up." h={820}><ABPlayfulDashboard /></Artboard>
+
+      <Artboard num="P8" title="Core / Personalized" desc="Two big radio cards with subject tiles, plain-English labels, and a calm resolution banner below. No flashing red — just a soft rose mat when Core is on." h={820}><ABPlayfulCore /></Artboard>
+
+      <Artboard num="P9" title="Standards drill" desc="Mint playmat with a CCSS hero tile + the standard description as a friendly subtitle. Lessons below render as full Playful cards in their own subject tints." h={820}><ABPlayfulStandards /></Artboard>
+
+      <Artboard num="P10" title="To-do panel" desc="Blush playmat. Each to-do is a white card with tag-pastel checkboxes and tag pills. Due-today chips sit on the right." h={760}><ABPlayfulTodo /></Artboard>
+    </div>
+  );
+};
+
+// Vivid theme tab — every major surface rendered in the Phase-2
+// visual direction so the team can see what shipping Vivid would look
+// like at scale.
+window.TabVivid = function TabVivid() {
+  return (
+    <div style={{ maxWidth: 1300 }}>
+      <div style={{ background: "var(--paper)", border: "1px solid #e6e8ed", borderRadius: 10, padding: "20px 22px", marginBottom: 18 }}>
+        <div style={{ fontSize: 11, color: "#8a8d99", textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 600 }}>Phase-2 visual direction</div>
+        <h2 style={{ margin: "4px 0 8px", fontSize: 20, fontWeight: 600, letterSpacing: -0.3, color: "#14141a" }}>Every surface, in Vivid</h2>
+        <div style={{ fontSize: 13, color: "#5b5e69", lineHeight: 1.6, textWrap: "pretty", marginBottom: 14 }}>
+          The full set, not just the weekly grid. Each card paints with its subject's <strong>tint</strong> background, a full-saturation <strong>stripe</strong> on the left, and a <strong>deep-shade title</strong> for AA-safe contrast. Top bars, side panels, and body text stay restrained so the meaning-carrying color reads loudly. Quiet vs Vivid is a runtime token swap — the same component renders both.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          {[
+            { tag: "Card background",  q: "Near-white surface",            v: "Subject tint (~18% mix)" },
+            { tag: "Subject stripe",   q: "4px thin solid",                v: "5px full-saturation solid" },
+            { tag: "Title color",      q: "Ink-900",                       v: "Subject deep shade" },
+            { tag: "Unit shading",     q: "Grayscale steps",               v: "Light tint steps of subject" },
+            { tag: "Hover affordance", q: "Soft shadow",                   v: "Subject-tinted shadow + border" },
+            { tag: "Catch-up canvas",  q: "Neutral",                       v: "Rust-tinted page background" },
+          ].map((r, i) => (
+            <div key={i} style={{ padding: "10px 12px", border: "1px solid #eef0f4", borderRadius: 8, background: "#fafbfc" }}>
+              <div style={{ fontSize: 10, color: "#8a8d99", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{r.tag}</div>
+              <div style={{ fontSize: 11.5, color: "#5b5e69", marginTop: 4 }}>Quiet — {r.q}</div>
+              <div style={{ fontSize: 11.5, color: "#14141a", marginTop: 2, fontWeight: 600 }}>Vivid — {r.v}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 14, padding: "10px 12px", background: "color-mix(in oklch, var(--important) 14%, white)", borderRadius: 6, fontSize: 12, color: "#7a5300", lineHeight: 1.5, textWrap: "pretty" }}>
+          <strong>The one-meter test.</strong> Stand back. Can you tell which row is Math (blue), Writing (purple), Reading (green) without reading the titles? In Vivid the answer must be yes.
+        </div>
+      </div>
+
+      <Artboard num="V0" title="Vivid lesson card — atomic" desc="Every state on a tinted background: default across 8 subjects · modified / moved / both · selected / done / carried · plus a side-by-side Quiet vs Vivid for the same Math lesson." h={1180}><ABVividLessonCard /></Artboard>
+
+      <Artboard num="V1" title="Vivid Weekly grid" desc="8 subjects × 5 days. Empty cells get a tinted dashed placeholder. The grid reads as a Padlet board, not a spreadsheet." h={920}><ABVividWeeklyFull /></Artboard>
+
+      <Artboard num="V2" title="Vivid Daily — two pane" desc="Left list is a stack of subject-tinted rows; the selected row brightens to a hotter tint. Right pane opens with a bold subject-color block at the top, then quiet body chrome." h={840}><ABVividDaily /></Artboard>
+
+      <Artboard num="V3" title="Vivid Schedule — time-blocked" desc="Each timed block is a colored card on a quiet canvas. Breaks and non-academic blocks stay neutral so the academic color reads loud. The current block flips to the hot-tint variant with a '▶ Now' chip." h={840}><ABVividSchedule /></Artboard>
+
+      <Artboard num="V4" title="Vivid Subject view — Math, full year" desc="The whole year framed in Math blue. Week cards sit inside the math-tinted page; the current week steps up to a 2px math border." h={920}><ABVividSubject /></Artboard>
+
+      <Artboard num="V5" title="Vivid Task list" desc="Flat checklist where every row is tinted by its subject. At a glance the day's color rhythm is legible — heavy Math morning, lighter SEL afternoon." h={860}><ABVividTasks /></Artboard>
+
+      <Artboard num="V6" title="Vivid Catch-up screen" desc="Rust-tinted page canvas. Each missed lesson row keeps its subject tint so coverage gaps still read by subject." h={820}><ABVividCatchup /></Artboard>
+
+      <Artboard num="V7" title="Vivid Today dashboard" desc="A grid of subject-tinted stat cards. Carry-overs surface a clickable rust pill linking into Catch-up." h={780}><ABVividDashboard /></Artboard>
+
+      <Artboard num="V8" title="Vivid Core / Personalized" desc="Two-card radio in subject palette: Personalized in math blue, Core in core-mode warm rose. When Core is active a slim banner pins to the top of the viewport." h={780}><ABVividCore /></Artboard>
+
+      <Artboard num="V9" title="Vivid Standards drill-through" desc="Standard code framed by its subject. Lessons listed below render in their own subject tints so cross-subject coverage stays legible." h={820}><ABVividStandards /></Artboard>
+
+      <Artboard num="V10" title="Vivid To-do panel" desc="Each to-do row tinted by its primary tag (prep amber, copies amber, parents pink, supplies green, team indigo). Subject tints stay out of this surface — to-dos aren't subject-scoped." h={760}><ABVividTodo /></Artboard>
+    </div>
+  );
+}
+
+// Simple-mode tab — purpose-built Simple artboards for each surface.
+// Each artboard is a complete redesigned screen, not a flag-hidden
+// version of the Advanced surface. The intro panel surfaces the three
+// modes (Simple / Task / Advanced) and what's different about each.
+function TabSimple() {
+  return (
+    <div style={{ maxWidth: 1300 }}>
+      {/* ── Intro · the three modes ────────────────────────────────── */}
+      <div style={{ background: "var(--paper)", border: "1px solid #e6e8ed", borderRadius: 10, padding: "20px 22px", marginBottom: 18 }}>
+        <div style={{ fontSize: 11, color: "#8a8d99", textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 600 }}>The three modes</div>
+        <h2 style={{ margin: "4px 0 8px", fontSize: 20, fontWeight: 600, letterSpacing: -0.3, color: "#14141a" }}>Same planner, three on-ramps</h2>
+        <div style={{ fontSize: 13, color: "#5b5e69", lineHeight: 1.6, textWrap: "pretty", marginBottom: 14 }}>
+          Simple, Task, and Advanced are interchangeable views on the same data — the teacher picks once from any view's top-bar mode switch, and the whole site flips. Simple is the low-floor experience: a teacher who wants to ignore the machinery should never see it. Advanced exposes the full toolkit. Task mode is a flat checklist for marking off the day.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          {[
+            { mode: "Simple",   accent: "var(--reading)",  desc: "88px cards · 24px checks · plain-language status · one resource count · one standards count · single primary action.", who: "For the teacher who wants the planner out of the way." },
+            { mode: "Task",     accent: "var(--math)",     desc: "Flat checklist by day. Multi-select with a bulk-action bar (mark done · skip · carry over · add to to-dos). Best for end-of-day triage.", who: "For checking lessons off as the day runs." },
+            { mode: "Advanced", accent: "var(--catchup)",  desc: "Every indicator: Modified pill · move-arrow · Core ↑ · tasks-inside pill · comment count · I-Can statement · right-click menus · keyboard shortcuts.", who: "For curriculum leads + power users." },
+          ].map((m, i) => (
+            <div key={i} style={{ padding: "12px 14px", border: "1px solid #eef0f4", borderRadius: 8, background: "#fafbfc" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 999, background: m.accent }} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#14141a" }}>{m.mode}</span>
+              </div>
+              <div style={{ fontSize: 12, color: "#2e3038", lineHeight: 1.5, textWrap: "pretty" }}>{m.desc}</div>
+              <div style={{ fontSize: 11.5, color: "#8a8d99", lineHeight: 1.5, marginTop: 6, fontStyle: "italic", textWrap: "pretty" }}>{m.who}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Mode-switch affordance reference ──────────────────────── */}
+      <div style={{ background: "var(--paper)", border: "1px solid #e6e8ed", borderRadius: 10, padding: "14px 18px", marginBottom: 18, display: "flex", alignItems: "center", gap: 16 }}>
+        <span style={{ fontSize: 12, color: "#5b5e69", lineHeight: 1.5, flex: 1, textWrap: "pretty" }}>
+          <strong style={{ color: "#14141a" }}>Where the switch lives</strong><br/>The three-way pill sits in the top bar of every full-screen view. Last-clicked wins, persisted per teacher, and remembered across sessions.
+        </span>
+        <window.CPViewModeSwitch />
+      </div>
+
+      {/* ── The eight Simple-mode artboards ───────────────────────── */}
+      <Artboard num="S0" title="Simple lesson card — the atom" desc="88px tall · 6px stripe · 16px title · 24px check · single resource count · single standards count · plain-language status pill. Tap the check to mark done; tap anywhere else to open the lesson." h={760}><ABSimpleLessonCard /></Artboard>
+
+      <Artboard num="S1" title="Simple Weekly grid" desc="Drag any lesson card to another day to reschedule it. Multiple lessons stack vertically in the same cell (see Math · Monday). Empty cells show a 40px + button with subject-tinted hover. No catch-up bar, no Core banner." h={860}><ABSimpleWeekly /></Artboard>
+
+      <Artboard num="S2" title="Simple Daily — two pane" desc="Left list with 64px rows. Right pane: big title · plain-language status pill · 14px directions · single 'Mark as done' primary action · 'More options' disclosure for everything else. No keyboard-shortcut hints, no Modified pill, no I-Can banner." h={820}><ABSimpleDaily /></Artboard>
+
+      <Artboard num="S3" title="Simple Schedule — today's timeline" desc="Time-blocked timeline of one day, with plain English times ('9 AM · 1 hour'). The current block reads as '▶ Right now'. Breaks, lunch, and morning meeting render as a quieter neutral card." h={820}><ABSimpleSchedule /></Artboard>
+
+      <Artboard num="S4" title="Simple Subject / Unit view" desc="Plain-language week labels ('This week' / 'Next week' / 'In two weeks'). Plain-language unit range ('Weeks 9 to 14'). 'Done X of Y' progress per week. No standards drill-through, no missed-events task list." h={820}><ABSimpleSubject /></Artboard>
+
+      <Artboard num="S5" title="Simple Task list" desc="Single filter (Today / This week / Missed last week) instead of the four-scope chip strip. 56px rows. One-line title + subject + resource count. Tap the check to complete." h={820}><ABSimpleTaskList /></Artboard>
+
+      <Artboard num="S6" title="Simple Catch-up" desc="No scope chips, no bulk-actions, no carry-over destination picker. Each missed lesson is one card with one button: 'Decide what to do'. Tap that and you get three plain-English choices. Celebratory empty state when the queue is clear." h={820}><ABSimpleCatchup /></Artboard>
+
+      <Artboard num="S7" title="Simple Core / Personalized" desc="Replaces the warm-amber flashing entry sequence with a calmly-labelled two-state pill. Plain English explains what each mode means and what changes when you flip. No flashing banner, no urgent pulse." h={760}><ABSimpleCore /></Artboard>
+
+      <Artboard num="S8" title="Simple Standards drill-through" desc="Standards arrive here via the lesson detail's 'Standards covered' footer (text, not a chip). The drill page reads as a plain list: standard code + description, then each lesson tagged with this standard. No missed-events section, no scope filter — just lessons." h={780}><ABSimpleStandards /></Artboard>
+    </div>
+  );
+}
+
+// ── Side widgets ─────────────────────────────────────────────────────
+function CPReadme() {
+  return (
+    <div style={{ padding: 28, fontFamily: "var(--body)", height: "100%", overflow: "auto", background: "#fff" }}>
+      <div style={{ fontSize: 11, color: "#8a8d99", textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 500 }}>Design notes</div>
+      <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.5, marginTop: 4, color: "#14141a" }}>The system in one minute</h1>
+      <hr style={{ border: 0, borderTop: "1px solid #e6e8ed", margin: "14px 0" }} />
+      <dl style={{ fontSize: 13, lineHeight: 1.55, color: "#2e3038" }}>
+        <dt style={{ fontWeight: 600, color: "#14141a", marginTop: 10 }}>Color carries meaning.</dt>
+        <dd style={{ margin: "2px 0 0" }}>Subjects = saturated, fixed across the team. Tags = soft pills, separate palette. Catch-up = rust; Core-mode = warm amber; FYI = blue.</dd>
+        <dt style={{ fontWeight: 600, color: "#14141a", marginTop: 14 }}>Each surface has one job.</dt>
+        <dd style={{ margin: "2px 0 0" }}>Today dashboard reads. Lesson detail edits. To-do panel tracks. Catch-up <em>filter</em> vs. catch-up <em>screen</em> are deliberate (§5.17).</dd>
+        <dt style={{ fontWeight: 600, color: "#14141a", marginTop: 14 }}>Lesson = lesson OR lesson tasks.</dt>
+        <dd style={{ margin: "2px 0 0" }}>Every lesson can hold inner tasks (literacy centers → grammar · writing · reading stations). Tasks surface in every view, flagged as TASK of their parent.</dd>
+        <dt style={{ fontWeight: 600, color: "#14141a", marginTop: 14 }}>Three-state completion cycle.</dt>
+        <dd style={{ margin: "2px 0 0" }}>Click 1 → done · Click 2 → partially done · Click 3 → not done. Skipped / carry-over live in the right-click menu.</dd>
+      </dl>
+    </div>
+  );
+}
+function CPChangeLog() {
+  const items = [
+    ["v2.5", "Three-state completion cycle on every checkbox"],
+    ["v2.5", "Core-mode banner softened to warm amber"],
+    ["v2.5", "Task-list toggle on Weekly + Schedule views"],
+    ["v2.5", "Resource preview popover on every chip"],
+    ["v2.4", "Catch-up chip wired across views"],
+    ["v2.4", "Lesson tasks (sub-events) propagated everywhere"],
+    ["v2.4", "Padlet resource drawer in Daily lesson detail"],
+    ["v2.3", "Multi-event-per-day stacking + by-type resource chips"],
+    ["v2.3", "Padlet-style Resources board (new)"],
+    ["v2.2", "Catch-up screen (§5.17) (new)"],
+    ["v2.2", "Standards drill-through side panel (new)"],
+    ["v2.2", "Master → Core Curriculum · Personal → Personalized"],
+    ["v2.1", "Three-tier mod system (dashed stripe + Modified pill + arrow)"],
+    ["v2.0", "Vivid theme direction prototype"],
+  ];
+  return (
+    <div style={{ padding: 26, fontFamily: "var(--body)", height: "100%", overflow: "auto", background: "#fff" }}>
+      <div style={{ fontSize: 11, color: "#8a8d99", textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 500 }}>Change log</div>
+      <h2 style={{ fontSize: 20, fontWeight: 600, letterSpacing: -0.4, marginTop: 4, color: "#14141a" }}>What's changed</h2>
+      <div style={{ fontSize: 12, color: "#5b5e69", marginTop: 4, marginBottom: 14, lineHeight: 1.5 }}>
+        Tabbed shell replaces the long scroll. Each tab houses related artboards at proper size.
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+        {items.map(([v, t], i) => (
+          <div key={i} style={{ display: "flex", gap: 10, paddingBottom: 9, borderBottom: "1px solid #eef0f4" }}>
+            <span style={{
+              fontSize: 9.5, fontWeight: 700, letterSpacing: 0.5, fontFamily: "var(--font-mono, monospace)",
+              padding: "2px 6px", borderRadius: 3, height: "fit-content", marginTop: 1,
+              background: "#eef0f4", color: "#5b5e69",
+            }}>{v}</span>
+            <div style={{ flex: 1, fontSize: 12.5, color: "#14141a", lineHeight: 1.45 }}>{t}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function CPPaletteCard() {
+  return (
+    <div style={{ padding: 26, fontFamily: "var(--body)", height: "100%", overflow: "auto", background: "#fff" }}>
+      <div style={{ fontSize: 11, color: "#8a8d99", textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 500 }}>Tokens</div>
+      <h2 style={{ fontSize: 20, fontWeight: 600, letterSpacing: -0.4, marginTop: 4, color: "#14141a" }}>Color carries meaning</h2>
+      <div style={{ fontSize: 11, color: "var(--ink-500)", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 500, marginTop: 18, marginBottom: 8 }}>Subjects · fixed team-wide</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+        {SUBJECTS.map(s => (
+          <div key={s.id} className={`cp-subj ${s.cls}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "var(--cl)", borderLeft: "3px solid var(--c)", borderRadius: 3 }}>
+            <span style={{ width: 14, height: 14, background: "var(--c)", borderRadius: 2 }} />
+            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--cd)" }}>{s.name}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--ink-500)", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 500, marginTop: 18, marginBottom: 8 }}>Tags</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+        {TAGS.map(t => (
+          <span key={t.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px 2px 6px", fontSize: 11, fontWeight: 500, background: t.bg, color: t.fg, borderRadius: 999 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 999, background: t.fg }} /> {t.label}
+          </span>
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--ink-500)", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 500, marginTop: 18, marginBottom: 8 }}>Status surfaces</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <Swatch color="var(--core-mode)" name="Core mode · warm amber" />
+        <Swatch color="var(--catchup)" name="Catch-up · rust" />
+        <Swatch color="var(--important)" name="Important · gold" />
+        <Swatch color="var(--urgent)" name="Urgent · red (daily-notes only)" />
+        <Swatch color="var(--fyi)" name="FYI · blue" />
+      </div>
+      <div style={{ fontSize: 11, color: "var(--ink-500)", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 500, marginTop: 18, marginBottom: 8 }}>Ink ramp</div>
+      <div style={{ display: "flex", height: 26, borderRadius: 4, overflow: "hidden" }}>
+        {["50","100","150","200","300","400","500","700","900"].map(n => (
+          <div key={n} style={{ flex: 1, background: `var(--ink-${n})`, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "0 0 3px" }}>
+            <span style={{ fontSize: 9, color: parseInt(n,10) > 300 ? "white" : "var(--ink-700)", fontFamily: "var(--mono)" }}>{n}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function Swatch({ color, name }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 8px", background: "#f6f7f9", borderRadius: 3 }}>
+      <span style={{ width: 22, height: 22, background: color, borderRadius: 3 }} />
+      <span style={{ fontSize: 12, color: "#2e3038" }}>{name}</span>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

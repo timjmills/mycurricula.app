@@ -1,0 +1,27 @@
+/* lesson-card.css — global interaction styling for Lesson Card sub-parts.
+   These rules target class names shared across the card and its context
+   menu (which renders into a fixed-position layer). CSS Modules require
+   "pure" selectors, so genuinely global hover/focus rules live here. */
+
+.cp-card-menuitem:hover {
+  background: var(--ink-50);
+}
+
+.cp-card-menuitem:focus-visible {
+  outline: 2px solid var(--ink-300);
+  outline-offset: -2px;
+}
+
+.cp-card-reslink:hover {
+  background: var(--ink-50);
+}
+
+.cp-card-reslink:focus-visible {
+  outline: 2px solid var(--c, var(--ink-700));
+  outline-offset: -2px;
+}
+
+.cp-card-check:focus-visible {
+  outline: 2px solid var(--done);
+  outline-offset: -2px;
+}
