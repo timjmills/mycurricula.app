@@ -234,6 +234,47 @@ function ToolbarButton({
   );
 }
 
+// Undo / redo glyphs — curved arrows. Inline SVG keeps the toolbar
+// dependency-free; stroke uses currentColor so they inherit the white
+// toolbar text color.
+function UndoIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h9a6 6 0 0 1 0 12h-4" />
+    </svg>
+  );
+}
+
+function RedoIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15 14 20 9l-5-5" />
+      <path d="M20 9h-9a6 6 0 0 0 0 12h4" />
+    </svg>
+  );
+}
+
 interface SwatchButtonProps {
   label: string;
   color: string; // resolved CSS color
@@ -600,6 +641,23 @@ export function RichTextEditor({
           // Prevent toolbar clicks from stealing focus away from selection.
           onMouseDown={(e) => e.preventDefault()}
         >
+          {/* ── Group 0: Undo / Redo ── */}
+          <ToolbarButton
+            label="Undo"
+            onMouseDown={(e) => applyCommand(e, "undo")}
+          >
+            <UndoIcon />
+          </ToolbarButton>
+
+          <ToolbarButton
+            label="Redo"
+            onMouseDown={(e) => applyCommand(e, "redo")}
+          >
+            <RedoIcon />
+          </ToolbarButton>
+
+          <span className={styles.divider} aria-hidden />
+
           {/* ── Group 1: Inline text formatting ── */}
           <ToolbarButton
             label="Bold"
