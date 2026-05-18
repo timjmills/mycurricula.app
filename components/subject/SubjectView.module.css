@@ -510,6 +510,30 @@
   transform: rotate(90deg);
 }
 
+/* ── Completion toggle button wrapper ───────────────────────────────── */
+/* Invisible wrapper that makes CheckIcon a clickable target. The visual
+   affordance is the icon itself; the button resets all browser defaults so
+   the layout is unchanged. The 44px touch target is satisfied by the
+   parent .lessonRow which fully contains this button. */
+.checkBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex: 0 0 auto;
+  border-radius: 3px;
+  line-height: 0;
+}
+
+.checkBtn:focus-visible {
+  outline: 2px solid var(--c);
+  outline-offset: 2px;
+}
+
 /* ── Completion check indicator ─────────────────────────────────────── */
 .checkIcon {
   display: inline-flex;

@@ -20,18 +20,27 @@
 // selectedDay state is shared planner state (useAppState). Internal selected-
 // lesson state is local to this component — never written to global
 // selectedLessonId (per task brief: Daily has its own right pane).
+//
+// Store wiring (planner-store):
+//   lessons       — read from usePlanner().lessons (shared doc, undo-aware).
+//   completion    — handleToggleComplete calls setLessonStatus so toggles
+//                   participate in program-wide undo/redo history.
+//   scroll        — useEffect keyed on lastChange calls
+//                   scrollPlannerItemIntoView so the view stays near the
+//                   affected lesson after edits, section moves, undo, or redo.
+//   UI-only state — selectedId, hover/reveal toggles remain local.
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import type { ReactNode } from "react";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import {
-  LESSONS,
   SUBJECT_BY_ID,
   WEEK_DAYS,
   WEEK_DAYS_SHORT,
   notesForDay,
 } from "@/lib/mock";
+import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { LessonDetail } from "./LessonDetail";
 import { TodayDashboard } from "./TodayDashboard";
 import styles from "./DailyView.module.css";
@@ -166,6 +175,9 @@ function LessonRow({
   return (
     <div
       role="listitem"
+      // data-planner-item enables scrollPlannerItemIntoView to locate this
+      // row after a store mutation (edit, reorder, undo, redo).
+      data-planner-item={`lesson:${lesson.id}`}
       className={`${styles.lessonRow} ${selected ? styles.lessonRowSelected : ""} cp-subj ${lesson.subject}`}
     >
       {/* 3px subject-color left stripe */}
@@ -323,19 +335,18 @@ export function DailyView(): ReactNode {
   // selectedDay is shared planner state — the top bar may also change it.
   const { week, selectedDay, setSelectedDay } = useAppState();
 
-  // All lessons live in local state so completion toggles don't mutate the
-  // imported fixture — the same pattern used by WeeklyGrid.
-  const [lessons, setLessons] = useState<Lesson[]>(() => [...LESSONS]);
+  // Lessons come from the planner store so completions, edits, and undo/redo
+  // are immediately reflected in the left pane list and right pane detail.
+  const { lessons, setLessonStatus, lastChange } = usePlanner();
 
   // Daily view manages its own selected-lesson state (per task brief).
-  // Default: first not-yet-done lesson; null → show dashboard.
+  // Default: first not-yet-done lesson for the active day; null → dashboard.
   const dayLessons = useMemo(
     () => lessons.filter((l) => l.week === week && l.day === selectedDay),
     [lessons, week, selectedDay],
   );
 
-  // Fix #5: derive initial selection from the component's own `lessons` state
-  // (already initialised above), not from the raw imported LESSONS fixture.
+  // Derive initial selection from the store lessons on mount.
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     const first = lessons.find(
       (l) => l.week === week && l.day === selectedDay && l.status !== "done",
@@ -352,17 +363,31 @@ export function DailyView(): ReactNode {
     setSelectedId(first?.id ?? null);
   }
 
+  // Route completion toggles through the store so they enter undo/redo history
+  // and are broadcast to sibling views (Weekly, Subject) reading the same doc.
+  // LessonDetail also calls this after setLessonStatus so the store's status
+  // is the authoritative source; this callback handles the left pane row too.
   const handleToggleComplete = useCallback(
     (lessonId: string, nextStatus: LessonStatus): void => {
-      setLessons((prev) =>
-        prev.map((l) => (l.id === lessonId ? { ...l, status: nextStatus } : l)),
-      );
+      setLessonStatus(lessonId, nextStatus);
     },
-    [],
+    [setLessonStatus],
   );
 
-  // The selected lesson, resolved from the current lesson state so
-  // completion toggles are immediately reflected in the right pane.
+  // ── Scroll preservation ──────────────────────────────────────────────
+  // After any store mutation (edit, reorder, undo, redo) scroll the affected
+  // lesson card into view so the Daily view stays near the changed content.
+  // `lastChange` identity changes on every dispatch — using it as the effect
+  // dep ensures exactly one scroll attempt per mutation.
+  useEffect(() => {
+    const id = lastChange?.lessonIds[0];
+    if (id) {
+      scrollPlannerItemIntoView(id);
+    }
+  }, [lastChange]);
+
+  // The selected lesson, resolved from the current store state so
+  // completion toggles and remote edits are immediately visible in the right pane.
   const selectedLesson = selectedId
     ? (lessons.find((l) => l.id === selectedId) ?? null)
     : null;

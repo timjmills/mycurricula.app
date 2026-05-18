@@ -91,6 +91,10 @@ export function LessonChip({
     <button
       type="button"
       className={chipClass}
+      // Scroll-into-view anchor (planner-store convention).
+      // scrollPlannerItemIntoView() queries this attribute to find the card
+      // after a move/undo/redo, even while the weekly-board is in compact mode.
+      data-planner-item={`lesson:${lesson.id}`}
       aria-pressed={selected}
       aria-label={
         isStacked

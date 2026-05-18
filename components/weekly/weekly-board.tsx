@@ -32,14 +32,21 @@
 // see the correct style axis.  It never sets the theme.
 
 import type { CSSProperties, ReactNode } from "react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
-import { CURRENT_WEEK, LESSONS, WEEK_DAYS, WEEK_DAYS_SHORT } from "@/lib/mock";
+import { CURRENT_WEEK, WEEK_DAYS, WEEK_DAYS_SHORT } from "@/lib/mock";
 import type {
   ContextAction,
   ContextActionPayload,
 } from "@/components/lesson-card";
+import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { WeekNavigator } from "@/components/grid/WeekNavigator";
 import { LessonChip } from "@/components/grid/lesson-chip";
 // WeeklyLessonCard is provided by the sibling agent's weekly-lesson-card.tsx.
@@ -65,11 +72,30 @@ export function WeeklyBoard(): ReactNode {
   // this view's WeekNavigator both drive it.
   const { week, setWeek } = useAppState();
 
-  // All lessons in local state so drag-to-move and completion can mutate
-  // copies without touching the imported fixture.
-  const [lessons, setLessons] = useState<Lesson[]>(() => [...LESSONS]);
+  // ── Planner store — single source of truth for lessons ─────────────────
+  // All lesson mutations route through the store so they join the shared
+  // undo/redo history and are visible to sibling views (WeeklyGrid, Daily).
+  const {
+    lessons,
+    moveLesson,
+    setLessonStatus,
+    editLesson,
+    duplicateLesson,
+    setSaveTarget,
+    lastChange,
+  } = usePlanner();
+
+  // ── Scroll preservation after any store mutation ─────────────────────────
+  // Keeps the affected card visible after drag-move, context-menu move,
+  // undo, or redo. data-planner-item="lesson:<id>" is on each card root.
+  useEffect(() => {
+    if (lastChange?.lessonIds[0]) {
+      scrollPlannerItemIntoView(lastChange.lessonIds[0]);
+    }
+  }, [lastChange]);
 
   // draggingId: the id of the lesson currently being dragged, or null.
+  // UI state only — not part of history.
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   // dragOverDay: the day-column index currently being hovered by the drag,
@@ -96,7 +122,10 @@ export function WeeklyBoard(): ReactNode {
   const scrollRafRef = useRef<number | null>(null);
   const scrollVelocityRef = useRef<number>(0);
 
-  const { min: minWeek, max: maxWeek } = useMemo(() => weekBounds(LESSONS), []);
+  const { min: minWeek, max: maxWeek } = useMemo(
+    () => weekBounds(lessons),
+    [lessons],
+  );
 
   // DAY_COUNT is derived from the WEEK_DAYS fixture — never hard-coded.
   const DAY_COUNT = WEEK_DAYS.length;
@@ -187,54 +216,18 @@ export function WeeklyBoard(): ReactNode {
   }
 
   /**
-   * Drop: move the dragged lesson to `targetDay` at position `insertAt`
-   * within that day's lesson list.  If `insertAt` is null the lesson
-   * appends to the end of the column.
+   * Drop: move the dragged lesson to `targetDay` via the store so the action
+   * joins the shared undo/redo history. Positional reorder within the same day
+   * is a planned follow-up (§3.4); the store's moveLesson handles cross-day and
+   * same-day moves alike. `insertAt` is retained for the future inline reorder.
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function handleDrop(targetDay: number, insertAt: number | null): void {
     if (!draggingId) return;
-    const draggedId = draggingId;
-
-    setLessons((prev) => {
-      // Remove the dragged lesson from the list.
-      const removed = prev.find((l) => l.id === draggedId);
-      if (!removed) return prev;
-      const without = prev.filter((l) => l.id !== draggedId);
-
-      // Determine the moved flag: if the lesson changed day within the
-      // same week, mark it as "same-week"; cross-week is not possible
-      // via column drop (it stays in the same week).
-      const movedFlag: Lesson["moved"] =
-        removed.day === targetDay ? removed.moved : "same-week";
-
-      const updated: Lesson = { ...removed, day: targetDay, moved: movedFlag };
-
-      // Insert the updated lesson at the computed position in `without`.
-      // "Position within target day" means we must find where lessons of
-      // targetDay sit inside `without` and then insert at `insertAt`
-      // relative to that group.
-      if (insertAt === null) {
-        // Append — just push at the end.
-        return [...without, updated];
-      }
-      // Find the indices of the target day's lessons in `without`.
-      const targetIndices = without.reduce<number[]>((acc, l, i) => {
-        if (l.week === updated.week && l.day === targetDay) acc.push(i);
-        return acc;
-      }, []);
-
-      const globalInsertIdx =
-        insertAt < targetIndices.length
-          ? targetIndices[insertAt]
-          : // insertAt is at or past the last item — insert after the last
-            // lesson of that day (or at the very end if the day is empty).
-            (targetIndices[targetIndices.length - 1] ?? without.length - 1) + 1;
-
-      const result = [...without];
-      result.splice(globalInsertIdx, 0, updated);
-      return result;
-    });
-
+    // Route through the store — records one "Move lesson" undo step.
+    // `insertAt` tracks reorder position within the same column (§3.4 TODO).
+    void insertAt;
+    moveLesson(draggingId, { day: targetDay });
     stopScrollLoop();
     setDraggingId(null);
     setDragOverDay(null);
@@ -254,19 +247,20 @@ export function WeeklyBoard(): ReactNode {
     });
   }
 
-  /** Completion checkbox three-state cycle. */
+  /** Completion checkbox three-state cycle — routes through the store. */
   function handleToggleComplete(
     lessonId: string,
     nextStatus: LessonStatus,
   ): void {
-    setLessons((prev) =>
-      prev.map((l) => (l.id === lessonId ? { ...l, status: nextStatus } : l)),
-    );
+    setLessonStatus(lessonId, nextStatus);
   }
 
   /**
-   * Context-menu actions.  Mirrors WeeklyGrid's handler: local state only,
-   * no backend.  Duplicate, move (day/week), and mark-status are supported.
+   * Context-menu actions — each routed to the appropriate store action so
+   * every mutation lands in the shared undo/redo history.
+   *   duplicate  → store.duplicateLesson
+   *   move       → store.moveLesson
+   *   mark-status → store.setLessonStatus
    */
   function handleContextAction(
     action: ContextAction,
@@ -274,22 +268,7 @@ export function WeeklyBoard(): ReactNode {
     payload?: ContextActionPayload,
   ): void {
     if (action === "duplicate") {
-      setLessons((prev) => {
-        const source = prev.find((l) => l.id === lessonId);
-        if (!source) return prev;
-        const copy: Lesson = {
-          ...source,
-          id: `${source.id}-copy-${Date.now().toString(36)}`,
-          isPersonal: true,
-          modified: false,
-          moved: null,
-          pendingMaster: false,
-          commentCount: 0,
-          unreadComments: 0,
-        };
-        const at = prev.findIndex((l) => l.id === lessonId);
-        return [...prev.slice(0, at + 1), copy, ...prev.slice(at + 1)];
-      });
+      duplicateLesson(lessonId);
       return;
     }
 
@@ -298,31 +277,38 @@ export function WeeklyBoard(): ReactNode {
       const toWeek = typeof payload?.week === "number" ? payload.week : null;
       if (toDay === null && toWeek === null) return;
       if (toDay !== null && (toDay < 0 || toDay >= DAY_COUNT)) return;
-      setLessons((prev) =>
-        prev.map((l) => {
-          if (l.id !== lessonId) return l;
-          const nextDay = toDay ?? l.day;
-          const nextWeek = toWeek ?? l.week;
-          const sameSlot = nextDay === l.day && nextWeek === l.week;
-          return {
-            ...l,
-            day: nextDay,
-            week: nextWeek,
-            moved: sameSlot
-              ? l.moved
-              : nextWeek !== l.week
-                ? "across-weeks"
-                : "same-week",
-          };
-        }),
-      );
+      moveLesson(lessonId, {
+        ...(toDay !== null ? { day: toDay } : {}),
+        ...(toWeek !== null ? { week: toWeek } : {}),
+      });
       setSelectedId(lessonId);
       return;
     }
 
     if (action === "mark-status" && payload?.status) {
-      handleToggleComplete(lessonId, payload.status);
+      setLessonStatus(lessonId, payload.status);
     }
+  }
+
+  /**
+   * Inline text edit committed — routes through store with coalescing so a
+   * typing burst collapses into one undo step.
+   * coalesceKey format: "lesson:<id>:<field>" (first patch key used as field).
+   */
+  function handleEditLesson(lessonId: string, patch: Partial<Lesson>): void {
+    const field = Object.keys(patch)[0] ?? "patch";
+    editLesson(lessonId, patch, {
+      key: `lesson:${lessonId}:${field}`,
+      ts: Date.now(),
+    });
+  }
+
+  /** Save-target choice — routes through store (lazy-fork on "personal"). */
+  function handleSaveTarget(
+    lessonId: string,
+    target: "personal" | "core",
+  ): void {
+    setSaveTarget(lessonId, target);
   }
 
   // ── Render ────────────────────────────────────────────────────────────
@@ -415,6 +401,8 @@ export function WeeklyBoard(): ReactNode {
                 onSelect={handleSelect}
                 onToggleComplete={handleToggleComplete}
                 onContextAction={handleContextAction}
+                onEditLesson={handleEditLesson}
+                onSaveTarget={handleSaveTarget}
               />
             ))}
         </div>
@@ -456,6 +444,8 @@ interface DayColumnProps {
     id: string,
     payload?: ContextActionPayload,
   ) => void;
+  onEditLesson: (id: string, patch: Partial<Lesson>) => void;
+  onSaveTarget: (id: string, target: "personal" | "core") => void;
 }
 
 function DayColumn({
@@ -477,6 +467,8 @@ function DayColumn({
   onSelect,
   onToggleComplete,
   onContextAction,
+  onEditLesson,
+  onSaveTarget,
 }: DayColumnProps): ReactNode {
   const isEmpty = lessons.length === 0;
 
@@ -570,6 +562,8 @@ function DayColumn({
                 onToggleExpand={onSelect}
                 onToggleComplete={onToggleComplete}
                 onContextAction={onContextAction}
+                onEditLesson={onEditLesson}
+                onSaveTarget={onSaveTarget}
                 dragHandleProps={{
                   draggable: true,
                   onDragStart: () => onDragStart(lesson.id),

@@ -1,49 +1,95 @@
 "use client";
 
-// WeeklyGrid.tsx — the Weekly view: subjects × Sun–Thu day grid.
+// WeeklyGrid.tsx — the Weekly view: subjects × configurable-day grid.
 //
 // Layout (see WeeklyGrid.module.css):
-//   row 0      → corner cell + five day headers
-//   rows 1..n  → one subject row each: subject-label cell + five day cells
+//   row 0      → corner cell + day header cells (one per WEEK_DAYS entry)
+//   rows 1..n  → one subject row each: subject-label cell + day cells
 //
-// Drag-and-drop uses native HTML5 DnD. Moving a card across days updates
-// local state only — the mock fixture is never mutated and there is no
-// persistence (per the task brief). A move keeps the lesson in the same
-// subject row; only the `day` changes. Lessons are moved by dragging from
-// the move-handle icon in the card header band — the only drag affordance.
+// Drag-and-drop uses @dnd-kit with the collapse-on-drag pattern (spec §3
+// of 5.18.26 collapse_on_drag_pattern.md). The moment any drag starts every
+// lesson card collapses to a 28px chip simultaneously; on drop they all
+// re-expand. This multiplies visible drop targets and removes mid-drag scroll.
 //
-// Split-slot layout: a lesson dropped with a DropRegion can be arranged
-// side-by-side (half-left / half-right), stacked in a new row (above /
-// below), or paged into an existing slot (on). cellLayouts holds the
-// arranged state, keyed by cellKey(subjectId, day).
+// Board-level DragState (spec §2.2):
+//   idle      → all cards at full density
+//   dragging  → all cards collapse to chips; DragOverlay shows floating chip
 //
-// Context-menu "stack / unstack" is a planned follow-up; this increment
-// is drag-based arrangement only.
+// NOTE: the `dropping` phase from the original spec has been eliminated
+// (Bug 1 fix). Going dragging→idle synchronously in handleDragEnd means
+// re-expansion begins within one render cycle (<30ms). The DragOverlay's
+// own dropAnimation (220ms cubic-bezier) runs in parallel — they do not
+// need to be sequenced.
+//
+// Expansion snapshot (spec §3.6):
+//   On drag-start: snapshot expandedIds → expandedSnapshot.
+//   On drop / cancel: restore expandedIds from snapshot, clear snapshot.
+//   This preserves the teacher's per-card expansion without re-fetching.
+//
+// Drop model (spec §3.3):
+//   Each cell is a droppable (id = "cell:<subjectId>:<day>").
+//   Dropping on a cell moves the lesson's subject + day (optimistic local state).
+//   CellDropZones (the old region-based overlay) is no longer used; cell-level
+//   drop with the dnd-kit glow replaces it.
+//
+// Within-cell reorder (spec §3.4):
+//   TODO §3.4 — full insertion-line reorder within a same-cell drop is deferred.
+//   Currently a same-cell drop is treated as a no-op move (preserves position).
+//
+// Anchored chrome (spec §3.5):
+//   Day headers, subject-label column, and week controls never collapse.
+//
+// Accessibility (spec §2.5):
+//   KeyboardSensor via useDndSensors(). An aria-live="polite" region announces
+//   pick-up / over / drop events for screen-reader users.
 //
 // Theme: `useTheme()` supplies the style axis (quiet/calm/vivid), which
-// drives unit-cell shading. The palette axis is handled inside the
-// per-subject color hook. The grid reads theme — it never sets it.
+// drives unit-cell shading. The palette axis is handled inside the per-subject
+// color hook. The grid reads theme — it never sets it.
 
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { useReducedMotion } from "framer-motion";
 import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { useTheme } from "@/lib/theme";
 import { useSubjectColor } from "@/lib/palette";
 import {
-  LESSONS,
   SUBJECTS,
   UNITS,
   CURRENT_WEEK,
   WEEK_DAYS,
   WEEK_DAYS_SHORT,
+  SUBJECT_BY_ID,
 } from "@/lib/mock";
 import type {
   ContextAction,
   ContextActionPayload,
 } from "@/components/lesson-card";
-import type { CellLayout, DropRegion } from "@/lib/cell-layout";
-import { cellKey, isTrivialLayout } from "@/lib/cell-layout";
+import type { CellLayout } from "@/lib/cell-layout";
+import { cellKey } from "@/lib/cell-layout";
+import { WeeklyLessonCard } from "@/components/weekly";
+import {
+  type DragState,
+  type Density,
+  densityFor,
+  useDndSensors,
+} from "@/lib/collapse-on-drag";
+import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { WeekNavigator } from "./WeekNavigator";
 import { GridCell } from "./GridCell";
 import { resolveCellShade } from "./unitShading";
@@ -52,7 +98,7 @@ import { useGridNavigation } from "./useGridNavigation";
 import type { CellNavProps, CellPos } from "./useGridNavigation";
 import styles from "./WeeklyGrid.module.css";
 
-const DAY_COUNT = WEEK_DAYS.length; // 5 — Sun..Thu
+const DAY_COUNT = WEEK_DAYS.length;
 
 /** Span of navigable weeks, derived from the lesson fixture. */
 function weekBounds(lessons: Lesson[]): { min: number; max: number } {
@@ -62,41 +108,62 @@ function weekBounds(lessons: Lesson[]): { min: number; max: number } {
 
 export function WeeklyGrid(): ReactNode {
   const { style } = useTheme();
-  // The visible week is shared planner state — the top-bar week jumper and
-  // this view's WeekNavigator both drive it. The fork decision (personal vs.
-  // core) now surfaces via SaveTargetDialog on blur, not from editMode directly.
   const { week, setWeek } = useAppState();
+  const prefersReducedMotion = useReducedMotion();
 
-  // All lessons live in local state so drag-to-move and the completion
-  // checkbox can mutate copies without touching the imported fixture.
-  const [lessons, setLessons] = useState<Lesson[]>(() => [...LESSONS]);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  // Inline expansion is grid-owned per spec §6.5: Weekly cards expand in
-  // place. Expansion is sticky and multiple cards may be open at once.
+  // ── Planner store — single source of truth for lessons and layouts ─────────
+  // Lesson mutations route through the store so they join the shared undo/redo
+  // history and are visible to sibling views (Daily, Subject, TopBar).
+  const {
+    lessons,
+    cellLayouts,
+    moveLesson,
+    setLessonStatus,
+    editLesson,
+    duplicateLesson,
+    setSaveTarget,
+    lastChange,
+  } = usePlanner();
+
+  // ── Inline expansion state ─────────────────────────────────────────────────
+  // UI state only — expansion is not part of history.
+  // Multiple cards may be open at once (spec §6.5 / §3.6).
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  // Snapshot captured at drag-start; restored on drop / cancel (spec §3.6).
+  const expandedSnapshotRef = useRef<Set<string> | null>(null);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // maximizedCell — only one cell is expanded at a time. Key = `${subjectId}:${day}`.
   const [maximizedCell, setMaximizedCell] = useState<string | null>(null);
 
-  // ── Drag auto-scroll ─────────────────────────────────────────────────
-  // A ref to the scroll container so the dragOver handler can read its
-  // bounds without querying the DOM on every event.
-  const scrollRef = useRef<HTMLDivElement>(null);
-  // The rAF id for the current scroll loop — cancelled on drag end.
-  const scrollRafRef = useRef<number | null>(null);
-  // Current scroll velocity (px/frame), set by the dragOver proximity check.
-  const scrollVelocityRef = useRef<number>(0);
+  // ── dnd-kit drag state (spec §2.2) ────────────────────────────────────────
+  // Also UI state — drag phase is never part of history.
+  const [dragState, setDragState] = useState<DragState>({ phase: "idle" });
+  const density: Density = densityFor(dragState);
 
-  // Per-cell arranged layouts, keyed by cellKey(subjectId, day).
-  // A cell with no entry here renders its default CardStack view.
-  const [cellLayouts, setCellLayouts] = useState<Record<string, CellLayout>>(
-    {},
+  // ── Sensors (spec §2.1 / §2.5) ────────────────────────────────────────────
+  const sensors = useDndSensors();
+
+  // ── Accessibility live region ─────────────────────────────────────────────
+  // Announces pick-up / over / drop for screen readers (spec §2.5).
+  const [liveAnnouncement, setLiveAnnouncement] = useState("");
+
+  // ── Week bounds — derived from all lessons (including store mutations) ─────
+  const { min: minWeek, max: maxWeek } = useMemo(
+    () => weekBounds(lessons),
+    [lessons],
   );
 
-  const { min: minWeek, max: maxWeek } = useMemo(() => weekBounds(LESSONS), []);
+  // ── Scroll preservation after any store mutation ───────────────────────────
+  // When a lesson is moved (drag, context-menu, undo/redo) we scroll the
+  // affected card into view so the teacher never loses track of it.
+  // data-planner-item="lesson:<id>" is set on each WeeklyLessonCard root.
+  useEffect(() => {
+    if (lastChange?.lessonIds[0]) {
+      scrollPlannerItemIntoView(lastChange.lessonIds[0]);
+    }
+  }, [lastChange]);
 
-  // Lessons for the visible week, bucketed by subject then day.
-  // bySubjectDay[subjectId][dayIndex] → Lesson[].
+  // ── bySubjectDay — lessons bucketed by subject × day ──────────────────────
   const bySubjectDay = useMemo(() => {
     const buckets: Record<string, Lesson[][]> = {};
     for (const s of SUBJECTS) {
@@ -115,10 +182,7 @@ export function WeeklyGrid(): ReactNode {
     [lessons, week],
   );
 
-  // ── Keyboard navigation ─────────────────────────────────────────────
-  // A roving tabindex over the subject×day cells. Enter on a cell expands
-  // its lessons; Esc collapses every open card. Cell (row, col) maps to
-  // (SUBJECTS[row], dayIndex col).
+  // ── Keyboard navigation ────────────────────────────────────────────────────
   const expandCell = useCallback(
     (pos: CellPos) => {
       const subject = SUBJECTS[pos.row];
@@ -126,7 +190,6 @@ export function WeeklyGrid(): ReactNode {
       if (cellLessons.length === 0) return;
       setExpandedIds((prev) => {
         const next = new Set(prev);
-        // Open every lesson in the cell — a cell may stack several.
         for (const l of cellLessons) next.add(l.id);
         return next;
       });
@@ -139,7 +202,6 @@ export function WeeklyGrid(): ReactNode {
     setExpandedIds((prev) => (prev.size === 0 ? prev : new Set()));
   }, []);
 
-  /** Expand every lesson card in the visible week. */
   const expandAll = useCallback(() => {
     setExpandedIds(() => {
       const next = new Set<string>();
@@ -157,392 +219,86 @@ export function WeeklyGrid(): ReactNode {
     onCollapse: collapseAll,
   });
 
-  /**
-   * Drag start — record the dragging id immediately (needed by handleDrop),
-   * then collapse every expanded card on the next animation frame.
-   *
-   * Collapsing synchronously inside the dragstart event handler causes the
-   * drag source element to resize while the browser is still capturing the
-   * drag image, which cancels the drag in Chrome and Edge. Deferring to rAF
-   * lets the browser finish the dragstart task (and snapshot the ghost image)
-   * before any DOM mutation occurs.
-   */
-  function handleDragStart(id: string): void {
-    setDraggingId(id);
-    requestAnimationFrame(() => {
-      setExpandedIds((prev) => (prev.size === 0 ? prev : new Set()));
-    });
-  }
+  // ── dnd-kit event handlers ─────────────────────────────────────────────────
 
-  // ── Drag auto-scroll implementation ─────────────────────────────────
-  //
-  // While a drag is active and the pointer nears the top or bottom edge of
-  // the scroll container, we scroll it automatically so lessons off-screen
-  // can be reached. The scroll loop runs via requestAnimationFrame; the
-  // velocity is set each dragover event and cleared on dragend.
-  //
-  // Edge zone: 80px from the top / bottom of the visible scroll region.
-  // Max speed: 14px per frame (≈ 840px/s at 60fps) — fast but not jarring.
-
-  const SCROLL_EDGE = 80; // px from edge to begin scrolling
-  const SCROLL_MAX = 14; // px per frame at the edge
-
-  // Start the rAF scroll loop if not already running.
-  const startScrollLoop = useCallback(() => {
-    if (scrollRafRef.current !== null) return;
-    function tick() {
-      const v = scrollVelocityRef.current;
-      if (v !== 0 && scrollRef.current) {
-        scrollRef.current.scrollTop += v;
-      }
-      scrollRafRef.current = requestAnimationFrame(tick);
-    }
-    scrollRafRef.current = requestAnimationFrame(tick);
-  }, []);
-
-  // Stop the rAF loop (called on dragend and when velocity drops to 0).
-  const stopScrollLoop = useCallback(() => {
-    if (scrollRafRef.current !== null) {
-      cancelAnimationFrame(scrollRafRef.current);
-      scrollRafRef.current = null;
-    }
-    scrollVelocityRef.current = 0;
-  }, []);
-
-  // Ensure the loop is cleaned up if the component unmounts mid-drag.
-  useEffect(() => stopScrollLoop, [stopScrollLoop]);
-
-  /**
-   * Fired on dragover events on the scroll container. Computes how far
-   * the pointer is from the top/bottom edge and sets the scroll velocity
-   * proportionally, then starts the rAF loop if needed.
-   */
-  function handleScrollDragOver(e: React.DragEvent<HTMLDivElement>): void {
-    if (!draggingId) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const y = e.clientY;
-    const distFromTop = y - rect.top;
-    const distFromBottom = rect.bottom - y;
-
-    let v = 0;
-    if (distFromTop < SCROLL_EDGE) {
-      // Near top — scroll up (negative).
-      v = -SCROLL_MAX * (1 - distFromTop / SCROLL_EDGE);
-    } else if (distFromBottom < SCROLL_EDGE) {
-      // Near bottom — scroll down (positive).
-      v = SCROLL_MAX * (1 - distFromBottom / SCROLL_EDGE);
-    }
-
-    scrollVelocityRef.current = v;
-    if (v !== 0) {
-      startScrollLoop();
-    }
-    // Loop keeps running with v=0 when pointer is in the middle zone —
-    // that is fine: the tick just does nothing at zero velocity. The loop
-    // is stopped cleanly on dragend.
-  }
-
-  /** Move the dragged lesson into the target cell (subject row + day). */
-  function handleDrop(subjectId: SubjectId, day: number): void {
-    if (!draggingId) return;
-    setLessons((prev) =>
-      prev.map((l) =>
-        l.id === draggingId
-          ? {
-              ...l,
-              day,
-              // A lesson dropped in a subject row keeps its subject; only
-              // the day changes. Flag it as moved-within-week for the card.
-              subject: subjectId,
-              moved: l.day === day ? l.moved : "same-week",
-            }
-          : l,
-      ),
+  function handleDragStart(event: DragStartEvent): void {
+    const id = String(event.active.id);
+    // Snapshot which cards are currently expanded (spec §3.6).
+    expandedSnapshotRef.current = new Set(expandedIds);
+    // Collapse all to chips immediately.
+    setExpandedIds(new Set());
+    setDragState({ phase: "dragging", activeId: id, overId: null });
+    // Announce pick-up for screen readers.
+    const lesson = lessons.find((l) => l.id === id);
+    const subjectName = lesson ? SUBJECT_BY_ID[lesson.subject]?.name : "";
+    setLiveAnnouncement(
+      `Picked up ${subjectName ? subjectName + " lesson: " : "lesson: "}${lesson?.title ?? id}. Drag to a new cell.`,
     );
-    stopScrollLoop();
-    setDraggingId(null);
   }
 
-  // ── Layout-mutation helpers ────────────────────────────────────────────
-  //
-  // These helpers build/modify CellLayout values.  They are pure functions
-  // so they are easy to test and reason about in isolation.
-  //
-  // MAX_VISIBLE_ROWS: at most two rows are visible at once. If a third row
-  // would be added, its lessons are folded into the nearest existing slot's
-  // paged stack instead (i.e. appended to the last slot of the last row).
-
-  const MAX_VISIBLE_ROWS = 2;
-
-  /**
-   * Build a seed CellLayout from a flat array of lesson ids.
-   * Each id gets its own single-lesson slot; all slots are stacked into
-   * a single full-width row if there is only one, or the first two
-   * lessons fill the two visible rows (each as a solo slot) and any
-   * remaining lessons are folded into the second row's slot.
-   *
-   * The result is always a valid CellLayout that matches exactly the ids
-   * that were already in the cell — no lesson is added or removed.
-   */
-  function seedLayout(ids: string[]): CellLayout {
-    if (ids.length === 0) return [[ids]]; // single empty slot
-    if (ids.length === 1) return [[[ids[0]]]]; // row[0] = [slot[lessonId]]
-    // Two or more: put the first in row 0, everything else in row 1 slot 0.
-    return [[[ids[0]]], [ids.slice(1)]];
-  }
-
-  /**
-   * Remove a lesson id from all slots in a layout.
-   * Empty slots are dropped; empty rows are dropped.
-   * Returns the pruned layout (may be an empty array if the lesson was
-   * the only one — callers should delete the layout entry in that case).
-   */
-  function removeIdFromLayout(layout: CellLayout, id: string): CellLayout {
-    return layout
-      .map((row) =>
-        row
-          .map((slot) => slot.filter((slotId) => slotId !== id))
-          .filter((slot) => slot.length > 0),
-      )
-      .filter((row) => row.length > 0);
-  }
-
-  /**
-   * Apply a DropRegion to a CellLayout, inserting `newId` according to
-   * the teacher's intent.
-   *
-   * Region semantics:
-   *   "cell"       — empty cell: single slot with just newId.
-   *   "half-left"  — first row gets two slots; newId goes on the left.
-   *   "half-right" — first row gets two slots; newId goes on the right.
-   *   "above"      — new solo row inserted at the top; overflow is folded.
-   *   "below"      — new solo row appended at the bottom; overflow is folded.
-   *   "on"         — newId appended to the first slot of the first row
-   *                  (CellDropZones tells the grid which slot was targeted,
-   *                  but we approximate by placing it in row[0][0]; the
-   *                  more granular "on-slot" variant is a follow-up).
-   *
-   * The two-visible-row cap is enforced: any row that would push total rows
-   * past MAX_VISIBLE_ROWS has its lessons folded into the last slot of the
-   * last row that fits.
-   */
-  function applyRegion(
-    layout: CellLayout,
-    newId: string,
-    region: DropRegion,
-  ): CellLayout {
-    // Deep-clone so mutations don't bleed.
-    let rows: CellLayout = layout.map((row) => row.map((slot) => [...slot]));
-
-    switch (region) {
-      case "cell":
-        // Landing on an empty cell — just start fresh.
-        return [[[newId]]];
-
-      case "half-left": {
-        // Ensure the first row has exactly two slots; put newId on the left.
-        if (rows.length === 0) {
-          rows = [[[newId], []]];
-        } else {
-          const firstRow = rows[0];
-          if (firstRow.length >= 2) {
-            // Already two slots — replace the left slot with [newId, ...existing].
-            firstRow[0] = [newId, ...firstRow[0]];
-          } else {
-            // Only one slot — split: newId on left, existing lessons on right.
-            const existing = firstRow[0] ?? [];
-            rows[0] = [[newId], existing];
-          }
-        }
-        break;
-      }
-
-      case "half-right": {
-        // Mirror of half-left: newId on the right.
-        if (rows.length === 0) {
-          rows = [[[]], [[newId]]];
-        } else {
-          const firstRow = rows[0];
-          if (firstRow.length >= 2) {
-            // Already two slots — append to right slot.
-            firstRow[1] = [...firstRow[1], newId];
-          } else {
-            // One slot — split: existing on left, newId on right.
-            const existing = firstRow[0] ?? [];
-            rows[0] = [existing, [newId]];
-          }
-        }
-        break;
-      }
-
-      case "above": {
-        // Prepend a new solo row. Fold if that would exceed the visible cap.
-        const newRow: CellLayout[number] = [[newId]];
-        rows = [newRow, ...rows];
-        rows = foldExcessRows(rows);
-        break;
-      }
-
-      case "below": {
-        // Append a new solo row. Fold if that would exceed the visible cap.
-        const newRow: CellLayout[number] = [[newId]];
-        rows = [...rows, newRow];
-        rows = foldExcessRows(rows);
-        break;
-      }
-
-      case "on":
-      default: {
-        // Add to the paged stack at the first slot of the first row.
-        if (rows.length === 0) {
-          rows = [[[newId]]];
-        } else {
-          rows[0][0] = [...(rows[0][0] ?? []), newId];
-        }
-        break;
-      }
-    }
-
-    return rows;
-  }
-
-  /**
-   * Enforce the two-visible-row cap by folding excess-row lessons into
-   * the last slot of the last allowed row.  This keeps every lesson
-   * accessible via paged stacking without infinite row growth.
-   */
-  function foldExcessRows(rows: CellLayout): CellLayout {
-    if (rows.length <= MAX_VISIBLE_ROWS) return rows;
-    const kept = rows.slice(0, MAX_VISIBLE_ROWS);
-    const overflow = rows.slice(MAX_VISIBLE_ROWS);
-    // Collect all lesson ids from overflow rows.
-    const extraIds = overflow.flatMap((row) => row.flatMap((slot) => slot));
-    // Fold into the last slot of the last kept row.
-    const lastRow = kept[kept.length - 1];
-    const lastSlot = lastRow[lastRow.length - 1];
-    lastRow[lastRow.length - 1] = [...lastSlot, ...extraIds];
-    return kept;
-  }
-
-  /**
-   * Handle a region-aware drop: the teacher dropped `draggingId` onto the
-   * target cell (subjectId × day) with a specific placement intent.
-   *
-   * Steps:
-   *   1. Move the lesson in the flat `lessons` array (updates subject/day).
-   *   2. Remove the lesson from its previous cell's layout (if any).
-   *   3. Seed a layout for the target cell if it has none yet.
-   *   4. Apply the region to the target layout.
-   *   5. Prune trivial layouts (single-lesson, no arrangement) so the
-   *      default CardStack rendering stays in effect where layout adds
-   *      no value.
-   */
-  function handleDropRegion(
-    subjectId: SubjectId,
-    day: number,
-    region: DropRegion,
-  ): void {
-    if (!draggingId) return;
-    const draggedId = draggingId;
-
-    // 1. Find the current lesson to know its source cell.
-    const sourceLessons = lessons;
-    const draggedLesson = sourceLessons.find((l) => l.id === draggedId);
-    if (!draggedLesson) {
-      setDraggingId(null);
-      return;
-    }
-    const srcKey = cellKey(draggedLesson.subject, draggedLesson.day);
-    const tgtKey = cellKey(subjectId, day);
-
-    // 2. Update the flat lessons array — move lesson to target cell.
-    setLessons((prev) =>
-      prev.map((l) =>
-        l.id === draggedId
-          ? {
-              ...l,
-              day,
-              subject: subjectId,
-              moved:
-                l.day === day && l.subject === subjectId
-                  ? l.moved
-                  : "same-week",
-            }
-          : l,
-      ),
+  function handleDragOver(event: DragOverEvent): void {
+    const overId = event.over ? String(event.over.id) : null;
+    setDragState((prev) =>
+      prev.phase === "dragging" ? { ...prev, overId } : prev,
     );
-
-    // 3. Mutate the layouts: remove from source, apply region to target.
-    setCellLayouts((prevLayouts) => {
-      const next = { ...prevLayouts };
-
-      // ── Remove from source cell layout ──────────────────────────────
-      if (srcKey !== tgtKey && next[srcKey]) {
-        const pruned = removeIdFromLayout(next[srcKey], draggedId);
-        if (pruned.length === 0) {
-          // Source cell is now empty — drop its layout entry entirely.
-          delete next[srcKey];
-        } else {
-          next[srcKey] = pruned;
-        }
-      }
-
-      // ── Seed target layout from current flat lessons if needed ───────
-      // We need to know which lessons are currently in the target cell
-      // (before the move updates them in the next render). We use the
-      // sourceLessons snapshot captured above, excluding the dragged id.
-      if (!next[tgtKey]) {
-        const currentTargetIds = sourceLessons
-          .filter(
-            (l) =>
-              l.subject === subjectId &&
-              l.day === day &&
-              l.week === draggedLesson.week && // same week only
-              l.id !== draggedId,
-          )
-          .map((l) => l.id);
-        if (currentTargetIds.length > 0) {
-          next[tgtKey] = seedLayout(currentTargetIds);
-        }
-        // If the cell is empty, applyRegion handles the "cell" region case.
-      } else {
-        // Remove the dragged lesson from the target layout in case it
-        // was already present there (e.g. same-cell reorder).
-        const cleaned = removeIdFromLayout(next[tgtKey], draggedId);
-        next[tgtKey] = cleaned.length > 0 ? cleaned : [];
-      }
-
-      // ── Apply the region ─────────────────────────────────────────────
-      const baseLayout = next[tgtKey] ?? [];
-      const updatedLayout = applyRegion(baseLayout, draggedId, region);
-
-      // ── Prune trivial layouts ────────────────────────────────────────
-      // A single-lesson layout with no arrangement is the same as the
-      // default CardStack view — drop the entry to avoid unnecessary state.
-      if (isTrivialLayout(updatedLayout)) {
-        delete next[tgtKey];
-      } else {
-        next[tgtKey] = updatedLayout;
-      }
-
-      return next;
-    });
-
-    stopScrollLoop();
-    setDraggingId(null);
+    // Screen-reader position announcement.
+    if (overId?.startsWith("cell:")) {
+      const [, subjectId, dayStr] = overId.split(":");
+      const dayName = WEEK_DAYS[Number(dayStr)] ?? dayStr;
+      const subj = SUBJECTS.find((s) => s.id === subjectId);
+      setLiveAnnouncement(`Over ${subj?.name ?? subjectId}, ${dayName}.`);
+    }
   }
 
-  /** Placeholder add — no lesson-creation flow exists in the mock. */
+  function handleDragEnd(event: DragEndEvent): void {
+    const activeId = String(event.active.id);
+    const overId = event.over ? String(event.over.id) : null;
+
+    // Bug 1 fix: go straight to `idle` SYNCHRONOUSLY — no `dropping` phase,
+    // no setTimeout. Re-expansion begins in the same render cycle as the drop
+    // event, giving a <30ms first-frame target. The DragOverlay's dropAnimation
+    // (220ms cubic-bezier) runs in parallel via dnd-kit and does not block this.
+    // Restore the snapshotted expansion set atomically in the same handler
+    // so there is no intermediate render where expandedIds is wrong (spec §3.6).
+    const snapshot = expandedSnapshotRef.current;
+    expandedSnapshotRef.current = null;
+    setExpandedIds(snapshot ?? new Set());
+    setDragState({ phase: "idle" });
+
+    if (overId?.startsWith("cell:")) {
+      const [, subjectId, dayStr] = overId.split(":");
+      const day = Number(dayStr);
+      // Route through the store — this records one undo step ("Move lesson")
+      // and prunes the source cell's CellLayout automatically (store reducer).
+      moveLesson(activeId, { day, subject: subjectId as SubjectId });
+      // Announce drop.
+      const [, tgtSubjectId, tgtDayStr] = overId.split(":");
+      const dayName = WEEK_DAYS[Number(tgtDayStr)] ?? tgtDayStr;
+      const subj = SUBJECTS.find((s) => s.id === tgtSubjectId);
+      setLiveAnnouncement(
+        `Dropped in ${subj?.name ?? tgtSubjectId}, ${dayName}.`,
+      );
+    } else {
+      // Dropped outside a cell — no move.
+      setLiveAnnouncement("Drag cancelled.");
+    }
+  }
+
+  function handleDragCancel(): void {
+    // Restore snapshot and reset.
+    setExpandedIds(expandedSnapshotRef.current ?? new Set());
+    expandedSnapshotRef.current = null;
+    setDragState({ phase: "idle" });
+    setLiveAnnouncement("Drag cancelled.");
+  }
+
+  // ── Simple helpers ─────────────────────────────────────────────────────────
+
   function handleAdd(subjectId: SubjectId, day: number): void {
-    // Lesson creation is out of scope for the grid task; the affordance
-    // is wired so the interaction is testable once an editor exists.
     void subjectId;
     void day;
   }
 
-  /** Card click → select + toggle inline expansion (spec §6.5). */
   function handleSelect(lessonId: string): void {
     setSelectedId(lessonId);
     setExpandedIds((prev) => {
@@ -553,35 +309,25 @@ export function WeeklyGrid(): ReactNode {
     });
   }
 
-  /**
-   * Toggle the maximized state of a cell. Clicking an already-maximized cell
-   * collapses it; clicking any other cell replaces the current one — only one
-   * cell is ever open at a time.
-   */
   function handleToggleMaximize(subjectId: SubjectId, day: number): void {
     const key = `${subjectId}:${day}`;
     setMaximizedCell((prev) => (prev === key ? null : key));
   }
 
-  /** Completion checkbox cycle — done → partial → not_done. */
+  /** Completion toggle — routes through store (one undo step per cycle). */
   function handleToggleComplete(
     lessonId: string,
     nextStatus: LessonStatus,
   ): void {
-    setLessons((prev) =>
-      prev.map((l) => (l.id === lessonId ? { ...l, status: nextStatus } : l)),
-    );
+    setLessonStatus(lessonId, nextStatus);
   }
 
   /**
-   * Context-menu actions that mutate the grid's local lesson state.
-   * Mirrors the drag-and-drop model — local state only, no backend.
-   *
-   * `payload` carries action detail: `day` / `week` for Move targets,
-   * `status` for Mark-status. A same-week move flips `moved` to
-   * "same-week" (matching a drag); a cross-week move flips it to
-   * "across-weeks". Actions outside the grid's scope (copy-to-personal,
-   * print, etc.) intentionally no-op here.
+   * Context-menu actions — each routed to the appropriate store action so
+   * every mutation lands in the shared undo/redo history.
+   *   duplicate  → store.duplicateLesson
+   *   move       → store.moveLesson
+   *   mark-status → store.setLessonStatus
    */
   function handleContextAction(
     action: ContextAction,
@@ -589,110 +335,67 @@ export function WeeklyGrid(): ReactNode {
     payload?: ContextActionPayload,
   ): void {
     if (action === "duplicate") {
-      setLessons((prev) => {
-        const source = prev.find((l) => l.id === lessonId);
-        if (!source) return prev;
-        // Clone into the same cell with a fresh id; the copy is a
-        // personal, unmodified lesson so it reads as the teacher's own.
-        const copy: Lesson = {
-          ...source,
-          id: `${source.id}-copy-${Date.now().toString(36)}`,
-          isPersonal: true,
-          modified: false,
-          moved: null,
-          pendingMaster: false,
-          commentCount: 0,
-          unreadComments: 0,
-        };
-        // Insert directly after the source so it stacks beneath it.
-        const at = prev.findIndex((l) => l.id === lessonId);
-        return [...prev.slice(0, at + 1), copy, ...prev.slice(at + 1)];
-      });
+      duplicateLesson(lessonId);
       return;
     }
 
     if (action === "move") {
-      // "Move to day" → payload.day (0–4). "Move to week" → payload.week.
       const toDay = typeof payload?.day === "number" ? payload.day : null;
       const toWeek = typeof payload?.week === "number" ? payload.week : null;
-      if (toDay === null && toWeek === null) return; // no actionable target
+      if (toDay === null && toWeek === null) return;
       if (toDay !== null && (toDay < 0 || toDay >= DAY_COUNT)) return;
-      setLessons((prev) =>
-        prev.map((l) => {
-          if (l.id !== lessonId) return l;
-          const nextDay = toDay ?? l.day;
-          const nextWeek = toWeek ?? l.week;
-          const sameSlot = nextDay === l.day && nextWeek === l.week;
-          return {
-            ...l,
-            day: nextDay,
-            week: nextWeek,
-            moved: sameSlot
-              ? l.moved
-              : nextWeek !== l.week
-                ? "across-weeks"
-                : "same-week",
-          };
-        }),
-      );
+      moveLesson(lessonId, {
+        ...(toDay !== null ? { day: toDay } : {}),
+        ...(toWeek !== null ? { week: toWeek } : {}),
+      });
       setSelectedId(lessonId);
       return;
     }
 
     if (action === "mark-status" && payload?.status) {
-      handleToggleComplete(lessonId, payload.status);
+      setLessonStatus(lessonId, payload.status);
     }
   }
 
   /**
-   * Inline text edit committed on a lesson card.
-   *
-   * This handler now applies only the content patch. The fork decision
-   * (personal vs. core) is deferred to the SaveTargetDialog — the dialog
-   * fires onSaveTarget when the teacher chooses, at which point handleSaveTarget
-   * applies the appropriate fork flags. This keeps the two concerns separate:
-   * editing content vs. deciding who owns the change.
+   * Inline text edit committed — routes through store with coalescing so a
+   * typing burst collapses into one undo step.
+   * coalesceKey format: "lesson:<id>:<field>" (first patch key used as field).
    */
   function handleEditLesson(lessonId: string, patch: Partial<Lesson>): void {
-    setLessons((prev) =>
-      prev.map((l) => (l.id !== lessonId ? l : { ...l, ...patch })),
-    );
+    const field = Object.keys(patch)[0] ?? "patch";
+    editLesson(lessonId, patch, {
+      key: `lesson:${lessonId}:${field}`,
+      ts: Date.now(),
+    });
   }
 
-  /**
-   * Save-target chosen in the SaveTargetDialog.
-   *
-   * "personal" → lazy fork: set modified=true, isPersonal=true on the lesson,
-   *   giving it the dashed stripe + "Modified" pill per the three-tier visual
-   *   contract. This mirrors what the old handleEditLesson did in personal mode.
-   *
-   * "core"     → the teacher wants to update the shared Core Curriculum. No fork
-   *   flags are applied — the lesson stays as-is (not marked as personal). In a
-   *   backend-connected version this would write back to the master plan row.
-   */
+  /** Save-target choice — routes through store (lazy-fork on "personal"). */
   function handleSaveTarget(
     lessonId: string,
     target: "personal" | "core",
   ): void {
-    if (target === "personal") {
-      setLessons((prev) =>
-        prev.map((l) =>
-          l.id !== lessonId ? l : { ...l, modified: true, isPersonal: true },
-        ),
-      );
-    }
-    // "core" path: content patch was already applied in handleEditLesson.
-    // No additional flag mutations — the lesson is intentionally left as
-    // an unforked Core Curriculum entry until the backend lands.
+    setSaveTarget(lessonId, target);
   }
+
+  // ── Active lesson for DragOverlay ─────────────────────────────────────────
+  const activeLessonId = dragState.phase !== "idle" ? dragState.activeId : null;
+  const activeLesson = activeLessonId
+    ? lessons.find((l) => l.id === activeLessonId)
+    : null;
 
   return (
     <div className={styles.page}>
-      {/*
-       * WeekNavigator owns the navbar shell and the prev/next/today controls.
-       * The toolbar bar (Expand all / Minimize all) renders as a separate
-       * sticky bar immediately below so the two components stay decoupled.
-       */}
+      {/* Accessibility live region — announces drag events for screen readers. */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className={styles.srOnly}
+      >
+        {liveAnnouncement}
+      </div>
+
       <WeekNavigator
         week={week}
         currentWeek={CURRENT_WEEK}
@@ -701,12 +404,8 @@ export function WeeklyGrid(): ReactNode {
         onChange={setWeek}
       />
 
-      {/* ── Toolbar ────────────────────────────────────────────────────
-          A slim bar beneath the week navigator with expand/minimize
-          controls. Sticky so it stays visible while scrolling the grid.
-          Buttons are 44px tall (WCAG touch target). */}
+      {/* ── Toolbar — anchored chrome (spec §3.5) ──────────────────────── */}
       <div className={styles.moveToolbar}>
-        {/* Expand / minimize every card in the visible week at once. */}
         <button
           type="button"
           className={styles.moveModeBtn}
@@ -725,98 +424,121 @@ export function WeeklyGrid(): ReactNode {
         </button>
       </div>
 
-      <div
-        ref={scrollRef}
-        className={styles.scroll}
-        onDragOver={handleScrollDragOver}
+      {/* ── DndContext wraps the entire scrollable grid ──────────────────── */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
-        <div
-          className={styles.grid}
-          role="grid"
-          aria-label={`Weekly plan, week ${week}`}
-        >
-          {/* ── Day header row ── */}
-          <div className={styles.cornerCell} role="presentation" />
-          {WEEK_DAYS.map((dayName, dayIdx) => (
-            <div
-              key={dayName}
-              role="columnheader"
-              className={`${styles.dayHead} ${
-                week === CURRENT_WEEK && dayIdx === 0 ? styles.dayHeadToday : ""
-              }`}
-            >
-              <span>{dayName}</span>
-              <span className={styles.dayHeadDate}>
-                {WEEK_DAYS_SHORT[dayIdx]}
-              </span>
-            </div>
-          ))}
+        <div className={styles.scroll}>
+          <div
+            className={styles.grid}
+            role="grid"
+            aria-label={`Weekly plan, week ${week}`}
+          >
+            {/* ── Day header row — anchored chrome (spec §3.5) ── */}
+            <div className={styles.cornerCell} role="presentation" />
+            {WEEK_DAYS.map((dayName, dayIdx) => (
+              <div
+                key={dayName}
+                role="columnheader"
+                className={`${styles.dayHead} ${
+                  week === CURRENT_WEEK && dayIdx === 0
+                    ? styles.dayHeadToday
+                    : ""
+                }`}
+              >
+                <span>{dayName}</span>
+                <span className={styles.dayHeadDate}>
+                  {WEEK_DAYS_SHORT[dayIdx]}
+                </span>
+              </div>
+            ))}
 
-          {/* ── Subject rows ── */}
-          {!weekHasLessons && (
-            <div className={styles.emptyWeek} role="status">
-              No lessons planned for week {week} yet.
+            {/* ── Subject rows ── */}
+            {!weekHasLessons && (
+              <div className={styles.emptyWeek} role="status">
+                No lessons planned for week {week} yet.
+              </div>
+            )}
+            {SUBJECTS.map((subject, rowIdx) => (
+              <SubjectRow
+                key={subject.id}
+                rowIndex={rowIdx}
+                subjectId={subject.id}
+                cells={bySubjectDay[subject.id]}
+                style={style}
+                dragState={dragState}
+                density={density}
+                expandedIds={expandedIds}
+                selectedId={selectedId}
+                maximizedCell={maximizedCell}
+                cellLayouts={cellLayouts}
+                cellProps={gridNav.cellProps}
+                onAdd={handleAdd}
+                onSelect={handleSelect}
+                onToggleComplete={handleToggleComplete}
+                onContextAction={handleContextAction}
+                onToggleMaximize={handleToggleMaximize}
+                onEditLesson={handleEditLesson}
+                onSaveTarget={handleSaveTarget}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* ── DragOverlay — floating chip follows cursor (spec §6.1 / §7) ── */}
+        <DragOverlay
+          dropAnimation={
+            prefersReducedMotion
+              ? null
+              : {
+                  duration: 220,
+                  easing: "cubic-bezier(0.2, 0, 0, 1)",
+                }
+          }
+        >
+          {activeLesson && (
+            <div className={styles.overlayCard}>
+              {/* The floating drag chip. `overlay` triggers the floating
+                  shadow/ring/rotation on the card (Bug 4 fix: in-grid cards
+                  never show those styles, even when isDragging is true). */}
+              <WeeklyLessonCard
+                lesson={activeLesson}
+                density="compact"
+                overlay
+                expanded={false}
+                selected={false}
+                dragging={true}
+              />
             </div>
           )}
-          {SUBJECTS.map((subject, rowIdx) => (
-            <SubjectRow
-              key={subject.id}
-              rowIndex={rowIdx}
-              subjectId={subject.id}
-              cells={bySubjectDay[subject.id]}
-              style={style}
-              draggingId={draggingId}
-              expandedIds={expandedIds}
-              selectedId={selectedId}
-              maximizedCell={maximizedCell}
-              cellLayouts={cellLayouts}
-              cellProps={gridNav.cellProps}
-              onDragStart={handleDragStart}
-              onDragEnd={() => {
-                stopScrollLoop();
-                setDraggingId(null);
-              }}
-              onDrop={handleDrop}
-              onDropRegion={handleDropRegion}
-              onAdd={handleAdd}
-              onSelect={handleSelect}
-              onToggleComplete={handleToggleComplete}
-              onContextAction={handleContextAction}
-              onToggleMaximize={handleToggleMaximize}
-              onEditLesson={handleEditLesson}
-              onSaveTarget={handleSaveTarget}
-            />
-          ))}
-        </div>
-      </div>
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }
 
-// ── Subject row ───────────────────────────────────────────────────────
+// ── SubjectRow ────────────────────────────────────────────────────────────────
 // Split into its own component so the subject-color hook (one per row)
 // is called at a stable position — hooks can't run inside the .map above.
+// Also anchored chrome: the subject label never collapses (spec §3.5).
 
 interface SubjectRowProps {
-  /** Row index — the row coordinate for keyboard navigation. */
   rowIndex: number;
   subjectId: SubjectId;
   cells: Lesson[][];
   style: ReturnType<typeof useTheme>["style"];
-  draggingId: string | null;
+  dragState: DragState;
+  density: Density;
   expandedIds: Set<string>;
   selectedId: string | null;
-  /** Key of the currently maximized cell (`${subjectId}:${day}`), or null. */
   maximizedCell: string | null;
-  /** Per-cell arranged layouts, passed through to GridCell. */
   cellLayouts: Record<string, CellLayout>;
-  /** Builds the roving-tabindex props for a cell at (row, col). */
   cellProps: (row: number, col: number) => CellNavProps;
-  onDragStart: (id: string) => void;
-  onDragEnd: () => void;
-  onDrop: (subjectId: SubjectId, day: number) => void;
-  /** Region-aware drop: teacher chose a specific placement zone. */
-  onDropRegion: (subjectId: SubjectId, day: number, region: DropRegion) => void;
   onAdd: (subjectId: SubjectId, day: number) => void;
   onSelect: (id: string) => void;
   onToggleComplete: (id: string, next: LessonStatus) => void;
@@ -826,13 +548,7 @@ interface SubjectRowProps {
     payload?: ContextActionPayload,
   ) => void;
   onToggleMaximize: (subjectId: SubjectId, day: number) => void;
-  /** Inline text edit committed: threaded to each GridCell → WeeklyLessonCard. */
   onEditLesson: (id: string, patch: Partial<Lesson>) => void;
-  /**
-   * Save-target chosen in the SaveTargetDialog: "personal" forks the lesson
-   * into the teacher's personal copy; "core" writes to the shared Core
-   * Curriculum (no fork). Threaded through to WeeklyLessonCard.
-   */
   onSaveTarget: (id: string, target: "personal" | "core") => void;
 }
 
@@ -841,16 +557,13 @@ function SubjectRow({
   subjectId,
   cells,
   style,
-  draggingId,
+  dragState,
+  density,
   expandedIds,
   selectedId,
   maximizedCell,
   cellLayouts,
   cellProps,
-  onDragStart,
-  onDragEnd,
-  onDrop,
-  onDropRegion,
   onAdd,
   onSelect,
   onToggleComplete,
@@ -863,12 +576,11 @@ function SubjectRow({
   const subject = SUBJECTS.find((s) => s.id === subjectId)!;
   const unit = UNITS[subjectId];
 
-  // Unit shading is uniform across a subject row here: the mock has one
-  // active unit per subject, so every cell in the row shares its shade.
   const shade: CellShade = resolveCellShade(style, color, unit.shade);
 
   return (
     <>
+      {/* Subject label — anchored chrome, never collapses (spec §3.5) */}
       <div className={`${styles.subjectHead} cp-subj ${subjectId}`}>
         <span
           className={styles.subjectTile}
@@ -889,16 +601,13 @@ function SubjectRow({
           day={day}
           lessons={cells?.[day] ?? []}
           shade={shade}
-          draggingId={draggingId}
+          dragState={dragState}
+          density={density}
           expandedIds={expandedIds}
           selectedId={selectedId}
           maximized={maximizedCell === `${subjectId}:${day}`}
           cellLayout={cellLayouts[cellKey(subjectId, day)] ?? null}
           navProps={cellProps(rowIndex, day)}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-          onDrop={onDrop}
-          onDropRegion={onDropRegion}
           onAdd={onAdd}
           onSelect={onSelect}
           onToggleComplete={onToggleComplete}

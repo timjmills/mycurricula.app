@@ -27,6 +27,92 @@
   outline: none;
 }
 
+/* Compact chip mode: fixed 28px height, overflow visible so the 44px grab
+   handle can exceed the chip bounds for touch targets (spec §2.5 / §7). */
+.cardCompact {
+  overflow: visible;
+  cursor: default;
+}
+
+/* ── Compact chip layout ─────────────────────────────────────────────────── */
+/* Single-line 28px chip shown during drag. The card root has overflow:visible
+   in compact mode so the 44px grab handle overflows without clipping.
+   Internal overflow is hidden on the chip row to keep stripe/title/dot clean. */
+
+/* Outer chip row — flex, full-height, clips its own contents. */
+.chip {
+  display: flex;
+  align-items: center;
+  height: 28px; /* DRAG_CHIP.cardChipHeight — token value is 28 */
+  overflow: hidden;
+  border-radius: var(--r-8);
+  /* Stripe is absolutely positioned and covers the full chip height. */
+  position: relative;
+}
+
+/* Subject color stripe — absolutely positioned so it spans full chip height
+   even when the grab handle (44px) overflows the chip bounds.
+   Width is set inline from DRAG_CHIP.subjectStripeWidth (6px). */
+.chipStripe {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  /* width set inline */
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+/* Grab handle in compact mode — overflows the 28px chip vertically so the
+   44px touch target is maintained (spec §2.5). The chip itself has
+   overflow:hidden; the card root has overflow:visible in compact mode. */
+.chipHandle {
+  /* Override the standard 44×44 affordance dimensions — keep width for touch
+     but center vertically within the chip row. */
+  height: 44px; /* DRAG_CHIP.handleTouchTarget */
+  width: 44px;
+  /* Negative block margin overflows the 28px chip to reach 44px. */
+  margin-block: -8px;
+  flex-shrink: 0;
+  /* Pull right so it clears the 6px stripe. */
+  padding-inline-start: calc(var(--t-10) + 2px);
+  z-index: 2;
+}
+
+/* Chip title: 13px / weight 500 / single-line clamp (spec §3.2 / §7).
+   Includes the subject code prefix in the clamp budget. */
+.chipTitle {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--t-13);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink-900);
+  /* Left padding clears the 6px stripe + a small gap. */
+  padding-inline-start: 6px;
+}
+
+/* 2-letter subject code prefix — gray, same weight as title (spec §3.2 / §7).
+   "XX · " format; the middle-dot is a text character (U+00B7). */
+.chipCode {
+  color: var(--ink-500);
+  /* Inherit weight from chipTitle (500) — same weight, different color. */
+}
+
+/* Completion-status dot — 4×4px colored circle right of title (spec §3.2). */
+.chipDot {
+  flex-shrink: 0;
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  /* background is set inline (subject color / partial mix / ink-200). */
+  margin-inline: 6px 8px;
+}
+
 .card:focus-visible {
   /* Double-ring focus pattern: paper gap + subject-color ring. */
   box-shadow:
@@ -51,6 +137,22 @@
   align-items: center;
   gap: 6px;
   min-height: 28px;
+}
+
+/* 2-letter subject code badge — leading edge of the header band in full mode.
+   Mirrors the compact chip's chipCode (§3.2 / §3.7): same 2-char code, same
+   weight as the surrounding meta text, slightly muted opacity so it reads as
+   a scan label rather than competing with the subject name.
+   No hard-coded colors: color inherited inline from color.cd via parent, then
+   tempered by opacity; font-size uses the shared --t-10 token. */
+.bandSubjectCode {
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  opacity: 0.55;
+  flex: 0 0 auto;
+  user-select: none;
+  line-height: 1;
 }
 
 /* Completion check — ≥44px hit area, pulled back so the band stays compact. */
@@ -642,7 +744,10 @@
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────────── */
-/* Collapse all decorative transitions; focus rings remain instant always. */
+/* Collapse all decorative transitions; focus rings remain instant always.
+   The AnimatePresence motion.div for full-mode content is controlled
+   by collapseTransition (DRAG_MOTION.reduced) when useReducedMotion() is
+   true — opacity-only, no height/layout animation (spec §2.4). */
 @media (prefers-reduced-motion: reduce) {
   .card,
   .caret,

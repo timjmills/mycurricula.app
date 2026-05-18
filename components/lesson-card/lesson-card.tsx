@@ -199,6 +199,9 @@ export function LessonCard({
     <div
       className={`cp-subj ${subject.cls} ${styles.card}`}
       data-style={style}
+      // Scroll anchor for the program-wide history — scrollPlannerItemIntoView()
+      // queries this attribute to bring an edited/undone lesson back into view.
+      data-planner-item={`lesson:${lesson.id}`}
       role="group"
       aria-label={`${subject.name} lesson: ${lesson.title}`}
       tabIndex={0}

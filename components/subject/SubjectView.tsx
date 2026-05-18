@@ -11,14 +11,19 @@
 //
 // Shared state is read/written via `useAppState()` — `subjectView` and
 // `setSubjectView` bind the subject picker; `week` scopes Month/Week filters.
-// All lesson data is derived from the LESSONS fixture; no backend is needed.
+//
+// Curriculum DATA (lessons) now comes exclusively from `usePlanner()` so that
+// edits made in the Weekly or Daily views immediately appear here, and mutations
+// performed here (completion toggle) flow through the shared undo/redo stack.
+// Purely-UI state (period filter, group mode, expand/collapse) remains local.
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
-import type { SubjectId, LessonResource } from "@/lib/types";
+import { useEffect, useMemo, useState } from "react";
+import type { SubjectId, LessonResource, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { useSubjectColor } from "@/lib/palette";
-import { LESSONS, SUBJECTS, UNITS, WEEK_DAYS, CURRENT_WEEK } from "@/lib/mock";
+import { SUBJECTS, UNITS, WEEK_DAYS, CURRENT_WEEK } from "@/lib/mock";
+import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import styles from "./SubjectView.module.css";
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -186,7 +191,7 @@ interface LessonRowData {
   title: string;
   week: number;
   day: number;
-  status: string;
+  status: LessonStatus;
   isPersonal: boolean;
   standards: string[];
   resources: LessonResource[];
@@ -200,16 +205,22 @@ function LessonRowItem({
   lesson,
   isExpanded,
   onToggle,
+  onToggleStatus,
 }: {
   lesson: LessonRowData;
   isExpanded: boolean;
   onToggle: () => void;
+  /** Cycle the lesson's completion status. One store step = one undo entry. */
+  onToggleStatus: () => void;
 }): ReactNode {
   // Day label derived from WEEK_DAYS — never hard-coded.
   const dayLabel = WEEK_DAYS[lesson.day] ?? `Day ${lesson.day}`;
 
   return (
+    // data-planner-item — required by scrollPlannerItemIntoView() contract.
+    // See planner-store.tsx §"Data-planner-item attribute convention".
     <div
+      data-planner-item={`lesson:${lesson.id}`}
       className={[
         styles.lessonItem,
         lesson.status === "skipped" ? styles.lessonItemSkipped : "",
@@ -241,7 +252,20 @@ function LessonRowItem({
           <ChevronIcon size={8} />
         </span>
 
-        <CheckIcon status={lesson.status} />
+        {/* Completion toggle — routes through setLessonStatus in the store.
+            Wrapped in a separate button so the click target is distinct from
+            the expand/collapse row button. stopPropagation prevents the row
+            expand from also firing. */}
+        <button
+          className={styles.checkBtn}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleStatus();
+          }}
+          aria-label={`Toggle completion for ${lesson.title}`}
+        >
+          <CheckIcon status={lesson.status} />
+        </button>
 
         <span
           className={[
@@ -355,6 +379,8 @@ interface GroupBlockProps {
   expandedLessons: Set<string>;
   onToggleLesson: (id: string) => void;
   onToggleAllLessons: () => void;
+  /** Cycle completion status for a lesson — routed to the store. */
+  onToggleStatus: (id: string) => void;
 }
 
 function GroupBlock({
@@ -364,6 +390,7 @@ function GroupBlock({
   expandedLessons,
   onToggleLesson,
   onToggleAllLessons,
+  onToggleStatus,
 }: GroupBlockProps): ReactNode {
   const doneCount = group.lessons.filter((l) => l.status === "done").length;
   const allExpanded =
@@ -427,6 +454,7 @@ function GroupBlock({
                 lesson={lesson}
                 isExpanded={expandedLessons.has(lesson.id)}
                 onToggle={() => onToggleLesson(lesson.id)}
+                onToggleStatus={() => onToggleStatus(lesson.id)}
               />
             ))}
           </div>
@@ -595,7 +623,22 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
   // limitation; the UI is ready for multi-unit subjects.
   const unit = UNITS[subjectId];
 
-  // Local UI state
+  // ── Planner store — the single source of truth for curriculum data ─────
+  // `lessons` is the live document shared with Weekly and Daily views.
+  // `setLessonStatus` and `lastChange` are the only store APIs this view
+  // currently needs beyond reading — other mutations (inline edit, duplicate,
+  // move) are not surfaced in the Subject view UI yet.
+  const { lessons, setLessonStatus, lastChange } = usePlanner();
+
+  // ── Scroll preservation ────────────────────────────────────────────────
+  // After any mutation (including undo/redo from another view) bring the
+  // affected lesson card into view so the teacher can see what changed.
+  useEffect(() => {
+    const id = lastChange?.lessonIds[0];
+    if (id) scrollPlannerItemIntoView(id);
+  }, [lastChange]);
+
+  // Local UI state — purely presentational, intentionally not in the store
   const [period, setPeriod] = useState<PeriodFilter>("All");
   const [groupMode, setGroupMode] = useState<GroupMode>("unit");
 
@@ -609,10 +652,11 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
     Map<string, Set<string>>
   >(() => new Map());
 
-  // Derive this subject's lessons from the fixture
+  // Filter to this subject's lessons from the live store document.
+  // Grade-scoping is already on each lesson (lesson.subject, lesson.week).
   const allLessons = useMemo(
-    () => LESSONS.filter((l) => l.subject === subjectId),
-    [subjectId],
+    () => lessons.filter((l) => l.subject === subjectId),
+    [lessons, subjectId],
   );
 
   // Apply time-period filter
@@ -698,10 +742,12 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
     if (groupMode === "unit") {
       // Use the lesson's unit id as the grouping key; preserve insertion order
       // so the visual sequence follows the year's unit progression.
+      // Look up unit id from allLessons (which already comes from the store),
+      // not from the static LESSONS fixture, so moves/edits are reflected.
+      const unitById = new Map(allLessons.map((l) => [l.id, l.unit]));
       const byUnit: Map<string, LessonRowData[]> = new Map();
       for (const l of lessonRows) {
-        const lessonObj = LESSONS.find((x) => x.id === l.id);
-        const unitId = lessonObj?.unit ?? "unknown";
+        const unitId = unitById.get(l.id) ?? "unknown";
         const existing = byUnit.get(unitId) ?? [];
         existing.push(l);
         byUnit.set(unitId, existing);
@@ -743,7 +789,7 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
         lessons,
       };
     });
-  }, [groupMode, lessonRows, unit]);
+  }, [groupMode, lessonRows, allLessons, unit]);
 
   // Collect all resources for the resource browser
   const allResources = useMemo((): ResourceEntry[] => {
@@ -805,6 +851,18 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
       next.set(groupKey, allExpanded ? new Set() : new Set(lessonIds));
       return next;
     });
+  }
+
+  // ── Completion toggle ──────────────────────────────────────────────────
+  // Cycles: not_done → done → not_done (partial / carried / skipped cycle
+  // remains accessible via the Weekly/Daily detail panel). Each call is one
+  // history step so it is independently undoable. Completion intentionally
+  // never forks the lesson (product rule — see CLAUDE.md §2).
+  function handleToggleStatus(lessonId: string): void {
+    const lesson = allLessons.find((l) => l.id === lessonId);
+    if (!lesson) return;
+    const next: LessonStatus = lesson.status === "done" ? "not_done" : "done";
+    setLessonStatus(lessonId, next);
   }
 
   return (
@@ -952,6 +1010,7 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
                     group.lessons.map((l) => l.id),
                   )
                 }
+                onToggleStatus={handleToggleStatus}
               />
             );
           })
@@ -969,18 +1028,23 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
 export function SubjectView(): ReactNode {
   const { subjectView, setSubjectView, week } = useAppState();
 
-  // Per-subject done/total for the sidebar badge — computed once here.
+  // Lessons from the shared store — sidebar badges stay live as other views
+  // mark lessons done or undo those changes.
+  const { lessons } = usePlanner();
+
+  // Per-subject done/total for the sidebar badge — recomputed whenever the
+  // live lesson list changes (e.g. after a completion toggle in Weekly view).
   const subjectCounts = useMemo(() => {
     const counts: Record<string, { done: number; total: number }> = {};
     for (const s of SUBJECTS) {
-      const lessons = LESSONS.filter((l) => l.subject === s.id);
+      const subjectLessons = lessons.filter((l) => l.subject === s.id);
       counts[s.id] = {
-        total: lessons.length,
-        done: lessons.filter((l) => l.status === "done").length,
+        total: subjectLessons.length,
+        done: subjectLessons.filter((l) => l.status === "done").length,
       };
     }
     return counts;
-  }, []);
+  }, [lessons]);
 
   return (
     <div className={styles.page}>

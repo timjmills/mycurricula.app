@@ -312,7 +312,8 @@
     background 0.12s ease;
 }
 
-/* Drop target highlight — subject-tinted border while a card hovers over. */
+/* Drop target highlight — subject-tinted border while a card hovers over.
+   Legacy class kept in place; new dnd-kit glow uses .cellDropGlow below. */
 .cellDragOver {
   border-color: var(--cell-accent, var(--ink-400));
   background: color-mix(
@@ -320,6 +321,93 @@
     var(--cell-accent, var(--ink-300)) 12%,
     var(--cell-bg, var(--paper))
   );
+}
+
+/* ── dnd-kit cell drop-glow (spec §3.3 / §7) ────────────────────────────
+ *
+ * When the dnd-kit pointer is over a cell during a drag:
+ *   .cellDropGlow          — dashed 2px border + subject-tint fill at ~30 %
+ *   .cellDropGlowOccupied  — same but shows the "Stack here" hint badge
+ *
+ * The subject-accent custom property is injected from the shade object via
+ * the --cell-accent inline style on the cell wrapper.
+ */
+.cellDropGlow {
+  border: 2px dashed var(--cell-accent, var(--ink-400));
+  background: color-mix(
+    in oklch,
+    var(--cell-accent, var(--ink-300)) 30%,
+    var(--cell-bg, var(--paper))
+  );
+}
+
+/* Occupied-cell drop: same glow, a bit more prominent. */
+.cellDropGlowOccupied {
+  border: 2px dashed var(--cell-accent, var(--ink-400));
+  background: color-mix(
+    in oklch,
+    var(--cell-accent, var(--ink-300)) 30%,
+    var(--cell-bg, var(--paper))
+  );
+}
+
+/* "Stack here" badge shown inside an occupied cell when dragged over. */
+.dropStackHint {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: var(--t-10);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--paper);
+  background: var(--cell-accent, var(--ink-500));
+  padding: 2px 7px;
+  border-radius: 999px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* ── DragOverlay floating chip (spec §7) ─────────────────────────────────
+ *
+ * The overlay card renders with: shadow 0 8px 24px rgba(0,0,0,0.12) +
+ * 2px var(--fyi-bg) ring (closest token to purple-300) + scale 1.02 +
+ * opacity 0.95.  The ring uses --fyi (information blue) as the closest
+ * available token to the spec's "purple-300 ring" — the writing-light
+ * swatch would also be acceptable; --fyi is more semantically neutral.
+ */
+.overlayCard {
+  /* Scale via transform so it doesn't displace layout. */
+  transform: scale(1.02);
+  transform-origin: top left;
+  opacity: 0.95;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  /* 2px ring (spec §7: "purple-300 ring"). --writing (#6b46c1, purple-600) is
+     the closest visible token; --writing-light (#ece5fa) is too pale to read
+     as a ring at 2px. A mid-opacity writing color reads correctly as a
+     "light purple" ring without needing a purple-300 token. */
+  outline: 2px solid color-mix(in oklch, var(--writing) 60%, transparent);
+  outline-offset: 0;
+  border-radius: var(--r-8);
+  pointer-events: none;
+}
+
+/* ── Screen-reader only — visually hidden but accessible ─────────────────
+ *
+ * Used for the aria-live announcement region and any other sr-only text.
+ * Matches the standard WCAG technique; clip-path is the modern equivalent
+ * of the old clip: rect(0,0,0,0) approach.
+ */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ── Empty-cell affordance ──────────────────────────────────────────── */

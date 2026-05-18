@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AppStateProvider } from "@/lib/app-state";
+import { PlannerProvider } from "@/lib/planner-store";
 import {
   LeftFilterPanel,
   MasterBanner,
@@ -22,29 +23,31 @@ export default function PlannerLayout({
 }): ReactNode {
   return (
     <AppStateProvider>
-      <div
-        className="cp-root"
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {/* Master-mode heads-up → persistent banner. Renders only while
+      <PlannerProvider>
+        <div
+          className="cp-root"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {/* Master-mode heads-up → persistent banner. Renders only while
             the Master edit mode is active; pins above the top bar. */}
-        <MasterBanner />
-        <TopBar />
-        <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-          <LeftFilterPanel />
-          <main
-            style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "auto" }}
-          >
-            {children}
-          </main>
-          <RightPanel />
+          <MasterBanner />
+          <TopBar />
+          <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+            <LeftFilterPanel />
+            <main
+              style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "auto" }}
+            >
+              {children}
+            </main>
+            <RightPanel />
+          </div>
         </div>
-      </div>
+      </PlannerProvider>
     </AppStateProvider>
   );
 }

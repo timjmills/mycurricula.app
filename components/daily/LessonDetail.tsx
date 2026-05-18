@@ -13,22 +13,20 @@
 // cascade (--c / --cl / --cd) flows through every token reference without
 // prop drilling.
 //
-// Section and notes state: per-session local state keyed by lesson.id — a
-// clean slate is re-instantiated when the selected lesson changes. Persistence
-// arrives with the Supabase backend.
+// Store wiring (planner-store):
+//   sections  — read from usePlanner().getSections(lesson.id); never local state.
+//   notes     — written via editLesson with coalesce (typing burst = one undo step).
+//   completion— cycleStatus() calls setLessonStatus (completion never forks a lesson).
+//   add section footer button → addSection(lesson.id).
+// UI-only state (notesHovered) stays local — not persisted or undone.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { Lesson } from "@/lib/types";
 import { SUBJECT_BY_ID, UNITS, describeStandard, lessonTime } from "@/lib/mock";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
-import { instantiateSections, newLessonSection } from "@/lib/lesson-flow";
-import type { LessonSectionContent } from "@/lib/lesson-flow";
-import {
-  LESSON_TEMPLATE_BY_ID,
-  DEFAULT_LESSON_TEMPLATE_ID,
-} from "@/lib/lesson-templates";
+import { usePlanner } from "@/lib/planner-store";
 import detailStyles from "./lesson-detail.module.css";
 
 // ── Small inline icon set ────────────────────────────────────────────────
@@ -252,29 +250,6 @@ function StatusCheckbox({
   );
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-/** Build the initial sections array from the default lesson-flow template.
- *  Guards the lookup so a missing or misconfigured template id never crashes
- *  the render — in that case we start with a single blank section. */
-function buildInitialSections(): LessonSectionContent[] {
-  const template = LESSON_TEMPLATE_BY_ID[DEFAULT_LESSON_TEMPLATE_ID];
-  if (!template) {
-    // Defensive fallback: template registry misconfigured — start blank.
-    return [
-      {
-        id: `lsec-fallback-${Date.now().toString(36)}`,
-        templateSectionId: null,
-        heading: "Lesson plan",
-        prompt: "Describe your lesson plan here…",
-        body: "",
-        resources: [],
-      },
-    ];
-  }
-  return instantiateSections(template) as LessonSectionContent[];
-}
-
 // ── Props ────────────────────────────────────────────────────────────────
 
 interface LessonDetailProps {
@@ -298,12 +273,17 @@ export function LessonDetail({
     shade: 1,
   };
 
-  // ── Lesson-flow sections — local state, re-instantiated on lesson change.
-  // Section content is per-session only; Supabase persistence comes later.
-  const [sections, setSections] =
-    useState<LessonSectionContent[]>(buildInitialSections);
+  // ── Store — notes and section mutations ─────────────────────────────
+  // Notes are written through editLesson with coalescing so a typing burst
+  // produces one history step. Sections are managed by LessonFlow directly
+  // (it calls usePlanner() for all section ops). Completion is routed through
+  // the onToggleComplete callback to DailyView, which calls setLessonStatus —
+  // keeping a single dispatch path per UI action.
+  const { editLesson, addSection } = usePlanner();
 
-  // ── Teacher notes — editable rich text, seeded from lesson.notes.
+  // ── Teacher notes — derived from store lesson; displayed in local editor.
+  // notesHtml is kept in local state so the RichTextEditor can drive it
+  // synchronously; on each onChange we immediately coalesce-commit to store.
   const [notesHtml, setNotesHtml] = useState<string>(lesson.notes ?? "");
 
   // Notes hover-reveal: the editor is blurred until hover or focus enters.
@@ -311,16 +291,50 @@ export function LessonDetail({
   // in scope when the effect fires.
   const [notesHovered, setNotesHovered] = useState(false);
 
-  // Re-instantiate both section state and notes when the selected lesson
-  // changes. Keying on lesson.id ensures a clean slate for each lesson.
-  // Reset notesHovered so the new lesson always starts with notes hidden.
+  // Track whether the notes editor is currently focused so external store
+  // updates (undo/redo, other views) don't overwrite mid-edit content.
+  const notesEditingRef = useRef(false);
+
+  // When the selected lesson changes, seed the notes editor from the new
+  // lesson's notes field and reset the hover state. Sections are store-
+  // managed and automatically reflect the new lessonId without local reset.
   useEffect(() => {
-    setSections(buildInitialSections());
     setNotesHtml(lesson.notes ?? "");
     setNotesHovered(false);
+    notesEditingRef.current = false;
   }, [lesson.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cycle: not_done → done → partial → not_done
+  // When the store's notes value changes (e.g. undo/redo from another view)
+  // while this lesson is still selected, reseed the editor — but only if
+  // the teacher is not actively typing (guard against overwriting mid-edit).
+  const storeNotes = lesson.notes ?? "";
+  useEffect(() => {
+    if (!notesEditingRef.current) {
+      setNotesHtml(storeNotes);
+    }
+  }, [storeNotes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Commit notes to the store on every editor change with coalescing so a
+  // continuous typing burst collapses to one undo step.
+  function handleNotesChange(html: string): void {
+    notesEditingRef.current = true; // teacher is actively typing
+    setNotesHtml(html);
+    editLesson(
+      lesson.id,
+      { notes: html },
+      { key: `lesson:${lesson.id}:notes`, ts: Date.now() },
+    );
+  }
+
+  // When the notes editor loses focus, clear the editing guard so that
+  // subsequent undo/redo can reseed the editor to the authoritative store value.
+  function handleNotesBlur(): void {
+    notesEditingRef.current = false;
+  }
+
+  // Cycle: not_done → done → partial → not_done.
+  // Routes through onToggleComplete → DailyView.handleToggleComplete →
+  // store.setLessonStatus (one dispatch, completion never forks a lesson).
   function cycleStatus(): void {
     const next: Lesson["status"] =
       lesson.status === "not_done"
@@ -540,11 +554,10 @@ export function LessonDetail({
             Lesson Flow
           </div>
           <div className={detailStyles.flowWrap}>
-            <LessonFlow
-              key={lesson.id}
-              sections={sections}
-              onChange={setSections}
-            />
+            {/* key resets dnd drag state when the selected lesson changes.
+                lessonId drives section reads/writes inside LessonFlow via
+                the planner store — no sections/onChange props needed. */}
+            <LessonFlow key={lesson.id} lessonId={lesson.id} />
           </div>
         </section>
 
@@ -556,7 +569,10 @@ export function LessonDetail({
           onMouseEnter={() => setNotesHovered(true)}
           onMouseLeave={() => setNotesHovered(false)}
           onFocusCapture={() => setNotesHovered(true)}
-          onBlurCapture={() => setNotesHovered(false)}
+          onBlurCapture={() => {
+            setNotesHovered(false);
+            handleNotesBlur();
+          }}
         >
           <div className={detailStyles.sectionHead}>
             {/* Eye icon */}
@@ -591,7 +607,7 @@ export function LessonDetail({
           >
             <RichTextEditor
               value={notesHtml}
-              onChange={setNotesHtml}
+              onChange={handleNotesChange}
               placeholder="Add private notes for yourself…"
               ariaLabel="Teacher notes"
             />
@@ -717,7 +733,7 @@ export function LessonDetail({
           <button
             type="button"
             className={detailStyles.footerBtn}
-            onClick={() => setSections((prev) => [...prev, newLessonSection()])}
+            onClick={() => addSection(lesson.id)}
             aria-label="Add a new lesson section"
           >
             {/* Plus icon */}

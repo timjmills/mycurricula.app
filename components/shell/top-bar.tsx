@@ -4,7 +4,7 @@
 //
 // Sticky chrome bar at the top of every planner view. Left-to-right order:
 //   wordmark → panel collapse → view switcher → week jumper →
-//   master/personal toggle → view-mode pill → search →
+//   undo/redo → master/personal toggle → view-mode pill → search →
 //   to-do button → comments button (with badge) → profile avatar.
 //
 // State from useAppState(); mock data (ME, LESSONS, CURRENT_WEEK) for badge
@@ -12,10 +12,12 @@
 // horizontally on narrower viewports.
 
 import type { ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
-import { ME, LESSONS, CURRENT_WEEK } from "@/lib/mock";
+import { usePlanner } from "@/lib/planner-store";
+import { ME, CURRENT_WEEK } from "@/lib/mock";
 import styles from "./top-bar.module.css";
 
 // ── View definitions ─────────────────────────────────────────────────────
@@ -58,10 +60,57 @@ export function TopBar(): ReactNode {
     toggleCommentsPanel,
   } = useAppState();
 
+  const { undo, redo, canUndo, canRedo, undoLabel, redoLabel, lessons } =
+    usePlanner();
+
   const pathname = usePathname();
 
-  // Total unread comment count across all lessons in mock data.
-  const unreadCount = LESSONS.reduce((n, l) => n + (l.unreadComments ?? 0), 0);
+  // Keep a stable ref to the latest undo/redo so the keydown listener never
+  // captures a stale closure — the ref is updated on every render before the
+  // effect dependency check runs.
+  const undoRef = useRef(undo);
+  const redoRef = useRef(redo);
+  undoRef.current = undo;
+  redoRef.current = redo;
+
+  // ── Global keyboard shortcuts ────────────────────────────────────────
+  // Cmd/Ctrl+Z → undo; Cmd/Ctrl+Shift+Z or Ctrl+Y → redo.
+  // Skipped when the event target is a text input, textarea, or contentEditable
+  // element so that the focused editor's own native undo is not hijacked.
+  useEffect(() => {
+    function isEditingTarget(target: EventTarget | null): boolean {
+      if (!target || !(target instanceof Element)) return false;
+      const tag = (target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return true;
+      // Walk up to catch nested contenteditable (e.g. RichTextEditor).
+      return target.closest('[contenteditable="true"]') !== null;
+    }
+
+    function handleKeyDown(e: KeyboardEvent): void {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (isEditingTarget(e.target)) return;
+
+      const isZ = e.key === "z" || e.key === "Z";
+      const isY = e.key === "y" || e.key === "Y";
+
+      if (isZ && !e.shiftKey) {
+        // Cmd/Ctrl + Z → undo
+        e.preventDefault();
+        undoRef.current();
+      } else if ((isZ && e.shiftKey) || (isY && !e.shiftKey && e.ctrlKey)) {
+        // Cmd/Ctrl + Shift + Z  OR  Ctrl + Y → redo
+        e.preventDefault();
+        redoRef.current();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []); // intentionally empty — we access latest callbacks via refs
+
+  // Total unread comment count across all live lessons — re-derived on every
+  // store mutation so undo/redo keeps the badge accurate.
+  const unreadCount = lessons.reduce((n, l) => n + (l.unreadComments ?? 0), 0);
 
   return (
     <header className={styles.bar}>
@@ -163,6 +212,39 @@ export function TopBar(): ReactNode {
           aria-label="Jump to this week"
         >
           This week
+        </button>
+      </div>
+
+      <div className={styles.divider} aria-hidden="true" />
+
+      {/* ── Undo / Redo ───────────────────────────────────────────── */}
+      {/* A paired group of icon buttons. Keyboard shortcuts: Cmd/Ctrl+Z and
+          Cmd/Ctrl+Shift+Z (or Ctrl+Y). Disabled state prevents interaction
+          and meets WCAG AA contrast via the .iconBtnDisabled modifier. */}
+      <div
+        className={styles.undoRedoGroup}
+        role="group"
+        aria-label="Undo and redo"
+      >
+        <button
+          type="button"
+          className={`${styles.iconBtn} ${!canUndo ? styles.iconBtnDisabled : ""}`}
+          onClick={undo}
+          disabled={!canUndo}
+          aria-label="Undo"
+          title={canUndo ? `Undo: ${undoLabel}` : "Nothing to undo"}
+        >
+          <UndoIcon />
+        </button>
+        <button
+          type="button"
+          className={`${styles.iconBtn} ${!canRedo ? styles.iconBtnDisabled : ""}`}
+          onClick={redo}
+          disabled={!canRedo}
+          aria-label="Redo"
+          title={canRedo ? `Redo: ${redoLabel}` : "Nothing to redo"}
+        >
+          <RedoIcon />
         </button>
       </div>
 
@@ -394,6 +476,46 @@ function CommentsIcon(): ReactNode {
       aria-hidden="true"
     >
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+// Curved counter-clockwise arrow — standard undo glyph.
+function UndoIcon(): ReactNode {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 7v6h6" />
+      <path d="M3 13C5.4 7.4 12.3 4.5 18 7c3.4 1.5 5.5 4.7 5.5 8.2" />
+    </svg>
+  );
+}
+
+// Curved clockwise arrow — standard redo glyph.
+function RedoIcon(): ReactNode {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 7v6h-6" />
+      <path d="M21 13C18.6 7.4 11.7 4.5 6 7c-3.4 1.5-5.5 4.7-5.5 8.2" />
     </svg>
   );
 }

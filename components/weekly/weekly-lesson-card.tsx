@@ -6,7 +6,7 @@
 // colored header band that anchors subject + time + title at a glance.
 //
 // Anatomy (top to bottom):
-//   • Three-tier fork stripe (left edge, 5px) — solid / dashed / move-arrow.
+//   • Three-tier fork stripe (left edge, 5px / 6px compact) — solid / dashed.
 //   • Header band — subject-tint fill (`--cl`), deep text (`--cd`):
 //       [CompletionCheck]  [Subject name · time]  [move-handle] […]
 //       [Lesson title — wraps if long]
@@ -17,6 +17,22 @@
 //       ("+ Add section" / "Edit Template").
 //   • Done = whole card faded: opacity 0.52 + filter desaturate(55%).
 //       The checkbox still fires so the teacher can un-mark it.
+//
+// Density prop (collapse-on-drag pattern, §3.2):
+//   density="full"    — default; card exactly as described above.
+//   density="compact" — single-line 28px chip used during drag.
+//                       Chip anatomy: [stripe] [grab handle] [XX · title] [● status dot]
+//                       Everything below the chip row is unmounted via AnimatePresence.
+//                       Interaction (edit/expand) is suppressed; chip is drag-only.
+//
+// Motion: the card root is a plain `motion.div` — NO `layout` or `layoutId`.
+// Using framer-motion's `layout` on the root caused FLIP-based scale()
+// transforms when height changed from chip (28px) to full (88px+), visually
+// stretching text ~3× vertically (Bug 3 fix). Instead, the compact↔full
+// density flip is instant (both states are always valid DOM sizes); only the
+// rich content inside uses AnimatePresence (opacity+height: 0→auto) so text
+// renders at its target font-size from frame one. Under useReducedMotion() →
+// DRAG_MOTION.reduced (opacity-only, no height animation).
 //
 // Style-axis: the card respects `data-style` on <html> (quiet / calm / vivid)
 // but its header band is always subject-tinted — that is the Weekly-view
@@ -33,6 +49,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import type { Density } from "@/lib/collapse-on-drag";
+import { DRAG_CHIP, DRAG_MOTION } from "@/lib/collapse-on-drag";
 import { SaveTargetDialog } from "@/components/weekly/save-target-dialog";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { SUBJECT_BY_ID } from "@/lib/mock";
@@ -94,6 +113,21 @@ const DEFAULT_SECTION_ORDER: SectionKey[] = [
 
 export interface WeeklyLessonCardProps {
   lesson: Lesson;
+  /**
+   * Dual-density mode for the collapse-on-drag pattern (spec §3.2).
+   * - "full"    — default; full card with header band, body, footer.
+   * - "compact" — single-line 28px chip; editing/expand interactions suppressed.
+   *   The grid sets this to "compact" on all peers while any card is being dragged.
+   */
+  density?: Density;
+  /**
+   * True when this card is the floating copy inside dnd-kit's `<DragOverlay>`.
+   * The overlay copy must NOT carry the shared framer-motion `layoutId` — the
+   * ghosted source card is still mounted with the same id, and two live
+   * elements sharing a layoutId makes framer-motion animate between them.
+   * Overlay cards opt out of layout animation entirely.
+   */
+  overlay?: boolean;
   /** Expanded-inline disclosure. Default false (collapsed). */
   expanded?: boolean;
   /** Selected ring. Default false. */
@@ -157,9 +191,11 @@ function stripHtml(html: string): string {
 
 export function WeeklyLessonCard({
   lesson,
+  density = "full",
+  overlay = false,
   expanded = false,
   selected = false,
-  dragging = false,
+  dragging: _dragging = false, // eslint-disable-line @typescript-eslint/no-unused-vars
   onSelect,
   onToggleExpand,
   onToggleComplete,
@@ -171,6 +207,13 @@ export function WeeklyLessonCard({
   const { style } = useTheme();
   const color = useSubjectColor(lesson.subject);
   const subject = SUBJECT_BY_ID[lesson.subject];
+
+  // Respect prefers-reduced-motion (spec §2.5 / §2.4): under reduced motion,
+  // skip height/layout animation and use opacity-only fade instead.
+  const reducedMotion = useReducedMotion();
+
+  // Whether the card is currently in compact (chip) mode.
+  const isCompact = density === "compact";
 
   const [hovered, setHovered] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -247,6 +290,14 @@ export function WeeklyLessonCard({
   // mode the card border picks up a subject-tint; quiet/calm stay ink-150.
   const isVivid = style === "vivid";
 
+  // Bug 4 fix: floating shadow/ring/rotation applies ONLY to the DragOverlay
+  // copy (overlay=true). The in-grid card — even while isDragging via
+  // useSortable — uses a plain ghost appearance (opacity handled by the
+  // SortableLessonItem wrapper) with no ring, no shadow, no rotation.
+  // The `dragging` prop is retained for the overlay to receive elevated shadow
+  // but only when combined with `overlay`.
+  const isFloating = overlay;
+
   const cardSurface: CSSProperties = {
     position: "relative",
     // Body surface is always neutral so header color contrast is maximum.
@@ -256,12 +307,12 @@ export function WeeklyLessonCard({
       : isVivid
         ? `1px solid color-mix(in oklch, ${color.deep} 14%, transparent)`
         : "1px solid var(--ink-150)",
-    boxShadow: dragging
+    boxShadow: isFloating
       ? `0 12px 28px rgba(20,22,32,0.18), 0 0 0 1.5px ${color.stripe}`
       : hovered
         ? "0 4px 14px rgba(20,22,32,0.10)"
         : "var(--shadow-card)",
-    transform: dragging ? "rotate(-1.2deg)" : "none",
+    transform: isFloating ? "rotate(-1.2deg)" : "none",
     cursor: "pointer",
     // Done cards recede but stay readable — a gentle fade with only a light
     // desaturation, so "done" scans at a glance without going washed-out.
@@ -400,21 +451,46 @@ export function WeeklyLessonCard({
     [editingField, saveDialogOpen, dirty],
   );
 
+  // ── Compact-chip subject code prefix ──────────────────────────────────
+  // §3.7: 2-letter subject code prefix for chip mode.
+  // We use subject.icon (already 2-char, e.g. "Ma", "Re") as the code —
+  // uppercase per spec. A dedicated Settings "Code" field is a future
+  // enhancement; the subject monogram is the spec-sanctioned fallback.
+  const subjectCode = subject.icon.toUpperCase();
+
+  // ── Motion configuration ───────────────────────────────────────────────
+  // Under reduced motion: opacity-only fade for content. Otherwise:
+  // DRAG_MOTION.collapse (200ms ease-out, spec §2.4).
+  // NOTE: layoutProp is intentionally omitted — the card root does NOT use
+  // framer-motion `layout` or `layoutId` (Bug 3 fix: avoids FLIP scale()).
+  const collapseTransition = reducedMotion
+    ? DRAG_MOTION.reduced
+    : DRAG_MOTION.collapse;
+
   return (
-    <div
+    <motion.div
       ref={cardRef}
-      className={`cp-subj ${subject.cls} ${styles.card}`}
+      // Bug 3 fix: NO `layout` or `layoutId` on the card root.
+      // framer-motion's `layout` uses FLIP (transform: scale()) on height
+      // changes, which stretches text 3× when the card grows from 28px (chip)
+      // to 88px+ (full). Instead the compact↔full switch is an instant DOM
+      // reflow; only the rich content inside uses AnimatePresence
+      // (height: 0→auto) so text renders at its correct font-size every frame.
+      className={`cp-subj ${subject.cls} ${styles.card} ${isCompact ? styles.cardCompact : ""}`}
       data-style={style}
+      // Scroll-into-view anchor — present in BOTH compact and full density
+      // so scrollPlannerItemIntoView() always finds this card after a move or
+      // undo/redo (planner-store convention: data-planner-item="lesson:<id>").
+      data-planner-item={`lesson:${lesson.id}`}
       role="group"
       aria-label={`${subject.name} lesson: ${stripHtml(lesson.title)}`}
       tabIndex={0}
-      onBlurCapture={handleCardBlurCapture}
-      onContextMenu={handleContextMenu}
+      // In compact mode, suppress editing and expansion — the chip is a
+      // drag affordance only. Leave onBlurCapture / context menu off too.
+      onBlurCapture={isCompact ? undefined : handleCardBlurCapture}
+      onContextMenu={isCompact ? undefined : handleContextMenu}
       onKeyDown={(e) => {
-        // Only the card root itself toggles on Enter/Space. Keystrokes that
-        // bubbled up from an inner control (a text editor, a button) must be
-        // left alone — otherwise preventDefault here eats newlines and spaces
-        // while a teacher is typing in a cell.
+        if (isCompact) return; // chip suppresses all keyboard interaction
         if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -425,513 +501,655 @@ export function WeeklyLessonCard({
       onMouseLeave={() => setHovered(false)}
       style={cardSurface}
     >
-      {/* Left fork stripe — aria-hidden, purely decorative/informational */}
-      <div aria-hidden style={stripeStyle} />
+      {/* ── Compact chip layout (density="compact") ──────────────────────
+          Single-line 28px chip per spec §3.2 / §7. Rendered instead of the
+          full header+body when the grid signals a drag is active.
+          Anatomy: [6px stripe] [44px grab handle] [XX · title] [4px dot]
+          The stripe overflows card height to guarantee full-height coverage
+          even when the chip is shorter than the handle's 44px touch target. */}
+      {isCompact && (
+        <div className={styles.chip}>
+          {/* Subject color stripe — full-height, non-negotiable (spec §3.2).
+              Width uses DRAG_CHIP.subjectStripeWidth (6px). The stripe is
+              absolutely positioned so it spans the entire card height even
+              when the chip is only 28px and the grab handle overflows. */}
+          <div
+            aria-hidden
+            className={styles.chipStripe}
+            style={{
+              width: DRAG_CHIP.subjectStripeWidth,
+              background: lesson.modified
+                ? undefined // dashed handled via CSS below
+                : color.stripe,
+              // Dashed stripe when personally modified (same as full mode).
+              backgroundImage: lesson.modified
+                ? `repeating-linear-gradient(to bottom, ${color.stripe} 0 6px, transparent 6px 11px)`
+                : undefined,
+            }}
+          />
 
-      {/* ── Header band ─────────────────────────────────────────────────── */}
-      {/* Deeply-tinted subject fill (noticeably deeper than the body) with
+          {/* Grab handle — 44px touch target (spec §2.5 / §7).
+              Overflows the 28px chip vertically via negative margin so touch
+              ergonomics meet the minimum even at reduced chip height. */}
+          {dragHandleProps && (
+            <span
+              {...dragHandleProps}
+              data-drag-handle
+              className={`${styles.affordance} ${styles.dragHandle} ${styles.chipHandle}`}
+              title="Drag to move this lesson"
+              aria-label="Drag to move this lesson"
+              role="button"
+              tabIndex={0}
+              style={{ cursor: "grab", ...dragHandleProps.style }}
+            >
+              <span aria-hidden className={styles.affordanceVisual}>
+                <Icon name="drag" size={13} />
+              </span>
+            </span>
+          )}
+
+          {/* Title with 2-letter subject code prefix (spec §3.2 / §3.7).
+              Format: "XX · Lesson title" — prefix in --ink-500, middle-dot
+              separator, same weight as the rest of the title (500). */}
+          <p className={styles.chipTitle}>
+            <span className={styles.chipCode} aria-hidden>
+              {subjectCode}
+              {" · "}
+            </span>
+            {/* dangerouslySetInnerHTML stripped for the chip — we need plain
+                text in a single-line clamp. Use stripHtml so HTML tags from
+                the RTE editor are not rendered as visible markup. */}
+            <span>{stripHtml(lesson.title)}</span>
+          </p>
+
+          {/* Completion-status dot — 4×4px right of title (spec §3.2). */}
+          <span
+            aria-hidden
+            className={styles.chipDot}
+            style={{
+              background:
+                lesson.status === "done"
+                  ? color.stripe
+                  : lesson.status === "partial"
+                    ? `color-mix(in oklch, ${color.stripe} 55%, var(--paper))`
+                    : "var(--ink-200)",
+            }}
+          />
+        </div>
+      )}
+
+      {/* ── Full card layout (density="full") ────────────────────────────── */}
+      {/* Left fork stripe — aria-hidden, purely decorative/informational.
+          Only rendered in full mode; compact has its own chipStripe above. */}
+      {!isCompact && <div aria-hidden style={stripeStyle} />}
+
+      {/* ── Full-mode rich content (header band + body) ──────────────────
+          Wrapped in AnimatePresence + motion.div so it animates out/in on
+          density changes (spec §2.3). Under reduced motion: opacity-only fade
+          with no height/layout transitions (spec §2.4). */}
+      <AnimatePresence initial={false}>
+        {!isCompact && (
+          <motion.div
+            key="full-content"
+            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+            animate={
+              reducedMotion ? { opacity: 1 } : { opacity: 1, height: "auto" }
+            }
+            exit={reducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+            transition={collapseTransition}
+            style={{ overflow: "hidden" }}
+          >
+            {/* ── Header band ─────────────────────────────────────────────────── */}
+            {/* Deeply-tinted subject fill (noticeably deeper than the body) with
           deep text (`--cd`). Always tinted regardless of the style axis —
           this is the Weekly-view design contract. The hard bottom border plus
           drop shadow make the header/body boundary unmistakable at a glance.
           The band carries: subject name, time label, move/modified indicators,
           drag handle, ⋯ affordance, and the lesson title below them. */}
-      <div
-        className={styles.band}
-        style={{
-          background: color.gradient,
-          borderBottom: `2px solid ${bandSeparatorColor}`,
-          boxShadow: `0 2px 6px color-mix(in oklch, ${color.stripe} 18%, transparent)`,
-        }}
-        onClick={toggleExpand}
-        role="button"
-        tabIndex={-1}
-        aria-label={expanded ? "Collapse lesson" : "Expand lesson"}
-      >
-        {/* Band top row: check + subject·time + right controls */}
-        <div className={styles.bandTop}>
-          {/* Completion check — always on top of the faded state so it's
-              reachable even when done=true. */}
-          <div
-            className={styles.bandCheckWrap}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CompletionCheck
-              status={lesson.status}
-              size={15}
-              onCycle={cycleComplete}
-              label={`Mark "${stripHtml(lesson.title)}" — current status ${lesson.status}`}
-            />
-          </div>
+            <div
+              className={styles.band}
+              style={{
+                background: color.gradient,
+                borderBottom: `2px solid ${bandSeparatorColor}`,
+                boxShadow: `0 2px 6px color-mix(in oklch, ${color.stripe} 18%, transparent)`,
+              }}
+              onClick={toggleExpand}
+              role="button"
+              tabIndex={-1}
+              aria-label={expanded ? "Collapse lesson" : "Expand lesson"}
+            >
+              {/* Band top row: [code badge] check + subject·time + right controls */}
+              <div className={styles.bandTop}>
+                {/* 2-letter subject code badge — leading edge of the header band.
+              Mirrors the compact chip's "XX · Title" prefix so the subject
+              is scannable at a glance in full mode too.
+              Styled with design tokens only; inherits subject deep color (--cd)
+              from the band. aria-hidden because the subject name in bandMeta
+              already provides the accessible label. */}
+                <span
+                  aria-hidden="true"
+                  className={styles.bandSubjectCode}
+                  style={{ color: color.cd }}
+                >
+                  {subjectCode}
+                </span>
 
-          {/* Subject eyebrow + time — grouped identifier row.
+                {/* Completion check — always on top of the faded state so it's
+              reachable even when done=true. */}
+                <div
+                  className={styles.bandCheckWrap}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <CompletionCheck
+                    status={lesson.status}
+                    size={15}
+                    onCycle={cycleComplete}
+                    label={`Mark "${stripHtml(lesson.title)}" — current status ${lesson.status}`}
+                  />
+                </div>
+
+                {/* Subject eyebrow + time — grouped identifier row.
               Subject name: uppercase eyebrow label (strong, compact).
               Time: tabular-numeric, slightly softer weight, separated by
               a thin vertical rule so the two pieces read as one unit. */}
-          <div className={styles.bandMeta} style={{ color: color.cd }}>
-            <span className={styles.bandSubject}>{subject.name}</span>
-            <span className={styles.bandMetaSep} aria-hidden />
-            <span className={styles.bandTime}>{timeLabel}</span>
-          </div>
+                <div className={styles.bandMeta} style={{ color: color.cd }}>
+                  <span className={styles.bandSubject}>{subject.name}</span>
+                  <span className={styles.bandMetaSep} aria-hidden />
+                  <span className={styles.bandTime}>{timeLabel}</span>
+                </div>
 
-          {/* Right indicator cluster: move arrow, Modified pill, drag, ⋯ */}
-          <div
-            className={styles.bandControls}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {lesson.moved && (
-              <span
-                className={styles.indicator}
-                title={
-                  lesson.moved === "across-weeks"
-                    ? "Moved across weeks"
-                    : "Moved within the week"
-                }
-                aria-label={
-                  lesson.moved === "across-weeks"
-                    ? "Moved across weeks"
-                    : "Moved within the week"
-                }
-                style={{ background: color.stripe, color: "var(--paper)" }}
-              >
-                {lesson.moved === "across-weeks" ? "⤴" : "↔"}
-              </span>
-            )}
-            {lesson.modified && (
-              <span
-                className={styles.modifiedPill}
-                title="Personally modified from the Core Curriculum"
-                // Deep (~700–800) tone: white text clears AA in every palette.
-                style={{ background: color.deep, color: "var(--paper)" }}
-              >
-                Modified
-              </span>
-            )}
-            {/* Affordances: drag handle (always shown) + ⋯ menu */}
-            <span className={styles.affordanceRow}>
-              {dragHandleProps && (
-                <span
-                  {...dragHandleProps}
-                  data-drag-handle
-                  className={`${styles.affordance} ${styles.dragHandle}`}
-                  title="Drag to move this lesson"
-                  aria-label="Drag to move this lesson"
-                  role="button"
-                  tabIndex={0}
-                  style={{ cursor: "grab", ...dragHandleProps.style }}
+                {/* Right indicator cluster: move arrow, Modified pill, drag, ⋯ */}
+                <div
+                  className={styles.bandControls}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <span aria-hidden className={styles.affordanceVisual}>
-                    <Icon name="drag" size={13} />
+                  {lesson.moved && (
+                    <span
+                      className={styles.indicator}
+                      title={
+                        lesson.moved === "across-weeks"
+                          ? "Moved across weeks"
+                          : "Moved within the week"
+                      }
+                      aria-label={
+                        lesson.moved === "across-weeks"
+                          ? "Moved across weeks"
+                          : "Moved within the week"
+                      }
+                      style={{
+                        background: color.stripe,
+                        color: "var(--paper)",
+                      }}
+                    >
+                      {lesson.moved === "across-weeks" ? "⤴" : "↔"}
+                    </span>
+                  )}
+                  {lesson.modified && (
+                    <span
+                      className={styles.modifiedPill}
+                      title="Personally modified from the Core Curriculum"
+                      // Deep (~700–800) tone: white text clears AA in every palette.
+                      style={{ background: color.deep, color: "var(--paper)" }}
+                    >
+                      Modified
+                    </span>
+                  )}
+                  {/* Affordances: drag handle (always shown) + ⋯ menu */}
+                  <span className={styles.affordanceRow}>
+                    {dragHandleProps && (
+                      <span
+                        {...dragHandleProps}
+                        data-drag-handle
+                        className={`${styles.affordance} ${styles.dragHandle}`}
+                        title="Drag to move this lesson"
+                        aria-label="Drag to move this lesson"
+                        role="button"
+                        tabIndex={0}
+                        style={{ cursor: "grab", ...dragHandleProps.style }}
+                      >
+                        <span aria-hidden className={styles.affordanceVisual}>
+                          <Icon name="drag" size={13} />
+                        </span>
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className={styles.affordance}
+                      onClick={handleAffordance}
+                      title="More actions"
+                      aria-label="More actions"
+                      aria-haspopup="menu"
+                    >
+                      <span aria-hidden className={styles.affordanceVisual}>
+                        <Icon name="dots" size={11} />
+                      </span>
+                    </button>
                   </span>
-                </span>
-              )}
-              <button
-                type="button"
-                className={styles.affordance}
-                onClick={handleAffordance}
-                title="More actions"
-                aria-label="More actions"
-                aria-haspopup="menu"
-              >
-                <span aria-hidden className={styles.affordanceVisual}>
-                  <Icon name="dots" size={11} />
-                </span>
-              </button>
-            </span>
-          </div>
-        </div>
+                </div>
+              </div>
 
-        {/* Lesson title — prominent second line of the band. Weight 600,
+              {/* Lesson title — prominent second line of the band. Weight 600,
             one size step up from before, so it reads as the headline of
             the labeled zone rather than a secondary detail.
             Double-click enters inline rich-text edit mode (suppresses expand). */}
-        <h3
-          className={styles.bandTitle}
-          style={{
-            color: color.cd,
-            textDecoration: done ? "line-through" : "none",
-            textDecorationColor: `color-mix(in oklch, ${color.cd} 40%, transparent)`,
-          }}
-        >
-          {editingField === "title" ? (
-            <RichEditorWrapper
-              onCommit={commitEdit}
-              onCancel={cancelEdit}
-              className={styles.richEditorTitle}
-            >
-              <RichTextEditor
-                value={draftValue}
-                onChange={setDraftValue}
-                autoFocus
-                singleLine
-                ariaLabel="Edit lesson title"
-              />
-            </RichEditorWrapper>
-          ) : (
-            <span
-              className={styles.editableText}
-              tabIndex={0}
-              role="button"
-              aria-label="Edit lesson title"
-              // Swallow the single click so it never reaches the card/band
-              // expand handler — clicking text must not resize the cell.
-              onClick={(e) => e.stopPropagation()}
-              onDoubleClick={(e) => openEditor("title", e)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === "F2") openEditor("title", e);
-              }}
-              title="Double-click or press Enter to edit"
-              // eslint-disable-next-line react/no-danger
-              dangerouslySetInnerHTML={{ __html: lesson.title }}
-            />
-          )}
-        </h3>
-
-        {/* Caret — indicates expand state, positioned at bottom-right of band */}
-        <span
-          aria-hidden
-          className={`${styles.caret} ${expanded ? styles.caretOpen : ""}`}
-        >
-          <Icon name="chevronD" size={11} />
-        </span>
-      </div>
-
-      {/* ── Card body ───────────────────────────────────────────────────── */}
-      <div className={styles.body}>
-        {/* Collapsed: 2-line preview only. Expanded: full section rows.
-            Double-click on the preview text enters inline edit mode. */}
-        {!expanded ? (
-          <p className={styles.preview} style={{ color: "var(--ink-700)" }}>
-            {editingField === "preview" ? (
-              <RichEditorWrapper
-                onCommit={commitEdit}
-                onCancel={cancelEdit}
-                className={styles.richEditorBody}
-              >
-                <RichTextEditor
-                  value={draftValue}
-                  onChange={setDraftValue}
-                  autoFocus
-                  placeholder="Lesson preview…"
-                  ariaLabel="Edit lesson preview"
-                />
-              </RichEditorWrapper>
-            ) : (
-              <span
-                className={styles.editableText}
-                tabIndex={0}
-                role="button"
-                aria-label="Edit lesson preview"
-                onClick={(e) => e.stopPropagation()}
-                onDoubleClick={(e) => openEditor("preview", e)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === "F2")
-                    openEditor("preview", e);
+              <h3
+                className={styles.bandTitle}
+                style={{
+                  color: color.cd,
+                  textDecoration: done ? "line-through" : "none",
+                  textDecorationColor: `color-mix(in oklch, ${color.cd} 40%, transparent)`,
                 }}
-                title="Double-click or press Enter to edit"
-                // eslint-disable-next-line react/no-danger
-                dangerouslySetInnerHTML={{ __html: lesson.preview }}
-              />
-            )}
-          </p>
-        ) : (
-          <div className={styles.sections}>
-            {/*
-             * Reorderable sections — iterate sectionOrder so the teacher can
-             * drag-to-reorder via 2-second hold (matching the card's own
-             * hold-to-drag threshold). Absent sections (objective when blank,
-             * tasks when there are none, notes when blank) are skipped.
-             * Each ReorderableSectionRow:
-             *   • owns a separate 2-second hold timer that arms draggable
-             *   • calls stopPropagation on all pointer events so the card-level
-             *     hold timer never fires during a section hold
-             *   • exposes move-up / move-down buttons for keyboard access
-             */}
-            {sectionOrder.map((key, idx) => {
-              // ── Skip absent sections ──────────────────────────────────────
-              if (key === "objective" && !lesson.objective) return null;
-              if (key === "tasks" && !hasTasks) return null;
-              if (key === "notes" && !lesson.notes && editingField !== "notes")
-                return null;
-
-              // ── Visible index for keyboard move buttons ───────────────────
-              // We need the count of actually-visible sections to decide whether
-              // move-up / move-down are at the boundary.
-              const visibleKeys = sectionOrder.filter((k) => {
-                if (k === "objective" && !lesson.objective) return false;
-                if (k === "tasks" && !hasTasks) return false;
-                if (k === "notes" && !lesson.notes && editingField !== "notes")
-                  return false;
-                return true;
-              });
-              const visibleIdx = visibleKeys.indexOf(key);
-              const visibleCount = visibleKeys.length;
-
-              // ── Section content ───────────────────────────────────────────
-              let sectionLabel = "";
-              let sectionContent: React.ReactNode = null;
-
-              if (key === "objective") {
-                sectionLabel = "I Can";
-                sectionContent =
-                  editingField === "objective" ? (
-                    <RichEditorWrapper
-                      onCommit={commitEdit}
-                      onCancel={cancelEdit}
-                      className={styles.richEditorBody}
-                    >
-                      <RichTextEditor
-                        value={draftValue}
-                        onChange={setDraftValue}
-                        autoFocus
-                        placeholder="I can…"
-                        ariaLabel="Edit lesson objective"
-                      />
-                    </RichEditorWrapper>
-                  ) : (
-                    <p
-                      className={`${styles.sectionText} ${styles.editableText}`}
-                      style={{ fontStyle: "italic", color: "var(--ink-700)" }}
-                      tabIndex={0}
-                      role="button"
-                      aria-label="Edit lesson objective"
-                      onClick={(e) => e.stopPropagation()}
-                      onDoubleClick={(e) => openEditor("objective", e)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === "F2")
-                          openEditor("objective", e);
-                      }}
-                      title="Double-click or press Enter to edit"
-                      // eslint-disable-next-line react/no-danger
-                      dangerouslySetInnerHTML={{ __html: objectiveBody }}
+              >
+                {editingField === "title" ? (
+                  <RichEditorWrapper
+                    onCommit={commitEdit}
+                    onCancel={cancelEdit}
+                    className={styles.richEditorTitle}
+                  >
+                    <RichTextEditor
+                      value={draftValue}
+                      onChange={setDraftValue}
+                      autoFocus
+                      singleLine
+                      ariaLabel="Edit lesson title"
                     />
-                  );
-              } else if (key === "directions") {
-                sectionLabel = "Directions";
-                sectionContent =
-                  editingField === "directions" ? (
-                    <RichEditorWrapper
-                      onCommit={commitEdit}
-                      onCancel={cancelEdit}
-                      className={styles.richEditorBody}
-                    >
-                      <RichTextEditor
-                        value={draftValue}
-                        onChange={setDraftValue}
-                        autoFocus
-                        placeholder="Directions…"
-                        ariaLabel="Edit lesson directions"
-                      />
-                    </RichEditorWrapper>
-                  ) : (
-                    <p
-                      className={`${styles.sectionText} ${styles.editableText}`}
-                      style={{ color: "var(--ink-700)" }}
-                      tabIndex={0}
-                      role="button"
-                      aria-label="Edit lesson directions"
-                      onClick={(e) => e.stopPropagation()}
-                      onDoubleClick={(e) => openEditor("directions", e)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === "F2")
-                          openEditor("directions", e);
-                      }}
-                      title="Double-click or press Enter to edit"
-                      // eslint-disable-next-line react/no-danger
-                      dangerouslySetInnerHTML={{ __html: lesson.directions }}
-                    />
-                  );
-              } else if (key === "notes") {
-                sectionLabel = "Notes";
-                sectionContent = (
-                  <>
-                    <button
-                      type="button"
-                      className={styles.notesToggle}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setNotesOpen((v) => !v);
-                      }}
-                      aria-expanded={notesOpen}
-                    >
-                      <Icon name="eye" size={11} />
-                      {notesOpen ? "Hide teacher notes" : "Show teacher notes"}
-                    </button>
-                    {notesOpen &&
-                      (editingField === "notes" ? (
-                        <RichEditorWrapper
-                          onCommit={commitEdit}
-                          onCancel={cancelEdit}
-                          className={`${styles.notesBody} ${styles.richEditorBody}`}
-                        >
-                          <RichTextEditor
-                            value={draftValue}
-                            onChange={setDraftValue}
-                            autoFocus
-                            placeholder="Teacher notes…"
-                            ariaLabel="Edit teacher notes"
-                          />
-                        </RichEditorWrapper>
-                      ) : (
-                        <p
-                          className={`${styles.notesBody} ${styles.editableText}`}
-                          tabIndex={0}
-                          role="button"
-                          aria-label="Edit teacher notes"
-                          onClick={(e) => e.stopPropagation()}
-                          onDoubleClick={(e) => openEditor("notes", e)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === "F2")
-                              openEditor("notes", e);
-                          }}
-                          title="Double-click or press Enter to edit"
-                          // eslint-disable-next-line react/no-danger
-                          dangerouslySetInnerHTML={{
-                            __html: lesson.notes ?? "",
-                          }}
-                        />
-                      ))}
-                  </>
-                );
-              } else if (key === "tasks") {
-                sectionLabel = `${lesson.tasks.length} Tasks`;
-                sectionContent = (
-                  <div className={styles.taskList}>
-                    {lesson.tasks.map((task) => (
-                      <TaskRow
-                        key={task.id}
-                        task={{
-                          ...task,
-                          status: taskStatus[task.id] ?? task.status,
-                        }}
-                        parentSubject={lesson.subject}
-                        onCycle={(next) => {
-                          setTaskStatus((prev) => ({
-                            ...prev,
-                            [task.id]: next,
-                          }));
-                          onContextAction?.("mark-status", lesson.id, {
-                            status: next,
-                            taskId: task.id,
-                          });
-                        }}
-                      />
-                    ))}
-                  </div>
-                );
-              } else if (key === "resources") {
-                sectionLabel = "Resources";
-                sectionContent = <ResourceList resources={lesson.resources} />;
-              } else if (key === "standards") {
-                sectionLabel = "Standards";
-                sectionContent = <StandardsList codes={lesson.standards} />;
-              }
-
-              return (
-                <ReorderableSectionRow
-                  key={key}
-                  sectionKey={key}
-                  label={sectionLabel}
-                  accent={color.cl}
-                  ink={color.cd}
-                  setSectionOrder={setSectionOrder}
-                  visibleIdx={visibleIdx}
-                  visibleCount={visibleCount}
-                  visibleKeys={visibleKeys}
-                  originalIdx={idx}
-                >
-                  {sectionContent}
-                </ReorderableSectionRow>
-              );
-            })}
-
-            {/* Footer affordances — "+ Add section" / "Edit Template" */}
-            <div className={styles.expandedFooter}>
-              <button
-                type="button"
-                className={styles.footerBtn}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onContextAction?.("add-to-todo", lesson.id);
-                }}
-              >
-                <Icon name="plus" size={11} />
-                Add section
-              </button>
-              <button
-                type="button"
-                className={styles.footerBtn}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onContextAction?.("print", lesson.id);
-                }}
-              >
-                Edit Template
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Collapsed footer — meta chips + carry-over + pending ──────── */}
-        {!expanded && (
-          <div className={styles.footer}>
-            {lesson.standards.length > 0 && (
-              <StandardsBadge codes={lesson.standards} />
-            )}
-            <ResourceTypeRow resources={lesson.resources} dense />
-            {hasTasks && (
-              <span
-                className={styles.tasksPill}
-                title={`${lesson.tasks.length} lesson tasks`}
-                style={{ background: color.cl, color: color.cd }}
-              >
-                <Icon name="list" size={9} />
-                {lesson.tasks.length} tasks
-              </span>
-            )}
-            {lesson.commentCount > 0 && (
-              <span
-                className={styles.commentBadge}
-                title={`${lesson.commentCount} comment${lesson.commentCount === 1 ? "" : "s"}`}
-                style={{ color: isVivid ? color.deep : "var(--ink-500)" }}
-              >
-                <span aria-hidden>💬</span>
-                {lesson.commentCount}
-                {lesson.unreadComments > 0 && (
+                  </RichEditorWrapper>
+                ) : (
                   <span
-                    aria-label={`${lesson.unreadComments} unread`}
-                    className={styles.unreadDot}
+                    className={styles.editableText}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Edit lesson title"
+                    // Swallow the single click so it never reaches the card/band
+                    // expand handler — clicking text must not resize the cell.
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => openEditor("title", e)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === "F2")
+                        openEditor("title", e);
+                    }}
+                    title="Double-click or press Enter to edit"
+                    // eslint-disable-next-line react/no-danger
+                    dangerouslySetInnerHTML={{ __html: lesson.title }}
                   />
                 )}
-              </span>
-            )}
-            <div style={{ flex: 1 }} />
-            {lesson.pendingMaster && (
-              <span
-                className={styles.metaPill}
-                style={{
-                  background: "var(--important-bg)",
-                  color: "var(--important)",
-                }}
-              >
-                Core ↑
-              </span>
-            )}
-            {lesson.status === "carried" && (
-              <span className={styles.carryLabel}>carry-over</span>
-            )}
-          </div>
-        )}
+              </h3>
 
-        {/* ── "Why not done" reason ─────────────────────────────────────── */}
-        {lesson.reasonNotDone && lesson.status !== "done" && (
-          <div className={styles.reasonRow}>
-            <span aria-hidden style={{ fontWeight: 700 }}>
-              🔥
-            </span>
-            <span>{lesson.reasonNotDone}</span>
-          </div>
+              {/* Caret — indicates expand state, positioned at bottom-right of band */}
+              <span
+                aria-hidden
+                className={`${styles.caret} ${expanded ? styles.caretOpen : ""}`}
+              >
+                <Icon name="chevronD" size={11} />
+              </span>
+            </div>
+
+            {/* ── Card body ───────────────────────────────────────────────────── */}
+            <div className={styles.body}>
+              {/* Collapsed: 2-line preview only. Expanded: full section rows.
+            Double-click on the preview text enters inline edit mode. */}
+              {!expanded ? (
+                <p
+                  className={styles.preview}
+                  style={{ color: "var(--ink-700)" }}
+                >
+                  {editingField === "preview" ? (
+                    <RichEditorWrapper
+                      onCommit={commitEdit}
+                      onCancel={cancelEdit}
+                      className={styles.richEditorBody}
+                    >
+                      <RichTextEditor
+                        value={draftValue}
+                        onChange={setDraftValue}
+                        autoFocus
+                        placeholder="Lesson preview…"
+                        ariaLabel="Edit lesson preview"
+                      />
+                    </RichEditorWrapper>
+                  ) : (
+                    <span
+                      className={styles.editableText}
+                      tabIndex={0}
+                      role="button"
+                      aria-label="Edit lesson preview"
+                      onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => openEditor("preview", e)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "F2")
+                          openEditor("preview", e);
+                      }}
+                      title="Double-click or press Enter to edit"
+                      // eslint-disable-next-line react/no-danger
+                      dangerouslySetInnerHTML={{ __html: lesson.preview }}
+                    />
+                  )}
+                </p>
+              ) : (
+                <div className={styles.sections}>
+                  {/*
+                   * Reorderable sections — iterate sectionOrder so the teacher can
+                   * drag-to-reorder via 2-second hold (matching the card's own
+                   * hold-to-drag threshold). Absent sections (objective when blank,
+                   * tasks when there are none, notes when blank) are skipped.
+                   * Each ReorderableSectionRow:
+                   *   • owns a separate 2-second hold timer that arms draggable
+                   *   • calls stopPropagation on all pointer events so the card-level
+                   *     hold timer never fires during a section hold
+                   *   • exposes move-up / move-down buttons for keyboard access
+                   */}
+                  {sectionOrder.map((key, idx) => {
+                    // ── Skip absent sections ──────────────────────────────────────
+                    if (key === "objective" && !lesson.objective) return null;
+                    if (key === "tasks" && !hasTasks) return null;
+                    if (
+                      key === "notes" &&
+                      !lesson.notes &&
+                      editingField !== "notes"
+                    )
+                      return null;
+
+                    // ── Visible index for keyboard move buttons ───────────────────
+                    // We need the count of actually-visible sections to decide whether
+                    // move-up / move-down are at the boundary.
+                    const visibleKeys = sectionOrder.filter((k) => {
+                      if (k === "objective" && !lesson.objective) return false;
+                      if (k === "tasks" && !hasTasks) return false;
+                      if (
+                        k === "notes" &&
+                        !lesson.notes &&
+                        editingField !== "notes"
+                      )
+                        return false;
+                      return true;
+                    });
+                    const visibleIdx = visibleKeys.indexOf(key);
+                    const visibleCount = visibleKeys.length;
+
+                    // ── Section content ───────────────────────────────────────────
+                    let sectionLabel = "";
+                    let sectionContent: React.ReactNode = null;
+
+                    if (key === "objective") {
+                      sectionLabel = "I Can";
+                      sectionContent =
+                        editingField === "objective" ? (
+                          <RichEditorWrapper
+                            onCommit={commitEdit}
+                            onCancel={cancelEdit}
+                            className={styles.richEditorBody}
+                          >
+                            <RichTextEditor
+                              value={draftValue}
+                              onChange={setDraftValue}
+                              autoFocus
+                              placeholder="I can…"
+                              ariaLabel="Edit lesson objective"
+                            />
+                          </RichEditorWrapper>
+                        ) : (
+                          <p
+                            className={`${styles.sectionText} ${styles.editableText}`}
+                            style={{
+                              fontStyle: "italic",
+                              color: "var(--ink-700)",
+                            }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label="Edit lesson objective"
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => openEditor("objective", e)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === "F2")
+                                openEditor("objective", e);
+                            }}
+                            title="Double-click or press Enter to edit"
+                            // eslint-disable-next-line react/no-danger
+                            dangerouslySetInnerHTML={{ __html: objectiveBody }}
+                          />
+                        );
+                    } else if (key === "directions") {
+                      sectionLabel = "Directions";
+                      sectionContent =
+                        editingField === "directions" ? (
+                          <RichEditorWrapper
+                            onCommit={commitEdit}
+                            onCancel={cancelEdit}
+                            className={styles.richEditorBody}
+                          >
+                            <RichTextEditor
+                              value={draftValue}
+                              onChange={setDraftValue}
+                              autoFocus
+                              placeholder="Directions…"
+                              ariaLabel="Edit lesson directions"
+                            />
+                          </RichEditorWrapper>
+                        ) : (
+                          <p
+                            className={`${styles.sectionText} ${styles.editableText}`}
+                            style={{ color: "var(--ink-700)" }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label="Edit lesson directions"
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => openEditor("directions", e)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === "F2")
+                                openEditor("directions", e);
+                            }}
+                            title="Double-click or press Enter to edit"
+                            // eslint-disable-next-line react/no-danger
+                            dangerouslySetInnerHTML={{
+                              __html: lesson.directions,
+                            }}
+                          />
+                        );
+                    } else if (key === "notes") {
+                      sectionLabel = "Notes";
+                      sectionContent = (
+                        <>
+                          <button
+                            type="button"
+                            className={styles.notesToggle}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNotesOpen((v) => !v);
+                            }}
+                            aria-expanded={notesOpen}
+                          >
+                            <Icon name="eye" size={11} />
+                            {notesOpen
+                              ? "Hide teacher notes"
+                              : "Show teacher notes"}
+                          </button>
+                          {notesOpen &&
+                            (editingField === "notes" ? (
+                              <RichEditorWrapper
+                                onCommit={commitEdit}
+                                onCancel={cancelEdit}
+                                className={`${styles.notesBody} ${styles.richEditorBody}`}
+                              >
+                                <RichTextEditor
+                                  value={draftValue}
+                                  onChange={setDraftValue}
+                                  autoFocus
+                                  placeholder="Teacher notes…"
+                                  ariaLabel="Edit teacher notes"
+                                />
+                              </RichEditorWrapper>
+                            ) : (
+                              <p
+                                className={`${styles.notesBody} ${styles.editableText}`}
+                                tabIndex={0}
+                                role="button"
+                                aria-label="Edit teacher notes"
+                                onClick={(e) => e.stopPropagation()}
+                                onDoubleClick={(e) => openEditor("notes", e)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === "F2")
+                                    openEditor("notes", e);
+                                }}
+                                title="Double-click or press Enter to edit"
+                                // eslint-disable-next-line react/no-danger
+                                dangerouslySetInnerHTML={{
+                                  __html: lesson.notes ?? "",
+                                }}
+                              />
+                            ))}
+                        </>
+                      );
+                    } else if (key === "tasks") {
+                      sectionLabel = `${lesson.tasks.length} Tasks`;
+                      sectionContent = (
+                        <div className={styles.taskList}>
+                          {lesson.tasks.map((task) => (
+                            <TaskRow
+                              key={task.id}
+                              task={{
+                                ...task,
+                                status: taskStatus[task.id] ?? task.status,
+                              }}
+                              parentSubject={lesson.subject}
+                              onCycle={(next) => {
+                                setTaskStatus((prev) => ({
+                                  ...prev,
+                                  [task.id]: next,
+                                }));
+                                onContextAction?.("mark-status", lesson.id, {
+                                  status: next,
+                                  taskId: task.id,
+                                });
+                              }}
+                            />
+                          ))}
+                        </div>
+                      );
+                    } else if (key === "resources") {
+                      sectionLabel = "Resources";
+                      sectionContent = (
+                        <ResourceList resources={lesson.resources} />
+                      );
+                    } else if (key === "standards") {
+                      sectionLabel = "Standards";
+                      sectionContent = (
+                        <StandardsList codes={lesson.standards} />
+                      );
+                    }
+
+                    return (
+                      <ReorderableSectionRow
+                        key={key}
+                        sectionKey={key}
+                        label={sectionLabel}
+                        accent={color.cl}
+                        ink={color.cd}
+                        setSectionOrder={setSectionOrder}
+                        visibleIdx={visibleIdx}
+                        visibleCount={visibleCount}
+                        visibleKeys={visibleKeys}
+                        originalIdx={idx}
+                      >
+                        {sectionContent}
+                      </ReorderableSectionRow>
+                    );
+                  })}
+
+                  {/* Footer affordances — "+ Add section" / "Edit Template" */}
+                  <div className={styles.expandedFooter}>
+                    <button
+                      type="button"
+                      className={styles.footerBtn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onContextAction?.("add-to-todo", lesson.id);
+                      }}
+                    >
+                      <Icon name="plus" size={11} />
+                      Add section
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.footerBtn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onContextAction?.("print", lesson.id);
+                      }}
+                    >
+                      Edit Template
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Collapsed footer — meta chips + carry-over + pending ──────── */}
+              {!expanded && (
+                <div className={styles.footer}>
+                  {lesson.standards.length > 0 && (
+                    <StandardsBadge codes={lesson.standards} />
+                  )}
+                  <ResourceTypeRow resources={lesson.resources} dense />
+                  {hasTasks && (
+                    <span
+                      className={styles.tasksPill}
+                      title={`${lesson.tasks.length} lesson tasks`}
+                      style={{ background: color.cl, color: color.cd }}
+                    >
+                      <Icon name="list" size={9} />
+                      {lesson.tasks.length} tasks
+                    </span>
+                  )}
+                  {lesson.commentCount > 0 && (
+                    <span
+                      className={styles.commentBadge}
+                      title={`${lesson.commentCount} comment${lesson.commentCount === 1 ? "" : "s"}`}
+                      style={{ color: isVivid ? color.deep : "var(--ink-500)" }}
+                    >
+                      <span aria-hidden>💬</span>
+                      {lesson.commentCount}
+                      {lesson.unreadComments > 0 && (
+                        <span
+                          aria-label={`${lesson.unreadComments} unread`}
+                          className={styles.unreadDot}
+                        />
+                      )}
+                    </span>
+                  )}
+                  <div style={{ flex: 1 }} />
+                  {lesson.pendingMaster && (
+                    <span
+                      className={styles.metaPill}
+                      style={{
+                        background: "var(--important-bg)",
+                        color: "var(--important)",
+                      }}
+                    >
+                      Core ↑
+                    </span>
+                  )}
+                  {lesson.status === "carried" && (
+                    <span className={styles.carryLabel}>carry-over</span>
+                  )}
+                </div>
+              )}
+
+              {/* ── "Why not done" reason ─────────────────────────────────────── */}
+              {lesson.reasonNotDone && lesson.status !== "done" && (
+                <div className={styles.reasonRow}>
+                  <span aria-hidden style={{ fontWeight: 700 }}>
+                    🔥
+                  </span>
+                  <span>{lesson.reasonNotDone}</span>
+                </div>
+              )}
+            </div>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
+
+      {/* Context menu and Save-target dialog are portals — they render outside
+          the card's DOM subtree and are not affected by the AnimatePresence
+          wrapper. Keep them at the root level so they survive compact mode. */}
 
       {/* Context menu — portal, positional */}
       {menu && (
@@ -975,7 +1193,7 @@ export function WeeklyLessonCard({
           onSaveTarget?.(lesson.id, "personal");
         }}
       />
-    </div>
+    </motion.div>
   );
 }
 

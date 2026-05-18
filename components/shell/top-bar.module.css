@@ -107,6 +107,14 @@
   color: var(--ink-900);
 }
 
+/* Disabled state — WCAG AA contrast via reduced opacity on the neutral token.
+ * Applied alongside .iconBtn (not a replacement), so transitions still work. */
+.iconBtnDisabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* ── View switcher ──────────────────────────────────────────────────── */
 .viewSwitcher {
   display: flex;
@@ -452,6 +460,15 @@
 .avatar:focus-visible {
   outline: 2px solid var(--ink-900);
   outline-offset: 2px;
+}
+
+/* ── Undo / Redo button group ───────────────────────────────────────── */
+/* Tight pair: no gap between undo and redo so they read as a unit. */
+.undoRedoGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
 }
 
 /* ── Spacer — flex push ──────────────────────────────────────────────── */
