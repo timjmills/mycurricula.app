@@ -67,6 +67,26 @@ export type {
 // to be patched through onEditLesson.
 type EditableField = "title" | "preview" | "objective" | "directions" | "notes";
 
+// The stable keys for each section rendered in the expanded body.
+// "tasks" is conditional on hasTasks; "objective" conditional on lesson.objective.
+// The order array is card-local state so the teacher can reorder without persistence.
+type SectionKey =
+  | "objective"
+  | "directions"
+  | "notes"
+  | "tasks"
+  | "resources"
+  | "standards";
+
+const DEFAULT_SECTION_ORDER: SectionKey[] = [
+  "objective",
+  "directions",
+  "notes",
+  "tasks",
+  "resources",
+  "standards",
+];
+
 // ── Props ────────────────────────────────────────────────────────────────────
 // Mirrors LessonCardProps so WeeklyLessonCard is a drop-in for the Weekly grid.
 
@@ -168,6 +188,14 @@ export function WeeklyLessonCard({
   // pointer strays far before the timer fires (mis-tap on a small card).
   const holdOriginRef = useRef<{ x: number; y: number } | null>(null);
 
+  // ── Section-reorder state ──────────────────────────────────────────────
+  // sectionOrder: the current ordering of sections within the expanded body.
+  // Card-local (no persistence) — prototype behavior, consistent with the rest
+  // of the card. Resets if the lesson id changes (parent reuses the component).
+  const [sectionOrder, setSectionOrder] = useState<SectionKey[]>(
+    DEFAULT_SECTION_ORDER,
+  );
+
   // ── Inline editing state ───────────────────────────────────────────────
   // editingField: which field is currently being edited, or null.
   // draftValue: the in-progress string the teacher is typing.
@@ -175,10 +203,11 @@ export function WeeklyLessonCard({
   const [draftValue, setDraftValue] = useState<string>("");
 
   // If the parent re-uses this component instance for a different lesson
-  // (key not changed) we must not show a stale editor from the previous lesson.
+  // (key not changed) we must not show a stale editor or stale section order.
   useEffect(() => {
     setEditingField(null);
     setDraftValue("");
+    setSectionOrder(DEFAULT_SECTION_ORDER);
   }, [lesson.id]);
 
   const done = lesson.status === "done";
@@ -671,168 +700,211 @@ export function WeeklyLessonCard({
           </p>
         ) : (
           <div className={styles.sections}>
-            {/* Objective section — double-click text to edit inline */}
-            {lesson.objective && (
-              <SectionRow label="I Can" accent={color.cl} ink={color.cd}>
-                {editingField === "objective" ? (
-                  <RichEditorWrapper
-                    onCommit={commitEdit}
-                    onCancel={cancelEdit}
-                    className={styles.richEditorBody}
-                  >
-                    <RichTextEditor
-                      value={draftValue}
-                      onChange={setDraftValue}
-                      placeholder="I can…"
-                      ariaLabel="Edit lesson objective"
-                    />
-                  </RichEditorWrapper>
-                ) : (
-                  <p
-                    className={`${styles.sectionText} ${styles.editableText}`}
-                    style={{ fontStyle: "italic", color: "var(--ink-700)" }}
-                    tabIndex={0}
-                    role="button"
-                    aria-label="Edit lesson objective"
-                    onClick={(e) => e.stopPropagation()}
-                    onDoubleClick={(e) => openEditor("objective", e)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === "F2")
-                        openEditor("objective", e);
-                    }}
-                    title="Double-click or press Enter to edit"
-                    // eslint-disable-next-line react/no-danger
-                    dangerouslySetInnerHTML={{ __html: objectiveBody }}
-                  />
-                )}
-              </SectionRow>
-            )}
+            {/*
+             * Reorderable sections — iterate sectionOrder so the teacher can
+             * drag-to-reorder via 2-second hold (matching the card's own
+             * hold-to-drag threshold). Absent sections (objective when blank,
+             * tasks when there are none, notes when blank) are skipped.
+             * Each ReorderableSectionRow:
+             *   • owns a separate 2-second hold timer that arms draggable
+             *   • calls stopPropagation on all pointer events so the card-level
+             *     hold timer never fires during a section hold
+             *   • exposes move-up / move-down buttons for keyboard access
+             */}
+            {sectionOrder.map((key, idx) => {
+              // ── Skip absent sections ──────────────────────────────────────
+              if (key === "objective" && !lesson.objective) return null;
+              if (key === "tasks" && !hasTasks) return null;
+              if (key === "notes" && !lesson.notes && editingField !== "notes")
+                return null;
 
-            {/* Directions section — double-click text to edit inline */}
-            <SectionRow label="Directions" accent={color.cl} ink={color.cd}>
-              {editingField === "directions" ? (
-                <RichEditorWrapper
-                  onCommit={commitEdit}
-                  onCancel={cancelEdit}
-                  className={styles.richEditorBody}
-                >
-                  <RichTextEditor
-                    value={draftValue}
-                    onChange={setDraftValue}
-                    placeholder="Directions…"
-                    ariaLabel="Edit lesson directions"
-                  />
-                </RichEditorWrapper>
-              ) : (
-                <p
-                  className={`${styles.sectionText} ${styles.editableText}`}
-                  style={{ color: "var(--ink-700)" }}
-                  tabIndex={0}
-                  role="button"
-                  aria-label="Edit lesson directions"
-                  onClick={(e) => e.stopPropagation()}
-                  onDoubleClick={(e) => openEditor("directions", e)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === "F2")
-                      openEditor("directions", e);
-                  }}
-                  title="Double-click or press Enter to edit"
-                  // eslint-disable-next-line react/no-danger
-                  dangerouslySetInnerHTML={{ __html: lesson.directions }}
-                />
-              )}
-            </SectionRow>
+              // ── Visible index for keyboard move buttons ───────────────────
+              // We need the count of actually-visible sections to decide whether
+              // move-up / move-down are at the boundary.
+              const visibleKeys = sectionOrder.filter((k) => {
+                if (k === "objective" && !lesson.objective) return false;
+                if (k === "tasks" && !hasTasks) return false;
+                if (k === "notes" && !lesson.notes && editingField !== "notes")
+                  return false;
+                return true;
+              });
+              const visibleIdx = visibleKeys.indexOf(key);
+              const visibleCount = visibleKeys.length;
 
-            {/* Teacher notes — hover-gated disclosure; text is editable on double-click */}
-            {(lesson.notes || editingField === "notes") && (
-              <SectionRow label="Notes" accent={color.cl} ink={color.cd}>
-                <button
-                  type="button"
-                  className={styles.notesToggle}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNotesOpen((v) => !v);
-                  }}
-                  aria-expanded={notesOpen}
-                >
-                  <Icon name="eye" size={11} />
-                  {notesOpen ? "Hide teacher notes" : "Show teacher notes"}
-                </button>
-                {notesOpen &&
-                  (editingField === "notes" ? (
+              // ── Section content ───────────────────────────────────────────
+              let sectionLabel = "";
+              let sectionContent: React.ReactNode = null;
+
+              if (key === "objective") {
+                sectionLabel = "I Can";
+                sectionContent =
+                  editingField === "objective" ? (
                     <RichEditorWrapper
                       onCommit={commitEdit}
                       onCancel={cancelEdit}
-                      className={`${styles.notesBody} ${styles.richEditorBody}`}
+                      className={styles.richEditorBody}
                     >
                       <RichTextEditor
                         value={draftValue}
                         onChange={setDraftValue}
-                        placeholder="Teacher notes…"
-                        ariaLabel="Edit teacher notes"
+                        placeholder="I can…"
+                        ariaLabel="Edit lesson objective"
                       />
                     </RichEditorWrapper>
                   ) : (
                     <p
-                      className={`${styles.notesBody} ${styles.editableText}`}
+                      className={`${styles.sectionText} ${styles.editableText}`}
+                      style={{ fontStyle: "italic", color: "var(--ink-700)" }}
                       tabIndex={0}
                       role="button"
-                      aria-label="Edit teacher notes"
+                      aria-label="Edit lesson objective"
                       onClick={(e) => e.stopPropagation()}
-                      onDoubleClick={(e) => openEditor("notes", e)}
+                      onDoubleClick={(e) => openEditor("objective", e)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === "F2")
-                          openEditor("notes", e);
+                          openEditor("objective", e);
                       }}
                       title="Double-click or press Enter to edit"
                       // eslint-disable-next-line react/no-danger
-                      dangerouslySetInnerHTML={{ __html: lesson.notes ?? "" }}
+                      dangerouslySetInnerHTML={{ __html: objectiveBody }}
                     />
-                  ))}
-              </SectionRow>
-            )}
-
-            {/* Tasks — multi-task lesson station rows */}
-            {hasTasks && (
-              <SectionRow
-                label={`${lesson.tasks.length} Tasks`}
-                accent={color.cl}
-                ink={color.cd}
-              >
-                <div className={styles.taskList}>
-                  {lesson.tasks.map((task) => (
-                    <TaskRow
-                      key={task.id}
-                      task={{
-                        ...task,
-                        status: taskStatus[task.id] ?? task.status,
+                  );
+              } else if (key === "directions") {
+                sectionLabel = "Directions";
+                sectionContent =
+                  editingField === "directions" ? (
+                    <RichEditorWrapper
+                      onCommit={commitEdit}
+                      onCancel={cancelEdit}
+                      className={styles.richEditorBody}
+                    >
+                      <RichTextEditor
+                        value={draftValue}
+                        onChange={setDraftValue}
+                        placeholder="Directions…"
+                        ariaLabel="Edit lesson directions"
+                      />
+                    </RichEditorWrapper>
+                  ) : (
+                    <p
+                      className={`${styles.sectionText} ${styles.editableText}`}
+                      style={{ color: "var(--ink-700)" }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label="Edit lesson directions"
+                      onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => openEditor("directions", e)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "F2")
+                          openEditor("directions", e);
                       }}
-                      parentSubject={lesson.subject}
-                      onCycle={(next) => {
-                        setTaskStatus((prev) => ({
-                          ...prev,
-                          [task.id]: next,
-                        }));
-                        onContextAction?.("mark-status", lesson.id, {
-                          status: next,
-                          taskId: task.id,
-                        });
-                      }}
+                      title="Double-click or press Enter to edit"
+                      // eslint-disable-next-line react/no-danger
+                      dangerouslySetInnerHTML={{ __html: lesson.directions }}
                     />
-                  ))}
-                </div>
-              </SectionRow>
-            )}
+                  );
+              } else if (key === "notes") {
+                sectionLabel = "Notes";
+                sectionContent = (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.notesToggle}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNotesOpen((v) => !v);
+                      }}
+                      aria-expanded={notesOpen}
+                    >
+                      <Icon name="eye" size={11} />
+                      {notesOpen ? "Hide teacher notes" : "Show teacher notes"}
+                    </button>
+                    {notesOpen &&
+                      (editingField === "notes" ? (
+                        <RichEditorWrapper
+                          onCommit={commitEdit}
+                          onCancel={cancelEdit}
+                          className={`${styles.notesBody} ${styles.richEditorBody}`}
+                        >
+                          <RichTextEditor
+                            value={draftValue}
+                            onChange={setDraftValue}
+                            placeholder="Teacher notes…"
+                            ariaLabel="Edit teacher notes"
+                          />
+                        </RichEditorWrapper>
+                      ) : (
+                        <p
+                          className={`${styles.notesBody} ${styles.editableText}`}
+                          tabIndex={0}
+                          role="button"
+                          aria-label="Edit teacher notes"
+                          onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => openEditor("notes", e)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === "F2")
+                              openEditor("notes", e);
+                          }}
+                          title="Double-click or press Enter to edit"
+                          // eslint-disable-next-line react/no-danger
+                          dangerouslySetInnerHTML={{
+                            __html: lesson.notes ?? "",
+                          }}
+                        />
+                      ))}
+                  </>
+                );
+              } else if (key === "tasks") {
+                sectionLabel = `${lesson.tasks.length} Tasks`;
+                sectionContent = (
+                  <div className={styles.taskList}>
+                    {lesson.tasks.map((task) => (
+                      <TaskRow
+                        key={task.id}
+                        task={{
+                          ...task,
+                          status: taskStatus[task.id] ?? task.status,
+                        }}
+                        parentSubject={lesson.subject}
+                        onCycle={(next) => {
+                          setTaskStatus((prev) => ({
+                            ...prev,
+                            [task.id]: next,
+                          }));
+                          onContextAction?.("mark-status", lesson.id, {
+                            status: next,
+                            taskId: task.id,
+                          });
+                        }}
+                      />
+                    ))}
+                  </div>
+                );
+              } else if (key === "resources") {
+                sectionLabel = "Resources";
+                sectionContent = <ResourceList resources={lesson.resources} />;
+              } else if (key === "standards") {
+                sectionLabel = "Standards";
+                sectionContent = <StandardsList codes={lesson.standards} />;
+              }
 
-            {/* Resources */}
-            <SectionRow label="Resources" accent={color.cl} ink={color.cd}>
-              <ResourceList resources={lesson.resources} />
-            </SectionRow>
-
-            {/* Standards */}
-            <SectionRow label="Standards" accent={color.cl} ink={color.cd}>
-              <StandardsList codes={lesson.standards} />
-            </SectionRow>
+              return (
+                <ReorderableSectionRow
+                  key={key}
+                  sectionKey={key}
+                  label={sectionLabel}
+                  accent={color.cl}
+                  ink={color.cd}
+                  setSectionOrder={setSectionOrder}
+                  visibleIdx={visibleIdx}
+                  visibleCount={visibleCount}
+                  visibleKeys={visibleKeys}
+                  originalIdx={idx}
+                >
+                  {sectionContent}
+                </ReorderableSectionRow>
+              );
+            })}
 
             {/* Footer affordances — "+ Add section" / "Edit Template" */}
             <div className={styles.expandedFooter}>
@@ -945,34 +1017,305 @@ export function WeeklyLessonCard({
   );
 }
 
-// ── SectionRow ────────────────────────────────────────────────────────────────
-// A labeled section row inside the expanded card body. Each row has a small
-// colored pill label (same technique as the "I can" badge in LessonCard) so
-// section headings read distinctly without heavy borders.
+// ── ReorderableSectionRow ─────────────────────────────────────────────────────
+// A labeled section row that the teacher can drag to reorder within the
+// expanded card body. Supports two reorder gestures:
+//
+//   • Press-and-hold (2 s) → section enters "hold-ready" state (visual lift +
+//     grab cursor). Once armed, dragging it with native HTML5 DnD repositions
+//     it in the order.  The 2-second threshold reuses HOLD_MS so the feel is
+//     identical to the card-level hold-to-drag.
+//
+//   • Move-up / move-down buttons — keyboard-accessible alternative. Rendered
+//     inside each section row as small ghost buttons.  They shift the section
+//     one position in the visible list and are disabled at the boundary.
+//
+// Gesture isolation: ALL pointer handlers call stopPropagation() so the card's
+// handleBodyPointerDown / handleBodyPointerMove / handleBodyPointerUp never
+// fire while a section is being interacted with.  The section drag events
+// similarly stop propagation so they cannot bubble into the card's onDragStart.
 
-function SectionRow({
+function ReorderableSectionRow({
+  sectionKey,
   label,
   accent,
   ink,
   children,
+  setSectionOrder,
+  visibleIdx,
+  visibleCount,
+  visibleKeys,
 }: {
+  sectionKey: SectionKey;
   label: string;
   /** Subject light fill for the label pill background. */
   accent: string;
   /** Subject deep color for the label pill text. */
   ink: string;
   children: React.ReactNode;
+  setSectionOrder: React.Dispatch<React.SetStateAction<SectionKey[]>>;
+  /** Position of this section in the visible (non-absent) list. */
+  visibleIdx: number;
+  visibleCount: number;
+  /** Ordered keys of all visible sections (for keyboard move). */
+  visibleKeys: SectionKey[];
+  /** Index of this key in the full sectionOrder array. */
+  originalIdx: number;
 }) {
+  // ── Per-section hold state ───────────────────────────────────────────────
+  // holdReady: this section's 2-second hold has fired and it can now be dragged.
+  const [holdReady, setHoldReady] = useState(false);
+  // dragOver: another section is being dragged and is hovering over this one.
+  const [dragOver, setDragOver] = useState(false);
+  const sectionHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const sectionHoldOriginRef = useRef<{ x: number; y: number } | null>(null);
+
+  const cancelSectionHold = () => {
+    if (sectionHoldTimerRef.current !== null) {
+      clearTimeout(sectionHoldTimerRef.current);
+      sectionHoldTimerRef.current = null;
+    }
+    sectionHoldOriginRef.current = null;
+  };
+
+  // ── Reorder helpers ──────────────────────────────────────────────────────
+  // Swap the dragged section key with the target section key in the full order.
+  const moveSectionAfter = (draggedKey: SectionKey, targetKey: SectionKey) => {
+    setSectionOrder((prev) => {
+      const next = prev.filter((k) => k !== draggedKey);
+      const targetPos = next.indexOf(targetKey);
+      // Insert the dragged section immediately after the target.
+      next.splice(targetPos + 1, 0, draggedKey);
+      return next;
+    });
+  };
+
+  const moveSectionBefore = (draggedKey: SectionKey, targetKey: SectionKey) => {
+    setSectionOrder((prev) => {
+      const next = prev.filter((k) => k !== draggedKey);
+      const targetPos = next.indexOf(targetKey);
+      next.splice(targetPos, 0, draggedKey);
+      return next;
+    });
+  };
+
+  // Keyboard move: shift this section one position in the visible list.
+  const moveKeyboard = (direction: "up" | "down") => {
+    const targetVisibleIdx =
+      direction === "up" ? visibleIdx - 1 : visibleIdx + 1;
+    if (targetVisibleIdx < 0 || targetVisibleIdx >= visibleCount) return;
+    const neighborKey = visibleKeys[targetVisibleIdx];
+    if (direction === "up") {
+      moveSectionBefore(sectionKey, neighborKey);
+    } else {
+      moveSectionAfter(sectionKey, neighborKey);
+    }
+  };
+
+  // ── Pointer handlers ──────────────────────────────────────────────────────
+  // ALL must stopPropagation so the card-level hold timer never fires.
+
+  const handleSectionPointerDown = (e: React.PointerEvent<HTMLElement>) => {
+    // Stop ALL propagation immediately — this is the critical gesture isolator.
+    e.stopPropagation();
+    if (e.button !== 0 && e.pointerType !== "touch") return;
+
+    sectionHoldOriginRef.current = { x: e.clientX, y: e.clientY };
+    sectionHoldTimerRef.current = setTimeout(() => {
+      sectionHoldTimerRef.current = null;
+      sectionHoldOriginRef.current = null;
+      setHoldReady(true);
+    }, HOLD_MS);
+  };
+
+  const handleSectionPointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    e.stopPropagation();
+    if (!sectionHoldOriginRef.current || sectionHoldTimerRef.current === null)
+      return;
+    const dx = e.clientX - sectionHoldOriginRef.current.x;
+    const dy = e.clientY - sectionHoldOriginRef.current.y;
+    // Cancel hold if the pointer strays more than 8px (scroll intent).
+    if (dx * dx + dy * dy > 64) {
+      cancelSectionHold();
+    }
+  };
+
+  const handleSectionPointerUp = (e: React.PointerEvent<HTMLElement>) => {
+    e.stopPropagation();
+    cancelSectionHold();
+    setHoldReady(false);
+  };
+
+  // ── DnD handlers — section drag source ───────────────────────────────────
+  const handleSectionDragStart = (e: React.DragEvent<HTMLElement>) => {
+    // Critical: stop so the card's own onDragStart is never triggered by this.
+    e.stopPropagation();
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/x-section-key", sectionKey);
+  };
+
+  const handleSectionDragEnd = (e: React.DragEvent<HTMLElement>) => {
+    e.stopPropagation();
+    setHoldReady(false);
+    setDragOver(false);
+  };
+
+  // ── DnD handlers — section drop target ───────────────────────────────────
+  const handleSectionDragOver = (e: React.DragEvent<HTMLElement>) => {
+    e.stopPropagation();
+    // Only react to section drags (our custom type), not card drags.
+    if (!e.dataTransfer.types.includes("text/x-section-key")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOver(true);
+  };
+
+  const handleSectionDragLeave = (e: React.DragEvent<HTMLElement>) => {
+    e.stopPropagation();
+    // Only clear when the pointer truly leaves this section element.
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOver(false);
+    }
+  };
+
+  const handleSectionDrop = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const draggedKey = e.dataTransfer.getData(
+      "text/x-section-key",
+    ) as SectionKey;
+    if (!draggedKey || draggedKey === sectionKey) return;
+    // Determine drop position: above or below the midpoint of this element.
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    if (e.clientY < mid) {
+      moveSectionBefore(draggedKey, sectionKey);
+    } else {
+      moveSectionAfter(draggedKey, sectionKey);
+    }
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  const isFirst = visibleIdx === 0;
+  const isLast = visibleIdx === visibleCount - 1;
+
   return (
-    <section className={styles.sectionRow}>
-      <div
-        className={styles.sectionLabel}
-        style={{ background: accent, color: ink }}
-      >
-        {label}
+    <section
+      className={`${styles.sectionRow} ${holdReady ? styles.sectionRowHoldReady : ""} ${dragOver ? styles.sectionRowDragOver : ""}`}
+      // draggable is only active after the hold fires so plain pointer
+      // interactions (click, scroll) are never hijacked.
+      draggable={holdReady}
+      // Pointer events — all stop propagation to guard the card-level hold.
+      onPointerDown={handleSectionPointerDown}
+      onPointerMove={handleSectionPointerMove}
+      onPointerUp={handleSectionPointerUp}
+      onPointerCancel={handleSectionPointerUp}
+      // DnD — drag source
+      onDragStart={handleSectionDragStart}
+      onDragEnd={handleSectionDragEnd}
+      // DnD — drop target
+      onDragOver={handleSectionDragOver}
+      onDragLeave={handleSectionDragLeave}
+      onDrop={handleSectionDrop}
+      aria-label={`${label} section`}
+    >
+      {/* Section header row: pill label + keyboard move buttons */}
+      <div className={styles.sectionHeader}>
+        <div
+          className={styles.sectionLabel}
+          style={{ background: accent, color: ink }}
+        >
+          {label}
+        </div>
+
+        {/* Move-up / move-down — keyboard-accessible reorder alternative.
+            Hidden visually until the section is focused/hovered so they
+            don't clutter the default state. Disabled at the boundaries. */}
+        <div
+          className={styles.sectionMoveControls}
+          // Don't let these button clicks bubble up to the section
+          // pointerDown handler and start the hold timer.
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className={styles.sectionMoveBtn}
+            onClick={() => moveKeyboard("up")}
+            disabled={isFirst}
+            aria-label={`Move ${label} section up`}
+            title={`Move ${label} section up`}
+          >
+            <ChevronUpIcon />
+          </button>
+          <button
+            type="button"
+            className={styles.sectionMoveBtn}
+            onClick={() => moveKeyboard("down")}
+            disabled={isLast}
+            aria-label={`Move ${label} section down`}
+            title={`Move ${label} section down`}
+          >
+            <ChevronDownIcon />
+          </button>
+        </div>
       </div>
+
+      {/* Screen-reader announcement when this section enters "hold ready". */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className={styles.srOnly}
+      >
+        {holdReady ? `${label} section ready to drag. Drag to reorder.` : ""}
+      </div>
+
       <div className={styles.sectionContent}>{children}</div>
     </section>
+  );
+}
+
+// ── Keyboard-reorder icons ────────────────────────────────────────────────────
+// Minimal inline SVG chevrons — no import needed, consistent with the existing
+// PlusIcon / CollapseIcon / ExpandIcon pattern in GridCell.tsx.
+
+function ChevronUpIcon() {
+  return (
+    <svg
+      width={9}
+      height={9}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 15l-6-6-6 6" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      width={9}
+      height={9}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
   );
 }
 

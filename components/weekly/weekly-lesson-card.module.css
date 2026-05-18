@@ -272,10 +272,48 @@
   gap: 8px;
 }
 
-/* One labeled section: pill label on top, indented content below. */
+/* One labeled section: pill label row on top, indented content below.
+   Transition the border so the drop-indicator appears smoothly. */
 .sectionRow {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  border-radius: var(--r-4);
+  /* Reserve space for the drag hover ring without layout shift. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition:
+    outline-color 0.08s ease,
+    box-shadow 0.08s ease,
+    transform 0.08s ease;
+}
+
+/* Hold-ready state: the teacher held this section for 2 s and it is now
+   armed for dragging. Matches the card's own holdReady visual language:
+   a colored outline + subtle lift so the affordance is unmistakable. */
+.sectionRowHoldReady {
+  outline-color: var(--c, var(--ink-400));
+  box-shadow: 0 3px 10px rgba(20, 22, 32, 0.12);
+  transform: scale(1.01);
+  cursor: grab;
+  z-index: 1;
+  position: relative;
+}
+
+/* Drop-target highlight: a section being hovered during a sibling drag.
+   Uses a translucent ink fill so it reads on both light and vivid cards. */
+.sectionRowDragOver {
+  background: color-mix(in srgb, var(--ink-900) 5%, transparent);
+  outline-color: var(--c, var(--ink-400));
+}
+
+/* ── Section header row: label pill + keyboard move controls ─────────────── */
+/* Positions the pill at inline-start and the move buttons at inline-end.
+   The move controls are invisible by default and revealed on hover/focus
+   so they don't clutter the resting state. */
+.sectionHeader {
+  display: flex;
+  align-items: center;
   gap: 4px;
 }
 
@@ -289,10 +327,70 @@
   text-transform: uppercase;
   padding: 1px 6px;
   border-radius: var(--r-4);
+  /* flex-shrink: 0 so the label never collapses when move buttons appear. */
+  flex-shrink: 0;
+}
+
+/* Move-up / move-down button cluster — hidden until hover/focus so they
+   don't distract in the resting state. Revealed by the section row hover
+   or when any child gains keyboard focus. */
+.sectionMoveControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  /* Prevent layout shift: the buttons are always rendered but invisible. */
+  pointer-events: none;
+}
+
+.sectionRow:hover .sectionMoveControls,
+.sectionRow:focus-within .sectionMoveControls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Move button: a compact ghost button matching the footerBtn / notesToggle
+   visual language — small, borderless at rest, ink-50 on hover. */
+.sectionMoveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-4);
+  background: transparent;
+  color: var(--ink-400);
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.sectionMoveBtn:hover:not(:disabled) {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.sectionMoveBtn:focus-visible {
+  outline: 2px solid var(--c, var(--ink-700));
+  outline-offset: 1px;
+  color: var(--ink-700);
+}
+
+.sectionMoveBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .sectionContent {
   padding-left: 2px;
+}
+
+/* While any section is in hold-ready state, suppress the text edit cursor
+   on editable text within sections so "grab" wins cleanly. */
+.sectionRowHoldReady .editableText {
+  cursor: inherit;
 }
 
 /* Body text inside a section (directions, objective). */
@@ -572,7 +670,11 @@
   .affordanceVisual,
   .notesToggle,
   .footerBtn,
-  .editableText {
+  .editableText,
+  .sectionRow,
+  .sectionRowHoldReady,
+  .sectionMoveControls,
+  .sectionMoveBtn {
     transition-duration: 0.001ms !important;
   }
 }
