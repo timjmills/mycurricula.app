@@ -11,4 +11,7 @@
   "observability": {
     "enabled": true,
   },
+  // Serve the Worker on the production domain. `custom_domain` provisions the
+  // DNS record + TLS cert automatically, since the zone is in this account.
+  "routes": [{ "pattern": "mycurricula.app", "custom_domain": true }],
 }
