@@ -609,6 +609,9 @@ export function WeeklyLessonCard({
               tabIndex={0}
               role="button"
               aria-label="Edit lesson title"
+              // Swallow the single click so it never reaches the card/band
+              // expand handler — clicking text must not resize the cell.
+              onClick={(e) => e.stopPropagation()}
               onDoubleClick={(e) => openEditor("title", e)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === "F2") openEditor("title", e);
@@ -654,6 +657,7 @@ export function WeeklyLessonCard({
                 tabIndex={0}
                 role="button"
                 aria-label="Edit lesson preview"
+                onClick={(e) => e.stopPropagation()}
                 onDoubleClick={(e) => openEditor("preview", e)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === "F2")
@@ -690,6 +694,7 @@ export function WeeklyLessonCard({
                     tabIndex={0}
                     role="button"
                     aria-label="Edit lesson objective"
+                    onClick={(e) => e.stopPropagation()}
                     onDoubleClick={(e) => openEditor("objective", e)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === "F2")
@@ -725,6 +730,7 @@ export function WeeklyLessonCard({
                   tabIndex={0}
                   role="button"
                   aria-label="Edit lesson directions"
+                  onClick={(e) => e.stopPropagation()}
                   onDoubleClick={(e) => openEditor("directions", e)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === "F2")
@@ -772,6 +778,7 @@ export function WeeklyLessonCard({
                       tabIndex={0}
                       role="button"
                       aria-label="Edit teacher notes"
+                      onClick={(e) => e.stopPropagation()}
                       onDoubleClick={(e) => openEditor("notes", e)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === "F2")
