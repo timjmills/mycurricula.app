@@ -628,6 +628,7 @@ export function WeeklyLessonCard({
               <RichTextEditor
                 value={draftValue}
                 onChange={setDraftValue}
+                autoFocus
                 singleLine
                 ariaLabel="Edit lesson title"
               />
@@ -676,6 +677,7 @@ export function WeeklyLessonCard({
                 <RichTextEditor
                   value={draftValue}
                   onChange={setDraftValue}
+                  autoFocus
                   placeholder="Lesson preview…"
                   ariaLabel="Edit lesson preview"
                 />
@@ -747,6 +749,7 @@ export function WeeklyLessonCard({
                       <RichTextEditor
                         value={draftValue}
                         onChange={setDraftValue}
+                        autoFocus
                         placeholder="I can…"
                         ariaLabel="Edit lesson objective"
                       />
@@ -781,6 +784,7 @@ export function WeeklyLessonCard({
                       <RichTextEditor
                         value={draftValue}
                         onChange={setDraftValue}
+                        autoFocus
                         placeholder="Directions…"
                         ariaLabel="Edit lesson directions"
                       />
@@ -829,6 +833,7 @@ export function WeeklyLessonCard({
                           <RichTextEditor
                             value={draftValue}
                             onChange={setDraftValue}
+                            autoFocus
                             placeholder="Teacher notes…"
                             ariaLabel="Edit teacher notes"
                           />

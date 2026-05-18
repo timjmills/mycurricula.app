@@ -58,6 +58,12 @@ export interface RichTextEditorProps {
   singleLine?: boolean;
   /** Accessible label for the editable region. */
   ariaLabel?: string;
+  /**
+   * Focus the editable region on mount and place the caret at the end —
+   * for inline editors that open in response to a teacher action so the
+   * field is ready to type the instant it appears.
+   */
+  autoFocus?: boolean;
 }
 
 // ── Toolbar data ─────────────────────────────────────────────────────────────
@@ -308,6 +314,7 @@ export function RichTextEditor({
   placeholder = "",
   singleLine = false,
   ariaLabel,
+  autoFocus = false,
 }: RichTextEditorProps): ReactNode {
   const editorRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -417,6 +424,25 @@ export function RichTextEditor({
     setToolbarPos({ top, left });
     setToolbarVisible(true);
   }, []);
+
+  // ── Auto-focus on mount ─────────────────────────────────────────────
+  // Inline editors open in response to a teacher action (double-click a
+  // cell's text). Focusing the editable region and dropping the caret at
+  // the end makes the box ready to type the instant it appears.
+  useEffect(() => {
+    if (!autoFocus) return;
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    if (sel) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false); // collapse to the end
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }, [autoFocus]);
 
   // ── Keyboard handler ────────────────────────────────────────────────
   const handleKeyDown = useCallback(
