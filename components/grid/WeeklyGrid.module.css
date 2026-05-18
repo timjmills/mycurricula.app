@@ -264,7 +264,7 @@
 }
 
 .todayPill {
-  font-size: 9.5px;
+  font-size: var(--t-10);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -293,7 +293,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: var(--t-11);
   font-weight: 700;
   line-height: 1;
   flex: 0 0 auto;
@@ -308,7 +308,7 @@
 }
 
 .subjectUnit {
-  font-size: 10px;
+  font-size: var(--t-10);
   font-weight: 500;
   color: var(--ink-400);
   white-space: nowrap;

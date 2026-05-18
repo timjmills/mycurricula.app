@@ -167,14 +167,18 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
     if (idx === -1) return;
     const source = sections[idx];
     // Deep-copy the section with a fresh id so both can be edited independently.
+    // Use a local counter alongside Date.now() to guarantee uniqueness even
+    // when multiple duplications occur within the same millisecond.
+    const ts = Date.now().toString(36);
+    let counter = 0;
     const copy: LessonSectionContent = {
       ...source,
-      id: `lsec-${Date.now().toString(36)}-dup`,
+      id: `lsec-${ts}-dup`,
       heading: source.heading,
-      resources: source.resources.map((r) => ({
-        ...r,
-        id: `res-${Date.now().toString(36)}-${r.id}`,
-      })),
+      resources: source.resources.map((r) => {
+        counter += 1;
+        return { ...r, id: `res-${ts}-${counter}` };
+      }),
     };
     const next = [...sections];
     next.splice(idx + 1, 0, copy);
@@ -212,7 +216,7 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
    *  pointer moves between children of the card.
    */
   function handleCardDragOver(
-    e: React.DragEvent<HTMLLIElement>,
+    e: React.DragEvent<HTMLDivElement>,
     targetId: string,
   ): void {
     if (!drag) return;
@@ -233,7 +237,7 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
 
   /** Drop a section onto the target position. */
   function handleCardDrop(
-    e: React.DragEvent<HTMLLIElement>,
+    e: React.DragEvent<HTMLDivElement>,
     targetId: string,
   ): void {
     e.preventDefault();
@@ -281,7 +285,7 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
   /** dragLeave on the card — only clear the highlight when the pointer has
    *  genuinely left the card (not just moved to a child element). */
   function handleCardDragLeave(
-    e: React.DragEvent<HTMLLIElement>,
+    e: React.DragEvent<HTMLDivElement>,
     cardId: string,
   ): void {
     const related = e.relatedTarget as Node | null;
@@ -373,14 +377,18 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
           const isLast = idx === sections.length - 1;
 
           // Toolbar is visible when the mouse is over this card wrapper OR
-          // when keyboard focus is somewhere inside it (handled via
-          // :focus-within CSS on the wrapper — no JS for the focus path).
-          // We only manage the hover path here in JS state.
+          // when keyboard focus is somewhere inside it. Both paths update
+          // hoveredSectionId via onFocusCapture/onBlurCapture + onMouseEnter/
+          // onMouseLeave on the wrapper li, so toolbarVisible is the single
+          // source of truth for the visible prop.
           const toolbarVisible = hoveredSectionId === section.id;
 
           return (
             // Card wrapper — the hover/focus boundary for the toolbar.
-            <div
+            // Must be <li> (direct child of <ol>) for valid HTML. The inner
+            // card becomes a <div> so the list item and card roles are on
+            // the same element.
+            <li
               key={section.id}
               className={styles.cardWrapper}
               onMouseEnter={() => setHoveredSectionId(section.id)}
@@ -389,6 +397,17 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
                   prev === section.id ? null : prev,
                 )
               }
+              // Keyboard path: reveal the toolbar when focus enters the card.
+              onFocusCapture={() => setHoveredSectionId(section.id)}
+              // Hide toolbar when focus leaves the card entirely (not just
+              // moving between children), mirroring the mouse-leave behaviour.
+              onBlurCapture={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                  setHoveredSectionId((prev) =>
+                    prev === section.id ? null : prev,
+                  );
+                }
+              }}
             >
               {/* ── Padlet-style hover toolbar ─────────────────────── */}
               <div className={styles.toolbarAnchor}>
@@ -408,7 +427,7 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
                 />
               </div>
 
-              <li
+              <div
                 className={[
                   styles.card,
                   isDraggingThis ? styles.cardDragging : "",
@@ -564,8 +583,8 @@ export function LessonFlow({ sections, onChange }: LessonFlowProps): ReactNode {
                     Add resource
                   </button>
                 </div>
-              </li>
-            </div>
+              </div>
+            </li>
           );
         })}
       </ol>

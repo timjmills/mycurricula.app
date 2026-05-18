@@ -115,7 +115,9 @@ export function WeeklyLessonCard({
   );
 
   const done = lesson.status === "done";
-  const hasTasks = lesson.tasks.length >= 2;
+  // Show the task section / pill for any lesson that has at least one task.
+  // The previous threshold of >= 2 silently hid single-task lessons.
+  const hasTasks = lesson.tasks.length >= 1;
   const timeLabel = lessonTime(lesson);
 
   // ── Stripe — solid by default, dashed when personally modified ────────────

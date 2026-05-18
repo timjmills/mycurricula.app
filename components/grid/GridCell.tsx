@@ -28,7 +28,7 @@
 // click-to-expand, satisfying the touch-conflict note in the brief.
 
 import type { DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import { WeeklyLessonCard } from "@/components/weekly";
 import type { ContextAction, ContextActionPayload } from "@/components/weekly";
@@ -128,6 +128,15 @@ export function GridCell({
   compact = false,
 }: GridCellProps): ReactNode {
   const [dragOver, setDragOver] = useState(false);
+
+  // Clear the local dragOver highlight whenever the drag session ends.
+  // Without this, pressing Escape (which fires onDragEnd on the source
+  // but no onDragLeave on the target) leaves the last-hovered cell
+  // stuck in its .cellDragOver highlight indefinitely.
+  useEffect(() => {
+    if (!draggingId) setDragOver(false);
+  }, [draggingId]);
+
   const isEmpty = lessons.length === 0;
   // Multi-lesson cells collapse by default; only maximized ones show all cards.
   const hasMultiple = lessons.length > 1;

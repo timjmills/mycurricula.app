@@ -299,7 +299,8 @@
   border-left: 2px solid
     color-mix(in oklch, var(--c, var(--ink-200)) 30%, transparent);
   user-select: none;
-  pointer-events: none;
+  /* pointer-events must remain auto so keyboard focus can reach the editor
+     and trigger the onFocusCapture reveal on the parent section. */
 }
 
 .notesVisible {

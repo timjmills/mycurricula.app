@@ -23,7 +23,7 @@ import type { Lesson } from "@/lib/types";
 import { SUBJECT_BY_ID, UNITS, describeStandard, lessonTime } from "@/lib/mock";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
-import { instantiateSections } from "@/lib/lesson-flow";
+import { instantiateSections, newLessonSection } from "@/lib/lesson-flow";
 import type { LessonSectionContent } from "@/lib/lesson-flow";
 import {
   LESSON_TEMPLATE_BY_ID,
@@ -401,6 +401,7 @@ export function LessonDetail({
         {/* Action bar — completion controls + utility icons */}
         <div className={detailStyles.actions}>
           <button
+            type="button"
             className={`${detailStyles.actionBtn} ${lesson.status === "done" ? detailStyles.actionBtnDone : ""}`}
             onClick={cycleStatus}
             aria-label={
@@ -410,7 +411,11 @@ export function LessonDetail({
             <StatusCheckbox status={lesson.status} size={14} />
             {lesson.status === "done" ? "Done" : "Mark done"}
           </button>
-          <button className={detailStyles.actionBtn} aria-label="Change status">
+          <button
+            type="button"
+            className={detailStyles.actionBtn}
+            aria-label="Change status"
+          >
             {/* Three-dots icon */}
             <svg
               width="12"
@@ -426,7 +431,11 @@ export function LessonDetail({
             Status
           </button>
           <div style={{ flex: 1 }} />
-          <button className={detailStyles.actionIcon} aria-label="Print lesson">
+          <button
+            type="button"
+            className={detailStyles.actionIcon}
+            aria-label="Print lesson"
+          >
             {/* Printer icon */}
             <svg
               width="14"
@@ -463,7 +472,11 @@ export function LessonDetail({
               />
             </svg>
           </button>
-          <button className={detailStyles.actionIcon} aria-label="More options">
+          <button
+            type="button"
+            className={detailStyles.actionIcon}
+            aria-label="More options"
+          >
             {/* Vertical three-dots icon */}
             <svg
               width="14"
@@ -612,6 +625,7 @@ export function LessonDetail({
                   key={i}
                   className={detailStyles.resourceItem}
                   role="listitem"
+                  tabIndex={0}
                 >
                   <span
                     className={detailStyles.resourceIcon}
@@ -700,7 +714,12 @@ export function LessonDetail({
         {/* Padlet-style "+ Add section" / "Edit Template" buttons live at
             the bottom of the tinted surface, visually closing the block. */}
         <div className={detailStyles.footer}>
-          <button className={detailStyles.footerBtn}>
+          <button
+            type="button"
+            className={detailStyles.footerBtn}
+            onClick={() => setSections((prev) => [...prev, newLessonSection()])}
+            aria-label="Add a new lesson section"
+          >
             {/* Plus icon */}
             <svg
               width="11"
@@ -730,7 +749,7 @@ export function LessonDetail({
             </svg>
             Add section
           </button>
-          <button className={detailStyles.footerBtn}>
+          <button type="button" className={detailStyles.footerBtn}>
             {/* Template / grid icon */}
             <svg
               width="11"

@@ -123,6 +123,7 @@ export function SectionToolbar({
         }
         onClick={onToggleWebsite}
         icon={<GlobeIcon />}
+        toggle
         active={websiteVisible}
       />
 
@@ -147,6 +148,8 @@ interface ToolbarButtonProps {
   onClick: () => void;
   icon: ReactNode;
   disabled?: boolean;
+  /** When true the button is a toggle and aria-pressed reflects its state. */
+  toggle?: boolean;
   active?: boolean;
   danger?: boolean;
 }
@@ -156,6 +159,7 @@ function ToolbarButton({
   onClick,
   icon,
   disabled = false,
+  toggle = false,
   active = false,
   danger = false,
 }: ToolbarButtonProps): ReactNode {
@@ -174,7 +178,9 @@ function ToolbarButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      aria-pressed={active !== false ? active : undefined}
+      // aria-pressed only on toggle buttons; always a boolean so screen readers
+      // can announce both the on and off states correctly.
+      aria-pressed={toggle ? active : undefined}
     >
       {icon}
       {/* Tooltip — always rendered; opacity controlled by CSS :hover/:focus-visible */}
