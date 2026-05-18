@@ -62,9 +62,9 @@ function weekBounds(lessons: Lesson[]): { min: number; max: number } {
 export function WeeklyGrid(): ReactNode {
   const { style } = useTheme();
   // The visible week is shared planner state — the top-bar week jumper and
-  // this view's WeekNavigator both drive it. editMode drives whether inline
-  // text edits fork the lesson (personal) or update Core Curriculum (master).
-  const { week, setWeek, editMode } = useAppState();
+  // this view's WeekNavigator both drive it. The fork decision (personal vs.
+  // core) now surfaces via SaveTargetDialog on blur, not from editMode directly.
+  const { week, setWeek } = useAppState();
 
   // All lessons live in local state so drag-to-move and the completion
   // checkbox can mutate copies without touching the imported fixture.
@@ -654,24 +654,43 @@ export function WeeklyGrid(): ReactNode {
   /**
    * Inline text edit committed on a lesson card.
    *
-   * In personal mode (the default) the edit constitutes a lazy fork of the
-   * Master lesson: modified and isPersonal are set to true, making the card
-   * show the dashed stripe + "Modified" pill per the three-tier visual contract.
-   *
-   * In master mode the edit goes directly to the Core Curriculum copy — no fork,
-   * no modified flag — because the teacher deliberately toggled into master mode.
+   * This handler now applies only the content patch. The fork decision
+   * (personal vs. core) is deferred to the SaveTargetDialog — the dialog
+   * fires onSaveTarget when the teacher chooses, at which point handleSaveTarget
+   * applies the appropriate fork flags. This keeps the two concerns separate:
+   * editing content vs. deciding who owns the change.
    */
   function handleEditLesson(lessonId: string, patch: Partial<Lesson>): void {
     setLessons((prev) =>
-      prev.map((l) => {
-        if (l.id !== lessonId) return l;
-        const forkFlags: Partial<Lesson> =
-          editMode === "master"
-            ? {} // Master edit: no fork markers
-            : { modified: true, isPersonal: true }; // Personal: lazy fork
-        return { ...l, ...patch, ...forkFlags };
-      }),
+      prev.map((l) => (l.id !== lessonId ? l : { ...l, ...patch })),
     );
+  }
+
+  /**
+   * Save-target chosen in the SaveTargetDialog.
+   *
+   * "personal" → lazy fork: set modified=true, isPersonal=true on the lesson,
+   *   giving it the dashed stripe + "Modified" pill per the three-tier visual
+   *   contract. This mirrors what the old handleEditLesson did in personal mode.
+   *
+   * "core"     → the teacher wants to update the shared Core Curriculum. No fork
+   *   flags are applied — the lesson stays as-is (not marked as personal). In a
+   *   backend-connected version this would write back to the master plan row.
+   */
+  function handleSaveTarget(
+    lessonId: string,
+    target: "personal" | "core",
+  ): void {
+    if (target === "personal") {
+      setLessons((prev) =>
+        prev.map((l) =>
+          l.id !== lessonId ? l : { ...l, modified: true, isPersonal: true },
+        ),
+      );
+    }
+    // "core" path: content patch was already applied in handleEditLesson.
+    // No additional flag mutations — the lesson is intentionally left as
+    // an unforked Core Curriculum entry until the backend lands.
   }
 
   return (
@@ -800,6 +819,7 @@ export function WeeklyGrid(): ReactNode {
               onContextAction={handleContextAction}
               onToggleMaximize={handleToggleMaximize}
               onEditLesson={handleEditLesson}
+              onSaveTarget={handleSaveTarget}
             />
           ))}
         </div>
@@ -845,6 +865,12 @@ interface SubjectRowProps {
   onToggleMaximize: (subjectId: SubjectId, day: number) => void;
   /** Inline text edit committed: threaded to each GridCell → WeeklyLessonCard. */
   onEditLesson: (id: string, patch: Partial<Lesson>) => void;
+  /**
+   * Save-target chosen in the SaveTargetDialog: "personal" forks the lesson
+   * into the teacher's personal copy; "core" writes to the shared Core
+   * Curriculum (no fork). Threaded through to WeeklyLessonCard.
+   */
+  onSaveTarget: (id: string, target: "personal" | "core") => void;
 }
 
 function SubjectRow({
@@ -869,6 +895,7 @@ function SubjectRow({
   onContextAction,
   onToggleMaximize,
   onEditLesson,
+  onSaveTarget,
 }: SubjectRowProps): ReactNode {
   const color = useSubjectColor(subjectId);
   const subject = SUBJECTS.find((s) => s.id === subjectId)!;
@@ -917,6 +944,7 @@ function SubjectRow({
           onContextAction={onContextAction}
           onToggleMaximize={onToggleMaximize}
           onEditLesson={onEditLesson}
+          onSaveTarget={onSaveTarget}
         />
       ))}
     </>

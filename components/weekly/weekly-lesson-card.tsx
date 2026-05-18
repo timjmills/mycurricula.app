@@ -32,6 +32,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent, PointerEvent } from "react";
+import { SaveTargetDialog } from "@/components/weekly/save-target-dialog";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { SUBJECT_BY_ID } from "@/lib/mock";
 import { lessonTime } from "@/lib/mock";
@@ -127,6 +128,14 @@ export interface WeeklyLessonCardProps {
    * the existing onDragStart / onDrop flow.
    */
   onHoldDragStart?: (id: string) => void;
+  /**
+   * Save-target resolved in the SaveTargetDialog. Fired after the teacher
+   * leaves the card and picks where to save their edit: "personal" forks the
+   * lesson into their personal copy; "core" writes directly to the shared Core
+   * Curriculum. If omitted, the dialog still appears but the choice is logged
+   * only (safe for the prototype phase).
+   */
+  onSaveTarget?: (id: string, target: "personal" | "core") => void;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -163,6 +172,7 @@ export function WeeklyLessonCard({
   dragHandleProps,
   onEditLesson,
   onHoldDragStart,
+  onSaveTarget,
 }: WeeklyLessonCardProps) {
   const { style } = useTheme();
   const color = useSubjectColor(lesson.subject);
@@ -171,6 +181,16 @@ export function WeeklyLessonCard({
   const [hovered, setHovered] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+
+  // ── Save-target dialog state ───────────────────────────────────────────
+  // dirty: true when at least one real content change has been committed via
+  // commitEdit since the last save-target decision (or since the card mounted).
+  // saveDialogOpen: the teacher has left the card and we are asking where to save.
+  const [dirty, setDirty] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+
+  // Ref to the card root so onBlurCapture can test containment.
+  const cardRef = useRef<HTMLDivElement>(null);
   // Per-task completion is card-local: the mock fixture is immutable and there
   // is no task-level persistence handler, so the card owns the three-state
   // cycle for each task row. Keyed by task id.
@@ -203,11 +223,14 @@ export function WeeklyLessonCard({
   const [draftValue, setDraftValue] = useState<string>("");
 
   // If the parent re-uses this component instance for a different lesson
-  // (key not changed) we must not show a stale editor or stale section order.
+  // (key not changed) we must not show a stale editor, stale section order,
+  // or a stale dirty flag / open dialog.
   useEffect(() => {
     setEditingField(null);
     setDraftValue("");
     setSectionOrder(DEFAULT_SECTION_ORDER);
+    setDirty(false);
+    setSaveDialogOpen(false);
   }, [lesson.id]);
 
   const done = lesson.status === "done";
@@ -413,6 +436,9 @@ export function WeeklyLessonCard({
     const original = (lesson[editingField] as string) ?? "";
     if (trimmed !== original) {
       onEditLesson?.(lesson.id, { [editingField]: trimmed });
+      // A real change was made — mark this card dirty so the save-target
+      // dialog opens when the teacher leaves the card.
+      setDirty(true);
     }
     setEditingField(null);
     setDraftValue("");
@@ -430,8 +456,41 @@ export function WeeklyLessonCard({
     [lesson.objective],
   );
 
+  // ── Leave-card detection ───────────────────────────────────────────────
+  // onBlurCapture fires when any element inside the card loses focus. We use
+  // the capture phase so we see the event before child stopPropagation calls.
+  // relatedTarget is the element RECEIVING focus — if it is null (page blur)
+  // or is outside the card AND outside the SaveTargetDialog itself, the teacher
+  // has genuinely left the card. We must not re-open the dialog when focus moves
+  // INTO the dialog (otherwise closing the dialog would re-trigger it).
+  const handleCardBlurCapture = useCallback(
+    (e: React.FocusEvent<HTMLDivElement>) => {
+      // If an editor is still active, wait for commitEdit to close it first —
+      // the editor's own blur will fire commitEdit and then the card blur fires.
+      if (editingField) return;
+      // If the dialog is already open, don't re-trigger.
+      if (saveDialogOpen) return;
+      // If dirty flag is not set, nothing to ask about.
+      if (!dirty) return;
+
+      const next = e.relatedTarget as HTMLElement | null;
+
+      // Focus stayed within the card itself — no dialog needed yet.
+      if (next && cardRef.current?.contains(next)) return;
+
+      // Focus moved into the SaveTargetDialog (role="dialog"). Guard against
+      // the dialog opening causing its own blur → re-open loop.
+      if (next?.closest('[role="dialog"]')) return;
+
+      // Genuine card exit with unsaved changes — open the dialog.
+      setSaveDialogOpen(true);
+    },
+    [editingField, saveDialogOpen, dirty],
+  );
+
   return (
     <div
+      ref={cardRef}
       className={`cp-subj ${subject.cls} ${styles.card} ${holdReady ? styles.cardHoldReady : ""}`}
       data-style={style}
       role="group"
@@ -441,6 +500,7 @@ export function WeeklyLessonCard({
       // existing HTML5 DnD flow drive the actual move. At rest, draggable is
       // false so a finger scroll / single click is never hijacked.
       draggable={holdReady}
+      onBlurCapture={handleCardBlurCapture}
       onContextMenu={handleContextMenu}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -1017,6 +1077,30 @@ export function WeeklyLessonCard({
           }}
         />
       )}
+
+      {/* Save-target dialog — fires when the teacher leaves the card after
+          making at least one real content change. Asking "save to Personal
+          or Core?" keeps the forking decision explicit rather than silently
+          writing to the shared Core Curriculum.
+          onClose without a choice defaults to "personal" (safer — never
+          auto-writes to the shared plan) and clears dirty so the dialog
+          won't re-open unless a new edit is committed. */}
+      <SaveTargetDialog
+        open={saveDialogOpen}
+        lessonTitle={stripHtml(lesson.title)}
+        onChoose={(target) => {
+          setSaveDialogOpen(false);
+          setDirty(false);
+          onSaveTarget?.(lesson.id, target);
+        }}
+        onClose={() => {
+          // Dismiss without choosing → default to "personal" (safe fallback:
+          // never silently touch the shared Core Curriculum).
+          setSaveDialogOpen(false);
+          setDirty(false);
+          onSaveTarget?.(lesson.id, "personal");
+        }}
+      />
     </div>
   );
 }

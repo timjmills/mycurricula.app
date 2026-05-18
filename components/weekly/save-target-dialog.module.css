@@ -1,0 +1,357 @@
+/* save-target-dialog.module.css — layout and visual treatment for the
+   SaveTargetDialog pop-up.
+
+   Architecture:
+     • .backdrop   — full-viewport fixed dim overlay; click-to-close target.
+     • .panel      — centered modal card; white surface, shadow-popover.
+     • .header     — heading + lesson-title row.
+     • .choices    — two-column grid of choice buttons on wide viewports;
+                     single column on narrow (< 440 px).
+     • .choiceBtn  — large touch-friendly choice card (≥44px; in practice
+                     much taller). Two variants: Personal (neutral) and
+                     Core (--core-mode token family).
+     • .footer     — Cancel affordance row.
+
+   Color rules:
+     • All color via var(--token) — never hard-coded hex.
+     • Core variant: --core-mode / --core-mode-bg / --core-mode-deep.
+     • Neutral / Personal: --ink-* + --paper.
+
+   Motion: transitions are ~180–200ms. prefers-reduced-motion collapses
+   them to near-instant (0.001ms) per the tokens.css pattern. */
+
+/* ── Backdrop ────────────────────────────────────────────────────────────── */
+/* Full-viewport overlay. Dim (not black) so it reads as "focus shift",
+   not "error". z-index 400 puts it above lesson cards and side-panels
+   but the exact stack value can be adjusted when the app shell lands. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgba(20, 22, 32, 0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  /* Backdrop fades in; the panel slides up simultaneously. */
+  animation: backdropIn 0.18s ease forwards;
+}
+
+@keyframes backdropIn {
+  from {
+    background: rgba(20, 22, 32, 0);
+  }
+  to {
+    background: rgba(20, 22, 32, 0.38);
+  }
+}
+
+/* ── Panel ───────────────────────────────────────────────────────────────── */
+/* White card, shadow-popover, gently rounded. Max-width keeps the layout
+   compact on large monitors — this is an interstitial, not a full modal. */
+.panel {
+  background: var(--paper);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-popover);
+  border: 1px solid var(--ink-150);
+  width: 100%;
+  max-width: 480px;
+  padding: 28px 28px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  outline: none; /* panel is not itself focusable — focus goes to buttons */
+  animation: panelIn 0.18s ease forwards;
+}
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+/* Heading + lesson-title line. Tight vertical grouping — they read as one
+   unit that answers "save what?". */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--t-18);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink-900);
+  letter-spacing: -0.2px;
+}
+
+/* Lesson-title row: a small eyebrow label + the actual title. */
+.lessonLine {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--ink-500);
+  line-height: 1.4;
+}
+
+.lessonLabel {
+  font-weight: 600;
+  color: var(--ink-400);
+  font-size: var(--t-12);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lessonTitle {
+  color: var(--ink-700);
+  font-weight: 500;
+}
+
+/* ── Prompt text ─────────────────────────────────────────────────────────── */
+.prompt {
+  margin: 0;
+  font-size: var(--t-14);
+  color: var(--ink-700);
+  line-height: 1.4;
+  /* Negative gap compensation: pull the prompt closer to the heading block. */
+  margin-top: -8px;
+}
+
+/* ── Choice grid ─────────────────────────────────────────────────────────── */
+/* Two columns on viewports wide enough to show both cards side-by-side.
+   Below 440px they stack vertically — single column keeps the text readable
+   on small phone screens. */
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 440px) {
+  .choices {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Choice button base ──────────────────────────────────────────────────── */
+/* Each button is a tall card-style button: icon on top, label + sub-line
+   below, padding generous enough to satisfy the ≥44px touch target rule
+   (min-height enforces it; actual rendered height is much larger at ~120px). */
+.choiceBtn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 18px 16px 16px;
+  border-radius: var(--r-8);
+  border: 2px solid var(--ink-150);
+  background: var(--ink-50);
+  cursor: pointer;
+  text-align: left;
+  min-height: 44px; /* WCAG 2.5.5 — real height is taller in practice */
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.12s ease;
+  /* Reset browser button defaults that can override font/color. */
+  font-family: var(--font-sans);
+  color: inherit;
+}
+
+.choiceBtn:hover {
+  background: var(--paper);
+  border-color: var(--ink-300);
+  box-shadow: 0 2px 10px rgba(20, 22, 32, 0.08);
+  transform: translateY(-1px);
+}
+
+.choiceBtn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.choiceBtn:focus-visible {
+  /* Double-ring pattern matching the rest of the design system. */
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+  border-color: var(--ink-400);
+}
+
+/* ── Personalized variant ────────────────────────────────────────────────── */
+/* Neutral-tinted: paper/ink family. Reads as the safe, default choice. */
+.choiceBtnPersonal .choiceIcon {
+  color: var(--ink-500);
+  background: var(--ink-100);
+  border: 1px solid var(--ink-200);
+}
+
+.choiceBtnPersonal .choiceTitle {
+  color: var(--ink-900);
+}
+
+.choiceBtnPersonal:hover {
+  border-color: var(--ink-400);
+}
+
+.choiceBtnPersonal:focus-visible {
+  outline-color: var(--ink-900);
+}
+
+/* ── Core variant ────────────────────────────────────────────────────────── */
+/* Uses the --core-mode token family: a soft red/pink that signals "shared,
+   weightier" without reading as an emergency. The border tints pink at rest
+   so the card already carries visual weight before hover. */
+.choiceBtnCore {
+  border-color: color-mix(in oklch, var(--core-mode) 30%, var(--ink-150));
+  background: color-mix(in oklch, var(--core-mode-bg) 60%, var(--ink-50));
+}
+
+.choiceBtnCore .choiceIcon {
+  color: var(--core-mode-deep);
+  background: var(--core-mode-bg);
+  border: 1px solid color-mix(in oklch, var(--core-mode) 35%, transparent);
+}
+
+.choiceBtnCore .choiceTitle {
+  color: var(--core-mode-deep);
+}
+
+.choiceBtnCore .choiceSub {
+  color: color-mix(in oklch, var(--core-mode-deep) 70%, var(--ink-500));
+}
+
+.choiceBtnCore:hover {
+  background: var(--core-mode-bg);
+  border-color: var(--core-mode);
+  box-shadow: 0 2px 10px color-mix(in oklch, var(--core-mode) 20%, transparent);
+}
+
+.choiceBtnCore:focus-visible {
+  outline-color: var(--core-mode-deep);
+  border-color: var(--core-mode);
+}
+
+/* ── Choice icon ─────────────────────────────────────────────────────────── */
+/* Circular/rounded pill that frames the SVG icon. Color is set by each
+   variant above (.choiceBtnPersonal / .choiceBtnCore). */
+.choiceIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-8);
+  flex-shrink: 0;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+/* ── Choice text stack: title + sub-line ─────────────────────────────────── */
+.choiceText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.choiceTitle {
+  font-size: var(--t-14);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.1px;
+}
+
+.choiceSub {
+  font-size: var(--t-12);
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--ink-500);
+  text-wrap: pretty;
+}
+
+/* ── "Shared" badge on the Core button ───────────────────────────────────── */
+/* Positioned at the top-right corner of the Core card. A small pill that
+   reinforces the team-wide nature of this choice without needing extra text
+   in the main copy. */
+.coreBadge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--core-mode-bg);
+  color: var(--core-mode-deep);
+  border: 1px solid color-mix(in oklch, var(--core-mode) 30%, transparent);
+  pointer-events: none; /* badge is decorative; click lands on the button */
+}
+
+/* ── Footer: Cancel ──────────────────────────────────────────────────────── */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--ink-100);
+}
+
+/* Ghost "Cancel" button — low visual weight, clearly below the two primary
+   choices. Min-height ≥44px satisfies the touch target rule. */
+.cancelBtn {
+  font-family: var(--font-sans);
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-500);
+  background: transparent;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--r-6);
+  cursor: pointer;
+  min-height: 44px;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.cancelBtn:hover {
+  background: var(--ink-50);
+  color: var(--ink-700);
+}
+
+.cancelBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+  color: var(--ink-700);
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+/* Collapse all decorative transitions to near-instant; focus rings and
+   border-color changes remain instant either way. Matches the pattern in
+   weekly-lesson-card.module.css and the tokens.css cp-root rule. */
+@media (prefers-reduced-motion: reduce) {
+  .backdrop {
+    animation-duration: 0.001ms !important;
+  }
+
+  .panel {
+    animation-duration: 0.001ms !important;
+  }
+
+  .choiceBtn,
+  .choiceIcon,
+  .cancelBtn {
+    transition-duration: 0.001ms !important;
+  }
+}

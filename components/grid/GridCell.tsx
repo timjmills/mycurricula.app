@@ -103,11 +103,16 @@ interface GridCellProps {
    */
   compact?: boolean;
   /**
-   * Inline text edit committed on a lesson card. The grid applies the patch
-   * (and marks it modified in personal mode). Threaded from WeeklyGrid through
-   * to WeeklyLessonCard.
+   * Inline text edit committed on a lesson card. The grid applies the content
+   * patch. Threaded from WeeklyGrid through to WeeklyLessonCard.
    */
   onEditLesson: (id: string, patch: Partial<Lesson>) => void;
+  /**
+   * Save-target chosen in the SaveTargetDialog after a real edit. "personal"
+   * forks the lesson into the teacher's copy; "core" writes to the shared Core
+   * Curriculum. Threaded from WeeklyGrid through to WeeklyLessonCard.
+   */
+  onSaveTarget: (id: string, target: "personal" | "core") => void;
 }
 
 /** A single day/subject cell: drop target, card stack, empty affordance. */
@@ -133,6 +138,7 @@ export function GridCell({
   onToggleMaximize,
   compact = false,
   onEditLesson,
+  onSaveTarget,
 }: GridCellProps): ReactNode {
   const [dragOver, setDragOver] = useState(false);
 
@@ -208,6 +214,9 @@ export function GridCell({
           onContextAction={onContextAction}
           // onEditLesson: inline text edits committed by the card.
           onEditLesson={onEditLesson}
+          // onSaveTarget: save-target dialog resolved; the card calls this after
+          // the teacher picks "personal" or "core" and clears its dirty flag.
+          onSaveTarget={onSaveTarget}
           // onHoldDragStart: the card's hold timer fired; record the dragging id
           // in the grid so the existing DnD drop handlers can resolve it.
           onHoldDragStart={onDragStart}
