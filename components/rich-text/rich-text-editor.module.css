@@ -239,7 +239,9 @@
 /* ── Palette popover ───────────────────────────────────────────────────────── */
 .palettePopover {
   position: absolute;
-  bottom: calc(100% + 8px);
+  /* Open downward, below the trigger. The toolbar is often pinned near the
+     top of the viewport, so an upward popover would be clipped off-screen. */
+  top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   display: grid;
