@@ -36,6 +36,10 @@
   gap: 2px;
   padding: 4px 6px;
   background: var(--ink-900);
+  /* White text for every button glyph. Set on the toolbar itself because
+     `.cp-root button { color: inherit }` (tokens.css) out-specifies a
+     class on the button, so buttons must inherit white from this parent. */
+  color: var(--paper);
   border-radius: var(--r-8);
   box-shadow: var(--shadow-popover);
   user-select: none;
