@@ -437,8 +437,11 @@
   border-radius: var(--r-2);
 }
 
-/* Single-line variant — clamp to one line, suppress visible overflow */
+/* Single-line variant — "single-line" means Enter is suppressed (no manual
+   line breaks), NOT that long text is clipped. The text still wraps so the
+   whole value stays visible while editing. */
 .editorSingleLine {
-  white-space: nowrap;
-  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
