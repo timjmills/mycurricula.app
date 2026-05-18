@@ -47,3 +47,11 @@ next-env.d.ts
 
 # claude code (agent worktrees, local state)
 /.claude/
+
+# cloudflare / opennext
+/.open-next/
+.dev.vars
+cloudflare-env.d.ts
+
+# jetbrains ide
+/.idea/

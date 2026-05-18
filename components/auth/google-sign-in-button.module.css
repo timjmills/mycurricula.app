@@ -1,0 +1,73 @@
+/* google-sign-in-button.module.css — Google sign-in button.
+ *
+ * The visible button is drawn by Google Identity Services (GSI) into the
+ * `.googleButton` container. Before the GSI script is ready we show a styled
+ * placeholder (`.button`) that mirrors GSI's outlined look so there is no
+ * layout shift when the real button swaps in. The Google glyph carries the
+ * only non-token color (a brand asset); min-height keeps the control above
+ * the WCAG 2.5.5 44px touch-target floor.
+ */
+
+/* GSI-rendered button container. Centered, full width, and height-reserved so
+ * the placeholder → rendered-button swap does not shift the layout. */
+.googleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+}
+
+/* Loading placeholder — matches the GSI "outline" button look while the
+ * external script loads. Disabled and non-interactive by design. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  color: var(--ink-900);
+}
+
+/* Placeholder is always disabled — show it as a passive waiting state. */
+.button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.label {
+  font-size: var(--t-14);
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  white-space: nowrap;
+}
+
+/* Pending text — shown while the ID token is being exchanged with Supabase. */
+.status {
+  margin: 10px 0 0;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-500);
+  text-align: center;
+}
+
+/* Inline retry hint shown if the sign-in itself errors. */
+.error {
+  margin: 10px 0 0;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--core-mode-deep);
+  text-align: center;
+}

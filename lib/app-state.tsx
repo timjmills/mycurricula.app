@@ -16,12 +16,15 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
 import type { ReactNode } from "react";
+import type { User } from "@supabase/supabase-js";
 import type { LessonStatus, SubjectId } from "@/lib/types";
-import { CURRENT_WEEK } from "@/lib/mock";
+import { CURRENT_WEEK, ME } from "@/lib/mock";
+import { createClient } from "@/lib/supabase/client";
 
 /** Low-floor / high-ceiling UI complexity — the top-bar three-way pill. */
 export type ViewMode = "simple" | "task" | "grid";
@@ -46,6 +49,66 @@ const EMPTY_FILTERS: PlannerFilters = {
   standards: [],
   showHolidays: true,
 };
+
+/**
+ * The signed-in teacher, derived from the Supabase Auth session. Until the
+ * session resolves — and whenever the prototype runs without a backend — this
+ * falls back to the mock `ME` so the shell still renders a populated avatar.
+ */
+export interface CurrentUser {
+  /** Supabase auth user id. `null` while loading or when signed out. */
+  id: string | null;
+  name: string;
+  email: string;
+  /** Two-letter monogram for the top-bar avatar. */
+  initials: string;
+  /** Google profile photo URL, when the provider supplies one. */
+  avatarUrl: string | null;
+}
+
+// Pre-session placeholder — the mock lead teacher. Keeps the avatar populated
+// during the first paint and in backend-less prototype runs.
+const FALLBACK_USER: CurrentUser = {
+  id: null,
+  name: ME.name,
+  email: "",
+  initials: ME.initials,
+  avatarUrl: null,
+};
+
+/** Derive a two-letter monogram from a display name, falling back to email. */
+function initialsFrom(name: string, email: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  }
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (email.slice(0, 2) || "?").toUpperCase();
+}
+
+/** Map a Supabase Auth user onto the shell's CurrentUser shape. */
+function toCurrentUser(user: User): CurrentUser {
+  // Google returns the display name and photo under user_metadata; the keys
+  // vary by provider (full_name / name, avatar_url / picture) so we try both.
+  const meta = user.user_metadata ?? {};
+  const email = user.email ?? "";
+  const name =
+    (typeof meta.full_name === "string" && meta.full_name) ||
+    (typeof meta.name === "string" && meta.name) ||
+    email ||
+    "Teacher";
+  const avatarUrl =
+    (typeof meta.avatar_url === "string" && meta.avatar_url) ||
+    (typeof meta.picture === "string" && meta.picture) ||
+    null;
+  return {
+    id: user.id,
+    name,
+    email,
+    initials: initialsFrom(name, email),
+    avatarUrl,
+  };
+}
 
 export interface AppStateValue {
   /** Simple / Task / Advanced — persists per teacher in a real backend. */
@@ -97,6 +160,9 @@ export interface AppStateValue {
   /** Top-bar search query (the results surface is a later increment). */
   search: string;
   setSearch: (q: string) => void;
+
+  /** The signed-in teacher, derived from the Supabase Auth session. */
+  currentUser: CurrentUser;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -129,6 +195,30 @@ export function AppStateProvider({
   const [commentsPanelOpen, setCommentsPanelOpen] = useState<boolean>(false);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [search, setSearch] = useState<string>("");
+
+  // Current user — hydrated from the Supabase Auth session on mount and kept
+  // in sync via onAuthStateChange (sign-in, sign-out, token refresh).
+  const [currentUser, setCurrentUser] = useState<CurrentUser>(FALLBACK_USER);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let active = true;
+
+    const apply = (user: User | null): void => {
+      if (active) setCurrentUser(user ? toCurrentUser(user) : FALLBACK_USER);
+    };
+
+    // Initial read, then subscribe to subsequent auth changes.
+    supabase.auth.getUser().then(({ data }) => apply(data.user));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      apply(session?.user ?? null);
+    });
+
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
 
   const updateFilters = useCallback((patch: Partial<PlannerFilters>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -171,6 +261,7 @@ export function AppStateProvider({
       setSelectedLessonId,
       search,
       setSearch,
+      currentUser,
     }),
     [
       viewMode,
@@ -189,6 +280,7 @@ export function AppStateProvider({
       toggleCommentsPanel,
       selectedLessonId,
       search,
+      currentUser,
     ],
   );
 

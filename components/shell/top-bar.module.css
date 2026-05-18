@@ -450,7 +450,16 @@
   letter-spacing: 0.2px;
   text-decoration: none;
   flex: 0 0 auto;
+  /* Clips the profile photo to the circle. */
+  overflow: hidden;
   transition: background 0.12s ease;
+}
+
+/* Google profile photo — fills the circular avatar. */
+.avatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .avatar:hover {
@@ -460,6 +469,15 @@
 .avatar:focus-visible {
   outline: 2px solid var(--ink-900);
   outline-offset: 2px;
+}
+
+/* ── Sign-out form ──────────────────────────────────────────────────── */
+/* The form is only a POST wrapper around the icon button — it must not add
+ * its own box to the flex row. */
+.signOutForm {
+  display: flex;
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 /* ── Undo / Redo button group ───────────────────────────────────────── */

@@ -1,0 +1,82 @@
+/* login/page.module.css — sign-in screen layout.
+ *
+ * A single centered card on a plain neutral ground, matching the calm
+ * onboarding aesthetic. Color, type, and radius come from tokens only.
+ */
+
+.page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  background: var(--ink-50);
+}
+
+/* The centered sign-in card. */
+.card {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 36px;
+  border-radius: var(--r-12);
+  border: var(--line);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Wordmark ──────────────────────────────────────────────────────── */
+.wordmark {
+  margin-bottom: 28px;
+}
+
+.wordmarkApp {
+  font-size: var(--t-22);
+  font-weight: 700;
+  letter-spacing: -0.6px;
+  color: var(--ink-900);
+}
+
+/* ── Copy ──────────────────────────────────────────────────────────── */
+.heading {
+  margin: 0;
+  font-size: var(--t-18);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--ink-900);
+}
+
+.tagline {
+  margin: 6px 0 0;
+  font-size: var(--t-13);
+  color: var(--ink-500);
+}
+
+/* ── Sign-in failure notice ────────────────────────────────────────── */
+.error {
+  width: 100%;
+  margin: 20px 0 0;
+  padding: 9px 12px;
+  border-radius: var(--r-6);
+  background: var(--core-mode-bg);
+  color: var(--core-mode-deep);
+  font-size: var(--t-12);
+  font-weight: 500;
+}
+
+/* ── Action ────────────────────────────────────────────────────────── */
+.action {
+  width: 100%;
+  margin-top: 28px;
+}
+
+.fineprint {
+  margin: 18px 0 0;
+  font-size: var(--t-11);
+  line-height: 1.5;
+  color: var(--ink-400);
+}

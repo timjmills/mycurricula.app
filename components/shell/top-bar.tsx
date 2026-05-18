@@ -7,17 +7,19 @@
 //   undo/redo → master/personal toggle → view-mode pill → search →
 //   to-do button → comments button (with badge) → profile avatar.
 //
-// State from useAppState(); mock data (ME, LESSONS, CURRENT_WEEK) for badge
-// count and avatar initials. Desktop-first (~1280px); bar scrolls
-// horizontally on narrower viewports.
+// State from useAppState() — including `currentUser`, derived from the
+// Supabase Auth session, for the profile avatar. CURRENT_WEEK (mock) seeds the
+// week jumper. Desktop-first (~1280px); bar scrolls horizontally on narrower
+// viewports.
 
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAppState } from "@/lib/app-state";
+import { useAppState, type CurrentUser } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
-import { ME, CURRENT_WEEK } from "@/lib/mock";
+import { CURRENT_WEEK } from "@/lib/mock";
 import styles from "./top-bar.module.css";
 
 // ── View definitions ─────────────────────────────────────────────────────
@@ -58,6 +60,7 @@ export function TopBar(): ReactNode {
     toggleTodoPanel,
     commentsPanelOpen,
     toggleCommentsPanel,
+    currentUser,
   } = useAppState();
 
   const { undo, redo, canUndo, canRedo, undoLabel, redoLabel, lessons } =
@@ -351,14 +354,60 @@ export function TopBar(): ReactNode {
       </div>
 
       {/* ── Profile avatar → settings ─────────────────────────────── */}
-      <Link
-        href="/settings/appearance"
-        className={styles.avatar}
-        aria-label={`Profile settings (${ME.name})`}
-      >
-        {ME.initials}
-      </Link>
+      {/* Keyed on the photo URL so ProfileAvatar's load-error state resets
+          whenever the signed-in user changes. */}
+      <ProfileAvatar
+        key={currentUser.avatarUrl ?? "initials"}
+        user={currentUser}
+      />
+
+      {/* ── Sign out ──────────────────────────────────────────────── */}
+      {/* Native form POST to the /auth/signout route handler, which clears
+          the Supabase session and redirects to /login. A plain form keeps
+          this working even if the icon button loses its JS handler. */}
+      <form action="/auth/signout" method="post" className={styles.signOutForm}>
+        <button
+          type="submit"
+          className={styles.iconBtn}
+          aria-label="Sign out"
+          title="Sign out"
+        >
+          <SignOutIcon />
+        </button>
+      </form>
     </header>
+  );
+}
+
+// ── Profile avatar ───────────────────────────────────────────────────────
+// Renders the Google profile photo when the session supplies one; on a load
+// failure — or when no photo exists — it falls back to the initials monogram.
+// The parent keys this component on the photo URL, so the load-error state
+// resets cleanly whenever the signed-in user changes.
+
+function ProfileAvatar({ user }: { user: CurrentUser }): ReactNode {
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const showPhoto = Boolean(user.avatarUrl) && !photoFailed;
+
+  return (
+    <Link
+      href="/settings/appearance"
+      className={styles.avatar}
+      aria-label={`Profile settings (${user.name})`}
+    >
+      {showPhoto ? (
+        <Image
+          src={user.avatarUrl!}
+          alt=""
+          width={32}
+          height={32}
+          className={styles.avatarImg}
+          onError={() => setPhotoFailed(true)}
+        />
+      ) : (
+        user.initials
+      )}
+    </Link>
   );
 }
 
@@ -516,6 +565,27 @@ function RedoIcon(): ReactNode {
     >
       <path d="M21 7v6h-6" />
       <path d="M21 13C18.6 7.4 11.7 4.5 6 7c-3.4 1.5-5.5 4.7-5.5 8.2" />
+    </svg>
+  );
+}
+
+// Door with an exiting arrow — standard sign-out glyph.
+function SignOutIcon(): ReactNode {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   );
 }
