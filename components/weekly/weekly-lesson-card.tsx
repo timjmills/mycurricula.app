@@ -25,12 +25,12 @@
 // Gesture coordination (three non-overlapping intents):
 //   single click   → onSelect / expand (via handleCardClick / toggleExpand)
 //   double-click   → inline text editing (suppresses expand via stopPropagation)
-//   press-and-hold → pick-up to drag (280ms hold timer, sets holdReady state)
+//   press-and-hold → pick-up to drag (2-second hold timer, sets holdReady state)
 //
 // Types re-exported so the sibling board agent can import without a deep path:
 //   export type { ContextAction, ContextActionPayload }
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent, PointerEvent } from "react";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { SUBJECT_BY_ID } from "@/lib/mock";
@@ -110,10 +110,24 @@ export interface WeeklyLessonCardProps {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-// Hold threshold: pointer must be down this long before the card enters
-// "ready to move" state. 280ms is short enough to feel responsive but
-// long enough to distinguish from a tap/click.
-const HOLD_MS = 280;
+// Hold threshold: the pointer must be held down on the card for this long
+// before it enters the "ready to move" state. A deliberate 2-second hold so
+// a move is always intentional — never triggered by an ordinary click.
+const HOLD_MS = 2000;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+/**
+ * Strip HTML tags from a string so that RTE-edited HTML values are safe to
+ * use in aria-label / title attributes (plain-text contexts).
+ * Runs client-side only; falls back to the raw string during SSR (acceptable
+ * because aria-labels are never used server-side for correctness).
+ */
+function stripHtml(html: string): string {
+  if (typeof document === "undefined") return html;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return tmp.textContent ?? tmp.innerText ?? html;
+}
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -145,7 +159,7 @@ export function WeeklyLessonCard({
   );
 
   // ── Hold-to-drag state ─────────────────────────────────────────────────
-  // holdReady: the 280ms timer has fired and the card is armed for dragging.
+  // holdReady: the 2-second timer has fired and the card is armed for dragging.
   // While holdReady, the card root is draggable (so a subsequent pointermove
   // triggers HTML5 DnD) and shows the lift/grab visual signal.
   const [holdReady, setHoldReady] = useState(false);
@@ -159,6 +173,13 @@ export function WeeklyLessonCard({
   // draftValue: the in-progress string the teacher is typing.
   const [editingField, setEditingField] = useState<EditableField | null>(null);
   const [draftValue, setDraftValue] = useState<string>("");
+
+  // If the parent re-uses this component instance for a different lesson
+  // (key not changed) we must not show a stale editor from the previous lesson.
+  useEffect(() => {
+    setEditingField(null);
+    setDraftValue("");
+  }, [lesson.id]);
 
   const done = lesson.status === "done";
   // Show the task section / pill for any lesson that has at least one task.
@@ -280,7 +301,7 @@ export function WeeklyLessonCard({
   }, [onToggleComplete, lesson.id, lesson.status]);
 
   // ── Hold-to-drag handlers ──────────────────────────────────────────────
-  // pointerdown on the card body starts the 280ms hold timer. If the pointer
+  // pointerdown on the card body starts the 2-second hold timer. If the pointer
   // is released, cancelled, or moves more than 8px before the timer fires, the
   // gesture is treated as a click and holdReady stays false.
 
@@ -338,12 +359,14 @@ export function WeeklyLessonCard({
   // ── Inline editing handlers ────────────────────────────────────────────
 
   // Open an editor for `field`, seeding the draft from the lesson's current value.
+  // `e` is optional so keyboard handlers can call this without a synthetic event.
   const openEditor = useCallback(
-    (field: EditableField, e: MouseEvent) => {
-      // Block propagation so the double-click never reaches the band's expand
-      // handler or the card's select handler — editing must not resize the cell.
-      e.stopPropagation();
-      e.preventDefault();
+    (field: EditableField, e?: React.SyntheticEvent) => {
+      // Block propagation so the double-click / Enter never reaches the band's
+      // expand handler or the card's select handler — editing must not resize
+      // the cell or toggle selection.
+      e?.stopPropagation();
+      e?.preventDefault();
       cancelHoldTimer();
       setEditingField(field);
       setDraftValue(lesson[field] as string);
@@ -383,7 +406,7 @@ export function WeeklyLessonCard({
       className={`cp-subj ${subject.cls} ${styles.card} ${holdReady ? styles.cardHoldReady : ""}`}
       data-style={style}
       role="group"
-      aria-label={`${subject.name} lesson: ${lesson.title}`}
+      aria-label={`${subject.name} lesson: ${stripHtml(lesson.title)}`}
       tabIndex={0}
       // The card root becomes draggable only when holdReady — this lets the
       // existing HTML5 DnD flow drive the actual move. At rest, draggable is
@@ -438,7 +461,9 @@ export function WeeklyLessonCard({
         aria-atomic="true"
         className={styles.srOnly}
       >
-        {holdReady ? `${lesson.title} ready to drag. Drag to move it.` : ""}
+        {holdReady
+          ? `${stripHtml(lesson.title)} ready to drag. Drag to move it.`
+          : ""}
       </div>
 
       {/* ── Header band ─────────────────────────────────────────────────── */}
@@ -472,7 +497,7 @@ export function WeeklyLessonCard({
               status={lesson.status}
               size={15}
               onCycle={cycleComplete}
-              label={`Mark "${lesson.title}" — current status ${lesson.status}`}
+              label={`Mark "${stripHtml(lesson.title)}" — current status ${lesson.status}`}
             />
           </div>
 
@@ -581,8 +606,14 @@ export function WeeklyLessonCard({
           ) : (
             <span
               className={styles.editableText}
+              tabIndex={0}
+              role="button"
+              aria-label="Edit lesson title"
               onDoubleClick={(e) => openEditor("title", e)}
-              title="Double-click to edit"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "F2") openEditor("title", e);
+              }}
+              title="Double-click or press Enter to edit"
               // eslint-disable-next-line react/no-danger
               dangerouslySetInnerHTML={{ __html: lesson.title }}
             />
@@ -620,8 +651,15 @@ export function WeeklyLessonCard({
             ) : (
               <span
                 className={styles.editableText}
+                tabIndex={0}
+                role="button"
+                aria-label="Edit lesson preview"
                 onDoubleClick={(e) => openEditor("preview", e)}
-                title="Double-click to edit"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "F2")
+                    openEditor("preview", e);
+                }}
+                title="Double-click or press Enter to edit"
                 // eslint-disable-next-line react/no-danger
                 dangerouslySetInnerHTML={{ __html: lesson.preview }}
               />
@@ -649,8 +687,15 @@ export function WeeklyLessonCard({
                   <p
                     className={`${styles.sectionText} ${styles.editableText}`}
                     style={{ fontStyle: "italic", color: "var(--ink-700)" }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Edit lesson objective"
                     onDoubleClick={(e) => openEditor("objective", e)}
-                    title="Double-click to edit"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === "F2")
+                        openEditor("objective", e);
+                    }}
+                    title="Double-click or press Enter to edit"
                     // eslint-disable-next-line react/no-danger
                     dangerouslySetInnerHTML={{ __html: objectiveBody }}
                   />
@@ -677,8 +722,15 @@ export function WeeklyLessonCard({
                 <p
                   className={`${styles.sectionText} ${styles.editableText}`}
                   style={{ color: "var(--ink-700)" }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label="Edit lesson directions"
                   onDoubleClick={(e) => openEditor("directions", e)}
-                  title="Double-click to edit"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "F2")
+                      openEditor("directions", e);
+                  }}
+                  title="Double-click or press Enter to edit"
                   // eslint-disable-next-line react/no-danger
                   dangerouslySetInnerHTML={{ __html: lesson.directions }}
                 />
@@ -717,8 +769,15 @@ export function WeeklyLessonCard({
                   ) : (
                     <p
                       className={`${styles.notesBody} ${styles.editableText}`}
+                      tabIndex={0}
+                      role="button"
+                      aria-label="Edit teacher notes"
                       onDoubleClick={(e) => openEditor("notes", e)}
-                      title="Double-click to edit notes"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "F2")
+                          openEditor("notes", e);
+                      }}
+                      title="Double-click or press Enter to edit"
                       // eslint-disable-next-line react/no-danger
                       dangerouslySetInnerHTML={{ __html: lesson.notes ?? "" }}
                     />
@@ -940,12 +999,19 @@ function RichEditorWrapper({
       // use position:fixed / portal, so check relatedTarget to avoid false
       // triggers when the user clicks a toolbar button).
       onBlur={(e) => {
-        // relatedTarget is null when focus leaves the page entirely, or points
-        // to the element receiving focus. If it is outside our wrapper AND
-        // outside the floating toolbar (which has role="toolbar"), commit.
+        // relatedTarget points to the element receiving focus (null = page blur
+        // or focus leaving the document entirely → commit in both cases).
         const next = e.relatedTarget as HTMLElement | null;
-        // Allow focus to move to the floating toolbar without committing.
+
+        // 1. Focus stayed within the wrapper DOM subtree (handles the case where
+        //    the toolbar is position:fixed but still in the DOM under us).
+        if (next && (e.currentTarget as HTMLElement).contains(next)) return;
+
+        // 2. Focus moved to the floating rich-text toolbar (role="toolbar")
+        //    rendered by RichTextEditor — identified by role so it works even
+        //    when CSS transform/stacking context moves the rendered position.
         if (next?.closest('[role="toolbar"]')) return;
+
         onCommit();
       }}
       onKeyDown={(e) => {

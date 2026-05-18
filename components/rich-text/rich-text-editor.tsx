@@ -155,10 +155,14 @@ const FONT_OPTIONS: FontOption[] = [
  * Resolve a CSS custom property to its computed value on <html>.
  * Falls back to the string unchanged when it is not a custom-property name
  * (so literal colors and font stacks pass through unmodified).
- * Must only be called in browser context — never during SSR render.
+ * Returns the variable name unchanged during SSR (no document available).
+ * Must only be called in browser context for meaningful results — all
+ * critical calls are in event handlers; render-path calls are guarded by
+ * toolbarVisible (client-only state), so this is safe in practice.
  */
 function resolveCssVar(variable: string): string {
   if (!variable.startsWith("--")) return variable; // already a concrete value
+  if (typeof document === "undefined") return variable; // SSR guard
   return getComputedStyle(document.documentElement)
     .getPropertyValue(variable)
     .trim();
@@ -202,7 +206,12 @@ function ToolbarButton({
     <button
       type="button"
       aria-label={label}
-      aria-pressed={active}
+      // aria-pressed is only set when the caller passes active=true (toggle
+      // buttons: bold, italic, etc.). Action-only buttons (insert link, list
+      // commands) pass active={false} and must NOT carry aria-pressed at all —
+      // a persistent aria-pressed="false" tells screen readers the button is a
+      // toggle that is currently off, which is misleading for one-shot actions.
+      aria-pressed={active ? true : undefined}
       title={label}
       className={`${styles.tbBtn} ${active ? styles.tbBtnActive : ""} cp-focusable`}
       onMouseDown={onMouseDown}

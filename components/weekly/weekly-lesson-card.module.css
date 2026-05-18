@@ -170,8 +170,8 @@
   align-items: center;
   justify-content: center;
   color: var(--cd, var(--ink-500));
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink-900) 10%, transparent);
   border-radius: var(--r-2);
   padding: 3px;
   transition:
@@ -185,7 +185,7 @@
 }
 
 .affordance:hover .affordanceVisual {
-  background: rgba(255, 255, 255, 0.8);
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
 }
 
 .affordance:focus-visible {
@@ -488,9 +488,12 @@
   background: color-mix(in srgb, currentColor 6%, transparent);
 }
 
+/* Show the same hover hint on keyboard focus so teachers can discover
+   the edit affordance without a mouse. */
 .editableText:focus-visible {
   outline: 2px solid var(--c, var(--ink-700));
   outline-offset: 1px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
 }
 
 /* Suppress the edit cursor hint while the card is in hold-ready state so
@@ -522,8 +525,10 @@
   font-size: var(--t-14);
   font-weight: 600;
   line-height: 1.25;
-  /* Faint translucent panel so the editor region reads against the tinted band. */
-  background: rgba(255, 255, 255, 0.22);
+  /* Faint translucent panel so the editor region reads against the tinted band.
+     Uses color-mix to express 22% paper on a transparent base without a
+     hard-coded hex — stays correct when --paper changes. */
+  background: color-mix(in srgb, var(--paper) 22%, transparent);
   border-radius: var(--r-4);
   padding: 2px 4px;
   /* Min-width ensures the field is always at least as wide as the band title. */

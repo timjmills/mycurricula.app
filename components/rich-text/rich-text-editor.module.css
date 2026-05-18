@@ -170,9 +170,15 @@
   font-weight: 700;
   font-family: var(--font-sans);
   line-height: 1;
-  /* Gradient suggestion of "color" — stops use literal values since
-     CSS gradient in a var() can't reference other vars reliably. */
-  background: linear-gradient(135deg, #2b6cff 0%, #d4488f 50%, #e26a3a 100%);
+  /* Gradient spanning math-blue → spelling-pink → ufli-orange to suggest
+     the full color palette. var() works inside linear-gradient in all
+     browsers that support CSS custom properties (every browser we support). */
+  background: linear-gradient(
+    135deg,
+    var(--math) 0%,
+    var(--spelling) 50%,
+    var(--ufli) 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -183,8 +189,12 @@
   font-weight: 700;
   font-family: var(--font-sans);
   line-height: 1;
-  /* Yellow-tinted to suggest highlight */
-  background: linear-gradient(135deg, #fdf3d2 20%, #e8a91a 100%);
+  /* Yellow-tinted to suggest highlight — uses design tokens. */
+  background: linear-gradient(
+    135deg,
+    var(--important-bg) 20%,
+    var(--tag-amber) 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -209,7 +219,7 @@
 .divider {
   display: block;
   width: 1px;
-  height: 16px;
+  height: var(--t-16);
   background: rgba(255, 255, 255, 0.12);
   margin: 0 3px;
   flex-shrink: 0;
@@ -289,12 +299,12 @@
 
 /* ── Swatch button ─────────────────────────────────────────────────────────── */
 .swatch {
-  /* 28×28 touch target containing a 16×16 visual swatch */
+  /* 28×28 touch target — uses --t-28 token (28px) */
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--t-28);
+  height: var(--t-28);
   border-radius: var(--r-4);
   border: 1.5px solid rgba(255, 255, 255, 0.1);
   cursor: pointer;
@@ -326,7 +336,7 @@
   content: "";
   position: absolute;
   width: 1.5px;
-  height: 14px;
+  height: var(--t-14);
   background: var(--ink-400);
   border-radius: 1px;
 }
