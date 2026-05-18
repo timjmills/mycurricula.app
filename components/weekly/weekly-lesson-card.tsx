@@ -411,6 +411,11 @@ export function WeeklyLessonCard({
       onBlurCapture={handleCardBlurCapture}
       onContextMenu={handleContextMenu}
       onKeyDown={(e) => {
+        // Only the card root itself toggles on Enter/Space. Keystrokes that
+        // bubbled up from an inner control (a text editor, a button) must be
+        // left alone — otherwise preventDefault here eats newlines and spaces
+        // while a teacher is typing in a cell.
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           handleCardClick();

@@ -196,13 +196,13 @@ export function TopBar(): ReactNode {
 
       <div className={styles.divider} aria-hidden="true" />
 
-      {/* ── View-mode pill (Simple | Task | Advanced) ─────────────── */}
+      {/* ── View-mode pill (Simple | Task | Grid) ─────────────────── */}
       <div
         className={styles.viewModePill}
         role="group"
         aria-label="View detail level"
       >
-        {(["simple", "task", "advanced"] as const).map((mode) => (
+        {(["simple", "task", "grid"] as const).map((mode) => (
           <button
             key={mode}
             type="button"

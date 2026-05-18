@@ -24,7 +24,7 @@ import type { LessonStatus, SubjectId } from "@/lib/types";
 import { CURRENT_WEEK } from "@/lib/mock";
 
 /** Low-floor / high-ceiling UI complexity — the top-bar three-way pill. */
-export type ViewMode = "simple" | "task" | "advanced";
+export type ViewMode = "simple" | "task" | "grid";
 
 /** Personal-first (default) vs. the gated team-wide Master surface. */
 export type EditMode = "personal" | "master";
@@ -118,7 +118,7 @@ interface AppStateProviderProps {
 export function AppStateProvider({
   children,
 }: AppStateProviderProps): ReactNode {
-  const [viewMode, setViewMode] = useState<ViewMode>("advanced");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [editMode, setEditMode] = useState<EditMode>("personal");
   const [week, setWeek] = useState<number>(CURRENT_WEEK);
   const [selectedDay, setSelectedDay] = useState<number>(0);
