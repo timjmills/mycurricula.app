@@ -84,13 +84,9 @@ const TEXT_COLORS: ColorSwatch[] = [
   { label: "SEL slate", variable: "--sel" },
 ];
 
-// Normal (saturated) highlight colors — vivid enough to stand out.
-const HIGHLIGHT_NORMAL: ColorSwatch[] = [
-  { label: "Important yellow", variable: "--important-bg" },
-  { label: "FYI blue", variable: "--fyi-bg" },
-  { label: "Catch-up orange", variable: "--catchup-bg" },
-  { label: "Urgent red", variable: "--urgent-bg" },
-];
+// Highlight offers the same swatches as the text-color picker, so any
+// font color can equally be applied as a highlight (plus the pastel set).
+const HIGHLIGHT_COLORS: ColorSwatch[] = TEXT_COLORS;
 
 // Pastel (soft tint) highlight colors — the subject light tokens, softer tones.
 const HIGHLIGHT_PASTEL: ColorSwatch[] = [
@@ -706,13 +702,13 @@ export function RichTextEditor({
                   />
                 </div>
 
-                {/* Normal (saturated) highlight set */}
+                {/* Font-color set — the same swatches as the text-color picker */}
                 <div className={styles.paletteSection}>
                   <span className={styles.paletteSectionLabel} aria-hidden>
-                    Normal
+                    Colors
                   </span>
                   <div className={styles.swatchRow}>
-                    {HIGHLIGHT_NORMAL.map((swatch) => (
+                    {HIGHLIGHT_COLORS.map((swatch) => (
                       <SwatchButton
                         key={swatch.variable}
                         label={swatch.label}
