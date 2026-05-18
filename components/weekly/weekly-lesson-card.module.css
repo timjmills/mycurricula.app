@@ -499,50 +499,48 @@
   cursor: inherit;
 }
 
-/* ── Inline editors ──────────────────────────────────────────────────────── */
-/* Single-line input used for the lesson title. Inherits the band's font
-   and color (set inline); this rule handles geometry and focus ring only. */
-.editInput {
-  display: block;
+/* ── Rich-text editor hosting ────────────────────────────────────────────── */
+/* RichEditorWrapper: the outer shell that holds a RichTextEditor instance.
+   The RichTextEditor's floating toolbar uses position:fixed so it escapes
+   overflow:hidden on the card root. Note: if the card's CSS transform is
+   active at the same time as an editor (e.g. holdReady), position:fixed
+   coordinates are relative to the transformed element — in practice this
+   cannot happen because handleBodyPointerDown guards `if (editingField) return`,
+   so the two states are mutually exclusive. */
+.richEditorWrap {
+  /* Allow the editor region to expand past the collapsed card width if needed;
+     the floating toolbar (position:fixed) is viewport-positioned and never
+     clipped by this element. */
+  position: relative;
   width: 100%;
+}
+
+/* Title field: match the band headline scale and colour context. The editor
+   itself is borderless; the band background provides the visual frame.
+   A subtle inset focus ring appears via the editor's own :focus-visible rule. */
+.richEditorTitle {
   font-size: var(--t-14);
   font-weight: 600;
   line-height: 1.25;
-  padding: 1px 3px;
-  border: 1.5px solid var(--c, var(--ink-500));
+  /* Faint translucent panel so the editor region reads against the tinted band. */
+  background: rgba(255, 255, 255, 0.22);
   border-radius: var(--r-4);
-  background: rgba(255, 255, 255, 0.55);
-  outline: none;
-  resize: none;
+  padding: 2px 4px;
+  /* Min-width ensures the field is always at least as wide as the band title. */
+  min-width: 0;
 }
 
-.editInput:focus-visible {
-  border-color: var(--c, var(--ink-700));
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--c, var(--ink-700)) 20%, transparent);
-}
-
-/* Multi-line textarea used for preview, objective, directions, and notes.
-   Matches the body text scale and stretches to fill its content section. */
-.editTextarea {
-  display: block;
-  width: 100%;
+/* Body fields (preview, objective, directions, notes): match body text scale.
+   No fixed height — content grows. min-height gives a comfortable click target. */
+.richEditorBody {
   font-size: var(--t-12);
   line-height: 1.5;
-  padding: 3px 5px;
-  border: 1.5px solid var(--c, var(--ink-500));
-  border-radius: var(--r-4);
-  background: var(--paper);
   color: var(--ink-700);
-  outline: none;
-  resize: vertical;
+  background: var(--paper);
+  border: 1.5px solid var(--c, var(--ink-400));
+  border-radius: var(--r-4);
+  padding: 4px 6px;
   min-height: 52px;
-}
-
-.editTextarea:focus-visible {
-  border-color: var(--c, var(--ink-700));
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--c, var(--ink-700)) 20%, transparent);
 }
 
 /* ── Screen-reader only utility ──────────────────────────────────────────── */

@@ -52,6 +52,7 @@ import {
 } from "@/components/lesson-card/parts";
 import { cycleStatus } from "@/components/lesson-card/status";
 import { TaskRow } from "@/components/lesson-card/task-row";
+import { RichTextEditor } from "@/components/rich-text";
 import styles from "./weekly-lesson-card.module.css";
 import "@/components/lesson-card/lesson-card.css";
 
@@ -351,10 +352,14 @@ export function WeeklyLessonCard({
   );
 
   // Commit the edited value; a no-op if nothing changed.
+  // draftValue is now an HTML string produced by RichTextEditor.
   const commitEdit = useCallback(() => {
     if (!editingField) return;
+    // Trim only the outer HTML string (not inner tags). A bare whitespace-only
+    // value equals the original when the field was already empty.
     const trimmed = draftValue.trim();
-    if (trimmed !== (lesson[editingField] as string)) {
+    const original = (lesson[editingField] as string) ?? "";
+    if (trimmed !== original) {
       onEditLesson?.(lesson.id, { [editingField]: trimmed });
     }
     setEditingField(null);
@@ -551,7 +556,7 @@ export function WeeklyLessonCard({
         {/* Lesson title — prominent second line of the band. Weight 600,
             one size step up from before, so it reads as the headline of
             the labeled zone rather than a secondary detail.
-            Double-click enters inline edit mode (suppresses expand). */}
+            Double-click enters inline rich-text edit mode (suppresses expand). */}
         <h3
           className={styles.bandTitle}
           style={{
@@ -561,23 +566,26 @@ export function WeeklyLessonCard({
           }}
         >
           {editingField === "title" ? (
-            <EditableInput
-              value={draftValue}
-              onChange={setDraftValue}
+            <RichEditorWrapper
               onCommit={commitEdit}
               onCancel={cancelEdit}
-              className={styles.editInput}
-              style={{ color: color.cd, background: "transparent" }}
-              aria-label="Edit lesson title"
-            />
+              className={styles.richEditorTitle}
+            >
+              <RichTextEditor
+                value={draftValue}
+                onChange={setDraftValue}
+                singleLine
+                ariaLabel="Edit lesson title"
+              />
+            </RichEditorWrapper>
           ) : (
             <span
               className={styles.editableText}
               onDoubleClick={(e) => openEditor("title", e)}
               title="Double-click to edit"
-            >
-              {lesson.title}
-            </span>
+              // eslint-disable-next-line react/no-danger
+              dangerouslySetInnerHTML={{ __html: lesson.title }}
+            />
           )}
         </h3>
 
@@ -597,22 +605,26 @@ export function WeeklyLessonCard({
         {!expanded ? (
           <p className={styles.preview} style={{ color: "var(--ink-700)" }}>
             {editingField === "preview" ? (
-              <EditableTextarea
-                value={draftValue}
-                onChange={setDraftValue}
+              <RichEditorWrapper
                 onCommit={commitEdit}
                 onCancel={cancelEdit}
-                className={styles.editTextarea}
-                aria-label="Edit lesson preview"
-              />
+                className={styles.richEditorBody}
+              >
+                <RichTextEditor
+                  value={draftValue}
+                  onChange={setDraftValue}
+                  placeholder="Lesson preview…"
+                  ariaLabel="Edit lesson preview"
+                />
+              </RichEditorWrapper>
             ) : (
               <span
                 className={styles.editableText}
                 onDoubleClick={(e) => openEditor("preview", e)}
                 title="Double-click to edit"
-              >
-                {lesson.preview}
-              </span>
+                // eslint-disable-next-line react/no-danger
+                dangerouslySetInnerHTML={{ __html: lesson.preview }}
+              />
             )}
           </p>
         ) : (
@@ -621,24 +633,27 @@ export function WeeklyLessonCard({
             {lesson.objective && (
               <SectionRow label="I Can" accent={color.cl} ink={color.cd}>
                 {editingField === "objective" ? (
-                  <EditableTextarea
-                    value={draftValue}
-                    onChange={setDraftValue}
+                  <RichEditorWrapper
                     onCommit={commitEdit}
                     onCancel={cancelEdit}
-                    className={styles.editTextarea}
-                    style={{ fontStyle: "italic" }}
-                    aria-label="Edit lesson objective"
-                  />
+                    className={styles.richEditorBody}
+                  >
+                    <RichTextEditor
+                      value={draftValue}
+                      onChange={setDraftValue}
+                      placeholder="I can…"
+                      ariaLabel="Edit lesson objective"
+                    />
+                  </RichEditorWrapper>
                 ) : (
                   <p
                     className={`${styles.sectionText} ${styles.editableText}`}
                     style={{ fontStyle: "italic", color: "var(--ink-700)" }}
                     onDoubleClick={(e) => openEditor("objective", e)}
                     title="Double-click to edit"
-                  >
-                    {objectiveBody}
-                  </p>
+                    // eslint-disable-next-line react/no-danger
+                    dangerouslySetInnerHTML={{ __html: objectiveBody }}
+                  />
                 )}
               </SectionRow>
             )}
@@ -646,23 +661,27 @@ export function WeeklyLessonCard({
             {/* Directions section — double-click text to edit inline */}
             <SectionRow label="Directions" accent={color.cl} ink={color.cd}>
               {editingField === "directions" ? (
-                <EditableTextarea
-                  value={draftValue}
-                  onChange={setDraftValue}
+                <RichEditorWrapper
                   onCommit={commitEdit}
                   onCancel={cancelEdit}
-                  className={styles.editTextarea}
-                  aria-label="Edit lesson directions"
-                />
+                  className={styles.richEditorBody}
+                >
+                  <RichTextEditor
+                    value={draftValue}
+                    onChange={setDraftValue}
+                    placeholder="Directions…"
+                    ariaLabel="Edit lesson directions"
+                  />
+                </RichEditorWrapper>
               ) : (
                 <p
                   className={`${styles.sectionText} ${styles.editableText}`}
                   style={{ color: "var(--ink-700)" }}
                   onDoubleClick={(e) => openEditor("directions", e)}
                   title="Double-click to edit"
-                >
-                  {lesson.directions}
-                </p>
+                  // eslint-disable-next-line react/no-danger
+                  dangerouslySetInnerHTML={{ __html: lesson.directions }}
+                />
               )}
             </SectionRow>
 
@@ -683,22 +702,26 @@ export function WeeklyLessonCard({
                 </button>
                 {notesOpen &&
                   (editingField === "notes" ? (
-                    <EditableTextarea
-                      value={draftValue}
-                      onChange={setDraftValue}
+                    <RichEditorWrapper
                       onCommit={commitEdit}
                       onCancel={cancelEdit}
-                      className={`${styles.notesBody} ${styles.editTextarea}`}
-                      aria-label="Edit teacher notes"
-                    />
+                      className={`${styles.notesBody} ${styles.richEditorBody}`}
+                    >
+                      <RichTextEditor
+                        value={draftValue}
+                        onChange={setDraftValue}
+                        placeholder="Teacher notes…"
+                        ariaLabel="Edit teacher notes"
+                      />
+                    </RichEditorWrapper>
                   ) : (
                     <p
                       className={`${styles.notesBody} ${styles.editableText}`}
                       onDoubleClick={(e) => openEditor("notes", e)}
                       title="Double-click to edit notes"
-                    >
-                      {lesson.notes}
-                    </p>
+                      // eslint-disable-next-line react/no-danger
+                      dangerouslySetInnerHTML={{ __html: lesson.notes ?? "" }}
+                    />
                   ))}
               </SectionRow>
             )}
@@ -887,101 +910,56 @@ function SectionRow({
   );
 }
 
-// ── EditableInput ─────────────────────────────────────────────────────────────
-// Single-line inline editor used for the lesson title field. Commits on
-// Enter or blur; cancels on Escape. Auto-focuses when mounted.
+// ── RichEditorWrapper ─────────────────────────────────────────────────────────
+// Thin shell that hosts a RichTextEditor instance inside the card. Handles the
+// three editing gestures that the card cares about but that RichTextEditor does
+// not expose as props:
+//   • Escape           → cancel (discard draft)
+//   • blur out of area → commit (focusout fires when focus leaves both the
+//                         editor AND the floating toolbar — relatedTarget check)
+//   • click / dblclick  → stopPropagation so the card's expand handler is deaf
+//
+// Sizing is supplied through `className` so callers (title vs. body fields)
+// can independently constrain width, font, and min-height via CSS Modules.
 
-function EditableInput({
-  value,
-  onChange,
+function RichEditorWrapper({
   onCommit,
   onCancel,
   className,
-  style,
-  "aria-label": ariaLabel,
+  children,
 }: {
-  value: string;
-  onChange: (v: string) => void;
   onCommit: () => void;
   onCancel: () => void;
   className?: string;
-  style?: CSSProperties;
-  "aria-label"?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <input
-      type="text"
-      value={value}
-      className={className}
-      style={style}
-      aria-label={ariaLabel}
-      autoFocus
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onCommit}
+    <div
+      className={`${styles.richEditorWrap} ${className ?? ""}`}
+      // Commit when focus genuinely leaves this subtree (editor + toolbar both
+      // use position:fixed / portal, so check relatedTarget to avoid false
+      // triggers when the user clicks a toolbar button).
+      onBlur={(e) => {
+        // relatedTarget is null when focus leaves the page entirely, or points
+        // to the element receiving focus. If it is outside our wrapper AND
+        // outside the floating toolbar (which has role="toolbar"), commit.
+        const next = e.relatedTarget as HTMLElement | null;
+        // Allow focus to move to the floating toolbar without committing.
+        if (next?.closest('[role="toolbar"]')) return;
+        onCommit();
+      }}
       onKeyDown={(e) => {
-        // Enter commits; Escape cancels; both stop the event so it doesn't
-        // bubble up to the card's own keydown handler.
-        if (e.key === "Enter") {
-          e.preventDefault();
-          e.stopPropagation();
-          onCommit();
-        } else if (e.key === "Escape") {
+        if (e.key === "Escape") {
           e.preventDefault();
           e.stopPropagation();
           onCancel();
         }
       }}
+      // Block card-level pointer events so the editor doesn't expand/select.
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
-    />
-  );
-}
-
-// ── EditableTextarea ──────────────────────────────────────────────────────────
-// Multi-line inline editor used for preview, objective, directions, and notes.
-// Commits on blur or Ctrl+Enter / Cmd+Enter. Escape cancels. Auto-focuses.
-
-function EditableTextarea({
-  value,
-  onChange,
-  onCommit,
-  onCancel,
-  className,
-  style,
-  "aria-label": ariaLabel,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onCommit: () => void;
-  onCancel: () => void;
-  className?: string;
-  style?: CSSProperties;
-  "aria-label"?: string;
-}) {
-  return (
-    <textarea
-      value={value}
-      className={className}
-      style={style}
-      aria-label={ariaLabel}
-      autoFocus
-      rows={3}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onCommit}
-      onKeyDown={(e) => {
-        // Ctrl/Cmd+Enter commits; Escape cancels; plain Enter is a newline.
-        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-          e.preventDefault();
-          e.stopPropagation();
-          onCommit();
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          e.stopPropagation();
-          onCancel();
-        }
-      }}
-      onClick={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
-    />
+    >
+      {children}
+    </div>
   );
 }

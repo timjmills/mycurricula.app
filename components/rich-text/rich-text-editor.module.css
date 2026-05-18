@@ -2,16 +2,19 @@
    Floating dark toolbar + borderless contentEditable region.
 
    Design language:
-     • Toolbar: near-black pill surface (--ink-900), compact 32px buttons,
-       white glyphs, popover shadow. Appears above the selection.
-     • Swatches: 16×16 rounded squares, 2-column grid in the popover.
+     • Toolbar: near-black pill surface (--ink-900), compact 28px buttons,
+       white glyphs, popover shadow. Appears above the selection. Can wrap
+       on narrow viewports — groups stay visually intact with flex-wrap.
+     • Swatches: 28×28 touch targets (16×16 visual) in the palette popovers.
+     • Highlight popover: two labeled sections — Normal (saturated) and
+       Pastel (soft tint) — plus a Clear row, separated by section labels.
      • Editor: no border itself — the parent card/field provides the frame.
      • All sizing via var(--t-*) and var(--r-*) tokens; no hard-coded px on
        colors, fonts, or semantic spacing.
 
-   Touch targets: toolbar buttons are 32px visual / 36px touch (comfortable
-   for a dense formatting bar — see CLAUDE.md §toolbar note). Swatch buttons
-   are 28×28 touch targets with 16×16 visual swatches inside.
+   Touch targets: toolbar buttons are 28px visual / 36px touch (comfortable
+   for a dense formatting bar). Swatch buttons are 28×28 touch targets with
+   16×16 visual swatches inside.
 */
 
 /* ── Root wrapper ──────────────────────────────────────────────────────────── */
@@ -27,12 +30,17 @@
   z-index: 9999;
   display: flex;
   align-items: center;
+  /* flex-wrap allows the toolbar to reflow on narrow viewports rather than
+     truncating — controls stay in their logical groups */
+  flex-wrap: wrap;
   gap: 2px;
   padding: 4px 6px;
   background: var(--ink-900);
   border-radius: var(--r-8);
   box-shadow: var(--shadow-popover);
   user-select: none;
+  /* Cap width so the toolbar doesn't span the full page on wide screens */
+  max-width: calc(100vw - 16px);
   /* Entrance: fade + small upward lift */
   animation: tbReveal 0.14s ease both;
 }
@@ -111,6 +119,50 @@
   font-family: var(--font-sans);
   font-weight: 500;
   line-height: 1;
+}
+
+/* Strikethrough glyph */
+.iconS {
+  font-size: var(--t-13);
+  text-decoration: line-through;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* Subscript / superscript — compact, using native HTML sub/sup inside the span
+   so the visual matches the actual effect in the editor. */
+.iconScript {
+  font-size: var(--t-12);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.iconScript sub,
+.iconScript sup {
+  font-size: 0.65em;
+  font-weight: 500;
+}
+
+/* List icons — short text glyphs approximating list controls */
+.iconList {
+  font-size: var(--t-12);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  /* Prevent emoji rendering on the checklist ☐ */
+  font-variant-emoji: text;
+}
+
+/* Insert icons (link, image) — emoji rendered at toolbar scale */
+.iconInsert {
+  font-size: var(--t-14);
+  line-height: 1;
+  /* Force emoji presentation for the unicode icons */
+  font-variant-emoji: emoji;
 }
 
 .iconColor {
@@ -195,6 +247,46 @@
   }
 }
 
+/* ── Highlight popover — sectioned layout ──────────────────────────────────── */
+/* Overrides the generic grid to use a column layout with labeled sections. */
+.highlightPopover {
+  /* Reset the grid and use a column flex for the section rows */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  grid-template-columns: unset;
+  min-width: 192px;
+  padding: 10px;
+}
+
+/* A labeled section inside the highlight popover */
+.paletteSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Small muted label above each swatch row ("Normal", "Pastel", "Clear") */
+.paletteSectionLabel {
+  font-size: var(--t-10);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--ink-400);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1;
+  /* Prevent the label from receiving pointer events */
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Horizontal row of swatches within a section */
+.swatchRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 /* ── Swatch button ─────────────────────────────────────────────────────────── */
 .swatch {
   /* 28×28 touch target containing a 16×16 visual swatch */
@@ -210,6 +302,7 @@
     transform 0.1s ease,
     border-color 0.1s ease;
   position: relative;
+  flex-shrink: 0;
 }
 
 .swatch:hover {

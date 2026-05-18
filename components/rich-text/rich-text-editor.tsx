@@ -4,10 +4,14 @@
 //
 // Design: a borderless contentEditable region. On text selection a compact
 // floating toolbar surfaces above/below the selection with:
-//   • Bold / Italic / Underline (execCommand shortcuts)
+//   • Bold / Italic / Underline / Strikethrough (execCommand shortcuts)
+//   • Subscript (X₂) and Superscript (X²)      (execCommand)
 //   • Text-color palette  — ink ramp + all 8 subject colors
-//   • Highlight palette   — status light-bg tokens + subject lights + clear
-//   • Font-family picker  — Sans / Mono / Serif / System
+//   • Highlight palette   — normal (saturated) set + pastel (soft tint) set + clear
+//   • Font-family picker  — Sans / Serif / Mono / System / Humanist (5 options)
+//   • Numbered list / Bullet list / Checklist   (execCommand / best-effort)
+//   • Link (createLink via execCommand)          (prompts for URL)
+//   • Image (insertImage via execCommand)        (prompts for URL)
 //
 // Caret safety: the component is UNCONTROLLED for typing. It syncs `value`
 // into the DOM only on mount and when an externally-driven value change is
@@ -23,6 +27,11 @@
 // risk in the current single-user prototype. When multi-user persistence
 // lands (Supabase backend), sanitize stored HTML with DOMPurify before
 // trusting it from the server.
+//
+// execCommand note: document.execCommand is deprecated in the spec but is
+// universally supported in all current browsers and is the pragmatic choice
+// for a contentEditable prototype. All document/window access is guarded so
+// it never runs during SSR render.
 
 import {
   useCallback,
@@ -75,20 +84,24 @@ const TEXT_COLORS: ColorSwatch[] = [
   { label: "SEL slate", variable: "--sel" },
 ];
 
-const HIGHLIGHT_COLORS: ColorSwatch[] = [
-  { label: "No highlight", variable: "transparent" },
+// Normal (saturated) highlight colors — vivid enough to stand out.
+const HIGHLIGHT_NORMAL: ColorSwatch[] = [
   { label: "Important yellow", variable: "--important-bg" },
   { label: "FYI blue", variable: "--fyi-bg" },
   { label: "Catch-up orange", variable: "--catchup-bg" },
   { label: "Urgent red", variable: "--urgent-bg" },
-  { label: "Math light", variable: "--math-light" },
-  { label: "Reading light", variable: "--reading-light" },
-  { label: "Writing light", variable: "--writing-light" },
-  { label: "Grammar light", variable: "--grammar-light" },
-  { label: "Spelling light", variable: "--spelling-light" },
-  { label: "UFLI light", variable: "--ufli-light" },
-  { label: "Explorers light", variable: "--explorers-light" },
-  { label: "SEL light", variable: "--sel-light" },
+];
+
+// Pastel (soft tint) highlight colors — the subject light tokens, softer tones.
+const HIGHLIGHT_PASTEL: ColorSwatch[] = [
+  { label: "Math pastel", variable: "--math-light" },
+  { label: "Reading pastel", variable: "--reading-light" },
+  { label: "Writing pastel", variable: "--writing-light" },
+  { label: "Grammar pastel", variable: "--grammar-light" },
+  { label: "Spelling pastel", variable: "--spelling-light" },
+  { label: "UFLI pastel", variable: "--ufli-light" },
+  { label: "Explorers pastel", variable: "--explorers-light" },
+  { label: "SEL pastel", variable: "--sel-light" },
 ];
 
 interface FontOption {
@@ -104,6 +117,7 @@ interface FontOption {
   css: string;
 }
 
+// Five distinct font options covering the main stylistic categories.
 const FONT_OPTIONS: FontOption[] = [
   {
     label: "Sans",
@@ -111,19 +125,27 @@ const FONT_OPTIONS: FontOption[] = [
     css: "var(--font-sans)",
   },
   {
-    label: "Mono",
-    variable: "--font-mono",
-    css: "var(--font-mono)",
-  },
-  {
     label: "Serif",
     variable: "Georgia, 'Times New Roman', serif",
     css: "Georgia, 'Times New Roman', serif",
   },
   {
+    label: "Mono",
+    variable: "--font-mono",
+    css: "var(--font-mono)",
+  },
+  {
     label: "System",
     variable: "system-ui, sans-serif",
     css: "system-ui, sans-serif",
+  },
+  {
+    // Humanist option — warmer, rounder than geometric sans; gives
+    // teachers a friendlier alternative for lesson notes.
+    label: "Humanist",
+    variable:
+      "'Trebuchet MS', 'Gill Sans', 'Gill Sans MT', Calibri, sans-serif",
+    css: "'Trebuchet MS', 'Gill Sans', 'Gill Sans MT', Calibri, sans-serif",
   },
 ];
 
@@ -143,7 +165,8 @@ function resolveCssVar(variable: string): string {
 }
 
 /** Safely call document.execCommand (deprecated but pragmatic for a
- *  prototype — universally supported in all modern browsers). */
+ *  prototype — universally supported in all modern browsers). All callers
+ *  are in event handlers so this only runs in the browser. */
 function exec(command: string, value = ""): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (document as any).execCommand(command, false, value || undefined);
@@ -233,10 +256,14 @@ export function RichTextEditor({
   const [toolbarVisible, setToolbarVisible] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0 });
 
-  // Which inline states are active at the current selection
+  // Which inline states are active at the current selection.
+  // queryCommandState guards are in event handlers (browser-only).
   const [bold, setBold] = useState(false);
   const [italic, setItalic] = useState(false);
   const [underline, setUnderline] = useState(false);
+  const [strikethrough, setStrikethrough] = useState(false);
+  const [subscript, setSubscript] = useState(false);
+  const [superscript, setSuperscript] = useState(false);
 
   // Whether the editor content is empty (for placeholder).
   // Initial state: treat as empty when value is blank or a bare <br>.
@@ -244,10 +271,10 @@ export function RichTextEditor({
     () => !value || value === "<br>" || value === "<br/>",
   );
 
-  // Font picker open state
+  // Font picker open state.
   const [fontOpen, setFontOpen] = useState(false);
 
-  // Color/highlight palette open state
+  // Color/highlight palette open state.
   const [paletteOpen, setPaletteOpen] = useState<"color" | "highlight" | null>(
     null,
   );
@@ -282,10 +309,13 @@ export function RichTextEditor({
       return;
     }
 
-    // Read format state.
+    // Read format state for all toggle commands.
     setBold(document.queryCommandState("bold"));
     setItalic(document.queryCommandState("italic"));
     setUnderline(document.queryCommandState("underline"));
+    setStrikethrough(document.queryCommandState("strikeThrough"));
+    setSubscript(document.queryCommandState("subscript"));
+    setSuperscript(document.queryCommandState("superscript"));
 
     // Position toolbar above the selection rect, clamped to viewport.
     // The toolbar uses position:fixed, so coordinates must be viewport-relative.
@@ -293,8 +323,9 @@ export function RichTextEditor({
     // add window.scrollY / window.scrollX (that would misplace the toolbar on
     // any scrolled page).
     const rect = range.getBoundingClientRect();
-    const toolbarH = 42; // approximate toolbar height
-    const toolbarW = 340; // approximate toolbar width
+    // Wider estimate: toolbar can wrap, so account for the full button set.
+    const toolbarH = 42;
+    const toolbarW = 520;
     const gap = 8;
 
     let top = rect.top - toolbarH - gap;
@@ -363,10 +394,13 @@ export function RichTextEditor({
       e.preventDefault(); // prevent blur before execCommand
       editorRef.current?.focus();
       exec(command, value);
-      // Re-read format state after command.
+      // Re-read all toggle-command states after the command.
       setBold(document.queryCommandState("bold"));
       setItalic(document.queryCommandState("italic"));
       setUnderline(document.queryCommandState("underline"));
+      setStrikethrough(document.queryCommandState("strikeThrough"));
+      setSubscript(document.queryCommandState("subscript"));
+      setSuperscript(document.queryCommandState("superscript"));
       // Report the updated HTML.
       const html = editorRef.current?.innerHTML ?? "";
       lastWrittenRef.current = html;
@@ -406,6 +440,77 @@ export function RichTextEditor({
       setFontOpen(false);
     },
     [applyCommand],
+  );
+
+  // ── Link / Image handlers ───────────────────────────────────────────
+  // These use window.prompt for the URL — acceptable for a teacher-only
+  // prototype tool. Replace with an inline popover when a richer UI is needed.
+
+  const applyLink = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      // Preserve the selection range before the prompt steals focus.
+      const sel = window.getSelection();
+      const savedRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+
+      const url = window.prompt("Enter link URL:", "https://");
+      if (!url || !url.trim()) return; // cancelled or empty
+
+      // Restore the selection that may have been lost while the prompt was open.
+      if (savedRange && sel) {
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
+      }
+
+      editorRef.current?.focus();
+      exec("createLink", url.trim());
+      const html = editorRef.current?.innerHTML ?? "";
+      lastWrittenRef.current = html;
+      onChange(html);
+    },
+    [onChange],
+  );
+
+  const applyImage = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const sel = window.getSelection();
+      const savedRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+
+      const url = window.prompt("Enter image URL:", "https://");
+      if (!url || !url.trim()) return;
+
+      if (savedRange && sel) {
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
+      }
+
+      editorRef.current?.focus();
+      exec("insertImage", url.trim());
+      const html = editorRef.current?.innerHTML ?? "";
+      lastWrittenRef.current = html;
+      onChange(html);
+    },
+    [onChange],
+  );
+
+  // ── Checklist (best-effort) ─────────────────────────────────────────
+  // True interactive checklists in contentEditable require complex DOM
+  // bookkeeping beyond execCommand. This best-effort implementation inserts
+  // a "☐ " prefix on each selected line so teachers can visually track
+  // checkbox items. Items are plain text markers, not interactive inputs.
+  const applyChecklist = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      editorRef.current?.focus();
+      // Insert a checkbox character + non-breaking-space before the selection.
+      // execCommand('insertText') places it at the caret or replaces selection.
+      exec("insertText", "☐ ");
+      const html = editorRef.current?.innerHTML ?? "";
+      lastWrittenRef.current = html;
+      onChange(html);
+    },
+    [onChange],
   );
 
   // ── Paste handler ───────────────────────────────────────────────────
@@ -460,7 +565,7 @@ export function RichTextEditor({
           // Prevent toolbar clicks from stealing focus away from selection.
           onMouseDown={(e) => e.preventDefault()}
         >
-          {/* Bold / Italic / Underline */}
+          {/* ── Group 1: Inline text formatting ── */}
           <ToolbarButton
             label="Bold"
             active={bold}
@@ -485,8 +590,40 @@ export function RichTextEditor({
             <span className={styles.iconU}>U</span>
           </ToolbarButton>
 
+          <ToolbarButton
+            label="Strikethrough"
+            active={strikethrough}
+            onMouseDown={(e) => applyCommand(e, "strikeThrough")}
+          >
+            <span className={styles.iconS}>S</span>
+          </ToolbarButton>
+
           <span className={styles.divider} aria-hidden />
 
+          {/* ── Group 2: Script formatting ── */}
+          <ToolbarButton
+            label="Subscript (X₂)"
+            active={subscript}
+            onMouseDown={(e) => applyCommand(e, "subscript")}
+          >
+            <span className={styles.iconScript}>
+              X<sub>₂</sub>
+            </span>
+          </ToolbarButton>
+
+          <ToolbarButton
+            label="Superscript (X²)"
+            active={superscript}
+            onMouseDown={(e) => applyCommand(e, "superscript")}
+          >
+            <span className={styles.iconScript}>
+              X<sup>²</sup>
+            </span>
+          </ToolbarButton>
+
+          <span className={styles.divider} aria-hidden />
+
+          {/* ── Group 3: Color pickers ── */}
           {/* Text color trigger */}
           <div className={styles.paletteGroup}>
             <ToolbarButton
@@ -542,30 +679,111 @@ export function RichTextEditor({
 
             {paletteOpen === "highlight" && (
               <div
-                className={styles.palettePopover}
+                className={`${styles.palettePopover} ${styles.highlightPopover}`}
                 role="group"
                 aria-label="Highlight color palette"
               >
-                {HIGHLIGHT_COLORS.map((swatch) => (
+                {/* Clear highlight */}
+                <div className={styles.paletteSection}>
+                  <span className={styles.paletteSectionLabel} aria-hidden>
+                    Clear
+                  </span>
                   <SwatchButton
-                    key={swatch.variable}
-                    label={swatch.label}
-                    color={
-                      swatch.variable === "transparent"
-                        ? "transparent"
-                        : resolveCssVar(swatch.variable)
-                    }
-                    isNone={swatch.variable === "transparent"}
-                    onMouseDown={(e) => applyHighlight(e, swatch.variable)}
+                    key="transparent"
+                    label="No highlight"
+                    color="transparent"
+                    isNone
+                    onMouseDown={(e) => applyHighlight(e, "transparent")}
                   />
-                ))}
+                </div>
+
+                {/* Normal (saturated) highlight set */}
+                <div className={styles.paletteSection}>
+                  <span className={styles.paletteSectionLabel} aria-hidden>
+                    Normal
+                  </span>
+                  <div className={styles.swatchRow}>
+                    {HIGHLIGHT_NORMAL.map((swatch) => (
+                      <SwatchButton
+                        key={swatch.variable}
+                        label={swatch.label}
+                        color={resolveCssVar(swatch.variable)}
+                        onMouseDown={(e) => applyHighlight(e, swatch.variable)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pastel (soft tint) highlight set */}
+                <div className={styles.paletteSection}>
+                  <span className={styles.paletteSectionLabel} aria-hidden>
+                    Pastel
+                  </span>
+                  <div className={styles.swatchRow}>
+                    {HIGHLIGHT_PASTEL.map((swatch) => (
+                      <SwatchButton
+                        key={swatch.variable}
+                        label={swatch.label}
+                        color={resolveCssVar(swatch.variable)}
+                        onMouseDown={(e) => applyHighlight(e, swatch.variable)}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
           <span className={styles.divider} aria-hidden />
 
-          {/* Font family picker */}
+          {/* ── Group 4: Lists ── */}
+          <ToolbarButton
+            label="Numbered list"
+            active={false}
+            onMouseDown={(e) => applyCommand(e, "insertOrderedList")}
+          >
+            <span className={styles.iconList}>1≡</span>
+          </ToolbarButton>
+
+          <ToolbarButton
+            label="Bullet list"
+            active={false}
+            onMouseDown={(e) => applyCommand(e, "insertUnorderedList")}
+          >
+            {/* Unicode bullet + rule approximating the list icon */}
+            <span className={styles.iconList}>•≡</span>
+          </ToolbarButton>
+
+          <ToolbarButton
+            label="Checklist (inserts ☐ marker)"
+            active={false}
+            onMouseDown={applyChecklist}
+          >
+            <span className={styles.iconList}>☐</span>
+          </ToolbarButton>
+
+          <span className={styles.divider} aria-hidden />
+
+          {/* ── Group 5: Insert ── */}
+          <ToolbarButton
+            label="Insert link"
+            active={false}
+            onMouseDown={applyLink}
+          >
+            <span className={styles.iconInsert}>🔗</span>
+          </ToolbarButton>
+
+          <ToolbarButton
+            label="Insert image"
+            active={false}
+            onMouseDown={applyImage}
+          >
+            <span className={styles.iconInsert}>🖼</span>
+          </ToolbarButton>
+
+          <span className={styles.divider} aria-hidden />
+
+          {/* ── Group 6: Font family picker ── */}
           <div className={styles.paletteGroup}>
             <ToolbarButton
               label="Font family"
