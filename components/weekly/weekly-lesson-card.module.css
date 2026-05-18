@@ -143,10 +143,11 @@
   white-space: nowrap;
 }
 
-/* ── Affordance cluster — drag + ⋯ ────────────────────────────────────────── */
+/* ── Affordance cluster — drag handle + ⋯ ──────────────────────────────────── */
 /* Each affordance is a full 44×44 touch target (iPad minimum).
    Negative margin on the row pulls targets back so they don't bloat the band.
-   Dim by default, fully visible on hover/focus; touch always full (no hover). */
+   The ⋯ button dims at rest and reveals on hover/focus. The drag handle is
+   always visible so teachers can discover the move affordance at a glance. */
 .affordanceRow {
   display: inline-flex;
   align-items: center;
@@ -163,6 +164,11 @@
   background: transparent;
   opacity: 0.5;
   transition: opacity 0.12s ease;
+}
+
+/* Drag handle: always fully visible — it is the primary move affordance. */
+.dragHandle {
+  opacity: 1;
 }
 
 .affordanceVisual {
@@ -556,26 +562,9 @@
   margin-top: 2px;
 }
 
-/* ── Hold-ready state ────────────────────────────────────────────────────── */
-/* Applied to the card root when the 280ms hold timer has fired and the card
-   is armed for dragging. The visual lift (scale + shadow) signals "you can
-   drag this now". Inline styles drive the color-reactive parts (border,
-   box-shadow) — this class adds the z-index bump so the lifted card floats
-   above its siblings, and locks pointer-events so a quick move doesn't get
-   swallowed by a child element. */
-.cardHoldReady {
-  z-index: 2;
-  /* Snap back quickly when the teacher releases without dragging. */
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease,
-    border-color 0.12s ease;
-}
-
 /* ── Editable text regions ───────────────────────────────────────────────── */
-/* Any text region that supports double-click editing shows a faint underline
-   hint on hover so the affordance is discoverable. The hint is suppressed
-   entirely when a hold is in progress (cursor is already "grab"). */
+/* Any text region that supports double-click editing shows a faint background
+   hint on hover so the affordance is discoverable. */
 .editableText {
   cursor: text;
   border-radius: var(--r-2);
@@ -594,20 +583,12 @@
   background: color-mix(in srgb, currentColor 6%, transparent);
 }
 
-/* Suppress the edit cursor hint while the card is in hold-ready state so
-   the "grab" cursor from the parent wins without a cursor conflict. */
-.cardHoldReady .editableText {
-  cursor: inherit;
-}
-
 /* ── Rich-text editor hosting ────────────────────────────────────────────── */
 /* RichEditorWrapper: the outer shell that holds a RichTextEditor instance.
    The RichTextEditor's floating toolbar uses position:fixed so it escapes
-   overflow:hidden on the card root. Note: if the card's CSS transform is
-   active at the same time as an editor (e.g. holdReady), position:fixed
-   coordinates are relative to the transformed element — in practice this
-   cannot happen because handleBodyPointerDown guards `if (editingField) return`,
-   so the two states are mutually exclusive. */
+   overflow:hidden on the card root. The card root has no CSS transform
+   active during editing, so position:fixed coordinates are always
+   viewport-relative and the toolbar renders correctly. */
 .richEditorWrap {
   /* Allow the editor region to expand past the collapsed card width if needed;
      the floating toolbar (position:fixed) is viewport-positioned and never
@@ -664,7 +645,6 @@
 /* Collapse all decorative transitions; focus rings remain instant always. */
 @media (prefers-reduced-motion: reduce) {
   .card,
-  .cardHoldReady,
   .caret,
   .affordance,
   .affordanceVisual,

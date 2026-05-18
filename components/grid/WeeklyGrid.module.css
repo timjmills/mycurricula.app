@@ -5,11 +5,6 @@
  * card styles (quiet/calm/vivid) and palette types (normal/highlight) are
  * driven by `data-style` / `data-palette` on <html> — this file only
  * styles the grid chrome, never the Lesson Card itself.
- *
- * Compact / move-mode: the `.gridCompact` modifier makes cells slim so the
- * entire 8-subjects × 5-days grid fits on screen and lessons can be
- * rearranged without scrolling. Entered automatically during a drag or
- * manually via the Move-mode toggle button in the header.
  */
 
 /* ── Page shell ─────────────────────────────────────────────────────── */
@@ -130,10 +125,11 @@
   cursor: not-allowed;
 }
 
-/* ── Move-mode toolbar ──────────────────────────────────────────────────
- * A slim bar immediately below the WeekNavigator's sticky header.
- * Sticky itself so it stays pinned when the grid scrolls. The z-index is
- * one below the navigator's (20) so they stack cleanly. */
+/* ── Toolbar ────────────────────────────────────────────────────────────
+ * A slim bar immediately below the WeekNavigator's sticky header holding
+ * the Expand all / Minimize all controls. Sticky itself so it stays pinned
+ * when the grid scrolls. The z-index is one below the navigator's (20) so
+ * they stack cleanly. */
 .moveToolbar {
   display: flex;
   align-items: center;
@@ -149,11 +145,9 @@
   z-index: 19;
 }
 
-/* ── Move-mode toggle button ────────────────────────────────────────────
- * Sits in the navbar controls row alongside the week arrows. At rest it
- * looks like the other ghost controls; when active it takes a tinted
- * background to signal that move mode is on.
- * Touch target: min 44px height, >= 44px width via padding.
+/* ── Toolbar buttons (Expand all / Minimize all) ────────────────────────
+ * Ghost-style controls; touch target: min 44px height, ≥44px width via
+ * padding.
  */
 .moveModeBtn {
   display: inline-flex;
@@ -183,19 +177,7 @@
   outline-offset: 2px;
 }
 
-/* Active state: tinted background signals move mode is on. */
-.moveModeBtnActive {
-  background: color-mix(in oklch, var(--math) 10%, var(--paper));
-  border-color: color-mix(in oklch, var(--math) 40%, var(--ink-200));
-  color: var(--math-deep);
-}
-
-.moveModeBtnActive:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--math) 16%, var(--paper));
-  border-color: color-mix(in oklch, var(--math) 55%, var(--ink-200));
-}
-
-/* Separator between move-mode button and the week-nav arrows. */
+/* Separator between toolbar controls and the week-nav arrows. */
 .navSep {
   width: 1px;
   height: 28px;
@@ -221,19 +203,6 @@
   column-gap: 3px;
   row-gap: 0;
   min-width: 1082px;
-}
-
-/* ── Compact / move-mode grid ───────────────────────────────────────────
- * .gridCompact narrows the day columns so the full grid fits on-screen,
- * and reduces cell padding. Subject label column stays at 132px; each
- * day column shrinks to a fixed slim width.
- *
- * The max-height transition on .cell animates the contraction when the
- * teacher picks up a lesson (or toggles Move mode). The transition is
- * suppressed by tokens.css's prefers-reduced-motion override on .cp-root.
- */
-.gridCompact {
-  grid-template-columns: 132px repeat(5, minmax(120px, 1fr));
 }
 
 /* ── Day header row ─────────────────────────────────────────────────── */
@@ -341,61 +310,6 @@
   transition:
     border-color 0.12s ease,
     background 0.12s ease;
-}
-
-/* Compact cell — slim, one-line chip list. The max-height transition
- * animates the contraction so entering move mode feels smooth.
- * The transition property added here composes with the base cell's
- * border-color / background transitions declared above.
- *
- * max-height: 0 is not used because cells with chips must show their
- * content. Instead a generous compact value keeps chips visible while
- * eliminating the large white space from full cards.
- *
- * prefers-reduced-motion: tokens.css already sets transition-duration to
- * 0.001ms on .cp-root * — this transition is automatically suppressed. */
-.cellCompact {
-  min-height: 30px;
-  max-height: 200px;
-  padding: 2px 3px;
-  gap: 2px;
-  overflow: hidden;
-  transition:
-    min-height 0.18s ease,
-    max-height 0.18s ease,
-    padding 0.18s ease,
-    border-color 0.12s ease,
-    background 0.12s ease;
-}
-
-/* Empty-cell compact: a slim drop-target strip. */
-.cellCompact .emptyCell {
-  min-height: 26px;
-  border-radius: var(--r-4);
-  gap: 0;
-}
-
-/* Hide the hint text and add-button in compact empty cells —
- * the border alone communicates "droppable here". */
-.cellCompact .emptyHint,
-.cellCompact .cellAdd {
-  display: none;
-}
-
-/* Hide the inline add and the collapse button — not needed in move mode. */
-.cellCompact .cellAddInline,
-.cellCompact .collapseBtn {
-  display: none;
-}
-
-/* ── Compact chip list ─────────────────────────────────────────────────
- * Vertical stack of one-line LessonChip rows inside a compact cell.
- * Each chip is ~28px, so 8-lesson cells stay under 250px in the
- * rare worst case. */
-.chipList {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 /* Drop target highlight — subject-tinted border while a card hovers over. */

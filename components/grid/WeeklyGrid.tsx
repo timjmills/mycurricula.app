@@ -9,7 +9,8 @@
 // Drag-and-drop uses native HTML5 DnD. Moving a card across days updates
 // local state only — the mock fixture is never mutated and there is no
 // persistence (per the task brief). A move keeps the lesson in the same
-// subject row; only the `day` changes.
+// subject row; only the `day` changes. Lessons are moved by dragging from
+// the move-handle icon in the card header band — the only drag affordance.
 //
 // Split-slot layout: a lesson dropped with a DropRegion can be arranged
 // side-by-side (half-left / half-right), stacked in a new row (above /
@@ -76,14 +77,6 @@ export function WeeklyGrid(): ReactNode {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // maximizedCell — only one cell is expanded at a time. Key = `${subjectId}:${day}`.
   const [maximizedCell, setMaximizedCell] = useState<string | null>(null);
-
-  // ── Compact / move-mode state ────────────────────────────────────────
-  // compact is true when either a drag is in progress (draggingId ≠ null)
-  // or the teacher has toggled Move mode on manually.
-  // compactManual persists between drags so the teacher can keep move mode
-  // on while rearranging multiple lessons.
-  const [compactManual, setCompactManual] = useState(false);
-  const compact = compactManual || draggingId !== null;
 
   // ── Drag auto-scroll ─────────────────────────────────────────────────
   // A ref to the scroll container so the dragOver handler can read its
@@ -696,22 +689,9 @@ export function WeeklyGrid(): ReactNode {
   return (
     <div className={styles.page}>
       {/*
-       * WeekNavigator is rendered by the WeekNavigator component (which owns
-       * the navbar shell and the prev/next/today controls). The Move-mode
-       * toggle is placed here, in a sibling wrapper inside the same navbar,
-       * because WeekNavigator.tsx is read-only by convention (the agent owns
-       * only WeeklyGrid.tsx, GridCell.tsx, WeeklyGrid.module.css). We render
-       * a separate header row that contains both the WeekNavigator and the
-       * move-mode button so the visual grouping stays correct.
-       *
-       * Implementation note: WeekNavigator renders a full <header> with
-       * class .navbar. Rather than wrapping that, we inject the toggle as an
-       * adjacent element styled to float into the same visual row. A flex
-       * container wraps both and we use CSS to keep them aligned.
-       *
-       * Simpler alternative chosen: render a second sticky bar below the
-       * WeekNavigator's sticky header that holds the toggle. This keeps the
-       * two components fully decoupled.
+       * WeekNavigator owns the navbar shell and the prev/next/today controls.
+       * The toolbar bar (Expand all / Minimize all) renders as a separate
+       * sticky bar immediately below so the two components stay decoupled.
        */}
       <WeekNavigator
         week={week}
@@ -721,25 +701,11 @@ export function WeeklyGrid(): ReactNode {
         onChange={setWeek}
       />
 
-      {/* ── Move-mode toolbar ──────────────────────────────────────────
-          A slim secondary bar beneath the week navigator that holds the
-          compact / move-mode toggle. Sticky so it stays visible while
-          scrolling the grid. The button is 44px tall (WCAG touch target). */}
+      {/* ── Toolbar ────────────────────────────────────────────────────
+          A slim bar beneath the week navigator with expand/minimize
+          controls. Sticky so it stays visible while scrolling the grid.
+          Buttons are 44px tall (WCAG touch target). */}
       <div className={styles.moveToolbar}>
-        <button
-          type="button"
-          className={`${styles.moveModeBtn} ${compactManual ? styles.moveModeBtnActive : ""}`}
-          onClick={() => setCompactManual((v) => !v)}
-          aria-pressed={compactManual}
-          aria-label={
-            compactManual
-              ? "Exit Move mode (expand cards)"
-              : "Enter Move mode (compact view)"
-          }
-        >
-          <MoveIcon active={compactManual} />
-          {compactManual ? "Exit Move mode" : "Move mode"}
-        </button>
         {/* Expand / minimize every card in the visible week at once. */}
         <button
           type="button"
@@ -765,7 +731,7 @@ export function WeeklyGrid(): ReactNode {
         onDragOver={handleScrollDragOver}
       >
         <div
-          className={`${styles.grid} ${compact ? styles.gridCompact : ""}`}
+          className={styles.grid}
           role="grid"
           aria-label={`Weekly plan, week ${week}`}
         >
@@ -805,7 +771,6 @@ export function WeeklyGrid(): ReactNode {
               maximizedCell={maximizedCell}
               cellLayouts={cellLayouts}
               cellProps={gridNav.cellProps}
-              compact={compact}
               onDragStart={handleDragStart}
               onDragEnd={() => {
                 stopScrollLoop();
@@ -847,8 +812,6 @@ interface SubjectRowProps {
   cellLayouts: Record<string, CellLayout>;
   /** Builds the roving-tabindex props for a cell at (row, col). */
   cellProps: (row: number, col: number) => CellNavProps;
-  /** Pass-through of the grid's compact / move-mode state. */
-  compact: boolean;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
   onDrop: (subjectId: SubjectId, day: number) => void;
@@ -884,7 +847,6 @@ function SubjectRow({
   maximizedCell,
   cellLayouts,
   cellProps,
-  compact,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -933,7 +895,6 @@ function SubjectRow({
           maximized={maximizedCell === `${subjectId}:${day}`}
           cellLayout={cellLayouts[cellKey(subjectId, day)] ?? null}
           navProps={cellProps(rowIndex, day)}
-          compact={compact}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
           onDrop={onDrop}
@@ -948,28 +909,5 @@ function SubjectRow({
         />
       ))}
     </>
-  );
-}
-
-// ── Move-mode icon ───────────────────────────────────────────────────────
-// A simple arrows icon (two horizontal arrows) communicating "rearrange".
-// Active state uses a filled/tinted variant (just a stroke-width bump).
-
-function MoveIcon({ active }: { active: boolean }): ReactNode {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={active ? 2.5 : 2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {/* Left-right double arrow */}
-      <path d="M7 16l-4-4 4-4M17 8l4 4-4 4M3 12h18" />
-    </svg>
   );
 }

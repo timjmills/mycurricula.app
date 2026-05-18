@@ -8,7 +8,7 @@
 // Anatomy (top to bottom):
 //   • Three-tier fork stripe (left edge, 5px) — solid / dashed / move-arrow.
 //   • Header band — subject-tint fill (`--cl`), deep text (`--cd`):
-//       [CompletionCheck]  [Subject name · time]  […] [drag]
+//       [CompletionCheck]  [Subject name · time]  [move-handle] […]
 //       [Lesson title — wraps if long]
 //   • Body (collapsed): 2-line preview + footer row (standards badge,
 //       resource-type chips, tasks pill, carry-over / pending meta).
@@ -22,16 +22,17 @@
 // but its header band is always subject-tinted — that is the Weekly-view
 // design contract independent of the style preference.
 //
-// Gesture coordination (three non-overlapping intents):
+// Gesture coordination (two non-overlapping intents):
 //   single click   → expand/collapse, but only on the header band (toggleExpand)
 //   double-click   → inline text editing (suppresses expand via stopPropagation)
-//   press-and-hold → pick-up to drag (2-second hold timer, sets holdReady state)
+//   drag handle    → drag the lesson to a new cell via the move-handle icon
+//                    in the header band (the ONLY drag affordance on the card)
 //
 // Types re-exported so the sibling board agent can import without a deep path:
 //   export type { ContextAction, ContextActionPayload }
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, MouseEvent, PointerEvent } from "react";
+import type { CSSProperties, MouseEvent } from "react";
 import { SaveTargetDialog } from "@/components/weekly/save-target-dialog";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { SUBJECT_BY_ID } from "@/lib/mock";
@@ -123,12 +124,6 @@ export interface WeeklyLessonCardProps {
    */
   onEditLesson?: (id: string, patch: Partial<Lesson>) => void;
   /**
-   * The card's hold-drag has fired and the card root is now draggable.
-   * The grid uses this to record the dragging id so DnD can proceed via
-   * the existing onDragStart / onDrop flow.
-   */
-  onHoldDragStart?: (id: string) => void;
-  /**
    * Save-target resolved in the SaveTargetDialog. Fired after the teacher
    * leaves the card and picks where to save their edit: "personal" forks the
    * lesson into their personal copy; "core" writes directly to the shared Core
@@ -139,9 +134,9 @@ export interface WeeklyLessonCardProps {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-// Hold threshold: the pointer must be held down on the card for this long
-// before it enters the "ready to move" state. A deliberate 2-second hold so
-// a move is always intentional — never triggered by an ordinary click.
+// Hold threshold used by ReorderableSectionRow: the pointer must be held on
+// a section for this long before it enters "ready to drag" state for reordering.
+// A deliberate 2-second hold so section reorder is never triggered by accident.
 const HOLD_MS = 2000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -171,7 +166,6 @@ export function WeeklyLessonCard({
   onContextAction,
   dragHandleProps,
   onEditLesson,
-  onHoldDragStart,
   onSaveTarget,
 }: WeeklyLessonCardProps) {
   const { style } = useTheme();
@@ -198,16 +192,6 @@ export function WeeklyLessonCard({
     {},
   );
 
-  // ── Hold-to-drag state ─────────────────────────────────────────────────
-  // holdReady: the 2-second timer has fired and the card is armed for dragging.
-  // While holdReady, the card root is draggable (so a subsequent pointermove
-  // triggers HTML5 DnD) and shows the lift/grab visual signal.
-  const [holdReady, setHoldReady] = useState(false);
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Track the pointer position at pointerdown so we can cancel if the
-  // pointer strays far before the timer fires (mis-tap on a small card).
-  const holdOriginRef = useRef<{ x: number; y: number } | null>(null);
-
   // ── Section-reorder state ──────────────────────────────────────────────
   // sectionOrder: the current ordering of sections within the expanded body.
   // Card-local (no persistence) — prototype behavior, consistent with the rest
@@ -231,6 +215,8 @@ export function WeeklyLessonCard({
     setSectionOrder(DEFAULT_SECTION_ORDER);
     setDirty(false);
     setSaveDialogOpen(false);
+    // Note: lesson.id change does not reset hovered/menu — those are transient
+    // interaction state that should clear naturally via pointer events.
   }, [lesson.id]);
 
   const done = lesson.status === "done";
@@ -265,38 +251,23 @@ export function WeeklyLessonCard({
     position: "relative",
     // Body surface is always neutral so header color contrast is maximum.
     background: "var(--paper)",
-    border: holdReady
-      ? // holdReady ring: a clear subject-colored outline signals "ready to move".
-        `2px solid ${color.stripe}`
-      : selected
-        ? `1.5px solid ${color.stripe}`
-        : isVivid
-          ? `1px solid color-mix(in oklch, ${color.deep} 14%, transparent)`
-          : "1px solid var(--ink-150)",
+    border: selected
+      ? `1.5px solid ${color.stripe}`
+      : isVivid
+        ? `1px solid color-mix(in oklch, ${color.deep} 14%, transparent)`
+        : "1px solid var(--ink-150)",
     boxShadow: dragging
       ? `0 12px 28px rgba(20,22,32,0.18), 0 0 0 1.5px ${color.stripe}`
-      : holdReady
-        ? // Lift the card: stronger shadow + subtle outer glow to signal "pickable".
-          `0 8px 22px rgba(20,22,32,0.16), 0 0 0 3px color-mix(in oklch, ${color.stripe} 28%, transparent)`
-        : hovered
-          ? "0 4px 14px rgba(20,22,32,0.10)"
-          : "var(--shadow-card)",
-    // Slight scale-up on holdReady echoes a card being "lifted off the table".
-    transform: dragging
-      ? "rotate(-1.2deg)"
-      : holdReady
-        ? "scale(1.025) translateY(-2px)"
-        : "none",
-    cursor: holdReady ? "grab" : "pointer",
+      : hovered
+        ? "0 4px 14px rgba(20,22,32,0.10)"
+        : "var(--shadow-card)",
+    transform: dragging ? "rotate(-1.2deg)" : "none",
+    cursor: "pointer",
     // Done cards recede but stay readable — a gentle fade with only a light
     // desaturation, so "done" scans at a glance without going washed-out.
     opacity: done ? 0.66 : 1,
     filter: done ? "saturate(72%)" : "none",
     paddingInlineStart: 5,
-    // Fast transition when entering holdReady; card snaps back on release.
-    transition: holdReady
-      ? "box-shadow 0.08s ease, transform 0.08s ease, border-color 0.08s ease"
-      : undefined,
   };
 
   // ── Header band ───────────────────────────────────────────────────────────
@@ -333,80 +304,22 @@ export function WeeklyLessonCard({
   // keyboard (Enter / Space on the focused card) — a mouse click on the
   // card body no longer toggles; only a click on the header band does.
   const handleCardClick = useCallback(() => {
-    if (holdReady) return; // hold gesture took precedence — don't expand
     if (editingField) return; // an editor is open — ignore stray root clicks
     onSelect?.(lesson.id);
-  }, [onSelect, lesson.id, holdReady, editingField]);
+  }, [onSelect, lesson.id, editingField]);
 
   const toggleExpand = useCallback(
     (e: MouseEvent) => {
       e.stopPropagation();
-      if (holdReady) return;
       if (editingField) return;
       (onToggleExpand ?? onSelect)?.(lesson.id);
     },
-    [onToggleExpand, onSelect, lesson.id, holdReady, editingField],
+    [onToggleExpand, onSelect, lesson.id, editingField],
   );
 
   const cycleComplete = useCallback(() => {
     onToggleComplete?.(lesson.id, cycleStatus(lesson.status));
   }, [onToggleComplete, lesson.id, lesson.status]);
-
-  // ── Hold-to-drag handlers ──────────────────────────────────────────────
-  // pointerdown on the card body starts the 2-second hold timer. If the pointer
-  // is released, cancelled, or moves more than 8px before the timer fires, the
-  // gesture is treated as a click and holdReady stays false.
-
-  const cancelHoldTimer = useCallback(() => {
-    if (holdTimerRef.current !== null) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    holdOriginRef.current = null;
-  }, []);
-
-  const handleBodyPointerDown = useCallback(
-    (e: PointerEvent<HTMLDivElement>) => {
-      // Only the primary pointer (finger / left mouse button) triggers a hold.
-      if (e.button !== 0 && e.pointerType !== "touch") return;
-      // Don't hijack the explicit drag handle — it has its own DnD wiring.
-      if ((e.target as HTMLElement).closest("[data-drag-handle]")) return;
-      // Don't start a hold timer when any text editor is active.
-      if (editingField) return;
-
-      holdOriginRef.current = { x: e.clientX, y: e.clientY };
-      holdTimerRef.current = setTimeout(() => {
-        holdTimerRef.current = null;
-        holdOriginRef.current = null;
-        // Arm the card for dragging.
-        setHoldReady(true);
-        onHoldDragStart?.(lesson.id);
-      }, HOLD_MS);
-    },
-    [lesson.id, editingField, onHoldDragStart],
-  );
-
-  const handleBodyPointerMove = useCallback(
-    (e: PointerEvent<HTMLDivElement>) => {
-      if (!holdOriginRef.current || holdTimerRef.current === null) return;
-      const dx = e.clientX - holdOriginRef.current.x;
-      const dy = e.clientY - holdOriginRef.current.y;
-      // 8px movement tolerance: cancels the hold so the teacher can scroll.
-      if (dx * dx + dy * dy > 64) {
-        cancelHoldTimer();
-      }
-    },
-    [cancelHoldTimer],
-  );
-
-  const handleBodyPointerUp = useCallback(() => {
-    // Pointer released before the hold fired → cancel; it was just a click.
-    cancelHoldTimer();
-    // If holdReady, a real DnD drag has started (or the teacher just lifted
-    // without dragging). Reset holdReady so the card returns to rest state.
-    // The dragend event on the card root also resets it (see below).
-    setHoldReady(false);
-  }, [cancelHoldTimer]);
 
   // ── Inline editing handlers ────────────────────────────────────────────
 
@@ -419,11 +332,10 @@ export function WeeklyLessonCard({
       // the cell or toggle selection.
       e?.stopPropagation();
       e?.preventDefault();
-      cancelHoldTimer();
       setEditingField(field);
       setDraftValue(lesson[field] as string);
     },
-    [lesson, cancelHoldTimer],
+    [lesson],
   );
 
   // Commit the edited value; a no-op if nothing changed.
@@ -491,15 +403,11 @@ export function WeeklyLessonCard({
   return (
     <div
       ref={cardRef}
-      className={`cp-subj ${subject.cls} ${styles.card} ${holdReady ? styles.cardHoldReady : ""}`}
+      className={`cp-subj ${subject.cls} ${styles.card}`}
       data-style={style}
       role="group"
       aria-label={`${subject.name} lesson: ${stripHtml(lesson.title)}`}
       tabIndex={0}
-      // The card root becomes draggable only when holdReady — this lets the
-      // existing HTML5 DnD flow drive the actual move. At rest, draggable is
-      // false so a finger scroll / single click is never hijacked.
-      draggable={holdReady}
       onBlurCapture={handleCardBlurCapture}
       onContextMenu={handleContextMenu}
       onKeyDown={(e) => {
@@ -509,50 +417,11 @@ export function WeeklyLessonCard({
         }
       }}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => {
-        setHovered(false);
-        // If the pointer left the card without starting a drag, disarm.
-        if (!dragging) {
-          cancelHoldTimer();
-          setHoldReady(false);
-        }
-      }}
-      // Hold-drag: pointerdown starts the timer; pointermove cancels on movement;
-      // pointerup / pointercancel cancel if the hold hasn't fired yet.
-      onPointerDown={handleBodyPointerDown}
-      onPointerMove={handleBodyPointerMove}
-      onPointerUp={handleBodyPointerUp}
-      onPointerCancel={handleBodyPointerUp}
-      // When a real DnD drag starts from the card root (holdReady path),
-      // wire it into the grid's existing drag flow.
-      onDragStart={(e) => {
-        if (!holdReady) return;
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", lesson.id);
-        // dragHandleProps.onDragStart wires the grid's draggingId — call it.
-        // HTMLDivElement extends HTMLElement so the event is compatible.
-        dragHandleProps?.onDragStart?.(e as React.DragEvent<HTMLElement>);
-      }}
-      onDragEnd={(e) => {
-        setHoldReady(false);
-        dragHandleProps?.onDragEnd?.(e as React.DragEvent<HTMLElement>);
-      }}
+      onMouseLeave={() => setHovered(false)}
       style={cardSurface}
     >
       {/* Left fork stripe — aria-hidden, purely decorative/informational */}
       <div aria-hidden style={stripeStyle} />
-
-      {/* Screen-reader announcement when the card enters "ready to move" state. */}
-      <div
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className={styles.srOnly}
-      >
-        {holdReady
-          ? `${stripHtml(lesson.title)} ready to drag. Drag to move it.`
-          : ""}
-      </div>
 
       {/* ── Header band ─────────────────────────────────────────────────── */}
       {/* Deeply-tinted subject fill (noticeably deeper than the body) with
@@ -632,21 +501,21 @@ export function WeeklyLessonCard({
                 Modified
               </span>
             )}
-            {/* Affordances: drag handle (optional) + ⋯ menu */}
+            {/* Affordances: drag handle (always shown) + ⋯ menu */}
             <span className={styles.affordanceRow}>
               {dragHandleProps && (
                 <span
                   {...dragHandleProps}
                   data-drag-handle
-                  className={styles.affordance}
-                  title="Drag to move"
-                  aria-label="Drag handle"
+                  className={`${styles.affordance} ${styles.dragHandle}`}
+                  title="Drag to move this lesson"
+                  aria-label="Drag to move this lesson"
                   role="button"
                   tabIndex={0}
                   style={{ cursor: "grab", ...dragHandleProps.style }}
                 >
                   <span aria-hidden className={styles.affordanceVisual}>
-                    <Icon name="drag" size={11} />
+                    <Icon name="drag" size={13} />
                   </span>
                 </span>
               )}
@@ -1111,16 +980,14 @@ export function WeeklyLessonCard({
 //
 //   • Press-and-hold (2 s) → section enters "hold-ready" state (visual lift +
 //     grab cursor). Once armed, dragging it with native HTML5 DnD repositions
-//     it in the order.  The 2-second threshold reuses HOLD_MS so the feel is
-//     identical to the card-level hold-to-drag.
+//     it in the order (HOLD_MS threshold).
 //
 //   • Move-up / move-down buttons — keyboard-accessible alternative. Rendered
 //     inside each section row as small ghost buttons.  They shift the section
 //     one position in the visible list and are disabled at the boundary.
 //
-// Gesture isolation: ALL pointer handlers call stopPropagation() so the card's
-// handleBodyPointerDown / handleBodyPointerMove / handleBodyPointerUp never
-// fire while a section is being interacted with.  The section drag events
+// Gesture isolation: ALL pointer handlers call stopPropagation() so they do
+// not bubble into the card's own event handlers. The section drag events
 // similarly stop propagation so they cannot bubble into the card's onDragStart.
 
 function ReorderableSectionRow({
