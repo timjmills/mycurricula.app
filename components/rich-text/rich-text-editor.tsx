@@ -170,6 +170,178 @@ const FONT_OPTIONS: FontOption[] = [
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+// ── Auto-list detection helper ────────────────────────────────────────────
+//
+// Called on every Space keypress (before the space is inserted). Inspects
+// the text on the current line from its start up to the caret. If that text
+// is exactly a list marker — and nothing else has been typed on the line yet
+// — it cancels the space, deletes the marker, and fires the matching list
+// execCommand. Result: the marker vanishes and the line becomes a proper
+// list item with the caret ready to type.
+//
+// Supported markers:
+//   "- "  (hyphen + space)   → insertUnorderedList
+//   "* "  (asterisk + space) → insertUnorderedList
+//   "1. " "2. " … (number + period + space) → insertOrderedList
+//
+// Guards:
+//   • Only fires in the browser (typeof document check).
+//   • Only fires when the caret selection is collapsed (no text selected).
+//   • Does NOT fire when the caret is already inside a <ul> or <ol> node,
+//     because the list is already active and the browser handles continuation.
+//   • Does NOT fire in singleLine mode (lists are multi-line constructs).
+//
+// Detection strategy:
+//   We need the text from the start of the current block line to the caret.
+//   contentEditable blocks can be: bare text nodes in the editor root, or
+//   text wrapped in <div>, <p>, <br>, or similar block elements.
+//
+//   We use the Selection API to locate the anchor node, then collect all
+//   text content in that node up to the anchor offset. For inline-only
+//   content (a text node directly inside the editor root) the entire
+//   textContent up to the offset is the "line prefix."
+//   For text inside a block element (<div>/<p>) we walk the block's child
+//   nodes in order, accumulating text until we reach the anchor node+offset,
+//   which gives us the full prefix of the visual line.
+//
+//   We then test whether that prefix matches /^(-|\*|\d+\.)$/ — meaning
+//   the marker characters are the ONLY content before the space that would
+//   be inserted. If matched, we delete exactly `prefix.length` characters
+//   backward (execCommand 'delete' once per character) and then execute
+//   the correct list command.
+
+/** List marker patterns. Captured group 1 distinguishes bullet vs ordered. */
+const AUTO_LIST_RE = /^(-|\*|\d+\.)$/;
+
+/**
+ * Returns the text content of the current line from its start to the caret,
+ * or null when the selection is unavailable / not collapsed.
+ * "Line start" is the beginning of the nearest block ancestor (div, p, li)
+ * that is a direct child of the editor — not the editor root itself.
+ * Pure SSR guard: caller must ensure this is called in browser context.
+ */
+function getLinePrefixBeforeCaret(editor: HTMLElement): string | null {
+  const sel = window.getSelection();
+  if (!sel || !sel.isCollapsed || sel.rangeCount === 0) return null;
+
+  const anchor = sel.anchorNode;
+  const offset = sel.anchorOffset;
+  if (!anchor) return null;
+
+  // Walk up from the anchor to find the nearest block container that is a
+  // direct child of the editor (or the editor itself for inline content).
+  // We stop at the first block-level element whose parent is the editor root.
+  let block: Node = anchor;
+  while (block.parentNode && block.parentNode !== editor) {
+    block = block.parentNode;
+  }
+  // `block` is now the top-level child node of the editor (could be a text
+  // node, a <div>, a <p>, etc.).
+
+  if (block === anchor) {
+    // The anchor IS the top-level child — a bare text node or the editor div.
+    // The prefix is everything in that text node up to the offset.
+    if (anchor.nodeType === Node.TEXT_NODE) {
+      return (anchor.textContent ?? "").slice(0, offset);
+    }
+    // Anchor is an element node (e.g. the editor root itself when empty).
+    return "";
+  }
+
+  // The anchor is inside `block`. Walk block's descendants in DOM order,
+  // accumulating text content until we reach anchor at offset.
+  let accumulated = "";
+  let reached = false;
+
+  function walk(node: Node): void {
+    if (reached) return;
+    if (node === anchor) {
+      // We've arrived: add text up to the caret offset within this node.
+      if (node.nodeType === Node.TEXT_NODE) {
+        accumulated += (node.textContent ?? "").slice(0, offset);
+      }
+      reached = true;
+      return;
+    }
+    if (node.nodeType === Node.TEXT_NODE) {
+      accumulated += node.textContent ?? "";
+      return;
+    }
+    // Element node — recurse into children.
+    for (let i = 0; i < node.childNodes.length; i++) {
+      walk(node.childNodes[i]);
+      if (reached) return;
+    }
+  }
+
+  walk(block);
+  return reached ? accumulated : null;
+}
+
+/**
+ * Attempt markdown-style list auto-conversion when the teacher presses Space.
+ *
+ * Returns true if the event was handled (caller should e.preventDefault()).
+ * Returns false to let the keystroke proceed normally.
+ *
+ * Must be called after an SSR guard — all access to document/window happens
+ * inside and is safe because this is invoked from a keyboard event handler
+ * (always browser-only).
+ */
+function tryAutoList(
+  e: React.KeyboardEvent<HTMLDivElement>,
+  editor: HTMLElement,
+  singleLine: boolean,
+): boolean {
+  // Auto-list is a multi-line feature — skip entirely in singleLine mode.
+  if (singleLine) return false;
+
+  // Only activate on an unmodified Space press with a collapsed selection.
+  if (e.key !== " " || e.ctrlKey || e.metaKey || e.altKey) return false;
+
+  const sel = window.getSelection();
+  if (!sel || !sel.isCollapsed) return false;
+
+  // Do not fire if the caret is already inside an existing list — the
+  // browser's native continuation handles everything there.
+  const anchorEl =
+    sel.anchorNode?.nodeType === Node.ELEMENT_NODE
+      ? (sel.anchorNode as Element)
+      : sel.anchorNode?.parentElement;
+  if (anchorEl?.closest("ul, ol")) return false;
+
+  // Get the text from the start of the current line to the caret.
+  const prefix = getLinePrefixBeforeCaret(editor);
+  if (prefix === null) return false;
+
+  // Match against the list marker pattern.
+  const match = AUTO_LIST_RE.exec(prefix);
+  if (!match) return false;
+
+  // We have a match. Prevent the space from being inserted.
+  e.preventDefault();
+
+  // Delete the marker characters that were already typed.
+  // execCommand('delete') removes one character at a time backward from caret.
+  const markerLen = prefix.length;
+  for (let i = 0; i < markerLen; i++) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (document as any).execCommand("delete", false, undefined);
+  }
+
+  // Determine list type: hyphen or asterisk → unordered; digit+period → ordered.
+  const marker = match[1];
+  const command =
+    marker === "-" || marker === "*"
+      ? "insertUnorderedList"
+      : "insertOrderedList";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (document as any).execCommand(command, false, undefined);
+
+  return true;
+}
+
 /**
  * Resolve a CSS custom property to its computed value on <html>.
  * Falls back to the string unchanged when it is not a custom-property name
@@ -451,8 +623,19 @@ export function RichTextEditor({
         e.preventDefault();
         return;
       }
+
+      // Markdown-style auto-list: convert "- ", "* ", "1. " etc. at line
+      // start into proper list items. tryAutoList returns true when it
+      // consumed the keypress, at which point we report the updated HTML.
+      const el = editorRef.current;
+      if (el && tryAutoList(e, el, singleLine)) {
+        const html = el.innerHTML;
+        lastWrittenRef.current = html;
+        onChange(html);
+        setEmpty(isEditorEmpty(el));
+      }
     },
-    [singleLine],
+    [singleLine, onChange],
   );
 
   // ── Input handler — report changes, check empty state ──────────────
