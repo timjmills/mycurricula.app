@@ -23,7 +23,7 @@
 // design contract independent of the style preference.
 //
 // Gesture coordination (three non-overlapping intents):
-//   single click   → onSelect / expand (via handleCardClick / toggleExpand)
+//   single click   → expand/collapse, but only on the header band (toggleExpand)
 //   double-click   → inline text editing (suppresses expand via stopPropagation)
 //   press-and-hold → pick-up to drag (2-second hold timer, sets holdReady state)
 //
@@ -306,9 +306,9 @@ export function WeeklyLessonCard({
     [openMenuAt],
   );
 
-  // handleCardClick: fires on a plain single click on the card root.
-  // Guards against misfires when a hold has already fired (holdReady)
-  // so the drag pick-up doesn't also trigger an expand toggle.
+  // handleCardClick: the expand/collapse toggle. Reached only via the
+  // keyboard (Enter / Space on the focused card) — a mouse click on the
+  // card body no longer toggles; only a click on the header band does.
   const handleCardClick = useCallback(() => {
     if (holdReady) return; // hold gesture took precedence — don't expand
     if (editingField) return; // an editor is open — ignore stray root clicks
@@ -441,7 +441,6 @@ export function WeeklyLessonCard({
       // existing HTML5 DnD flow drive the actual move. At rest, draggable is
       // false so a finger scroll / single click is never hijacked.
       draggable={holdReady}
-      onClick={handleCardClick}
       onContextMenu={handleContextMenu}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
