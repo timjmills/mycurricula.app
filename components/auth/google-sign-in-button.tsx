@@ -264,29 +264,30 @@ export function GoogleSignInButton({
   }
 
   return (
-    <>
-      {/* GSI draws its official button into this container once ready. While
-          `loading`, it is empty but still reserves height; the styled
-          placeholder below overlays it so there is no layout shift. */}
-      <div
-        ref={containerRef}
-        className={styles.googleButton}
-        aria-hidden={loading}
-      >
-        {loading && (
-          <button
-            type="button"
-            className={styles.button}
-            disabled
-            aria-label="Loading Google sign-in"
-          >
-            <span className={styles.icon} aria-hidden="true">
-              <GoogleGlyph />
-            </span>
-            <span className={styles.label}>Continue with Google</span>
-          </button>
-        )}
-      </div>
+    <div className={styles.wrapper}>
+      {/* Google Identity Services draws its official button into this element.
+          React must NEVER render children inside it: GSI clears and owns this
+          subtree, so a React-managed child here triggers a `removeChild` crash
+          when React later reconciles it away. The placeholder below is a
+          SIBLING, never a child. */}
+      <div ref={containerRef} className={styles.googleButton} />
+
+      {/* Loading placeholder — overlaid on the GSI container while the GSI
+          script loads. A sibling of (not a child of) the container, so React
+          and GSI never contend for the same parent node. */}
+      {loading && (
+        <button
+          type="button"
+          className={styles.placeholder}
+          disabled
+          aria-label="Loading Google sign-in"
+        >
+          <span className={styles.icon} aria-hidden="true">
+            <GoogleGlyph />
+          </span>
+          <span className={styles.label}>Continue with Google</span>
+        </button>
+      )}
 
       {pending && (
         <p className={styles.status} role="status">
@@ -299,7 +300,7 @@ export function GoogleSignInButton({
           {errorMsg}
         </p>
       )}
-    </>
+    </div>
   );
 }
 

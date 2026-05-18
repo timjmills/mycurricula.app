@@ -2,8 +2,8 @@
  *
  * The visible button is drawn by Google Identity Services (GSI) into the
  * `.googleButton` container. Before the GSI script is ready we show a styled
- * placeholder (`.button`) that mirrors GSI's outlined look so there is no
- * layout shift when the real button swaps in. The Google glyph carries the
+ * `.placeholder` that mirrors GSI's outlined look so there is no layout
+ * shift when the real button swaps in. The Google glyph carries the
  * only non-token color (a brand asset); min-height keeps the control above
  * the WCAG 2.5.5 44px touch-target floor.
  */
@@ -18,9 +18,20 @@
   min-height: 48px;
 }
 
+/* Positioning context so the loading placeholder can overlay the GSI
+ * container without being a child of it — a shared parent makes React and
+ * GSI fight over the same DOM node (see the .tsx header). */
+.wrapper {
+  position: relative;
+  width: 100%;
+}
+
 /* Loading placeholder — matches the GSI "outline" button look while the
- * external script loads. Disabled and non-interactive by design. */
-.button {
+ * external script loads. Absolutely overlaid on the GSI container, always
+ * disabled, and removed once Google's real button has rendered. */
+.placeholder {
+  position: absolute;
+  inset: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -32,10 +43,6 @@
   border: 1px solid var(--ink-200);
   background: var(--paper);
   color: var(--ink-900);
-}
-
-/* Placeholder is always disabled — show it as a passive waiting state. */
-.button:disabled {
   opacity: 0.6;
   cursor: progress;
 }
