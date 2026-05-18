@@ -88,16 +88,33 @@ const TEXT_COLORS: ColorSwatch[] = [
 // font color can equally be applied as a highlight (plus the pastel set).
 const HIGHLIGHT_COLORS: ColorSwatch[] = TEXT_COLORS;
 
-// Pastel (soft tint) highlight colors — the subject light tokens, softer tones.
+// Highlighter-pen colors — the classic bright marker set.
+const HIGHLIGHTERS: ColorSwatch[] = [
+  { label: "Laser lemon", variable: "--hl-lemon" },
+  { label: "French lime", variable: "--hl-lime" },
+  { label: "Mint green", variable: "--hl-mint" },
+  { label: "Aquamarine", variable: "--hl-aqua" },
+  { label: "Maya blue", variable: "--hl-maya" },
+  { label: "Slate blue", variable: "--hl-slate" },
+  { label: "Heliotrope", variable: "--hl-heliotrope" },
+  { label: "Violet web", variable: "--hl-violet" },
+  { label: "Ultra red", variable: "--hl-red" },
+  { label: "Mac & cheese", variable: "--hl-cheese" },
+];
+
+// Pastel highlight colors — softer tints of the highlighter hues, distinct
+// enough to tell apart while gentler than the bright markers.
 const HIGHLIGHT_PASTEL: ColorSwatch[] = [
-  { label: "Math pastel", variable: "--math-light" },
-  { label: "Reading pastel", variable: "--reading-light" },
-  { label: "Writing pastel", variable: "--writing-light" },
-  { label: "Grammar pastel", variable: "--grammar-light" },
-  { label: "Spelling pastel", variable: "--spelling-light" },
-  { label: "UFLI pastel", variable: "--ufli-light" },
-  { label: "Explorers pastel", variable: "--explorers-light" },
-  { label: "SEL pastel", variable: "--sel-light" },
+  { label: "Lemon pastel", variable: "--hlp-lemon" },
+  { label: "Lime pastel", variable: "--hlp-lime" },
+  { label: "Mint pastel", variable: "--hlp-mint" },
+  { label: "Aqua pastel", variable: "--hlp-aqua" },
+  { label: "Maya pastel", variable: "--hlp-maya" },
+  { label: "Slate pastel", variable: "--hlp-slate" },
+  { label: "Heliotrope pastel", variable: "--hlp-heliotrope" },
+  { label: "Violet pastel", variable: "--hlp-violet" },
+  { label: "Rose pastel", variable: "--hlp-red" },
+  { label: "Peach pastel", variable: "--hlp-cheese" },
 ];
 
 interface FontOption {
@@ -722,6 +739,23 @@ export function RichTextEditor({
                   </span>
                   <div className={styles.swatchRow}>
                     {HIGHLIGHT_COLORS.map((swatch) => (
+                      <SwatchButton
+                        key={swatch.variable}
+                        label={swatch.label}
+                        color={resolveCssVar(swatch.variable)}
+                        onMouseDown={(e) => applyHighlight(e, swatch.variable)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Highlighter-pen set — bright marker colors */}
+                <div className={styles.paletteSection}>
+                  <span className={styles.paletteSectionLabel} aria-hidden>
+                    Highlighters
+                  </span>
+                  <div className={styles.swatchRow}>
+                    {HIGHLIGHTERS.map((swatch) => (
                       <SwatchButton
                         key={swatch.variable}
                         label={swatch.label}

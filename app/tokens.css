@@ -111,6 +111,31 @@
   --tag-pink: #e54b94;
   --tag-gray: #8b909e;
 
+  /* ── Highlighter pens ─────────────────────────────────────────────── */
+  /* Bright marker colors + softer pastel tints for the rich-text
+     highlight picker. */
+  --hl-lemon: #ffff77;
+  --hl-lime: #aeff77;
+  --hl-mint: #77ff92;
+  --hl-aqua: #77ffe4;
+  --hl-maya: #77c9ff;
+  --hl-slate: #7777ff;
+  --hl-heliotrope: #c977ff;
+  --hl-violet: #ff77e4;
+  --hl-red: #ff7792;
+  --hl-cheese: #ffae77;
+
+  --hlp-lemon: #fdfdc7;
+  --hlp-lime: #dcfcc7;
+  --hlp-mint: #c7fccf;
+  --hlp-aqua: #c7fcf2;
+  --hlp-maya: #c7e7fc;
+  --hlp-slate: #c7c7fc;
+  --hlp-heliotrope: #e6c7fc;
+  --hlp-violet: #fcc7f2;
+  --hlp-red: #fcc7d0;
+  --hlp-cheese: #fcdcc7;
+
   /* ── Spacing / radii ──────────────────────────────────────────────── */
   --r-2: 2px;
   --r-4: 4px;
