@@ -328,20 +328,33 @@ export function RichTextEditor({
     // add window.scrollY / window.scrollX (that would misplace the toolbar on
     // any scrolled page).
     const rect = range.getBoundingClientRect();
-    // Wider estimate: toolbar can wrap, so account for the full button set.
-    const toolbarH = 42;
+    // The toolbar wraps to ~2 rows of buttons, so estimate a generous
+    // height. TOP_CHROME leaves clearance for the app's fixed top bar /
+    // nav so the floating toolbar is never tucked behind it.
+    const toolbarH = 88;
     const toolbarW = 520;
     const gap = 8;
+    const margin = 8;
+    const TOP_CHROME = 116;
 
-    let top = rect.top - toolbarH - gap;
     let left = rect.left + rect.width / 2 - toolbarW / 2;
-
     // Clamp so it doesn't escape the viewport horizontally.
-    left = Math.max(8, Math.min(left, window.innerWidth - toolbarW - 8));
-    // If not enough room above, flip below.
-    if (rect.top < toolbarH + gap + 4) {
+    left = Math.max(
+      margin,
+      Math.min(left, window.innerWidth - toolbarW - margin),
+    );
+
+    // Prefer placing the toolbar above the selection; if that would land
+    // it in the top-chrome zone, drop it below the selection instead.
+    let top = rect.top - toolbarH - gap;
+    if (top < TOP_CHROME) {
       top = rect.bottom + gap;
     }
+    // Always keep the whole toolbar within the viewport.
+    top = Math.max(
+      margin,
+      Math.min(top, window.innerHeight - toolbarH - margin),
+    );
 
     setToolbarPos({ top, left });
     setToolbarVisible(true);
