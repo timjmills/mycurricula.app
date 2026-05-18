@@ -215,8 +215,11 @@
   /* Leading subject-label column + 5 day columns. The min day width keeps
      cards readable; below ~1180px the region scrolls rather than crushes. */
   grid-template-columns: 132px repeat(5, minmax(190px, 1fr));
-  /* Tight gap — cells should read as a continuous grid, not floating tiles. */
-  gap: 3px;
+  /* Tight gap — cells should read as a continuous grid, not floating tiles.
+     Column gap keeps horizontal breathing room; row gap is collapsed to 0
+     so subject rows read as tightly stacked bands rather than floating tiles. */
+  column-gap: 3px;
+  row-gap: 0;
   min-width: 1082px;
 }
 
@@ -323,7 +326,10 @@
   gap: 6px;
   min-height: 84px;
   border-radius: var(--r-12);
-  padding: 4px;
+  /* Block padding trimmed to 2px so that zero row-gap produces no visible
+     vertical gap between adjacent cells. Inline padding stays at 4px to
+     keep cards away from the cell border. */
+  padding: 2px 4px;
   /* Unit shading paints the cell background via inline style (--cell-bg). */
   background: var(--cell-bg, transparent);
   border: 1.5px solid transparent;

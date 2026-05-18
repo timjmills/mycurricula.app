@@ -102,6 +102,12 @@ interface GridCellProps {
    * Move-mode toggle in the grid header.
    */
   compact?: boolean;
+  /**
+   * Inline text edit committed on a lesson card. The grid applies the patch
+   * (and marks it modified in personal mode). Threaded from WeeklyGrid through
+   * to WeeklyLessonCard.
+   */
+  onEditLesson: (id: string, patch: Partial<Lesson>) => void;
 }
 
 /** A single day/subject cell: drop target, card stack, empty affordance. */
@@ -126,6 +132,7 @@ export function GridCell({
   navProps,
   onToggleMaximize,
   compact = false,
+  onEditLesson,
 }: GridCellProps): ReactNode {
   const [dragOver, setDragOver] = useState(false);
 
@@ -199,6 +206,11 @@ export function GridCell({
           // Forward the full context-action payload (e.g. the target
           // day for "Move to day") straight through to the grid.
           onContextAction={onContextAction}
+          // onEditLesson: inline text edits committed by the card.
+          onEditLesson={onEditLesson}
+          // onHoldDragStart: the card's hold timer fired; record the dragging id
+          // in the grid so the existing DnD drop handlers can resolve it.
+          onHoldDragStart={onDragStart}
           dragHandleProps={{
             draggable: true,
             onDragStart: (e) => {

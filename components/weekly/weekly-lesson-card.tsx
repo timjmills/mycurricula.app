@@ -22,11 +22,16 @@
 // but its header band is always subject-tinted — that is the Weekly-view
 // design contract independent of the style preference.
 //
+// Gesture coordination (three non-overlapping intents):
+//   single click   → onSelect / expand (via handleCardClick / toggleExpand)
+//   double-click   → inline text editing (suppresses expand via stopPropagation)
+//   press-and-hold → pick-up to drag (280ms hold timer, sets holdReady state)
+//
 // Types re-exported so the sibling board agent can import without a deep path:
 //   export type { ContextAction, ContextActionPayload }
 
-import { useCallback, useMemo, useState } from "react";
-import type { CSSProperties, MouseEvent } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import type { CSSProperties, MouseEvent, PointerEvent } from "react";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { SUBJECT_BY_ID } from "@/lib/mock";
 import { lessonTime } from "@/lib/mock";
@@ -55,6 +60,11 @@ export type {
   ContextAction,
   ContextActionPayload,
 } from "@/components/lesson-card/context-menu";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+// The fields a teacher can edit inline; matches the Lesson keys we allow
+// to be patched through onEditLesson.
+type EditableField = "title" | "preview" | "objective" | "directions" | "notes";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 // Mirrors LessonCardProps so WeeklyLessonCard is a drop-in for the Weekly grid.
@@ -85,7 +95,24 @@ export interface WeeklyLessonCardProps {
   ) => void;
   /** Drag-handle slot — spread onto the card's drag affordance. */
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
+  /**
+   * Inline text edit committed. The grid applies the patch and marks the
+   * lesson modified (or edits Core Curriculum in master mode).
+   */
+  onEditLesson?: (id: string, patch: Partial<Lesson>) => void;
+  /**
+   * The card's hold-drag has fired and the card root is now draggable.
+   * The grid uses this to record the dragging id so DnD can proceed via
+   * the existing onDragStart / onDrop flow.
+   */
+  onHoldDragStart?: (id: string) => void;
 }
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+// Hold threshold: pointer must be down this long before the card enters
+// "ready to move" state. 280ms is short enough to feel responsive but
+// long enough to distinguish from a tap/click.
+const HOLD_MS = 280;
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -99,6 +126,8 @@ export function WeeklyLessonCard({
   onToggleComplete,
   onContextAction,
   dragHandleProps,
+  onEditLesson,
+  onHoldDragStart,
 }: WeeklyLessonCardProps) {
   const { style } = useTheme();
   const color = useSubjectColor(lesson.subject);
@@ -113,6 +142,22 @@ export function WeeklyLessonCard({
   const [taskStatus, setTaskStatus] = useState<Record<string, LessonStatus>>(
     {},
   );
+
+  // ── Hold-to-drag state ─────────────────────────────────────────────────
+  // holdReady: the 280ms timer has fired and the card is armed for dragging.
+  // While holdReady, the card root is draggable (so a subsequent pointermove
+  // triggers HTML5 DnD) and shows the lift/grab visual signal.
+  const [holdReady, setHoldReady] = useState(false);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track the pointer position at pointerdown so we can cancel if the
+  // pointer strays far before the timer fires (mis-tap on a small card).
+  const holdOriginRef = useRef<{ x: number; y: number } | null>(null);
+
+  // ── Inline editing state ───────────────────────────────────────────────
+  // editingField: which field is currently being edited, or null.
+  // draftValue: the in-progress string the teacher is typing.
+  const [editingField, setEditingField] = useState<EditableField | null>(null);
+  const [draftValue, setDraftValue] = useState<string>("");
 
   const done = lesson.status === "done";
   // Show the task section / pill for any lesson that has at least one task.
@@ -146,22 +191,38 @@ export function WeeklyLessonCard({
     position: "relative",
     // Body surface is always neutral so header color contrast is maximum.
     background: "var(--paper)",
-    border: selected
-      ? `1.5px solid ${color.stripe}`
-      : isVivid
-        ? `1px solid color-mix(in oklch, ${color.deep} 14%, transparent)`
-        : "1px solid var(--ink-150)",
+    border: holdReady
+      ? // holdReady ring: a clear subject-colored outline signals "ready to move".
+        `2px solid ${color.stripe}`
+      : selected
+        ? `1.5px solid ${color.stripe}`
+        : isVivid
+          ? `1px solid color-mix(in oklch, ${color.deep} 14%, transparent)`
+          : "1px solid var(--ink-150)",
     boxShadow: dragging
       ? `0 12px 28px rgba(20,22,32,0.18), 0 0 0 1.5px ${color.stripe}`
-      : hovered
-        ? "0 4px 14px rgba(20,22,32,0.10)"
-        : "var(--shadow-card)",
-    transform: dragging ? "rotate(-1.2deg)" : "none",
+      : holdReady
+        ? // Lift the card: stronger shadow + subtle outer glow to signal "pickable".
+          `0 8px 22px rgba(20,22,32,0.16), 0 0 0 3px color-mix(in oklch, ${color.stripe} 28%, transparent)`
+        : hovered
+          ? "0 4px 14px rgba(20,22,32,0.10)"
+          : "var(--shadow-card)",
+    // Slight scale-up on holdReady echoes a card being "lifted off the table".
+    transform: dragging
+      ? "rotate(-1.2deg)"
+      : holdReady
+        ? "scale(1.025) translateY(-2px)"
+        : "none",
+    cursor: holdReady ? "grab" : "pointer",
     // Done cards recede but stay readable — a gentle fade with only a light
     // desaturation, so "done" scans at a glance without going washed-out.
     opacity: done ? 0.66 : 1,
     filter: done ? "saturate(72%)" : "none",
     paddingInlineStart: 5,
+    // Fast transition when entering holdReady; card snaps back on release.
+    transition: holdReady
+      ? "box-shadow 0.08s ease, transform 0.08s ease, border-color 0.08s ease"
+      : undefined,
   };
 
   // ── Header band ───────────────────────────────────────────────────────────
@@ -194,21 +255,117 @@ export function WeeklyLessonCard({
     [openMenuAt],
   );
 
+  // handleCardClick: fires on a plain single click on the card root.
+  // Guards against misfires when a hold has already fired (holdReady)
+  // so the drag pick-up doesn't also trigger an expand toggle.
   const handleCardClick = useCallback(() => {
+    if (holdReady) return; // hold gesture took precedence — don't expand
+    if (editingField) return; // an editor is open — ignore stray root clicks
     onSelect?.(lesson.id);
-  }, [onSelect, lesson.id]);
+  }, [onSelect, lesson.id, holdReady, editingField]);
 
   const toggleExpand = useCallback(
     (e: MouseEvent) => {
       e.stopPropagation();
+      if (holdReady) return;
+      if (editingField) return;
       (onToggleExpand ?? onSelect)?.(lesson.id);
     },
-    [onToggleExpand, onSelect, lesson.id],
+    [onToggleExpand, onSelect, lesson.id, holdReady, editingField],
   );
 
   const cycleComplete = useCallback(() => {
     onToggleComplete?.(lesson.id, cycleStatus(lesson.status));
   }, [onToggleComplete, lesson.id, lesson.status]);
+
+  // ── Hold-to-drag handlers ──────────────────────────────────────────────
+  // pointerdown on the card body starts the 280ms hold timer. If the pointer
+  // is released, cancelled, or moves more than 8px before the timer fires, the
+  // gesture is treated as a click and holdReady stays false.
+
+  const cancelHoldTimer = useCallback(() => {
+    if (holdTimerRef.current !== null) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    holdOriginRef.current = null;
+  }, []);
+
+  const handleBodyPointerDown = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      // Only the primary pointer (finger / left mouse button) triggers a hold.
+      if (e.button !== 0 && e.pointerType !== "touch") return;
+      // Don't hijack the explicit drag handle — it has its own DnD wiring.
+      if ((e.target as HTMLElement).closest("[data-drag-handle]")) return;
+      // Don't start a hold timer when any text editor is active.
+      if (editingField) return;
+
+      holdOriginRef.current = { x: e.clientX, y: e.clientY };
+      holdTimerRef.current = setTimeout(() => {
+        holdTimerRef.current = null;
+        holdOriginRef.current = null;
+        // Arm the card for dragging.
+        setHoldReady(true);
+        onHoldDragStart?.(lesson.id);
+      }, HOLD_MS);
+    },
+    [lesson.id, editingField, onHoldDragStart],
+  );
+
+  const handleBodyPointerMove = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      if (!holdOriginRef.current || holdTimerRef.current === null) return;
+      const dx = e.clientX - holdOriginRef.current.x;
+      const dy = e.clientY - holdOriginRef.current.y;
+      // 8px movement tolerance: cancels the hold so the teacher can scroll.
+      if (dx * dx + dy * dy > 64) {
+        cancelHoldTimer();
+      }
+    },
+    [cancelHoldTimer],
+  );
+
+  const handleBodyPointerUp = useCallback(() => {
+    // Pointer released before the hold fired → cancel; it was just a click.
+    cancelHoldTimer();
+    // If holdReady, a real DnD drag has started (or the teacher just lifted
+    // without dragging). Reset holdReady so the card returns to rest state.
+    // The dragend event on the card root also resets it (see below).
+    setHoldReady(false);
+  }, [cancelHoldTimer]);
+
+  // ── Inline editing handlers ────────────────────────────────────────────
+
+  // Open an editor for `field`, seeding the draft from the lesson's current value.
+  const openEditor = useCallback(
+    (field: EditableField, e: MouseEvent) => {
+      // Block propagation so the double-click never reaches the band's expand
+      // handler or the card's select handler — editing must not resize the cell.
+      e.stopPropagation();
+      e.preventDefault();
+      cancelHoldTimer();
+      setEditingField(field);
+      setDraftValue(lesson[field] as string);
+    },
+    [lesson, cancelHoldTimer],
+  );
+
+  // Commit the edited value; a no-op if nothing changed.
+  const commitEdit = useCallback(() => {
+    if (!editingField) return;
+    const trimmed = draftValue.trim();
+    if (trimmed !== (lesson[editingField] as string)) {
+      onEditLesson?.(lesson.id, { [editingField]: trimmed });
+    }
+    setEditingField(null);
+    setDraftValue("");
+  }, [editingField, draftValue, lesson, onEditLesson]);
+
+  // Cancel the edit without saving.
+  const cancelEdit = useCallback(() => {
+    setEditingField(null);
+    setDraftValue("");
+  }, []);
 
   // Strip the "I can" prefix for display; the band label makes it explicit.
   const objectiveBody = useMemo(
@@ -218,11 +375,15 @@ export function WeeklyLessonCard({
 
   return (
     <div
-      className={`cp-subj ${subject.cls} ${styles.card}`}
+      className={`cp-subj ${subject.cls} ${styles.card} ${holdReady ? styles.cardHoldReady : ""}`}
       data-style={style}
       role="group"
       aria-label={`${subject.name} lesson: ${lesson.title}`}
       tabIndex={0}
+      // The card root becomes draggable only when holdReady — this lets the
+      // existing HTML5 DnD flow drive the actual move. At rest, draggable is
+      // false so a finger scroll / single click is never hijacked.
+      draggable={holdReady}
       onClick={handleCardClick}
       onContextMenu={handleContextMenu}
       onKeyDown={(e) => {
@@ -232,11 +393,48 @@ export function WeeklyLessonCard({
         }
       }}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => {
+        setHovered(false);
+        // If the pointer left the card without starting a drag, disarm.
+        if (!dragging) {
+          cancelHoldTimer();
+          setHoldReady(false);
+        }
+      }}
+      // Hold-drag: pointerdown starts the timer; pointermove cancels on movement;
+      // pointerup / pointercancel cancel if the hold hasn't fired yet.
+      onPointerDown={handleBodyPointerDown}
+      onPointerMove={handleBodyPointerMove}
+      onPointerUp={handleBodyPointerUp}
+      onPointerCancel={handleBodyPointerUp}
+      // When a real DnD drag starts from the card root (holdReady path),
+      // wire it into the grid's existing drag flow.
+      onDragStart={(e) => {
+        if (!holdReady) return;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", lesson.id);
+        // dragHandleProps.onDragStart wires the grid's draggingId — call it.
+        // HTMLDivElement extends HTMLElement so the event is compatible.
+        dragHandleProps?.onDragStart?.(e as React.DragEvent<HTMLElement>);
+      }}
+      onDragEnd={(e) => {
+        setHoldReady(false);
+        dragHandleProps?.onDragEnd?.(e as React.DragEvent<HTMLElement>);
+      }}
       style={cardSurface}
     >
       {/* Left fork stripe — aria-hidden, purely decorative/informational */}
       <div aria-hidden style={stripeStyle} />
+
+      {/* Screen-reader announcement when the card enters "ready to move" state. */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className={styles.srOnly}
+      >
+        {holdReady ? `${lesson.title} ready to drag. Drag to move it.` : ""}
+      </div>
 
       {/* ── Header band ─────────────────────────────────────────────────── */}
       {/* Deeply-tinted subject fill (noticeably deeper than the body) with
@@ -321,6 +519,7 @@ export function WeeklyLessonCard({
               {dragHandleProps && (
                 <span
                   {...dragHandleProps}
+                  data-drag-handle
                   className={styles.affordance}
                   title="Drag to move"
                   aria-label="Drag handle"
@@ -351,7 +550,8 @@ export function WeeklyLessonCard({
 
         {/* Lesson title — prominent second line of the band. Weight 600,
             one size step up from before, so it reads as the headline of
-            the labeled zone rather than a secondary detail. */}
+            the labeled zone rather than a secondary detail.
+            Double-click enters inline edit mode (suppresses expand). */}
         <h3
           className={styles.bandTitle}
           style={{
@@ -360,7 +560,25 @@ export function WeeklyLessonCard({
             textDecorationColor: `color-mix(in oklch, ${color.cd} 40%, transparent)`,
           }}
         >
-          {lesson.title}
+          {editingField === "title" ? (
+            <EditableInput
+              value={draftValue}
+              onChange={setDraftValue}
+              onCommit={commitEdit}
+              onCancel={cancelEdit}
+              className={styles.editInput}
+              style={{ color: color.cd, background: "transparent" }}
+              aria-label="Edit lesson title"
+            />
+          ) : (
+            <span
+              className={styles.editableText}
+              onDoubleClick={(e) => openEditor("title", e)}
+              title="Double-click to edit"
+            >
+              {lesson.title}
+            </span>
+          )}
         </h3>
 
         {/* Caret — indicates expand state, positioned at bottom-right of band */}
@@ -374,37 +592,82 @@ export function WeeklyLessonCard({
 
       {/* ── Card body ───────────────────────────────────────────────────── */}
       <div className={styles.body}>
-        {/* Collapsed: 2-line preview only. Expanded: full section rows. */}
+        {/* Collapsed: 2-line preview only. Expanded: full section rows.
+            Double-click on the preview text enters inline edit mode. */}
         {!expanded ? (
           <p className={styles.preview} style={{ color: "var(--ink-700)" }}>
-            {lesson.preview}
+            {editingField === "preview" ? (
+              <EditableTextarea
+                value={draftValue}
+                onChange={setDraftValue}
+                onCommit={commitEdit}
+                onCancel={cancelEdit}
+                className={styles.editTextarea}
+                aria-label="Edit lesson preview"
+              />
+            ) : (
+              <span
+                className={styles.editableText}
+                onDoubleClick={(e) => openEditor("preview", e)}
+                title="Double-click to edit"
+              >
+                {lesson.preview}
+              </span>
+            )}
           </p>
         ) : (
           <div className={styles.sections}>
-            {/* Objective section */}
+            {/* Objective section — double-click text to edit inline */}
             {lesson.objective && (
               <SectionRow label="I Can" accent={color.cl} ink={color.cd}>
-                <p
-                  className={styles.sectionText}
-                  style={{ fontStyle: "italic", color: "var(--ink-700)" }}
-                >
-                  {objectiveBody}
-                </p>
+                {editingField === "objective" ? (
+                  <EditableTextarea
+                    value={draftValue}
+                    onChange={setDraftValue}
+                    onCommit={commitEdit}
+                    onCancel={cancelEdit}
+                    className={styles.editTextarea}
+                    style={{ fontStyle: "italic" }}
+                    aria-label="Edit lesson objective"
+                  />
+                ) : (
+                  <p
+                    className={`${styles.sectionText} ${styles.editableText}`}
+                    style={{ fontStyle: "italic", color: "var(--ink-700)" }}
+                    onDoubleClick={(e) => openEditor("objective", e)}
+                    title="Double-click to edit"
+                  >
+                    {objectiveBody}
+                  </p>
+                )}
               </SectionRow>
             )}
 
-            {/* Directions section */}
+            {/* Directions section — double-click text to edit inline */}
             <SectionRow label="Directions" accent={color.cl} ink={color.cd}>
-              <p
-                className={styles.sectionText}
-                style={{ color: "var(--ink-700)" }}
-              >
-                {lesson.directions}
-              </p>
+              {editingField === "directions" ? (
+                <EditableTextarea
+                  value={draftValue}
+                  onChange={setDraftValue}
+                  onCommit={commitEdit}
+                  onCancel={cancelEdit}
+                  className={styles.editTextarea}
+                  aria-label="Edit lesson directions"
+                />
+              ) : (
+                <p
+                  className={`${styles.sectionText} ${styles.editableText}`}
+                  style={{ color: "var(--ink-700)" }}
+                  onDoubleClick={(e) => openEditor("directions", e)}
+                  title="Double-click to edit"
+                >
+                  {lesson.directions}
+                </p>
+              )}
             </SectionRow>
 
-            {/* Teacher notes — hover-gated disclosure */}
-            {lesson.notes && (
+            {/* Teacher notes — hover-gated disclosure; text is editable on double-click */}
+            {(lesson.notes || editingField === "notes") && (
               <SectionRow label="Notes" accent={color.cl} ink={color.cd}>
                 <button
                   type="button"
@@ -418,9 +681,25 @@ export function WeeklyLessonCard({
                   <Icon name="eye" size={11} />
                   {notesOpen ? "Hide teacher notes" : "Show teacher notes"}
                 </button>
-                {notesOpen && (
-                  <p className={styles.notesBody}>{lesson.notes}</p>
-                )}
+                {notesOpen &&
+                  (editingField === "notes" ? (
+                    <EditableTextarea
+                      value={draftValue}
+                      onChange={setDraftValue}
+                      onCommit={commitEdit}
+                      onCancel={cancelEdit}
+                      className={`${styles.notesBody} ${styles.editTextarea}`}
+                      aria-label="Edit teacher notes"
+                    />
+                  ) : (
+                    <p
+                      className={`${styles.notesBody} ${styles.editableText}`}
+                      onDoubleClick={(e) => openEditor("notes", e)}
+                      title="Double-click to edit notes"
+                    >
+                      {lesson.notes}
+                    </p>
+                  ))}
               </SectionRow>
             )}
 
@@ -605,5 +884,104 @@ function SectionRow({
       </div>
       <div className={styles.sectionContent}>{children}</div>
     </section>
+  );
+}
+
+// ── EditableInput ─────────────────────────────────────────────────────────────
+// Single-line inline editor used for the lesson title field. Commits on
+// Enter or blur; cancels on Escape. Auto-focuses when mounted.
+
+function EditableInput({
+  value,
+  onChange,
+  onCommit,
+  onCancel,
+  className,
+  style,
+  "aria-label": ariaLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+  className?: string;
+  style?: CSSProperties;
+  "aria-label"?: string;
+}) {
+  return (
+    <input
+      type="text"
+      value={value}
+      className={className}
+      style={style}
+      aria-label={ariaLabel}
+      autoFocus
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onCommit}
+      onKeyDown={(e) => {
+        // Enter commits; Escape cancels; both stop the event so it doesn't
+        // bubble up to the card's own keydown handler.
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.stopPropagation();
+          onCommit();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          onCancel();
+        }
+      }}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+    />
+  );
+}
+
+// ── EditableTextarea ──────────────────────────────────────────────────────────
+// Multi-line inline editor used for preview, objective, directions, and notes.
+// Commits on blur or Ctrl+Enter / Cmd+Enter. Escape cancels. Auto-focuses.
+
+function EditableTextarea({
+  value,
+  onChange,
+  onCommit,
+  onCancel,
+  className,
+  style,
+  "aria-label": ariaLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+  className?: string;
+  style?: CSSProperties;
+  "aria-label"?: string;
+}) {
+  return (
+    <textarea
+      value={value}
+      className={className}
+      style={style}
+      aria-label={ariaLabel}
+      autoFocus
+      rows={3}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onCommit}
+      onKeyDown={(e) => {
+        // Ctrl/Cmd+Enter commits; Escape cancels; plain Enter is a newline.
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+          e.preventDefault();
+          e.stopPropagation();
+          onCommit();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          onCancel();
+        }
+      }}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+    />
   );
 }

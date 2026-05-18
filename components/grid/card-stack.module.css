@@ -27,7 +27,9 @@
 .stackDeck {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  /* No gap: the navBar's top border provides the visual separation from the
+     deck stage, so a gap would double-space the divider. */
+  gap: 0;
 }
 
 /* The card staging area: relative context so the pseudo-deck layers can
@@ -118,12 +120,23 @@
   align-items: center;
   justify-content: space-between;
   /* Keep the nav bar tight — cells should stay short. */
-  height: 26px;
+  height: 28px;
   gap: 4px;
+  /* Distinct surface so the bar is unmistakable against the card above it.
+     A filled tint + top border separates it visually from the lesson card
+     without requiring any extra spacing. */
+  background: var(--ink-100);
+  border-top: 1px solid var(--ink-200);
+  border-radius: 0 0 var(--r-8) var(--r-8);
+  padding: 0 4px;
+  /* Subtle shadow lifts the bar away from the card above. */
+  box-shadow: 0 1px 3px rgba(20, 22, 32, 0.06);
 }
 
 /* Prev/next arrow buttons — 44×44 touch target via negative margin trick
-   so the visual footprint stays compact inside the cell. */
+   so the visual footprint stays compact inside the cell. Arrows use a
+   stronger base color (ink-700) and a filled pill on hover so they read
+   as clearly interactive even on a quick scan of the grid. */
 .arrow {
   display: inline-flex;
   align-items: center;
@@ -136,20 +149,22 @@
      layout back so neighbours are unaffected. */
   margin: -11px;
   border-radius: var(--r-4);
-  border: none;
-  background: transparent;
-  color: var(--ink-500);
+  border: 1px solid var(--ink-300);
+  background: var(--paper);
+  color: var(--ink-700);
   cursor: pointer;
   transition:
     color 0.1s ease,
-    background 0.1s ease;
+    background 0.1s ease,
+    border-color 0.1s ease;
   /* Reset box-sizing so the padding trick works cleanly. */
   box-sizing: content-box;
 }
 
 .arrow:hover:not(:disabled) {
   color: var(--ink-900);
-  background: var(--ink-100);
+  background: var(--ink-200);
+  border-color: var(--ink-400);
 }
 
 .arrow:disabled {
@@ -163,14 +178,15 @@
   border-radius: var(--r-4);
 }
 
-/* Position indicator: "{i} of {n}" */
+/* Position indicator: "{i} of {n}" — bumped to t-11 and ink-700 so it
+   reads clearly as "there are more lessons here" at grid scale. */
 .counter {
   flex: 1;
   text-align: center;
-  font-size: var(--t-10);
-  font-weight: 600;
-  color: var(--ink-400);
-  letter-spacing: 0.3px;
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--ink-700);
+  letter-spacing: 0.2px;
   /* Block pointer events on the text itself; the parent navBar handles the
      stopPropagation wrapper. */
   pointer-events: none;

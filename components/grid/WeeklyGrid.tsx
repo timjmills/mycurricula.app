@@ -62,8 +62,9 @@ function weekBounds(lessons: Lesson[]): { min: number; max: number } {
 export function WeeklyGrid(): ReactNode {
   const { style } = useTheme();
   // The visible week is shared planner state — the top-bar week jumper and
-  // this view's WeekNavigator both drive it.
-  const { week, setWeek } = useAppState();
+  // this view's WeekNavigator both drive it. editMode drives whether inline
+  // text edits fork the lesson (personal) or update Core Curriculum (master).
+  const { week, setWeek, editMode } = useAppState();
 
   // All lessons live in local state so drag-to-move and the completion
   // checkbox can mutate copies without touching the imported fixture.
@@ -144,6 +145,17 @@ export function WeeklyGrid(): ReactNode {
   const collapseAll = useCallback(() => {
     setExpandedIds((prev) => (prev.size === 0 ? prev : new Set()));
   }, []);
+
+  /** Expand every lesson card in the visible week. */
+  const expandAll = useCallback(() => {
+    setExpandedIds(() => {
+      const next = new Set<string>();
+      for (const l of lessons) {
+        if (l.week === week) next.add(l.id);
+      }
+      return next;
+    });
+  }, [lessons, week]);
 
   const gridNav = useGridNavigation({
     rowCount: SUBJECTS.length,
@@ -639,6 +651,29 @@ export function WeeklyGrid(): ReactNode {
     }
   }
 
+  /**
+   * Inline text edit committed on a lesson card.
+   *
+   * In personal mode (the default) the edit constitutes a lazy fork of the
+   * Master lesson: modified and isPersonal are set to true, making the card
+   * show the dashed stripe + "Modified" pill per the three-tier visual contract.
+   *
+   * In master mode the edit goes directly to the Core Curriculum copy — no fork,
+   * no modified flag — because the teacher deliberately toggled into master mode.
+   */
+  function handleEditLesson(lessonId: string, patch: Partial<Lesson>): void {
+    setLessons((prev) =>
+      prev.map((l) => {
+        if (l.id !== lessonId) return l;
+        const forkFlags: Partial<Lesson> =
+          editMode === "master"
+            ? {} // Master edit: no fork markers
+            : { modified: true, isPersonal: true }; // Personal: lazy fork
+        return { ...l, ...patch, ...forkFlags };
+      }),
+    );
+  }
+
   return (
     <div className={styles.page}>
       {/*
@@ -685,6 +720,23 @@ export function WeeklyGrid(): ReactNode {
         >
           <MoveIcon active={compactManual} />
           {compactManual ? "Exit Move mode" : "Move mode"}
+        </button>
+        {/* Expand / minimize every card in the visible week at once. */}
+        <button
+          type="button"
+          className={styles.moveModeBtn}
+          onClick={expandAll}
+          aria-label="Expand all lesson cards"
+        >
+          Expand all
+        </button>
+        <button
+          type="button"
+          className={styles.moveModeBtn}
+          onClick={collapseAll}
+          aria-label="Minimize all lesson cards"
+        >
+          Minimize all
         </button>
       </div>
 
@@ -747,6 +799,7 @@ export function WeeklyGrid(): ReactNode {
               onToggleComplete={handleToggleComplete}
               onContextAction={handleContextAction}
               onToggleMaximize={handleToggleMaximize}
+              onEditLesson={handleEditLesson}
             />
           ))}
         </div>
@@ -790,6 +843,8 @@ interface SubjectRowProps {
     payload?: ContextActionPayload,
   ) => void;
   onToggleMaximize: (subjectId: SubjectId, day: number) => void;
+  /** Inline text edit committed: threaded to each GridCell → WeeklyLessonCard. */
+  onEditLesson: (id: string, patch: Partial<Lesson>) => void;
 }
 
 function SubjectRow({
@@ -813,6 +868,7 @@ function SubjectRow({
   onToggleComplete,
   onContextAction,
   onToggleMaximize,
+  onEditLesson,
 }: SubjectRowProps): ReactNode {
   const color = useSubjectColor(subjectId);
   const subject = SUBJECTS.find((s) => s.id === subjectId)!;
@@ -860,6 +916,7 @@ function SubjectRow({
           onToggleComplete={onToggleComplete}
           onContextAction={onContextAction}
           onToggleMaximize={onToggleMaximize}
+          onEditLesson={onEditLesson}
         />
       ))}
     </>
