@@ -559,7 +559,7 @@ const ABSimpleWeekly = () => {
                       background: isHot ? `color-mix(in oklch, var(--${s.id}) 12%, var(--paper))` : "transparent",
                       outline: isHot ? `2px dashed var(--${s.id})` : "none",
                       transition: "background .12s, outline-color .12s",
-                      minHeight: 88,
+                      minHeight: 44,
                     }}>
                     {ids.length === 0 ? (
                       <SimpleAddCell subjectColor={`var(--${s.id})`} label={isHot ? `Drop here` : `Add ${s.name.toLowerCase()} lesson`} />

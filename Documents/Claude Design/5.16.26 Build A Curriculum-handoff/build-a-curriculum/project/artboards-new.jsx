@@ -689,7 +689,7 @@ function ABVividWeekly() {
             </div>
             {[0,1,2,3,4].map(day => (
               <div key={day} style={{
-                minHeight: 100, padding: 6, borderLeft: "1px solid color-mix(in oklch, var(--c) 14%, transparent)",
+                minHeight: 44, padding: 6, borderLeft: "1px solid color-mix(in oklch, var(--c) 14%, transparent)",
                 display: "flex", flexDirection: "column", gap: 4,
               }}>
                 {bySubjDay[subj.id][day].map(l => <VividCard key={l.id} lesson={l} />)}

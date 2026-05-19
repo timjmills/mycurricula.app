@@ -380,7 +380,12 @@ function ABWeeklyGrid() {
                   onDragLeave={()=>setDropTarget(null)}
                   onDrop={()=>handleDrop(subj.id, day)}
                   style={{
-                    minHeight: 110, padding: 6, borderLeft: "1px solid var(--ink-100)",
+                    // Cells hug their content: a small min-height keeps empty
+                    // cells a comfortable click target without padding short
+                    // rows out to a fixed 110px (which left blank bands below
+                    // a subject's cards). The grid row's height is now driven
+                    // by its tallest actual card, not a reserved minimum.
+                    minHeight: 44, padding: 6, borderLeft: "1px solid var(--ink-100)",
                     background: isDrop ? "var(--cl)" : "transparent",
                     display: "flex", flexDirection: "column", gap: 4,
                     transition: "background .12s",
