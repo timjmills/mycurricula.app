@@ -53,7 +53,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Density } from "@/lib/collapse-on-drag";
 import { DRAG_CHIP, DRAG_MOTION } from "@/lib/collapse-on-drag";
 import { SaveTargetDialog } from "@/components/weekly/save-target-dialog";
-import type { Lesson, LessonStatus } from "@/lib/types";
+import { NotePopover } from "@/components/weekly/note-popover";
+import type { Lesson, LessonStatus, WeeklyCardDeck } from "@/lib/types";
 import { SUBJECT_BY_ID } from "@/lib/mock";
 import { lessonTime } from "@/lib/mock";
 import { useSubjectColor } from "@/lib/palette";
@@ -165,6 +166,15 @@ export interface WeeklyLessonCardProps {
    * only (safe for the prototype phase).
    */
   onSaveTarget?: (id: string, target: "personal" | "core") => void;
+  /**
+   * Multi-lesson pager. When supplied AND `deck.total > 1`, the card renders
+   * an in-card pager footer (‹ {index + 1} of {total} ›) pinned to its bottom
+   * edge so the teacher can flip through every lesson in a day cell without
+   * leaving the card. Absent (or `total <= 1`) → no footer; the collapsed body
+   * fills the cell with the lesson preview instead. The grid owns the index
+   * and supplies onPrev / onNext to step it.
+   */
+  deck?: WeeklyCardDeck;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -203,6 +213,7 @@ export function WeeklyLessonCard({
   dragHandleProps,
   onEditLesson,
   onSaveTarget,
+  deck,
 }: WeeklyLessonCardProps) {
   const { style } = useTheme();
   const color = useSubjectColor(lesson.subject);
@@ -267,6 +278,20 @@ export function WeeklyLessonCard({
   // The previous threshold of >= 2 silently hid single-task lessons.
   const hasTasks = lesson.tasks.length >= 1;
   const timeLabel = lessonTime(lesson);
+
+  // ── "Why not done" reason ──────────────────────────────────────────────
+  // A catch-up reason is shown only for a not-yet-done lesson that actually
+  // carries one. It used to render as an inline `.reasonRow`, which made the
+  // collapsed card overflow the fixed-height grid cell — it now lives behind
+  // a compact alert-icon affordance that opens NotePopover. `reasonNotDone`
+  // is a plain string on the Lesson model (no label / author / date).
+  const hasReason = Boolean(lesson.reasonNotDone) && lesson.status !== "done";
+
+  // ── Multi-lesson pager ─────────────────────────────────────────────────
+  // The in-card pager footer renders only for a day cell that holds more
+  // than one lesson. A single-lesson cell (or no deck at all) shows the
+  // taller preview body instead — see the `.bodyFill` class below.
+  const hasPager = Boolean(deck) && (deck?.total ?? 0) > 1;
 
   // ── Stripe — solid by default, dashed when personally modified ────────────
   // The stripe sits behind the header band via z-index but still reads
@@ -591,6 +616,11 @@ export function WeeklyLessonCard({
         {!isCompact && (
           <motion.div
             key="full-content"
+            // `.fullContent` makes this wrapper a flex column that grows to
+            // fill the card root (flex: 1) so the collapsed body can stretch
+            // to the bottom of the cell. The framer-motion height animation
+            // (height: 0 → auto) still drives the density in/out transition.
+            className={styles.fullContent}
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
             animate={
               reducedMotion ? { opacity: 1 } : { opacity: 1, height: "auto" }
@@ -785,12 +815,20 @@ export function WeeklyLessonCard({
             </div>
 
             {/* ── Card body ───────────────────────────────────────────────────── */}
-            <div className={styles.body}>
-              {/* Collapsed: 2-line preview only. Expanded: full section rows.
-            Double-click on the preview text enters inline edit mode. */}
+            {/* Collapsed body grows to fill the remaining cell height via
+            `.bodyFill` (flex: 1) so the card always reaches the bottom of its
+            grid slot. Expanded body keeps its natural height — the expanded
+            card may grow taller than the cell, which is intentional. */}
+            <div
+              className={`${styles.body} ${!expanded ? styles.bodyFill : ""}`}
+            >
+              {/* Collapsed: preview text (fills the taller body). Expanded:
+            full section rows. Double-click on the preview enters edit mode. */}
               {!expanded ? (
                 <p
-                  className={styles.preview}
+                  className={`${styles.preview} ${
+                    hasPager ? "" : styles.previewFill
+                  }`}
                   style={{ color: "var(--ink-700)" }}
                 >
                   {editingField === "preview" ? (
@@ -1130,22 +1168,61 @@ export function WeeklyLessonCard({
                   {lesson.status === "carried" && (
                     <span className={styles.carryLabel}>carry-over</span>
                   )}
-                </div>
-              )}
-
-              {/* ── "Why not done" reason ─────────────────────────────────────── */}
-              {lesson.reasonNotDone && lesson.status !== "done" && (
-                <div className={styles.reasonRow}>
-                  <span aria-hidden style={{ fontWeight: 700 }}>
-                    🔥
-                  </span>
-                  <span>{lesson.reasonNotDone}</span>
+                  {/* "Why not done" reason — compact alert-icon affordance.
+                      Opens NotePopover with the reason text. Rendered inline in
+                      the footer (not as its own row) so the collapsed card
+                      stays bounded inside the fixed-height grid cell. Only
+                      mounted when the lesson actually carries a reason. */}
+                  {hasReason && <NotePopover reason={lesson.reasonNotDone} />}
                 </div>
               )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── In-card pager footer — multi-lesson days ───────────────────────
+          A quiet horizontal strip pinned flush with the card's bottom edge
+          (within its rounded corners) when this day cell holds more than one
+          lesson. Lets the teacher flip through every lesson without leaving
+          the card. Rendered as the last flex child of the card root so it
+          sits at the bottom; it is unmounted in compact mode and when there
+          is only a single lesson (deck absent or total <= 1).
+          Mirrors the look of card-stack's `.navBar` (ink-tinted band, top
+          hairline) but adapted to live inside the card.
+          Page buttons stopPropagation so paging never bubbles to the card /
+          cell click or expand handlers. */}
+      {!isCompact && hasPager && deck && (
+        <div className={styles.pager}>
+          <button
+            type="button"
+            className={styles.pagerArrow}
+            disabled={deck.index === 0}
+            aria-label="Previous lesson"
+            onClick={(e) => {
+              e.stopPropagation();
+              deck.onPrev();
+            }}
+          >
+            <span aria-hidden>‹</span>
+          </button>
+          <span className={styles.pagerCounter} aria-live="polite">
+            {deck.index + 1} of {deck.total}
+          </span>
+          <button
+            type="button"
+            className={styles.pagerArrow}
+            disabled={deck.index === deck.total - 1}
+            aria-label="Next lesson"
+            onClick={(e) => {
+              e.stopPropagation();
+              deck.onNext();
+            }}
+          >
+            <span aria-hidden>›</span>
+          </button>
+        </div>
+      )}
 
       {/* Context menu and Save-target dialog are portals — they render outside
           the card's DOM subtree and are not affected by the AnimatePresence

@@ -18,6 +18,14 @@
   border-radius: var(--r-8);
   overflow: hidden;
   cursor: pointer;
+  /* Fill the grid cell slot the card is placed in: a flex column whose body
+     stretches to consume any leftover height (the Weekly matrix gives each
+     cell a fixed min-height). The header band keeps its natural height; the
+     collapsed body grows via `.bodyFill`. The expanded card is allowed to
+     grow past the cell — that layout is unchanged. */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   transition:
     box-shadow 0.15s ease,
     border-color 0.15s ease,
@@ -28,10 +36,23 @@
 }
 
 /* Compact chip mode: fixed 28px height, overflow visible so the 44px grab
-   handle can exceed the chip bounds for touch targets (spec §2.5 / §7). */
+   handle can exceed the chip bounds for touch targets (spec §2.5 / §7).
+   block-size: auto cancels the card root's `height: 100%` so the chip keeps
+   its intrinsic 28px height during a drag instead of stretching to the cell. */
 .cardCompact {
   overflow: visible;
   cursor: default;
+  height: auto;
+}
+
+/* Full-mode content wrapper (band + body). Grows to consume the card root's
+   leftover height so the collapsed body can stretch to the bottom of the
+   cell. A flex column so the body child's `flex: 1` resolves against it. */
+.fullContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* ── Compact chip layout ─────────────────────────────────────────────────── */
@@ -311,7 +332,9 @@
 /* ── Lesson title — prominent second line of the band ────────────────────── */
 /* One size step up from the meta row, weight 600 — reads as the headline
    of the labeled header zone. Stays compact (1.25 line-height) so it doesn't
-   dominate a small cell when the title wraps to two lines. */
+   dominate a small cell when the title wraps to two lines.
+   Clamped to a maximum of 2 lines so a long title can never make the
+   collapsed card overflow its fixed-height grid cell (~206px matrix). */
 .bandTitle {
   margin: 4px 0 0;
   font-size: var(--t-14);
@@ -320,6 +343,11 @@
   text-wrap: pretty;
   /* Leave room for caret (20px) at the right. */
   padding-right: 20px;
+  /* 2-line clamp — keeps the band height bounded. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ── Expand caret — bottom-right of the band ─────────────────────────────── */
@@ -359,8 +387,18 @@
   background: var(--paper);
 }
 
-/* Collapsed 2-line preview — neutral ink on the paper body. Color is set
-   inline per style axis; this rule owns layout and clamp behavior only. */
+/* Collapsed body fills the remaining card height so the card reaches the
+   bottom of its fixed-height grid cell. Only applied when collapsed — the
+   expanded body keeps its natural (content-driven) height. min-height: 0 so
+   the flex child can shrink correctly inside the wrapper. */
+.bodyFill {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Collapsed preview — neutral ink on the paper body. Color is set inline per
+   style axis; this rule owns layout and clamp behavior only. Default clamp is
+   2 lines; `.previewFill` raises it for the taller single-lesson card. */
 .preview {
   margin: 0;
   font-size: var(--t-12);
@@ -371,6 +409,16 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-wrap: pretty;
+}
+
+/* Single-lesson card (no pager footer): the preview fills the now-taller
+   flex body and shows MORE of the lesson text. flex: 1 lets it consume the
+   body height; a generous line-clamp caps it to roughly the number of lines
+   that fit a ~232px cell so a long preview still can't overflow. */
+.previewFill {
+  flex: 1;
+  min-height: 0;
+  -webkit-line-clamp: 6;
 }
 
 /* ── Expanded section rows ───────────────────────────────────────────────── */
@@ -650,19 +698,10 @@
   font-weight: 500;
 }
 
-/* ── "Why not done" reason row ───────────────────────────────────────────── */
-.reasonRow {
-  display: flex;
-  gap: 6px;
-  font-size: var(--t-11);
-  line-height: 1.45;
-  color: var(--catchup);
-  background: var(--catchup-bg);
-  border-radius: var(--r-4);
-  padding: 5px 8px;
-  text-wrap: pretty;
-  margin-top: 2px;
-}
+/* The "Why not done" reason no longer renders inline as a `.reasonRow` —
+   an inline block of arbitrary-length text made the collapsed card overflow
+   the fixed-height grid cell. It is now a compact alert-icon affordance in
+   the footer that opens NotePopover (see note-popover.tsx / .module.css). */
 
 /* ── Editable text regions ───────────────────────────────────────────────── */
 /* Any text region that supports double-click editing shows a faint background
@@ -729,6 +768,83 @@
   min-height: 52px;
 }
 
+/* ── In-card pager footer — multi-lesson days ────────────────────────────── */
+/* A quiet horizontal strip pinned to the card's bottom edge for day cells
+   that hold more than one lesson. Mirrors card-stack's `.navBar`: an
+   ink-tinted band with a top hairline border, a ‹ prev / › next arrow pair,
+   and a centered "{i} of {n}" counter. Adapted to sit INSIDE the card —
+   it inherits the card's rounded bottom corners. Rendered as the last flex
+   child of the card root so it always sits flush at the bottom. */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  gap: 4px;
+  /* Tight band height — keeps the card compact inside the cell. */
+  height: 26px;
+  padding: 0 4px;
+  /* Filled tint + top hairline separate the strip from the card body above
+     without extra spacing. */
+  background: var(--ink-100);
+  border-top: 1px solid var(--ink-200);
+  /* Inherit the card's rounded bottom corners. */
+  border-radius: 0 0 var(--r-8) var(--r-8);
+}
+
+/* Prev/next arrow — 22×22 visual, inflated to a 44×44 touch target via
+   padding while a matching negative margin keeps the layout footprint tight
+   (the same box-model trick card-stack's `.arrow` uses). */
+.pagerArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 11px;
+  margin: -11px;
+  border-radius: var(--r-4);
+  border: 1px solid var(--ink-300);
+  background: var(--paper);
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  line-height: 1;
+  cursor: pointer;
+  box-sizing: content-box;
+  transition:
+    color 0.1s ease,
+    background 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.pagerArrow:hover:not(:disabled) {
+  color: var(--ink-900);
+  background: var(--ink-200);
+  border-color: var(--ink-400);
+}
+
+.pagerArrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pagerArrow:focus-visible {
+  outline: 2px solid var(--c, var(--ink-900));
+  outline-offset: 2px;
+}
+
+/* "{i} of {n}" position counter — centered between the arrows. */
+.pagerCounter {
+  flex: 1;
+  text-align: center;
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--ink-700);
+  letter-spacing: 0.2px;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ── Screen-reader only utility ──────────────────────────────────────────── */
 /* Used for the aria-live region that announces "ready to drag" state. */
 .srOnly {
@@ -759,7 +875,8 @@
   .sectionRow,
   .sectionRowHoldReady,
   .sectionMoveControls,
-  .sectionMoveBtn {
+  .sectionMoveBtn,
+  .pagerArrow {
     transition-duration: 0.001ms !important;
   }
 }

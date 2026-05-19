@@ -1,0 +1,172 @@
+/* note-popover.module.css — layout + interaction CSS for the Weekly Lesson
+   Card's "Why not done" reason affordance. This file owns:
+     • the small alert-triangle trigger button (≥44px hit area)
+     • the floating popover panel (paper surface, border, soft shadow)
+     • the panel header (icon · title · close) and body
+     • prefers-reduced-motion guard for the open/close fade
+   All color / type / radius / shadow values come from tokens.css. */
+
+/* ── Root ────────────────────────────────────────────────────────────────── */
+/* Wraps trigger + panel so outside-click detection has one element to test
+   containment against. Positioned so the absolute panel anchors to it. */
+.root {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+/* ── Trigger — alert-triangle button ─────────────────────────────────────── */
+/* A 44×44 touch target (iPad minimum, spec §4). Negative margin pulls the
+   oversized target back so it does not bloat the footer / band-controls row
+   it sits in — the same trick `.affordance` uses on the card itself. */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -15px -13px;
+  border-radius: var(--r-6);
+  background: transparent;
+  cursor: pointer;
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--catchup);
+  outline-offset: -6px;
+}
+
+/* The visible glyph chip — `--catchup` flame on a `--catchup-bg` tint so the
+   affordance reads as a catch-up signal at a glance, consistent with the
+   reason's prior inline `.reasonRow` coloring. */
+.triggerVisual {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-4);
+  color: var(--catchup);
+  background: var(--catchup-bg);
+  transition: filter 0.12s ease;
+}
+
+.trigger:hover .triggerVisual {
+  filter: brightness(0.96);
+}
+
+/* ── Floating panel ──────────────────────────────────────────────────────── */
+/* Anchored above-right of the trigger so it floats clear of the card body.
+   ~260px wide, rounded, subtle border + soft drop shadow on the paper
+   surface. z-index lifts it above sibling cards in the grid matrix. */
+.panel {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: -8px;
+  z-index: 30;
+  width: 260px;
+  max-width: 78vw;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-8);
+  box-shadow: var(--shadow-popover);
+  padding: 9px 11px 11px;
+  cursor: default;
+  /* Open fade — suppressed under reduced motion (see media query below). */
+  animation: notePopoverIn 0.13s ease-out;
+}
+
+@keyframes notePopoverIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Panel header — icon · title · close ─────────────────────────────────── */
+.panelHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+/* Alert glyph echoing the trigger — flame color on a faint catch-up tint. */
+.panelIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-4);
+  color: var(--catchup);
+  background: var(--catchup-bg);
+  flex: 0 0 auto;
+}
+
+/* Short header title — bold, catch-up colored so the panel's purpose reads
+   immediately. */
+.panelTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-12);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--catchup);
+}
+
+/* X close button — compact ghost button, ink-toned, hover fill. */
+.panelClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: -2px -3px -2px 0;
+  border-radius: var(--r-4);
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.panelClose:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.panelClose:focus-visible {
+  outline: 2px solid var(--catchup);
+  outline-offset: 1px;
+  color: var(--ink-900);
+}
+
+/* ── Panel body — the reason text ────────────────────────────────────────── */
+/* Normal ink on the paper surface — readable and not alarmist; the colored
+   header already carries the catch-up signal. */
+.panelBody {
+  margin: 0;
+  font-size: var(--t-12);
+  line-height: 1.5;
+  color: var(--ink-700);
+  text-wrap: pretty;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+/* Suppress the open fade/slide; the panel appears instantly (spec §4). */
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+  .triggerVisual,
+  .panelClose {
+    transition-duration: 0.001ms !important;
+  }
+}

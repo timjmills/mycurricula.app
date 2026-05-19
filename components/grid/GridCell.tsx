@@ -42,7 +42,12 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS as DndCSS } from "@dnd-kit/utilities";
-import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
+import type {
+  Lesson,
+  LessonStatus,
+  SubjectId,
+  WeeklyCardDeck,
+} from "@/lib/types";
 import { WeeklyLessonCard } from "@/components/weekly";
 import type { ContextAction, ContextActionPayload } from "@/components/weekly";
 import type { CellLayout } from "@/lib/cell-layout";
@@ -68,6 +73,9 @@ interface SortableLessonItemProps {
   expanded: boolean;
   selected: boolean;
   dragging: boolean;
+  /** Multi-lesson pager state — when present the card renders an in-card
+   *  flip-through footer. Absent for single-lesson and maximized cells. */
+  deck?: WeeklyCardDeck;
   onSelect: (id: string) => void;
   onToggleComplete: (id: string, next: LessonStatus) => void;
   onContextAction: (
@@ -87,12 +95,16 @@ interface SortableLessonItemProps {
 //   • density changes once (idle→compact on drag-start, compact→idle on drop)
 //   • expanded/selected/dragging are primitives
 //   • callbacks are stable (useCallback in GridCell)
+//   • deck (when present) is a stable object — CardStack memoizes it and its
+//     onPrev/onNext handlers with useMemo/useCallback, so it does not change
+//     identity on drag pointer-moves.
 const SortableLessonItem = React.memo(function SortableLessonItem({
   lesson,
   density,
   expanded,
   selected,
   dragging,
+  deck,
   onSelect,
   onToggleComplete,
   onContextAction,
@@ -132,6 +144,7 @@ const SortableLessonItem = React.memo(function SortableLessonItem({
         expanded={expanded}
         selected={selected}
         dragging={dragging || isDragging}
+        deck={deck}
         onSelect={onSelect}
         onToggleExpand={onSelect}
         onToggleComplete={onToggleComplete}
@@ -239,8 +252,10 @@ export function GridCell({
   const dragActiveId = dragState.phase !== "idle" ? dragState.activeId : null;
 
   // ── Card renderer — used by both the flat and layout paths ───────────────
+  // CardStack calls this with an optional `deck` for the collapsed
+  // multi-lesson case; the card then draws its own in-card pager footer.
   const renderCard = useCallback(
-    (lesson: Lesson): ReactNode => (
+    (lesson: Lesson, deck?: WeeklyCardDeck): ReactNode => (
       <SortableLessonItem
         key={lesson.id}
         lesson={lesson}
@@ -248,6 +263,7 @@ export function GridCell({
         expanded={expandedIds.has(lesson.id)}
         selected={selectedId === lesson.id}
         dragging={dragActiveId === lesson.id}
+        deck={deck}
         onSelect={onSelect}
         onToggleComplete={onToggleComplete}
         onContextAction={onContextAction}
@@ -300,7 +316,6 @@ export function GridCell({
             const slotLessons = slot
               .map((id) => lessons.find((l) => l.id === id))
               .filter((l): l is Lesson => l !== undefined);
-            const slotCards = slotLessons.map((l) => renderCard(l));
             return (
               <div
                 key={slotIdx}
@@ -308,7 +323,11 @@ export function GridCell({
                   isSplit ? styles.layoutSlotHalf : styles.layoutSlotFull
                 }
               >
-                <CardStack cards={slotCards} maximized={maximized} />
+                <CardStack
+                  lessons={slotLessons}
+                  renderCard={renderCard}
+                  maximized={maximized}
+                />
               </div>
             );
           })}
@@ -374,11 +393,15 @@ export function GridCell({
               renderLayout(cellLayout)
             ) : (
               <CardStack
-                cards={lessons.map((l) => renderCard(l))}
+                lessons={lessons}
+                renderCard={renderCard}
                 maximized={maximized}
               />
             )}
 
+            {/* Compact "+" affordance — absolutely positioned bottom-right,
+                revealed on cell hover/focus. Takes ZERO flow space so the
+                lesson card fills 100% of the cell. */}
             <button
               type="button"
               className={styles.cellAddInline}
@@ -389,7 +412,6 @@ export function GridCell({
               aria-label="Add another lesson to this day"
             >
               <PlusIcon small />
-              Add
             </button>
           </>
         )}

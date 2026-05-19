@@ -172,3 +172,17 @@ export interface ScheduleBlock {
 
 /** A CCSS standard: code → description. */
 export type StandardsMap = Record<string, string>;
+
+/** Pager state handed to a Weekly lesson card when it represents one lesson
+ *  of a multi-lesson day. The card renders an in-card flip-through footer
+ *  (‹ {index+1} of {total} ›) instead of the cell hosting a separate pager. */
+export interface WeeklyCardDeck {
+  /** 0-based index of the visible lesson within the cell. */
+  index: number;
+  /** Total lessons in the cell — the pager footer shows only when > 1. */
+  total: number;
+  /** Step to the previous lesson in the cell. */
+  onPrev: () => void;
+  /** Step to the next lesson in the cell. */
+  onNext: () => void;
+}

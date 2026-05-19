@@ -202,6 +202,10 @@
      so subject rows read as tightly stacked bands rather than floating tiles. */
   column-gap: 3px;
   row-gap: 0;
+  /* Cells stretch to a uniform height per subject row (the default grid
+     behaviour — no `align-items: start`). Combined with each cell's fixed
+     `min-height` (see .cell), every cell in a row settles to the same height,
+     so the grid reads as a clean matrix with no ragged voids. */
   min-width: 1082px;
 }
 
@@ -249,7 +253,10 @@
 /* ── Subject row header ─────────────────────────────────────────────── */
 .subjectHead {
   display: flex;
-  align-items: center;
+  /* Top-align the label: in a tall subject row, centering would float
+     the subject name in the middle of the row. flex-start keeps it at the top,
+     aligned with the cards in that row. */
+  align-items: flex-start;
   gap: 8px;
   padding: 10px 6px 0 4px;
   position: sticky;
@@ -293,7 +300,15 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-height: 84px;
+  /* Fixed minimum cell height. Combined with the grid's default cell-stretch
+     (the grid has no `align-items: start`), this makes every cell in a subject
+     row settle to the SAME height, so the Weekly grid reads as a clean uniform
+     matrix with no ragged rows or voids. It is a *min*-height, not a fixed
+     height: a deliberately-expanded card (.cellMaximized) can still grow its
+     own cell — and therefore its row — beyond this baseline. The lesson card
+     now fills the cell's full content area, so this baseline is set a little
+     taller to give the card comfortable breathing room. */
+  min-height: 232px;
   border-radius: var(--r-12);
   /* Block padding trimmed to 2px so that zero row-gap produces no visible
      vertical gap between adjacent cells. Inline padding stays at 4px to
@@ -469,33 +484,48 @@
   color: var(--paper);
 }
 
-/* A faint add button shown beneath stacked cards so a populated cell can
-   still take another lesson. */
+/* "Add another lesson" affordance — a compact "+" button pinned to the
+   cell's bottom-right corner. Because the lesson card now fills the entire
+   cell content area, this button can no longer sit in the flow below the
+   card; it is absolutely positioned so it takes ZERO flow space and simply
+   overlays the card's lower-right edge. Hidden at rest, revealed on cell
+   hover or keyboard focus. */
 .cellAddInline {
-  align-self: stretch;
-  display: flex;
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  z-index: 3;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  min-height: 32px;
-  border-radius: var(--r-6);
-  border: 1px dashed var(--ink-200);
-  background: transparent;
-  color: var(--ink-400);
-  font-size: var(--t-11);
-  font-weight: 500;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-8);
+  background: var(--paper);
+  color: var(--ink-500);
+  border: 1px solid var(--ink-200);
+  /* Invisible and non-interactive at rest. */
   opacity: 0;
-  transition: opacity 0.12s ease;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(20, 22, 32, 0.12);
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
 }
 
+/* Revealed on cell hover / keyboard focus. */
 .cell:hover .cellAddInline,
 .cellAddInline:focus-visible {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .cellAddInline:hover {
+  background: var(--cell-accent, var(--ink-100));
   border-color: var(--cell-accent, var(--ink-300));
-  color: var(--cell-accent, var(--ink-500));
+  color: var(--paper);
 }
 
 .cellAddInline:focus-visible {
@@ -572,10 +602,26 @@
 /* ── Card slot ──────────────────────────────────────────────────────
    One slot per stacked lesson. The LessonCard renders its own grab
    affordance (fed `dragHandleProps` by the grid) and its own surface,
-   so the slot is just a positioning context. */
+   so the slot is just a positioning context.
+   In a collapsed cell only ONE card is rendered and it must fill the
+   whole cell content area — so the slot stretches (`flex: 1`) and the
+   card inside is given `height: 100%`. In a maximized cell the slots
+   stack naturally and grow to their content. */
 .cardSlot {
   position: relative;
   min-width: 0;
+  /* Fill the cell's content area so the single rendered card has no
+     blank space beneath it. CardStack's single/deck wrappers also
+     stretch (see card-stack.module.css), so this slot inherits a
+     full-height box to occupy. */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The card itself (direct child of the slot) fills the slot. */
+.cardSlot > * {
+  flex: 1;
 }
 
 /* ── Empty-week state ───────────────────────────────────────────────── */
@@ -611,6 +657,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 4px);
+  /* Stretch so each layout row shares the cell's height and its cards
+     fill the available space rather than leaving a void below. */
+  flex: 1;
 }
 
 .layoutRowSplit {
@@ -618,19 +667,26 @@
   flex-direction: row;
   gap: var(--space-2, 4px);
   align-items: stretch;
+  flex: 1;
 }
 
-/* Full-width slot — just a positioning context, like .cardSlot. */
+/* Full-width slot — just a positioning context, like .cardSlot.
+   Stretches as a flex column so its CardStack fills the row height. */
 .layoutSlotFull {
   min-width: 0;
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Half-width slot: each occupies exactly 50% of the row minus the gap.
    The small gap (--space-2 ≈ 4px) visually separates the two subjects
-   so their individual color stripes don't bleed together. */
+   so their individual color stripes don't bleed together. Stretches as
+   a flex column so its CardStack fills the row height. */
 .layoutSlotHalf {
   flex: 0 0 calc(50% - var(--space-2, 4px) / 2);
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
