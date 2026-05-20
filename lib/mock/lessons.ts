@@ -157,9 +157,17 @@ export const LESSONS: Lesson[] = [
       "Number-talk routine: pairs find three equivalent fractions for 3/4, share strategies, then class consolidates the visual model on the board.",
     notes:
       "If they struggle, fall back to the strip diagrams from Lesson 22. Maya's class skipped this in October — extend by 5min.",
+    // Resources seeded per spec §7 / §4.2 — the first four populate the
+    // 2×2 thumbnail grid in Section 1 (Standards); the remaining three flow
+    // into the "More resources" sub-list. Exact labels per the spec.
     resources: [
-      { type: "slides", label: "Number talk deck" },
-      { type: "pdf", label: "Fraction strips" },
+      { type: "youtube", label: "Fraction Basics" }, // Card 1 — play icon
+      { type: "link", label: "What is a Fraction?" }, // Card 2 — paperclip
+      { type: "doc", label: "Fractions Overview" }, // Card 3 — document
+      { type: "link", label: "Khan Academy" }, // Card 4 — paperclip
+      { type: "pdf", label: "Fraction Wall Poster" }, // More — PDF
+      { type: "doc", label: "Anchor Chart Template" }, // More — DOCX
+      { type: "pdf", label: "Fraction Examples Sheet" }, // More — PDF
     ],
     standards: ["5.NF.B.3", "5.NF.A.1"],
   }),

@@ -1,0 +1,409 @@
+/* TodayTodos.module.css — the To-do List card in the Daily right rail.
+
+   A WHITE card matching the Resources + Shoutbox cards above and below it.
+   The only colors that appear inside are:
+     • the green count badge in the head (open-item count),
+     • the green-filled checkbox on done items, and
+     • each tag's identity dot.
+   Everything else is neutral ink. */
+
+/* ── Panel container ─────────────────────────────────────────────────── */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Inner padding stays comfortable on a wide rail but collapses smoothly
+     to a tight gutter on a very narrow rail. */
+  padding: 12px clamp(6px, 2vw, 12px);
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-8);
+  box-shadow: var(--shadow-card);
+  /* Allow the card to shrink below its content's intrinsic min-width when
+     the rail is dragged narrow. */
+  min-width: 0;
+  /* Fill the rail's slot when a fixed height has been set on it (the
+     teacher's per-panel splitter resize). `height: 100%` resolves to
+     `auto` when the slot has no fixed height (collapsed panels or
+     standalone use), so this is inert outside the rail. `box-sizing:
+     border-box` keeps the JS-driven px height matching the visible
+     card height including the 1px border. */
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+/* ── Head row: optional grip + title + green open-count + optional chevron ─ */
+
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  padding: 0 2px;
+  /* Allow children to shrink — the title cell carries its own min-width: 0
+     so long titles wrap instead of pushing the head wider than the card. */
+  min-width: 0;
+  /* Header is pinned when the panel slot has a fixed height; the body
+     below scrolls internally. */
+  flex-shrink: 0;
+}
+
+/* ── Drag grip (rail-driven; only when dragHandleProps is provided) ────── */
+/* Same vocabulary as the Resources panel's grip — subject-neutral, hit-
+   padded to meet the ≥44px touch target without growing the header. */
+
+.gripBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin: -10px -4px -10px -6px;
+  position: relative;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-300);
+  border-radius: var(--r-4);
+  cursor: grab;
+  transition: color 0.1s;
+  touch-action: none;
+}
+
+.gripBtn::before {
+  content: "";
+  position: absolute;
+  inset: -10px -6px;
+}
+
+.gripBtn:hover {
+  color: var(--ink-500);
+}
+
+.gripBtn:active {
+  cursor: grabbing;
+}
+
+.gripBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Chevron collapse toggle (rail-driven) ─────────────────────────────── */
+/* Pushed flush right via margin-left: auto. Subject-neutral, hit-padded. */
+
+.collapseBtn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  position: relative;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  /* Match the grip on the same row — both tertiary chrome under the
+     panel title, never competing with it. */
+  color: var(--ink-300);
+  border-radius: var(--r-4);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.collapseBtn::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+}
+
+.collapseBtn:hover {
+  color: var(--ink-900);
+}
+
+.collapseBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Collapsible body wrapper ──────────────────────────────────────────── */
+/* framer-motion drives height auto ⇄ 0 on this element. Stacks the body
+   children (list + quick-add) with the same 10px gap the panel previously
+   had between head and body so the collapse animation looks like the
+   body sliding away cleanly.
+
+   Internal scroll: when the rail's slot has a fixed height the body fills
+   the leftover space and scrolls — long to-do lists no longer push the
+   card past its slot. `min-height: 0` is the flex-child unlock that
+   actually lets `overflow: auto` shrink the body below its content's
+   intrinsic min-height. `overflow: auto !important` is needed because
+   the panel's TSX sets `style={{ overflow: "hidden" }}` inline on this
+   element to keep the open/close height tween clean; the inline rule
+   wins over a non-`!important` style. */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto !important;
+  /* Cap horizontal overflow — vertical scroll only. To-do rows wrap via
+     overflow-wrap; a stray un-breakable word shouldn't surface a
+     horizontal scrollbar. */
+  overflow-x: hidden;
+}
+
+.title {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--t-14);
+  font-weight: 700;
+  /* Tight tracking — matches the Resources + Shoutbox panel titles so the
+     three rail cards share one consistent title rhythm. */
+  letter-spacing: -0.2px;
+  color: var(--ink-900);
+  /* Long custom panel labels wrap rather than push the head wider. */
+  overflow-wrap: anywhere;
+}
+
+/* Green-tinted count badge — open-item count. The done token is
+   reused (status, not subject), with a soft tint via color-mix so the
+   badge reads as a quiet pill rather than a solid alert. */
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--done) 18%, var(--paper));
+  color: var(--done);
+  font-size: var(--t-11);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── List ────────────────────────────────────────────────────────────── */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 2px;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+/* The checkbox + title together are one toggle — ≥44px tall touch target. */
+.toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+  border-radius: var(--r-4);
+}
+
+.check {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.itemTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-12);
+  line-height: 1.4;
+  color: var(--ink-900);
+  /* Wrap long to-dos rather than truncate — the rail has the height. */
+  overflow-wrap: anywhere;
+}
+
+.itemTitleDone {
+  color: var(--ink-400);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-300);
+}
+
+/* Tag dots — tag color is the only color in the row besides the green
+   done state; both carry information, not decoration. */
+.tags {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.tagDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+}
+
+/* Team-scope marker — a quiet uppercase text chip, deliberately colorless. */
+.scope {
+  flex-shrink: 0;
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────── */
+
+.empty {
+  margin: 0;
+  padding: 6px 2px;
+  font-size: var(--t-12);
+  color: var(--ink-400);
+  font-style: italic;
+}
+
+/* ── "+ Add a to-do" link (collapsed affordance) ─────────────────────── */
+/* Quiet, full-width button styled as an inline link. Reveals the
+   composer on click. Matches Image 13's calm bottom row. */
+
+.addLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 6px 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-500);
+  transition: color 0.1s;
+}
+
+.addLink:hover {
+  color: var(--ink-900);
+}
+
+.addLink:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+  border-radius: var(--r-4);
+}
+
+.addLinkIcon {
+  display: inline-flex;
+  color: currentColor;
+}
+
+/* ── Quick-add composer (expanded affordance) ─────────────────────────── */
+
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Slightly roomier so the dashed shell reads as a comfortable input,
+     not a cramped chip. */
+  padding: 6px 10px;
+  border: 1px dashed var(--ink-200);
+  border-radius: var(--r-6);
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.composer:focus-within {
+  border-color: var(--ink-400);
+  border-style: solid;
+  background: var(--ink-50);
+}
+
+.composerIcon {
+  display: inline-flex;
+  color: var(--ink-400);
+  flex-shrink: 0;
+}
+
+.composerInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: var(--t-12);
+  color: var(--ink-900);
+  /* The composer's outer dashed border supplies the focus affordance;
+     the input itself stays chromeless. Min-height to keep it tappable. */
+  min-height: 28px;
+}
+
+.composerInput::placeholder {
+  color: var(--ink-400);
+}
+
+.composerAdd {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  min-height: 28px;
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-4);
+  background: var(--paper);
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-700);
+  cursor: pointer;
+  transition:
+    background 0.1s,
+    color 0.1s,
+    border-color 0.1s;
+}
+
+.composerAdd:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.composerAdd:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.composerAdd:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .addLink,
+  .composer,
+  .composerAdd {
+    transition: none;
+  }
+}

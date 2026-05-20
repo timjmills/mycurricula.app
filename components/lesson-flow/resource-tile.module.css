@@ -1,0 +1,335 @@
+/* resource-tile.module.css — synthetic ~16:9 thumbnail preview tile.
+ *
+ * A ResourceTile is the DEFAULT form a section's resources render as inside
+ * LessonFlow (a responsive grid of tiles). Since the prototype has no real
+ * files (CLAUDE.md §3), the preview is a synthetic placeholder: a
+ * subject-tinted 16:9 frame whose look varies by resource kind
+ * (data-frame="video|slides|document|image|url").
+ *
+ * This module also styles <ResourceLinkPreview> — the floating thumbnail
+ * preview revealed when a resource link is hovered / focused in a section's
+ * MINIMIZED inline-link list.
+ *
+ * The tile inherits --c / --cl / --cd from the .cp-subj cascade on the
+ * LessonDetail root, so all subject color is read — never invented.
+ *
+ * Layout:
+ *   .tile           → <figure> column: frame on top, caption below
+ *   .frame          → the 16:9 preview surface (aspect-ratio 16/9)
+ *   .artwork        → absolutely-positioned synthetic SVG decoration
+ *   .bigIcon        → large centered type glyph
+ *   .collapseBtn    → top-right "minimize to link list" control
+ *   .removeBtn      → top-right "remove resource" control
+ *   .caption        → small icon + label + type tag below the frame
+ *   .previewWrap    → inline wrapper anchoring the hover/focus preview popover
+ *   .previewPopover → the floating thumbnail shown on link hover / focus
+ *   .previewFrame   → the popover's 16:9 synthetic frame
+ *   .previewBigIcon → the centered glyph inside the popover frame
+ *
+ * All color/type/spacing via var(--token). No hard-coded hex or px font sizes.
+ */
+
+/* ── Tile (figure) ───────────────────────────────────────────────────── */
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  /* Sized by the parent grid track in lesson-flow.module.css. */
+  min-width: 0;
+}
+
+/* ── 16:9 preview frame ──────────────────────────────────────────────── */
+/* Default (url / slides / document / image) frame: subject-light fill with
+   a subject-tinted hairline. The video frame overrides to a dark plate. */
+.frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-6);
+  overflow: hidden;
+  background: var(--cl, var(--ink-100));
+  border: 1px solid
+    color-mix(in oklch, var(--c, var(--ink-300)) 32%, transparent);
+  /* The big icon sits centered above the artwork. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cd, var(--ink-600));
+}
+
+/* ── Per-type tints ──────────────────────────────────────────────────────
+   Every resource kind gets its own soft pastel fill + a deeper matching
+   icon/border, so a glance at a tile says what's inside regardless of the
+   lesson's subject. The pastel tokens come from the highlighter palette in
+   tokens.css (`--hlp-*` for the soft fills, `--hl-*` for the saturated
+   markers we mix into the icon/border).
+
+   `data-frame` lives on the outer `.tile` figure, so the descendant
+   selector targets the inner `.frame`. The plain `.frame` rule above acts
+   as a fallback for any kind not explicitly listed.
+
+   Kind → mood:
+     • video    → dark plate, hot-red play button (the YouTube tell).
+     • slides   → maya-blue pastel.
+     • document → rose / coral pastel (pdf, doc).
+     • image    → lime pastel.
+     • url      → mac-and-cheese peach (website, link). */
+
+.tile[data-frame="video"] .frame {
+  background: var(--ink-900);
+  border-color: color-mix(in oklch, var(--hl-red) 45%, transparent);
+  color: var(--hl-red);
+}
+
+.tile[data-frame="slides"] .frame {
+  background: var(--hlp-maya);
+  border-color: color-mix(in oklch, var(--hl-maya) 38%, transparent);
+  color: color-mix(in oklch, var(--hl-maya) 60%, var(--ink-900));
+}
+
+.tile[data-frame="document"] .frame {
+  background: var(--hlp-red);
+  border-color: color-mix(in oklch, var(--hl-red) 38%, transparent);
+  color: color-mix(in oklch, var(--hl-red) 60%, var(--ink-900));
+}
+
+.tile[data-frame="image"] .frame {
+  background: var(--hlp-lime);
+  border-color: color-mix(in oklch, var(--hl-lime) 38%, transparent);
+  color: color-mix(in oklch, var(--hl-lime) 60%, var(--ink-900));
+}
+
+.tile[data-frame="url"] .frame {
+  background: var(--hlp-cheese);
+  border-color: color-mix(in oklch, var(--hl-cheese) 38%, transparent);
+  color: color-mix(in oklch, var(--hl-cheese) 60%, var(--ink-900));
+}
+
+/* ── Synthetic artwork SVG ───────────────────────────────────────────── */
+/* Fills the frame behind the big icon. currentColor inherits from .frame. */
+.artwork {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  pointer-events: none;
+}
+
+/* ── Big centered type icon ──────────────────────────────────────────── */
+.bigIcon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Deep subject ink on the light frames; subject base on the dark video
+     frame (set on .frame, inherited here via color). */
+  z-index: 1;
+}
+
+/* ── Collapse + remove controls ──────────────────────────────────────── */
+/* Both pinned to the frame's top-right. Small paper chips so they read on
+   any frame fill (light tint or dark video plate). */
+.collapseBtn,
+.removeBtn {
+  position: absolute;
+  top: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-4);
+  border: 1px solid color-mix(in oklch, var(--ink-900) 12%, transparent);
+  background: color-mix(in oklch, var(--paper) 86%, transparent);
+  color: var(--ink-600);
+  cursor: pointer;
+  z-index: 2;
+  /* Expand the tap target to ≥44px without disturbing the 24px visual box. */
+  padding: 10px;
+  margin: -10px;
+  box-sizing: content-box;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.collapseBtn {
+  right: 36px;
+}
+
+.removeBtn {
+  right: 6px;
+}
+
+.collapseBtn:hover {
+  background: var(--paper);
+  color: var(--ink-900);
+}
+
+.removeBtn:hover {
+  background: var(--urgent-bg);
+  color: var(--urgent);
+}
+
+.collapseBtn:focus-visible,
+.removeBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Caption row ─────────────────────────────────────────────────────── */
+.caption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+  min-width: 0;
+}
+
+.captionIcon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--cd, var(--ink-500));
+}
+
+.captionLabel {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-800, var(--ink-900));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.captionType {
+  flex: 0 0 auto;
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--cd, var(--ink-500));
+}
+
+/* ── Resource-link hover/focus preview ───────────────────────────────── */
+/* Used by <ResourceLinkPreview> in the MINIMIZED inline-link list: hovering
+   or keyboard-focusing a resource link floats a small synthetic thumbnail of
+   that resource just above the row. */
+
+/* Inline anchor — wraps the link row and positions the popover relative to
+   it. `display: contents` would drop the positioning context, so this is a
+   real inline-flex box that still flows like the link row it replaces. */
+.previewWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+/* The floating preview card. Pinned just ABOVE the link row, left-aligned to
+   it. A paper card with a hairline + popover shadow so it reads as a floating
+   layer over the section body. pointer-events:none — it is a passive preview,
+   never a hover target itself, so it cannot trap the cursor. */
+.previewPopover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  /* A compact preview — wide enough to read the synthetic frame at a glance
+     without dominating the section. Width is fixed; the frame holds 16:9. */
+  width: 168px;
+  padding: 4px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-150);
+  background: var(--paper);
+  box-shadow: var(--shadow-popover);
+  pointer-events: none;
+  /* A quiet fade + tiny lift, as if surfacing from the link. One tasteful
+     motion — no bounce. */
+  animation: previewIn 0.12s ease both;
+}
+
+@keyframes previewIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The popover's 16:9 synthetic frame — same per-kind treatment as .frame on
+   a full tile, just without the caption row and the collapse/remove chrome. */
+.previewFrame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-6);
+  overflow: hidden;
+  background: var(--cl, var(--ink-100));
+  border: 1px solid
+    color-mix(in oklch, var(--c, var(--ink-300)) 32%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cd, var(--ink-600));
+}
+
+/* Per-type tints — mirror the `.tile[data-frame="X"] .frame` block above so
+   the hover/focus preview matches the tile it previews. */
+.previewFrame[data-frame="video"] {
+  background: var(--ink-900);
+  border-color: color-mix(in oklch, var(--hl-red) 45%, transparent);
+  color: var(--hl-red);
+}
+
+.previewFrame[data-frame="slides"] {
+  background: var(--hlp-maya);
+  border-color: color-mix(in oklch, var(--hl-maya) 38%, transparent);
+  color: color-mix(in oklch, var(--hl-maya) 60%, var(--ink-900));
+}
+
+.previewFrame[data-frame="document"] {
+  background: var(--hlp-red);
+  border-color: color-mix(in oklch, var(--hl-red) 38%, transparent);
+  color: color-mix(in oklch, var(--hl-red) 60%, var(--ink-900));
+}
+
+.previewFrame[data-frame="image"] {
+  background: var(--hlp-lime);
+  border-color: color-mix(in oklch, var(--hl-lime) 38%, transparent);
+  color: color-mix(in oklch, var(--hl-lime) 60%, var(--ink-900));
+}
+
+.previewFrame[data-frame="url"] {
+  background: var(--hlp-cheese);
+  border-color: color-mix(in oklch, var(--hl-cheese) 38%, transparent);
+  color: color-mix(in oklch, var(--hl-cheese) 60%, var(--ink-900));
+}
+
+/* Centered glyph inside the popover frame, above the synthetic artwork. */
+.previewBigIcon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .collapseBtn,
+  .removeBtn {
+    transition-duration: 0.001ms !important;
+  }
+  /* The preview simply appears — no fade, no lift. */
+  .previewPopover {
+    animation-duration: 0.001ms;
+    transform: none;
+  }
+}

@@ -1,25 +1,42 @@
 "use client";
 
-// section-toolbar.tsx — padlet-style hover toolbar for lesson sections.
+// section-toolbar.tsx — the per-section MANAGEMENT popup for the lesson flow.
 //
-// Renders a compact horizontal row of small icon buttons that appears when
-// the teacher mouses over (or tabs into) a lesson section card. Matches the
-// Padlet reference (commonplanner.com): each button is an icon with a tooltip
-// label revealed on hover.
+// A floating POPUP MENU shown only when the teacher clicks the per-section
+// "+" button (the parent — see lesson-flow.tsx — owns that trigger and
+// toggles the `visible` prop). When `visible` is true this renders as an
+// intentional floating menu panel — rounded paper card, hairline border,
+// elevation shadow — that reads as having popped out of the "+".
 //
-// Actions provided:
-//   • Add resource   — paperclip/link icon
-//   • Add image      — image icon
-//   • Add note       — comment/note icon
-//   • Move up        — chevron up (disabled at first position)
-//   • Move down      — chevron down (disabled at last position)
-//   • Duplicate      — copy icon
-//   • Show on class website — globe icon, toggle with active state
-//   • Delete         — trash icon (destructive tint on hover)
+// SCOPE — what this toolbar contains, and what it intentionally does NOT.
 //
-// Visibility is driven by the parent card wrapper (see lesson-flow.tsx):
-// a `visible` prop switches the .toolbarVisible class so CSS handles the
-// fade + slide without extra JS state here.
+// The toolbar carries ONLY the section MANAGEMENT actions:
+//   • Move up        — chevron up (disabled at the first position).
+//   • Move down      — chevron down (disabled at the last position); the
+//                      two move buttons are the keyboard reorder path.
+//   • Duplicate      — copy icon.
+//   • Show on website — globe icon, a toggle with an active state.
+//   • Delete         — trash icon (destructive tint on hover; disabled
+//                      when this is the lesson's last section).
+//
+// The OLD Padlet-style hero — the "Add an image, video, link, or file"
+// caption and the four media tiles (Upload / Photo / Video / Link) — is
+// GONE from this popup. Adding resources is now handled app-wide by the
+// shared <ResourceComposer> (see components/daily/ResourceComposer). The
+// section "+" trigger in lesson-flow now opens that composer instead of
+// this management popup's old add-tiles.
+//
+// Pointer reorder is NOT driven from this popup — the drag affordance
+// lives as a dedicated grip on the section HEADING ROW (see
+// lesson-flow.tsx). The Move up / Move down buttons remain here as the
+// keyboard reorder path.
+//
+// Visibility is driven entirely by the parent: a `visible` prop switches the
+// .panelVisible class so CSS handles the entrance fade + scale. When
+// `visible` is false the panel is fully hidden and non-interactive. This
+// component owns ONLY how the panel looks and its internal layout / a11y —
+// the open/close trigger, click-outside, Escape and positioning all live in
+// lesson-flow.tsx.
 
 import type { ReactNode } from "react";
 import styles from "./section-toolbar.module.css";
@@ -27,12 +44,6 @@ import styles from "./section-toolbar.module.css";
 // ── Props ────────────────────────────────────────────────────────────────
 
 export interface SectionToolbarProps {
-  /** Fire when the teacher clicks "Add resource". */
-  onAddResource: () => void;
-  /** Fire when the teacher clicks "Add image". */
-  onAddImage: () => void;
-  /** Fire when the teacher clicks "Add note". */
-  onAddNote: () => void;
   /** Fire when the teacher clicks "Move up". */
   onMoveUp: () => void;
   /** Fire when the teacher clicks "Move down". */
@@ -49,17 +60,20 @@ export interface SectionToolbarProps {
   canMoveUp?: boolean;
   /** Disable the Move Down button (section is already at the bottom). */
   canMoveDown?: boolean;
+  /** Disable the Delete button (this is the lesson's last section). */
+  canDelete?: boolean;
   /** Whether the toolbar is currently visible (controlled by parent). */
   visible?: boolean;
 }
 
 // ── SectionToolbar ───────────────────────────────────────────────────────
 
-/** Padlet-style compact toolbar revealed on section card hover/focus. */
+/** Per-section MANAGEMENT popup, shown when the parent's "+" is toggled.
+ *  Five small icon buttons in one quiet row: move up / move down,
+ *  duplicate, website toggle, delete. Resource adding is handled
+ *  separately by the app-wide ResourceComposer, which the section "+"
+ *  trigger now opens directly in place of this popup's old add-tiles. */
 export function SectionToolbar({
-  onAddResource,
-  onAddImage,
-  onAddNote,
   onMoveUp,
   onMoveDown,
   onDuplicate,
@@ -68,82 +82,77 @@ export function SectionToolbar({
   websiteVisible = false,
   canMoveUp = true,
   canMoveDown = true,
+  canDelete = true,
   visible = false,
 }: SectionToolbarProps): ReactNode {
   return (
     <div
-      className={[styles.toolbar, visible ? styles.toolbarVisible : ""]
+      className={[styles.panel, visible ? styles.panelVisible : ""]
         .filter(Boolean)
         .join(" ")}
-      // Prevent toolbar interaction from bubbling up as a card "blur" event.
+      // Prevent panel interaction from bubbling up as a card "blur" event.
       onMouseDown={(e) => e.stopPropagation()}
+      // role="toolbar" — a group of icon buttons. Chosen over role="menu"
+      // because the controls are plain buttons + a toggle, not single-select
+      // menu items; "toolbar" keeps native button semantics and tab order
+      // intact.
       role="toolbar"
       aria-label="Section actions"
+      // When hidden the panel stays mounted for the entrance animation, but
+      // it must be invisible to assistive tech and untabbable. pointer-events
+      // is dropped in CSS; aria-hidden + inert are mirrored here so a
+      // screen-reader / keyboard user never lands inside a collapsed menu.
+      aria-hidden={!visible}
+      inert={!visible}
     >
-      {/* ── Group 1: Add actions ── */}
-      <ToolbarButton
-        label="Add resource"
-        onClick={onAddResource}
-        icon={<PaperclipIcon />}
-      />
-      <ToolbarButton
-        label="Add image"
-        onClick={onAddImage}
-        icon={<ImageIcon />}
-      />
-      <ToolbarButton label="Add note" onClick={onAddNote} icon={<NoteIcon />} />
-
-      <div className={styles.divider} aria-hidden="true" />
-
-      {/* ── Group 2: Move ── */}
-      <ToolbarButton
-        label="Move up"
-        onClick={onMoveUp}
-        icon={<ChevronUpIcon />}
-        disabled={!canMoveUp}
-      />
-      <ToolbarButton
-        label="Move down"
-        onClick={onMoveDown}
-        icon={<ChevronDownIcon />}
-        disabled={!canMoveDown}
-      />
-
-      <div className={styles.divider} aria-hidden="true" />
-
-      {/* ── Group 3: Organize ── */}
-      <ToolbarButton
-        label="Duplicate section"
-        onClick={onDuplicate}
-        icon={<CopyIcon />}
-      />
-      <ToolbarButton
-        label={
-          websiteVisible ? "Hide from class website" : "Show on class website"
-        }
-        onClick={onToggleWebsite}
-        icon={<GlobeIcon />}
-        toggle
-        active={websiteVisible}
-      />
-
-      <div className={styles.divider} aria-hidden="true" />
-
-      {/* ── Group 4: Destructive ── */}
-      <ToolbarButton
-        label="Delete section"
-        onClick={onDelete}
-        icon={<TrashIcon />}
-        danger
-      />
+      {/* ── Section management — five small icon buttons ─────────────────
+          A single compact, quiet row. Move up / Move down lead the row —
+          they are the keyboard reorder path. Pointer reorder is handled by
+          the dedicated grip on the section HEADING ROW (see lesson-flow.tsx),
+          so this popup never carries a drag grip. */}
+      <div className={styles.manageRow}>
+        <ManageButton
+          label="Move up"
+          onClick={onMoveUp}
+          icon={<ChevronUpIcon />}
+          disabled={!canMoveUp}
+        />
+        <ManageButton
+          label="Move down"
+          onClick={onMoveDown}
+          icon={<ChevronDownIcon />}
+          disabled={!canMoveDown}
+        />
+        <ManageButton
+          label="Duplicate section"
+          onClick={onDuplicate}
+          icon={<CopyIcon />}
+        />
+        <ManageButton
+          label={
+            websiteVisible ? "Hide from class website" : "Show on class website"
+          }
+          onClick={onToggleWebsite}
+          icon={<GlobeIcon />}
+          toggle
+          active={websiteVisible}
+        />
+        <ManageButton
+          label="Delete section"
+          onClick={onDelete}
+          icon={<TrashIcon />}
+          danger
+          disabled={!canDelete}
+        />
+      </div>
     </div>
   );
 }
 
-// ── ToolbarButton ─────────────────────────────────────────────────────────
-// Shared icon-button + tooltip unit for the toolbar.
+// ── ManageButton ──────────────────────────────────────────────────────────
+// Shared small icon-button + tooltip unit for the management row.
 
-interface ToolbarButtonProps {
+interface ManageButtonProps {
   label: string;
   onClick: () => void;
   icon: ReactNode;
@@ -154,7 +163,7 @@ interface ToolbarButtonProps {
   danger?: boolean;
 }
 
-function ToolbarButton({
+function ManageButton({
   label,
   onClick,
   icon,
@@ -162,11 +171,11 @@ function ToolbarButton({
   toggle = false,
   active = false,
   danger = false,
-}: ToolbarButtonProps): ReactNode {
+}: ManageButtonProps): ReactNode {
   const className = [
-    styles.btn,
-    active ? styles.btnActive : "",
-    danger ? styles.btnDanger : "",
+    styles.manageBtn,
+    active ? styles.manageBtnActive : "",
+    danger ? styles.manageBtnDanger : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -192,64 +201,9 @@ function ToolbarButton({
 }
 
 // ── Icons ────────────────────────────────────────────────────────────────
-// Inline SVG icons, aria-hidden, consistent 16×16 rendered size.
-
-function PaperclipIcon(): ReactNode {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-    </svg>
-  );
-}
-
-function ImageIcon(): ReactNode {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <polyline points="21 15 16 10 5 21" />
-    </svg>
-  );
-}
-
-function NoteIcon(): ReactNode {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {/* Message-square / comment bubble */}
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
+// Inline SVG icons, aria-hidden. The management-row icons render at 16px.
+// (The drag-grip icon lives on the heading row in lesson-flow.tsx — it is
+// not part of this popup.)
 
 function ChevronUpIcon(): ReactNode {
   return (

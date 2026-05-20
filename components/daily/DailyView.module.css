@@ -1,8 +1,13 @@
 /* DailyView.module.css
-   Scoped styles for the Daily two-pane layout and its sub-components.
+   Scoped styles for the Daily view: top chrome, the compact day-header
+   strip, the two-pane layout, and the left-pane lesson rows.
    All color/type/spacing tokens are read from tokens.css via var().
-   Layout uses Tailwind utility classes (flex/grid/overflow) where possible;
-   specifics that Tailwind cannot express go here. */
+   Tailwind utilities are not used here — every rule is layout/spacing the
+   token system or component structure requires.
+
+   Chrome (page, panes, header) stays NEUTRAL white/grey; color is carried
+   only by the per-row subject stripe, the fork dot, and the day-header's
+   per-subject progress segments — never by tinting whole regions. */
 
 /* ── Root / outer chrome ──────────────────────────────────────────────── */
 
@@ -11,76 +16,132 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--paper);
+  /* Neutral page bg so the lesson list column reads as a clean white card.
+     The page itself no longer hosts a day-selector strip or a pinned
+     day-header band — both fold into the column. */
+  background: var(--ink-50);
 }
 
-/* Day selector strip */
-.dayBar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 10px 16px 0;
-  border-bottom: 1px solid var(--ink-100);
+/* ── Week strip (inside the lesson list column) ───────────────────────── */
+/* One pill per configured school-week day. The whole strip is a tablist;
+   each pill is a real <button> stacked as: 3-letter day name on top, date
+   number below. The selected day's date number sits inside a solid filled
+   circle. A small priority-colored dot under non-selected days surfaces
+   personal notes. The strip lives at the top of the lesson list column,
+   just below the "WEEK N" eyebrow. */
+
+.weekStrip {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 4px;
+  /* Sits one rhythm step below the eyebrow and above the day header. */
+  padding: 2px 12px 4px;
   flex-shrink: 0;
 }
 
-.dayBtn {
+.weekStripPill {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 6px 14px 8px;
-  border-radius: var(--r-6) var(--r-6) 0 0;
-  font-size: var(--t-12);
-  font-weight: 500;
+  gap: 4px;
+  /* ≥44px touch target — the pill IS the day-select tap area. */
+  min-height: 56px;
+  padding: 6px 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-6);
+  background: transparent;
   color: var(--ink-500);
   cursor: pointer;
-  border: 1px solid transparent;
-  border-bottom: none;
   transition:
     background 0.12s,
-    color 0.12s;
-  white-space: nowrap;
+    color 0.12s,
+    border-color 0.12s;
 }
 
-.dayBtn:hover {
+.weekStripPill:hover {
   background: var(--ink-50);
   color: var(--ink-700);
 }
 
-.dayBtnActive {
-  background: var(--paper);
+.weekStripPill:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.weekStripPillActive {
   color: var(--ink-900);
+}
+
+.weekStripPillActive:hover {
+  background: transparent;
+}
+
+/* Day name — small uppercase label at the top of the pill. */
+.weekStripDayName {
+  font-size: var(--t-10);
   font-weight: 600;
-  border-color: var(--ink-150);
-  border-bottom-color: var(--paper);
-  /* Pull 1px down so the bottom border overlaps the dayBar border */
-  margin-bottom: -1px;
+  /* A touch more tracking on the smallest uppercase label so the letters
+     read cleanly inside the pill. */
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink-400);
 }
 
-.dayBtnDotWrap {
-  display: flex;
-  gap: 3px;
-  margin-top: 4px;
-  height: 5px;
+.weekStripPillActive .weekStripDayName {
+  color: var(--ink-700);
+}
+
+/* Date-number container — a 30px circle that holds the day-of-month
+   number. The container only fills when the pill is active (carrying the
+   selection); inactive pills show the number flat against the column. */
+.weekStripDateWrap {
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
-.dayBtnDot {
+.weekStripDateWrapActive {
+  background: var(--math);
+  color: var(--paper);
+}
+
+.weekStripDate {
+  font-size: var(--t-14);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Personal-notes indicator — a small priority-colored dot under non-
+   selected pills (the selected day's notes appear in the in-column notes
+   banner below the strip, so a duplicate dot would be redundant). */
+.weekStripNoteDot {
+  position: absolute;
+  /* Pin to the bottom of the pill, centered horizontally. */
+  bottom: 3px;
   width: 5px;
   height: 5px;
   border-radius: 999px;
-  flex-shrink: 0;
 }
 
-/* ── Notes banner (below day selector) ───────────────────────────────── */
+/* ── Notes banner (inside the lesson list column) ────────────────────── */
+/* Sits between the in-column day header and the "Lessons" label row. The
+   banner self-hides when the day has no personal notes. Kept neutral —
+   the priority-colored left border carries the urgency cue. */
 
 .notesBanner {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--ink-100);
+  padding: 0 16px;
   flex-shrink: 0;
 }
 
@@ -114,57 +175,243 @@
   color: var(--ink-700);
 }
 
-.noteItemScope {
-  font-size: var(--t-11);
-  color: var(--ink-500);
-  margin-top: 1px;
+/* ── In-column day header ─────────────────────────────────────────────── */
+/* The old standalone full-width day-header strip is gone. This block now
+   sits INSIDE the lesson list column, right below the week strip — the
+   full day name on the left + lesson progress on the right + a thin
+   segmented per-subject progress bar. Neutral chrome; the only color is
+   the per-subject progress segments. */
+
+.dayHeader {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  /* The day header sits on the column rhythm: a touch above the notes
+     banner / lessons label cluster below it. */
+  padding: 6px 16px 12px;
   flex-shrink: 0;
+}
+
+.dayHeaderTitle {
+  margin: 0;
+  font-size: var(--t-22);
+  /* Heavier weight — this is the day's hero label for the lesson list
+     column, paired with the smaller secondary tier (lessons label, etc.). */
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  line-height: 1.1;
+  color: var(--ink-900);
+  align-self: center;
+  flex-shrink: 0;
+}
+
+/* Progress block — "X of Y lessons" count above a thin segmented bar. */
+.dayHeaderProgress {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: flex-end;
+}
+
+.dayHeaderProgressNumbers {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.dayHeaderProgressCount {
+  font-size: var(--t-13);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-900);
+}
+
+.dayHeaderProgressOf {
+  font-size: var(--t-12);
+  font-weight: 400;
+  color: var(--ink-500);
+}
+
+.dayHeaderBar {
+  display: flex;
+  gap: 2px;
+  height: 5px;
+  width: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--ink-100);
+}
+
+.dayHeaderBarSegment {
+  flex: 1;
+  min-width: 3px;
+}
+
+.dayHeaderBarEmpty {
+  flex: 1;
+  background: var(--ink-100);
 }
 
 /* ── Two-pane body ────────────────────────────────────────────────────── */
 
+/* The body row holds the IconRail and the content body side by side.
+   Keeping the IconRail a SIBLING of the .body grid (rather than its first
+   column) keeps the splitter-drag math honest: the body's bounding rect's
+   left edge coincides with the lesson list's left edge, so a pointer
+   clientX resolves cleanly into a list width without subtracting the icon
+   rail's width.  In narrow mode this flips to column so the icon rail (if
+   it were visible — its own CSS hides it) would sit on top, and so the
+   body's contents stack naturally underneath. */
+.bodyRow {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+/* The grid columns are set inline by DailyView from the resizable width:
+   [lesson list (px)] [splitter (auto)] [center detail (1fr)] [right rail
+   (auto)]. The fallback here keeps a sane layout if the inline style is
+   ever absent. The narrow media query at the foot of this file overrides
+   this back to a single column.  */
 .body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 300px 1fr;
+  /* Five tracks, left → right: lesson list | left splitter | center detail |
+     right splitter | right rail. The list and the rail are both resizable
+     (DailyView writes their px widths into an inline gridTemplateColumns at
+     runtime); the center detail takes the remaining 1fr. */
+  grid-template-columns: 300px auto 1fr auto 320px;
 }
 
-/* ── Left pane ────────────────────────────────────────────────────────── */
+/* ── Left pane (calendar-style white card) ─────────────────────────────── */
+/* The lesson list column reads as a clean white card on the neutral page
+   background. A hairline border separates it from the page; the column
+   itself stacks: eyebrow → week strip → in-column day header → notes
+   banner → "Lessons" label row → scrollable lesson list. */
 
 .leftPane {
+  background: var(--paper);
   border-right: 1px solid var(--ink-150);
-  background: var(--ink-50);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.leftPaneHead {
-  padding: 12px 16px 8px;
+/* "WEEK 12" eyebrow at the very top of the column. */
+.leftPaneEyebrow {
+  padding: 14px 16px 6px;
+  font-size: var(--t-11);
+  font-weight: 600;
+  /* Match the LESSONS / shared eyebrow tracking. */
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--ink-400);
   flex-shrink: 0;
 }
 
-.leftPaneDay {
-  font-size: var(--t-11);
-  color: var(--ink-400);
-  font-weight: 500;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
+/* "Lessons" label row + actions cluster (collapse-all + add-lesson). Sits
+   between the notes banner and the scrollable lesson list. */
+.lessonsLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  /* One column-rhythm step below the day header / notes banner so the
+     "LESSONS" eyebrow + actions cluster sits as a secondary tier. */
+  padding: 14px 12px 6px 16px;
+  flex-shrink: 0;
 }
 
-.leftPaneDate {
-  font-size: var(--t-18);
+.lessonsLabel {
+  font-size: var(--t-11);
   font-weight: 600;
-  letter-spacing: -0.2px;
-  color: var(--ink-900);
-  margin: 2px 0 0;
+  /* Match the WEEK / TODAY'S NOTES eyebrows for a consistent secondary tier. */
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--ink-500);
 }
 
-.leftPaneMeta {
+.lessonsLabelActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Collapse all / Expand all toggle */
+.collapseAllBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-4);
+  background: var(--paper);
   font-size: var(--t-11);
+  font-weight: 500;
   color: var(--ink-500);
-  margin-top: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.1s,
+    border-color 0.1s,
+    color 0.1s;
+}
+
+.collapseAllBtn:hover {
+  background: var(--ink-50);
+  color: var(--ink-700);
+}
+
+.collapseAllIcon {
+  display: inline-flex;
+  transition: transform 0.15s;
+}
+
+/* Rotate the chevron to a "▶" when the rows are collapsed. */
+.collapseAllIconCollapsed {
+  transform: rotate(-90deg);
+}
+
+/* Filled blue add-lesson button — Phase 1A stub, non-functional like the
+   "Add an event" affordance. ≥28px square so the icon is comfortably
+   tappable; aria-label carries the meaning. Disabled state keeps the
+   filled look but dims to telegraph "not yet". */
+.addLessonBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-4);
+  background: var(--math);
+  color: var(--paper);
+  cursor: pointer;
+  transition:
+    background 0.1s,
+    opacity 0.1s;
+}
+
+.addLessonBtn:hover:not(:disabled) {
+  background: var(--math-deep);
+}
+
+.addLessonBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.addLessonBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .leftScroll {
@@ -173,27 +420,184 @@
   padding: 4px 8px 16px;
 }
 
-/* Lesson row in the left pane — now a div wrapper, not a button. */
+/* ── Lesson-row entrance choreography ────────────────────────────────────
+   First-render stagger — each row fades + rises ~4px into place, with a
+   small per-row delay so the day's lessons read as cascading into view
+   rather than popping in all at once. Capped at the first 12 rows to keep
+   the cascade short on long days. The animation runs once via the
+   `forwards` fill mode; subsequent renders (selection changes, edits) do
+   not re-trigger it. Reduced-motion drops the animation entirely below. */
+@keyframes cp-daily-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Tiny per-row stagger — ~36ms apart so the cascade reads as a flourish
+   rather than a long wait. Cap at the first 12 to keep the total under
+   half a second on long days. */
+.lessonRow:nth-child(1) {
+  animation-delay: 0ms;
+}
+.lessonRow:nth-child(2) {
+  animation-delay: 36ms;
+}
+.lessonRow:nth-child(3) {
+  animation-delay: 72ms;
+}
+.lessonRow:nth-child(4) {
+  animation-delay: 108ms;
+}
+.lessonRow:nth-child(5) {
+  animation-delay: 144ms;
+}
+.lessonRow:nth-child(6) {
+  animation-delay: 180ms;
+}
+.lessonRow:nth-child(7) {
+  animation-delay: 216ms;
+}
+.lessonRow:nth-child(8) {
+  animation-delay: 252ms;
+}
+.lessonRow:nth-child(9) {
+  animation-delay: 288ms;
+}
+.lessonRow:nth-child(10) {
+  animation-delay: 324ms;
+}
+.lessonRow:nth-child(11) {
+  animation-delay: 360ms;
+}
+.lessonRow:nth-child(n + 12) {
+  animation-delay: 396ms;
+}
+
+/* ── Lesson row in the left pane ──────────────────────────────────────── */
+/* A div wrapper (role="listitem"); the drag handle, checkbox, select
+   area, fork dot, and reorder buttons are interactive siblings inside.
+   The entrance animation (cp-daily-row-in above) runs once on first
+   render with the per-row stagger delays defined above. */
+
 .lessonRow {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 6px;
   width: 100%;
-  padding: 8px 9px;
-  border-radius: var(--r-4);
+  padding: 7px 7px 7px 2px;
+  border-radius: var(--r-6);
   border: 1px solid transparent;
   margin-bottom: 1px;
+  background: transparent;
+  animation: cp-daily-row-in 0.32s ease-out both;
   transition:
-    background 0.1s,
-    box-shadow 0.1s,
-    border-color 0.1s;
+    background 0.12s ease,
+    box-shadow 0.12s ease,
+    border-color 0.12s ease;
+}
+
+/* While a row is being dragged dnd-kit applies a transform inline; we do
+   NOT want our entrance animation to fight with that transform. Suppress
+   it on the active sortable row. The .lessonRowOverlay ghost is a DragOverlay
+   sibling — also exempt. */
+.lessonRowDragging,
+.lessonRowOverlay {
+  animation: none;
 }
 
 .lessonRow:hover {
   background: color-mix(in oklch, var(--paper) 70%, var(--ink-100));
 }
 
-/* The clickable select area inside the row — expands to fill available space. */
+/* Selected state — quiet but unambiguous: a paper fill lifts the row off
+   the column's neutral track, a soft card shadow seats it, and a slim
+   subject-tinted left edge stand-in reinforces the stripe without the
+   row gaining a heavy colored full perimeter border. */
+.lessonRowSelected {
+  background: var(--paper) !important;
+  box-shadow: var(--shadow-card);
+  border-color: color-mix(
+    in oklch,
+    var(--c, var(--ink-200)) 35%,
+    var(--ink-150)
+  );
+}
+
+/* While this row is the dnd-kit source, dim it — its content rides the
+   DragOverlay ghost instead. */
+.lessonRowDragging {
+  opacity: 0.4;
+}
+
+/* The floating DragOverlay ghost. */
+.lessonRowOverlay {
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+  border-color: var(--c, var(--ink-200));
+  cursor: grabbing;
+}
+
+/* Collapsed (compact) row — subject + title share one line. */
+.lessonRowCollapsed {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/* Drag handle — ≥44px touch target (spec / collapse-on-drag DRAG_CHIP). */
+.lessonDragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  margin: -11px 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--ink-300);
+  cursor: grab;
+  flex-shrink: 0;
+  border-radius: var(--r-4);
+  transition: color 0.1s;
+  touch-action: none;
+}
+
+.lessonDragHandle:hover {
+  color: var(--ink-500);
+}
+
+.lessonDragHandle:active {
+  cursor: grabbing;
+}
+
+/* 3px subject-color left stripe */
+.lessonStripe {
+  width: 3px;
+  align-self: stretch;
+  min-height: 22px;
+  border-radius: 1px;
+  background: var(--c, var(--ink-300));
+  flex-shrink: 0;
+}
+
+/* Completion checkbox button — neutral, just wraps the svg. */
+.lessonCheckBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* The clickable select area — expands to fill available space. */
 .lessonRowSelectBtn {
   flex: 1;
   min-width: 0;
@@ -207,36 +611,38 @@
   gap: 0;
 }
 
-.lessonRowSelected {
-  background: var(--paper) !important;
-  box-shadow: var(--shadow-card);
-  border-color: var(--c, var(--ink-200));
-}
-
-.lessonStripe {
-  width: 3px;
-  align-self: stretch;
-  border-radius: 1px;
-  background: var(--c, var(--ink-300));
-  flex-shrink: 0;
+/* Collapsed mode: lay subject + title out on a single line. */
+.lessonRowCollapsed .lessonRowSelectBtn {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 7px;
 }
 
 .lessonSubjectLabel {
-  font-size: var(--t-11);
-  font-weight: 500;
-  letter-spacing: 0.3px;
+  font-size: var(--t-10);
+  font-weight: 600;
+  /* Tighter, harder uppercase label so the SUBJECT eyebrow reads as a
+     subordinate eyebrow to the lesson title rather than a peer. */
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--c, var(--ink-500));
+  flex-shrink: 0;
 }
 
 .lessonTitle {
-  font-size: var(--t-12);
+  /* One step bigger than the subject eyebrow so the title leads the row. */
+  font-size: var(--t-13);
   font-weight: 500;
   color: var(--ink-900);
-  line-height: 1.3;
+  line-height: 1.35;
+  letter-spacing: -0.05px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.lessonRowCollapsed .lessonTitle {
+  min-width: 0;
 }
 
 .lessonTitleDone {
@@ -244,37 +650,27 @@
   text-decoration-color: var(--ink-300);
 }
 
-/* Dashboard selector button */
-.dashboardBtn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 12px;
-  border-radius: var(--r-4);
-  text-align: left;
-  margin-top: 10px;
-  font-size: var(--t-12);
-  color: var(--ink-500);
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: background 0.1s;
+/* Personal fork indicator dot */
+.lessonForkDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
 }
 
-.dashboardBtn:hover {
-  background: var(--ink-100);
+/* Empty-list message */
+.emptyList {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--ink-400);
+  font-size: var(--t-13);
 }
 
-.dashboardBtnActive {
-  background: var(--paper);
-  border-color: var(--ink-200);
-  color: var(--ink-700);
-}
+/* ── Events section in left pane ──────────────────────────────────────── */
 
-/* Events section in left pane */
 .eventsSection {
-  padding: 0 8px 0;
-  margin-top: 4px;
+  padding: 0 8px;
+  margin-top: 10px;
 }
 
 .eventsSectionHead {
@@ -323,409 +719,286 @@
   flex-direction: column;
 }
 
-/* ── Lesson detail panel ──────────────────────────────────────────────── */
-
-.detailRoot {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--paper);
-}
-
-.detailHeader {
-  padding: 16px 20px 14px;
-  border-bottom: 1px solid var(--ink-100);
-  flex-shrink: 0;
-}
-
-.detailEyebrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--t-11);
-  font-weight: 500;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--c, var(--ink-500));
-}
-
-.detailColorDot {
-  width: 8px;
-  height: 8px;
-  background: var(--c, var(--ink-400));
-  border-radius: 1px;
-  flex-shrink: 0;
-}
-
-.detailSep {
-  color: var(--ink-300);
-}
-
-.detailUnitName {
-  color: var(--ink-500);
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 400;
-}
-
-.detailTitle {
-  margin: 8px 0 0;
-  font-size: var(--t-20);
-  font-weight: 600;
-  letter-spacing: -0.2px;
-  line-height: 1.25;
-  color: var(--ink-900);
-}
-
-.detailObjective {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  margin-top: 8px;
-  padding: 7px 10px;
-  background: var(--cl, var(--ink-50));
-  border: 1px solid
-    color-mix(in oklch, var(--c, var(--ink-200)) 25%, transparent);
-  border-radius: var(--r-6);
-}
-
-.detailObjectiveBadge {
-  font-size: var(--t-10);
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: var(--c, var(--ink-400));
-  color: var(--paper);
-  flex-shrink: 0;
-  margin-top: 1px;
-  text-transform: uppercase;
-}
-
-.detailObjectiveText {
-  font-size: var(--t-13);
-  line-height: 1.5;
-  flex: 1;
-  color: var(--ink-900);
-}
-
-.detailActions {
-  margin-top: 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.detailActionBtn {
-  display: inline-flex;
+/* "← Back to list" affordance — only meaningful in the narrow single-column
+   layout; hidden on wide viewports where both panes are always visible. */
+.backToList {
+  display: none;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px 5px 8px;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-6);
+  flex-shrink: 0;
+  padding: 9px 16px;
+  border: none;
+  border-bottom: 1px solid var(--ink-100);
+  background: var(--ink-50);
   font-size: var(--t-12);
   font-weight: 500;
-  cursor: pointer;
   color: var(--ink-700);
-  background: var(--paper);
-  transition: background 0.1s;
-}
-
-.detailActionBtn:hover {
-  background: var(--ink-50);
-}
-
-.detailActionBtnDone {
-  border-color: var(--done);
-  color: var(--done);
-}
-
-.detailActionIcon {
-  padding: 6px;
-  color: var(--ink-500);
   cursor: pointer;
-  border-radius: var(--r-4);
-  transition: background 0.1s;
-}
-
-.detailActionIcon:hover {
-  background: var(--ink-50);
-}
-
-.detailBody {
-  flex: 1;
-  overflow: auto;
-  padding: 14px 20px;
-}
-
-/* Detail sections */
-.detailSection {
-  margin-bottom: 18px;
-}
-
-.detailSectionHead {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  text-align: left;
   width: 100%;
-  font-size: var(--t-11);
-  font-weight: 500;
-  color: var(--ink-500);
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  padding: 4px 0;
-  margin-bottom: 8px;
-}
-
-.detailSectionHeadBtn {
-  cursor: pointer;
-}
-
-.detailSectionHeadBtn:hover {
-  color: var(--ink-700);
-}
-
-.chevronIcon {
-  display: inline-flex;
-  transition: transform 0.15s;
-  flex-shrink: 0;
-}
-
-.chevronOpen {
-  transform: rotate(90deg);
-}
-
-.detailDirections {
-  font-size: var(--t-13);
-  color: var(--ink-700);
-  line-height: 1.55;
-}
-
-.detailNotes {
-  font-size: var(--t-13);
-  line-height: 1.55;
-  color: var(--ink-700);
-  padding: 10px 12px;
-  border-radius: 0 4px 4px 0;
-  transition:
-    filter 0.18s,
-    background 0.18s;
-}
-
-.detailNotesHidden {
-  filter: blur(3.5px);
-  background: var(--ink-50);
-  border-left: 2px solid var(--ink-200);
-  user-select: none;
-}
-
-.detailNotesVisible {
-  filter: none;
-  background: var(--important-bg);
-  border-left: 2px solid var(--important);
-}
-
-/* Resources in detail panel */
-.resourceItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: var(--r-4);
-  font-size: var(--t-12);
-  color: var(--ink-700);
-  cursor: pointer;
   transition: background 0.1s;
 }
 
-.resourceItem:hover {
-  background: var(--ink-50);
-}
-
-.resourceIcon {
-  display: inline-flex;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-/* Standards in detail panel */
-.standardItem {
-  display: flex;
-  gap: 10px;
-  padding: 8px 10px;
-  background: var(--ink-50);
-  border-radius: var(--r-6);
-}
-
-.standardCode {
-  font-size: var(--t-11);
-  font-weight: 600;
-  color: var(--cd, var(--ink-700));
-  background: var(--cl, var(--ink-100));
-  padding: 1px 6px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  margin-top: 1px;
-  height: fit-content;
-}
-
-.standardDesc {
-  font-size: var(--t-12);
-  color: var(--ink-500);
-  line-height: 1.4;
-}
-
-/* ── Today dashboard panel ────────────────────────────────────────────── */
-
-.dashRoot {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--paper);
-}
-
-.dashHeader {
-  padding: 16px 20px 14px;
-  border-bottom: 1px solid var(--ink-100);
-  flex-shrink: 0;
-}
-
-.dashEyebrow {
-  font-size: var(--t-11);
-  color: var(--ink-500);
-  font-weight: 500;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-}
-
-.dashTitle {
-  margin: 4px 0 0;
-  font-size: var(--t-22);
-  font-weight: 600;
-  letter-spacing: -0.4px;
-  line-height: 1.1;
-  color: var(--ink-900);
-}
-
-.dashSubtitle {
-  font-size: var(--t-12);
-  color: var(--ink-500);
-  margin-top: 4px;
-}
-
-.dashBody {
-  flex: 1;
-  overflow: auto;
-  padding: 16px 20px 20px;
-}
-
-/* Progress strip */
-.progressWrap {
-  margin-bottom: 22px;
-}
-
-.progressNumbers {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.progressCount {
-  font-size: var(--t-28);
-  font-weight: 600;
-  letter-spacing: -0.6px;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-900);
-}
-
-.progressOf {
-  font-size: var(--t-14);
-  color: var(--ink-500);
-}
-
-.progressPct {
-  font-size: var(--t-11);
-  color: var(--ink-400);
-  font-variant-numeric: tabular-nums;
-}
-
-.progressBar {
-  display: flex;
-  gap: 2px;
-  height: 6px;
-  border-radius: 999px;
-  overflow: hidden;
+.backToList:hover {
   background: var(--ink-100);
 }
 
-.progressBarSegment {
+/* Quiet neutral empty state — shown when no lesson is selected. */
+.emptyDetail {
   flex: 1;
-}
-
-.progressLabels {
   display: flex;
-  margin-top: 4px;
-  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+  padding: 24px;
 }
 
-.progressLabel {
-  flex: 1;
-  font-size: var(--t-10);
+.emptyDetailText {
+  margin: 0;
+  font-size: var(--t-13);
   color: var(--ink-400);
   text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
 }
 
-/* Section headings in dashboard */
-.dashSectionHead {
+/* ── Responsive: narrow single-column layout ─────────────────────────── */
+/* On narrow viewports the four-track grid collapses to a single column.
+   The icon rail hides (its own CSS module owns that). The lesson list and
+   center detail toggle by data-narrow-pane — "list" shows the list,
+   "detail" shows the center detail with its "← Back to list" button. The
+   right rail stacks BELOW the active pane so its panels (resources, to-
+   dos, shoutbox) remain reachable; it has its own narrow-mode chrome in
+   RightRail.module.css. */
+@media (max-width: 720px) {
+  /* The body-row's icon rail self-hides in narrow mode (IconRail.module
+     .css), so the row is effectively just the body. Collapsing the row to
+     a column is defensive: if the rail ever switches to a top-bar mode
+     here, the body stays beneath it without overlap. */
+  .bodyRow {
+    flex-direction: column;
+  }
+
+  /* The body switches to a vertical flex column in narrow mode — the
+     wide-viewport grid tracks are meaningless when everything stacks. The
+     !important overrides the inline grid-template-columns DailyView sets
+     from the resizable list width. */
+  .body {
+    display: flex !important;
+    flex-direction: column;
+    grid-template-columns: 1fr !important;
+  }
+
+  /* The splitter is meaningless when the panes stack — remove it. */
+  .splitter {
+    display: none;
+  }
+
+  .leftPane {
+    border-right: none;
+    border-bottom: 1px solid var(--ink-150);
+  }
+
+  /* data-narrow-pane="list" → show the list, hide the center detail.
+     Hides both the inner column wrapper AND the outer .columnSlot via
+     :has() so the slot doesn't reserve space in the narrow stack. */
+  .body[data-narrow-pane="list"] [data-column="detail"],
+  .body[data-narrow-pane="list"] .columnSlot:has([data-column="detail"]) {
+    display: none;
+  }
+
+  /* data-narrow-pane="detail" → show the detail, hide the list. */
+  .body[data-narrow-pane="detail"] [data-column="list"],
+  .body[data-narrow-pane="detail"] .columnSlot:has([data-column="list"]) {
+    display: none;
+  }
+
+  /* The "← Back to list" button is visible only in the narrow layout. */
+  .backToList {
+    display: flex;
+  }
+
+  /* Let the in-column day-header wrap when space is tight (the title can
+     drop above the progress block on a narrow column). */
+  .dayHeader {
+    flex-wrap: wrap;
+    gap: 8px 14px;
+  }
+
+  .dayHeaderProgress {
+    align-items: flex-start;
+    flex-basis: 100%;
+  }
+}
+
+/* ── Resizable pane splitter ──────────────────────────────────────────── */
+/* A slim vertical handle in its own grid column between the two panes. The
+   element itself is a wider invisible hit area; the visible grip is the
+   short centered bar. Neutral chrome — it carries no information, only an
+   affordance, so it stays grey and only emphasises on hover / focus. */
+
+.splitter {
+  /* Sits in the middle grid column (auto width). The negative inline
+     margin lets the wide hit area straddle the pane border without
+     pushing the panes apart. */
+  width: 9px;
+  margin: 0 -4px;
+  z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  justify-content: center;
+  cursor: col-resize;
+  background: transparent;
+  border: none;
+  touch-action: none;
+  transition: background 0.12s ease;
 }
 
-.dashSectionLabel {
+/* Quiet hover wash — barely there, just enough to telegraph the affordance
+   without competing with the column chrome on either side. */
+.splitter:hover,
+.splitter:focus-visible {
+  background: color-mix(in oklch, var(--paper) 55%, var(--ink-100));
+}
+
+.splitter:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -3px;
+  border-radius: var(--r-4);
+}
+
+/* The visible grip — a slim, near-invisible bar that thickens only
+   slightly on hover. Resting state is ink-200 so the splitter reads as
+   chrome, not a control. */
+.splitterGrip {
+  width: 2px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--ink-200);
+  transition:
+    background 0.12s ease,
+    height 0.12s ease;
+}
+
+/* Hover/focus — a touch taller and a small bump in contrast. Deliberately
+   restrained: we want a quiet handle, not a tall colored bar. */
+.splitter:hover .splitterGrip,
+.splitter:focus-visible .splitterGrip {
+  background: var(--ink-300);
+  height: 36px;
+}
+
+/* ── Left rail: auxiliary planning panels under the lesson list ───────── */
+/* Rendered inside leftScroll, after the lesson list + events section, so it
+   scrolls together with the list. Stacked panels with comfortable vertical
+   rhythm; the rail itself adds no chrome of its own. */
+
+.leftRail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+/* Hairline divider separating the lesson list from the planning panels. */
+.railDivider {
+  height: 1px;
+  background: var(--ink-150);
+  margin: 0 4px;
+}
+
+/* ── Shared rail panel chrome ─────────────────────────────────────────── */
+
+.railPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.railPanelHead {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 0 2px;
+}
+
+.railPanelTitle {
+  margin: 0;
   font-size: var(--t-11);
-  font-weight: 500;
-  color: var(--ink-500);
-  letter-spacing: 0.6px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
-}
-
-.dashSectionAction {
-  font-size: var(--t-11);
-  /* Fix #8: replaced subject color var(--math) with neutral ink token. */
   color: var(--ink-500);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
 }
 
-.dashSectionAction:hover {
-  text-decoration: underline;
+/* Count / status text pushed to the right of the panel head. */
+.railPanelCount {
+  margin-left: auto;
+  font-size: var(--t-11);
+  color: var(--ink-400);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-/* To-do items */
-.todoRow {
+/* Quiet empty-state line shared by both panels. */
+.railEmpty {
+  margin: 0;
+  padding: 6px 2px;
+  font-size: var(--t-12);
+  color: var(--ink-400);
+  font-style: italic;
+}
+
+/* ── Today's to-dos panel ─────────────────────────────────────────────── */
+
+.todoList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.todoItem {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 6px 0;
+  gap: 7px;
+  padding: 2px 2px;
   border-bottom: 1px solid var(--ink-100);
+}
+
+.todoItem:last-child {
+  border-bottom: none;
+}
+
+/* The checkbox + title together are one toggle — ≥44px tall touch target. */
+.todoToggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.todoCheck {
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
 .todoTitle {
   flex: 1;
+  min-width: 0;
   font-size: var(--t-12);
   line-height: 1.4;
   color: var(--ink-900);
+  /* Wrap long to-dos rather than truncate — the rail has the height. */
+  overflow-wrap: anywhere;
 }
 
 .todoTitleDone {
@@ -734,77 +1007,647 @@
   text-decoration-color: var(--ink-300);
 }
 
-.todoAddBtn {
-  margin-top: 8px;
-  font-size: var(--t-12);
-  color: var(--ink-400);
-  padding: 5px 8px;
-  border: 1px dashed var(--ink-200);
-  border-radius: var(--r-4);
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.1s;
-}
-
-.todoAddBtn:hover {
-  background: var(--ink-50);
-  color: var(--ink-700);
-}
-
-/* Stats footer */
-.statsGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.statCard {
-  padding: 10px 12px;
-  background: var(--ink-50);
-  border-radius: var(--r-6);
-}
-
-.statLabel {
-  font-size: var(--t-10);
-  color: var(--ink-400);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 500;
-}
-
-.statValue {
-  font-size: var(--t-20);
-  font-weight: 600;
-  letter-spacing: -0.3px;
-  font-variant-numeric: tabular-nums;
-  margin-top: 2px;
-}
-
-.statSub {
-  font-size: var(--t-11);
-  color: var(--ink-500);
-}
-
-/* Tag dot */
-.tagDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  display: inline-block;
+/* Tag dots — tag color is the only color in the panel; it is information. */
+.todoTags {
+  display: inline-flex;
+  gap: 3px;
   flex-shrink: 0;
 }
 
-/* ── Responsive: narrow (≤640px) ─────────────────────────────────────── */
-@media (max-width: 640px) {
-  .body {
+.todoTagDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+}
+
+/* Team-scope marker — a quiet uppercase text chip, deliberately colorless. */
+.todoScope {
+  flex-shrink: 0;
+  font-size: var(--t-10);
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+/* ── Quick-add composer (to-dos) ──────────────────────────────────────── */
+
+.todoComposer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 4px 6px;
+  border: 1px dashed var(--ink-200);
+  border-radius: var(--r-4);
+  transition: border-color 0.1s;
+}
+
+.todoComposer:focus-within {
+  border-color: var(--ink-400);
+  border-style: solid;
+}
+
+.todoComposerIcon {
+  display: inline-flex;
+  color: var(--ink-400);
+  flex-shrink: 0;
+}
+
+.todoInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: var(--t-12);
+  color: var(--ink-900);
+}
+
+.todoInput::placeholder {
+  color: var(--ink-400);
+}
+
+/* Compact submit button shared visual pattern with the shoutbox send. */
+.todoAddBtn,
+.shoutSendBtn {
+  flex-shrink: 0;
+  padding: 4px 9px;
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-4);
+  background: var(--paper);
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-700);
+  cursor: pointer;
+  transition:
+    background 0.1s,
+    color 0.1s,
+    border-color 0.1s;
+}
+
+.todoAddBtn:hover:not(:disabled),
+.shoutSendBtn:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.todoAddBtn:disabled,
+.shoutSendBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── Day shoutbox panel ───────────────────────────────────────────────── */
+
+/* "Team chat" tag in the panel head — fyi-blue, marking this as the
+   team-visible counterpart to the personal Daily Notes banner. */
+.shoutTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--fyi-bg);
+  color: var(--fyi);
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.shoutList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 9px;
+  list-style: none;
+  background: var(--ink-50);
+  border: 1px solid var(--ink-100);
+  border-radius: var(--r-6);
+}
+
+.shoutItem {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* Initials avatar — neutral grey; identity, not status, so no subject color. */
+.shoutAvatar {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink-150);
+  color: var(--ink-700);
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.shoutBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.shoutMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.shoutAuthor {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.shoutTime {
+  font-size: var(--t-10);
+  color: var(--ink-400);
+  font-variant-numeric: tabular-nums;
+}
+
+.shoutText {
+  margin-top: 1px;
+  font-size: var(--t-12);
+  line-height: 1.45;
+  color: var(--ink-700);
+  overflow-wrap: anywhere;
+}
+
+/* ── Shoutbox composer ────────────────────────────────────────────────── */
+
+.shoutComposer {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 2px;
+}
+
+.shoutInput {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 11px;
+  border: 1px solid var(--ink-200);
+  border-radius: 999px;
+  background: var(--paper);
+  outline: none;
+  font-size: var(--t-12);
+  color: var(--ink-900);
+  transition: border-color 0.1s;
+}
+
+.shoutInput::placeholder {
+  color: var(--ink-400);
+}
+
+.shoutInput:focus-visible {
+  border-color: var(--ink-400);
+}
+
+/* ── Resources panel (right rail) ─────────────────────────────────────── */
+/* The Resources panel sits at the top of the right rail above to-dos and
+   the shoutbox. It shares the rail's panel chrome (railPanel /
+   railPanelHead / railPanelTitle / railPanelCount / railEmpty above) and
+   adds: a category tab row, a grid/list mode toggle, a 2-column thumbnail
+   grid, and a compact list-row layout for list mode.
+   Subject color carries only through the synthetic ResourceTile artwork —
+   the panel chrome itself is neutral. */
+
+/* Container marker — used only to scope rules unique to this panel
+   (e.g. compacting the head spacing for a denser top of the rail). */
+.resourcesPanel {
+  /* Slight head tightening — the rail starts with this panel, and the
+     category-tab row already supplies its own bottom spacing. */
+  gap: 6px;
+}
+
+/* ── Category tabs ────────────────────────────────────────────────────── */
+/* A quiet horizontal pill row. Each tab is a small button with a flat
+   inactive state and a subtle filled active state. Same visual vocabulary
+   as the Weekly view's view-mode toggles so the chrome reads as part of
+   the same family. */
+
+.resourceTabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--ink-100);
+  border-radius: var(--r-6);
+  /* Sit on its own line below the panel head; comfortable spacing above
+     the body below it. */
+  margin: 2px 0 4px;
+  /* Allow horizontal scroll if a future fifth tab pushes the row past the
+     rail width, without affecting the panels below. */
+  overflow-x: auto;
+}
+
+.resourceTab {
+  flex: 1;
+  /* Min-width keeps tab labels legible if the rail narrows. */
+  min-width: 0;
+  padding: 5px 9px;
+  border: none;
+  border-radius: var(--r-4);
+  background: transparent;
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-500);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.1s,
+    color 0.1s;
+}
+
+.resourceTab:hover {
+  color: var(--ink-700);
+}
+
+.resourceTabActive {
+  background: var(--paper);
+  color: var(--ink-900);
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
+}
+
+.resourceTabActive:hover {
+  color: var(--ink-900);
+}
+
+/* ── Grid / list mode toggle ──────────────────────────────────────────── */
+/* A small paired-icon segmented control on the right of the panel head.
+   Lives in the railPanelHead row alongside the title + count; styled to
+   sit quietly at the right edge. */
+
+.modeToggle {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px;
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-4);
+  background: var(--paper);
+}
+
+.modeToggleBtn {
+  /* 28px target — the rail is narrow and the row holds title + count + a
+     two-button toggle, so we deliberately undersize this. A title hint +
+     aria-label still keeps it operable; touch targets meet the spec via
+     the comfortable ink-100 background extending outside the icon box. */
+  width: 26px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+  transition:
+    background 0.1s,
+    color 0.1s;
+}
+
+.modeToggleBtn:hover {
+  color: var(--ink-900);
+}
+
+.modeToggleBtnActive {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.modeToggleBtnActive:hover {
+  background: var(--ink-100);
+}
+
+/* ── Resource thumbnail grid (mode = "grid") ─────────────────────────── */
+/* 2-column responsive grid of ResourceTile thumbnails. The tile component
+   itself supplies all the artwork + subject color (via the .cp-subj
+   cascade on the rail wrapper). */
+
+.resourceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+
+/* When the rail is very narrow (e.g. on a small wide-but-shallow window)
+   collapse to one column so the tile artwork doesn't squash. */
+@media (max-width: 920px) {
+  .resourceGrid {
     grid-template-columns: 1fr;
   }
+}
 
-  .leftPane {
-    /* On mobile, left pane shows when no lesson is selected; right pane
-       fills the screen when a lesson is selected. CSS-only toggle via
-       data attribute is handled in the component. */
+/* ── Resource link list (mode = "list") ──────────────────────────────── */
+/* Compact rows: small type icon + label + muted type tag. Reads like a
+   sortable inline link list. */
+
+.resourceList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resourceListItem {
+  /* The whole row is a button; the LI is layout-only so its margin handles
+     vertical rhythm without doubling up on the row's padding. */
+  display: flex;
+}
+
+.resourceRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  /* ≥44px tap target — the row itself meets the touch spec without needing
+     a separate hit area. */
+  min-height: 36px;
+  padding: 6px 8px;
+  background: var(--paper);
+  border: 1px solid var(--ink-100);
+  border-radius: var(--r-4);
+  margin-bottom: 4px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--ink-900);
+  transition:
+    background 0.1s,
+    border-color 0.1s;
+}
+
+.resourceRow:hover {
+  background: var(--ink-50);
+  border-color: var(--ink-200);
+}
+
+.resourceRow:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.resourceRowIcon {
+  display: inline-flex;
+  color: var(--ink-500);
+  flex-shrink: 0;
+}
+
+.resourceRowLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-12);
+  line-height: 1.3;
+  color: var(--ink-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resourceRowType {
+  flex-shrink: 0;
+  font-size: var(--t-10);
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+/* ── Column reorder: per-column wrapper + grip + drag ghost ──────────── */
+/* The three big content columns — lesson list, center detail, right rail —
+   are reorderable as a horizontal sortable group. Each column is wrapped
+   in a SortableColumn whose DOM looks like:
+     <div .columnSlot>                  ← sortable item; transform host
+       <div .columnWithGrip data-column>← positioning host for the grip
+         <button .columnDragGrip />     ← dnd-kit activator (≥44px)
+         <…column content…>             ← unchanged inner subtree
+       </div>
+     </div>
+   The grip sits ABSOLUTELY in the column's top-left, above the column's
+   own content. The visible icon chip is 24×24; the wrapping button pads
+   out to a ≥44px tap target while keeping the rendered chip small.
+   Subject color does not enter the grip — it is intentionally neutral
+   (CLAUDE.md §4: color is information, never decoration). */
+
+/* The sortable item that wraps each column. min-width: 0 lets the column
+   collapse cleanly inside its grid track — the lesson list and detail
+   both manage their own internal overflow strategy already. */
+.columnSlot {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The positioning host inside each column. Stretches to fill the slot so
+   inner content (white card, detail pane, rail) keeps its full track. */
+.columnWithGrip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Direct child of columnWithGrip fills the available height. Before the
+   reorder wrapper landed, leftPane / rightPane / RightRail were direct
+   grid items that auto-stretched to their row; now they sit one level
+   deeper inside a flex column, so they need `flex: 1` to recover the
+   same full-height behaviour. */
+.columnWithGrip > :not(.columnDragGrip) {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* The grip BUTTON — pads out to a ≥44px touch target while painting the
+   small 24px chip in the top-left corner. `touch-action: none` keeps
+   mobile from interpreting the press as a scroll gesture; the dnd-kit
+   activator owns the press from pointerdown. The default opacity stays
+   low so the grip never visually competes with column content; on hover
+   / focus it lifts to its full color so it's clearly grabbable. */
+.columnDragGrip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  /* ≥44px tap target via padding — the visible chip is the inner span. */
+  width: 44px;
+  height: 44px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--ink-300);
+  cursor: grab;
+  z-index: 2;
+  border-radius: var(--r-4);
+  /* Resting state is fully hidden so the column chrome reads clean — the
+     grip is a teacher-discoverable affordance, not visible decoration. It
+     fades in when the user hovers ANYWHERE on the column (via the
+     :hover/:focus-within rule below) or when the grip itself receives
+     keyboard focus, then lifts to full color on direct hover. */
+  opacity: 0;
+  transform: scale(0.96);
+  transform-origin: top left;
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.18s ease-out,
+    color 0.12s ease,
+    background 0.12s ease;
+  /* Block touch-action so mobile dnd-kit can own the gesture. */
+  touch-action: none;
+}
+
+/* Reveal the grip when the user is engaging with the column — either by
+   hovering anywhere inside the column wrapper, or by tabbing into a child
+   control with the keyboard. Keep the resting state hidden so the column
+   chrome stays calm. */
+.columnWithGrip:hover .columnDragGrip,
+.columnWithGrip:focus-within .columnDragGrip {
+  opacity: 0.55;
+  transform: scale(1);
+}
+
+/* Direct hover/focus on the grip itself lifts it to full color so it
+   reads as the active drag affordance. */
+.columnDragGrip:hover,
+.columnDragGrip:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+  color: var(--ink-500);
+  background: color-mix(in oklch, var(--paper) 70%, var(--ink-100));
+}
+
+.columnDragGrip:active {
+  cursor: grabbing;
+}
+
+.columnDragGrip:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* The visible 24×24 chip — neutral ink dots, inherits the button color. */
+.columnDragGripIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-4);
+  color: inherit;
+  pointer-events: none;
+}
+
+/* ── Column DragOverlay ghost ─────────────────────────────────────────── */
+/* While a column rides the DragOverlay we float a small header-style chip
+   showing the column's name + the grip glyph. Reuses the right-rail
+   panel-ghost visual vocabulary (paper card + hairline + soft lift) so
+   the chip reads as "the same thing, picked up". Width auto + a generous
+   max-width keeps it from overflowing the viewport on narrow layouts. */
+.columnDragGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  max-width: min(280px, calc(100vw - 28px));
+  padding: 10px 14px;
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-8);
+  box-shadow:
+    0 6px 16px color-mix(in oklch, var(--ink-900) 18%, transparent),
+    0 1px 2px color-mix(in oklch, var(--ink-900) 8%, transparent);
+  /* A faint tilt sells the lift without animation cost — matches the
+     right-rail dragGhost idiom in RightRail.module.css. */
+  transform: rotate(-0.5deg);
+  cursor: grabbing;
+}
+
+.columnDragGhostGrip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--ink-500);
+  flex-shrink: 0;
+}
+
+.columnDragGhostTitle {
+  font-size: var(--t-13);
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  color: var(--ink-900);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ── Screen-reader-only live region ──────────────────────────────────── */
+/* Used for the aria-live announcement when the column order changes via
+   the keyboard. Same visually-hidden recipe as lesson-flow's .srOnly. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────── */
+/* The rail's micro-motion is purely a hover/focus affordance — drop it for
+   teachers who prefer reduced motion (CLAUDE.md §4). The column drag
+   ghost's tilt + the grip's fade-and-scale fade out the same way the
+   right-rail panel ghost does. */
+@media (prefers-reduced-motion: reduce) {
+  .splitter,
+  .splitterGrip,
+  .todoComposer,
+  .todoAddBtn,
+  .shoutSendBtn,
+  .shoutInput,
+  .resourceTab,
+  .modeToggleBtn,
+  .resourceRow,
+  .columnDragGrip,
+  .columnDragGripIcon {
+    transition: none;
+  }
+  .columnDragGrip {
+    /* Keep the reveal pattern but skip the scale/transform. The
+       :hover/:focus-within reveal still shows the grip, just without
+       the spring-style scale-in. */
+    transform: none;
+  }
+  .columnDragGhost {
+    transform: none;
+  }
+  /* Drop the lesson-row entrance choreography — the cascade is decorative
+     and only welcome when motion is enabled. tokens.css already collapses
+     all transition/animation durations to 0.001ms under reduced-motion;
+     this `none` is belt-and-suspenders for the animation rule above. */
+  .lessonRow {
+    animation: none;
   }
 }

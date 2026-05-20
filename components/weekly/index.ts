@@ -6,3 +6,7 @@ export { WeeklyLessonCard } from "./weekly-lesson-card";
 export type { ContextAction, ContextActionPayload } from "./weekly-lesson-card";
 export { SaveTargetDialog } from "./save-target-dialog";
 export type { SaveTargetDialogProps } from "./save-target-dialog";
+// The Weekly view's 3-panel shell — icon rail + grid + right rail. Wraps
+// the existing <WeeklyGrid> unchanged in the center slot and reuses the
+// Daily-view IconRail + RightRail + PaneSplitter.
+export { WeeklyShell } from "./WeeklyShell";

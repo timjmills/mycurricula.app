@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { ThemeProvider, DEFAULT_STYLE, DEFAULT_PALETTE } from "@/lib/theme";
+import { LabelsProvider } from "@/lib/labels";
 
 // GeistSans/GeistMono expose `--font-geist-sans` / `--font-geist-mono`,
 // which globals.css and the ported tokens.css reference for --font-sans/mono.
@@ -28,7 +29,15 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
       <body className="cp-root flex min-h-full flex-col">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {/* LabelsProvider hosts the renameable Subject/Unit/Lesson/Section
+              captions. Mounted near the root so every surface — Settings,
+              the ResourceComposer's routing pickers, future breadcrumbs —
+              reads from the same source. SSR-safe: it initializes with the
+              defaults and loads saved overrides post-mount so hydration
+              cannot mismatch. */}
+          <LabelsProvider>{children}</LabelsProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

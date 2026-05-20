@@ -66,6 +66,38 @@
   }
 }
 
+/* ── Docked toolbar variant ───────────────────────────────────────────────────
+   Applied when a `dockTarget` is supplied: the toolbar is pinned (by JS) to
+   the bottom-center of the dock target instead of floating by the selection.
+   The base `.toolbar` already supplies position:fixed, z-index, the dark pill
+   surface, wrapping, and the viewport-width cap — all of which the docked
+   variant keeps. The only visual difference is the entrance motion: a docked
+   toolbar lifts UP from the field's bottom edge, which reads better than the
+   downward drift of the floating reveal. Coordinates are still set inline by
+   the component. */
+.toolbarDocked {
+  animation: tbDockReveal 0.14s ease both;
+  /* Keep the docked bar centered above the field even when it wraps. */
+  justify-content: center;
+}
+
+@keyframes tbDockReveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbarDocked {
+    animation: none;
+  }
+}
+
 /* ── Toolbar button ────────────────────────────────────────────────────────── */
 .tbBtn {
   display: inline-flex;
@@ -450,4 +482,118 @@
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-break: break-word;
+}
+
+/* ── Lists inside the editor ───────────────────────────────────────────────────
+   Tailwind's preflight reset zeroes list styling globally
+   (`ol, ul { list-style: none; margin: 0; padding: 0; }`). That made the
+   "Numbered list" / "Bullet list" toolbar buttons appear broken: execCommand
+   DID create real <ol>/<ul>/<li> elements, but with no marker and no indent
+   they were visually indistinguishable from plain text.
+
+   These scoped rules re-enable proper list rendering for content the teacher
+   creates INSIDE the editor only — they never leak to lists elsewhere in the
+   app. Padding gives the markers room; nested lists switch marker styles the
+   way browsers do natively so multi-level lists stay readable. */
+.editor ol,
+.editor ul {
+  /* Indent enough to seat the marker clear of the editor's left edge. */
+  padding-left: var(--t-24);
+  /* Vertical breathing room around a list block; no horizontal margin so the
+     list aligns with surrounding paragraph text. */
+  margin: var(--t-10) 0;
+}
+
+.editor ol {
+  list-style: decimal;
+}
+
+.editor ul {
+  list-style: disc;
+}
+
+/* Nested lists: tighten the surrounding margin and rotate the marker style
+   per level, matching native browser behavior so depth stays legible. */
+.editor ol ol,
+.editor ol ul,
+.editor ul ol,
+.editor ul ul {
+  margin: 0;
+}
+
+.editor ul ul {
+  list-style: circle;
+}
+
+.editor ul ul ul {
+  list-style: square;
+}
+
+.editor ol ol {
+  list-style: lower-alpha;
+}
+
+.editor ol ol ol {
+  list-style: lower-roman;
+}
+
+/* Per-item spacing so list rows don't collide. */
+.editor li {
+  margin: var(--t-2, 2px) 0;
+}
+
+/* ── Text-size picker popover ──────────────────────────────────────────────────
+   Mirrors the font-family picker: a single-column list of size options. Each
+   option previews its own size so the choice is visible at a glance. */
+.sizePopover {
+  grid-template-columns: 1fr;
+  gap: 2px;
+  min-width: 120px;
+  padding: 6px;
+}
+
+/* A size option row. Shares the font-option interaction styles but the inline
+   font-size on each button (set in TSX) gives the live preview. */
+.sizeOption {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 9px;
+  border-radius: var(--r-4);
+  background: transparent;
+  border: none;
+  color: var(--paper);
+  font-family: var(--font-sans);
+  line-height: 1;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+  white-space: nowrap;
+}
+
+.sizeOption:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--paper);
+}
+
+.sizeOption:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: -2px;
+}
+
+/* The text-size trigger glyph — a small/large "A" pair suggesting size choice. */
+.iconSize {
+  font-size: var(--t-13);
+  font-weight: 600;
+  font-family: var(--font-sans);
+  line-height: 1;
+  color: inherit;
+  letter-spacing: -0.04em;
+}
+
+.iconSize .iconSizeSmall {
+  font-size: var(--t-10);
 }

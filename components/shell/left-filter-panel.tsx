@@ -8,8 +8,18 @@
 // CSS Modules keep scoped styles in left-filter-panel.module.css.
 // All color, type, and spacing come through CSS custom properties (tokens.css).
 // No hex values or raw px sizes here.
+//
+// ── Route-aware suppression ─────────────────────────────────────────────────
+// The Daily AND Weekly views each ship their own slim icon rail and a
+// per-view right column (the WeeklyShell mirrors the DailyView 3-panel
+// pattern), so the global filter pane is intentionally suppressed on
+// `/daily*` AND `/weekly*` routes. Every other planner surface (Subject, …)
+// keeps the panel as-is. We use next/navigation's `usePathname` (which is
+// why this file must remain a client component) to detect the active route
+// and bail early with `null`.
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { SUBJECTS, UNITS, describeStandard } from "@/lib/mock";
 import type { SubjectId, LessonStatus } from "@/lib/types";
@@ -68,7 +78,19 @@ function toggleArrayItem<T>(arr: T[], item: T): T[] {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function LeftFilterPanel(): ReactNode {
+  // Hooks first, always — Rules of Hooks require a stable call order across
+  // renders, so both `usePathname` and `useAppState` run before any early
+  // return below.
+  const pathname = usePathname();
   const { filters, updateFilters, resetFilters, leftPanelOpen } = useAppState();
+
+  // Route-based suppression — both the Daily and the Weekly views supply
+  // their own slim icon rail and a per-view right column, so the global
+  // filter pane must not render there. Bailing with `null` keeps the panel
+  // entirely out of the DOM and out of the accessibility tree on `/daily*`
+  // AND `/weekly*` routes.
+  if (pathname?.startsWith("/daily") || pathname?.startsWith("/weekly"))
+    return null;
 
   // When the panel is closed, return null — keeps the element entirely out
   // of the accessibility tree so screen readers cannot tab into hidden content.

@@ -1,31 +1,59 @@
-/* lesson-flow.module.css — per-lesson section editor.
+/* lesson-flow.module.css — per-lesson section editor ("lesson flow").
+ *
+ * Revised 2026-05-20 per Plugin Directions §3, §4: the body is now a canonical
+ * SIX-SECTION layout (Standards / Focus / Guided / Collaborative / Independent
+ * / Debrief). Each row leads with a PIN BADGE (USER OVERRIDE — teardrop shape
+ * replacing the spec's "circle"), then a plain-text title + helper line stack,
+ * then a small right-side chevron for expand / collapse. Pin badges are
+ * connected vertically by a 1.5px line in the badge's color at 50% opacity.
+ *
+ * Hex exceptions in this file: the PIN BADGE color and the connector line
+ * color BOTH read from a per-row CSS custom property `--pin-color`, set
+ * INLINE in the TSX from the spec §3.1 palette (teal/orange/purple/amber/
+ * blue/pink). This stylesheet declares only the variable's fallback; the
+ * specific hex values live in the TSX so the exception scope stays tight.
+ *
+ * The previous highlighter-band heading (subject-tinted band + tail fade) is
+ * REMOVED per spec §3.2 — section titles are plain dark text. Heading-edit
+ * mode is removed too; only the body remains double-click-to-edit.
  *
  * Layout overview:
- *   .root             → flex column container
- *   .list             → <ol> of section .cardWrapper items
- *   .cardWrapper      → positions the SectionToolbar + dnd-kit sortable root
- *   .card             → animated section card (motion.div)
- *   .chip40Row        → 40px compact row: grip + type icon + heading + index + summary
- *   .cardHeader       → drag handle + index badge + reorder + remove (flex row, full mode)
- *   .headingRow       → RichTextEditor (singleLine) for the section heading
- *   .bodyRow          → RichTextEditor (multi-line) for the section body
- *   .resourcesArea    → drop zone: resource chips + "+ Add resource" button
- *   .resourceChips    → flex-wrap list of .chip items
- *   .chip             → resource type icon + label + remove button
- *   .addSectionBtn    → footer "+ Add section" button
- *   .divergenceBar    → "↺ Custom order" indicator + reset button
- *   .overlayChip      → DragOverlay floating chip (spec §7)
- *   .srOnly           → visually-hidden live region for screen reader announcements
+ *   .root            → flex column container (header + stack + footer)
+ *   .flowHeader      → global Expand/Collapse all controls
+ *   .globalToggles   → the two global expand/collapse buttons
+ *   .list            → <ol> of section .row items
+ *   .row             → one section region (no card chrome; carries --pin-color)
+ *   .row::before     → 1.5px vertical connector line in --pin-color at 50%
+ *   .pinBadge        → 26×26 rounded-rect + right-pointing notch (per-row pin)
+ *   .section         → the section's heading + body wrapper
+ *   .headingRow      → drag grip + title stack + chevron + "···" overflow
+ *   .titleStack      → title + helper line column inside .headingRow
+ *   .sectionTitle    → plain text title (no highlighter band; spec §3.2)
+ *   .sectionHelper   → small helper line under the title (spec §3.3)
+ *   .collapseChevron → right-side `v` / `>` chevron in a ≥44px tap target
+ *   .dragGrip        → heading-row drag handle (dnd-kit drag activator)
+ *   .menuTriggerWrap → inline wrapper after the title; positions the popup
+ *   .menuTrigger     → small "···" overflow button toggling the SectionToolbar
+ *   .toolbarAnchor   → anchors the SectionToolbar popup below the "···" trigger
+ *   .bodyText        → static (double-click-to-edit) body text
+ *   .bodyEmpty       → empty body placeholder variant
+ *   .body            → bordered body box (spec §3.4)
+ *   .sectionLayout   → 2-column grid: left body, right Resources card
+ *   .resourcesColumn → outer wrapper for the SectionResources card
+ *   .chip40Row       → 40px compact row (drag-collapsed section)
+ *   .footer          → "+ Add section" + quiet "Edit lesson flow / template"
+ *   .overlayChip     → DragOverlay floating chip
+ *   .srOnly          → visually-hidden live region for SR announcements
  *
- * All color, type, and spacing via var(--token).
- * No hard-coded hex values or px font sizes.
+ * All non-pin color/type/spacing flows through var(--token). The pin colors
+ * are inlined per spec §3.1 (the published decorative palette).
  */
 
 /* ── Root ────────────────────────────────────────────────────────────── */
 .root {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 14px;
 }
 
 /* ── Screen-reader-only live region ──────────────────────────────────── */
@@ -42,19 +70,72 @@
   border: 0;
 }
 
+/* ── Flow header ─────────────────────────────────────────────────────── */
+/* Carries the global Expand all / Collapse all controls on the left and the
+   "↺ Custom order" divergence indicator (when present) on the right. */
+.flowHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── Global expand / collapse controls ───────────────────────────────── */
+/* Small, subtle paired buttons at the top of the lesson flow. */
+.globalToggles {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.globalToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  /* ≥44px touch target height — primary action on this surface. */
+  min-height: 44px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-6);
+  font-family: inherit;
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-500);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.globalToggleBtn:hover:not(:disabled) {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.globalToggleBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.globalToggleBtn:disabled {
+  color: var(--ink-300);
+  cursor: not-allowed;
+}
+
 /* ── Divergence indicator (spec §4.2 "↺ Custom order") ──────────────── */
-/* Subtle bar near the section list header showing the order has diverged
-   from the inherited baseline (Template → Master → Personal). Provides a
-   reset affordance. Mirrors the existing "Modified pill" pattern. */
+/* Subtle bar showing the section order has diverged from the inherited
+   baseline (Template → Master → Personal). Provides a reset affordance. */
 .divergenceBar {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  margin-left: auto;
+  padding: 5px 10px;
   border-radius: var(--r-6);
   background: var(--important-bg);
   border: 1px solid var(--important);
-  margin-bottom: 10px;
   font-size: var(--t-12);
   color: var(--important);
 }
@@ -68,7 +149,7 @@
 
 .divergenceLabel {
   font-weight: 600;
-  flex: 1 1 0;
+  flex: 0 0 auto;
 }
 
 .divergenceReset {
@@ -100,110 +181,923 @@
   outline-offset: 2px;
 }
 
-/* ── Section card wrapper ────────────────────────────────────────────── */
-/* Positions the SectionToolbar in the top-right corner of the card while
-   keeping the card itself in normal flow. The wrapper is the hover/focus
-   boundary — hover or focus-within on the wrapper reveals the toolbar. */
-.cardWrapper {
+/* ── Section list ────────────────────────────────────────────────────── */
+/* <ol> reset. Sections are separated by generous vertical whitespace — the
+   gap IS the divider; there are no hairlines or borders.
+   No global guide-rail border here — the vertical connector between PIN
+   badges is drawn PER-ROW as a ::before pseudo-element on `.row`, in the
+   exact spec color of that row's badge (teal/orange/purple/amber/blue/pink
+   at 50% opacity). This keeps the connector color in sync with the pin
+   at the bottom of each segment per spec §3.1. */
+.list {
+  list-style: none;
+  padding: 0;
+  /* The list anchors slightly inward so the PIN badge's left edge has room
+     against the lesson-body left gutter. */
+  margin: 0 0 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ── Section row ─────────────────────────────────────────────────────── */
+/* One section, plain on the white card body — no border, no shadow, no card
+   shell. Sections become a 2-column layout (left content + right resources
+   card) at roomy widths; the right column wraps below at narrow widths.
+   The row carries LEFT PADDING wide enough to host the PIN badge.
+   `--pin-color` is the per-section badge color (set inline on the row in TS);
+   the same color drives the vertical connector line drawn below.
+
+   The connector line is a ::before pseudo-element that runs from the bottom
+   of the row's pin badge to the BOTTOM of the row (i.e. into the gap that
+   precedes the next row's pin). The connector lives at 50% opacity per spec.
+   The LAST row hides its connector via `:last-child`. */
+.row {
   position: relative;
+  /* Leave space on the left for the pin badge + connector. */
+  padding-left: 38px;
 }
 
-/* Ghost slot while this card is being dragged — the sortable placeholder. */
-.cardWrapperDragging {
-  opacity: 0;
-}
-
-/* ── Toolbar anchor ──────────────────────────────────────────────────── */
-/* Absolutely positioned in the top-right corner of the card wrapper so the
-   toolbar floats above the card without shifting the card's own content. */
-.toolbarAnchor {
+/* Vertical connector — a 1.5px wide stripe at 50% opacity in the row's pin
+   color. Sits between the pin's vertical center and the next row's top. */
+.row::before {
+  content: "";
   position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 10;
-  /* Pointer events off by default; toolbar.module.css turns them back on
-     when the toolbar is visible. */
+  /* Start just below the pin badge's body (badge is 26px tall + glow). */
+  top: 36px;
+  /* Continue to the bottom of the row gap so the line meets the next pin. */
+  bottom: -22px;
+  /* Horizontally centered on the pin body (badge is 26px wide, sits at
+     padding-left start; pin body is 0..26 so its center is at 13px). */
+  left: 13px;
+  width: 1.5px;
+  /* Pin color in 50% transparency per spec. Falls back to a quiet grey when
+     the variable is missing (defensive — every row sets --pin-color). */
+  background: color-mix(
+    in srgb,
+    var(--pin-color, var(--ink-300)) 50%,
+    transparent
+  );
+  /* Decorative; do not contribute to layout / interaction. */
   pointer-events: none;
 }
 
-/* ── Section list ────────────────────────────────────────────────────── */
-/* <ol> reset — numbers rendered as custom pills, not native counters. */
-.list {
+/* Last row's connector is hidden — it has nothing to connect to. */
+.row:last-child::before {
+  display: none;
+}
+
+/* Ghost slot while this row is being dragged — the sortable placeholder. */
+.rowDragging {
+  opacity: 0;
+}
+
+/* ── PIN badge (USER OVERRIDE — replaces the spec's circle) ─────────────
+ * The owner has overridden the §3.1 "26px circle" with a PIN / TEARDROP /
+ * map-marker shape: a rounded-rectangle body with a small triangular notch
+ * pointing right.
+ *
+ * EXACT spec colors per §3.1 — used as INLINE values (one per section row):
+ *   1. Teal   — #14b8a6
+ *   2. Orange — #f97316
+ *   3. Purple — #a855f7
+ *   4. Amber  — #eab308
+ *   5. Blue   — #3b82f6
+ *   6. Pink   — #ec4899
+ * The hex VALUES are set inline (`style={{ '--pin-color': '#…' }}`) so the
+ * exception scope is narrowly contained; this stylesheet otherwise stays
+ * token-only. The glow `0 0 0 4px color-mix(... 18% ...)` is also kept here
+ * since it derives from --pin-color.
+ *
+ * The shape is composed in two parts:
+ *   • the BODY — a 26×26 rounded rect (`border-radius: 6px 6px 8px 6px`)
+ *     centered on the connector rail;
+ *   • the POINTER — a small triangle on the right via `::after` clip-path,
+ *     giving the silhouette the "map pin pointing into the title" look.
+ *
+ * The badge carries the section number (1..6) in bold white at its center.
+ * aria-hidden — the title carries the accessible name. */
+
+.pinBadge {
+  /* Absolute so the badge anchors to the row's left edge regardless of the
+     section's content height. Aligned with the heading row's baseline. */
+  position: absolute;
+  left: 0;
+  /* Roughly center on the title's mid-height. */
+  top: 4px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  /* Asymmetric radii give the pin a subtle teardrop tilt — slightly more
+     curve on the bottom-left corner where the pointer originates. */
+  border-radius: 6px 6px 8px 6px;
+  background: var(--pin-color, var(--ink-400));
+  color: #ffffff; /* Spec says white numeral; not a token because it's pure
+                     white on every badge regardless of subject. */
+  font-size: 13px; /* Spec §3.1: 13px numeral. */
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  /* Soft outer glow per spec: 4px color-mix(..., 18%, transparent). */
+  box-shadow: 0 0 0 4px
+    color-mix(in srgb, var(--pin-color, var(--ink-300)) 18%, transparent);
+  transition: box-shadow 0.12s ease;
+}
+
+/* The triangular notch pointing RIGHT — the "pin" pointer. Sized + offset so
+   it tucks into the body's right edge without competing with the numeral.
+   `clip-path` keeps the triangle a simple solid shape that picks up the
+   body's `--pin-color` automatically via `background`. */
+.pinBadge::after {
+  content: "";
+  position: absolute;
+  /* Sit on the right edge of the badge body; the clip-path triangle then
+     extends 5px beyond, into the heading. */
+  left: calc(100% - 1px);
+  top: 50%;
+  width: 6px;
+  height: 10px;
+  transform: translateY(-50%);
+  background: var(--pin-color, var(--ink-400));
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+  /* The pointer sits OUTSIDE the badge's box-shadow glow — that's fine; the
+     glow stays on the rounded body and reads as a halo. */
+  pointer-events: none;
+}
+
+/* ── Section 2-column layout ────────────────────────────────────────────
+   The body of each section is a two-column grid:
+     • LEFT (~65%, min 0): the heading row + italic description + body
+       editor area. The left column is the writing surface.
+     • RIGHT (~35%, min 220px): the Resources card.
+   At narrow widths the right column drops below the left (single column).
+   The right column's `min-width: 220px` in the wide layout ensures the
+   resources card never collapses below a useful width when both columns are
+   shown side-by-side. */
+.sectionLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(220px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+/* The left column simply stacks heading / description / body. */
+.leftColumn {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ── Resources column ───────────────────────────────────────────────────
+   The right column of the section row. A small "Resources" header carrying
+   the toggle + the "+ Add" affordance, then either the existing thumbnails
+   grid / link list, or the dotted-bordered EMPTY placeholder. */
+.resourcesColumn {
+  display: flex;
+  flex-direction: column;
+  /* Top-align to the heading band visually — the resources card top edge
+     sits near the heading's baseline. */
+  padding-top: 2px;
+  min-width: 0;
+}
+
+/* Header row above the resources content: a small "Resources" label, a
+   spacer, then the thumbnails⇄links toggle + a compact "+ Add" button. */
+.resourcesHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  margin-bottom: 4px;
+}
+
+.resourcesHeaderLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--ink-500);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Compact "+ Add" affordance shown in the resources header — opens the same
+   ResourceComposer the heading-row "+" trigger does. Small text + glyph; the
+   ≥44px tap target is provided by padding. */
+.resourcesAddBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-6);
+  font-family: inherit;
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-500);
+  cursor: pointer;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.resourcesAddBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.resourcesAddBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Compact toggle variant of the thumb-toggle for use in the resources
+   header — a smaller 28px square, since the resources column has its own
+   tighter visual rhythm than the section body. */
+.resourcesThumbToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-6);
+  color: var(--ink-400);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.resourcesThumbToggle:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.resourcesThumbToggle:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+/* ── Empty-state placeholder card ───────────────────────────────────────
+   Shown when a section has ZERO resources: a quiet, dotted-bordered card
+   that invites the teacher to add a link or thumbnail. Clicking it opens
+   the shared ResourceComposer (same as the heading-row "+" trigger).
+   The whole card is a focusable button so keyboard users can land on it. */
+.resourcesEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 120px;
+  padding: 18px;
+  border: 1px dashed var(--ink-200);
+  border-radius: var(--r-8);
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-500);
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.resourcesEmpty:hover {
+  border-color: color-mix(in oklch, var(--c, var(--ink-400)) 45%, transparent);
+  background: color-mix(in oklch, var(--cl, var(--ink-50)) 35%, var(--paper));
+  color: var(--ink-900);
+}
+
+.resourcesEmpty:focus-visible {
+  outline: 2px solid var(--cd, var(--ink-900));
+  outline-offset: 2px;
+}
+
+/* The small link/paperclip glyph inside the placeholder. Subject-tinted to
+   echo the lesson's color identity. */
+.resourcesEmptyIcon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--c, var(--ink-400));
+}
+
+/* ── Narrow-mode fallback ───────────────────────────────────────────────
+   When the lesson detail surface narrows (e.g. when a slide-out panel is
+   open beside it, or on a phone), the 2-column layout collapses to a
+   single column with resources sitting BELOW the body. The threshold is
+   measured against the lesson detail cell's typical 2-column min width;
+   tightening below ~720px is when the right column begins to feel cramped. */
+@media (max-width: 720px) {
+  .sectionLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* And drop the resource indent — the resources column is now full width. */
+  .resourcesColumn {
+    padding-top: 0;
+  }
+}
+
+/* ── Toolbar anchor ──────────────────────────────────────────────────── */
+/* Absolutely positioned so the SectionToolbar POPUP drops just BELOW the "+"
+   trigger. It is anchored within `.menuTriggerWrap` (a `position: relative`
+   inline wrapper that contains the "+" button), so the popup tracks the "+"
+   in its NEW inline position right after the heading text — wherever that
+   lands. The "+" trigger box is 44px tall, so `top: 44px` places the popup
+   immediately under it; `left: 0` aligns the popup's left edge with the
+   trigger. The other agent styles the toolbar itself as a floating panel
+   (shadow, rounded). */
+.toolbarAnchor {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  z-index: 20;
+  /* Pointer events off by default; section-toolbar.module.css turns them
+     back on when the toolbar is visible. */
+  pointer-events: none;
+}
+
+/* ── Section ─────────────────────────────────────────────────────────── */
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Heading row — title + helper + chevron + drag grip ─────────────────
+ * Per spec §3 the row leads with the PIN badge (absolute-positioned on the
+ * row), then a small drag grip, then a stack containing the section TITLE
+ * and HELPER LINE. A right-side chevron lives on the far right of the row.
+ *
+ * The pin badge is OUTSIDE this flex row (it's absolutely positioned on the
+ * row's left padding), so this row only lays out the right-of-pin content. */
+.headingRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 28px;
+  /* Whole heading row is the clickable expand/collapse hit area. */
+  cursor: pointer;
+}
+
+/* The stack carrying the title and the helper line — sits between the drag
+   grip and the right-side chevron, takes the remaining row width. */
+.titleStack {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Small top nudge so the title baseline sits visually centered against
+     the pin badge's vertical mid-line. */
+  padding-top: 2px;
+}
+
+/* Collapse chevron — small 12px glyph in a ≥44px tap target box. Per spec
+ * §3.2 the chevron lives on the RIGHT side of the section row. */
+.collapseChevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* ≥44px touch target — padding expands the tap area around the 12px glyph. */
+  width: 44px;
+  height: 44px;
+  /* Pull oversized hit-area back so the chevron does not inflate the row. */
+  margin: -8px 0;
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-6);
+  color: var(--ink-400);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.collapseChevron:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.collapseChevron:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Chevron orientation: expanded → points down; collapsed → points right. */
+.chevronExpanded {
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+
+.chevronCollapsed {
+  transform: rotate(0deg);
+  transition: transform 0.15s ease;
+}
+
+/* ── Drag grip — heading-row section-reorder handle ──────────────────────
+   The dnd-kit pointer-drag activator. Sits on the heading row right after
+   the collapse chevron — a small, quiet handle that IS the drag affordance
+   (the heading text is deliberately left undraggable so text-selection and
+   double-click-to-edit stay intact). The visible 12px grip glyph is centered
+   in a slim box; a ≥44px tap target comes from generous vertical padding so
+   the grip never inflates the heading-row height. `touch-action: none` lets
+   the touch sensor claim the gesture cleanly. */
+.dragGrip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Slim horizontally — it tucks between the chevron and the heading band —
+     but ≥44px tall for the touch target. */
+  width: 22px;
+  height: 44px;
+  margin: 0 -2px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-6);
+  color: var(--ink-300);
+  cursor: grab;
+  /* The touch sensor needs the browser to NOT treat the press as a scroll. */
+  touch-action: none;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.dragGrip:hover {
+  background: var(--ink-100);
+  color: var(--ink-600);
+}
+
+.dragGrip:active {
+  cursor: grabbing;
+  background: var(--ink-150, var(--ink-100));
+  color: var(--ink-700);
+}
+
+.dragGrip:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+  color: var(--ink-700);
+}
+
+/* ── Section title (plain text) ──────────────────────────────────────────
+ * Per spec §3.2: the section TITLE is plain text — no background highlight,
+ * no colored fill behind it. The previous highlighter band has been REMOVED.
+ *
+ * Type: ~15px (use `--t-14` as the closest existing token — see CLAUDE.md §4
+ * "All color, type, and spacing tokens live in `app/tokens.css`"; `--t-15`
+ * does not exist, so we round to the nearest token), weight 600, ink-900.
+ * The title is rendered as a static span — there is NO inline heading
+ * editor (the only editable text per spec §3.4 is the body textarea). */
+.sectionTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--t-14);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ink-900);
+  /* Truncate gracefully if the title gets long in a narrow lane. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Section helper line ────────────────────────────────────────────────
+ * Per spec §3.3: plain text 12.5px, ink-500, line-height 1.4. Sits directly
+ * under the title, indented to match the title's left edge (the title sits
+ * at the same column the helper does — both start AFTER the pin column). */
+.sectionHelper {
+  margin: 2px 0 0;
+  /* 12.5px → no exact token; --t-12 is the closest (rounded sensibly). */
+  font-size: var(--t-12);
+  line-height: 1.4;
+  color: var(--ink-500);
+}
+
+/* ── Static (double-click-to-edit) text ──────────────────────────────────
+   The heading and body each render as a static element by default and only
+   swap to a RichTextEditor on double-click (or Enter / F2). `.editableText`
+   is that static element — it inherits all type/color from its `.heading`
+   or `.body` container, fills the container so the whole text region is the
+   double-click target, and shows a quiet hover/focus affordance so teachers
+   can discover that the text is editable. Mirrors WeeklyLessonCard's
+   `.editableText`. */
+.editableText {
+  display: block;
+  cursor: text;
+  border-radius: var(--r-4);
+  /* Inherit type + color from the .heading / .body container. */
+  font: inherit;
+  color: inherit;
+  transition: background 0.1s ease;
+}
+
+/* Quiet hover tint — a faint wash of the current text color so the cue is
+   subtle on both the tinted heading band and the plain white body. */
+.editableText:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+/* Keyboard-focus affordance — the same hover tint plus a focus ring so the
+   edit affordance is discoverable without a mouse. */
+.editableText:focus-visible {
+  outline: 2px solid var(--cd, var(--ink-900));
+  outline-offset: 1px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+/* Body-text variant of `.editableText` — applied to the section BODY's
+   static element (both filled and empty states). Fills the whole bordered
+   `.body` box so a teacher double-clicking anywhere opens the editor. */
+.bodyText {
+  flex: 1 1 auto;
+  min-height: 36px;
+  padding: 0;
+  margin: 0;
+}
+
+/* An empty section body shows the placeholder prompt as quiet, muted text
+   per spec §3.4 (`var(--ink-400)`). */
+.bodyEmpty {
+  color: var(--ink-400);
+}
+
+/* ── Rich-text editor hosting ────────────────────────────────────────────
+   RichEditorWrapper — the shell that hosts a RichTextEditor while a heading
+   or body field is being edited. The RichTextEditor's toolbar is docked
+   (position:fixed, portaled) so it escapes this subtree; this wrapper just
+   needs to occupy the field's normal flow box. */
+.richEditorWrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Body-editor variant — stretches the wrapper to the tall `.body` box so the
+   live editing surface matches the full-box static double-click target. The
+   RichTextEditor inside is asked to fill the wrapper's height. */
+.richEditorWrapFill {
+  flex: 1 1 auto;
+  min-height: 84px;
+  display: flex;
+  flex-direction: column;
+}
+
+.richEditorWrapFill > * {
+  flex: 1 1 auto;
+}
+
+/* ── Section-menu "+" trigger ────────────────────────────────────────── */
+/* The "+" sits IMMEDIATELY AFTER the heading text — it reads as a small
+   inline affordance attached to the end of the heading band rather than a
+   control floating at the far right of the row. `.menuTriggerWrap` is the
+   inline, `position: relative` shell that follows the shrink-wrapped
+   `.heading` directly (no margin-left:auto) and also anchors the popup.
+   Because `.heading` carries a long ~8.4em transparent highlighter fade
+   tail, the "+" lands over the START of that fade — visually integrated
+   with the heading band, not stranded in empty space. */
+.menuTriggerWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  /* Pull the oversized 44px tap target back so the small glyph reads as
+     snug against the heading text — the negative inline-start margin lets
+     the "+" tuck into the heading band's fade tail. */
+  margin-left: -6px;
+}
+
+/* Small, subtle, ALWAYS-visible round icon button. Clicking it toggles this
+   section's <SectionToolbar> popup. The visible glyph is small; the ≥44px
+   tap target comes from the 44×44 box. Negative vertical margin keeps the
+   oversized box from inflating the heading-row height. */
+.menuTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* ≥44px touch target — a primary per-section action. */
+  width: 44px;
+  height: 44px;
+  /* Collapse the oversized box's vertical footprint into the row height. */
+  margin: -10px 0;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  /* Round button — a quiet circular affordance. 50% (a ratio, not a fixed
+     px) yields a true circle on the square 44×44 box; var(--r-full) is used
+     if the token set ever defines a pill radius. */
+  border-radius: var(--r-full, 50%);
+  color: var(--ink-400);
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.menuTrigger:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.menuTrigger:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+/* Open state — the popup is showing; tint the trigger so it reads as the
+   active anchor of the floating toolbar. */
+.menuTriggerOpen {
+  background: var(--ink-150, var(--ink-100));
+  color: var(--ink-900);
+}
+
+/* ── Section body ────────────────────────────────────────────────────── */
+/* The collapsing wrapper for body + resources. */
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  /* Small top breathing room under the heading row. */
+  margin-top: 8px;
+}
+
+/* The section body — per spec §3.4: a multi-line text input. Styled as a
+   bordered box (1px ink-150, radius 6px, padding ~10px, min-height 56px,
+   font 13px, ink-900, placeholder ink-400). The double-click-to-edit
+   gesture is preserved — clicking the static body opens the rich-text
+   editor in the same box. */
+.body {
+  display: flex;
+  flex-direction: column;
+  /* No left indent — per spec the body sits under its section's content
+     column, aligned with the title. The pin badge column lives in the row's
+     padding-left, so the body naturally starts at the title's left edge. */
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-6);
+  padding: 10px;
+  min-height: 56px;
+  font-size: var(--t-13);
+  line-height: 1.55;
+  color: var(--ink-900);
+  background: var(--paper);
+  transition: border-color 0.12s ease;
+}
+
+.body:hover {
+  border-color: var(--ink-200);
+}
+
+.body:focus-within {
+  border-color: var(--cd, var(--ink-400));
+}
+
+/* ── Resources ───────────────────────────────────────────────────────── */
+/* A drop target for resources dragged from another section. No bordered or
+   dashed box — the only visible chrome is a subtle background tint shown
+   while a resource drag hovers over it. Lives inside the section's RIGHT
+   COLUMN (.resourcesColumn) so it sits flush at left:0 of that column —
+   the old 52px indent (when it lived under the body) is no longer needed. */
+.resources {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  border-radius: var(--r-6);
+  border: 1px solid transparent;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+/* Highlighted while a resource link is dragged over this section. */
+.resourcesOver {
+  border-color: color-mix(in oklch, var(--c, var(--ink-300)) 45%, transparent);
+  background: color-mix(in oklch, var(--cl, var(--ink-50)) 55%, var(--paper));
+}
+
+/* ── Inline resource links ───────────────────────────────────────────── */
+/* One resource per line — a small type icon + a subject-colored link label.
+   Compact, no bordered chips. The whole row is draggable between sections. */
+.resourceLinks {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 1px;
 }
 
-/* ── Section card ────────────────────────────────────────────────────── */
-.card {
+.resourceLinkItem {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px 14px 16px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-150);
-  background: var(--paper);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-  transition:
-    border-color 0.12s ease,
-    box-shadow 0.12s ease,
-    opacity 0.12s ease;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: var(--r-4);
+  cursor: grab;
 }
 
-.card:hover {
-  border-color: var(--ink-200);
+.resourceLinkItem:hover {
+  background: var(--ink-50);
 }
 
-/* Ghost appearance for the sortable source while the overlay rides the cursor.
-   The cardWrapper sets opacity 0 instead; this class is kept for resilience. */
-.cardDragging {
-  opacity: 0.35;
-  box-shadow: none;
-}
-
-/* ── Floating chip in the DragOverlay (spec §7) ──────────────────────── */
-/* Shadow + purple ring + scale applied via the wrapper; the overlay itself
-   is rendered via transform by dnd-kit, so we rely on box-shadow for the
-   visual lift rather than CSS scale (which would conflict with the drag
-   transform). */
-.overlayChip {
-  height: calc(var(--_chip-height, 40px));
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-150);
-  background: var(--paper);
-  /* Floating chip shadow: 0 8px 24px rgba(0,0,0,0.12) + 2px purple-300 ring
-     (spec §7). The purple ring is approximated with --tag-indigo at ~40% alpha
-     since we don't have a literal purple-300 token. */
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.12),
-    0 0 0 2px rgba(86, 96, 216, 0.35);
-  opacity: 0.95;
-  /* spec §7 floating scale 1.02 */
-  transform: scale(1.02);
-  transform-origin: center center;
-  overflow: hidden;
+.resourceLinkItem:active {
   cursor: grabbing;
 }
 
-/* ── Compact chip row (40px, drag-active, spec §4.3) ─────────────────── */
-/* All section cards collapse to this single-line row when any drag is
-   active. Height is set to DRAG_CHIP.sectionChipHeight (40px). The handle
-   overflows the card bounds visually but stays within the 44×44 touch
-   target spec (§2.5). */
+/* The resource itself — a subject-colored inline link (var(--c) per spec).
+   Underlined on hover/focus so it reads unambiguously as a link. It is a
+   focusable element (role="link", tabIndex 0) so keyboard users can land on
+   it and trigger the same hover-preview a mouse gives. */
+.resourceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 0;
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--c, var(--ink-700));
+  text-decoration: underline;
+  text-decoration-color: color-mix(
+    in oklch,
+    var(--c, var(--ink-400)) 45%,
+    transparent
+  );
+  text-underline-offset: 2px;
+  border-radius: var(--r-4);
+  cursor: pointer;
+}
+
+.resourceLinkItem:hover .resourceLink {
+  text-decoration-color: var(--c, var(--ink-500));
+}
+
+/* Keyboard focus affordance — a clear ring + full underline so the focused
+   link reads as the active row (and its hover preview is showing). */
+.resourceLink:focus-visible {
+  outline: 2px solid var(--cd, var(--ink-900));
+  outline-offset: 2px;
+  text-decoration-color: var(--c, var(--ink-500));
+}
+
+/* Type icon beside the link — subject-colored to match the label. */
+.resourceIcon {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--c, var(--ink-400));
+}
+
+/* Label text — truncate if overlong. */
+.resourceLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Remove control — hidden until the link row is hovered or focused, so the
+   resource list reads clean. Tap target expanded to ≥44px via padding. */
+.resourceRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-4);
+  color: var(--ink-300);
+  cursor: pointer;
+  opacity: 0;
+  /* Expand the tap target to ≥44px without disturbing the 22px visual box. */
+  padding: 11px;
+  margin: -11px;
+  box-sizing: content-box;
+  transition:
+    opacity 0.1s ease,
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.resourceLinkItem:hover .resourceRemove,
+.resourceLinkItem:focus-within .resourceRemove {
+  opacity: 1;
+}
+
+.resourceRemove:hover {
+  background: var(--urgent-bg);
+  color: var(--urgent);
+}
+
+.resourceRemove:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+/* ── Resource actions — the thumbnails⇄links toggle ──────────────────── */
+/* Resource ADDING moved to the "+" popup menu (attach/image actions); this
+   row now carries only the resource-contextual thumbnails⇄links toggle, and
+   is rendered only when the section actually has resources. Resources
+   default to the thumbnail-tile grid; this toggle MINIMIZES them to the
+   compact inline-link list and back. */
+.resourceActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+/* Thumbnails⇄links chevron toggle — a compact icon-button. */
+.thumbToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-6);
+  color: var(--ink-400);
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.thumbToggle:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.thumbToggle:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+/* ── Resource thumbnail grid ─────────────────────────────────────────── */
+/* The DEFAULT resources view: every resource renders as a synthetic
+   ResourceTile. Responsive: tiles wrap to fill the pane width. The toggle
+   minimizes this to the compact inline-link list. The min track size is
+   smaller than the lesson-detail's old single-column layout (140px not
+   160px) because the resources column is narrower than the full body. */
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 4px 0 6px;
+}
+
+/* Subtle hover lift on each tile inside the grid — the tile component
+   itself sits at rest; on hover we float it a hair upward to telegraph
+   that the tile is a live affordance. Restraint over flair: 1px and a
+   short fade. Targets the figure since ResourceTile renders <figure> as
+   the tile root. */
+.tileGrid > :global(figure) {
+  transition: transform 0.12s ease;
+}
+
+.tileGrid > :global(figure):hover,
+.tileGrid > :global(figure):focus-within {
+  transform: translateY(-1px);
+}
+
+/* ── Compact drag chip (40px, drag-active) ───────────────────────────── */
+/* While a section drag is in progress every row collapses to this 40px chip.
+   It is the resting placeholder — the dragged section rides the DragOverlay.
+   No drag handle here: the whole list is collapsed and inert during a drag. */
 .chip40Row {
   display: flex;
   align-items: center;
   gap: 8px;
   height: 40px;
-  padding: 0 12px 0 0;
+  padding: 0 10px;
+  border-radius: var(--r-6);
+  background: var(--ink-50);
   overflow: hidden;
 }
 
-/* Type icon inside the chip — 16px, dimmed at 70% for clarity */
 .chip40TypeIcon {
   display: flex;
   align-items: center;
@@ -211,12 +1105,12 @@
   color: var(--ink-400);
 }
 
-/* Section heading in chip — 14px, medium weight, truncated to 1 line */
+/* Section heading inside the chip — truncated to one line. */
 .chip40Heading {
   flex: 1 1 0;
   min-width: 0;
   font-size: var(--t-14);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ink-700);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -224,24 +1118,7 @@
   line-height: 1.3;
 }
 
-/* Small index number inside the chip */
-.chip40Index {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--ink-100);
-  color: var(--ink-500);
-  font-size: var(--t-10);
-  font-weight: 700;
-  line-height: 1;
-  flex: 0 0 auto;
-  user-select: none;
-}
-
-/* Content summary chip — compact badge on the right of the row */
+/* Content summary badge on the right of the chip. */
 .chip40Summary {
   display: inline-flex;
   align-items: center;
@@ -250,374 +1127,74 @@
   padding: 0 7px;
   border-radius: var(--r-4);
   border: 1px solid var(--ink-150);
-  background: var(--ink-50);
+  background: var(--paper);
   font-size: var(--t-11);
   font-weight: 600;
   color: var(--ink-500);
   white-space: nowrap;
 }
 
-/* Empty-state variant of the summary chip */
 .chip40SummaryEmpty {
   color: var(--ink-300);
   border-color: transparent;
   background: transparent;
 }
 
-/* ── Card header: drag handle + index pill + remove ─────────────────── */
-.cardHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* ── Drag handle ─────────────────────────────────────────────────────── */
-/* ≥44px touch target; mouse cursor shows the grab affordance. */
-.dragHandle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* 44×44 touch target — same spec as every primary button */
-  width: 44px;
-  height: 44px;
-  border-radius: var(--r-6);
-  border: none;
-  background: transparent;
-  color: var(--ink-300);
-  cursor: grab;
-  flex: 0 0 auto;
-  padding: 0;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-}
-
-.dragHandle:hover {
-  background: var(--ink-100);
-  color: var(--ink-500);
-}
-
-.dragHandle:active {
+/* ── Floating chip in the DragOverlay (spec §7) ──────────────────────── */
+.overlayChip {
+  height: 40px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-150);
+  background: var(--paper);
+  box-shadow: var(--shadow-popover);
+  opacity: 0.97;
+  overflow: hidden;
   cursor: grabbing;
 }
 
-.dragHandle:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
+/* The overlay chip reuses .chip40Row but on a paper (not ink-50) fill. */
+.overlayChip .chip40Row {
+  background: var(--paper);
 }
 
-/* Drag handle inside the DragOverlay chip — no interactive states needed */
-.dragHandleOverlay {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 auto;
-  color: var(--ink-400);
-  cursor: grabbing;
-}
-
-/* ── Section index pill ──────────────────────────────────────────────── */
-.sectionIndex {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--ink-100);
-  color: var(--ink-500);
-  font-size: var(--t-11);
-  font-weight: 700;
-  line-height: 1;
-  flex: 0 0 auto;
-  user-select: none;
-}
-
-/* Keyboard reorder button group — move-up / move-down */
-.reorderBtns {
-  display: flex;
-  gap: 2px;
-}
-
-/* Compact variant of .iconBtn used for the reorder chevrons — 36×36
-   so the pair fits neatly in the header without dominating it, while
-   still exceeding the 44px combined touch height thanks to the card
-   padding above and below. */
-.reorderBtn {
-  width: 36px;
-  height: 36px;
-}
-
-/* Remove button pushed to the trailing end */
-.cardHeader .removeBtn {
-  margin-left: auto;
-}
-
-/* ── Shared icon button ──────────────────────────────────────────────── */
-/* ≥44px touch target; used for remove-section and chip remove. */
-.iconBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--r-6);
-  border: none;
-  background: transparent;
-  color: var(--ink-400);
-  cursor: pointer;
-  flex: 0 0 auto;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-}
-
-.iconBtn:hover {
-  background: var(--ink-100);
-  color: var(--ink-700);
-}
-
-.iconBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
-.iconBtn:disabled {
-  color: var(--ink-200);
-  cursor: not-allowed;
-  background: transparent;
-}
-
-/* Remove button: destructive tint on hover */
-.removeBtn:not(:disabled):hover {
-  background: var(--urgent-bg);
-  color: var(--urgent);
-}
-
-/* ── Heading row ─────────────────────────────────────────────────────── */
-/* Thin wrapper — border styled here so the heading feels distinct from
-   the body editor below it, but the RichTextEditor provides its own
-   internal chrome. We don't add extra padding here to avoid double-spacing
-   when the editor has its own padding. */
-.headingRow {
-  /* Decorative left accent bar aligned with the section's heading. */
-  border-left: 3px solid var(--ink-150);
-  padding-left: 10px;
-}
-
-/* ── Body row ────────────────────────────────────────────────────────── */
-.bodyRow {
-  /* Inset from the left accent so body content sits inside the heading's
-     visual column. */
-  padding-left: 13px;
-}
-
-/* ── Resources area ──────────────────────────────────────────────────── */
-/* Drop target for resource chips dragged from another section. */
-.resourcesArea {
+/* ── Footer — centered "+ Add section" + quiet template stub ─────────── */
+.footer {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: var(--r-6);
-  border: 1.5px dashed var(--ink-150);
-  background: var(--ink-50);
-  transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
-  /* Inset with the body column */
-  margin-left: 13px;
-}
-
-/* Highlighted when a resource chip is dragged over this area */
-.resourcesAreaOver {
-  border-color: var(--ink-400);
-  background: var(--ink-100);
-}
-
-/* ── Resource chip list ──────────────────────────────────────────────── */
-.resourceChips {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+  margin-top: 4px;
 }
 
-/* ── Resource chip ───────────────────────────────────────────────────── */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  max-width: 240px;
-  height: 30px;
-  padding: 0 6px 0 8px;
-  border-radius: var(--r-6);
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  font-size: var(--t-12);
-  color: var(--ink-700);
-  cursor: grab;
-  box-shadow: var(--shadow-card);
-  transition:
-    border-color 0.1s ease,
-    box-shadow 0.1s ease;
-  /* Prevent the chip list from wrapping awkwardly */
-  white-space: nowrap;
-}
-
-.chip:hover {
-  border-color: var(--ink-300);
-  box-shadow:
-    var(--shadow-card),
-    0 0 0 1px var(--ink-150);
-}
-
-.chip:active {
-  cursor: grabbing;
-}
-
-/* Type icon inside the chip */
-.chipIcon {
-  display: flex;
-  align-items: center;
-  color: var(--ink-400);
-  flex: 0 0 auto;
-}
-
-/* Label text — truncate if overlong */
-.chipLabel {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Remove button inside the chip.
- *
- * The chip is only 30px tall so a literal 44px button would break the
- * layout. We keep the 22×22 visual footprint but expand the tap area to
- * ≥44px using padding + negative margin so the invisible touch target
- * reaches the spec without disturbing surrounding layout. */
-.chipRemove {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* Visual size */
-  width: 22px;
-  height: 22px;
-  border-radius: var(--r-4);
-  border: none;
-  background: transparent;
-  color: var(--ink-300);
-  cursor: pointer;
-  flex: 0 0 auto;
-  /* Expand touch target to ≥44px vertically without affecting layout. */
-  padding: 11px 0;
-  margin: -11px 0;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-}
-
-.chipRemove:hover {
-  background: var(--urgent-bg);
-  color: var(--urgent);
-}
-
-.chipRemove:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
-/* ── Add resource button ─────────────────────────────────────────────── */
-/* Compact inline add affordance inside the resource area. */
-.addResourceBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  /* ≥44px touch target height */
-  min-height: 44px;
-  padding: 0 10px;
-  border-radius: var(--r-6);
-  border: none;
-  background: transparent;
-  font-size: var(--t-12);
-  font-weight: 600;
-  color: var(--ink-400);
-  cursor: pointer;
-  align-self: flex-start;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-  font-family: inherit;
-}
-
-.addResourceBtn:hover {
-  background: var(--ink-100);
-  color: var(--ink-700);
-}
-
-.addResourceBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
-/* ── Add section row ─────────────────────────────────────────────────── */
-/* Padlet-style footer: a full-width row with a centered "+" pill and
-   optional between-section affordances. Stays anchored — does not collapse
-   during drag (spec §4.5 analogue). */
-.addSectionRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.addSectionRow::before,
-.addSectionRow::after {
-  content: "";
-  flex: 1 1 0;
-  height: 1px;
-  background: var(--ink-150);
-  border-radius: 1px;
-}
-
-/* ── Add section button ──────────────────────────────────────────────── */
-/* Padlet-style centered pill — grows to fill the row between the two
-   decorative rules. */
+/* Primary affordance — a centered, link/subtle "+ Add section" control,
+   echoing the reference's centered "+ Add Card". Not a heavy filled pill. */
 .addSectionBtn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  /* ≥44px touch target height */
+  /* ≥44px touch target height — primary action on this surface. */
   min-height: 44px;
-  padding: 0 18px;
+  padding: 0 16px;
+  border: 1px dashed var(--ink-200);
+  background: transparent;
   border-radius: var(--r-8);
-  border: 1.5px dashed var(--ink-200);
-  background: var(--paper);
+  font-family: inherit;
   font-size: var(--t-13);
   font-weight: 600;
   color: var(--ink-500);
   cursor: pointer;
-  flex: 0 0 auto;
   white-space: nowrap;
   transition:
     border-color 0.12s ease,
     background 0.12s ease,
-    color 0.12s ease,
-    box-shadow 0.12s ease;
-  font-family: inherit;
+    color 0.12s ease;
 }
 
 .addSectionBtn:hover {
   border-color: var(--ink-400);
   background: var(--ink-50);
   color: var(--ink-900);
-  box-shadow: var(--shadow-card);
 }
 
 .addSectionBtn:focus-visible {
@@ -625,24 +1202,67 @@
   outline-offset: 2px;
 }
 
+/* Secondary, quiet template stub — small text link, no border/fill. A
+   non-functional Phase 1A placeholder for the later Lesson Templates editor. */
+.templateBtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-400);
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition:
+    color 0.1s ease,
+    text-decoration-color 0.1s ease;
+}
+
+.templateBtn:hover {
+  color: var(--ink-600);
+  text-decoration-color: var(--ink-300);
+}
+
+.templateBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
 /* ── Reduced motion ──────────────────────────────────────────────────── */
-/* Transitions are stripped to near-instant under prefers-reduced-motion;
-   the .cp-root rule in tokens.css already covers child elements, but we
-   mirror it here for elements that sit outside .cp-root scope.
-   framer-motion's layout animation is disabled via reducedMotion prop
-   passed from useReducedMotion() in the component. */
+/* Transitions stripped to near-instant under prefers-reduced-motion. */
 @media (prefers-reduced-motion: reduce) {
-  .card,
-  .dragHandle,
-  .iconBtn,
-  .reorderBtn,
-  .chip,
-  .chipRemove,
-  .addResourceBtn,
+  .collapseChevron,
+  .chevronExpanded,
+  .chevronCollapsed,
+  .dragGrip,
+  .resourceRemove,
+  .menuTrigger,
+  .thumbToggle,
+  .globalToggleBtn,
   .addSectionBtn,
-  .resourcesArea,
-  .divergenceBar,
-  .divergenceReset {
+  .templateBtn,
+  .resources,
+  .editableText,
+  .divergenceReset,
+  .resourcesAddBtn,
+  .resourcesThumbToggle,
+  .resourcesEmpty {
     transition-duration: 0.001ms !important;
+  }
+  /* Drop the per-tile hover lift — the transform itself is the motion;
+     keeping the transition only would still create a jump on hover. */
+  .tileGrid > :global(figure) {
+    transition: none;
+  }
+  .tileGrid > :global(figure):hover,
+  .tileGrid > :global(figure):focus-within {
+    transform: none;
   }
 }

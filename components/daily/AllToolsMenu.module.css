@@ -1,0 +1,384 @@
+/* AllToolsMenu.module.css — the "All tools" expanded grid revealed when the
+   teacher hits "All tools" inside ResourceComposer. Visually echoes the
+   Padlet "All Tools" panel: a scrollable 3-column grid of soft pastel
+   tool tiles, grouped into named sections with hairline dividers.
+
+   Lives INSIDE the ResourceComposer panel: it replaces the body (title +
+   tool grid + body + captured strip + routing) while open. A small
+   "back" affordance returns to the composer's normal view.
+
+   All color / type / spacing via var(--token). Tailwind = layout only.
+   Touch targets ≥44px (tile min-height + hit-pad on the back button).
+   prefers-reduced-motion drops the staggered entrance + all transitions. */
+
+/* ── Header (back · title) ─────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ink-100);
+  margin-bottom: 12px;
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 12px 5px 8px;
+  border: 1px solid var(--ink-150);
+  background: var(--paper);
+  color: var(--ink-700);
+  border-radius: 999px;
+  font-size: var(--t-12);
+  font-weight: 500;
+  cursor: pointer;
+  /* Hit-pad to ≥44px without inflating the visible chip. */
+  position: relative;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.backBtn::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+.backBtn:hover {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+  color: var(--ink-900);
+}
+
+.backBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--t-16);
+  font-weight: 600;
+  color: var(--ink-900);
+  letter-spacing: -0.2px;
+}
+
+/* ── Section block ──────────────────────────────────────────────────────── */
+/* Each named category (Web & Files, Camera & Media, Recordings, Embeds).
+   Sections after the first carry a hairline divider above the section
+   label so the four groups feel distinct without needing four boxes. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.section + .section {
+  padding-top: 14px;
+  border-top: 1px solid var(--ink-100);
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: var(--t-10);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  font-weight: 600;
+}
+
+/* ── Tool grid (3 columns) ─────────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Tile ──────────────────────────────────────────────────────────────── */
+/* A soft pastel rounded card. The pastel tint comes from --hlp-* tokens
+   (highlighter "pen" pastels). The icon sits in a slightly stronger pill
+   over the same hue. Tiles marked .tileStub fade their label + show a
+   subtle dashed border instead of solid, so the "coming soon" tiles read
+   as distinct from working ones without being alarming.
+
+   Tiles cascade in with a per-tile --stagger delay set inline. The
+   stagger runs continuously across the four sections so the whole grid
+   reads as ONE wave, not four sequential ones. */
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 88px;
+  padding: 12px 8px;
+  border: 1px solid transparent;
+  /* Soften the pastel toward paper so the tile body is calmer than the
+     icon pill — the tile is a quiet rest area, the icon pill is the
+     "where to tap" cue. */
+  background: color-mix(
+    in oklch,
+    var(--tileBg, var(--ink-50)) 55%,
+    var(--paper)
+  );
+  border-radius: var(--r-8);
+  cursor: pointer;
+  color: var(--ink-900);
+  text-align: center;
+  position: relative;
+  transition:
+    background 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+
+  /* Staggered entrance — the per-tile --stagger inline property carries
+     the delay so each tile lands in turn. The cubic easing matches the
+     composer panel's entrance for visual continuity. */
+  opacity: 0;
+  transform: translateY(4px);
+  animation: tileIn 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--stagger, 0ms);
+}
+
+@keyframes tileIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tile:hover {
+  background: color-mix(
+    in oklch,
+    var(--tileBg, var(--ink-50)) 78%,
+    var(--paper)
+  );
+  border-color: color-mix(in oklch, var(--ink-900) 7%, transparent);
+  box-shadow: 0 1px 2px color-mix(in oklch, var(--ink-900) 5%, transparent);
+}
+
+.tile:active {
+  transform: translateY(1px);
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.tileIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--tileIconBg, var(--ink-100));
+  color: var(--ink-900);
+  /* A whisper of inner ring gives the pill a subtle physical "button"
+     feel without committing to a hard bevel. */
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklch, var(--ink-900) 5%, transparent);
+}
+
+.tileLabel {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-900);
+  line-height: 1.15;
+  letter-spacing: 0.05px;
+}
+
+/* Stub-tile treatment — same pastel hue, but considerably muted so the
+   "coming soon" tiles read as recognised features that aren't yet
+   available. The label and icon both step down a tier of contrast. */
+
+.tileStub {
+  background: color-mix(
+    in oklch,
+    var(--tileBg, var(--ink-50)) 30%,
+    var(--paper)
+  );
+}
+
+.tileStub .tileLabel {
+  color: var(--ink-500);
+}
+
+.tileStub .tileIcon {
+  color: var(--ink-500);
+  background: color-mix(
+    in oklch,
+    var(--tileIconBg, var(--ink-100)) 45%,
+    var(--paper)
+  );
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklch, var(--ink-900) 3%, transparent);
+}
+
+.tileStub:hover {
+  background: color-mix(
+    in oklch,
+    var(--tileBg, var(--ink-50)) 45%,
+    var(--paper)
+  );
+}
+
+/* "New" / "Soon" micro-pills — sit top-right of the tile. The NEW badge
+   is a firm dark pill so the genuinely-new functional tiles (Lesson
+   Padlet, YouTube) catch the eye; the SOON badge is quieter — same shape,
+   muted neutral fill, so it reads as a label not an attention-grab. */
+
+.badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 6px;
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  border-radius: 999px;
+  background: var(--ink-900);
+  color: var(--paper);
+  line-height: 1.6;
+  /* Hairline ring softens the pill against the pastel body and keeps it
+     readable on the lighter stub tile backgrounds. */
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--paper) 60%, transparent);
+}
+
+.badgeSoon {
+  background: color-mix(in oklch, var(--ink-300) 50%, var(--paper));
+  color: var(--ink-500);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--ink-900) 5%, transparent);
+}
+
+/* ── Inline URL row (YouTube tile) ─────────────────────────────────────── */
+
+.inlineRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--ink-50);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-6);
+}
+
+.urlInput {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--ink-150);
+  background: var(--paper);
+  border-radius: var(--r-4);
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  outline: none;
+  transition: border-color 140ms ease;
+}
+
+.urlInput:focus {
+  border-color: var(--ink-400);
+}
+
+.inlineAddBtn {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  color: var(--ink-900);
+  border-radius: var(--r-4);
+  font-size: var(--t-12);
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    opacity 120ms ease;
+}
+
+.inlineAddBtn::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.inlineAddBtn:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.inlineAddBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.inlineAddBtn:disabled {
+  color: var(--ink-400);
+  cursor: not-allowed;
+}
+
+/* ── Stub-notice line ──────────────────────────────────────────────────── */
+/* Shown briefly when the teacher taps a (stub) tile. */
+
+.stubNotice {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--ink-50);
+  border: 1px dashed var(--ink-200);
+  border-radius: var(--r-6);
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  font-style: italic;
+}
+
+/* ── Scroll wrapper ────────────────────────────────────────────────────── */
+/* The grid can grow tall — let it scroll inside the composer panel rather
+   than the panel itself. */
+
+.scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 56vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+/* Strip the staggered tile entrance + every transition so the menu lands
+   without motion. The :root reduced-motion catch in tokens.css already
+   compresses generic transitions; this scopes the named guarantees. */
+
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .tile,
+  .urlInput,
+  .inlineAddBtn,
+  .backBtn {
+    transition: none;
+  }
+}

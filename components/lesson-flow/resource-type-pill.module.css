@@ -1,0 +1,66 @@
+/* resource-type-pill.module.css — small uppercase pill tag for resource types.
+ *
+ * Spec exception: §4.4 of the Plugin Directions explicitly lists HEX pairs
+ * for each type. They are the published resource-type colorway and are NOT
+ * part of the subject-color cascade. All other color in this folder still
+ * flows through var(--token).
+ *
+ * Layout: 2px 8px padding, 999px radius (true pill), 10px text, weight 600,
+ * uppercase, letter-spacing 0.4.
+ */
+
+.pill {
+  /* Inline so the pill flows next to the resource title without breaking the
+     row's vertical rhythm. */
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+
+  /* Geometry per spec §4.4. */
+  padding: 2px 8px;
+  border-radius: 999px;
+
+  /* Type per spec §4.4 — small uppercase tag. */
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+
+  /* `line-height: 1` keeps the pill snug around its glyph height. */
+  line-height: 1;
+}
+
+/* ── EXACT HEX VALUES per spec §4.4 ─────────────────────────────────────
+   These are the only hex literals in this stylesheet. Do not refactor them
+   to tokens — they are the spec's color language for resource types. */
+
+.pill[data-kind="video"] {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.pill[data-kind="docx"] {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.pill[data-kind="pdf"] {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.pill[data-kind="link"] {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.pill[data-kind="slides"] {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pill[data-kind="image"] {
+  background: #dcfce7;
+  color: #166534;
+}

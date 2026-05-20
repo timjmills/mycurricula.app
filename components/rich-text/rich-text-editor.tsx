@@ -40,6 +40,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import styles from "./rich-text-editor.module.css";
 
 // ── Public contract ─────────────────────────────────────────────────────────
@@ -64,6 +65,32 @@ export interface RichTextEditorProps {
    * field is ready to type the instant it appears.
    */
   autoFocus?: boolean;
+  /**
+   * When provided, the formatting toolbar is DOCKED instead of floating near
+   * the text selection.
+   *
+   * Docked behavior (when this prop IS supplied):
+   *   • The toolbar renders position:fixed, horizontally CENTERED within
+   *     `dockTarget.current`'s bounding rect, pinned ~12px above that
+   *     element's bottom edge. It is clamped inside the viewport so it can
+   *     never be clipped off-screen.
+   *   • The toolbar becomes visible whenever the editable region is FOCUSED —
+   *     even at a collapsed caret with NO text selected — so clicking into a
+   *     field immediately reveals the controls. It hides on blur (focus
+   *     leaving the editor AND the toolbar).
+   *   • B/I/U and the other toggle states stay correct at a collapsed caret:
+   *     document.queryCommandState still reports format state with no
+   *     selection, so the toggle highlights track the caret position.
+   *   • The docked position is recomputed on window scroll (capture phase, so
+   *     inner scrolling containers also trigger it), window resize, and on
+   *     focus — the dockTarget's rect moves as the surrounding pane scrolls.
+   *   • All formatting commands and popovers work exactly as in floating mode.
+   *
+   * When this prop is OMITTED the toolbar floats near the text selection and
+   * appears only when text is actually selected — the original behavior,
+   * unchanged. (The Weekly view relies on that floating behavior.)
+   */
+  dockTarget?: React.RefObject<HTMLElement | null>;
 }
 
 // ── Toolbar data ─────────────────────────────────────────────────────────────
@@ -166,6 +193,30 @@ const FONT_OPTIONS: FontOption[] = [
       "'Trebuchet MS', 'Gill Sans', 'Gill Sans MT', Calibri, sans-serif",
     css: "'Trebuchet MS', 'Gill Sans', 'Gill Sans MT', Calibri, sans-serif",
   },
+];
+
+interface SizeOption {
+  label: string;
+  /**
+   * HTML font-size value (1-7) passed to document.execCommand('fontSize').
+   * execCommand wraps the selection in <font size="N">; this is the same
+   * pragmatic deprecated-but-universal path the other commands use.
+   */
+  size: string;
+  /** CSS font-size for the preview text in the picker — a token, never a
+   *  hard-coded px value, so the preview tracks the design scale. */
+  previewVar: string;
+}
+
+// Four clear text sizes. The execCommand size values map to the browser's
+// legacy 1-7 scale: 2 ≈ small, 3 ≈ normal (browser default), 5 ≈ large,
+// 6 ≈ x-large. The preview font-size uses --t-* tokens so the popover
+// reflects the app's type scale rather than the raw legacy sizes.
+const SIZE_OPTIONS: SizeOption[] = [
+  { label: "Small", size: "2", previewVar: "--t-11" },
+  { label: "Normal", size: "3", previewVar: "--t-13" },
+  { label: "Large", size: "5", previewVar: "--t-18" },
+  { label: "X-Large", size: "6", previewVar: "--t-24" },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -487,7 +538,11 @@ export function RichTextEditor({
   singleLine = false,
   ariaLabel,
   autoFocus = false,
+  dockTarget,
 }: RichTextEditorProps): ReactNode {
+  // Docked mode is active whenever a dockTarget ref is supplied. When false,
+  // every code path below behaves exactly as it did before this prop existed.
+  const docked = dockTarget != null;
   const editorRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
@@ -516,6 +571,9 @@ export function RichTextEditor({
   // Font picker open state.
   const [fontOpen, setFontOpen] = useState(false);
 
+  // Text-size picker open state.
+  const [sizeOpen, setSizeOpen] = useState(false);
+
   // Color/highlight palette open state.
   const [paletteOpen, setPaletteOpen] = useState<"color" | "highlight" | null>(
     null,
@@ -533,12 +591,80 @@ export function RichTextEditor({
     setEmpty(isEditorEmpty(el));
   }, [value]);
 
+  // ── Shared format-state polling ─────────────────────────────────────────
+  // Reads document.queryCommandState for every toggle command and pushes the
+  // results into state. queryCommandState reports correctly even at a
+  // collapsed caret (no selection), so this keeps the B/I/U highlights honest
+  // in docked mode too. Browser-only — all callers run in event handlers or
+  // client-only effects.
+  const syncFormatState = useCallback(() => {
+    setBold(document.queryCommandState("bold"));
+    setItalic(document.queryCommandState("italic"));
+    setUnderline(document.queryCommandState("underline"));
+    setStrikethrough(document.queryCommandState("strikeThrough"));
+    setSubscript(document.queryCommandState("subscript"));
+    setSuperscript(document.queryCommandState("superscript"));
+  }, []);
+
+  // ── Docked positioning ──────────────────────────────────────────────────
+  // Computes the toolbar's fixed-position coordinates from the dockTarget's
+  // current bounding rect: horizontally centered within the target, pinned
+  // ~12px above the target's bottom edge, then clamped so the whole toolbar
+  // stays inside the viewport. A no-op when not docked or before the target
+  // has mounted. Browser-only — invoked from client-only effects/handlers.
+  const positionDocked = useCallback(() => {
+    if (!docked) return;
+    const target = dockTarget?.current;
+    if (!target) return;
+
+    const rect = target.getBoundingClientRect();
+    // The toolbar wraps to ~2 rows of buttons on narrow widths — match the
+    // generous estimate used by the floating path so clamping is consistent.
+    const toolbarH = 88;
+    const toolbarW = 520;
+    const gap = 12; // pinned ~12px above the dockTarget's bottom edge
+    const margin = 8;
+
+    // Center horizontally within the dockTarget's rect.
+    let left = rect.left + rect.width / 2 - toolbarW / 2;
+    left = Math.max(
+      margin,
+      Math.min(left, window.innerWidth - toolbarW - margin),
+    );
+
+    // Pin just above the dockTarget's bottom edge, then clamp vertically so
+    // the toolbar is never clipped at the top or bottom of the viewport.
+    let top = rect.bottom - toolbarH - gap;
+    top = Math.max(
+      margin,
+      Math.min(top, window.innerHeight - toolbarH - margin),
+    );
+
+    setToolbarPos({ top, left });
+  }, [docked, dockTarget]);
+
   // ── Toolbar positioning & format-state polling ──────────────────────────
   const updateToolbar = useCallback(() => {
+    // Docked mode does not respond to selectionchange for visibility — the
+    // focus-driven effect owns show/hide there. We still refresh the toggle
+    // states (the caret may have moved within the editor) and the docked
+    // position (the pane may have scrolled). Visibility is left untouched so
+    // a collapsed caret does not hide the docked toolbar.
+    if (docked) {
+      const el = editorRef.current;
+      const activeEl = document.activeElement;
+      if (el && activeEl && el.contains(activeEl)) {
+        syncFormatState();
+        positionDocked();
+      }
+      return;
+    }
+
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
       setToolbarVisible(false);
       setFontOpen(false);
+      setSizeOpen(false);
       setPaletteOpen(null);
       return;
     }
@@ -552,12 +678,7 @@ export function RichTextEditor({
     }
 
     // Read format state for all toggle commands.
-    setBold(document.queryCommandState("bold"));
-    setItalic(document.queryCommandState("italic"));
-    setUnderline(document.queryCommandState("underline"));
-    setStrikethrough(document.queryCommandState("strikeThrough"));
-    setSubscript(document.queryCommandState("subscript"));
-    setSuperscript(document.queryCommandState("superscript"));
+    syncFormatState();
 
     // Position toolbar above the selection rect, clamped to viewport.
     // The toolbar uses position:fixed, so coordinates must be viewport-relative.
@@ -595,7 +716,7 @@ export function RichTextEditor({
 
     setToolbarPos({ top, left });
     setToolbarVisible(true);
-  }, []);
+  }, [docked, syncFormatState, positionDocked]);
 
   // ── Auto-focus on mount ─────────────────────────────────────────────
   // Inline editors open in response to a teacher action (double-click a
@@ -654,7 +775,75 @@ export function RichTextEditor({
     return () => document.removeEventListener("selectionchange", updateToolbar);
   }, [updateToolbar]);
 
+  // ── Docked mode: focus-driven visibility ────────────────────────────
+  // The floating path keys visibility off the text selection. Docked mode
+  // instead keys it off editor focus, so clicking into the field — even with
+  // a collapsed caret and no text selected — reveals the toolbar.
+  //
+  // On focus: show the toolbar, sync the toggle states, and position it.
+  // On blur: hide it — UNLESS focus is moving to the toolbar itself. The
+  // toolbar's onMouseDown preventDefault already keeps the editor focused
+  // when a button is pressed, but we additionally guard the blur with a
+  // relatedTarget check against the toolbar ref as a belt-and-braces measure
+  // (relatedTarget is null in some browsers when focus leaves to nowhere).
+  //
+  // No-op entirely when not docked, so the floating/Weekly path is untouched.
+  useEffect(() => {
+    if (!docked) return;
+    const el = editorRef.current;
+    if (!el) return;
+
+    function handleFocus() {
+      syncFormatState();
+      positionDocked();
+      setToolbarVisible(true);
+    }
+
+    function handleBlur(e: FocusEvent) {
+      // Keep the toolbar open when focus is moving into the toolbar — pressing
+      // a toolbar button must not dismiss the docked toolbar.
+      const next = e.relatedTarget as Node | null;
+      if (next && toolbarRef.current?.contains(next)) return;
+      setToolbarVisible(false);
+      setFontOpen(false);
+      setSizeOpen(false);
+      setPaletteOpen(null);
+    }
+
+    el.addEventListener("focus", handleFocus);
+    el.addEventListener("blur", handleBlur);
+    return () => {
+      el.removeEventListener("focus", handleFocus);
+      el.removeEventListener("blur", handleBlur);
+    };
+  }, [docked, syncFormatState, positionDocked]);
+
+  // ── Docked mode: reposition on scroll & resize ──────────────────────
+  // The dockTarget's bounding rect moves as the surrounding pane scrolls or
+  // the window resizes. We listen for scroll in the CAPTURE phase so the
+  // handler also fires when an inner scrolling container moves — scroll
+  // events do not bubble, but they are observable during capture. Only
+  // recompute while the docked toolbar is actually visible.
+  useEffect(() => {
+    if (!docked || !toolbarVisible) return;
+
+    function handleReposition() {
+      positionDocked();
+    }
+
+    window.addEventListener("scroll", handleReposition, true); // capture phase
+    window.addEventListener("resize", handleReposition);
+    return () => {
+      window.removeEventListener("scroll", handleReposition, true);
+      window.removeEventListener("resize", handleReposition);
+    };
+  }, [docked, toolbarVisible, positionDocked]);
+
   // ── Close popups when clicking outside toolbar/editor ──────────────
+  // In floating mode an outside click dismisses the whole toolbar. In docked
+  // mode the toolbar's visibility is owned by editor focus/blur, so an
+  // outside click only collapses any open font/color popover — hiding the
+  // toolbar itself is left to the blur handler.
   useEffect(() => {
     function handlePointerDown(e: PointerEvent) {
       const target = e.target as Node;
@@ -662,14 +851,15 @@ export function RichTextEditor({
         !toolbarRef.current?.contains(target) &&
         !editorRef.current?.contains(target)
       ) {
-        setToolbarVisible(false);
+        if (!docked) setToolbarVisible(false);
         setFontOpen(false);
+        setSizeOpen(false);
         setPaletteOpen(null);
       }
     }
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, []);
+  }, [docked]);
 
   // ── Format command helpers ──────────────────────────────────────────
 
@@ -680,18 +870,13 @@ export function RichTextEditor({
       editorRef.current?.focus();
       exec(command, value);
       // Re-read all toggle-command states after the command.
-      setBold(document.queryCommandState("bold"));
-      setItalic(document.queryCommandState("italic"));
-      setUnderline(document.queryCommandState("underline"));
-      setStrikethrough(document.queryCommandState("strikeThrough"));
-      setSubscript(document.queryCommandState("subscript"));
-      setSuperscript(document.queryCommandState("superscript"));
+      syncFormatState();
       // Report the updated HTML.
       const html = editorRef.current?.innerHTML ?? "";
       lastWrittenRef.current = html;
       onChange(html);
     },
-    [onChange],
+    [onChange, syncFormatState],
   );
 
   const applyTextColor = useCallback(
@@ -723,6 +908,18 @@ export function RichTextEditor({
       const resolved = resolveCssVar(fontVariable);
       applyCommand(e, "fontName", resolved);
       setFontOpen(false);
+    },
+    [applyCommand],
+  );
+
+  const applySize = useCallback(
+    (e: React.MouseEvent, size: string) => {
+      // execCommand('fontSize') wraps the selection in <font size="N"> using
+      // the browser's legacy 1-7 scale. It is the pragmatic, universally
+      // supported choice — consistent with fontName/foreColor above — and
+      // works reliably at a collapsed caret as well as over a selection.
+      applyCommand(e, "fontSize", size);
+      setSizeOpen(false);
     },
     [applyCommand],
   );
@@ -836,313 +1033,391 @@ export function RichTextEditor({
   // ── Render ──────────────────────────────────────────────────────────
   return (
     <div className={styles.root}>
-      {/* Floating toolbar — position:fixed, coordinates are viewport-relative */}
-      {toolbarVisible && (
-        <div
-          ref={toolbarRef}
-          role="toolbar"
-          aria-label="Text formatting"
-          className={styles.toolbar}
-          style={{
-            top: toolbarPos.top,
-            left: toolbarPos.left,
-          }}
-          // Prevent toolbar clicks from stealing focus away from selection.
-          onMouseDown={(e) => e.preventDefault()}
-        >
-          {/* ── Group 0: Undo / Redo ── */}
-          <ToolbarButton
-            label="Undo"
-            onMouseDown={(e) => applyCommand(e, "undo")}
+      {/* Formatting toolbar — position:fixed, coordinates are viewport-relative.
+          Floats near the selection by default; docked (bottom-center of the
+          dockTarget) when a dockTarget ref is supplied.
+
+          Portaled OUT of this subtree: a position:fixed element is
+          offset/rescaled when an ancestor has `zoom` or a transform, and the
+          lesson-detail panel renders at `zoom: 0.8`. The portal target is the
+          app-shell root `.cp-root` — NOT document.body — because the toolbar's
+          buttons rely on the `.cp-root button { ... }` resets and the
+          `.cp-root` font cascade (tokens.css); rendering under bare <body>
+          would lose them. `.cp-root` is a non-zoomed ancestor, so the toolbar
+          still escapes the zoomed panel while keeping its styling. A portal
+          does not change fixed-positioning behaviour. The `typeof document`
+          guard keeps it inert during SSR (toolbarVisible is also client-only,
+          so this never runs on the server). */}
+      {toolbarVisible &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={toolbarRef}
+            role="toolbar"
+            aria-label="Text formatting"
+            className={`${styles.toolbar} ${docked ? styles.toolbarDocked : ""}`}
+            style={{
+              top: toolbarPos.top,
+              left: toolbarPos.left,
+            }}
+            // Prevent toolbar clicks from stealing focus away from the editor —
+            // this keeps the editor focused (and, in docked mode, keeps the
+            // focus-driven toolbar visible) when a button is pressed.
+            onMouseDown={(e) => e.preventDefault()}
           >
-            <UndoIcon />
-          </ToolbarButton>
-
-          <ToolbarButton
-            label="Redo"
-            onMouseDown={(e) => applyCommand(e, "redo")}
-          >
-            <RedoIcon />
-          </ToolbarButton>
-
-          <span className={styles.divider} aria-hidden />
-
-          {/* ── Group 1: Inline text formatting ── */}
-          <ToolbarButton
-            label="Bold"
-            active={bold}
-            onMouseDown={(e) => applyCommand(e, "bold")}
-          >
-            <span className={styles.iconB}>B</span>
-          </ToolbarButton>
-
-          <ToolbarButton
-            label="Italic"
-            active={italic}
-            onMouseDown={(e) => applyCommand(e, "italic")}
-          >
-            <span className={styles.iconI}>I</span>
-          </ToolbarButton>
-
-          <ToolbarButton
-            label="Underline"
-            active={underline}
-            onMouseDown={(e) => applyCommand(e, "underline")}
-          >
-            <span className={styles.iconU}>U</span>
-          </ToolbarButton>
-
-          <ToolbarButton
-            label="Strikethrough"
-            active={strikethrough}
-            onMouseDown={(e) => applyCommand(e, "strikeThrough")}
-          >
-            <span className={styles.iconS}>S</span>
-          </ToolbarButton>
-
-          <span className={styles.divider} aria-hidden />
-
-          {/* ── Group 2: Script formatting ── */}
-          <ToolbarButton
-            label="Subscript (X₂)"
-            active={subscript}
-            onMouseDown={(e) => applyCommand(e, "subscript")}
-          >
-            <span className={styles.iconScript}>
-              X<sub>₂</sub>
-            </span>
-          </ToolbarButton>
-
-          <ToolbarButton
-            label="Superscript (X²)"
-            active={superscript}
-            onMouseDown={(e) => applyCommand(e, "superscript")}
-          >
-            <span className={styles.iconScript}>
-              X<sup>²</sup>
-            </span>
-          </ToolbarButton>
-
-          <span className={styles.divider} aria-hidden />
-
-          {/* ── Group 3: Color pickers ── */}
-          {/* Text color trigger */}
-          <div className={styles.paletteGroup}>
+            {/* ── Group 0: Undo / Redo ── */}
             <ToolbarButton
-              label="Text color"
-              active={paletteOpen === "color"}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setPaletteOpen((v) => (v === "color" ? null : "color"));
-                setFontOpen(false);
-              }}
+              label="Undo"
+              onMouseDown={(e) => applyCommand(e, "undo")}
             >
-              {/* A colored "A" suggesting text-color */}
-              <span className={styles.iconColor}>A</span>
-              <span className={styles.iconCaret} aria-hidden>
-                ▾
+              <UndoIcon />
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Redo"
+              onMouseDown={(e) => applyCommand(e, "redo")}
+            >
+              <RedoIcon />
+            </ToolbarButton>
+
+            <span className={styles.divider} aria-hidden />
+
+            {/* ── Group 1: Inline text formatting ── */}
+            <ToolbarButton
+              label="Bold"
+              active={bold}
+              onMouseDown={(e) => applyCommand(e, "bold")}
+            >
+              <span className={styles.iconB}>B</span>
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Italic"
+              active={italic}
+              onMouseDown={(e) => applyCommand(e, "italic")}
+            >
+              <span className={styles.iconI}>I</span>
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Underline"
+              active={underline}
+              onMouseDown={(e) => applyCommand(e, "underline")}
+            >
+              <span className={styles.iconU}>U</span>
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Strikethrough"
+              active={strikethrough}
+              onMouseDown={(e) => applyCommand(e, "strikeThrough")}
+            >
+              <span className={styles.iconS}>S</span>
+            </ToolbarButton>
+
+            <span className={styles.divider} aria-hidden />
+
+            {/* ── Group 2: Script formatting ── */}
+            <ToolbarButton
+              label="Subscript (X₂)"
+              active={subscript}
+              onMouseDown={(e) => applyCommand(e, "subscript")}
+            >
+              <span className={styles.iconScript}>
+                X<sub>₂</sub>
               </span>
             </ToolbarButton>
 
-            {paletteOpen === "color" && (
-              <div
-                className={styles.palettePopover}
-                role="group"
-                aria-label="Text color palette"
-              >
-                {TEXT_COLORS.map((swatch) => (
-                  <SwatchButton
-                    key={swatch.variable}
-                    label={swatch.label}
-                    color={resolveCssVar(swatch.variable)}
-                    onMouseDown={(e) => applyTextColor(e, swatch.variable)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Highlight trigger */}
-          <div className={styles.paletteGroup}>
             <ToolbarButton
-              label="Highlight color"
-              active={paletteOpen === "highlight"}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setPaletteOpen((v) => (v === "highlight" ? null : "highlight"));
-                setFontOpen(false);
-              }}
+              label="Superscript (X²)"
+              active={superscript}
+              onMouseDown={(e) => applyCommand(e, "superscript")}
             >
-              <span className={styles.iconHighlight}>H</span>
-              <span className={styles.iconCaret} aria-hidden>
-                ▾
+              <span className={styles.iconScript}>
+                X<sup>²</sup>
               </span>
             </ToolbarButton>
 
-            {paletteOpen === "highlight" && (
-              <div
-                className={`${styles.palettePopover} ${styles.highlightPopover}`}
-                role="group"
-                aria-label="Highlight color palette"
+            <span className={styles.divider} aria-hidden />
+
+            {/* ── Group 3: Color pickers ── */}
+            {/* Text color trigger */}
+            <div className={styles.paletteGroup}>
+              <ToolbarButton
+                label="Text color"
+                active={paletteOpen === "color"}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setPaletteOpen((v) => (v === "color" ? null : "color"));
+                  setFontOpen(false);
+                  setSizeOpen(false);
+                }}
               >
-                {/* Clear highlight */}
-                <div className={styles.paletteSection}>
-                  <span className={styles.paletteSectionLabel} aria-hidden>
-                    Clear
-                  </span>
-                  <SwatchButton
-                    key="transparent"
-                    label="No highlight"
-                    color="transparent"
-                    isNone
-                    onMouseDown={(e) => applyHighlight(e, "transparent")}
-                  />
-                </div>
+                {/* A colored "A" suggesting text-color */}
+                <span className={styles.iconColor}>A</span>
+                <span className={styles.iconCaret} aria-hidden>
+                  ▾
+                </span>
+              </ToolbarButton>
 
-                {/* Font-color set — the same swatches as the text-color picker */}
-                <div className={styles.paletteSection}>
-                  <span className={styles.paletteSectionLabel} aria-hidden>
-                    Colors
-                  </span>
-                  <div className={styles.swatchRow}>
-                    {HIGHLIGHT_COLORS.map((swatch) => (
-                      <SwatchButton
-                        key={swatch.variable}
-                        label={swatch.label}
-                        color={resolveCssVar(swatch.variable)}
-                        onMouseDown={(e) => applyHighlight(e, swatch.variable)}
-                      />
-                    ))}
+              {paletteOpen === "color" && (
+                <div
+                  className={styles.palettePopover}
+                  role="group"
+                  aria-label="Text color palette"
+                >
+                  {TEXT_COLORS.map((swatch) => (
+                    <SwatchButton
+                      key={swatch.variable}
+                      label={swatch.label}
+                      color={resolveCssVar(swatch.variable)}
+                      onMouseDown={(e) => applyTextColor(e, swatch.variable)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Highlight trigger */}
+            <div className={styles.paletteGroup}>
+              <ToolbarButton
+                label="Highlight color"
+                active={paletteOpen === "highlight"}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setPaletteOpen((v) =>
+                    v === "highlight" ? null : "highlight",
+                  );
+                  setFontOpen(false);
+                  setSizeOpen(false);
+                }}
+              >
+                <span className={styles.iconHighlight}>H</span>
+                <span className={styles.iconCaret} aria-hidden>
+                  ▾
+                </span>
+              </ToolbarButton>
+
+              {paletteOpen === "highlight" && (
+                <div
+                  className={`${styles.palettePopover} ${styles.highlightPopover}`}
+                  role="group"
+                  aria-label="Highlight color palette"
+                >
+                  {/* Clear highlight */}
+                  <div className={styles.paletteSection}>
+                    <span className={styles.paletteSectionLabel} aria-hidden>
+                      Clear
+                    </span>
+                    <SwatchButton
+                      key="transparent"
+                      label="No highlight"
+                      color="transparent"
+                      isNone
+                      onMouseDown={(e) => applyHighlight(e, "transparent")}
+                    />
+                  </div>
+
+                  {/* Font-color set — the same swatches as the text-color picker */}
+                  <div className={styles.paletteSection}>
+                    <span className={styles.paletteSectionLabel} aria-hidden>
+                      Colors
+                    </span>
+                    <div className={styles.swatchRow}>
+                      {HIGHLIGHT_COLORS.map((swatch) => (
+                        <SwatchButton
+                          key={swatch.variable}
+                          label={swatch.label}
+                          color={resolveCssVar(swatch.variable)}
+                          onMouseDown={(e) =>
+                            applyHighlight(e, swatch.variable)
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Highlighter-pen set — bright marker colors */}
+                  <div className={styles.paletteSection}>
+                    <span className={styles.paletteSectionLabel} aria-hidden>
+                      Highlighters
+                    </span>
+                    <div className={styles.swatchRow}>
+                      {HIGHLIGHTERS.map((swatch) => (
+                        <SwatchButton
+                          key={swatch.variable}
+                          label={swatch.label}
+                          color={resolveCssVar(swatch.variable)}
+                          onMouseDown={(e) =>
+                            applyHighlight(e, swatch.variable)
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pastel (soft tint) highlight set */}
+                  <div className={styles.paletteSection}>
+                    <span className={styles.paletteSectionLabel} aria-hidden>
+                      Pastel
+                    </span>
+                    <div className={styles.swatchRow}>
+                      {HIGHLIGHT_PASTEL.map((swatch) => (
+                        <SwatchButton
+                          key={swatch.variable}
+                          label={swatch.label}
+                          color={resolveCssVar(swatch.variable)}
+                          onMouseDown={(e) =>
+                            applyHighlight(e, swatch.variable)
+                          }
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
+              )}
+            </div>
 
-                {/* Highlighter-pen set — bright marker colors */}
-                <div className={styles.paletteSection}>
-                  <span className={styles.paletteSectionLabel} aria-hidden>
-                    Highlighters
-                  </span>
-                  <div className={styles.swatchRow}>
-                    {HIGHLIGHTERS.map((swatch) => (
-                      <SwatchButton
-                        key={swatch.variable}
-                        label={swatch.label}
-                        color={resolveCssVar(swatch.variable)}
-                        onMouseDown={(e) => applyHighlight(e, swatch.variable)}
-                      />
-                    ))}
-                  </div>
-                </div>
+            <span className={styles.divider} aria-hidden />
 
-                {/* Pastel (soft tint) highlight set */}
-                <div className={styles.paletteSection}>
-                  <span className={styles.paletteSectionLabel} aria-hidden>
-                    Pastel
-                  </span>
-                  <div className={styles.swatchRow}>
-                    {HIGHLIGHT_PASTEL.map((swatch) => (
-                      <SwatchButton
-                        key={swatch.variable}
-                        label={swatch.label}
-                        color={resolveCssVar(swatch.variable)}
-                        onMouseDown={(e) => applyHighlight(e, swatch.variable)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <span className={styles.divider} aria-hidden />
-
-          {/* ── Group 4: Lists ── */}
-          <ToolbarButton
-            label="Numbered list"
-            active={false}
-            onMouseDown={(e) => applyCommand(e, "insertOrderedList")}
-          >
-            <span className={styles.iconList}>1≡</span>
-          </ToolbarButton>
-
-          <ToolbarButton
-            label="Bullet list"
-            active={false}
-            onMouseDown={(e) => applyCommand(e, "insertUnorderedList")}
-          >
-            {/* Unicode bullet + rule approximating the list icon */}
-            <span className={styles.iconList}>•≡</span>
-          </ToolbarButton>
-
-          <ToolbarButton
-            label="Checklist (inserts ☐ marker)"
-            active={false}
-            onMouseDown={applyChecklist}
-          >
-            <span className={styles.iconList}>☐</span>
-          </ToolbarButton>
-
-          <span className={styles.divider} aria-hidden />
-
-          {/* ── Group 5: Insert ── */}
-          <ToolbarButton
-            label="Insert link"
-            active={false}
-            onMouseDown={applyLink}
-          >
-            <span className={styles.iconInsert}>🔗</span>
-          </ToolbarButton>
-
-          <ToolbarButton
-            label="Insert image"
-            active={false}
-            onMouseDown={applyImage}
-          >
-            <span className={styles.iconInsert}>🖼</span>
-          </ToolbarButton>
-
-          <span className={styles.divider} aria-hidden />
-
-          {/* ── Group 6: Font family picker ── */}
-          <div className={styles.paletteGroup}>
+            {/* ── Group 4: Lists ── */}
             <ToolbarButton
-              label="Font family"
-              active={fontOpen}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setFontOpen((v) => !v);
-                setPaletteOpen(null);
-              }}
+              label="Numbered list"
+              active={false}
+              onMouseDown={(e) => applyCommand(e, "insertOrderedList")}
             >
-              <span className={styles.iconFont}>Aa</span>
-              <span className={styles.iconCaret} aria-hidden>
-                ▾
-              </span>
+              <span className={styles.iconList}>1≡</span>
             </ToolbarButton>
 
-            {fontOpen && (
-              <div
-                className={`${styles.palettePopover} ${styles.fontPopover}`}
-                role="group"
-                aria-label="Font family"
+            <ToolbarButton
+              label="Bullet list"
+              active={false}
+              onMouseDown={(e) => applyCommand(e, "insertUnorderedList")}
+            >
+              {/* Unicode bullet + rule approximating the list icon */}
+              <span className={styles.iconList}>•≡</span>
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Checklist (inserts ☐ marker)"
+              active={false}
+              onMouseDown={applyChecklist}
+            >
+              <span className={styles.iconList}>☐</span>
+            </ToolbarButton>
+
+            <span className={styles.divider} aria-hidden />
+
+            {/* ── Group 5: Insert ── */}
+            <ToolbarButton
+              label="Insert link"
+              active={false}
+              onMouseDown={applyLink}
+            >
+              <span className={styles.iconInsert}>🔗</span>
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Insert image"
+              active={false}
+              onMouseDown={applyImage}
+            >
+              <span className={styles.iconInsert}>🖼</span>
+            </ToolbarButton>
+
+            <span className={styles.divider} aria-hidden />
+
+            {/* ── Group 6: Font family picker ── */}
+            <div className={styles.paletteGroup}>
+              <ToolbarButton
+                label="Font family"
+                active={fontOpen}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setFontOpen((v) => !v);
+                  setPaletteOpen(null);
+                  setSizeOpen(false);
+                }}
               >
-                {FONT_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.variable}
-                    type="button"
-                    aria-label={`Font: ${opt.label}`}
-                    title={opt.label}
-                    className={`${styles.fontOption} cp-focusable`}
-                    style={{ fontFamily: opt.css }}
-                    onMouseDown={(e) => applyFont(e, opt.variable)}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+                <span className={styles.iconFont}>Aa</span>
+                <span className={styles.iconCaret} aria-hidden>
+                  ▾
+                </span>
+              </ToolbarButton>
+
+              {fontOpen && (
+                <div
+                  className={`${styles.palettePopover} ${styles.fontPopover}`}
+                  role="group"
+                  aria-label="Font family"
+                >
+                  {FONT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.variable}
+                      type="button"
+                      aria-label={`Font: ${opt.label}`}
+                      title={opt.label}
+                      className={`${styles.fontOption} cp-focusable`}
+                      style={{ fontFamily: opt.css }}
+                      onMouseDown={(e) => applyFont(e, opt.variable)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Group 7: Text size picker ── */}
+            {/* Mirrors the font-family picker: a trigger button + a popover of
+                size options, mutually exclusive with the font/color popovers. */}
+            <div className={styles.paletteGroup}>
+              <ToolbarButton
+                label="Text size"
+                active={sizeOpen}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setSizeOpen((v) => !v);
+                  setFontOpen(false);
+                  setPaletteOpen(null);
+                }}
+              >
+                {/* A small "A" beside a large "A" suggesting size choice. */}
+                <span className={styles.iconSize}>
+                  <span className={styles.iconSizeSmall}>A</span>A
+                </span>
+                <span className={styles.iconCaret} aria-hidden>
+                  ▾
+                </span>
+              </ToolbarButton>
+
+              {sizeOpen && (
+                <div
+                  className={`${styles.palettePopover} ${styles.sizePopover}`}
+                  role="group"
+                  aria-label="Text size"
+                >
+                  {SIZE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.size}
+                      type="button"
+                      aria-label={`Text size: ${opt.label}`}
+                      title={opt.label}
+                      className={`${styles.sizeOption} cp-focusable`}
+                      // Preview each option at its own size, pulled from the
+                      // --t-* type scale (never a hard-coded px value).
+                      style={{ fontSize: `var(${opt.previewVar})` }}
+                      onMouseDown={(e) => applySize(e, opt.size)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>,
+          document.querySelector(".cp-root") ?? document.body,
+        )}
 
       {/* Editable region */}
       <div className={styles.editorWrap}>

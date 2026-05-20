@@ -1,0 +1,294 @@
+/* RightRail.module.css
+   The Daily view's right-most column: Resources, To-do List, and Day
+   Shoutbox — three WHITE CARDS stacked in a single scroll container.
+
+   The rail's own track is intentionally neutral (a faint ink-50 tone) so
+   the three white cards lift off it cleanly with their hairline borders
+   and shadow-card. The card framing itself (background, border, shadow,
+   padding) lives inside each panel's own .module.css, not here — this
+   file owns only the column container + the scroll padding + the gap
+   between stacked cards. All color / radii / spacing come from
+   tokens.css via var(--…). */
+
+/* ── Column container ─────────────────────────────────────────────────── */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  /* The rail fills the resizable grid track that DailyView allocates for it
+     (DailyView owns the px width + persistence; this just stretches into
+     that track). The narrow-mode media query below overrides this. */
+  width: 100%;
+  flex-shrink: 0;
+  /* Allow the rail to shrink below its content's intrinsic min-width: the
+     resizable right-rail track can be dragged down to a thin strip, and
+     the inner scroll surface + each card sets its own overflow strategy
+     for that case. */
+  min-width: 0;
+  /* The body grid gives the rail an `auto` track; min-height-0 + the
+     inner scroll wrapper lets the panels scroll independently of the
+     lesson list and the center detail. */
+  min-height: 0;
+  /* Quiet ink-50 track behind the white cards — gives them a subtle
+     surface to lift off without competing with the cards themselves. */
+  background: var(--ink-50);
+  border-left: 1px solid var(--ink-150);
+}
+
+/* ── Scroll surface ───────────────────────────────────────────────────── */
+/* Comfortable padding around the cards + a gap between them. The cards
+   carry their own border + shadow, so no extra dividers are needed
+   between panels. The gap is reduced from the original (was 14px) because
+   each pair of expanded panels now has a slim splitter handle BETWEEN
+   them that occupies the gap visually — the handle's own padding gives
+   the panels breathing room, and a redundant flex `gap` here would push
+   collapsed panels too far apart from their neighbors. */
+
+.scroll {
+  flex: 1;
+  /* min-height + min-width: 0 keep this scroll surface shrinkable in both
+     axes; the rail can be dragged narrow and the parent body can shrink in
+     height without the scroller fighting back. */
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  /* Padding scales so the rail still has breathing room at common widths
+     but tightens to a single-px gutter on a thin strip. */
+  padding: clamp(6px, 2vw, 14px);
+  display: flex;
+  flex-direction: column;
+  /* No flex gap — the splitter row between each pair of panels owns the
+     vertical rhythm. Panels that DON'T have a splitter between them (e.g.
+     a collapsed pair) fall back on this default gap so they don't kiss.
+     Margin on .slot below carries that fallback. */
+  gap: 0;
+}
+
+/* ── Sortable slot wrapper ─────────────────────────────────────────────── */
+/* Each panel sits inside a thin wrapper that holds the dnd-kit transform
+   style. The wrapper has no visual chrome — the card framing lives on the
+   panel itself. The wrapper IS the sortable element so its bounding rect
+   maps to the panel's position, which is what the collision detector
+   needs to slot a dragged panel into the correct gap.
+
+   The wrapper is a FLEX COLUMN so the panel inside can stretch to fill the
+   slot's fixed pixel height (RightRail.tsx sets `height: NNNpx` inline on
+   the slot when the panel is expanded; collapsed panels skip the inline
+   height and shrink to their natural header). `min-height: 0` lets the
+   inner panel's body collapse below its content's intrinsic min-height,
+   which is what enables the internal scroll. `box-sizing: border-box` is
+   defensive — panels apply their own 1px border, and we want the px
+   height set in JS to MATCH the visible card height. */
+
+.slot {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  box-sizing: border-box;
+  /* Fallback gap between collapsed-neighbour panels (no splitter row
+     between them). The `.handleRow + .slot` selector below zeroes this
+     out where the splitter row already provides the space. */
+  margin-top: 8px;
+}
+
+/* No top margin on the very first slot in the scroller. */
+.scroll > .slot:first-child {
+  margin-top: 0;
+}
+
+/* When a handle row sits between two panels, that row already provides
+   the vertical breathing room — drop the slot's redundant top margin. */
+.handleRow + .slot {
+  margin-top: 0;
+}
+
+/* The card inside fills the slot. Without this rule, a panel with its own
+   `display: flex; flex-direction: column` rule would still fill height
+   when the slot has a fixed px height + display: flex, but only because
+   the default `align-items: stretch` does it for us. We rely on that
+   default — no extra rule needed on the panel from this side. */
+
+/* ── Horizontal resize handle row ──────────────────────────────────────── */
+/* The row hosting one <PaneSplitter orientation="horizontal" /> between
+   two consecutive expanded panels. The row supplies vertical breathing
+   room around the slim handle and acts as the pointer-down listener
+   wrapper from RightRail.tsx (so the JS can snapshot the starting heights
+   before PaneSplitter sets pointer capture). The visual handle itself is
+   the inner span; the row stays transparent. */
+
+.handleRow {
+  /* Wider invisible hit/breathing band around the slim grip. Matches the
+     vertical splitter's "small visible bar inside a generous tap zone"
+     pattern — keeps the handle reachable without making the panels look
+     spaced apart. */
+  display: flex;
+  align-items: center;
+  justify-content: stretch;
+  height: 12px;
+  /* No background — the handle inside carries the affordance. */
+  /* Don't let the row's height collapse to zero when the panel above is
+     mid-animation; flex-shrink: 0 keeps the row at a steady 12px so the
+     splitter remains hittable. */
+  flex-shrink: 0;
+}
+
+/* ── Horizontal splitter (rail row) ────────────────────────────────────── */
+/* PaneSplitter renders the base `.splitter` class from DailyView.module.css
+   (slim 9px column, col-resize cursor, neutral grip). For the rail's
+   horizontal use we layer this rail-scoped class on top — it overrides the
+   column-axis defaults to a slim ROW that runs across the rail. !important
+   is used sparingly to win specificity over the base module's same-
+   specificity rules without forking the DailyView CSS (off-limits for
+   this change). All color / size tokens still come from tokens.css. */
+
+.railSplitter {
+  /* Convert the slim column into a slim row. The handle row above gives
+     us the 12px tall hit band; the splitter expands inside it. */
+  width: 100% !important;
+  height: 12px !important;
+  margin: 0 !important;
+  cursor: row-resize !important;
+  /* The base class keeps its display: flex + center alignment, which now
+     centers the grip span horizontally inside the row. Override the
+     direction so the visible grip becomes a horizontal bar (see grip
+     overrides below). */
+}
+
+.railSplitter:hover,
+.railSplitter:focus-visible {
+  /* Inherit the same quiet hover wash from the base class — the colour
+     mix lands the same way regardless of axis. */
+  background: color-mix(in oklch, var(--paper) 55%, var(--ink-100));
+}
+
+.railSplitter:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -3px;
+  border-radius: var(--r-4);
+}
+
+/* Flip the grip bar's dimensions: the vertical splitter's grip is a 2x24
+   vertical pill; the horizontal splitter's grip is a 24x2 horizontal pill.
+   PaneSplitter renders the grip as a <span> inside the outer div, so the
+   `> span` descendant selector targets it without needing the hashed
+   class name from the other module. */
+.railSplitter > span {
+  width: 24px !important;
+  height: 2px !important;
+  /* Tokenised radius + colour — matches the vertical splitter so the
+     two read as the same control rotated 90°. */
+  border-radius: 999px;
+  background: var(--ink-200);
+  transition:
+    background 0.12s ease,
+    width 0.12s ease;
+}
+
+.railSplitter:hover > span,
+.railSplitter:focus-visible > span {
+  background: var(--ink-300);
+  /* The base `.splitter:hover .splitterGrip` rule grows HEIGHT on hover
+     (the vertical pill gets taller). Re-pin the height to 2px so this
+     horizontal pill stays a horizontal bar, then grow its WIDTH instead
+     so the affordance reads the same way rotated 90°. */
+  height: 2px !important;
+  width: 36px !important;
+}
+
+/* ── Floating drag ghost ──────────────────────────────────────────────── */
+/* While a panel is being dragged, its in-place slot dims (handled inline
+   in the slot wrapper via opacity) and a header-only ghost rides the
+   cursor in the dnd-kit DragOverlay. The ghost re-uses the panel-card
+   visual vocabulary (paper fill, hairline border, soft lift) so it reads
+   as "the same panel, picked up". */
+
+.dragGhost {
+  /* The rail is now teacher-resizable, so the ghost can't hard-code a
+     width. `width: auto` + a generous `max-width` lets it size to its
+     header content while never overflowing the available viewport on a
+     thin rail. */
+  width: auto;
+  max-width: min(360px, calc(100vw - 28px));
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-8);
+  /* A LIFTED version of --shadow-card so the floating chip reads as
+     hovering above the rail. */
+  box-shadow:
+    0 6px 16px color-mix(in oklch, var(--ink-900) 18%, transparent),
+    0 1px 2px color-mix(in oklch, var(--ink-900) 8%, transparent);
+  padding: 12px;
+  /* A faint tilt sells the lift without animation cost — matches the
+     floatingScale-style hint in collapse-on-drag's DRAG_CHIP. */
+  transform: rotate(-0.5deg);
+  cursor: grabbing;
+}
+
+.dragGhostHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+  /* Keep the head shrinkable so its title can wrap rather than blow out
+     the ghost on a narrow rail. */
+  min-width: 0;
+}
+
+.dragGhostGrip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--ink-500);
+  flex-shrink: 0;
+}
+
+.dragGhostTitle {
+  font-size: var(--t-14);
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  color: var(--ink-900);
+  /* Wrap inside the flex head; long titles break before they overflow. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ── Responsive: narrow viewports ─────────────────────────────────────── */
+/* On narrow viewports the body collapses to a single column. The right
+   rail stacks below the lesson list / detail pair so it remains reachable;
+   it loses its border-left so it doesn't look like a vestigial column. */
+@media (max-width: 720px) {
+  .rail {
+    /* Full width when stacked beneath the lesson list / detail. */
+    width: auto;
+    border-left: none;
+    border-top: 1px solid var(--ink-150);
+  }
+  .scroll {
+    /* No need to scroll independently when stacked — let it grow with the
+       page so the day's content reads top to bottom. */
+    overflow: visible;
+  }
+  .dragGhost {
+    /* Constrain the floating ghost to the available width on narrow
+       layouts so it doesn't overflow the column. The wide-mode rule
+       already sets width: auto + a min() max-width, so this is just a
+       narrower cap that's still 100vw-aware on tiny viewports. */
+    max-width: calc(100vw - 28px);
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .dragGhost {
+    /* No tilt under reduced motion — keep the lift but drop the rotate. */
+    transform: none;
+  }
+  /* The handle's hover thickening is a transition — drop it under reduced
+     motion so the affordance still updates (the colour + width change
+     still happens) but instantly, not via a tween. */
+  .railSplitter > span {
+    transition: none;
+  }
+}

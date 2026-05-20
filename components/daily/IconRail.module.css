@@ -1,0 +1,128 @@
+/* IconRail.module.css
+   The far-left slim icon strip on the Daily view. Subject-neutral chrome —
+   ink tokens only; no curriculum color carries into the rail (CLAUDE.md §4:
+   color is information, never decoration).
+   All sizing / radii / spacing comes from tokens.css via var(--…). */
+
+/* ── Rail container ───────────────────────────────────────────────────── */
+/* Fixed-width vertical strip in its own grid column. flex-column so the
+   bottom-pinned settings button can sit on a margin-top: auto spacer. */
+.rail {
+  flex-shrink: 0;
+  width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  background: var(--paper);
+  border-right: 1px solid var(--ink-150);
+  /* Quiet drop in case the rail sits over content with no shadow underlying
+     it — keeps the boundary present without screaming. */
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Top group ────────────────────────────────────────────────────────── */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  align-items: center;
+}
+
+.item {
+  display: flex;
+  justify-content: center;
+}
+
+/* Bottom-pinned slot — the gear. mt:auto pushes it to the bottom of the
+   rail without needing a flex-spacer element. */
+.bottom {
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* A short hairline above the gear so the visual separation between the
+     navigation buttons and the settings affordance is unambiguous. */
+  border-top: 1px solid var(--ink-100);
+  width: calc(100% - 12px);
+  align-self: center;
+}
+
+/* ── Button chrome ────────────────────────────────────────────────────── */
+/* Each button is a ≥44px tap target (WCAG AA). The visual chrome is a
+   rounded square inside the larger hit area — the same vocabulary the
+   appearance toolbar uses elsewhere in the repo. */
+
+.button {
+  /* Tap target: at least 44×44 (CLAUDE.md §4). */
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-6);
+  color: var(--ink-500);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+
+.button:hover {
+  background: var(--ink-50);
+  color: var(--ink-700);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.buttonActive {
+  background: var(--ink-100);
+  color: var(--ink-900);
+  border-color: var(--ink-150);
+}
+
+.buttonActive:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+/* The icon sits in a centered slot — the SVG inside picks up `color` via
+   `currentColor` so the button hover/active states drive the stroke tint. */
+.iconSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+}
+
+/* ── Responsive: narrow viewports ─────────────────────────────────────── */
+/* The 3-column body collapses to a single column on narrow viewports; the
+   icon rail steps aside (display:none rather than re-laying-out as a top
+   bar — the bottom of the page already carries the lesson list + back
+   button affordance, and a horizontal top rail would compete with the
+   day-selector tabs sitting above the body). */
+@media (max-width: 720px) {
+  .rail {
+    display: none;
+  }
+}
