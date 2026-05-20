@@ -118,15 +118,15 @@ export function TopBar(): ReactNode {
   return (
     <header className={styles.bar}>
       {/* ── Wordmark ──────────────────────────────────────────────────
-          The `title` carries the brand motto so it surfaces on hover
-          without crowding the chrome — the full pair lives on the
-          login screen; here we keep just the manifesto as a quiet
-          tooltip on the home link. */}
+          The `title` carries the brand promise so it surfaces on hover
+          without crowding the chrome — this is the same hero line that
+          opens the login screen, used here as a quiet tooltip on the
+          home link. */}
       <Link
         href="/weekly"
         className={styles.wordmark}
         aria-label="MyCurricula home"
-        title="Built for teachers, by teachers."
+        title="Connecting your curriculum to your teaching, and their learning."
       >
         <span className={styles.wordmarkApp}>MyCurricula</span>
         <span className={styles.wordmarkGrade}>Grade 5</span>

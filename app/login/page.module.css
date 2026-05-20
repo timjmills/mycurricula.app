@@ -4,14 +4,46 @@
  * onboarding aesthetic. Color, type, and radius come from tokens only.
  */
 
+/* Page-level layout: a vertical flex column that pins the hero motto
+   to the top, the sign-in card just below it, and the manifesto motto
+   to the very bottom of the viewport. `margin-top: auto` on the
+   footer absorbs whatever vertical room remains, so the footer always
+   sits at the bottom regardless of card height. */
 .page {
   flex: 1;
   min-height: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 32px 24px;
+  padding: 48px 24px 24px;
   background: var(--ink-50);
+}
+
+/* ── Hero motto (top of the page, big) ────────────────────────────
+   The brand promise as the page hero — confident, dark on the
+   neutral page ground, balanced to a readable measure so the line
+   doesn't run edge-to-edge on wide windows. Sits ABOVE the sign-in
+   card with a generous gap so it reads as the entry into the
+   experience, not a subtitle of the wordmark below it. */
+.heroMotto {
+  margin: 0 0 36px;
+  max-width: 680px;
+  text-align: center;
+  font-size: var(--t-28);
+  font-weight: 700;
+  letter-spacing: -0.6px;
+  line-height: 1.2;
+  color: var(--ink-900);
+  /* Slight clamp on narrow viewports so the hero stays comfortable on
+     a phone — the largest token (--t-28) is the cap. */
+}
+
+@media (max-width: 540px) {
+  .heroMotto {
+    font-size: var(--t-22);
+    letter-spacing: -0.4px;
+    margin-bottom: 24px;
+  }
 }
 
 /* The centered sign-in card. */
@@ -29,12 +61,10 @@
   box-shadow: var(--shadow-card);
 }
 
-/* ── Wordmark + brand mottos ───────────────────────────────────────
-   The wordmark anchors the brand; the two motto lines beneath carry
-   the voice. Motto 1 is the manifesto (italic, mid-ink, slightly
-   larger) and motto 2 is the product promise (a calmer, smaller
-   line). Spacing is tight between them so they read as one block,
-   then a generous gap before the sign-in heading. */
+/* ── Wordmark ──────────────────────────────────────────────────────
+   The wordmark sits inside the card and anchors the brand. Motto
+   lines that used to live here have moved to the page hero (above)
+   and the page footer (below). */
 .wordmark {
   margin-bottom: 28px;
   display: flex;
@@ -49,18 +79,18 @@
   color: var(--ink-900);
 }
 
-.motto {
-  margin: 8px 0 0;
-  font-size: var(--t-13);
+/* ── Manifesto motto (very bottom of the page, small) ─────────────
+   A quiet italic sign-off pinned to the bottom of the page. The
+   `margin-top: auto` is the trick that pushes it past whatever
+   natural height the hero + card take, so the footer always sits at
+   the bottom edge regardless of viewport height. */
+.footerMotto {
+  margin: auto 0 0; /* auto-top pins it to the bottom */
+  padding-top: 32px;
+  font-size: var(--t-12);
   font-style: italic;
   font-weight: 500;
-  letter-spacing: -0.1px;
-  color: var(--ink-700);
-}
-
-.mottoSecondary {
-  margin: 2px 0 0;
-  font-size: var(--t-12);
+  letter-spacing: -0.05px;
   color: var(--ink-500);
 }
 

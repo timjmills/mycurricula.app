@@ -29,18 +29,18 @@ export default async function LoginPage({
 
   return (
     <main className={`cp-root ${styles.page}`}>
+      {/* ── Brand hero motto ───────────────────────────────────────────
+          Big at the top of the page, above the sign-in card — the brand
+          promise every teacher meets first. Reads as the page hero, not a
+          sub-tagline of the wordmark. The card sits beneath it; the
+          smaller manifesto motto closes the page at the bottom. */}
+      <p className={styles.heroMotto}>
+        Connecting your curriculum to your teaching, and their learning.
+      </p>
+
       <section className={styles.card} aria-labelledby="login-heading">
-        {/* ── Wordmark + brand mottos ───────────────────────────────────
-            Two-line motto stack sits directly under the wordmark — the
-            brand voice for every teacher landing on the sign-in screen.
-            Motto 1 is the manifesto (italic, slightly larger, deeper ink);
-            motto 2 is the product promise (the calmer tagline below). */}
         <div className={styles.wordmark}>
           <span className={styles.wordmarkApp}>MyCurricula</span>
-          <p className={styles.motto}>Built for teachers, by teachers.</p>
-          <p className={styles.mottoSecondary}>
-            Connecting your curriculum, to your teaching.
-          </p>
         </div>
 
         <h1 id="login-heading" className={styles.heading}>
@@ -64,6 +64,13 @@ export default async function LoginPage({
           manage — your first sign-in creates your account.
         </p>
       </section>
+
+      {/* ── Manifesto motto, pinned at the very bottom of the page ──────
+          A quiet sign-off line in italic — the brand's voice closing the
+          page. `margin-top: auto` (see .module.css) pushes it to the
+          bottom of the flex column regardless of the card's natural
+          height. */}
+      <p className={styles.footerMotto}>Built for teachers, by teachers.</p>
     </main>
   );
 }
