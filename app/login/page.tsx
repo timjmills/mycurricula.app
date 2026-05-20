@@ -41,7 +41,7 @@ export default async function LoginPage({
           <span className={styles.wordmarkApp}>MyCurricula</span>
           <p className={styles.motto}>Built for teachers, by teachers.</p>
           <p className={styles.mottoSecondary}>
-            Connecting your curriculum
+            Connecting curriculum
             <br />
             to your teaching and their learning
           </p>
