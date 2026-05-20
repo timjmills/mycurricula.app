@@ -29,9 +29,17 @@
   box-shadow: var(--shadow-card);
 }
 
-/* ── Wordmark ──────────────────────────────────────────────────────── */
+/* ── Wordmark + brand mottos ───────────────────────────────────────
+   The wordmark anchors the brand; the two motto lines beneath carry
+   the voice. Motto 1 is the manifesto (italic, mid-ink, slightly
+   larger) and motto 2 is the product promise (a calmer, smaller
+   line). Spacing is tight between them so they read as one block,
+   then a generous gap before the sign-in heading. */
 .wordmark {
   margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .wordmarkApp {
@@ -41,6 +49,21 @@
   color: var(--ink-900);
 }
 
+.motto {
+  margin: 8px 0 0;
+  font-size: var(--t-13);
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+  color: var(--ink-700);
+}
+
+.mottoSecondary {
+  margin: 2px 0 0;
+  font-size: var(--t-12);
+  color: var(--ink-500);
+}
+
 /* ── Copy ──────────────────────────────────────────────────────────── */
 .heading {
   margin: 0;
@@ -48,12 +71,6 @@
   font-weight: 600;
   letter-spacing: -0.2px;
   color: var(--ink-900);
-}
-
-.tagline {
-  margin: 6px 0 0;
-  font-size: var(--t-13);
-  color: var(--ink-500);
 }
 
 /* ── Sign-in failure notice ────────────────────────────────────────── */

@@ -30,17 +30,22 @@ export default async function LoginPage({
   return (
     <main className={`cp-root ${styles.page}`}>
       <section className={styles.card} aria-labelledby="login-heading">
-        {/* ── Wordmark ──────────────────────────────────────────────── */}
+        {/* ── Wordmark + brand mottos ───────────────────────────────────
+            Two-line motto stack sits directly under the wordmark — the
+            brand voice for every teacher landing on the sign-in screen.
+            Motto 1 is the manifesto (italic, slightly larger, deeper ink);
+            motto 2 is the product promise (the calmer tagline below). */}
         <div className={styles.wordmark}>
           <span className={styles.wordmarkApp}>MyCurricula</span>
+          <p className={styles.motto}>Built for teachers, by teachers.</p>
+          <p className={styles.mottoSecondary}>
+            Connecting your curriculum, to your teaching.
+          </p>
         </div>
 
         <h1 id="login-heading" className={styles.heading}>
           Sign in to your planner
         </h1>
-        <p className={styles.tagline}>
-          Weekly curriculum planning for teaching teams.
-        </p>
 
         {/* ── Sign-in failure notice ────────────────────────────────── */}
         {hasAuthError && (
