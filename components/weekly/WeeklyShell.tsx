@@ -32,6 +32,23 @@
 // a thin module wrapper carries `min-width: 0; min-height: 0` so the grid
 // shrinks gracefully when the rail grows.
 //
+// ── Panel drag-reorder ──────────────────────────────────────────────────
+// The Weekly view has two large panels — the WeeklyGrid ("grid") and the
+// RightRail ("rail") — that a teacher can drag to swap sides. The pattern
+// mirrors the Daily view's column-reorder exactly:
+//
+//   • DndContext + SortableContext (horizontalListSortingStrategy) wraps
+//     both panels.
+//   • Each panel is a SortablePanel (a useSortable wrapper) that renders a
+//     ColumnDragGrip in the panel's top-left corner as the activator.
+//   • PaneSplitter sits between the two adjacent panels; when the panels
+//     are swapped the splitter drag math inverts so the rail still grows
+//     toward its own side.
+//   • Panel order persists to localStorage under
+//     `mycurricula:weekly-column-order` (DISTINCT from Daily's key).
+//   • Screen-reader live announcements follow the Daily pattern
+//     (role="status" + aria-live="polite").
+//
 // ── Pane width persistence ──────────────────────────────────────────────
 // Same "no fixed clamps; sanity-bounded by the live container" model the
 // Daily view uses:
@@ -48,22 +65,39 @@
 // ── Accessibility ──────────────────────────────────────────────────────
 // Every interactive control is keyboard-operable. The splitter is a real
 // role="separator" with aria-orientation + aria-valuemin/max/now (handled
-// inside <PaneSplitter>). The rail wrapper carries an aria-label. Reduced
-// motion is honored by the consumed components (the splitter has no
-// motion; RightRail's collapse uses an opacity-only path under
-// `prefers-reduced-motion`).
+// inside <PaneSplitter>). Column drag uses dnd-kit's KeyboardSensor so
+// Space lifts, arrows move, Space/Enter drops, Esc cancels. The rail
+// wrapper carries an aria-label. Reduced motion is honored by the consumed
+// components and by the drag ghost (transform: none under reduced-motion).
 
 import {
+  Fragment,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  type DragEndEvent,
+  type DragStartEvent,
+  closestCenter,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  horizontalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { IconRail, PaneSplitter, RightRail } from "@/components/daily";
 import { WeeklyGrid } from "@/components/grid";
 import { useAppState } from "@/lib/app-state";
+import { useDndSensors } from "@/lib/collapse-on-drag";
 import { usePlanner } from "@/lib/planner-store";
 import type { Lesson } from "@/lib/types";
 import styles from "./WeeklyShell.module.css";
@@ -85,6 +119,79 @@ const PANE_STEP = 16;
 const RIGHT_PANE_WIDTH_KEY = "mycurricula:weekly-right-width";
 /** localStorage key for the rail's hidden/visible state. */
 const RAIL_HIDDEN_KEY = "mycurricula:weekly-rail-hidden";
+/** localStorage key for the two-panel column order. */
+const COLUMN_ORDER_KEY = "mycurricula:weekly-column-order";
+
+// ── Panel column ids ──────────────────────────────────────────────────────
+// The Weekly body has TWO reorderable panels — the WeeklyGrid and the
+// RightRail. The icon rail is NOT part of this group: it stays pinned
+// to the far left as a sibling of the reorderable body.
+
+const PANEL_IDS = ["grid", "rail"] as const;
+type PanelId = (typeof PANEL_IDS)[number];
+
+const DEFAULT_COLUMN_ORDER: PanelId[] = [...PANEL_IDS];
+
+/** Human-readable labels — used in drag-grip aria-labels, the DragOverlay
+ *  ghost chip, and the aria-live announcement string. */
+const COLUMN_LABEL: Record<PanelId, string> = {
+  grid: "Weekly grid",
+  rail: "Resources rail",
+};
+
+/** Type-guard a parsed string against the closed PanelId set. */
+function isPanelId(value: unknown): value is PanelId {
+  return (
+    typeof value === "string" &&
+    (PANEL_IDS as readonly string[]).includes(value)
+  );
+}
+
+/** Normalize a parsed order: drop unknown ids, de-duplicate, append any
+ *  missing defaults so a future panel addition never disappears. */
+function normalizeColumnOrder(raw: unknown): PanelId[] {
+  const candidate = Array.isArray(raw) ? raw.filter(isPanelId) : [];
+  const seen = new Set<PanelId>();
+  const out: PanelId[] = [];
+  for (const id of candidate) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  for (const id of DEFAULT_COLUMN_ORDER) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  return out;
+}
+
+/** Read the saved column order from localStorage, or the default. */
+function readColumnOrder(): PanelId[] {
+  if (typeof window === "undefined") return DEFAULT_COLUMN_ORDER;
+  try {
+    const raw = window.localStorage.getItem(COLUMN_ORDER_KEY);
+    if (!raw) return DEFAULT_COLUMN_ORDER;
+    return normalizeColumnOrder(JSON.parse(raw) as unknown);
+  } catch {
+    // Corrupt or unavailable storage — fall back to the default.
+    return DEFAULT_COLUMN_ORDER;
+  }
+}
+
+/** Persist the chosen column order. Non-fatal on failure. */
+function writeColumnOrder(order: PanelId[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(order));
+  } catch {
+    // Storage full / unavailable — order simply won't persist; non-fatal.
+  }
+}
+
+// ── Width helpers (mirror of the DailyView model) ────────────────────────
 
 /** Clamp a candidate rail width to dynamic, sanity-only bounds.
  *
@@ -166,6 +273,156 @@ function writeRailHidden(hidden: boolean): void {
   }
 }
 
+// ── GripHorizontalIcon ────────────────────────────────────────────────────
+// Lucide-style GripHorizontal — two rows of three dots, oriented for the
+// column-reorder grip (a HORIZONTAL grip on each panel's top edge reads as
+// "drag me sideways"). Mirrors DailyView's identical icon so the affordance
+// reads the same across both views.
+
+function GripHorizontalIcon(): ReactNode {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <circle cx="5" cy="9" r="1.5" />
+      <circle cx="12" cy="9" r="1.5" />
+      <circle cx="19" cy="9" r="1.5" />
+      <circle cx="5" cy="15" r="1.5" />
+      <circle cx="12" cy="15" r="1.5" />
+      <circle cx="19" cy="15" r="1.5" />
+    </svg>
+  );
+}
+
+// ── ColumnDragGrip ────────────────────────────────────────────────────────
+// A small GripHorizontal chip that lives in the top-left of each large
+// content panel and acts as the dnd-kit activator for panel reordering.
+// Visually identical to DailyView's columnDragGrip — an ink-300 dot
+// pattern that lifts to ink-500 on hover / focus. The visible chip is
+// 24×24; the wrapping button enlarges the tap target to ≥44px via padding.
+// `aria-label` carries the human-readable panel name so a screen-reader
+// hears "Drag to reorder weekly grid panel".
+
+interface ColumnDragGripProps {
+  /** Stable panel id — must match SortableContext items. */
+  id: PanelId;
+  /** setActivatorNodeRef from useSortable — the grip is the SOLE activator. */
+  activatorRef: (el: HTMLElement | null) => void;
+  /** dnd-kit pointer + keyboard activation listeners. */
+  listeners: Record<string, unknown> | undefined;
+  /** dnd-kit a11y attributes (role, aria-roledescription, etc.). */
+  attributes: Record<string, unknown>;
+}
+
+function ColumnDragGrip({
+  id,
+  activatorRef,
+  listeners,
+  attributes,
+}: ColumnDragGripProps): ReactNode {
+  return (
+    <button
+      type="button"
+      ref={activatorRef}
+      // Spread dnd-kit's pointer + keyboard listeners + a11y attributes.
+      // The listeners object is typed loosely because dnd-kit's
+      // SyntheticListenerMap is a record of arbitrary event-handler keys.
+      {...(listeners ?? {})}
+      {...attributes}
+      className={styles.columnDragGrip}
+      aria-label={`Drag to reorder ${COLUMN_LABEL[id].toLowerCase()} panel`}
+      title={`Drag to reorder ${COLUMN_LABEL[id].toLowerCase()} panel`}
+    >
+      <span className={styles.columnDragGripIcon} aria-hidden="true">
+        <GripHorizontalIcon />
+      </span>
+    </button>
+  );
+}
+
+// ── SortablePanel ─────────────────────────────────────────────────────────
+// Each large content panel (WeeklyGrid, RightRail) wraps its content in
+// this component. The wrapper:
+//   • holds the useSortable transform (so the panel slides into its new
+//     slot when the order changes);
+//   • exposes the grip activator props so the panel's content can render
+//     a ColumnDragGrip in its own top-left corner;
+//   • carries the per-panel className from the caller so the wrapper
+//     itself remains stylistically transparent.
+//
+// IMPORTANT: the wrapper is also the SortableContext item. It must occupy
+// the same grid track its panel would occupy in the static layout — its
+// inline style adds no extra grid sizing so the parent grid keeps its
+// track math.
+
+interface SortablePanelProps {
+  id: PanelId;
+  className: string;
+  children: (grip: ReactNode) => ReactNode;
+}
+
+function SortablePanel({
+  id,
+  className,
+  children,
+}: SortablePanelProps): ReactNode {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  // Apply the sortable transform to the OUTER wrapper so the whole panel
+  // slides into its new position. While dragging, dim the in-place
+  // placeholder — the floating overlay carries the visible chip.
+  const wrapperStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : undefined,
+  };
+
+  const grip = (
+    <ColumnDragGrip
+      id={id}
+      activatorRef={setActivatorNodeRef}
+      listeners={listeners as unknown as Record<string, unknown>}
+      attributes={attributes as unknown as Record<string, unknown>}
+    />
+  );
+
+  return (
+    <div ref={setNodeRef} style={wrapperStyle} className={className}>
+      {children(grip)}
+    </div>
+  );
+}
+
+// ── ColumnDragGhost ───────────────────────────────────────────────────────
+// While a panel rides the DragOverlay we show a small header-style chip
+// with the panel's label. Reuses the Daily view's visual vocabulary (paper
+// card + hairline + soft lift + slight tilt) so the chip reads as "the
+// same thing, picked up". Matches DailyView's columnDragGhost class; here
+// those styles live in WeeklyShell.module.css.
+
+function ColumnDragGhost({ id }: { id: PanelId }): ReactNode {
+  return (
+    <div className={styles.columnDragGhost} aria-hidden="true">
+      <span className={styles.columnDragGhostGrip}>
+        <GripHorizontalIcon />
+      </span>
+      <span className={styles.columnDragGhostTitle}>{COLUMN_LABEL[id]}</span>
+    </div>
+  );
+}
+
 // ── WeeklyShell ──────────────────────────────────────────────────────────
 
 export function WeeklyShell(): ReactNode {
@@ -224,11 +481,46 @@ export function WeeklyShell(): ReactNode {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [bodyWidth, setBodyWidth] = useState<number>(0);
 
-  // ── Hydrate the saved width + hidden state once on mount ─────────────
+  // ── Panel column order + drag state ──────────────────────────────────
+  // The two large panels (grid + rail) can be reordered by dragging the
+  // small grip on each panel's top-left corner. Order is a per-teacher
+  // viewing preference; it persists to localStorage under
+  // `mycurricula:weekly-column-order` (DISTINCT from Daily's key).
+  //
+  // Hydration discipline: `columnOrder` starts at the default so the
+  // server-rendered HTML and the first client render match. The mount
+  // effect below loads any persisted order and `hydratedColumnRef` then
+  // gates persistence so the first load doesn't overwrite storage with
+  // the default. Same pattern as DailyView's column order.
+  const [columnOrder, setColumnOrder] =
+    useState<PanelId[]>(DEFAULT_COLUMN_ORDER);
+  const [draggingColumnId, setDraggingColumnId] = useState<PanelId | null>(
+    null,
+  );
+  const hydratedColumnRef = useRef(false);
+
+  // Screen-reader live announcement — committed when the order changes so
+  // a keyboard reorder is audible. Uses role="status" + aria-live="polite"
+  // so the SR speaks the new order without interrupting current speech.
+  const [columnAnnouncement, setColumnAnnouncement] = useState<string>("");
+  const columnAnnounceRegionId = useId();
+
+  // dnd-kit sensors — pointer + touch + keyboard (keyboard makes the drag
+  // reorder operable without a mouse). The same useDndSensors hook that
+  // DailyView uses; it bundles PointerSensor + KeyboardSensor with
+  // distance-based activation so accidental drags don't fire.
+  const sensors = useDndSensors();
+
+  // ── Hydrate the saved width + hidden state + column order once on mount ─
   useEffect(() => {
     setRightWidth(readRightWidth());
     setRailHidden(readRailHidden());
     hydratedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    setColumnOrder(readColumnOrder());
+    hydratedColumnRef.current = true;
   }, []);
 
   // ── Persist on change (after hydration) ──────────────────────────────
@@ -241,6 +533,11 @@ export function WeeklyShell(): ReactNode {
     if (!hydratedRef.current) return;
     writeRailHidden(railHidden);
   }, [railHidden]);
+
+  useEffect(() => {
+    if (!hydratedColumnRef.current) return;
+    writeColumnOrder(columnOrder);
+  }, [columnOrder]);
 
   // ── Observe container size so the bound follows window resizes ───────
   // When the body row shrinks (window resize, devtools opened, …) we
@@ -279,35 +576,114 @@ export function WeeklyShell(): ReactNode {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [selectedLessonId, setSelectedLessonId]);
 
-  // ── Splitter onDrag — clientX → new rail width ───────────────────────
-  // The splitter sits BETWEEN the center grid and the right rail. As the
-  // pointer moves LEFT, the rail grows (width = body.right − clientX);
-  // RIGHT, it shrinks. We anchor off the body row's right edge so the
-  // math stays independent of the icon-rail width and any horizontal
-  // page padding.
-  const handleSplitterDrag = useCallback((clientX: number): void => {
-    const body = bodyRef.current;
-    if (!body) return;
-    const rect = body.getBoundingClientRect();
-    // Convert pointer x → desired rail width (px) → clamp to live bounds.
-    const desired = rect.right - clientX;
-    setRightWidth(clampRightWidth(desired, rect.width));
+  // ── Column drag handlers ──────────────────────────────────────────────
+  const handleColumnDragStart = useCallback((e: DragStartEvent): void => {
+    const id = String(e.active.id);
+    if (isPanelId(id)) setDraggingColumnId(id);
   }, []);
 
-  // ── Splitter onStep — keyboard nudge ─────────────────────────────────
-  // PaneSplitter reports +1 for ArrowRight/Down, −1 for ArrowLeft/Up. The
-  // splitter sits to the LEFT of the rail, so right-arrow should SHRINK
-  // the rail and left-arrow should GROW it — i.e. the opposite of the
-  // direction sign. (This mirrors Daily's right-pane splitter mapping.)
+  const handleColumnDragEnd = useCallback((e: DragEndEvent): void => {
+    setDraggingColumnId(null);
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const from = String(active.id);
+    const to = String(over.id);
+    if (!isPanelId(from) || !isPanelId(to)) return;
+    setColumnOrder((prev) => {
+      const fromIdx = prev.indexOf(from);
+      const toIdx = prev.indexOf(to);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+      const next = arrayMove(prev, fromIdx, toIdx);
+      // Build an aria-live announcement reading each panel's new home so a
+      // keyboard user hears confirmation when they release Space to drop.
+      const orderLabels = next.map((id) => COLUMN_LABEL[id]).join(", ");
+      const newPos = next.indexOf(from);
+      const posLabel = newPos === 0 ? "first" : "second";
+      setColumnAnnouncement(
+        `${COLUMN_LABEL[from]} panel moved to ${posLabel}. New order: ${orderLabels}.`,
+      );
+      return next;
+    });
+  }, []);
+
+  const handleColumnDragCancel = useCallback((): void => {
+    setDraggingColumnId(null);
+  }, []);
+
+  // ── Splitter drag wiring ──────────────────────────────────────────────
+  // The splitter sits BETWEEN the grid and the rail — in either order. The
+  // rail is the only FIXED-width panel; the grid is always the 1fr flex
+  // track. We resolve the drag against the rail's live bounding rect so
+  // the math works regardless of which side the rail is on.
+  //
+  // resolveRailRect walks the rendered body to find the rail's wrapper via
+  // data-pane="rail", then returns its DOMRect. The body ref is the root.
+  const resolveRailRect = useCallback((): DOMRect | null => {
+    const body = bodyRef.current;
+    if (!body) return null;
+    const el = body.querySelector<HTMLElement>('[data-pane="rail"]');
+    return el ? el.getBoundingClientRect() : null;
+  }, []);
+
+  // Splitter onDrag — clientX → new rail width. The rail can be on either
+  // side of the grid after a reorder, so we can't anchor to the body's
+  // left or right edge directly. Instead we resolve the rail's own rect
+  // and compute the width as the distance from clientX to whichever of
+  // the rail's edges is NOT adjacent to the splitter.
+  //
+  // railOnRight → the splitter is to the LEFT of the rail; moving the
+  //   pointer leftward grows the rail (width = rect.right − clientX).
+  // railOnLeft  → the splitter is to the RIGHT of the rail; moving the
+  //   pointer rightward grows the rail (width = clientX − rect.left).
+  const handleSplitterDrag = useCallback(
+    (clientX: number): void => {
+      // Home / End (keyboard) arrive as ±Infinity; delegate to clamp.
+      if (!Number.isFinite(clientX)) {
+        const body = bodyRef.current;
+        const liveBodyWidth = body
+          ? Math.round(body.getBoundingClientRect().width)
+          : bodyWidth;
+        // Keyboard Home clamps to min, End to max (no need to read prev
+        // because the target value is computed absolutely, not relatively).
+        const target =
+          clientX === Infinity ? Number.MAX_SAFE_INTEGER : PANE_FLOOR;
+        setRightWidth(clampRightWidth(target, liveBodyWidth));
+        return;
+      }
+      const rect = resolveRailRect();
+      if (!rect) return;
+      // Determine which side the rail is on by checking column order.
+      const railOnRight = columnOrder[columnOrder.length - 1] === "rail";
+      const desired = railOnRight ? rect.right - clientX : clientX - rect.left;
+      const body = bodyRef.current;
+      const liveBodyWidth = body
+        ? Math.round(body.getBoundingClientRect().width)
+        : bodyWidth;
+      setRightWidth(clampRightWidth(desired, liveBodyWidth));
+    },
+    [resolveRailRect, columnOrder, bodyWidth],
+  );
+
+  // Splitter onStep — keyboard nudge. PaneSplitter reports +1 for
+  // ArrowRight / ArrowDown, −1 for ArrowLeft / ArrowUp. We translate that
+  // into "grow/shrink the rail" with the correct sign for the rail's
+  // current position:
+  //   • railOnRight: the splitter sits LEFT of the rail; ArrowRight
+  //     (direction = +1) moves the divider rightward, SHRINKING the rail.
+  //     So delta = −direction.
+  //   • railOnLeft: the splitter sits RIGHT of the rail; ArrowRight
+  //     moves the divider rightward, GROWING the rail. delta = +direction.
   const handleSplitterStep = useCallback(
     (direction: -1 | 1): void => {
       const body = bodyRef.current;
       const live = body?.getBoundingClientRect().width ?? bodyWidth;
+      const railOnRight = columnOrder[columnOrder.length - 1] === "rail";
+      const sign = railOnRight ? -1 : 1;
       setRightWidth((prev) =>
-        clampRightWidth(prev + direction * -1 * PANE_STEP, live),
+        clampRightWidth(prev + sign * direction * PANE_STEP, live),
       );
     },
-    [bodyWidth],
+    [bodyWidth, columnOrder],
   );
 
   // ── Hide-rail toggle — collapses the rail to a stub or back to full ──
@@ -328,96 +704,180 @@ export function WeeklyShell(): ReactNode {
     ? RAIL_STUB_WIDTH
     : Math.round(rightWidth);
 
-  // Build the body's grid-template-columns inline — center 1fr + auto
-  // splitter + sized rail. The icon rail sits OUTSIDE this grid so it
-  // never participates in the splitter math.
-  const gridTemplate = `1fr auto ${effectiveRailWidth}px`;
-
   // Rail scope: when a lesson is selected we switch from week-aggregation
   // to lesson-scoped day mode so the Resources panel shows only that
   // lesson's resources. The RightRail `mode` prop controls this.
   const railMode: "day" | "week" = selectedLesson !== null ? "day" : "week";
 
+  // ── Dynamic grid template ─────────────────────────────────────────────
+  // Walk the column order, emitting a track size per panel AND an `auto`
+  // track between the two panels for the splitter. The grid is always 1fr;
+  // the rail is `effectiveRailWidth`px.
+  const gridTemplate = useMemo(() => {
+    const trackFor = (id: PanelId): string =>
+      id === "rail" ? `${effectiveRailWidth}px` : "1fr";
+    const parts: string[] = [];
+    columnOrder.forEach((id, i) => {
+      parts.push(trackFor(id));
+      if (i < columnOrder.length - 1) parts.push("auto"); // splitter track
+    });
+    return parts.join(" ");
+  }, [columnOrder, effectiveRailWidth]);
+
+  // ── Panel renderers ───────────────────────────────────────────────────
+  // Each panel's content is captured in a small render fn that receives the
+  // ColumnDragGrip node and returns the panel's inner subtree. The wrapper
+  // div carries `position: relative` so the grip can sit absolutely on the
+  // top-left corner without touching the inner component's root.
+
+  function renderGridPanel(grip: ReactNode): ReactNode {
+    return (
+      <div className={styles.columnWithGrip} data-pane="grid">
+        {grip}
+        {/* WeeklyGrid renders untouched in the center slot. The outer slot
+            wrapper already carries min-width: 0 so the grid can shrink
+            gracefully when the rail grows. */}
+        <WeeklyGrid />
+      </div>
+    );
+  }
+
+  function renderRailPanel(grip: ReactNode): ReactNode {
+    return (
+      <div
+        className={[
+          styles.columnWithGrip,
+          styles.railColumnWithGrip,
+          railHidden ? styles.railSlotHidden : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        data-pane="rail"
+      >
+        {/* Hide-rail toggle button — always visible so the teacher can
+            re-expand after collapsing. Positioned at the top of the slot. */}
+        <button
+          type="button"
+          className={styles.railToggleBtn}
+          onClick={handleToggleRail}
+          aria-label={
+            railHidden ? "Show resources rail" : "Hide resources rail"
+          }
+          title={railHidden ? "Show rail" : "Hide rail"}
+        >
+          <RailToggleIcon hidden={railHidden} />
+        </button>
+
+        {/* The drag grip sits above the toggle so both affordances live in
+            the top-left region without overlap. The grip is hidden (same
+            as other content) when the rail is collapsed. */}
+        {!railHidden && grip}
+
+        {/* Full rail content — hidden (but still mounted) when collapsed
+            so state (panel order, heights, collapsed-set) survives
+            toggling. The railSlotHidden class clips the overflow so no
+            content peeks past the stub boundary. */}
+        {!railHidden && (
+          <RightRail
+            lesson={selectedLesson}
+            week={week}
+            day={selectedDay}
+            mode={railMode}
+            lessons={railMode === "week" ? weekLessons : undefined}
+            onClearLesson={
+              selectedLesson !== null
+                ? () => setSelectedLessonId(null)
+                : undefined
+            }
+          />
+        )}
+      </div>
+    );
+  }
+
+  const PANEL_RENDERERS: Record<PanelId, (grip: ReactNode) => ReactNode> = {
+    grid: renderGridPanel,
+    rail: renderRailPanel,
+  };
+
   return (
     <div className={styles.page}>
-      {/* ── Body row: icon rail (fixed) + resizable grid/rail body ───── */}
+      {/* ── aria-live region: column reorder announcements ───────────────
+          A visually hidden polite live region — when a panel moves
+          (mouse, touch, or keyboard) we write the new order into it so
+          screen-readers hear the change. Always in DOM so the live
+          attribute is observed from the start. */}
+      <div
+        id={columnAnnounceRegionId}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className={styles.srOnly}
+      >
+        {columnAnnouncement}
+      </div>
+
+      {/* ── Body row: icon rail (fixed) + reorderable grid/rail body ───── */}
       <div className={styles.bodyRow}>
         {/* Far-left slim icon nav strip — shared with Daily. */}
         <IconRail />
 
-        {/* The resizable body: center grid + splitter + right rail. */}
+        {/* The reorderable + resizable body. The grid template is computed
+            from columnOrder + effectiveRailWidth above so it re-evaluates
+            when the teacher reorders or resizes a panel. */}
         <div
           ref={bodyRef}
           className={styles.body}
           style={{ gridTemplateColumns: gridTemplate }}
         >
-          {/* Center slot — the existing WeeklyGrid, untouched. The slot
-              wrapper provides min-width: 0 so the grid can shrink
-              gracefully when the rail grows. */}
-          <div className={styles.gridSlot} data-pane="grid">
-            <WeeklyGrid />
-          </div>
-
-          {/* Splitter — same component the Daily view uses. Hidden when the
-              rail is collapsed to the stub so the teacher uses the toggle
-              button instead. */}
-          {!railHidden && (
-            <PaneSplitter
-              width={Math.round(rightWidth)}
-              min={bounds.min}
-              max={bounds.max}
-              onDrag={handleSplitterDrag}
-              onStep={handleSplitterStep}
-              label="Resize resources rail"
-            />
-          )}
-
-          {/* Right rail — lesson-scoped when a card is selected, week-scoped
-              otherwise. When collapsed the slot shows only the toggle button
-              so no content overflows into the stub width. */}
-          <div
-            className={[
-              styles.railSlot,
-              railHidden ? styles.railSlotHidden : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            data-pane="rail"
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleColumnDragStart}
+            onDragEnd={handleColumnDragEnd}
+            onDragCancel={handleColumnDragCancel}
           >
-            {/* Hide-rail toggle button — always visible so the teacher can
-                re-expand after collapsing. Positioned at the top of the
-                slot. ≥44px touch target via min-height on the button. */}
-            <button
-              type="button"
-              className={styles.railToggleBtn}
-              onClick={handleToggleRail}
-              aria-label={
-                railHidden ? "Show resources rail" : "Hide resources rail"
-              }
-              title={railHidden ? "Show rail" : "Hide rail"}
+            <SortableContext
+              items={columnOrder}
+              strategy={horizontalListSortingStrategy}
             >
-              <RailToggleIcon hidden={railHidden} />
-            </button>
+              {columnOrder.map((id, i) => {
+                const render = PANEL_RENDERERS[id];
+                // Build a unique CSS class per panel id so its inner
+                // chrome keeps its existing look regardless of position.
+                const slotClass =
+                  id === "rail" ? styles.railSlot : styles.gridSlot;
+                return (
+                  <Fragment key={id}>
+                    <SortablePanel id={id} className={slotClass}>
+                      {(grip) => render(grip)}
+                    </SortablePanel>
+                    {/* Splitter sits between this panel and the next; the
+                        last panel has no trailing splitter. When the rail
+                        is hidden we suppress the splitter so the teacher
+                        uses the toggle button to re-expand. */}
+                    {i < columnOrder.length - 1 && !railHidden && (
+                      <PaneSplitter
+                        width={Math.round(rightWidth)}
+                        min={bounds.min}
+                        max={bounds.max}
+                        onDrag={handleSplitterDrag}
+                        onStep={handleSplitterStep}
+                        label="Resize resources rail"
+                      />
+                    )}
+                  </Fragment>
+                );
+              })}
+            </SortableContext>
 
-            {/* Full rail content — hidden (but still mounted) when collapsed
-                so state (panel order, heights, collapsed-set) survives
-                toggling. The railSlotHidden class clips the overflow so no
-                content peeks past the stub boundary. */}
-            {!railHidden && (
-              <RightRail
-                lesson={selectedLesson}
-                week={week}
-                day={selectedDay}
-                mode={railMode}
-                lessons={railMode === "week" ? weekLessons : undefined}
-                onClearLesson={
-                  selectedLesson !== null
-                    ? () => setSelectedLessonId(null)
-                    : undefined
-                }
-              />
-            )}
-          </div>
+            {/* Floating ghost of the dragged panel — a small chip with
+                the panel's label, reusing the right-rail panel-ghost
+                visual vocabulary (paper card + hairline + soft lift). */}
+            <DragOverlay>
+              {draggingColumnId && <ColumnDragGhost id={draggingColumnId} />}
+            </DragOverlay>
+          </DndContext>
         </div>
       </div>
     </div>

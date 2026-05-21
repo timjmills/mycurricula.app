@@ -1531,9 +1531,14 @@
 /* The grip BUTTON — pads out to a ≥44px touch target while painting the
    small 24px chip in the top-left corner. `touch-action: none` keeps
    mobile from interpreting the press as a scroll gesture; the dnd-kit
-   activator owns the press from pointerdown. The default opacity stays
-   low so the grip never visually competes with column content; on hover
-   / focus it lifts to its full color so it's clearly grabbable. */
+   activator owns the press from pointerdown.
+
+   Discoverability: the grip is ALWAYS visible at a low (25%) opacity so
+   teachers know the panels are movable without needing to hover first —
+   the spec says "subtle but present grip affordance". On hover of the
+   column or keyboard focus it lifts to 65% and scales up so the grab
+   affordance reads unambiguously. Direct hover/focus on the grip itself
+   lifts to full color so it clearly reads as "grab here". */
 .columnDragGrip {
   position: absolute;
   top: 0;
@@ -1551,13 +1556,11 @@
   cursor: grab;
   z-index: 2;
   border-radius: var(--r-4);
-  /* Resting state is fully hidden so the column chrome reads clean — the
-     grip is a teacher-discoverable affordance, not visible decoration. It
-     fades in when the user hovers ANYWHERE on the column (via the
-     :hover/:focus-within rule below) or when the grip itself receives
-     keyboard focus, then lifts to full color on direct hover. */
-  opacity: 0;
-  transform: scale(0.96);
+  /* Resting state: subtly visible so the affordance is present even before
+     the user hovers. 0.25 is dim enough not to compete with column content
+     but bright enough to telegraph "this column can be reordered". */
+  opacity: 0.25;
+  transform: scale(1);
   transform-origin: top left;
   transition:
     opacity 0.18s ease-out,
@@ -1568,14 +1571,13 @@
   touch-action: none;
 }
 
-/* Reveal the grip when the user is engaging with the column — either by
-   hovering anywhere inside the column wrapper, or by tabbing into a child
-   control with the keyboard. Keep the resting state hidden so the column
-   chrome stays calm. */
+/* Column hover / keyboard focus reveal — the grip brightens and the
+   drag affordance becomes unmistakable. The scale nudge makes the chip
+   feel interactive ("it's alive") without distracting column content. */
 .columnWithGrip:hover .columnDragGrip,
 .columnWithGrip:focus-within .columnDragGrip {
-  opacity: 0.55;
-  transform: scale(1);
+  opacity: 0.65;
+  transform: scale(1.05);
 }
 
 /* Direct hover/focus on the grip itself lifts it to full color so it

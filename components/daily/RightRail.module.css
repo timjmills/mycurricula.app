@@ -1,11 +1,18 @@
 /* RightRail.module.css
-   MED-5: The Daily / Weekly right-rail is now a TABBED panel — a compact
-   tab strip at the top switches between Resources, To-do, and Chat.
-   Exactly one widget is shown at full height at a time.
+   The Daily / Weekly right-rail supports TWO display modes:
 
-   The rail's outer track stays intentionally neutral (ink-50 tone) so the
-   active panel card lifts off it cleanly. All color / radii / spacing come
-   from tokens.css via var(--…); no hard-coded hex or px font sizes. */
+   1. Tabbed   — MED-5 behavior: a compact tab strip at the top switches
+                 between Resources, To-do, and Chat. Exactly one widget is
+                 shown at full height at a time.
+   2. Stacked  — pre-MED-5 behavior restored: the three panels stack
+                 vertically, are drag-reorderable via dnd-kit, and are
+                 individually resizable via PaneSplitter (horizontal).
+
+   A small segmented mode-toggle control (TabbedIcon / StackedIcon) in the
+   rail header switches between modes and persists the choice to localStorage.
+
+   All color / radii / spacing come from tokens.css via var(--…); no
+   hard-coded hex or px font sizes. Tailwind is not used. */
 
 /* ── Column container ─────────────────────────────────────────────────── */
 
@@ -21,13 +28,64 @@
   border-left: 1px solid var(--ink-150);
 }
 
-/* ── Tab strip ─────────────────────────────────────────────────────────── */
-/* Compact pill-less tab strip pinned to the rail top. Each tab is a full-
-   width share of the strip; the active tab gets a 2px ink-900 bottom
-   indicator and a slightly bolder weight so it reads as "selected" without
-   a floating pill. Inactive tabs are muted (--ink-400) so the distinction
-   is clear at WCAG AA. The strip itself has a hairline bottom border that
-   visually separates it from the panel content below. */
+/* ── Mode toggle (shared between tabbed + stacked headers) ─────────────── */
+/* A compact two-button segmented control — TabbedIcon and StackedIcon.
+   The active button gets ink-900 background + paper text; inactive buttons
+   are muted so the distinction is clear at WCAG AA. The control always
+   appears at the far-right edge of whatever header row it lives in. */
+
+.modeToggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+.modeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-4);
+  background: transparent;
+  color: var(--ink-400);
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.modeBtn:hover {
+  color: var(--ink-700);
+  border-color: var(--ink-300);
+}
+
+.modeBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* Active state: filled button signals the current mode. */
+.modeBtnActive {
+  background: var(--ink-900);
+  color: var(--paper);
+  border-color: var(--ink-900);
+}
+
+.modeBtnActive:hover {
+  color: var(--paper);
+  border-color: var(--ink-900);
+}
+
+/* ── TABBED mode ─────────────────────────────────────────────────────────
+   Compact pill-less tab strip pinned to the rail top. The active tab gets
+   a 2px ink-900 bottom indicator. The mode toggle sits flush right in the
+   same strip row. */
 
 .tabStrip {
   display: flex;
@@ -79,18 +137,15 @@
   border-bottom-color: var(--ink-900);
 }
 
-/* ── Panel area ─────────────────────────────────────────────────────────── */
-/* Fills the rail height below the tab strip. The visible panel is a flex
-   column that stretches to fill this container so each panel can use its
-   own internal scroll. Hidden panels use HTML's native [hidden] attribute
-   (display: none) — they stay mounted so in-panel state (draft messages,
-   scroll position) survives tab switches without persisting to a store. */
+/* Panel area — fills the rail below the tab strip. The visible panel is
+   a flex column that stretches to fill the container. Hidden panels use
+   HTML's native [hidden] attribute so they stay mounted (preserving
+   in-panel state like draft messages and scroll position) but invisible. */
 
 .panelArea {
   flex: 1;
   min-height: 0;
   position: relative;
-  /* padding around each panel card */
   padding: clamp(6px, 2vw, 12px);
 }
 
@@ -102,11 +157,124 @@
   min-height: 0;
 }
 
-/* The native [hidden] attribute makes non-active panels invisible and inert.
-   We override the browser default with display:none explicitly so a future
-   CSS reset doesn't accidentally surface a non-active panel. */
+/* Override browser default so a future CSS reset doesn't accidentally
+   surface a non-active panel. */
 .panel[hidden] {
   display: none;
+}
+
+/* ── STACKED mode ────────────────────────────────────────────────────────
+   A thin header bar holds the mode toggle. Below it a flex column of
+   SortablePanel items; each item has a fixed px height (controlled from
+   the component) and a PaneSplitter below it for resize. */
+
+.stackedHeader {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  height: 38px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--ink-150);
+  padding-left: 10px;
+  /* overflow: hidden keeps the header flush even if modeToggle buttons
+     briefly expand during interaction. */
+  overflow: hidden;
+}
+
+.stackedHeaderLabel {
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-400);
+  /* Dragging hint: the label reads "Panels" — short, unambiguous. */
+}
+
+/* The scrollable column that holds the three stacked SortablePanel items.
+   overflow-y:auto lets the teacher scroll if the sum of panel heights
+   exceeds the rail height — the PaneSplitter resize handles reduce this in
+   practice but the overflow must be correct as a safety valve. */
+.stackedArea {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* A small gap above / below the column keeps it off the chrome edges. */
+  padding: clamp(4px, 1vw, 8px) clamp(4px, 1.5vw, 10px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Wrapper for each sortable panel in stacked mode. Height is set inline by
+   the SortablePanel component (from panelHeights state); min-height is the
+   ≥80px floor enforced in JS. The panel's own content card (ResourcesPanel
+   section, TodayTodos section, Shoutbox section) sits inside and fills
+   this wrapper. We add a small gap below each panel except the last so
+   the PaneSplitter doesn't need to account for external spacing. */
+.stackedPanel {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /* overflow: hidden clips the panel card to the wrapper's bounds. The
+     PaneSplitter below the panel sits in the same wrapper so it is still
+     visible — it overlaps the bottom edge of the panel card slightly. */
+  overflow: visible;
+}
+
+/* ── Horizontal PaneSplitter — stacked panel boundary ─────────────────────
+   The PaneSplitter component renders a vertical splitter by default
+   (from DailyView.module.css's .splitter class). When used with
+   orientation="horizontal" and this .railSplitter className the cursor +
+   grip orientation are overridden to suit a horizontal boundary between
+   two vertically stacked panels. The splitter hit area is the full width
+   of the rail column; the grip bar is centered horizontally.
+
+   The PaneSplitter's inner <span> is the visible bar; we target it below
+   to flip its dimensions so it reads as a horizontal grip. */
+
+.railSplitter {
+  /* Replace the vertical cursor with row-resize for a horizontal splitter. */
+  cursor: row-resize;
+  /* The hit/drag area: a full-width, visible-height band between panels.
+     8px total gives a comfortable finger/pointer target beyond the 4px
+     visible bar without stealing too much vertical space. */
+  width: 100%;
+  height: 8px;
+  flex: 0 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Sit slightly above the natural flow so the drag handle visually overlaps
+     the bottom of the panel card above it (matching the DailyView splitter's
+     Z layering on the vertical axis). */
+  position: relative;
+  z-index: 1;
+  /* Override DailyView splitter background: the horizontal rail splitter
+     should match the rail's neutral ink-50 background, not the card paper. */
+  background: var(--ink-100);
+  border-radius: var(--r-4);
+  margin: 2px 0;
+  transition: background 0.1s ease;
+}
+
+.railSplitter:hover,
+.railSplitter:focus-visible {
+  background: var(--ink-200);
+}
+
+.railSplitter:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* The inner <span> grip rendered by PaneSplitter. We override its dimensions
+   so the grip reads as HORIZONTAL (a short wide bar) rather than the default
+   vertical thin bar. The selector is scoped by the local `.railSplitter`
+   class (passed to PaneSplitter via its `className` prop) so it satisfies the
+   CSS-Modules "pure selector" rule, then narrowed by the orientation data
+   attribute and a child combinator to reach the inner grip span. */
+.railSplitter[data-splitter-orientation="horizontal"] > span {
+  /* Flip the short bar to landscape: wide + short rather than narrow + tall. */
+  width: 28px;
+  height: 3px;
+  border-radius: 2px;
 }
 
 /* ── Responsive: narrow viewports ─────────────────────────────────────── */
@@ -129,6 +297,12 @@
 /* ── Reduced motion ──────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .tab {
+    transition: none;
+  }
+  .modeBtn {
+    transition: none;
+  }
+  .railSplitter {
     transition: none;
   }
 }

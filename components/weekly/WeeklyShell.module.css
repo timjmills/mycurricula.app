@@ -6,7 +6,16 @@
    All color / type / spacing comes from var(--…). No hex values; no raw
    px font sizes. Subject color reaches only the lesson cards (via their
    own .cp-subj cascade); the shell chrome stays neutral. Reduced motion
-   is honored by the components we compose; this file has no animations.
+   is honored by the components we compose and explicitly by the drag-grip
+   and drag-ghost styles at the foot of this file.
+
+   ── Panel reorder (Wave 6) ─────────────────────────────────────────────
+   The two large panels (WeeklyGrid + RightRail) are drag-reorderable via
+   dnd-kit. Each panel wraps its content in a .columnWithGrip host that
+   carries `position: relative` so the .columnDragGrip can sit absolutely
+   in the top-left corner. The grip is revealed on hover / focus-within so
+   the column chrome stays calm at rest. Styles mirror DailyView.module.css
+   for visual consistency across both views.
 */
 
 /* ── Outermost page wrapper ───────────────────────────────────────────── */
@@ -36,9 +45,10 @@
   align-items: stretch;
 }
 
-/* The resizable body — the grid template is set inline by WeeklyShell.tsx
-   from the live rail width:
-     [center grid (1fr)] [splitter (auto)] [right rail (px)]
+/* The reorderable + resizable body — the grid template is set inline by
+   WeeklyShell.tsx from the live column order + rail width:
+     e.g. [grid 1fr] [splitter auto] [rail px]   (default order)
+          [rail px]  [splitter auto] [grid 1fr]   (swapped order)
    The fallback here keeps a sane layout if the inline style is ever
    absent. The narrow media query at the foot of this file overrides
    this back to a single column. */
@@ -133,6 +143,184 @@
   border-radius: var(--r-4);
 }
 
+/* ── Screen-reader-only live region ───────────────────────────────────
+   The aria-live region for column-reorder announcements is always in DOM
+   but visually hidden. Uses the same technique as DailyView: clip +
+   white-space: nowrap keeps it from affecting layout. */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Panel reorder: per-panel wrapper + grip + drag ghost ─────────────
+   The two large panels (WeeklyGrid + RightRail) are reorderable as a
+   horizontal sortable group. Each panel is wrapped in a SortablePanel
+   whose DOM looks like:
+
+     <div .gridSlot | .railSlot>          ← sortable item; transform host
+       <div .columnWithGrip data-pane>    ← positioning host for the grip
+         <button .columnDragGrip />       ← dnd-kit activator (≥44px)
+         <…panel content…>               ← unchanged inner subtree
+       </div>
+     </div>
+
+   The grip sits ABSOLUTELY in the panel's top-left, above the panel's
+   own content. The visible icon chip is 24×24; the wrapping button pads
+   that to ≥44px. Opacity is low at rest so the chrome stays calm; it
+   lifts on hover / focus to signal the affordance. No color decoration —
+   the grip uses neutral ink tokens throughout (CLAUDE.md §4: color is
+   information, never decoration). */
+
+/* Positioning host: the direct child of .gridSlot / .railSlot that
+   carries `position: relative` so the absolutely-positioned grip can
+   find its corner. It also stretches to fill the slot via flex. */
+.columnWithGrip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The rail variant stacks toggle + content; content gets flex: 1. */
+.railColumnWithGrip {
+  background: var(--ink-50);
+  border-left: 1px solid var(--ink-150);
+}
+
+/* Direct child of columnWithGrip fills the available height so inner
+   scroll containers (grid, right-rail panels) can size themselves
+   correctly. */
+.columnWithGrip > :not(.columnDragGrip):not(.railToggleBtn) {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* The drag grip — a small 24×24 chip in the top-left corner.
+   `touch-action: none` keeps mobile from interpreting the press as a
+   scroll gesture; the dnd-kit activator owns the press from pointerdown.
+   The default opacity stays low so the grip never visually competes
+   with panel content; on hover / focus it lifts to its full color so
+   it's clearly grabbable. */
+.columnDragGrip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  /* ≥44×44px touch target via padding (visible area stays 24×24). */
+  padding: 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-4);
+  color: var(--ink-300);
+  cursor: grab;
+  touch-action: none;
+  z-index: 10;
+  /* Hidden at rest — revealed on parent hover / focus-within. */
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity 0.12s,
+    transform 0.12s,
+    color 0.12s,
+    background 0.12s;
+}
+
+/* Reveal the grip when the user is engaging with the panel — either by
+   hovering anywhere inside the panel wrapper, or by tabbing into a child
+   control with the keyboard. Keep the resting state hidden so the panel
+   chrome stays calm. */
+.columnWithGrip:hover .columnDragGrip,
+.columnWithGrip:focus-within .columnDragGrip {
+  opacity: 0.55;
+  transform: scale(1);
+}
+
+/* Direct hover / focus on the grip itself lifts it to full color so it
+   reads as the active drag affordance. */
+.columnDragGrip:hover,
+.columnDragGrip:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+  color: var(--ink-500);
+  background: color-mix(in oklch, var(--paper) 70%, var(--ink-100));
+}
+
+.columnDragGrip:active {
+  cursor: grabbing;
+}
+
+.columnDragGrip:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* The visible 24×24 chip — neutral ink dots, inherits the button color. */
+.columnDragGripIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+
+/* While a panel rides the DragOverlay we float a small header-style chip
+   showing the panel's name + the grip glyph. Reuses the right-rail
+   panel-ghost visual vocabulary (paper card + hairline + soft lift) so
+   the chip reads as "the same thing, picked up". */
+.columnDragGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  max-width: min(280px, calc(100vw - 28px));
+  padding: 8px 14px 8px 10px;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-8);
+  box-shadow:
+    0 4px 16px color-mix(in oklch, var(--ink-900) 12%, transparent),
+    0 1px 4px color-mix(in oklch, var(--ink-900) 8%, transparent);
+  /* Slight tilt mirrors the right-rail dragGhost idiom in
+     RightRail.module.css. */
+  transform: rotate(-0.5deg);
+  cursor: grabbing;
+}
+
+.columnDragGhostGrip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--ink-500);
+  flex-shrink: 0;
+}
+
+.columnDragGhostTitle {
+  font-size: var(--t-13);
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  color: var(--ink-900);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Below 1280px — zero-footprint rail (no content visible) ──────────
    Between 721px and 1280px the rail grid track drops to 0px so it
    occupies NO space in the planner layout. The toggle button is
@@ -149,7 +337,8 @@
        JS state remain available without causing layout jank. */
     grid-template-columns: 1fr 0 0 !important;
   }
-  .railSlot {
+  .railSlot,
+  .railColumnWithGrip {
     /* Hide the slot entirely (display: none would lose state; visibility:
        hidden + width: 0 keeps React mounted while removing it from the
        flow). The 1px border is also suppressed so no stray line appears. */
@@ -178,7 +367,8 @@
   .body > [role="separator"] {
     display: none;
   }
-  .railSlot {
+  .railSlot,
+  .railColumnWithGrip {
     width: auto;
     visibility: visible;
     border-left: none;
@@ -202,5 +392,27 @@
      the grid, so the toggle is redundant and can be hidden. */
   .railToggleBtn {
     display: none;
+  }
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────
+   Under prefers-reduced-motion the drag grip appears without the scale-in
+   transition, and the drag ghost drops its tilt — the presence and
+   position of elements still change (drag still works), only the
+   decorative motion is removed. This mirrors DailyView.module.css. */
+
+@media (prefers-reduced-motion: reduce) {
+  .columnDragGrip,
+  .columnDragGripIcon {
+    transition: none;
+  }
+  .columnDragGrip {
+    /* Keep the reveal pattern but skip the scale / transform. The
+       :hover / :focus-within reveal still shows the grip, just without
+       the spring-style scale-in. */
+    transform: none;
+  }
+  .columnDragGhost {
+    transform: none;
   }
 }

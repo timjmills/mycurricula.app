@@ -90,10 +90,27 @@
    measurements (the 4px stripe lives on top of the left padding so the
    left cluster begins 20px in from the visible accent edge). A
    `min-height` keeps the band ≥72px even when content is short. The
-   spec's three-region flex row lives directly inside this container. */
+   spec's three-region flex row lives directly inside this container.
+
+   CLIPPING FIX: `overflow: hidden` on `.root` combined with the
+   `zoom: 0.8; width: 125%` scaling trick means the band's content must
+   truly fit within the band's box. `.band` must NOT have `flex-shrink:0`
+   fighting overflow — instead we let `.band` fill 100% of `.root`'s
+   width and ensure the inner flex layout resolves without overflowing.
+   The time region stays `flex: 0 0 auto` (never shrinks), while the
+   title region yields space first. See `.bandTitle` and `.bandRight`. */
 .band {
-  flex-shrink: 0;
+  /* Do NOT use flex-shrink:0 — it prevents the band from fitting inside
+     .root when the pane is narrow. The band is in a column flex, so
+     flex-shrink applies to the cross axis; the real guard is `width:100%`
+     ensuring the band's flex row is constrained to its container width. */
+  width: 100%;
   min-width: 0;
+  /* Prevent the band's own flex row from overflowing .root's clipping box.
+     The time region is `flex:0 0 auto` so it will always render; if the
+     title + left cluster push past the available width, the band clips the
+     title (via .bandTitle ellipsis) rather than hiding the time. */
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -114,6 +131,10 @@
      white body without introducing a hard rule line. */
   border-bottom: 1px solid
     color-mix(in oklch, var(--c, var(--ink-400)) 25%, transparent);
+  /* Prevent box-sizing from causing the border-left to push total width
+     past the parent — border-box is already the global default but stated
+     explicitly here for clarity given the clipping sensitivity. */
+  box-sizing: border-box;
 }
 
 /* ── Header region A — LEFT (monogram + check + subject name) ────────────
@@ -201,7 +222,15 @@
    center` true-centers the title in that remaining space. Token
    mapping: spec asks for "~19px / weight 700" → `--t-18` (18px) is the
    nearest token and visually reads as the spec's lesson-title tier.
-   Single-line truncate with ellipsis on overflow. */
+   Single-line truncate with ellipsis on overflow.
+
+   CLIPPING FIX: This region is the designated "yield" element — it must
+   shrink before the left or right clusters do. `flex: 1 1 auto` + `min-
+   width: 0` together allow the browser's flex algorithm to shrink this
+   region all the way to zero before touching the `flex: 0 0 auto` left
+   and right regions. `overflow: hidden; text-overflow: ellipsis` ensure
+   the title text gracefully truncates rather than overflowing into the
+   right region and obscuring the time. */
 .bandTitle {
   flex: 1 1 auto;
   min-width: 0;
@@ -210,8 +239,8 @@
   font-weight: 700;
   line-height: 1.2;
   color: var(--cd, var(--ink-900));
-  /* The title is the FIRST thing to truncate when the band is squeezed
-     below 720px (the subject + time both retain their sizes). */
+  /* Title is the FIRST to truncate when the band is squeezed — the left
+     subject cluster and the right time+icons never yield. */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -222,13 +251,26 @@
    `flex: 0 0 auto; margin-left: auto` keeps the right cluster hard-
    pinned to the right edge of the band; `text-align: right` reads-right
    for any wrapping of the inner stack. The time + icon row sit on one
-   line; gap reserved for visual separation. */
+   line; gap reserved for visual separation.
+
+   CLIPPING FIX: `flex-shrink: 0` (implied by `flex: 0 0 auto`) ensures
+   the right cluster — including the full time string — is NEVER squeezed
+   or clipped by the flex algorithm. The title region in the middle
+   absorbs all available squeeze instead. `white-space: nowrap` on
+   `.bandTime` ensures the time string itself never wraps. */
 .bandRight {
   flex: 0 0 auto;
+  flex-shrink: 0;
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 10px;
+  /* Guarantee the time is never flush against the card's right edge.
+     The card's right padding (20px from .band) already provides space,
+     but we add a minimum right padding here as a secondary guard since
+     the band's overflow:hidden on the root can clip the last few pixels
+     if the flex row is exactly at the boundary. */
+  padding-right: 4px;
 }
 
 /* The time range itself — big right-justified tabular-numerals digits.
