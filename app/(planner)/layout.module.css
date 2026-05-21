@@ -1,0 +1,46 @@
+/* layout.module.css — planner shell chrome styles.
+ *
+ * All values reference tokens from app/tokens.css.
+ * No hex values or raw px font sizes.
+ */
+
+/* ── Skip-to-content link (A11Y-004) ────────────────────────────────────
+ * The first focusable element in the page. Visually hidden until keyboard
+ * focus lands on it, then revealed as a pill above the top bar so screen-
+ * reader and keyboard users can bypass the navigation chrome.
+ *
+ * Positioning: `position: fixed` keeps the pill on-screen regardless of
+ * scroll; `top / left` pull it off the visible area when unfocused; the
+ * `:focus-visible` rule moves it into view. `z-index: 9999` ensures it
+ * sits above every other planner surface including the master banner.
+ */
+.skipLink {
+  position: fixed;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: 10px 20px;
+  background: var(--ink-900);
+  color: var(--paper);
+  border-radius: var(--r-6);
+  font-size: var(--t-13);
+  font-weight: 600;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  text-decoration: none;
+  /* Transitions only outside prefers-reduced-motion. */
+  transition: top 0.15s ease;
+}
+
+.skipLink:focus-visible {
+  top: 12px;
+  outline: 2px solid var(--paper);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skipLink {
+    transition: none;
+  }
+}

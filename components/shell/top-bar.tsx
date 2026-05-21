@@ -29,7 +29,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppState, type CurrentUser } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
-import { CURRENT_WEEK } from "@/lib/mock";
 import styles from "./top-bar.module.css";
 
 // ── View definitions ─────────────────────────────────────────────────────
@@ -61,7 +60,6 @@ export function TopBar(): ReactNode {
     editMode,
     setEditMode,
     week,
-    setWeek,
     search,
     setSearch,
     leftPanelOpen,
@@ -174,16 +172,20 @@ export function TopBar(): ReactNode {
       <nav className={styles.viewSwitcher} aria-label="View">
         {VIEWS.map((v) => {
           if (v.soon) {
+            // POLISH-003/TOPBAR-002/QW-4: soon tabs render at low opacity
+            // with cursor:not-allowed and a descriptive tooltip. No hover
+            // state. The SOON badge is uppercase for consistency. They are
+            // hidden below 1280px via CSS (from Wave 2).
             return (
               <span
                 key={v.label}
                 className={`${styles.viewTab} ${styles.viewTabSoon}`}
                 aria-disabled="true"
-                title={`${v.label} — coming soon`}
+                title={`Coming soon — ${v.label} view`}
               >
                 {v.label}
-                <span className={styles.soonLabel} aria-hidden="true">
-                  soon
+                <span className={styles.soonBadge} aria-hidden="true">
+                  SOON
                 </span>
               </span>
             );
@@ -205,44 +207,20 @@ export function TopBar(): ReactNode {
 
       <div className={styles.divider} aria-hidden="true" />
 
-      {/* ── Week jumper ───────────────────────────────────────────── */}
-      <div className={styles.weekJumper} aria-label="Week navigation">
-        <button
-          type="button"
-          className={styles.weekChevron}
-          onClick={() => setWeek(week - 1)}
-          aria-label="Previous week"
-        >
-          <ChevronLeftIcon />
-        </button>
-
-        <span
-          className={styles.weekLabel}
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          Week {week}
-        </span>
-
-        <button
-          type="button"
-          className={styles.weekChevron}
-          onClick={() => setWeek(week + 1)}
-          aria-label="Next week"
-        >
-          <ChevronRightIcon />
-        </button>
-
-        <button
-          type="button"
-          className={styles.thisWeekBtn}
-          onClick={() => setWeek(CURRENT_WEEK)}
-          disabled={week === CURRENT_WEEK}
-          aria-label="Jump to this week"
-        >
-          This week
-        </button>
-      </div>
+      {/* ── Week label — static heading (POLISH-011) ─────────────────
+          The top bar previously duplicated the in-grid week-navigation
+          trio (Prev / Today / Next). POLISH-011 removes that duplication:
+          the top bar keeps only the "Week N" heading as a passive context
+          label; the in-grid WeekNavigator (owned by another agent) remains
+          the working navigation control. */}
+      <span
+        className={styles.weekLabel}
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label={`Current week: Week ${week}`}
+      >
+        Week {week}
+      </span>
 
       <div className={styles.divider} aria-hidden="true" />
 
@@ -279,7 +257,15 @@ export function TopBar(): ReactNode {
 
       <div className={styles.divider} aria-hidden="true" />
 
-      {/* ── Master / Personal segmented control ───────────────────── */}
+      {/* ── Personal / Master segmented control (POLISH-002/TOPBAR-005/QW-5)
+          Two-option pill: the active option gets a paper background + shadow
+          (editToggleBtnActive); the inactive option is muted. A 1px separator
+          div between the two options provides visible structural separation so
+          the pair reads as two distinct choices rather than a single label.
+          aria-pressed on each button communicates the selection to assistive
+          technology. The floating bullet dot has been removed — the pill active
+          state provides sufficient visual differentiation. The red Master active
+          style and the heads-up banner behavior are preserved unchanged. */}
       <div className={styles.editToggle} role="group" aria-label="Edit mode">
         <button
           type="button"
@@ -291,6 +277,9 @@ export function TopBar(): ReactNode {
         >
           Personal
         </button>
+        {/* Visible 1px separator between the two options — confirms to the
+            teacher that these are two distinct, independent choices. */}
+        <span className={styles.editToggleSep} aria-hidden="true" />
         <button
           type="button"
           className={`${styles.editToggleBtn} ${styles.editToggleBtnMaster} ${
@@ -300,7 +289,6 @@ export function TopBar(): ReactNode {
           aria-pressed={editMode === "master"}
           title="Changes in Master mode affect the whole team"
         >
-          <span className={styles.masterDot} aria-hidden="true" />
           Master
         </button>
       </div>
@@ -490,42 +478,6 @@ function PanelLeftIcon(): ReactNode {
     >
       <rect x="3" y="3" width="18" height="18" rx="2" />
       <line x1="9" y1="3" x2="9" y2="21" />
-    </svg>
-  );
-}
-
-function ChevronLeftIcon(): ReactNode {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M15 18l-6-6 6-6" />
-    </svg>
-  );
-}
-
-function ChevronRightIcon(): ReactNode {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M9 18l6-6-6-6" />
     </svg>
   );
 }

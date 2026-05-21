@@ -224,7 +224,7 @@ export function WeeklyLessonCard({
   // BUG-006 — canonical resource source: derive resources from the planner
   // sections store (the same source the right-rail and daily detail use) so
   // all three surfaces agree on the same list (audit finding BUG-006).
-  const { getSections } = usePlanner();
+  const { getSections, addSectionResource } = usePlanner();
   const sectionResources = lessonResources(getSections(lesson.id));
 
   // Respect prefers-reduced-motion (spec §2.5 / §2.4): under reduced motion,
@@ -899,7 +899,7 @@ export function WeeklyLessonCard({
                   className={`${styles.preview} ${
                     hasPager ? "" : styles.previewFill
                   }`}
-                  style={{ color: "var(--ink-700)" }}
+                  style={{ color: "var(--ink-900)" }}
                 >
                   {editingField === "preview" ? (
                     <RichEditorWrapper
@@ -1000,7 +1000,7 @@ export function WeeklyLessonCard({
                             className={`${styles.sectionText} ${styles.editableText}`}
                             style={{
                               fontStyle: "italic",
-                              color: "var(--ink-700)",
+                              color: "var(--ink-900)",
                             }}
                             tabIndex={0}
                             role="button"
@@ -1036,7 +1036,7 @@ export function WeeklyLessonCard({
                         ) : (
                           <p
                             className={`${styles.sectionText} ${styles.editableText}`}
-                            style={{ color: "var(--ink-700)" }}
+                            style={{ color: "var(--ink-900)" }}
                             tabIndex={0}
                             role="button"
                             aria-label="Edit lesson directions"
@@ -1165,7 +1165,12 @@ export function WeeklyLessonCard({
                     );
                   })}
 
-                  {/* Footer affordances — "+ Add section" / "Edit Template" */}
+                  {/* Footer affordances — "+ Add section" / "+ Add resource" / "Edit Template".
+                      POLISH-010/CARD-001: "Add resource" is a persistent keyboard-
+                      accessible button so teachers can attach a resource without a
+                      mouse hover. It appends a link resource to the first section
+                      (the canonical resource container) via addSectionResource — the
+                      same action the right-rail and daily detail use (BUG-006). */}
                   <div className={styles.expandedFooter}>
                     <button
                       type="button"
@@ -1177,6 +1182,27 @@ export function WeeklyLessonCard({
                     >
                       <Icon name="plus" size={11} />
                       Add section
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.footerBtn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Attach a new link resource to the first available section.
+                        // If no sections exist yet the store creates a default section.
+                        const sections = getSections(lesson.id);
+                        const targetSectionId = sections[0]?.id ?? lesson.id;
+                        addSectionResource(
+                          lesson.id,
+                          targetSectionId,
+                          "link",
+                          "New resource",
+                        );
+                      }}
+                      aria-label="Add resource to this lesson"
+                    >
+                      <Icon name="plus" size={11} />
+                      Add resource
                     </button>
                     <button
                       type="button"
@@ -1264,13 +1290,16 @@ export function WeeklyLessonCard({
           hairline) but adapted to live inside the card.
           Page buttons stopPropagation so paging never bubbles to the card /
           cell click or expand handlers. */}
+      {/* POLISH-012: aria-labels include positional context ("…, 2 of 3") so
+          screen-reader users know where they are in the deck without having to
+          navigate to the pagerCounter live region first. */}
       {!isCompact && hasPager && deck && (
         <div className={styles.pager}>
           <button
             type="button"
             className={styles.pagerArrow}
             disabled={deck.index === 0}
-            aria-label="Previous lesson"
+            aria-label={`Previous lesson, ${deck.index + 1} of ${deck.total}`}
             onClick={(e) => {
               e.stopPropagation();
               deck.onPrev();
@@ -1285,7 +1314,7 @@ export function WeeklyLessonCard({
             type="button"
             className={styles.pagerArrow}
             disabled={deck.index === deck.total - 1}
-            aria-label="Next lesson"
+            aria-label={`Next lesson, ${deck.index + 2} of ${deck.total}`}
             onClick={(e) => {
               e.stopPropagation();
               deck.onNext();

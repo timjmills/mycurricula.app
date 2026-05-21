@@ -621,11 +621,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Slim horizontally — it tucks between the chevron and the heading band —
-     but ≥44px tall for the touch target. */
-  width: 22px;
+  /* WCAG 2.5.5 requires a ≥44×44px touch target (POLISH-013 /
+     DAILY-LESSON-DRAG-001). The visible glyph stays 12px; negative
+     horizontal margins absorb the extra width so the heading-row
+     layout is unchanged. */
+  width: 44px;
   height: 44px;
-  margin: 0 -2px;
+  margin: 0 -11px;
   flex: 0 0 auto;
   padding: 0;
   border: none;

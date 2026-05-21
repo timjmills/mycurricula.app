@@ -291,35 +291,43 @@
   margin: 0 2px;
 }
 
-/* Grouping toggle — "By Unit" / "By Week" */
+/* Grouping toggle — "By Unit" / "By Week" segmented control (POLISH-008).
+   Each option is a separate pill so there is always a visible gap between
+   them. The active pill gets an ink-900 fill; the container itself carries
+   no border so there is no "one phrase" bleed between the two options.
+   Same visual treatment as the Personal/Master toggle in the top bar. */
 .groupToggle {
   display: inline-flex;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-4);
-  overflow: hidden;
+  gap: 3px;
+  background: var(--ink-100);
+  border-radius: var(--r-6);
+  padding: 2px;
 }
 
 .groupBtn {
-  padding: 4px 10px;
+  padding: 3px 10px;
   font-size: var(--t-12);
   font-weight: 500;
   color: var(--ink-500);
-  background: var(--paper);
+  background: transparent;
   border: none;
+  border-radius: var(--r-4);
   cursor: pointer;
   transition:
-    background 0.1s ease,
-    color 0.1s ease;
-  min-height: 28px;
+    background 0.12s ease,
+    color 0.12s ease;
+  min-height: 26px;
 }
 
-.groupBtn + .groupBtn {
-  border-left: 1px solid var(--ink-200);
+.groupBtn:hover {
+  color: var(--ink-700);
 }
 
 .groupBtnActive {
-  background: var(--ink-900);
-  color: var(--paper);
+  background: var(--paper);
+  color: var(--ink-900);
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
 }
 
 /* ── Lesson list area ───────────────────────────────────────────────── */

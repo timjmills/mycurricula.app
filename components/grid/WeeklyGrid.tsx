@@ -446,23 +446,32 @@ export function WeeklyGrid(): ReactNode {
       />
 
       {/* ── Toolbar — anchored chrome (spec §3.5) ──────────────────────── */}
+      {/* POLISH-006: Expand-all / Minimize-all rendered as a segmented control
+          so the pair reads as a single compound action with a clear internal
+          boundary, consistent with the segmented-control treatment elsewhere. */}
       <div className={styles.moveToolbar}>
-        <button
-          type="button"
-          className={styles.moveModeBtn}
-          onClick={expandAll}
-          aria-label="Expand all lesson cards"
+        <div
+          className={styles.expandSegment}
+          role="group"
+          aria-label="Card expansion"
         >
-          Expand all
-        </button>
-        <button
-          type="button"
-          className={styles.moveModeBtn}
-          onClick={collapseAll}
-          aria-label="Minimize all lesson cards"
-        >
-          Minimize all
-        </button>
+          <button
+            type="button"
+            className={styles.expandSegmentBtn}
+            onClick={expandAll}
+            aria-label="Expand all lesson cards"
+          >
+            Expand all
+          </button>
+          <button
+            type="button"
+            className={styles.expandSegmentBtn}
+            onClick={collapseAll}
+            aria-label="Minimize all lesson cards"
+          >
+            Minimize all
+          </button>
+        </div>
       </div>
 
       {/* ── DndContext wraps the entire scrollable grid ──────────────────── */}
@@ -482,22 +491,31 @@ export function WeeklyGrid(): ReactNode {
           >
             {/* ── Day header row — anchored chrome (spec §3.5) ── */}
             <div className={styles.cornerCell} role="presentation" />
-            {WEEK_DAYS.map((dayName, dayIdx) => (
-              <div
-                key={dayName}
-                role="columnheader"
-                className={`${styles.dayHead} ${
-                  week === CURRENT_WEEK && dayIdx === 0
-                    ? styles.dayHeadToday
-                    : ""
-                }`}
-              >
-                <span>{dayName}</span>
-                <span className={styles.dayHeadDate}>
-                  {WEEK_DAYS_SHORT[dayIdx]}
-                </span>
-              </div>
-            ))}
+            {WEEK_DAYS.map((dayName, dayIdx) => {
+              const shortName = WEEK_DAYS_SHORT[dayIdx] ?? dayName;
+              return (
+                <div
+                  key={dayName}
+                  role="columnheader"
+                  // A11Y-001 / POLISH-005: without an explicit label, the two
+                  // visible spans ("Sunday" + "Sun") concatenate in the
+                  // accessibility tree as "SundaySun". The label supplies a
+                  // natural-language form; the spans are aria-hidden so the
+                  // label is not double-announced.
+                  aria-label={`${dayName} (${shortName})`}
+                  className={`${styles.dayHead} ${
+                    week === CURRENT_WEEK && dayIdx === 0
+                      ? styles.dayHeadToday
+                      : ""
+                  }`}
+                >
+                  <span aria-hidden="true">{dayName}</span>
+                  <span aria-hidden="true" className={styles.dayHeadDate}>
+                    {shortName}
+                  </span>
+                </div>
+              );
+            })}
 
             {/* ── Subject rows ── */}
             {!weekHasLessons && (

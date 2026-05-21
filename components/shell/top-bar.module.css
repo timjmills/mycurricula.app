@@ -168,114 +168,61 @@
   color: var(--paper);
 }
 
-/* Disabled soon-tab — visible but not interactive. */
+/* Disabled soon-tab — POLISH-003/TOPBAR-002/QW-4.
+   40% opacity signals "not yet available" at a glance. cursor:not-allowed
+   makes the non-interactivity physically apparent. No hover or focus styles
+   since the element is not focusable (pointer-events:none, not a link). */
 .viewTabSoon {
-  color: var(--ink-300);
-  cursor: default;
+  opacity: 0.4;
+  cursor: not-allowed;
   pointer-events: none;
 }
 
-/* TOPBAR-001: hide soon-tabs below 1280px to recover ~210px of bar width.
-   They carry no interactivity (pointer-events:none already) and their absence
-   does not affect any user flow. The hide threshold matches the breakpoint
-   where the bar would otherwise overflow at typical laptop widths (~1296px
-   inner). At 1280px+ they re-appear so wider screens show the full switcher. */
+/* TOPBAR-001 (Wave 2): hide soon-tabs below 1280px to recover ~210px of bar
+   width. Preserved from Wave 2 — the opacity/cursor override above is additive
+   and does not interfere with this rule. */
 @media (max-width: 1279px) {
   .viewTabSoon {
     display: none;
   }
 }
 
-.soonLabel {
+/* SOON badge — uppercase, micro scale, visually separated from the tab label.
+   text-transform:uppercase is handled in the JSX (the badge text is already
+   "SOON" in all-caps); this rule owns sizing and spacing only. */
+.soonBadge {
   font-size: var(--t-10);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  color: var(--ink-300);
-  margin-left: 4px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  /* Inherit the tab's muted color — opacity on the parent already tones it. */
+  color: currentColor;
+  margin-left: 5px;
 }
 
-/* ── Week jumper ────────────────────────────────────────────────────── */
-.weekJumper {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 0 auto;
-}
-
-.weekChevron {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--r-6);
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  color: var(--ink-700);
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease;
-}
-
-.weekChevron:hover:not(:disabled) {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
-}
-
-.weekChevron:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.weekChevron:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
+/* ── Week label — passive context heading (POLISH-011) ──────────────── */
+/* The Prev/Next chevrons and "This week" button have been removed from the
+   top bar (POLISH-011 — duplicate week navigation). The top bar now shows
+   only a static "Week N" label; the in-grid WeekNavigator is the working
+   navigation control. The label is a <span> in the flex row, not a button,
+   so it carries no interactive affordances. */
 .weekLabel {
   font-size: var(--t-13);
   font-weight: 600;
   color: var(--ink-700);
   white-space: nowrap;
-  padding: 0 4px;
-  min-width: 58px;
-  text-align: center;
+  /* Horizontal padding gives the label a little breathing room against the
+     adjacent dividers. */
+  padding: 0 6px;
+  flex: 0 0 auto;
+  user-select: none;
 }
 
-.thisWeekBtn {
-  height: 30px;
-  padding: 0 10px;
-  border-radius: var(--r-6);
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-700);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease;
-}
-
-.thisWeekBtn:hover:not(:disabled) {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
-}
-
-.thisWeekBtn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.thisWeekBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
-/* ── Master / Personal segmented control ───────────────────────────── */
+/* ── Personal / Master segmented control (POLISH-002/TOPBAR-005/QW-5) ─ */
+/* A proper two-option pill: muted ink-50 tray, paper+shadow on active option.
+   The 1px separator span (.editToggleSep) between the two buttons makes the
+   boundary between Personal and Master unmistakable — the control no longer
+   reads as a single label. The floating bullet dot has been removed since the
+   active-option pill provides sufficient visual differentiation. */
 .editToggle {
   display: flex;
   align-items: center;
@@ -284,14 +231,25 @@
   border: 1px solid var(--ink-200);
   background: var(--ink-50);
   padding: 2px;
-  gap: 1px;
+  /* No gap — buttons sit flush against the separator; the separator itself
+     provides visual spacing via its own margin. */
+  gap: 0;
   flex: 0 0 auto;
+}
+
+/* Visible 1px separator between Personal and Master options. */
+.editToggleSep {
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  background: var(--ink-200);
+  flex: 0 0 auto;
+  align-self: center;
 }
 
 .editToggleBtn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
   height: 26px;
   padding: 0 11px;
   border-radius: var(--r-6);
@@ -319,7 +277,8 @@
   box-shadow: 0 1px 2px rgba(20, 22, 32, 0.08);
 }
 
-/* Master mode carries a warning color when active. */
+/* Master mode — warning color in the inactive state, red fill when active.
+   The heads-up banner behavior (managed elsewhere) remains untouched. */
 .editToggleBtnMaster {
   color: var(--core-mode);
 }
@@ -328,15 +287,6 @@
   background: var(--core-mode);
   color: var(--paper);
   box-shadow: 0 1px 2px rgba(227, 107, 126, 0.25);
-}
-
-/* Small warning dot — always present on the Master button as a visual cue. */
-.masterDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  flex: 0 0 auto;
 }
 
 /* ── View-mode pill (Simple | Task | Advanced) ──────────────────────── */
