@@ -153,11 +153,26 @@
 }
 
 /* ── Band top row: check · subject·time · right controls ─────────────────── */
+/* BUG-002: Row 1 of the two-row band layout. Flex row that holds the subject
+   code badge, completion check, subject·time meta (flex:1), and the fixed
+   affordances (drag + ⋯). min-width:0 on flex children prevents them from
+   pushing the affordances off screen. */
 .bandTop {
   display: flex;
   align-items: center;
   gap: 6px;
   min-height: 28px;
+}
+
+/* BUG-002: Row 2 — status indicators (moved arrow, Modified pill).
+   Rendered only when the card carries moved/modified state so clean cards
+   pay no layout cost. flex:0 0 auto on each child prevents growth/overlap. */
+.bandStatusRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  flex-wrap: nowrap;
 }
 
 /* 2-letter subject code badge — leading edge of the header band in full mode.
@@ -334,13 +349,19 @@
    of the labeled header zone. Stays compact (1.25 line-height) so it doesn't
    dominate a small cell when the title wraps to two lines.
    Clamped to a maximum of 2 lines so a long title can never make the
-   collapsed card overflow its fixed-height grid cell (~206px matrix). */
+   collapsed card overflow its fixed-height grid cell (~206px matrix).
+   CARD-TITLE-002: 2-line clamp prevents pasted-long-text from exploding height.
+   CARD-TITLE-003: overflow-wrap:anywhere breaks unbroken strings (URLs, runs
+   of underscores) so they wrap instead of escaping the band width. */
 .bandTitle {
   margin: 4px 0 0;
   font-size: var(--t-14);
   font-weight: 600;
   line-height: 1.25;
   text-wrap: pretty;
+  /* CARD-TITLE-003: break long unbroken tokens (URLs, underscores) at any
+     character boundary so they wrap rather than overflow the band. */
+  overflow-wrap: anywhere;
   /* Leave room for caret (20px) at the right. */
   padding-right: 20px;
   /* 2-line clamp — keeps the band height bounded. */

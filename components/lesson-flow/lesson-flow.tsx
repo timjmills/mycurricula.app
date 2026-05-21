@@ -137,12 +137,15 @@ interface CanonicalSection {
   readonly templateMatch: string | null;
 }
 
+// NOTE: The Standards row (index 1) carries a placeholder helper here; the
+// rendered helper is overridden at runtime in LessonFlow to show the active
+// lesson's standards codes joined into a summary line (DAILY-STANDARDS-001).
+// The static string below is intentionally blank — it is never displayed.
 const CANONICAL_SECTIONS: readonly CanonicalSection[] = [
   {
     index: 1,
     title: "Standards",
-    helper:
-      "Interpret a fraction as division of the numerator by the denominator (a/b = a ÷ b).",
+    helper: "", // runtime-derived — see resolvedSections in LessonFlow
     pinColor: "#14b8a6", // Teal — spec §3.1
     templateMatch: null,
   },
@@ -207,6 +210,10 @@ interface ResolvedSection {
    *  virtual Standards row (and for any canonical position the template
    *  doesn't currently provide). */
   storeSection: LessonSectionContent | null;
+  /** Runtime helper text override — used by the Standards row to surface the
+   *  active lesson's standards codes instead of the static placeholder string.
+   *  When provided, this replaces `canonical.helper` in the rendered heading. */
+  helperOverride?: string;
 }
 
 // ── SortableSection ──────────────────────────────────────────────────────
@@ -429,10 +436,15 @@ const SortableSection = memo(function SortableSection({
               </button>
             )}
 
-            {/* Title + helper stack. */}
+            {/* Title + helper stack.
+                `helperOverride` is set by LessonFlow for the Standards row
+                to surface the active lesson's standards codes; all other rows
+                use the canonical static helper string (DAILY-STANDARDS-001). */}
             <div className={styles.titleStack}>
               <h3 className={styles.sectionTitle}>{canonical.title}</h3>
-              <p className={styles.sectionHelper}>{canonical.helper}</p>
+              <p className={styles.sectionHelper}>
+                {resolved.helperOverride ?? canonical.helper}
+              </p>
             </div>
 
             {/* Right-side chevron — `v` when expanded, `>` when collapsed
@@ -669,10 +681,33 @@ export function LessonFlow({
   // FIXED at the canonical order; reorder ops on store sections only affect
   // the underlying store, not the visible mapping. (A later phase could
   // expose drag-reorder of the canonical positions themselves.)
+  //
+  // DAILY-STANDARDS-001: the Standards row (index 1) injects a
+  // `helperOverride` derived from the active lesson's standards codes so
+  // the helper line updates within one render cycle when the selected lesson
+  // changes. When the lesson has no standards the helper is left empty.
   const resolved: ResolvedSection[] = useMemo(() => {
+    // Build the helper string for the virtual Standards row.
+    // Shows up to 3 codes inline (e.g. "5.NF.B.3 · RL.5.6"); when more
+    // standards are present, a "+N more" trailer keeps it compact.
+    const lessonStandards = lesson?.standards ?? [];
+    let standardsHelper = "";
+    if (lessonStandards.length > 0) {
+      const MAX_SHOWN = 3;
+      const shown = lessonStandards.slice(0, MAX_SHOWN);
+      const remainder = lessonStandards.length - shown.length;
+      standardsHelper = shown.join(" · ");
+      if (remainder > 0) standardsHelper += ` +${remainder} more`;
+    }
+
     return CANONICAL_SECTIONS.map((canonical) => {
       if (!canonical.templateMatch) {
-        return { canonical, storeSection: null };
+        // Virtual Standards row — attach the lesson-derived helper.
+        return {
+          canonical,
+          storeSection: null,
+          helperOverride: standardsHelper,
+        };
       }
       const match = sections.find((s) =>
         stripHtml(s.heading)
@@ -681,7 +716,7 @@ export function LessonFlow({
       );
       return { canonical, storeSection: match ?? null };
     });
-  }, [sections]);
+  }, [sections, lesson]);
 
   // ── Motion / DnD ────────────────────────────────────────────────────
   const prefersReducedMotion = useReducedMotion() ?? false;

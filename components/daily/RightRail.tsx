@@ -302,6 +302,12 @@ interface SortablePanelSlotProps {
    *  Collapsed panels always receive `null` so a previously-saved height
    *  doesn't pin the header to extra empty space. */
   height: number | null;
+  /**
+   * Called when the teacher clicks "Back to week" inside the Resources
+   * panel header (only present when the panel is lesson-scoped). Supplied
+   * by the consumer (WeeklyShell) and forwarded straight through.
+   */
+  onClearLesson?: () => void;
 }
 
 function SortablePanelSlot({
@@ -314,6 +320,7 @@ function SortablePanelSlot({
   mode,
   weekLessons,
   height,
+  onClearLesson,
 }: SortablePanelSlotProps): ReactNode {
   // dnd-kit sortable wiring — `id` matches the SortableContext items array.
   const {
@@ -365,6 +372,7 @@ function SortablePanelSlot({
             mode={mode}
             lessons={mode === "week" ? weekLessons : undefined}
             week={week}
+            onClearLesson={onClearLesson}
           />
         </div>
       );
@@ -461,6 +469,13 @@ interface RightRailProps {
    * week matches the active week.
    */
   lessons?: Lesson[];
+  /**
+   * When the rail is in lesson-scoped day mode (a card is selected on
+   * /weekly), this callback is wired to the Resources panel's "Back to
+   * week" affordance so clicking it clears the selection. Omit in pure
+   * day mode (the Daily view) where there is no week-scope to revert to.
+   */
+  onClearLesson?: () => void;
 }
 
 export function RightRail({
@@ -469,6 +484,7 @@ export function RightRail({
   day,
   mode = "day",
   lessons,
+  onClearLesson,
 }: RightRailProps): ReactNode {
   // The `cp-subj` wrapper on the rail forwards the selected lesson's
   // subject color into ResourcesPanel via the cascading --c / --cl / --cd
@@ -924,6 +940,7 @@ export function RightRail({
                     mode={mode}
                     weekLessons={weekLessons}
                     height={slotHeight}
+                    onClearLesson={onClearLesson}
                   />
                   {pair && handleAbove && handleBelow && (
                     <div

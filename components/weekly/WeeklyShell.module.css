@@ -73,14 +73,91 @@
    The right rail brings its own card chrome via <RightRail>; this slot
    only constrains its width and lets it scroll on its own. min-width: 0
    keeps the rail from forcing the body wider than its container when
-   tile thumbnails inside resize. */
+   tile thumbnails inside resize.
+
+   The slot always shows the hide-rail toggle button (`.railToggleBtn`).
+   When `.railSlotHidden` is applied, everything except the toggle is
+   clipped so the stub reads as intentionally thin (not broken). */
 
 .railSlot {
+  position: relative;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background: var(--ink-50);
+  border-left: 1px solid var(--ink-150);
+}
+
+/* Collapsed stub — clip overflow so nothing from the unmounted rail
+   content bleeds past the 32px stub boundary. The toggle button is
+   always visible inside the stub; it sits at the top via flex. */
+.railSlotHidden {
+  align-items: center;
+  padding-top: 8px;
+}
+
+/* ── Hide-rail toggle button ───────────────────────────────────────────
+   A small icon-only button that lives at the top of the rail slot.
+   Always mounted so the teacher can re-expand after collapsing. The
+   ≥44px touch target is supplied by min-height + min-width padding. */
+
+.railToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* ≥44×44px touch target */
+  min-width: 28px;
+  min-height: 44px;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-4);
+  color: var(--ink-400);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color 0.12s,
+    background 0.12s;
+}
+
+.railToggleBtn:hover {
+  color: var(--ink-700);
+  background: var(--ink-100);
+}
+
+.railToggleBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+  border-radius: var(--r-4);
+}
+
+/* ── Below 1280px — zero-footprint rail (no content visible) ──────────
+   Between 721px and 1280px the rail grid track drops to 0px so it
+   occupies NO space in the planner layout. The toggle button is
+   removed from flow at this width; at ≤720px the whole body collapses
+   to a single column (the existing rule below). The teacher can still
+   reach the rail by resizing to ≥1281px or by opening it from the
+   top-bar icons (a future Phase 1B affordance). */
+
+@media (max-width: 1280px) {
+  .body {
+    /* Force the rail and its splitter track to zero — only the grid 1fr
+       track is visible. The JS-driven inline gridTemplateColumns is
+       overridden here by !important so the measured body width and the
+       JS state remain available without causing layout jank. */
+    grid-template-columns: 1fr 0 0 !important;
+  }
+  .railSlot {
+    /* Hide the slot entirely (display: none would lose state; visibility:
+       hidden + width: 0 keeps React mounted while removing it from the
+       flow). The 1px border is also suppressed so no stray line appears. */
+    width: 0;
+    overflow: hidden;
+    border-left: none;
+    visibility: hidden;
+  }
 }
 
 /* ── Narrow viewport collapse ─────────────────────────────────────────── */
@@ -91,7 +168,7 @@
 
 @media (max-width: 720px) {
   .body {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
   }
   /* The splitter loses its meaning when the rail isn't a sibling
      column — collapse it visually so it doesn't render as a stray bar
@@ -102,6 +179,9 @@
     display: none;
   }
   .railSlot {
+    width: auto;
+    visibility: visible;
+    border-left: none;
     border-top: 1px solid var(--ink-150);
   }
 }

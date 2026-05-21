@@ -104,6 +104,46 @@
   outline-offset: 2px;
 }
 
+/* ── Back-to-week button in the panel header ────────────────────────────
+   Shown only when the Resources panel is lesson-scoped on the Weekly
+   view (onClearLesson is supplied). A quiet left-chevron + no label so
+   it reads as a back-navigation affordance rather than a destructive
+   action. Sits immediately before the panel title. ≥44px touch target
+   via the ::before shim. */
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-400);
+  border-radius: var(--r-4);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.12s;
+}
+
+.backBtn::before {
+  /* Invisible shim — pads the touch target to ≥44×44px. */
+  content: "";
+  position: absolute;
+  inset: -10px -6px;
+}
+
+.backBtn:hover {
+  color: var(--ink-700);
+}
+
+.backBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
 /* ── Add-resource ("+") button in the panel header ──────────────────────
    A quiet square icon button that sits in the header after the count chip.
    Opens the shared ResourceComposer. The "+" glyph stays small and
@@ -258,6 +298,13 @@
      editorial vocabulary used on the lesson-detail title hero. */
   letter-spacing: -0.2px;
   color: var(--ink-900);
+  /* Truncate with ellipsis when the title is long — most relevant when
+     showing "Resources · <lesson title>" in lesson-scoped mode. The full
+     title is exposed as a `title` attribute on the h3 element. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 /* Small neutral count chip — "how many resources" at a glance. Not a

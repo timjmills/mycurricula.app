@@ -60,6 +60,7 @@ import type { Lesson, LessonResource } from "@/lib/types";
 import type { SectionResource } from "@/lib/lesson-flow";
 import { ResourceTile } from "@/components/lesson-flow";
 import { usePlanner } from "@/lib/planner-store";
+import { lessonResources } from "@/lib/lesson-resources";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
 import type { PanelDragHandleProps } from "./RightRail";
 import {
@@ -69,11 +70,30 @@ import {
 } from "./ResourceComposer";
 import styles from "./ResourcesPanel.module.css";
 
-// ── Grip + chevron icons (rail-driven controls) ──────────────────────────
+// ── Grip + chevron + back icons (rail-driven controls) ──────────────────
 // Rendered only when ResourcesPanel is mounted inside <RightRail>, which
 // supplies the dragHandleProps + onToggleCollapsed bundle. The grip is the
 // SOLE drag activator for the panel — clicking anywhere else on the
 // header (or the body) never starts a reorder.
+
+// Back-chevron for the "Back to week" affordance — left-pointing ‹ arrow.
+function BackIcon(): ReactNode {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
 
 function GripVerticalIcon(): ReactNode {
   return (
@@ -628,6 +648,14 @@ interface ResourcesPanelProps {
    * day-mode embeds) need not supply it.
    */
   week?: number;
+  /**
+   * Called when the teacher clicks "Back to week" in the panel header.
+   * Only rendered when this prop is supplied AND the panel is in
+   * lesson-scoped day mode (i.e. when `lesson` is non-null). Intended
+   * for the Weekly view where a lesson card can be deselected to revert
+   * the Resources panel to week-aggregate scope.
+   */
+  onClearLesson?: () => void;
 }
 
 // ── ResourcesPanel ───────────────────────────────────────────────────────
@@ -640,6 +668,7 @@ export function ResourcesPanel({
   mode = "day",
   lessons,
   week,
+  onClearLesson,
 }: ResourcesPanelProps): ReactNode {
   // Panel-local UI state. Default tab "all"; default view "grid" (matches
   // the design and the LessonFlow editor's default for the same data).
@@ -723,45 +752,52 @@ export function ResourcesPanel({
   const { getSections } = usePlanner();
 
   // ── Aggregation ──────────────────────────────────────────────────────
-  // DAY mode (default):
-  //   Union the lesson-level resources (no native id; we synthesize) with
-  //   every section's resources (real ids). Deduplicate on id so a future
-  //   change that gives section + lesson resources the same id collapses
-  //   to one tile rather than rendering twice.
+  // DAY mode:
+  //   Derive the lesson's resources from the CANONICAL helper
+  //   `lessonResources(sections)` (lib/lesson-resources.ts). This is the
+  //   single source of truth shared with the weekly card and the daily
+  //   lesson detail, so all three surfaces always agree on the same list
+  //   (audit finding BUG-006). The sections are read from the planner
+  //   store via `getSections(lesson.id)` so section-resource edits
+  //   anywhere in the UI are reflected here immediately.
   //
   // WEEK mode:
-  //   Same union, applied across EVERY lesson in `lessons`. Lessons keep
-  //   their original order (the consumer is responsible for ordering by
-  //   day / subject); inside each lesson the lesson-level resources come
-  //   first, then sections in display order. The dedup rule still applies
-  //   on the synthesized + native ids, which are already lesson-scoped
-  //   (`lesson:<lessonId>:res:<i>` for lesson-level, section ids are
-  //   globally unique) so identical resources authored on different
-  //   lessons each surface as their own tile — the right behavior for a
-  //   "what does the week contain" glance.
+  //   Same canonical helper applied across EVERY lesson in `lessons`.
+  //   Lessons keep their original order (the consumer is responsible for
+  //   ordering by day / subject); within each lesson resources appear in
+  //   section order. Deduplication on resource id is still applied — the
+  //   same resource authored in two lessons surfaces once per lesson
+  //   (the synthesized `lesson:<id>:res:<i>` key is already lesson-scoped)
+  //   so a week-aggregate glance is accurate.
   const combined = useMemo<SectionResource[]>(() => {
-    /** Push one lesson's combined resources into `out`, respecting `seen`. */
+    /**
+     * Push one lesson's resources into `out` via the canonical helper,
+     * deduplicating on id. Lesson-level resources (no native id on the
+     * type) receive a synthesized id so React keys + dedup both work.
+     */
     function appendLesson(
       l: Lesson,
       seen: Set<string>,
       out: SectionResource[],
     ): void {
-      // Lesson-level resources first — they read as the "headline" set.
+      // Section-level resources — the canonical source per BUG-006.
+      const sectionRefs = lessonResources(getSections(l.id));
+      for (const r of sectionRefs) {
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+        out.push(r);
+      }
+      // Lesson-level resources (Lesson.resources) — synthesize an id so
+      // they participate in the same dedup contract as section resources.
+      // These come AFTER section resources so section edits are the
+      // primary edit surface; lesson-level entries are a legacy fallback
+      // that will migrate to sections as the data model matures.
       l.resources.forEach((r, i) => {
         const id = `lesson:${l.id}:res:${i}`;
         if (seen.has(id)) return;
         seen.add(id);
         out.push({ ...r, id });
       });
-      // Then every section's resources, in the section's display order.
-      const sections = getSections(l.id);
-      for (const section of sections) {
-        for (const r of section.resources) {
-          if (seen.has(r.id)) continue;
-          seen.add(r.id);
-          out.push(r);
-        }
-      }
     }
 
     const seen = new Set<string>();
@@ -776,7 +812,7 @@ export function ResourcesPanel({
       return out;
     }
 
-    // Day mode — existing behavior; bail when nothing is selected.
+    // Day mode — bail when nothing is selected.
     if (!lesson) return [];
     appendLesson(lesson, seen, out);
     return out;
@@ -897,7 +933,13 @@ export function ResourcesPanel({
       className={[styles.panel, isDragOver ? styles.panelDragOver : ""]
         .filter(Boolean)
         .join(" ")}
-      aria-label={isWeek ? "Week resources" : "Lesson resources"}
+      aria-label={
+        isWeek
+          ? "Week resources"
+          : lesson !== null
+            ? `Resources for ${lesson.title}`
+            : "Lesson resources"
+      }
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -921,14 +963,37 @@ export function ResourcesPanel({
             <GripVerticalIcon />
           </button>
         )}
-        {/* Headline. Day mode: just "Resources". Week mode: surface the
-            active week so the teacher knows the aggregation scope at a
-            glance — e.g. "Resources · Week 12". Falls back to plain
-            "Resources" when the consumer didn't pass `week`. */}
-        <h3 className={styles.title}>
+        {/* "Back to week" affordance — shown only when the panel is
+            lesson-scoped on the Weekly view (i.e. `onClearLesson` is
+            supplied AND a lesson is selected). Clicking it clears the
+            weekly card selection so the panel reverts to the week
+            aggregate. Uses a chevron-left + label combination so it
+            reads as a navigation back-action, not a destructive button. */}
+        {!isWeek && lesson !== null && onClearLesson && (
+          <button
+            type="button"
+            className={styles.backBtn}
+            onClick={onClearLesson}
+            aria-label="Back to week resources"
+            title="Show all week's resources"
+          >
+            <BackIcon />
+          </button>
+        )}
+        {/* Headline:
+            • Week mode: "Resources · Week 12" (or just "Resources").
+            • Day mode with a selected lesson: "Resources · <lesson title>"
+              (truncated via CSS ellipsis so the head doesn't overflow).
+            • Day mode with no selection: "Resources". */}
+        <h3
+          className={styles.title}
+          title={!isWeek && lesson !== null ? lesson.title : undefined}
+        >
           {isWeek && typeof week === "number"
             ? `Resources · Week ${week}`
-            : "Resources"}
+            : !isWeek && lesson !== null
+              ? `Resources · ${lesson.title}`
+              : "Resources"}
         </h3>
         {/* Small neutral count chip on the right of the title — only
             shown once there's context (a selected lesson in day mode, or

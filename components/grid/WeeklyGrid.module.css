@@ -12,6 +12,12 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  /* min-width: 0 lets the grid root shrink inside a flex or CSS-grid parent
+     (e.g. the planner shell's content column). Without it, flex items
+     default to min-width: auto and refuse to shrink below their intrinsic
+     size, which breaks the side-by-side planner + right-rail layout. */
+  min-width: 0;
+  width: 100%;
   background: var(--ink-50);
 }
 
@@ -211,7 +217,16 @@
 
 /* ── Day header row ─────────────────────────────────────────────────── */
 .cornerCell {
-  /* Empty top-left intersection. */
+  /* Top-left intersection. Must be opaque so day-header and subject-label
+     rows compose cleanly at the scroll origin, and so cards scrolling
+     past the left edge don't bleed through (BUG-003). Background matches
+     the grid canvas (--ink-50); hairline right border reads as a clean
+     edge against the scrolling day columns. */
+  position: sticky;
+  left: 0;
+  z-index: 6; /* above .dayHead (5) and .subjectHead (4) */
+  background: var(--ink-50);
+  border-right: var(--line);
 }
 
 .dayHead {
@@ -262,7 +277,11 @@
   position: sticky;
   left: 0;
   z-index: 4;
+  /* Opaque background prevents cards scrolling behind this sticky column
+     from bleeding through (BUG-003). Matches the grid canvas color. */
   background: var(--ink-50);
+  /* Hairline right border reads as a clean edge against the scrolling cards. */
+  border-right: var(--line);
 }
 
 .subjectTile {

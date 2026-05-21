@@ -75,11 +75,16 @@ import styles from "./WeeklyShell.module.css";
 const PANE_FLOOR = 40;
 /** Default right-rail width on first paint (pre-localStorage hydration). */
 const RIGHT_PANE_DEFAULT = 320;
+/** Collapsed rail stub width — a slim strip so the teacher can still see
+ *  the hide-rail toggle button and re-expand. */
+const RAIL_STUB_WIDTH = 32;
 /** Keyboard nudge step (px) for the splitter's arrow-key resize. */
 const PANE_STEP = 16;
 /** localStorage key — DISTINCT from Daily's so the two views can size
  *  their rails independently. */
 const RIGHT_PANE_WIDTH_KEY = "mycurricula:weekly-right-width";
+/** localStorage key for the rail's hidden/visible state. */
+const RAIL_HIDDEN_KEY = "mycurricula:weekly-rail-hidden";
 
 /** Clamp a candidate rail width to dynamic, sanity-only bounds.
  *
@@ -137,6 +142,30 @@ function writeRightWidth(px: number): void {
   }
 }
 
+/** Read whether the rail was left hidden. SSR-guarded. */
+function readRailHidden(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(RAIL_HIDDEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Persist the rail hidden state. Non-fatal on failure. */
+function writeRailHidden(hidden: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (hidden) {
+      window.localStorage.setItem(RAIL_HIDDEN_KEY, "1");
+    } else {
+      window.localStorage.removeItem(RAIL_HIDDEN_KEY);
+    }
+  } catch {
+    // Storage full / unavailable — state simply won't persist; non-fatal.
+  }
+}
+
 // ── WeeklyShell ──────────────────────────────────────────────────────────
 
 export function WeeklyShell(): ReactNode {
@@ -144,7 +173,8 @@ export function WeeklyShell(): ReactNode {
   // <WeeklyGrid> already reads. We don't pin a local copy here; the
   // RightRail just needs the current value to scope its Resources +
   // Shoutbox panels.
-  const { week, selectedDay } = useAppState();
+  const { week, selectedDay, selectedLessonId, setSelectedLessonId } =
+    useAppState();
   const { lessons } = usePlanner();
 
   // ── Lessons-for-this-week — fed to RightRail for week-mode aggregation ─
@@ -156,11 +186,30 @@ export function WeeklyShell(): ReactNode {
     [lessons, week],
   );
 
+  // ── Selected lesson object — resolves selectedLessonId → Lesson | null ─
+  // When a card is selected the Resources panel scopes to that lesson;
+  // when null it aggregates across the whole week. The lookup is O(n) but
+  // n is small (one week's lessons) and the result is memoized.
+  const selectedLesson = useMemo<Lesson | null>(
+    () =>
+      selectedLessonId
+        ? (weekLessons.find((l) => l.id === selectedLessonId) ?? null)
+        : null,
+    [selectedLessonId, weekLessons],
+  );
+
   // ── Right-rail width — state + post-mount hydration ──────────────────
   // Initialize to the DEFAULT (not localStorage) so the server-rendered
   // HTML matches the first client render. The effect below hydrates the
   // saved value once mounted. Same pattern DailyView uses.
   const [rightWidth, setRightWidth] = useState<number>(RIGHT_PANE_DEFAULT);
+
+  // ── Rail hidden state — true collapses the rail to a RAIL_STUB_WIDTH
+  //    stub so it is no longer a full 320px. Also hidden automatically on
+  //    viewports narrower than 1280px (handled purely in CSS via a media
+  //    query on the body's grid template). Initialize to false so the SSR
+  //    HTML is predictable; the effect below hydrates the saved preference.
+  const [railHidden, setRailHidden] = useState<boolean>(false);
 
   // Track whether the post-mount hydration completed. We only START
   // persisting writes after that point so the very first effect (loading
@@ -175,9 +224,10 @@ export function WeeklyShell(): ReactNode {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [bodyWidth, setBodyWidth] = useState<number>(0);
 
-  // ── Hydrate the saved width once on mount ────────────────────────────
+  // ── Hydrate the saved width + hidden state once on mount ─────────────
   useEffect(() => {
     setRightWidth(readRightWidth());
+    setRailHidden(readRailHidden());
     hydratedRef.current = true;
   }, []);
 
@@ -186,6 +236,11 @@ export function WeeklyShell(): ReactNode {
     if (!hydratedRef.current) return;
     writeRightWidth(rightWidth);
   }, [rightWidth]);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    writeRailHidden(railHidden);
+  }, [railHidden]);
 
   // ── Observe container size so the bound follows window resizes ───────
   // When the body row shrinks (window resize, devtools opened, …) we
@@ -210,6 +265,19 @@ export function WeeklyShell(): ReactNode {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // ── Esc key — clear the lesson selection so the Resources panel reverts
+  //    to the week aggregate. Listens on the document so it fires even when
+  //    focus is inside the grid or the rail.
+  useEffect(() => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent): void => {
+      if (e.key === "Escape" && selectedLessonId !== null) {
+        setSelectedLessonId(null);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [selectedLessonId, setSelectedLessonId]);
 
   // ── Splitter onDrag — clientX → new rail width ───────────────────────
   // The splitter sits BETWEEN the center grid and the right rail. As the
@@ -242,13 +310,33 @@ export function WeeklyShell(): ReactNode {
     [bodyWidth],
   );
 
+  // ── Hide-rail toggle — collapses the rail to a stub or back to full ──
+  // The stub (RAIL_STUB_WIDTH) is narrow enough that the grid reclaims
+  // nearly all of the body, but the toggle button remains reachable so
+  // the teacher can re-expand without a menu.
+  const handleToggleRail = useCallback((): void => {
+    setRailHidden((prev) => !prev);
+  }, []);
+
   // ── Splitter bounds for ARIA — live + clamped ────────────────────────
   const bounds = useMemo(() => rightBounds(bodyWidth), [bodyWidth]);
+
+  // Effective rail track width: stub when hidden, full width when visible.
+  // The CSS media query at ≤1280px overrides the inline style to 0 so no
+  // footprint overlaps the grid on narrow viewports.
+  const effectiveRailWidth = railHidden
+    ? RAIL_STUB_WIDTH
+    : Math.round(rightWidth);
 
   // Build the body's grid-template-columns inline — center 1fr + auto
   // splitter + sized rail. The icon rail sits OUTSIDE this grid so it
   // never participates in the splitter math.
-  const gridTemplate = `1fr auto ${Math.round(rightWidth)}px`;
+  const gridTemplate = `1fr auto ${effectiveRailWidth}px`;
+
+  // Rail scope: when a lesson is selected we switch from week-aggregation
+  // to lesson-scoped day mode so the Resources panel shows only that
+  // lesson's resources. The RightRail `mode` prop controls this.
+  const railMode: "day" | "week" = selectedLesson !== null ? "day" : "week";
 
   return (
     <div className={styles.page}>
@@ -270,32 +358,96 @@ export function WeeklyShell(): ReactNode {
             <WeeklyGrid />
           </div>
 
-          {/* Splitter — same component the Daily view uses. */}
-          <PaneSplitter
-            width={Math.round(rightWidth)}
-            min={bounds.min}
-            max={bounds.max}
-            onDrag={handleSplitterDrag}
-            onStep={handleSplitterStep}
-            label="Resize resources rail"
-          />
-
-          {/* Right rail — week-scoped. The lessons array drives the
-              Resources panel's week-wide aggregation; To-dos and
-              Shoutbox stay day-scoped via `selectedDay`. We pass
-              `lesson={null}` so the existing day-mode contract is
-              preserved (RightRail ignores `lesson` in week mode). */}
-          <div className={styles.railSlot} data-pane="rail">
-            <RightRail
-              lesson={null}
-              week={week}
-              day={selectedDay}
-              mode="week"
-              lessons={weekLessons}
+          {/* Splitter — same component the Daily view uses. Hidden when the
+              rail is collapsed to the stub so the teacher uses the toggle
+              button instead. */}
+          {!railHidden && (
+            <PaneSplitter
+              width={Math.round(rightWidth)}
+              min={bounds.min}
+              max={bounds.max}
+              onDrag={handleSplitterDrag}
+              onStep={handleSplitterStep}
+              label="Resize resources rail"
             />
+          )}
+
+          {/* Right rail — lesson-scoped when a card is selected, week-scoped
+              otherwise. When collapsed the slot shows only the toggle button
+              so no content overflows into the stub width. */}
+          <div
+            className={[
+              styles.railSlot,
+              railHidden ? styles.railSlotHidden : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            data-pane="rail"
+          >
+            {/* Hide-rail toggle button — always visible so the teacher can
+                re-expand after collapsing. Positioned at the top of the
+                slot. ≥44px touch target via min-height on the button. */}
+            <button
+              type="button"
+              className={styles.railToggleBtn}
+              onClick={handleToggleRail}
+              aria-label={
+                railHidden ? "Show resources rail" : "Hide resources rail"
+              }
+              title={railHidden ? "Show rail" : "Hide rail"}
+            >
+              <RailToggleIcon hidden={railHidden} />
+            </button>
+
+            {/* Full rail content — hidden (but still mounted) when collapsed
+                so state (panel order, heights, collapsed-set) survives
+                toggling. The railSlotHidden class clips the overflow so no
+                content peeks past the stub boundary. */}
+            {!railHidden && (
+              <RightRail
+                lesson={selectedLesson}
+                week={week}
+                day={selectedDay}
+                mode={railMode}
+                lessons={railMode === "week" ? weekLessons : undefined}
+                onClearLesson={
+                  selectedLesson !== null
+                    ? () => setSelectedLessonId(null)
+                    : undefined
+                }
+              />
+            )}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Rail toggle icon ──────────────────────────────────────────────────────
+// A simple chevron that flips direction based on whether the rail is hidden
+// (pointing left = "open it") or visible (pointing right = "close it").
+// aria-hidden because the parent button carries the label.
+
+function RailToggleIcon({ hidden }: { hidden: boolean }): ReactNode {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{
+        transform: hidden ? "rotate(180deg)" : "rotate(0deg)",
+        transition: "transform 0.15s ease-out",
+      }}
+    >
+      {/* Right-pointing chevron › — rotated 180° when rail is hidden */}
+      <polyline points="9 6 15 12 9 18" />
+    </svg>
   );
 }

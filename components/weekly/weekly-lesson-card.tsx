@@ -75,6 +75,8 @@ import {
 import { cycleStatus } from "@/components/lesson-card/status";
 import { TaskRow } from "@/components/lesson-card/task-row";
 import { RichTextEditor } from "@/components/rich-text";
+import { usePlanner } from "@/lib/planner-store";
+import { lessonResources } from "@/lib/lesson-resources";
 import styles from "./weekly-lesson-card.module.css";
 import "@/components/lesson-card/lesson-card.css";
 
@@ -218,6 +220,12 @@ export function WeeklyLessonCard({
   const { style } = useTheme();
   const color = useSubjectColor(lesson.subject);
   const subject = SUBJECT_BY_ID[lesson.subject];
+
+  // BUG-006 — canonical resource source: derive resources from the planner
+  // sections store (the same source the right-rail and daily detail use) so
+  // all three surfaces agree on the same list (audit finding BUG-006).
+  const { getSections } = usePlanner();
+  const sectionResources = lessonResources(getSections(lesson.id));
 
   // Respect prefers-reduced-motion (spec §2.5 / §2.4): under reduced motion,
   // skip height/layout animation and use opacity-only fade instead.
@@ -444,6 +452,41 @@ export function WeeklyLessonCard({
     [lesson.objective],
   );
 
+  // CARD-TITLE-002 — enforce a 120-char plain-text ceiling on the title field.
+  // The RichTextEditor produces HTML; we measure the stripped plain-text length
+  // so HTML tags don't count against the budget. If the paste exceeds the cap,
+  // we slice the HTML string at the first point where the cumulative plain-text
+  // character count reaches 120. Imprecise but safe: slicing mid-tag may produce
+  // a short trailing fragment which stripHtml's DOM parser resolves correctly.
+  const TITLE_MAX_CHARS = 120;
+  const handleTitleChange = useCallback((html: string) => {
+    const plain = stripHtml(html);
+    if (plain.length > TITLE_MAX_CHARS) {
+      // Find the approximate byte-offset in the HTML string where the
+      // visible character count hits the limit. We walk the raw string,
+      // counting non-tag characters until we reach the cap, then cut.
+      let visible = 0;
+      let inTag = false;
+      let cutIdx = html.length;
+      for (let i = 0; i < html.length; i++) {
+        if (html[i] === "<") {
+          inTag = true;
+        } else if (html[i] === ">") {
+          inTag = false;
+        } else if (!inTag) {
+          visible++;
+          if (visible === TITLE_MAX_CHARS) {
+            cutIdx = i + 1;
+            break;
+          }
+        }
+      }
+      setDraftValue(html.slice(0, cutIdx));
+    } else {
+      setDraftValue(html);
+    }
+  }, []);
+
   // ── Leave-card detection ───────────────────────────────────────────────
   // onBlurCapture fires when any element inside the card loses focus. We use
   // the capture phase so we see the event before child stopPropagation calls.
@@ -648,7 +691,16 @@ export function WeeklyLessonCard({
               tabIndex={-1}
               aria-label={expanded ? "Collapse lesson" : "Expand lesson"}
             >
-              {/* Band top row: [code badge] check + subject·time + right controls */}
+              {/* BUG-002: Band is split into two rows to prevent overflow when
+              status indicators accumulate. Row 1 always renders; Row 2 appears
+              only when the card carries moved/modified state. Fixed affordances
+              (drag handle, ⋯ menu) are pinned to the trailing edge of Row 1 so
+              they never compete with the growing indicator cluster.
+
+              Row 1: [code badge] [check] [subject · time — flex:1] [affordances]
+              Row 2: [moved indicator?] [Modified pill?]  — conditional            */}
+
+              {/* ── Band row 1: identity + fixed affordances ─────────────────── */}
               <div className={styles.bandTop}>
                 {/* 2-letter subject code badge — leading edge of the header band.
               Mirrors the compact chip's "XX · Title" prefix so the subject
@@ -681,50 +733,22 @@ export function WeeklyLessonCard({
                 {/* Subject eyebrow + time — grouped identifier row.
               Subject name: uppercase eyebrow label (strong, compact).
               Time: tabular-numeric, slightly softer weight, separated by
-              a thin vertical rule so the two pieces read as one unit. */}
+              a thin vertical rule so the two pieces read as one unit.
+              flex:1 + min-width:0 so it takes up available space while
+              allowing the trailing affordances to stay at their natural width. */}
                 <div className={styles.bandMeta} style={{ color: color.cd }}>
                   <span className={styles.bandSubject}>{subject.name}</span>
                   <span className={styles.bandMetaSep} aria-hidden />
                   <span className={styles.bandTime}>{timeLabel}</span>
                 </div>
 
-                {/* Right indicator cluster: move arrow, Modified pill, drag, ⋯ */}
+                {/* Affordances: drag handle (always shown) + ⋯ menu.
+              Pinned to trailing edge of Row 1 so they never overlap with
+              the moved/modified indicators that live in Row 2. */}
                 <div
                   className={styles.bandControls}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {lesson.moved && (
-                    <span
-                      className={styles.indicator}
-                      title={
-                        lesson.moved === "across-weeks"
-                          ? "Moved across weeks"
-                          : "Moved within the week"
-                      }
-                      aria-label={
-                        lesson.moved === "across-weeks"
-                          ? "Moved across weeks"
-                          : "Moved within the week"
-                      }
-                      style={{
-                        background: color.stripe,
-                        color: "var(--paper)",
-                      }}
-                    >
-                      {lesson.moved === "across-weeks" ? "⤴" : "↔"}
-                    </span>
-                  )}
-                  {lesson.modified && (
-                    <span
-                      className={styles.modifiedPill}
-                      title="Personally modified from the Core Curriculum"
-                      // Deep (~700–800) tone: white text clears AA in every palette.
-                      style={{ background: color.deep, color: "var(--paper)" }}
-                    >
-                      Modified
-                    </span>
-                  )}
-                  {/* Affordances: drag handle (always shown) + ⋯ menu */}
                   <span className={styles.affordanceRow}>
                     {dragHandleProps && (
                       <span
@@ -758,6 +782,50 @@ export function WeeklyLessonCard({
                 </div>
               </div>
 
+              {/* ── Band row 2: status indicators (conditional) ───────────────── */}
+              {/* Rendered only when the card carries move or modification state
+              so the row takes no space for clean, unmodified lessons.
+              Each element is flex:0 0 auto so they never grow or wrap into
+              each other. */}
+              {(lesson.moved || lesson.modified) && (
+                <div
+                  className={styles.bandStatusRow}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {lesson.moved && (
+                    <span
+                      className={styles.indicator}
+                      title={
+                        lesson.moved === "across-weeks"
+                          ? "Moved across weeks"
+                          : "Moved within the week"
+                      }
+                      aria-label={
+                        lesson.moved === "across-weeks"
+                          ? "Moved across weeks"
+                          : "Moved within the week"
+                      }
+                      style={{
+                        background: color.stripe,
+                        color: "var(--paper)",
+                      }}
+                    >
+                      {lesson.moved === "across-weeks" ? "⤴" : "↔"}
+                    </span>
+                  )}
+                  {lesson.modified && (
+                    <span
+                      className={styles.modifiedPill}
+                      title="Personally modified from the Core Curriculum"
+                      // Deep (~700–800) tone: white text clears AA in every palette.
+                      style={{ background: color.deep, color: "var(--paper)" }}
+                    >
+                      Modified
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Lesson title — prominent second line of the band. Weight 600,
             one size step up from before, so it reads as the headline of
             the labeled zone rather than a secondary detail.
@@ -778,7 +846,7 @@ export function WeeklyLessonCard({
                   >
                     <RichTextEditor
                       value={draftValue}
-                      onChange={setDraftValue}
+                      onChange={handleTitleChange}
                       autoFocus
                       singleLine
                       ariaLabel="Edit lesson title"
@@ -798,7 +866,9 @@ export function WeeklyLessonCard({
                       if (e.key === "Enter" || e.key === "F2")
                         openEditor("title", e);
                     }}
-                    title="Double-click or press Enter to edit"
+                    // POLISH-007/QW-7: full title in tooltip so teachers can
+                    // read the complete text when the 2-line clamp truncates it.
+                    title={stripHtml(lesson.title)}
                     // eslint-disable-next-line react/no-danger
                     dangerouslySetInnerHTML={{ __html: lesson.title }}
                   />
@@ -1066,7 +1136,9 @@ export function WeeklyLessonCard({
                     } else if (key === "resources") {
                       sectionLabel = "Resources";
                       sectionContent = (
-                        <ResourceList resources={lesson.resources} />
+                        // BUG-006: use canonical section-derived resources so
+                        // card, right-rail, and daily detail all agree.
+                        <ResourceList resources={sectionResources} />
                       );
                     } else if (key === "standards") {
                       sectionLabel = "Standards";
