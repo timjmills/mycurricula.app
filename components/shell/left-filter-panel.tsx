@@ -10,13 +10,12 @@
 // No hex values or raw px sizes here.
 //
 // ── Route-aware suppression ─────────────────────────────────────────────────
-// The Daily AND Weekly views each ship their own slim icon rail and a
-// per-view right column (the WeeklyShell mirrors the DailyView 3-panel
-// pattern), so the global filter pane is intentionally suppressed on
-// `/daily*` AND `/weekly*` routes. Every other planner surface (Subject, …)
-// keeps the panel as-is. We use next/navigation's `usePathname` (which is
-// why this file must remain a client component) to detect the active route
-// and bail early with `null`.
+// The Daily view ships its own slim IconRail in place of the global filter
+// panel, so this panel is suppressed on `/daily*`. The Weekly view no longer
+// hard-suppresses the panel — the teacher's `leftPanelOpen` toggle controls
+// visibility there too (TOPBAR-004: panel must respond to the toggle on all
+// routes, not just Subject). We use next/navigation's `usePathname` (which is
+// why this file must remain a client component) to detect the active route.
 //
 // ── Subject-aware STANDARDS list (BUG-004 / MED-6) ─────────────────────────
 // On /subject, the STANDARDS filter list derives from the standards actually
@@ -117,13 +116,13 @@ export function LeftFilterPanel(): ReactNode {
     return [...seen].sort();
   }, [isSubjectRoute, lessons, subjectView]);
 
-  // Route-based suppression — both the Daily and the Weekly views supply
-  // their own slim icon rail and a per-view right column, so the global
-  // filter pane must not render there. Bailing with `null` keeps the panel
-  // entirely out of the DOM and out of the accessibility tree on `/daily*`
-  // AND `/weekly*` routes.
-  if (pathname?.startsWith("/daily") || pathname?.startsWith("/weekly"))
-    return null;
+  // Route-based suppression — the Daily view supplies its own slim IconRail
+  // in place of the global filter panel (TOPBAR-004). Weekly no longer hard-
+  // suppresses: the teacher's leftPanelOpen toggle governs it there as well,
+  // so another agent can wire its filter pills to the weekly grid without
+  // changing this file. Bailing with `null` keeps the panel entirely out of
+  // the DOM and out of the accessibility tree on `/daily*` routes.
+  if (pathname?.startsWith("/daily")) return null;
 
   // When the panel is closed, return null — keeps the element entirely out
   // of the accessibility tree so screen readers cannot tab into hidden content.

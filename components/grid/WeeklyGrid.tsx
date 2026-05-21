@@ -66,6 +66,7 @@ import {
 import { useReducedMotion } from "framer-motion";
 import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
+import type { ViewMode } from "@/lib/app-state";
 import { useTheme } from "@/lib/theme";
 import { useSubjectColor } from "@/lib/palette";
 import {
@@ -108,7 +109,7 @@ function weekBounds(lessons: Lesson[]): { min: number; max: number } {
 
 export function WeeklyGrid(): ReactNode {
   const { style } = useTheme();
-  const { week, setWeek } = useAppState();
+  const { week, setWeek, search, viewMode, filters } = useAppState();
   const prefersReducedMotion = useReducedMotion();
 
   // ── Planner store — single source of truth for lessons and layouts ─────────
@@ -163,7 +164,46 @@ export function WeeklyGrid(): ReactNode {
     }
   }, [lastChange]);
 
+  // ── Search + filter predicate ─────────────────────────────────────────────
+  // Applied before bucketing so GridCell never sees lessons that don't match.
+  // Each axis is a no-op when the corresponding array is empty (no constraint).
+  const lessonMatchesQuery = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (lesson: Lesson): boolean => {
+      // Search filter (TOPBAR-003): title or preview/directions contains query.
+      if (q) {
+        const hay =
+          `${lesson.title} ${lesson.preview} ${lesson.directions}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      // Subject filter — lesson.subject must be in the active set.
+      if (
+        filters.subjects.length > 0 &&
+        !filters.subjects.includes(lesson.subject)
+      )
+        return false;
+      // Unit filter — lesson.unit must be in the active set.
+      if (filters.units.length > 0 && !filters.units.includes(lesson.unit))
+        return false;
+      // Status filter — lesson.status must be in the active set.
+      if (
+        filters.statuses.length > 0 &&
+        !filters.statuses.includes(lesson.status)
+      )
+        return false;
+      // Standards filter — lesson must carry at least one of the active codes.
+      if (filters.standards.length > 0) {
+        const hasStandard = filters.standards.some((code) =>
+          lesson.standards.includes(code),
+        );
+        if (!hasStandard) return false;
+      }
+      return true;
+    };
+  }, [search, filters]);
+
   // ── bySubjectDay — lessons bucketed by subject × day ──────────────────────
+  // Applies the search + filter predicate so non-matching lessons are hidden.
   const bySubjectDay = useMemo(() => {
     const buckets: Record<string, Lesson[][]> = {};
     for (const s of SUBJECTS) {
@@ -172,10 +212,11 @@ export function WeeklyGrid(): ReactNode {
     for (const lesson of lessons) {
       if (lesson.week !== week) continue;
       if (lesson.day < 0 || lesson.day >= DAY_COUNT) continue;
+      if (!lessonMatchesQuery(lesson)) continue;
       buckets[lesson.subject]?.[lesson.day].push(lesson);
     }
     return buckets;
-  }, [lessons, week]);
+  }, [lessons, week, lessonMatchesQuery]);
 
   const weekHasLessons = useMemo(
     () => lessons.some((l) => l.week === week),
@@ -471,6 +512,7 @@ export function WeeklyGrid(): ReactNode {
                 subjectId={subject.id}
                 cells={bySubjectDay[subject.id]}
                 style={style}
+                viewMode={viewMode}
                 dragState={dragState}
                 density={density}
                 expandedIds={expandedIds}
@@ -532,6 +574,7 @@ interface SubjectRowProps {
   subjectId: SubjectId;
   cells: Lesson[][];
   style: ReturnType<typeof useTheme>["style"];
+  viewMode: ViewMode;
   dragState: DragState;
   density: Density;
   expandedIds: Set<string>;
@@ -557,6 +600,7 @@ function SubjectRow({
   subjectId,
   cells,
   style,
+  viewMode,
   dragState,
   density,
   expandedIds,
@@ -601,6 +645,7 @@ function SubjectRow({
           day={day}
           lessons={cells?.[day] ?? []}
           shade={shade}
+          viewMode={viewMode}
           dragState={dragState}
           density={density}
           expandedIds={expandedIds}

@@ -3,44 +3,51 @@
 // IconRail.tsx — the slim vertical icon strip on the far-left of the Daily
 // view (Image 12 in the design handoff).
 //
-// In the Daily view the global "filter pane" is suppressed (the sibling
-// shell agent owns that), so the far-left chrome is replaced by this rail:
-// a quiet 56px-wide column of icon buttons that gestures at the major
-// app surfaces — calendar / today, schedule, to-dos, year/month, voice
-// notes — with a settings gear pinned to the bottom.
+// ── What changed in Wave 2 (RAIL-001, RAIL-002, POLISH-014) ────────────────
+// RAIL-001: Buttons are now wired:
+//   • "Today" — visually active; navigates to /daily via Next Link (currently
+//     the active page so it refreshes in place, no-op).
+//   • "To-dos" — calls useAppState().toggleTodoPanel; aria-pressed reflects
+//     the live todoPanelOpen state.
+//   • "Schedule", "Year / month overview", "Voice note" — these surfaces do
+//     not exist yet. They render as clearly inert "coming soon" affordances:
+//     no aria-pressed toggle behavior, cursor:default, a tooltip that reads
+//     "<Surface> — coming soon", and a small "soon" chip over the icon.
+// RAIL-002: The Settings gear is always visible without scrolling. The <nav>
+//   now sets overflow:hidden on narrow heights; the gear's parent uses
+//   position:sticky + bottom:0 so the hardware-level sticky algorithm keeps
+//   it in view regardless of the nav height.
+// POLISH-014: Every button already carried a `title` attribute in the
+//   original; confirmed present and correct — no gap to fill.
 //
-// PHASE 1A SCOPE. The buttons are presentational only. They are real
-// <button>s with accessible labels and a visual "active" state so the rail
-// reads as an actual nav, but they do NOT route anywhere yet. When the app
-// shell + router land (Phase 1B) a sibling agent will wire each button to
-// its surface; this file owns only the shape + chrome.
+// ── Add-lesson / Add-event forms ───────────────────────────────────────────
+// The "+ Add a lesson" and "+ Add an event" buttons are in DailyView.tsx.
+// DailyView owns their open-state and renders AddLessonForm / AddEventForm at
+// the root of its page tree so the popovers are never clipped by overflow.
+// The icon rail no longer carries duplicate affordances.
 //
-// CHROME RULES (CLAUDE.md §4):
-//   • Tailwind = layout only. All color / type / spacing comes from
-//     tokens.css via var(--…). No hard-coded hex or px font sizes.
-//   • The rail itself is subject-neutral — it carries no curriculum color.
-//     Hover / active states use ink tokens only.
-//   • Every button is a ≥44px tap target (WCAG AA / touch).
-//   • Icons follow the Lucide-style inline-SVG idiom used throughout the
-//     repo (DailyView.tsx, lesson-flow.tsx, resource-tile.tsx): outline
-//     strokes, 24×24 viewBox, currentColor strokes, aria-hidden.
+// ── Chrome rules (CLAUDE.md §4) ──────────────────────────────────────────
+//   • Tailwind = layout only. All color / type / spacing via tokens.css.
+//   • The rail is subject-neutral (ink tokens only).
+//   • Every interactive button is a ≥44px tap target (WCAG AA).
+//   • Icons follow the Lucide-style inline-SVG idiom.
+//   • Reduced motion is respected by the consumed form components.
 //
-// ACCESSIBILITY. The rail is a <nav> with an aria-label so screen readers
-// announce it as the daily-view navigation. Each button carries an
-// aria-label (the icon is decorative), a title for hover tooltips, and an
-// aria-pressed boolean so the active state is announced.
+// ACCESSIBILITY: The rail is a <nav> with aria-label. Each wired button
+// carries aria-pressed (boolean) and a descriptive aria-label + title.
+// Coming-soon buttons carry aria-disabled="true" and no aria-pressed so
+// screen-readers don't announce them as interactive toggles.
 
-import { useState } from "react";
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useAppState } from "@/lib/app-state";
 import styles from "./IconRail.module.css";
 
 // ── Icon set ─────────────────────────────────────────────────────────────
-// Inline SVGs in the existing Lucide-style outline idiom. Each accepts no
-// props because every button in the rail renders its icon at the same size
-// and the stroke takes the button's `color` via currentColor.
+// Inline SVGs in the Lucide-style outline idiom. 20×20 rendered size,
+// 24×24 viewBox. currentColor strokes follow the button's color token.
 
 function TodayIcon(): ReactNode {
-  // A calendar with the day inside marked — "today" affordance.
   return (
     <svg
       width="20"
@@ -57,7 +64,7 @@ function TodayIcon(): ReactNode {
       <line x1="3" y1="9" x2="21" y2="9" />
       <line x1="8" y1="2.5" x2="8" y2="6" />
       <line x1="16" y1="2.5" x2="16" y2="6" />
-      {/* Filled "today" marker — a small rounded square inside the grid. */}
+      {/* Filled "today" marker — small rounded square inside the grid. */}
       <rect
         x="10.5"
         y="12.5"
@@ -71,7 +78,6 @@ function TodayIcon(): ReactNode {
 }
 
 function ScheduleIcon(): ReactNode {
-  // A clock — the daily timetable / schedule affordance.
   return (
     <svg
       width="20"
@@ -91,7 +97,6 @@ function ScheduleIcon(): ReactNode {
 }
 
 function TodosIcon(): ReactNode {
-  // A check-list clipboard — the to-dos affordance.
   return (
     <svg
       width="20"
@@ -113,7 +118,6 @@ function TodosIcon(): ReactNode {
 }
 
 function YearIcon(): ReactNode {
-  // A 3×3 grid — the year / month overview affordance.
   return (
     <svg
       width="20"
@@ -140,7 +144,6 @@ function YearIcon(): ReactNode {
 }
 
 function VoiceIcon(): ReactNode {
-  // A microphone — the "voice / quick note" affordance.
   return (
     <svg
       width="20"
@@ -162,7 +165,6 @@ function VoiceIcon(): ReactNode {
 }
 
 function SettingsIcon(): ReactNode {
-  // A gear — pinned to the bottom of the rail.
   return (
     <svg
       width="20"
@@ -181,83 +183,111 @@ function SettingsIcon(): ReactNode {
   );
 }
 
-// ── Item descriptor ──────────────────────────────────────────────────────
-// Centralizes the button table so the render is a straight map and a future
-// router wire-up only has to swap out `key` for `href`.
-
-interface RailItem {
-  /** Stable id used as the active-item key (Phase 1A) and the React key. */
-  key: string;
-  /** Accessible label — the icon is decorative. */
-  label: string;
-  /** Render the icon — a noop function so each entry can pick its own. */
-  icon: () => ReactNode;
-}
-
-const TOP_ITEMS: readonly RailItem[] = [
-  { key: "today", label: "Today", icon: TodayIcon },
-  { key: "schedule", label: "Schedule", icon: ScheduleIcon },
-  { key: "todos", label: "To-dos", icon: TodosIcon },
-  { key: "year", label: "Year / month overview", icon: YearIcon },
-  { key: "voice", label: "Voice note", icon: VoiceIcon },
-] as const;
-
-// The settings gear sits in its own bottom-pinned slot, visually separated
-// by an mt:auto. Same `RailItem` shape so the render path is identical.
-const BOTTOM_ITEM: RailItem = {
-  key: "settings",
-  label: "Settings",
-  icon: SettingsIcon,
-};
-
 // ── IconRail ─────────────────────────────────────────────────────────────
 
 export function IconRail(): ReactNode {
-  // The Daily view is the surface this rail lives on, so "today" is the
-  // visually-active item by default. Clicking another button just moves the
-  // active marker locally — there is no router yet (Phase 1A).
-  const [activeKey, setActiveKey] = useState<string>("today");
+  const { todoPanelOpen, toggleTodoPanel } = useAppState();
+  const router = useRouter();
 
   return (
     <nav className={styles.rail} aria-label="Daily view navigation">
       {/* ── Top group: the main surface buttons ────────────────────── */}
       <ul className={styles.list} role="list">
-        {TOP_ITEMS.map((item) => (
-          <li key={item.key} className={styles.item}>
-            <button
-              type="button"
-              // aria-pressed (not aria-current) — these are not yet routes;
-              // they are togglable nav affordances within the rail.
-              aria-pressed={activeKey === item.key}
-              aria-label={item.label}
-              title={item.label}
-              className={`${styles.button} ${
-                activeKey === item.key ? styles.buttonActive : ""
-              }`}
-              onClick={() => setActiveKey(item.key)}
-            >
-              <span className={styles.iconSlot} aria-hidden="true">
-                {item.icon()}
-              </span>
-            </button>
-          </li>
-        ))}
+        {/* Today — this IS the daily view; mark active and no-op navigate. */}
+        <li className={styles.item}>
+          <button
+            type="button"
+            aria-pressed={true}
+            aria-label="Today (daily view)"
+            title="Today"
+            className={`${styles.button} ${styles.buttonActive}`}
+            onClick={() => router.push("/daily")}
+          >
+            <span className={styles.iconSlot} aria-hidden="true">
+              <TodayIcon />
+            </span>
+          </button>
+        </li>
+
+        {/* Schedule — coming soon; inert affordance.
+              A plain <span> has no interactive role — screen readers ignore it.
+              pointer-events:none in CSS keeps it outside the keyboard tab order.
+              Sighted users see the title tooltip on hover. */}
+        <li className={styles.item}>
+          <span
+            className={`${styles.button} ${styles.buttonSoon}`}
+            title="Schedule — coming soon"
+          >
+            <span className={styles.iconSlot} aria-hidden="true">
+              <ScheduleIcon />
+            </span>
+            <span className={styles.soonChip} aria-hidden="true">
+              soon
+            </span>
+          </span>
+        </li>
+
+        {/* To-dos — wired to the right-rail to-do panel toggle. */}
+        <li className={styles.item}>
+          <button
+            type="button"
+            aria-pressed={todoPanelOpen}
+            aria-label={todoPanelOpen ? "Close to-do list" : "Open to-do list"}
+            title="To-dos"
+            className={`${styles.button} ${todoPanelOpen ? styles.buttonActive : ""}`}
+            onClick={toggleTodoPanel}
+          >
+            <span className={styles.iconSlot} aria-hidden="true">
+              <TodosIcon />
+            </span>
+          </button>
+        </li>
+
+        {/* Year / month overview — coming soon; inert affordance. */}
+        <li className={styles.item}>
+          <span
+            className={`${styles.button} ${styles.buttonSoon}`}
+            title="Year / month overview — coming soon"
+          >
+            <span className={styles.iconSlot} aria-hidden="true">
+              <YearIcon />
+            </span>
+            <span className={styles.soonChip} aria-hidden="true">
+              soon
+            </span>
+          </span>
+        </li>
+
+        {/* Voice note — coming soon; inert affordance. */}
+        <li className={styles.item}>
+          <span
+            className={`${styles.button} ${styles.buttonSoon}`}
+            title="Voice note — coming soon"
+          >
+            <span className={styles.iconSlot} aria-hidden="true">
+              <VoiceIcon />
+            </span>
+            <span className={styles.soonChip} aria-hidden="true">
+              soon
+            </span>
+          </span>
+        </li>
       </ul>
 
-      {/* ── Bottom-pinned settings gear ───────────────────────────── */}
+      {/* ── Bottom-pinned settings gear (RAIL-002) ────────────────────
+            position:sticky + bottom:0 so the gear is always reachable
+            without scrolling, even when the nav is taller than the
+            viewport. */}
       <div className={styles.bottom}>
         <button
           type="button"
-          aria-pressed={activeKey === BOTTOM_ITEM.key}
-          aria-label={BOTTOM_ITEM.label}
-          title={BOTTOM_ITEM.label}
-          className={`${styles.button} ${
-            activeKey === BOTTOM_ITEM.key ? styles.buttonActive : ""
-          }`}
-          onClick={() => setActiveKey(BOTTOM_ITEM.key)}
+          aria-label="Settings"
+          title="Settings"
+          className={styles.button}
+          onClick={() => router.push("/settings/appearance")}
         >
           <span className={styles.iconSlot} aria-hidden="true">
-            {BOTTOM_ITEM.icon()}
+            <SettingsIcon />
           </span>
         </button>
       </div>

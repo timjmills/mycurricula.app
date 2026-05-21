@@ -630,6 +630,13 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
   // move) are not surfaced in the Subject view UI yet.
   const { lessons, setLessonStatus, lastChange } = usePlanner();
 
+  // ── Global filter rail state (SUBJECT-FILTER-001..004) ────────────────
+  // `filters` is the shared filter state written by the left filter panel.
+  // SubjectPane applies each active filter dimension as a further AND-pass
+  // over the period-filtered lesson set. An empty array for any dimension
+  // means "no filter — show all" (same contract as every other view).
+  const { filters } = useAppState();
+
   // ── Scroll preservation ────────────────────────────────────────────────
   // After any mutation (including undo/redo from another view) bring the
   // affected lesson card into view so the teacher can see what changed.
@@ -659,10 +666,11 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
     [lessons, subjectId],
   );
 
-  // Apply time-period filter
+  // Apply time-period filter (SUBJECT-PERIOD-001)
+  // Period narrows the candidate set before the rail filters are applied.
   const currentMonth = weekToMonth(week);
 
-  const filteredLessons = useMemo(() => {
+  const periodFilteredLessons = useMemo(() => {
     if (period === "All") return allLessons;
     if (period === "Unit") {
       // Scope to lessons in the active unit
@@ -677,6 +685,43 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
     }
     return allLessons;
   }, [allLessons, period, unit.id, week, currentMonth]);
+
+  // Apply left-rail filters on top of the period-filtered set.
+  // Each active dimension narrows further (AND semantics).
+  // An empty array for a dimension means "no constraint on that dimension".
+  //
+  // SUBJECT-FILTER-001: `filters.subjects` — on the Subject view this
+  //   pane is already scoped to one subject; the subjects filter acts as
+  //   an additional guard (hides the pane's lessons if the active subject
+  //   is not in the selected set).
+  // SUBJECT-FILTER-002: `filters.units` — show only lessons in the
+  //   selected unit(s).
+  // SUBJECT-FILTER-003: `filters.statuses` — show only lessons whose
+  //   status is in the selected set.
+  // SUBJECT-FILTER-004: `filters.standards` — show only lessons that
+  //   cover at least one of the selected standard codes.
+  const filteredLessons = useMemo(() => {
+    let base = periodFilteredLessons;
+
+    if (filters.subjects.length > 0) {
+      base = base.filter((l) => filters.subjects.includes(l.subject));
+    }
+    if (filters.units.length > 0) {
+      base = base.filter((l) => filters.units.includes(l.unit));
+    }
+    if (filters.statuses.length > 0) {
+      base = base.filter((l) => filters.statuses.includes(l.status));
+    }
+    if (filters.standards.length > 0) {
+      // Lesson matches if it covers ANY of the selected standards (OR within
+      // the standards dimension, AND across dimensions).
+      base = base.filter((l) =>
+        l.standards.some((s) => filters.standards.includes(s)),
+      );
+    }
+
+    return base;
+  }, [periodFilteredLessons, filters]);
 
   // Header stats — always over the full subject set (not filtered)
   const totalCount = allLessons.length;

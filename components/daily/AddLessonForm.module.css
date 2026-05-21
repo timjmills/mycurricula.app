@@ -1,0 +1,250 @@
+/* AddLessonForm.module.css
+   Inline lesson-creation popover anchored to the right of the icon rail.
+   All color, type, and spacing values come from tokens.css (CLAUDE.md §4).
+   Font sizes follow the --t-<N> scale; ink shades use --ink-<N> steps
+   that exist in tokens.css (:root). */
+
+/* ── Backdrop ─────────────────────────────────────────────────────────── */
+/* Covers the viewport so clicking outside the dialog closes it.
+   Transparent so the rest of the UI stays readable — this is a quick-add
+   flow, not a blocking modal. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 200;
+}
+
+/* ── Dialog box ───────────────────────────────────────────────────────── */
+
+.dialog {
+  position: fixed;
+  /* 56px rail + 8px gap = 64px from the left viewport edge. */
+  left: 64px;
+  /* Vertically centered so the popover appears beside the button
+     regardless of where in the rail the + button sits. */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 280px;
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-popover);
+  display: flex;
+  flex-direction: column;
+  z-index: 201;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dialog {
+    animation: slideIn 0.15s ease-out both;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.title {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-700);
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Day badge — a quiet chip showing which day the lesson is being added to. */
+.dayBadge {
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-500);
+  background: var(--ink-50);
+  border: 1px solid var(--ink-100);
+  border-radius: var(--r-4);
+  padding: 1px 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ≥44px tap target on the close button (WCAG AA — extended via negative margin). */
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 8px;
+  margin: -8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-6);
+  color: var(--ink-400);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.closeBtn:hover {
+  background: var(--ink-50);
+  color: var(--ink-700);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Form body ────────────────────────────────────────────────────────── */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-500);
+}
+
+.input,
+.select {
+  height: 34px;
+  padding: 0 8px;
+  font-size: var(--t-13);
+  color: var(--ink-700);
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-6);
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+
+.input:focus,
+.select:focus {
+  border-color: var(--ink-400);
+  box-shadow: 0 0 0 2px var(--ink-100);
+}
+
+.input::placeholder {
+  color: var(--ink-300);
+}
+
+/* ── Action row ───────────────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+/* Both buttons are ≥34px tall, which with padding produces a ≥44px target
+   when combined with the surrounding form padding (WCAG AA). */
+.btnCancel,
+.btnSave {
+  height: 34px;
+  padding: 0 14px;
+  font-size: var(--t-13);
+  font-weight: 500;
+  border-radius: var(--r-6);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background 0.1s,
+    color 0.1s,
+    border-color 0.1s;
+}
+
+.btnCancel {
+  background: transparent;
+  border-color: var(--ink-200);
+  color: var(--ink-500);
+}
+
+.btnCancel:hover {
+  background: var(--ink-50);
+  border-color: var(--ink-200);
+}
+
+.btnSave {
+  background: var(--ink-700);
+  color: var(--paper);
+}
+
+.btnSave:hover:not(:disabled) {
+  background: var(--ink-900);
+}
+
+.btnSave:disabled,
+.btnSave[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btnCancel:focus-visible,
+.btnSave:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Utility ──────────────────────────────────────────────────────────── */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .dialog {
+    animation: none;
+  }
+
+  .input,
+  .select,
+  .btnCancel,
+  .btnSave {
+    transition: none;
+  }
+}

@@ -9,8 +9,18 @@
 //
 // State from useAppState() — including `currentUser`, derived from the
 // Supabase Auth session, for the profile avatar. CURRENT_WEEK (mock) seeds the
-// week jumper. Desktop-first (~1280px); bar scrolls horizontally on narrower
-// viewports.
+// week jumper. Desktop-first (~1280px).
+//
+// TOPBAR-001: bar must fit without horizontal scroll at 1024–1920px.
+//   • The search field is collapsible: icon-only at rest, expands to a text
+//     input on click/focus, collapses on blur or Escape.
+//   • "soon" view tabs are hidden below 1280px (they are non-interactive;
+//     hiding them recovers ~210px that would otherwise trigger overflow).
+//   • The right cluster (to-do, comments, profile, sign-out) has a minimum
+//     padding-right:16px so the last control is never flush with the edge.
+// TOPBAR-004: the panel-collapse toggle calls useAppState().toggleLeftPanel —
+//   confirmed wired (see onClick below).
+// TOPBAR-003/006: search → setSearch ✓; view-mode pill → setViewMode ✓.
 
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -67,6 +77,13 @@ export function TopBar(): ReactNode {
     usePlanner();
 
   const pathname = usePathname();
+
+  // TOPBAR-001 — collapsible search state.
+  // The search field is hidden at rest (icon-only button shows instead).
+  // Clicking the icon or focusing the input reveals the full input field.
+  // Blurring with no query, or pressing Escape, collapses it back.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Keep a stable ref to the latest undo/redo so the keydown listener never
   // captures a stale closure — the ref is updated on every render before the
@@ -134,7 +151,11 @@ export function TopBar(): ReactNode {
 
       <div className={styles.divider} aria-hidden="true" />
 
-      {/* ── Left-panel collapse toggle ─────────────────────────────── */}
+      {/* ── Left-panel collapse toggle (TOPBAR-004) ───────────────────
+          onClick calls toggleLeftPanel from useAppState() which drives the
+          leftPanelOpen boolean. The panel itself is rendered by another agent
+          (WeeklyShell / planner layout) — this button is solely responsible
+          for toggling the state that controls it. */}
       <button
         type="button"
         className={`${styles.iconBtn} ${leftPanelOpen ? styles.iconBtnActive : ""}`}
@@ -310,20 +331,55 @@ export function TopBar(): ReactNode {
       {/* Push remaining controls to the right */}
       <div className={styles.spacer} aria-hidden="true" />
 
-      {/* ── Search ────────────────────────────────────────────────── */}
-      <div className={styles.searchWrap}>
-        <span className={styles.searchIcon} aria-hidden="true">
-          <SearchIcon />
-        </span>
-        <input
-          type="search"
-          className={styles.searchInput}
-          placeholder="Search lessons…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+      {/* ── Search — collapsible (TOPBAR-001) ────────────────────────
+          At rest: a 36px icon button (same size as the other icon buttons)
+          so the bar fits without horizontal scroll at 1024px. Clicking the
+          icon or pressing Enter/Space on it opens the full text input and
+          moves focus into it. The input collapses back on blur (when the
+          query is empty) or on Escape (always). A non-empty query keeps the
+          field open after blur so search results stay visible. This pattern
+          keeps every control reachable without a "More" overflow menu. */}
+      {searchOpen ? (
+        <div className={styles.searchWrap}>
+          <span className={styles.searchIcon} aria-hidden="true">
+            <SearchIcon />
+          </span>
+          <input
+            ref={searchInputRef}
+            type="search"
+            className={styles.searchInput}
+            placeholder="Search lessons…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search lessons"
+            // Collapse on blur when the query is empty; keep open otherwise
+            // so results stay visible after the teacher types something.
+            onBlur={() => {
+              if (!search) setSearchOpen(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setSearch("");
+                setSearchOpen(false);
+              }
+            }}
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={styles.iconBtn}
           aria-label="Search lessons"
-        />
-      </div>
+          title="Search lessons"
+          onClick={() => {
+            setSearchOpen(true);
+            // Focus the input on the next frame after it mounts.
+            requestAnimationFrame(() => searchInputRef.current?.focus());
+          }}
+        >
+          <SearchIcon />
+        </button>
+      )}
 
       {/* ── To-do panel toggle ────────────────────────────────────── */}
       <button

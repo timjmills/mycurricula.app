@@ -108,6 +108,68 @@
   justify-content: center;
 }
 
+/* ── Coming-soon affordances (RAIL-001) ──────────────────────────────── */
+/* These slots render as <span> (not <button>) so they are not keyboard-
+   reachable as interactive controls. The cursor stays default and opacity
+   drops to signal "not yet available". */
+
+.buttonSoon {
+  cursor: default;
+  opacity: 0.45;
+  position: relative;
+  /* Override any hover styling inherited from .button. */
+  pointer-events: none;
+}
+
+/* "soon" label — a small badge overlaid at the bottom-right of the icon. */
+.soonChip {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-400);
+  background: var(--ink-100);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-4);
+  padding: 1px 3px;
+  /* Keep it above the icon slot. */
+  z-index: 1;
+  /* Ensure the <span> stays positioned relative to the button wrapper. */
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Add-lesson / add-event buttons (DAILY-ADD-LESSON-001 / DAILY-ADD-EVENT-001) */
+/* A subdued "add" affordance distinct from the surface-navigation buttons
+   above — the tint shifts to the accent hue when active. */
+
+.buttonAdd {
+  position: relative;
+  /* Slightly warmer idle tint to suggest mutative intent. */
+  color: var(--ink-400);
+}
+
+.buttonAdd:hover {
+  color: var(--ink-700);
+  background: var(--ink-50);
+}
+
+/* The single-letter badge ("L" / "E") that disambiguates the two add buttons. */
+.addLabel {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--ink-500);
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ── Reduced motion ───────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .button {

@@ -132,6 +132,8 @@ import { TodayDashboard } from "./TodayDashboard";
 import { IconRail } from "./IconRail";
 import { RightRail } from "./RightRail";
 import { PaneSplitter } from "./PaneSplitter";
+import { AddLessonForm } from "./AddLessonForm";
+import { AddEventForm } from "./AddEventForm";
 import styles from "./DailyView.module.css";
 
 // ── Pane width persistence — NO fixed clamps; sanity-bounded by container ─
@@ -1014,6 +1016,13 @@ export function DailyView(): ReactNode {
   // Collapse-all toggle — default expanded. UI-only, never persisted.
   const [collapsedAll, setCollapsedAll] = useState(false);
 
+  // Add-lesson / add-event form open state (DAILY-ADD-LESSON-001 / DAILY-ADD-EVENT-001).
+  // The forms are position:fixed popovers rendered at the bottom of the page tree
+  // so they are not clipped by any parent overflow. Mutually exclusive — opening
+  // one closes the other so only one form is ever open at a time.
+  const [addLessonOpen, setAddLessonOpen] = useState(false);
+  const [addEventOpen, setAddEventOpen] = useState(false);
+
   // Narrow-mode pane choice — CSS decides whether this matters (it is inert
   // on wide viewports). "list" shows the lesson list; "detail" the right
   // pane. Selecting a lesson swaps to "detail"; "← Back" returns to "list".
@@ -1502,13 +1511,17 @@ export function DailyView(): ReactNode {
                 </span>
                 {collapsedAll ? "Expand all" : "Collapse all"}
               </button>
-              {/* Filled blue "+" add-lesson button — Phase 1A stub. */}
+              {/* Filled blue "+" add-lesson button (DAILY-ADD-LESSON-001). */}
               <button
                 type="button"
                 className={styles.addLessonBtn}
                 aria-label="Add a lesson"
                 title="Add a lesson"
-                disabled
+                aria-pressed={addLessonOpen}
+                onClick={() => {
+                  setAddEventOpen(false);
+                  setAddLessonOpen((v) => !v);
+                }}
               >
                 <svg
                   width="12"
@@ -1598,11 +1611,16 @@ export function DailyView(): ReactNode {
                   Today&apos;s Events
                 </span>
               </div>
-              {/* Non-functional add-event affordance — Phase 1A stub. */}
+              {/* Add-event button (DAILY-ADD-EVENT-001). */}
               <button
+                type="button"
                 className={styles.addEventBtn}
                 aria-label="Add an event"
-                disabled
+                aria-pressed={addEventOpen}
+                onClick={() => {
+                  setAddLessonOpen(false);
+                  setAddEventOpen((v) => !v);
+                }}
               >
                 <svg
                   width="11"
@@ -1763,6 +1781,23 @@ export function DailyView(): ReactNode {
           </DndContext>
         </div>
       </div>
+
+      {/* ── Add-lesson / add-event forms ──────────────────────────────────
+          Rendered at the root of the page tree so they sit outside every
+          overflow:hidden ancestor and appear above all other chrome.
+          Both are position:fixed — they position themselves correctly
+          regardless of DOM depth. */}
+      <AddLessonForm
+        open={addLessonOpen}
+        onClose={() => setAddLessonOpen(false)}
+        week={week}
+        day={selectedDay}
+      />
+      <AddEventForm
+        open={addEventOpen}
+        onClose={() => setAddEventOpen(false)}
+        day={selectedDay}
+      />
     </div>
   );
 }

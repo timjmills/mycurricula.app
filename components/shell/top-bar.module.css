@@ -4,9 +4,12 @@
  * border. All interactive controls use the token system only — no hard-coded
  * colors or sizes.
  *
- * Layout: a single flex row (left → right) at ~52px tall. At narrower
- * viewports the bar scrolls horizontally rather than collapsing, since the
- * main layout is desktop-first at 1280px+.
+ * Layout: a single flex row (left → right) at ~52px tall.
+ * TOPBAR-001: the bar must fit at 1024–1920px without horizontal overflow.
+ *   Strategy: the search field is collapsible (icon-only at rest, expands on
+ *   click — see top-bar.tsx). "soon" tabs are hidden below 1280px via the
+ *   .viewTabSoonHidden utility. padding-right:16px (QW-3) ensures the last
+ *   control is never flush with the viewport edge.
  */
 
 /* ── Outer bar ──────────────────────────────────────────────────────── */
@@ -14,6 +17,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  /* QW-3: padding-right ≥ 16px so the rightmost control never clips. */
   padding: 0 16px;
   height: 52px;
   background: var(--paper);
@@ -21,14 +25,12 @@
   position: sticky;
   top: 0;
   z-index: 30;
-  /* Allow horizontal scroll on narrow screens rather than crushing controls. */
-  overflow-x: auto;
-  overflow-y: visible;
-  /* Hide scrollbar on desktop; power users can still scroll if needed. */
-  scrollbar-width: none;
-}
-.bar::-webkit-scrollbar {
-  display: none;
+  /* TOPBAR-001: no horizontal scroll — bar content is sized to fit.
+     overflow:visible lets the focused search input expand into the bar
+     without being clipped. */
+  overflow: visible;
+  /* min-width:0 lets the bar shrink inside its flex/grid parent. */
+  min-width: 0;
 }
 
 /* ── Wordmark ───────────────────────────────────────────────────────── */
@@ -166,11 +168,22 @@
   color: var(--paper);
 }
 
-/* Disabled soon-tab — visible but not interactive */
+/* Disabled soon-tab — visible but not interactive. */
 .viewTabSoon {
   color: var(--ink-300);
   cursor: default;
   pointer-events: none;
+}
+
+/* TOPBAR-001: hide soon-tabs below 1280px to recover ~210px of bar width.
+   They carry no interactivity (pointer-events:none already) and their absence
+   does not affect any user flow. The hide threshold matches the breakpoint
+   where the bar would otherwise overflow at typical laptop widths (~1296px
+   inner). At 1280px+ they re-appear so wider screens show the full switcher. */
+@media (max-width: 1279px) {
+  .viewTabSoon {
+    display: none;
+  }
 }
 
 .soonLabel {
@@ -369,12 +382,17 @@
   box-shadow: 0 1px 2px rgba(20, 22, 32, 0.08);
 }
 
-/* ── Search ─────────────────────────────────────────────────────────── */
+/* ── Search — collapsible (TOPBAR-001) ──────────────────────────────── */
+/* The search wrapper is only rendered when the field is expanded (see
+   top-bar.tsx). At rest, an icon button takes its place in the flex row.
+   When expanded: fixed width so it doesn't crowd adjacent right-cluster
+   controls — 200px gives comfortable typing room without pushing sign-out
+   off screen at 1024px. flex:0 0 auto prevents it from growing/shrinking
+   into other controls. */
 .searchWrap {
   position: relative;
-  flex: 1 1 auto;
-  min-width: 120px;
-  max-width: 240px;
+  flex: 0 0 auto;
+  width: 200px;
 }
 
 .searchIcon {

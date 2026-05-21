@@ -52,6 +52,7 @@ import { WeeklyLessonCard } from "@/components/weekly";
 import type { ContextAction, ContextActionPayload } from "@/components/weekly";
 import type { CellLayout } from "@/lib/cell-layout";
 import type { DragState, Density } from "@/lib/collapse-on-drag";
+import type { ViewMode } from "@/lib/app-state";
 import type { CellShade } from "./unitShading";
 import type { CellNavProps } from "./useGridNavigation";
 import { CardStack } from "./card-stack";
@@ -164,6 +165,14 @@ interface GridCellProps {
   day: number;
   lessons: Lesson[];
   shade: CellShade;
+  /**
+   * Active view mode from the top-bar pill (TOPBAR-006).
+   *   "grid"   — default; full cards.
+   *   "simple" — compact chip row; density forced to "compact" for title-only.
+   *   "task"   — full cards with task emphasis; cell gets data-view-mode="task"
+   *              for CSS-driven row prominence (no card prop needed).
+   */
+  viewMode: ViewMode;
   /** Board-level drag state (for `isOver` detection via droppable). */
   dragState: DragState;
   /** Board-wide density derived from dragState. */
@@ -192,6 +201,7 @@ export function GridCell({
   day,
   lessons,
   shade,
+  viewMode,
   dragState,
   density,
   expandedIds,
@@ -207,6 +217,16 @@ export function GridCell({
   onEditLesson,
   onSaveTarget,
 }: GridCellProps): ReactNode {
+  // ── View-mode density override (TOPBAR-006) ───────────────────────────────
+  // "simple" → force compact chips for every card so the row collapses to a
+  // title-only strip. Drag density still wins when a drag is active (the
+  // board-level density is already "compact" then, so no conflict).
+  // "task" → keep full density; the data-view-mode attribute on the cell root
+  //   lets CSS emphasize task-row content without touching the card component.
+  // "grid" → no override; use the board-level density as-is.
+  const effectiveDensity: Density =
+    viewMode === "simple" && density === "full" ? "compact" : density;
+
   // ── dnd-kit droppable (spec §3.3) ─────────────────────────────────────────
   const droppableId = `cell:${subjectId}:${day}`;
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -259,7 +279,7 @@ export function GridCell({
       <SortableLessonItem
         key={lesson.id}
         lesson={lesson}
-        density={density}
+        density={effectiveDensity}
         expanded={expandedIds.has(lesson.id)}
         selected={selectedId === lesson.id}
         dragging={dragActiveId === lesson.id}
@@ -272,7 +292,7 @@ export function GridCell({
       />
     ),
     [
-      density,
+      effectiveDensity,
       expandedIds,
       selectedId,
       dragActiveId,
@@ -336,11 +356,21 @@ export function GridCell({
     });
   }
 
+  // "simple" cells are chips-only — shrink the min-height so the row doesn't
+  // leave a void above/below the 28px chips.
+  const viewModeClass =
+    viewMode === "simple"
+      ? styles.cellSimple
+      : viewMode === "task"
+        ? styles.cellTask
+        : "";
+
   return (
     <div
       ref={setDropRef}
-      className={`${styles.cell} ${stateClass} ${showDropGlow ? styles.cellDropGlow : ""} ${dropOnOccupied ? styles.cellDropGlowOccupied : ""}`}
+      className={`${styles.cell} ${stateClass} ${viewModeClass} ${showDropGlow ? styles.cellDropGlow : ""} ${dropOnOccupied ? styles.cellDropGlowOccupied : ""}`}
       style={cssVars}
+      data-view-mode={viewMode}
       role="gridcell"
       aria-label={cellLabel}
       aria-expanded={hasMultiple ? maximized : undefined}
