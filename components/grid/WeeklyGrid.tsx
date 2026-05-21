@@ -122,6 +122,7 @@ export function WeeklyGrid(): ReactNode {
     setLessonStatus,
     editLesson,
     duplicateLesson,
+    duplicateWeek,
     setSaveTarget,
     lastChange,
   } = usePlanner();
@@ -135,6 +136,32 @@ export function WeeklyGrid(): ReactNode {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [maximizedCell, setMaximizedCell] = useState<string | null>(null);
+
+  // ── Bulk multi-select state (BIG-1) ───────────────────────────────────────
+  // Cmd/Ctrl-click: toggle a lesson in/out of the selection.
+  // Shift-click: extend range from the last-clicked lesson.
+  // Esc / empty-canvas click: clear the selection.
+  // Selection is UI-only — no history entry. Bulk move routes through the
+  // store as N individual moveLesson calls (one undo step each), matching
+  // the same forking semantics as a single drag.
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  // The lesson id last explicitly clicked (not shift-extended) — used as the
+  // anchor point for the next shift-click range.
+  const lastClickedIdRef = useRef<string | null>(null);
+
+  /** Clear the bulk selection. */
+  const clearBulkSelection = useCallback(() => {
+    setBulkSelectedIds((prev) => (prev.size === 0 ? prev : new Set()));
+    lastClickedIdRef.current = null;
+  }, []);
+
+  // ── Duplicate-week confirmation toast ─────────────────────────────────────
+  // A brief inline message confirming the operation succeeded — per CLAUDE.md
+  // no blocking confirm dialog is used.
+  const [dupeToast, setDupeToast] = useState<string | null>(null);
+  const dupeToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── dnd-kit drag state (spec §2.2) ────────────────────────────────────────
   // Also UI state — drag phase is never part of history.
@@ -223,6 +250,21 @@ export function WeeklyGrid(): ReactNode {
     [lessons, week],
   );
 
+  // ── Flat ordered list of visible week lessons (for shift-click range) ──────
+  // Row-major order: subjects top-to-bottom, days left-to-right within each.
+  // Declared after bySubjectDay to avoid the temporal dead zone.
+  const flatWeekLessons = useMemo<Lesson[]>(() => {
+    const result: Lesson[] = [];
+    for (const subject of SUBJECTS) {
+      for (let d = 0; d < DAY_COUNT; d++) {
+        for (const lesson of bySubjectDay[subject.id]?.[d] ?? []) {
+          result.push(lesson);
+        }
+      }
+    }
+    return result;
+  }, [bySubjectDay]);
+
   // ── Keyboard navigation ────────────────────────────────────────────────────
   const expandCell = useCallback(
     (pos: CellPos) => {
@@ -259,6 +301,15 @@ export function WeeklyGrid(): ReactNode {
     onActivate: expandCell,
     onCollapse: collapseAll,
   });
+
+  // ── Esc clears bulk selection ─────────────────────────────────────────────
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent): void {
+      if (e.key === "Escape") clearBulkSelection();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [clearBulkSelection]);
 
   // ── dnd-kit event handlers ─────────────────────────────────────────────────
 
@@ -341,6 +392,8 @@ export function WeeklyGrid(): ReactNode {
   }
 
   function handleSelect(lessonId: string): void {
+    // Plain click: clear bulk selection, act as single-card select.
+    clearBulkSelection();
     setSelectedId(lessonId);
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -348,6 +401,61 @@ export function WeeklyGrid(): ReactNode {
       else next.add(lessonId);
       return next;
     });
+  }
+
+  /**
+   * BIG-1: modifier-aware selection handler.
+   *   ctrl=true → toggle this lesson in/out of the bulk set.
+   *   shift=true → extend range from the last-clicked anchor to this lesson.
+   *   neither   → delegate to plain handleSelect (expand/collapse + single select).
+   */
+  function handleSelectWithModifiers(
+    lessonId: string,
+    modifiers: { ctrl: boolean; shift: boolean },
+  ): void {
+    if (!modifiers.ctrl && !modifiers.shift) {
+      handleSelect(lessonId);
+      return;
+    }
+
+    if (modifiers.ctrl) {
+      // Toggle this lesson in/out of the bulk selection.
+      setBulkSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(lessonId)) next.delete(lessonId);
+        else next.add(lessonId);
+        return next;
+      });
+      lastClickedIdRef.current = lessonId;
+      return;
+    }
+
+    // Shift-click: extend range from lastClickedId to this lesson (row-major).
+    if (modifiers.shift) {
+      const anchor = lastClickedIdRef.current;
+      if (!anchor || anchor === lessonId) {
+        // No anchor or same lesson — treat as ctrl-click.
+        setBulkSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.add(lessonId);
+          return next;
+        });
+        lastClickedIdRef.current = lessonId;
+        return;
+      }
+      const anchorIdx = flatWeekLessons.findIndex((l) => l.id === anchor);
+      const targetIdx = flatWeekLessons.findIndex((l) => l.id === lessonId);
+      if (anchorIdx === -1 || targetIdx === -1) {
+        // Fallback: just add this lesson.
+        setBulkSelectedIds((prev) => new Set([...prev, lessonId]));
+        return;
+      }
+      const lo = Math.min(anchorIdx, targetIdx);
+      const hi = Math.max(anchorIdx, targetIdx);
+      const rangeIds = flatWeekLessons.slice(lo, hi + 1).map((l) => l.id);
+      setBulkSelectedIds((prev) => new Set([...prev, ...rangeIds]));
+      // Do NOT update the anchor — shift-click keeps the original anchor.
+    }
   }
 
   function handleToggleMaximize(subjectId: SubjectId, day: number): void {
@@ -419,6 +527,31 @@ export function WeeklyGrid(): ReactNode {
     setSaveTarget(lessonId, target);
   }
 
+  // ── Duplicate-week handler (BIG-2) ─────────────────────────────────────────
+  // Copies the current week into week+1. Lessons already in the target week
+  // are preserved (additive). Shows a brief toast confirmation.
+  function handleDuplicateWeek(): void {
+    const targetWeek = week + 1;
+    duplicateWeek(week, targetWeek);
+    // Brief toast — no blocking dialog (per CLAUDE.md §6).
+    if (dupeToastTimerRef.current) clearTimeout(dupeToastTimerRef.current);
+    const sourceLabel = `Week ${week}`;
+    setDupeToast(`Lessons from ${sourceLabel} copied to Week ${targetWeek}`);
+    dupeToastTimerRef.current = setTimeout(() => setDupeToast(null), 4000);
+  }
+
+  // ── Bulk move handler (BIG-1) ──────────────────────────────────────────────
+  // Routes N individual moveLesson calls through the store so each joins the
+  // undo history. Moves all bulk-selected lessons to the given target day
+  // within the current week. Clears selection after moving.
+  function handleBulkMove(toDay: number): void {
+    if (toDay < 0 || toDay >= DAY_COUNT) return;
+    for (const id of bulkSelectedIds) {
+      moveLesson(id, { day: toDay });
+    }
+    clearBulkSelection();
+  }
+
   // ── Active lesson for DragOverlay ─────────────────────────────────────────
   const activeLessonId = dragState.phase !== "idle" ? dragState.activeId : null;
   const activeLesson = activeLessonId
@@ -472,6 +605,25 @@ export function WeeklyGrid(): ReactNode {
             Minimize all
           </button>
         </div>
+
+        {/* BIG-2: Duplicate this week into the next week. */}
+        <button
+          type="button"
+          className={styles.dupeWeekBtn}
+          onClick={handleDuplicateWeek}
+          title={`Copy all lessons from week ${week} into week ${week + 1}`}
+          aria-label={`Duplicate week ${week} into week ${week + 1}`}
+        >
+          <CopyIcon />
+          Duplicate week
+        </button>
+
+        {/* Inline confirmation toast — shown for 4 s after a duplicate. */}
+        {dupeToast && (
+          <span className={styles.dupeToast} role="status" aria-live="polite">
+            {dupeToast}
+          </span>
+        )}
       </div>
 
       {/* ── DndContext wraps the entire scrollable grid ──────────────────── */}
@@ -483,7 +635,10 @@ export function WeeklyGrid(): ReactNode {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className={styles.scroll}>
+        {/* BIG-1: clicking the empty scroll canvas (not a card) clears the
+            bulk selection. The grid's own cells stopPropagation on card
+            clicks so only a genuine canvas click reaches this handler. */}
+        <div className={styles.scroll} onClick={clearBulkSelection}>
           <div
             className={styles.grid}
             role="grid"
@@ -535,11 +690,13 @@ export function WeeklyGrid(): ReactNode {
                 density={density}
                 expandedIds={expandedIds}
                 selectedId={selectedId}
+                bulkSelectedIds={bulkSelectedIds}
                 maximizedCell={maximizedCell}
                 cellLayouts={cellLayouts}
                 cellProps={gridNav.cellProps}
                 onAdd={handleAdd}
                 onSelect={handleSelect}
+                onSelectWithModifiers={handleSelectWithModifiers}
                 onToggleComplete={handleToggleComplete}
                 onContextAction={handleContextAction}
                 onToggleMaximize={handleToggleMaximize}
@@ -578,6 +735,52 @@ export function WeeklyGrid(): ReactNode {
           )}
         </DragOverlay>
       </DndContext>
+
+      {/* ── Bulk action bar (BIG-1) ───────────────────────────────────────
+          Floats at the bottom of the grid page when ≥1 lesson is selected.
+          Actions: Move to… (day picker), Clear selection. */}
+      {bulkSelectedIds.size > 0 && (
+        <div
+          className={styles.bulkBar}
+          role="toolbar"
+          aria-label="Bulk actions"
+        >
+          <span className={styles.bulkCount}>
+            {bulkSelectedIds.size} lesson
+            {bulkSelectedIds.size === 1 ? "" : "s"} selected
+          </span>
+
+          {/* Move to day — one button per school day. */}
+          <span className={styles.bulkLabel}>Move to:</span>
+          <div
+            className={styles.bulkDayGroup}
+            role="group"
+            aria-label="Move to day"
+          >
+            {WEEK_DAYS.map((dayName, dayIdx) => (
+              <button
+                key={dayName}
+                type="button"
+                className={styles.bulkDayBtn}
+                onClick={() => handleBulkMove(dayIdx)}
+                aria-label={`Move selected lessons to ${dayName}`}
+              >
+                {WEEK_DAYS_SHORT[dayIdx] ?? dayName}
+              </button>
+            ))}
+          </div>
+
+          {/* Clear selection. */}
+          <button
+            type="button"
+            className={styles.bulkClearBtn}
+            onClick={clearBulkSelection}
+            aria-label="Clear selection"
+          >
+            Clear
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -597,11 +800,18 @@ interface SubjectRowProps {
   density: Density;
   expandedIds: Set<string>;
   selectedId: string | null;
+  /** IDs in the current bulk multi-selection (BIG-1). */
+  bulkSelectedIds: Set<string>;
   maximizedCell: string | null;
   cellLayouts: Record<string, CellLayout>;
   cellProps: (row: number, col: number) => CellNavProps;
   onAdd: (subjectId: SubjectId, day: number) => void;
   onSelect: (id: string) => void;
+  /** BIG-1: modifier-aware select (Ctrl/Shift). */
+  onSelectWithModifiers: (
+    id: string,
+    modifiers: { ctrl: boolean; shift: boolean },
+  ) => void;
   onToggleComplete: (id: string, next: LessonStatus) => void;
   onContextAction: (
     action: ContextAction,
@@ -623,11 +833,13 @@ function SubjectRow({
   density,
   expandedIds,
   selectedId,
+  bulkSelectedIds,
   maximizedCell,
   cellLayouts,
   cellProps,
   onAdd,
   onSelect,
+  onSelectWithModifiers,
   onToggleComplete,
   onContextAction,
   onToggleMaximize,
@@ -668,11 +880,13 @@ function SubjectRow({
           density={density}
           expandedIds={expandedIds}
           selectedId={selectedId}
+          bulkSelectedIds={bulkSelectedIds}
           maximized={maximizedCell === `${subjectId}:${day}`}
           cellLayout={cellLayouts[cellKey(subjectId, day)] ?? null}
           navProps={cellProps(rowIndex, day)}
           onAdd={onAdd}
           onSelect={onSelect}
+          onSelectWithModifiers={onSelectWithModifiers}
           onToggleComplete={onToggleComplete}
           onContextAction={onContextAction}
           onToggleMaximize={onToggleMaximize}
@@ -681,5 +895,27 @@ function SubjectRow({
         />
       ))}
     </>
+  );
+}
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
+/** Copy icon for the "Duplicate week" toolbar button. */
+function CopyIcon(): ReactNode {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
   );
 }

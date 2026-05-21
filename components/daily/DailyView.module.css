@@ -22,6 +22,59 @@
   background: var(--ink-50);
 }
 
+/* ── Breadcrumb: Week N / Day / Subject (BIG-7) ─────────────────────────
+   A slim single-line strip across the top of the Daily view.  Each segment
+   is a clickable link; chevron separators are presentational (aria-hidden).
+   Sits above the body row (icon rail + columns) so it spans the full width.
+   Color is neutral ink — it is navigation chrome, not subject-colored. */
+
+.breadcrumb {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  height: 30px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--ink-150);
+}
+
+.breadcrumbList {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--t-12);
+  color: var(--ink-400);
+}
+
+.breadcrumbLink {
+  color: var(--ink-500);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 2px 4px;
+  border-radius: var(--r-4);
+  transition: color 0.1s ease;
+}
+
+.breadcrumbLink:hover {
+  color: var(--ink-900);
+}
+
+.breadcrumbLink:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.breadcrumbSep {
+  color: var(--ink-300);
+  font-size: var(--t-11);
+  /* The separator is aria-hidden — it exists only for visual rhythm.
+     Keyboard and screen-reader users navigate the link text directly. */
+  user-select: none;
+}
+
 /* ── Week strip (inside the lesson list column) ───────────────────────── */
 /* One pill per configured school-week day. The whole strip is a tablist;
    each pill is a real <button> stacked as: 3-letter day name on top, date

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AppStateProvider } from "@/lib/app-state";
 import { PlannerProvider } from "@/lib/planner-store";
 import {
+  GlobalShortcuts,
   LeftFilterPanel,
   MasterBanner,
   RightPanel,
@@ -44,6 +45,9 @@ export default function PlannerLayout({
             flexDirection: "column",
           }}
         >
+          {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
+            Mounted as a client leaf so the layout stays a Server Component. */}
+          <GlobalShortcuts />
           {/* Master-mode heads-up → persistent banner. Renders only while
             the Master edit mode is active; pins above the top bar. */}
           <MasterBanner />

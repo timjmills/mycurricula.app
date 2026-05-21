@@ -23,6 +23,7 @@ import type { SubjectId, LessonResource, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { useSubjectColor } from "@/lib/palette";
 import { SUBJECTS, UNITS, WEEK_DAYS, CURRENT_WEEK } from "@/lib/mock";
+import { useRouter } from "next/navigation";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import styles from "./SubjectView.module.css";
 
@@ -1070,8 +1071,44 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
 
 // ── Root SubjectView ────────────────────────────────────────────────────
 
-export function SubjectView(): ReactNode {
+/** Props for SubjectView.
+ *
+ * `initialSubject` is set by the dynamic `/subject/[slug]` route to the
+ * slug param. On first mount the component syncs `subjectView` in shared
+ * state to match, so the rest of the app (right-rail filter, filter panel)
+ * always reads the canonical value from app-state — never the raw URL param.
+ * When omitted (e.g. the old flat `/subject` page), the existing `subjectView`
+ * state is used without modification. */
+export interface SubjectViewProps {
+  initialSubject?: SubjectId;
+}
+
+export function SubjectView({ initialSubject }: SubjectViewProps): ReactNode {
   const { subjectView, setSubjectView, week } = useAppState();
+  const router = useRouter();
+
+  // Sync app-state on first mount whenever a slug param was passed in.
+  // The effect runs when `initialSubject` changes (i.e. a route param
+  // change on the same component instance). Empty-dep on purpose would
+  // miss fast client-side navigations between /subject/math and
+  // /subject/reading without a full unmount — hence the dep below.
+  useEffect(() => {
+    if (initialSubject && initialSubject !== subjectView) {
+      setSubjectView(initialSubject);
+    }
+    // `setSubjectView` is stable (from useState setter), `subjectView`
+    // intentionally omitted — we only react to the URL param changing,
+    // not to sidebar clicks (those push the URL themselves via router.push).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSubject]);
+
+  // Navigate to the slug URL AND update app-state. Using router.push keeps
+  // the address bar, browser history, and bookmarks in sync; the effect
+  // above ensures app-state stays consistent on hard-reload or direct link.
+  function handleSubjectSelect(id: SubjectId): void {
+    router.push(`/subject/${id}`);
+    setSubjectView(id);
+  }
 
   // Lessons from the shared store — sidebar badges stay live as other views
   // mark lessons done or undo those changes.
@@ -1106,7 +1143,7 @@ export function SubjectView(): ReactNode {
               isActive={subjectView === s.id}
               doneCount={subjectCounts[s.id]?.done ?? 0}
               totalCount={subjectCounts[s.id]?.total ?? 0}
-              onClick={() => setSubjectView(s.id)}
+              onClick={() => handleSubjectSelect(s.id)}
             />
           ))}
         </nav>

@@ -127,6 +127,7 @@ import {
 } from "@/lib/mock";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { useDndSensors } from "@/lib/collapse-on-drag";
+import Link from "next/link";
 import { LessonDetail } from "./LessonDetail";
 import { TodayDashboard } from "./TodayDashboard";
 import { IconRail } from "./IconRail";
@@ -1696,8 +1697,58 @@ export function DailyView(): ReactNode {
     rail: renderRailColumn,
   };
 
+  // ── Breadcrumb (BIG-7) ─────────────────────────────────────────────────
+  // Week N / <Day> / <Subject> — each segment is a clickable link.
+  // Day label is derived from the configured school-week array (WEEK_DAYS)
+  // so it respects the school's custom week, never a hard-coded weekday set.
+  // Subject is drawn from the selected lesson; falls back to null so the
+  // segment is omitted rather than showing a stale value when no lesson is
+  // selected (e.g. the day is empty).
+  const breadcrumbSubject = selectedLesson
+    ? SUBJECT_BY_ID[selectedLesson.subject]
+    : null;
+
   return (
     <div className={styles.page}>
+      {/* ── Breadcrumb: Week N / Day / Subject (BIG-7) ───────────────────
+          Renders above the body row so it sits flush with the page top,
+          spanning the full width including the icon rail. Each segment is
+          an anchor; the separator chevrons are presentational. */}
+      <nav className={styles.breadcrumb} aria-label="Breadcrumb">
+        <ol className={styles.breadcrumbList}>
+          <li>
+            <Link href="/weekly" className={styles.breadcrumbLink}>
+              Week {week}
+            </Link>
+          </li>
+          <li className={styles.breadcrumbSep} aria-hidden="true">
+            ›
+          </li>
+          <li>
+            {/* Day segment — links to the same daily view; clicking re-confirms
+                the active day, which is a no-op when already on it. */}
+            <Link href="/daily" className={styles.breadcrumbLink}>
+              {WEEK_DAYS[selectedDay] ?? "Day"}
+            </Link>
+          </li>
+          {breadcrumbSubject && (
+            <>
+              <li className={styles.breadcrumbSep} aria-hidden="true">
+                ›
+              </li>
+              <li>
+                <Link
+                  href={`/subject/${breadcrumbSubject.id}`}
+                  className={styles.breadcrumbLink}
+                >
+                  {breadcrumbSubject.name}
+                </Link>
+              </li>
+            </>
+          )}
+        </ol>
+      </nav>
+
       {/* ── aria-live region: column reorder announcements ───────────────
           A visually hidden polite live region — when a column moves
           (mouse, touch, or keyboard) we write the new order into it so

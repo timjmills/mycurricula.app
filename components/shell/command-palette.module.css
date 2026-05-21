@@ -1,0 +1,250 @@
+/* command-palette.module.css — layout and visual treatment for the ⌘K
+   command palette modal.
+
+   Architecture:
+     • .backdrop   — full-viewport fixed overlay; click-outside closes.
+     • .panel      — centered card, max-width 560px, shadow-popover.
+     • .inputRow   — search icon + text input + esc badge, borderless.
+     • .results    — scrollable list of matching options.
+     • .result     — single option row (icon + label + meta).
+     • .footer     — keyboard hint row at the bottom.
+
+   Color: all via var(--token). No hard-coded hex.
+   Motion: entry animations respect prefers-reduced-motion. */
+
+/* ── Backdrop ─────────────────────────────────────────────────────────────── */
+/* High z-index so it sits above the side panels and lesson cards. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(20, 22, 32, 0.42);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 80px 16px 16px;
+  animation: backdropIn 0.15s ease forwards;
+}
+
+@keyframes backdropIn {
+  from {
+    background: rgba(20, 22, 32, 0);
+  }
+  to {
+    background: rgba(20, 22, 32, 0.42);
+  }
+}
+
+/* ── Panel ────────────────────────────────────────────────────────────────── */
+.panel {
+  background: var(--paper);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-popover);
+  border: 1px solid var(--ink-150);
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  outline: none;
+  animation: panelIn 0.15s ease forwards;
+}
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Input row ────────────────────────────────────────────────────────────── */
+/* Search icon + full-width input + esc badge in a single tight row.
+   The row itself acts as the visual "search bar" — no separate border. */
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ink-150);
+  flex-shrink: 0;
+}
+
+.searchIcon {
+  flex-shrink: 0;
+  color: var(--ink-400);
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--t-16);
+  font-weight: 400;
+  color: var(--ink-900);
+  line-height: 1.4;
+}
+
+.input::placeholder {
+  color: var(--ink-400);
+}
+
+/* ── Esc badge ────────────────────────────────────────────────────────────── */
+.escBadge {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-400);
+  background: var(--ink-100);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-6);
+  padding: 2px 6px;
+  letter-spacing: 0.2px;
+  line-height: 1.5;
+  cursor: default;
+}
+
+/* ── Results list ─────────────────────────────────────────────────────────── */
+.results {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ── Single result row ────────────────────────────────────────────────────── */
+/* Min-height satisfies ≥44px touch target. Layout: icon · label · meta.
+   The active row gets a tinted background + accent indicator strip. */
+.result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  min-height: 44px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.result:hover,
+.resultActive {
+  background: var(--ink-50);
+}
+
+/* 2px left accent bar only on the active result. */
+.resultActive::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--ink-700);
+}
+
+/* ── Result icon ─────────────────────────────────────────────────────────── */
+.resultIcon {
+  flex-shrink: 0;
+  color: var(--ink-400);
+}
+
+/* Active row: darken the icon so it reads against the tinted background. */
+.resultActive .resultIcon {
+  color: var(--ink-700);
+}
+
+/* ── Result label ─────────────────────────────────────────────────────────── */
+.resultLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-14);
+  font-weight: 500;
+  color: var(--ink-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Result meta ──────────────────────────────────────────────────────────── */
+.resultMeta {
+  flex-shrink: 0;
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-400);
+  background: var(--ink-100);
+  padding: 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.empty {
+  padding: 24px 20px;
+  text-align: center;
+  font-size: var(--t-14);
+  color: var(--ink-400);
+  line-height: 1.4;
+}
+
+/* ── Footer keyboard hint row ─────────────────────────────────────────────── */
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--ink-100);
+  flex-shrink: 0;
+}
+
+.footerHint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--t-11);
+  color: var(--ink-400);
+}
+
+.footerHint kbd {
+  font-family: var(--font-sans);
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-500);
+  background: var(--ink-100);
+  border: 1px solid var(--ink-200);
+  border-radius: 4px;
+  padding: 1px 5px;
+  line-height: 1.5;
+}
+
+/* ── Screen-reader only ───────────────────────────────────────────────────── */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .backdrop {
+    animation-duration: 0.001ms !important;
+  }
+  .panel {
+    animation-duration: 0.001ms !important;
+  }
+}

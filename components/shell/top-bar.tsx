@@ -71,8 +71,16 @@ export function TopBar(): ReactNode {
     currentUser,
   } = useAppState();
 
-  const { undo, redo, canUndo, canRedo, undoLabel, redoLabel, lessons } =
-    usePlanner();
+  const {
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    undoLabel,
+    redoLabel,
+    lessons,
+    lastChange,
+  } = usePlanner();
 
   const pathname = usePathname();
 
@@ -82,6 +90,17 @@ export function TopBar(): ReactNode {
   // Blurring with no query, or pressing Escape, collapses it back.
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // MED-8 — save indicator. On each planner mutation (detected by lastChange
+  // identity changing) we record the wall-clock time and render "Saved HH:MM".
+  // `lastChange` is null before the first edit, so we show "All changes saved"
+  // until the first mutation arrives.
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  useEffect(() => {
+    // lastChange is null on mount (no mutations yet) — skip the initial null.
+    if (lastChange === null) return;
+    setSavedAt(new Date());
+  }, [lastChange]);
 
   // Keep a stable ref to the latest undo/redo so the keydown listener never
   // captures a stale closure — the ref is updated on every render before the
@@ -224,6 +243,28 @@ export function TopBar(): ReactNode {
 
       <div className={styles.divider} aria-hidden="true" />
 
+      {/* ── Save indicator (MED-8) ────────────────────────────────
+          Shows "Saved HH:MM" after any mutation; "All changes saved" before
+          the first edit. Subtle muted token color so it doesn't compete with
+          the primary controls. aria-live="polite" announces changes to screen
+          readers without interrupting the teacher mid-action. */}
+      <span
+        className={styles.saveIndicator}
+        aria-live="polite"
+        aria-atomic="true"
+        title={
+          savedAt
+            ? `Last saved at ${savedAt.toLocaleTimeString()}`
+            : "All changes saved"
+        }
+      >
+        {savedAt
+          ? `Saved ${savedAt.getHours().toString().padStart(2, "0")}:${savedAt.getMinutes().toString().padStart(2, "0")}`
+          : "All changes saved"}
+      </span>
+
+      <div className={styles.divider} aria-hidden="true" />
+
       {/* ── Undo / Redo ───────────────────────────────────────────── */}
       {/* A paired group of icon buttons. Keyboard shortcuts: Cmd/Ctrl+Z and
           Cmd/Ctrl+Shift+Z (or Ctrl+Y). Disabled state prevents interaction
@@ -340,6 +381,7 @@ export function TopBar(): ReactNode {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Search lessons"
+            data-search-input
             // Collapse on blur when the query is empty; keep open otherwise
             // so results stay visible after the teacher types something.
             onBlur={() => {
@@ -359,6 +401,7 @@ export function TopBar(): ReactNode {
           className={styles.iconBtn}
           aria-label="Search lessons"
           title="Search lessons"
+          data-search-trigger
           onClick={() => {
             setSearchOpen(true);
             // Focus the input on the next frame after it mounts.

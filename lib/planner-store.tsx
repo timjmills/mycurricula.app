@@ -143,6 +143,13 @@ type DuplicateLessonAction = {
   id: string;
 };
 
+/** Copy all lessons from `sourceWeek` into `targetWeek` (BIG-2). */
+type DuplicateWeekAction = {
+  type: "duplicateWeek";
+  sourceWeek: number;
+  targetWeek: number;
+};
+
 type SetSaveTargetAction = {
   type: "setSaveTarget";
   id: string;
@@ -239,6 +246,7 @@ type PlannerAction =
   | SetLessonStatusAction
   | EditLessonAction
   | DuplicateLessonAction
+  | DuplicateWeekAction
   | SetSaveTargetAction
   | SetCellLayoutAction
   | SetSectionsAction
@@ -266,6 +274,8 @@ function labelFor(action: PlannerAction): string {
       return "Edit lesson";
     case "duplicateLesson":
       return "Duplicate lesson";
+    case "duplicateWeek":
+      return `Duplicate week ${action.sourceWeek}`;
     case "setSaveTarget":
       return "Save to " + action.target;
     case "setCellLayout":
@@ -466,6 +476,55 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
         ...doc,
         lessons,
         sections: { ...doc.sections, [copy.id]: copiedSections },
+      };
+    }
+
+    case "duplicateWeek": {
+      // Copy every lesson from sourceWeek into targetWeek (BIG-2).
+      // Each copy gets a fresh id, isPersonal=true (personal copy), and
+      // moved/modified/pendingMaster reset — matching duplicateLesson semantics.
+      // Lessons already in targetWeek are left in place; this is an additive
+      // operation so teachers can carry forward without losing prior changes.
+      const sourceLessons = doc.lessons.filter(
+        (l) => l.week === action.sourceWeek,
+      );
+      if (sourceLessons.length === 0) return doc;
+
+      const copies: Lesson[] = sourceLessons.map((source) => ({
+        ...source,
+        id: uid("lesson"),
+        week: action.targetWeek,
+        isPersonal: true,
+        modified: false,
+        moved: null,
+        pendingMaster: false,
+        status: "not_done" as const,
+        commentCount: 0,
+        unreadComments: 0,
+      }));
+
+      // Seed sections for each copy (deep-copy source sections).
+      const newSections: Record<string, LessonSectionContent[]> = {};
+      const ts = Date.now().toString(36);
+      let counter = 0;
+      for (const [original, copy] of sourceLessons.map(
+        (s, i) => [s, copies[i]] as const,
+      )) {
+        const sourceSections = ensureSections(doc.sections, original.id);
+        newSections[copy.id] = sourceSections.map((sec) => ({
+          ...sec,
+          id: uid("lsec"),
+          resources: sec.resources.map((r) => {
+            counter += 1;
+            return { ...r, id: `res-${ts}-${counter}` };
+          }),
+        }));
+      }
+
+      return {
+        ...doc,
+        lessons: [...doc.lessons, ...copies],
+        sections: { ...doc.sections, ...newSections },
       };
     }
 
@@ -821,6 +880,9 @@ function buildLastChange(action: PlannerAction): LastChange {
     case "setSaveTarget":
       return { kind: action.type, lessonIds: [action.id] };
 
+    case "duplicateWeek":
+      return { kind: action.type, lessonIds: [] };
+
     case "setCellLayout":
       return { kind: action.type, lessonIds: [] };
 
@@ -912,6 +974,13 @@ export interface PlannerValue {
   ) => void;
   /** Duplicate a lesson (inserts immediately after source; marks isPersonal). */
   duplicateLesson: (id: string) => void;
+  /**
+   * Copy all lessons from `sourceWeek` into `targetWeek` (BIG-2 carry-over).
+   * Lessons already in the target week are preserved — this is additive.
+   * Each copy gets a fresh id, isPersonal=true, and status reset to not_done.
+   * Fully undoable (one undo step labelled "Duplicate week N").
+   */
+  duplicateWeek: (sourceWeek: number, targetWeek: number) => void;
   /**
    * Record whether a save was targeting personal or core.
    * "personal" sets modified=true and isPersonal=true (lazy fork).
@@ -1086,6 +1155,13 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     dispatchRef.current({ type: "duplicateLesson", id });
   }, []);
 
+  const duplicateWeek = useCallback(
+    (sourceWeek: number, targetWeek: number) => {
+      dispatchRef.current({ type: "duplicateWeek", sourceWeek, targetWeek });
+    },
+    [],
+  );
+
   const setSaveTarget = useCallback(
     (id: string, target: "personal" | "core") => {
       dispatchRef.current({ type: "setSaveTarget", id, target });
@@ -1236,6 +1312,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       setLessonStatus,
       editLesson,
       duplicateLesson,
+      duplicateWeek,
       setSaveTarget,
       setCellLayout,
       setSections,
@@ -1265,6 +1342,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       setLessonStatus,
       editLesson,
       duplicateLesson,
+      duplicateWeek,
       setSaveTarget,
       setCellLayout,
       setSections,

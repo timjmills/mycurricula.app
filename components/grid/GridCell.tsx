@@ -73,11 +73,18 @@ interface SortableLessonItemProps {
   density: Density;
   expanded: boolean;
   selected: boolean;
+  /** True when this card is in the bulk multi-selection (BIG-1). */
+  bulkSelected: boolean;
   dragging: boolean;
   /** Multi-lesson pager state — when present the card renders an in-card
    *  flip-through footer. Absent for single-lesson and maximized cells. */
   deck?: WeeklyCardDeck;
   onSelect: (id: string) => void;
+  /** BIG-1: modifier-aware select (Ctrl/Shift-click). */
+  onSelectWithModifiers: (
+    id: string,
+    modifiers: { ctrl: boolean; shift: boolean },
+  ) => void;
   onToggleComplete: (id: string, next: LessonStatus) => void;
   onContextAction: (
     action: ContextAction,
@@ -94,7 +101,7 @@ interface SortableLessonItemProps {
 // the full props object is sufficient because:
 //   • lesson identity is stable (same object reference from lessons array)
 //   • density changes once (idle→compact on drag-start, compact→idle on drop)
-//   • expanded/selected/dragging are primitives
+//   • expanded/selected/dragging/bulkSelected are primitives
 //   • callbacks are stable (useCallback in GridCell)
 //   • deck (when present) is a stable object — CardStack memoizes it and its
 //     onPrev/onNext handlers with useMemo/useCallback, so it does not change
@@ -104,9 +111,11 @@ const SortableLessonItem = React.memo(function SortableLessonItem({
   density,
   expanded,
   selected,
+  bulkSelected,
   dragging,
   deck,
   onSelect,
+  onSelectWithModifiers,
   onToggleComplete,
   onContextAction,
   onEditLesson,
@@ -137,13 +146,36 @@ const SortableLessonItem = React.memo(function SortableLessonItem({
     ...attributes,
   };
 
+  // BIG-1: intercept Ctrl/Meta/Shift-click on the card wrapper so modifier
+  // keys route through onSelectWithModifiers instead of the plain onSelect.
+  // The wrapper div is not interactive by default; we only intercept when a
+  // modifier key is down so normal single clicks pass through to the card's
+  // own click handler (which calls onSelect via its onSelect prop).
+  function handleWrapperClick(e: React.MouseEvent<HTMLDivElement>): void {
+    const ctrl = e.ctrlKey || e.metaKey;
+    const shift = e.shiftKey;
+    if (ctrl || shift) {
+      e.stopPropagation();
+      onSelectWithModifiers(lesson.id, { ctrl, shift });
+    }
+  }
+
+  // A bulk-selected card shows the card's own `selected` ring in addition to
+  // a data attribute so CSS can add a distinct overlay ring without modifying
+  // the card component itself.
   return (
-    <div ref={setNodeRef} style={wrapperStyle} className={styles.cardSlot}>
+    <div
+      ref={setNodeRef}
+      style={wrapperStyle}
+      className={styles.cardSlot}
+      onClick={handleWrapperClick}
+      data-bulk-selected={bulkSelected ? "true" : undefined}
+    >
       <WeeklyLessonCard
         lesson={lesson}
         density={density}
         expanded={expanded}
-        selected={selected}
+        selected={selected || bulkSelected}
         dragging={dragging || isDragging}
         deck={deck}
         onSelect={onSelect}
@@ -179,10 +211,17 @@ interface GridCellProps {
   density: Density;
   expandedIds: Set<string>;
   selectedId: string | null;
+  /** IDs currently bulk-selected (BIG-1). */
+  bulkSelectedIds: Set<string>;
   maximized: boolean;
   cellLayout: CellLayout | null;
   onAdd: (subjectId: SubjectId, day: number) => void;
   onSelect: (lessonId: string) => void;
+  /** BIG-1: modifier-aware select (Ctrl/Shift-click). */
+  onSelectWithModifiers: (
+    id: string,
+    modifiers: { ctrl: boolean; shift: boolean },
+  ) => void;
   onToggleComplete: (lessonId: string, next: LessonStatus) => void;
   onContextAction: (
     action: ContextAction,
@@ -206,10 +245,12 @@ export function GridCell({
   density,
   expandedIds,
   selectedId,
+  bulkSelectedIds,
   maximized,
   cellLayout,
   onAdd,
   onSelect,
+  onSelectWithModifiers,
   onToggleComplete,
   onContextAction,
   navProps,
@@ -282,9 +323,11 @@ export function GridCell({
         density={effectiveDensity}
         expanded={expandedIds.has(lesson.id)}
         selected={selectedId === lesson.id}
+        bulkSelected={bulkSelectedIds.has(lesson.id)}
         dragging={dragActiveId === lesson.id}
         deck={deck}
         onSelect={onSelect}
+        onSelectWithModifiers={onSelectWithModifiers}
         onToggleComplete={onToggleComplete}
         onContextAction={onContextAction}
         onEditLesson={onEditLesson}
@@ -295,8 +338,10 @@ export function GridCell({
       effectiveDensity,
       expandedIds,
       selectedId,
+      bulkSelectedIds,
       dragActiveId,
       onSelect,
+      onSelectWithModifiers,
       onToggleComplete,
       onContextAction,
       onEditLesson,

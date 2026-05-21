@@ -457,6 +457,21 @@
   flex: 0 0 auto;
 }
 
+/* ── Save indicator (MED-8) ─────────────────────────────────────────── */
+/* "Saved HH:MM" / "All changes saved" — persistent chrome next to the week
+   label. Intentionally subdued: --ink-400 so it recedes behind the primary
+   controls and reads as ambient status rather than an action affordance.
+   white-space: nowrap prevents wrapping on the one-line bar. */
+.saveIndicator {
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-400);
+  white-space: nowrap;
+  flex: 0 0 auto;
+  user-select: none;
+  padding: 0 4px;
+}
+
 /* ── Spacer — flex push ──────────────────────────────────────────────── */
 .spacer {
   flex: 1 1 auto;

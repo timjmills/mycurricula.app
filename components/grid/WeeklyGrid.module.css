@@ -755,3 +755,189 @@
   display: flex;
   flex-direction: column;
 }
+
+/* ── Duplicate-week button (BIG-2) ─────────────────────────────────────────
+ *
+ * A ghost button sitting in the toolbar next to the expand/minimize control.
+ * Matches the navToday treatment — border + background + hover transition —
+ * but includes a copy icon on the left.
+ */
+.dupeWeekBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 500;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.dupeWeekBtn:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.dupeWeekBtn:focus-visible {
+  outline: 2px solid var(--math);
+  outline-offset: 2px;
+}
+
+/* ── Duplicate-week toast (BIG-2) ──────────────────────────────────────────
+ *
+ * A slim confirmation line shown inside the toolbar for 4 s after the
+ * duplication fires. Uses the --done token (green) for positive feedback.
+ * No motion under prefers-reduced-motion — just a visibility toggle.
+ */
+.dupeToast {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--done);
+  padding: 4px 10px;
+  border-radius: var(--r-8);
+  background: color-mix(in oklch, var(--done) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--done) 25%, transparent);
+  animation: toastIn 0.15s ease;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dupeToast {
+    animation: none;
+  }
+}
+
+/* ── Bulk action bar (BIG-1) ───────────────────────────────────────────────
+ *
+ * Appears between the toolbar and the scroll region whenever at least one
+ * card is bulk-selected (Ctrl/Shift-click). Contains a count label, a row of
+ * "Move to <day>" buttons, and a Clear button on the far right.
+ *
+ * Layout: sticky below the toolbar so it scrolls with the grid position but
+ * stays visible while the teacher picks a target day. z-index 18 (below the
+ * toolbar at 19 and the nav at 20).
+ */
+.bulkBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 22px;
+  /* --fyi is the app's informational blue — neutral to subject meaning.
+     Using a subject color here would imply a subject identity (CLAUDE.md §4). */
+  background: color-mix(in oklch, var(--fyi) 8%, var(--paper));
+  border-bottom: 1px solid color-mix(in oklch, var(--fyi) 20%, transparent);
+  position: sticky;
+  top: 0;
+  z-index: 18;
+  flex-wrap: wrap;
+}
+
+/* "N selected" counter — short weight-600 label. */
+.bulkCount {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-900);
+  flex-shrink: 0;
+}
+
+/* "Move to:" label. */
+.bulkLabel {
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-500);
+  flex-shrink: 0;
+}
+
+/* Row of per-day move buttons. */
+.bulkDayGroup {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* Individual day button — ghost style. */
+.bulkDayBtn {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-8);
+  border: 1px solid var(--ink-200);
+  background: var(--paper);
+  color: var(--ink-700);
+  font-size: var(--t-12);
+  font-weight: 500;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.bulkDayBtn:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.bulkDayBtn:focus-visible {
+  outline: 2px solid var(--fyi);
+  outline-offset: 2px;
+}
+
+/* "Clear" button — pushed to the far right via margin-left: auto. */
+.bulkClearBtn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-8);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-500);
+  font-size: var(--t-12);
+  font-weight: 500;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.bulkClearBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.bulkClearBtn:focus-visible {
+  outline: 2px solid var(--fyi);
+  outline-offset: 2px;
+}
+
+/* BIG-1: Bulk-selected card slot gets a 2px accent ring so the teacher can
+   see which cards are in the selection. The ring is applied here (on the
+   slot wrapper that carries data-bulk-selected) so weekly-lesson-card.tsx
+   does not need a bulkSelected prop of its own for styling.
+   Token: --fyi (#1f6fb8) is the app's semantic "informational" blue —
+   subject-neutral. Using a subject color here would make a Reading card look
+   like a Math card during selection (CLAUDE.md §4: color carries meaning). */
+.cardSlot[data-bulk-selected="true"] {
+  outline: 2px solid var(--fyi);
+  outline-offset: 1px;
+  border-radius: var(--r-8);
+}

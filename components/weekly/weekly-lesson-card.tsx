@@ -55,7 +55,7 @@ import { DRAG_CHIP, DRAG_MOTION } from "@/lib/collapse-on-drag";
 import { SaveTargetDialog } from "@/components/weekly/save-target-dialog";
 import { NotePopover } from "@/components/weekly/note-popover";
 import type { Lesson, LessonStatus, WeeklyCardDeck } from "@/lib/types";
-import { SUBJECT_BY_ID } from "@/lib/mock";
+import { ME, SUBJECT_BY_ID, WEEK_DAYS } from "@/lib/mock";
 import { lessonTime } from "@/lib/mock";
 import { useSubjectColor } from "@/lib/palette";
 import { useTheme } from "@/lib/theme";
@@ -816,7 +816,20 @@ export function WeeklyLessonCard({
                   {lesson.modified && (
                     <span
                       className={styles.modifiedPill}
-                      title="Personally modified from the Core Curriculum"
+                      // MED-7: richer tooltip describing what changed and who.
+                      // The Lesson model carries no actor/timestamp fields — ME.name
+                      // is the viewing teacher (best-effort). If moved, include
+                      // the day the lesson was moved from so the tooltip is
+                      // actionable ("Moved Sun→Mon by Lena Haddad").
+                      // Note: lesson.day is the CURRENT day; prior placement is
+                      // not stored, so we describe the type of move only.
+                      title={
+                        lesson.moved === "across-weeks"
+                          ? `Moved to another week by ${ME.name} · personally modified from Core Curriculum`
+                          : lesson.moved === "same-week"
+                            ? `Moved to ${WEEK_DAYS[lesson.day] ?? "another day"} by ${ME.name} · personally modified from Core Curriculum`
+                            : `Personally modified from the Core Curriculum by ${ME.name}`
+                      }
                       // Deep (~700–800) tone: white text clears AA in every palette.
                       style={{ background: color.deep, color: "var(--paper)" }}
                     >

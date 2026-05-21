@@ -28,3 +28,41 @@ body {
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── BIG-3: Print-view shell suppression ──────────────────────────────────
+ * These rules fire on the /weekly/print route. The [data-print-view]
+ * attribute on the page root scopes the screen selectors so they only apply
+ * on this route — not globally across the app. The @media print block hides
+ * all shell chrome when the teacher triggers the browser's print dialog from
+ * any page, but is most useful on the print route.
+ *
+ * Cannot live in a CSS Module (those require at least one local class per
+ * selector). globals.css is the correct home for rules that must escape the
+ * module boundary. */
+
+/* Screen preview: hide the planner shell chrome when on the print page. */
+body:has([data-print-view]) header,
+body:has([data-print-view]) aside,
+body:has([data-print-view]) [role="complementary"] {
+  display: none !important;
+}
+
+/* Paper output: hide all chrome elements in @media print. */
+@media print {
+  header,
+  aside,
+  [role="complementary"],
+  a[href="#main-content"] {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+
+  #main-content {
+    overflow: visible !important;
+    min-height: auto !important;
+    flex: none !important;
+  }
+}
