@@ -1668,6 +1668,71 @@
   border: 0;
 }
 
+/* ── Responsive: intermediate breakpoints (960px, 540px, 480px) ──────────
+   The primary narrow-viewport rule lives above at max-width: 720px.
+   These additive blocks handle the mid-range and very-narrow cases.
+
+   960px: the five-track grid (list + splitter + detail + splitter + rail)
+     may crowd on tablets in portrait. Suppress the right rail + its
+     splitter so the lesson list + detail fill the body.
+   540px: very narrow — compress pane chrome so the list column still
+     has usable space.
+   480px: absolute minimum — tighten week-strip and header padding while
+     keeping the ≥44px touch target on every day pill. */
+
+@media (max-width: 960px) {
+  /* Collapse the right rail and its splitter to zero so they take no
+     space. The JS inline style is overridden so no horizontal scroll
+     occurs in this range. The left splitter (auto) is preserved so the
+     teacher can still resize the lesson-list width. */
+  .body {
+    grid-template-columns: 300px auto 1fr 0 0 !important;
+  }
+}
+
+@media (max-width: 540px) {
+  /* Tighten the breadcrumb bar so it doesn't wrap on very narrow screens.
+     Reducing the padding by roughly half recovers ~28px. */
+  .breadcrumb {
+    padding: 0 8px;
+  }
+  /* Compress the day-header padding slightly — the 22px hero title stays
+     the same; we just reclaim the generous top/bottom space. */
+  .dayHeader {
+    padding: 4px 12px 8px;
+  }
+  /* Tighten the notes banner horizontal padding to match the compressed
+     day header so the left edge stays visually consistent. */
+  .notesBanner {
+    padding: 0 12px;
+  }
+  /* Reduce the lesson scroll side padding so rows fill the narrower
+     column without truncating the drag handle + title area. */
+  .leftScroll {
+    padding: 4px 4px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* At 480px the week-strip day pills (5 pills across) need every pixel.
+     Tighten their outer padding while keeping the 56px min-height on each
+     pill so the ≥44px touch target is preserved. */
+  .weekStrip {
+    padding: 2px 6px 4px;
+    gap: 2px;
+  }
+  /* Compress the column-header eyebrow padding to give more height to the
+     scrollable lesson list below. */
+  .leftPaneEyebrow {
+    padding: 8px 12px 4px;
+  }
+  /* The "Lessons" label row: tighten horizontal padding to match the
+     compressed eyebrow above it. */
+  .lessonsLabelRow {
+    padding: 10px 8px 4px 12px;
+  }
+}
+
 /* ── Reduced motion ───────────────────────────────────────────────────── */
 /* The rail's micro-motion is purely a hover/focus affordance — drop it for
    teachers who prefer reduced motion (CLAUDE.md §4). The column drag

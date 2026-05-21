@@ -477,3 +477,71 @@
   flex: 1 1 auto;
   min-width: 4px;
 }
+
+/* ── Responsive: progressive top-bar collapse ───────────────────────────
+   Desktop (≥1280px) is the shipping target — base rules above are
+   byte-for-byte unchanged. Each breakpoint below only ADDS hide/narrow
+   rules so non-essential chrome yields space to primary controls.
+
+   1024px: hide save indicator + view-mode pill (recovered ~120px).
+    768px: also hide week label + undo/redo group (recovered ~160px more).
+    540px: also hide edit toggle; condense bar height to 44px.
+    480px: also hide grade label from wordmark.
+   All changes are additive media queries; no base rule is touched. */
+
+@media (max-width: 1024px) {
+  /* Save indicator and view-mode pill are secondary chrome — drop them
+     first so the primary tab bar and action controls keep their width. */
+  .saveIndicator {
+    display: none;
+  }
+  .viewModePill {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Week label is purely contextual — already visible in the grid header
+     beneath the bar, so hiding it from the top bar loses nothing. */
+  .weekLabel {
+    display: none;
+  }
+  /* Undo / redo are recoverable via keyboard (Ctrl-Z / Ctrl-Shift-Z)
+     and from the edit menu that will land in Phase 1B; hide the group
+     to reclaim ~80px for the primary tab row. */
+  .undoRedoGroup {
+    display: none;
+  }
+}
+
+@media (max-width: 540px) {
+  /* At 540px the Personal/Master toggle needs space to be readable; the
+     view-switcher tabs can compress. Hide the edit toggle here — teachers
+     on very narrow viewports work in Personal mode by default. The Master
+     toggle can be reached by rotating to landscape. */
+  .editToggle {
+    display: none;
+  }
+  /* Condense the bar slightly so it doesn't consume too much vertical
+     space on short mobile screens in landscape orientation. */
+  .bar {
+    height: 44px;
+  }
+  /* Tighten horizontal padding so the remaining controls have room. */
+  .bar {
+    gap: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* At 480px the wordmark grade suffix ("Grade 5") is redundant — the
+     app name alone identifies the product. Hiding it recovers ~52px. */
+  .wordmarkGrade {
+    display: none;
+  }
+  /* Tighten bar padding to the minimum so the remaining wordmark +
+     tab row + avatar fit without overflow. */
+  .bar {
+    padding: 0 10px;
+  }
+}

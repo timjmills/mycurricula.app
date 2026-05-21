@@ -185,3 +185,22 @@
     border-top: 1px solid var(--ink-150);
   }
 }
+
+/* ── Very narrow viewport (≤480px) ───────────────────────────────────────
+   At 480px the bodyRow itself needs min-height: 0 to prevent the flex
+   column from fighting the page scroll container, and the railToggleBtn
+   can be hidden since the rail is already full-width stacked below the
+   grid (the toggle is meaningless in single-column layout). */
+
+@media (max-width: 480px) {
+  .bodyRow {
+    min-height: 0;
+    flex-direction: column;
+  }
+  /* The rail toggle is a show/hide affordance for the side-by-side layout;
+     in the stacked single-column layout the rail is always visible below
+     the grid, so the toggle is redundant and can be hidden. */
+  .railToggleBtn {
+    display: none;
+  }
+}

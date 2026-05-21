@@ -804,3 +804,112 @@
   outline: 2px solid var(--c);
   outline-offset: 2px;
 }
+
+/* ── Responsive: collapse two-column layout at narrow widths ─────────────
+   Base layout (≥721px): sidebar (220px) | main (1fr).
+   ≤720px: stack sidebar above the main column as a horizontal strip.
+   ≤540px: tighten header and filter bar padding.
+   ≤480px: hide sidebar label in the horizontal strip; compress indents.
+   All rules are additive — no base rule is touched. */
+
+@media (max-width: 720px) {
+  /* Collapse the two-column grid to a single column so the main content
+     fills the full viewport width at narrow sizes. */
+  .body {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  /* The sidebar becomes a horizontal scrollable strip above the main column.
+     Subject buttons flow in a row; overflow-x: auto contains them cleanly. */
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--ink-150);
+    padding: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* In horizontal mode each subject button is auto-width, minimum 80px so
+     subject names remain legible. The 44px min-height is preserved for
+     WCAG touch-target compliance. */
+  .subjectBtn {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 6px 12px;
+    min-width: 80px;
+  }
+
+  /* The sidebar label becomes an inline leading label rather than a block
+     header — prevent it from wrapping. */
+  .sidebarLabel {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 0 4px 0 0;
+  }
+
+  /* Tighten the main content regions for the single-column narrow layout. */
+  .header {
+    padding: 14px 16px 10px;
+  }
+  .filterBar {
+    padding: 8px 16px;
+  }
+  .listArea {
+    padding: 10px 16px 20px;
+  }
+  .resourceSection {
+    padding: 0 16px 24px;
+  }
+}
+
+@media (max-width: 540px) {
+  /* At 540px further reduce the header and content padding. The section
+     title and stats still render; we just recover horizontal breathing room. */
+  .header {
+    padding: 10px 12px 8px;
+  }
+
+  /* Allow the header top row (title block + stats) to wrap so the stats
+     can drop below the title on very narrow screens without overflow. */
+  .headerTop {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .headerStats {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    gap: 20px;
+  }
+
+  .filterBar {
+    padding: 6px 12px;
+  }
+  .listArea {
+    padding: 8px 12px 16px;
+  }
+  .resourceSection {
+    padding: 0 12px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* At 480px the sidebar label wastes horizontal space in the strip —
+     hide it so the subject buttons have the full strip width. */
+  .sidebarLabel {
+    display: none;
+  }
+
+  /* Tighten the group body indents so lesson titles get more width. */
+  .groupBody {
+    padding-left: 6px;
+  }
+  .lessonRows {
+    padding-left: 10px;
+  }
+}

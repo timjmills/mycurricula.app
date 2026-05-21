@@ -826,6 +826,80 @@
   }
 }
 
+/* ── Responsive: narrow navbar / toolbar collapse ────────────────────────
+   The .scroll container already has overflow: auto so the wide grid
+   (min-width: 1082px) scrolls horizontally inside its own track — no
+   change needed there. The sticky .navbar and .moveToolbar bars are
+   the only chrome that could overflow at narrow widths because they
+   hold several fixed-width controls in one flex row.
+
+   Strategy (additive only — desktop ≥1280px is unchanged):
+     ≤768px  hide the "Today" and "Duplicate week" text labels, keep icons.
+     ≤540px  also hide the dupe-week button entirely; collapse .navTitle
+             eyebrow so only the week title remains.
+     ≤480px  also hide the expand/minimize segmented control to clear room
+             for the navigation arrows.
+   All rules live inside @media blocks; no base rule is touched. */
+
+@media (max-width: 768px) {
+  /* The navbar pads generously at desktop — tighten it at narrow widths
+     so the flex items have more room before they would overflow. */
+  .navbar {
+    padding: 10px 14px;
+    gap: 8px;
+  }
+  /* The toolbar similarly has 22px inline padding; trim it here. */
+  .moveToolbar {
+    padding: 6px 14px;
+    gap: 6px;
+  }
+  /* The navToday "This week" / "Today" button shows only at larger widths;
+     hide it here so the prev / next arrows keep their 44px footprint. */
+  .navToday {
+    display: none;
+  }
+  /* Duplicate-week button is a secondary workflow — hide it at narrow
+     widths where the grid is horizontally scrolled and the teacher
+     is in a read/navigate mode rather than an edit mode. */
+  .dupeWeekBtn {
+    display: none;
+  }
+  /* navSep loses its paired control on the left — hide the orphan line. */
+  .navSep {
+    display: none;
+  }
+}
+
+@media (max-width: 540px) {
+  /* At 540px suppress the eyebrow ("WEEK 12" label) inside navTitleWrap
+     so the title alone reads without wrapping. The top-bar context provides
+     the same information. */
+  .navEyebrow {
+    display: none;
+  }
+  /* Tighten the title font slightly so a long month/range name fits in
+     the reduced navTitleWrap space. Still uses a token — no raw px. */
+  .navTitle {
+    font-size: var(--t-15);
+  }
+}
+
+@media (max-width: 480px) {
+  /* The expand/minimize segmented control is a convenience at narrow
+     widths — a teacher on a 480px viewport is primarily scrolling and
+     reading. Remove it so the nav arrows have the full toolbar width. */
+  .expandSegment {
+    display: none;
+  }
+  /* Allow the bulk action bar to wrap its day-button row onto a second
+     line so the Clear button is always reachable without overflow. */
+  .bulkBar {
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    gap: 6px;
+  }
+}
+
 /* ── Bulk action bar (BIG-1) ───────────────────────────────────────────────
  *
  * Appears between the toolbar and the scroll region whenever at least one
