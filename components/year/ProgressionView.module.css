@@ -214,22 +214,33 @@
 }
 
 /* Unit marker bar — absolutely positioned over the unit row.
-   var(--c) / var(--cl) / var(--cd) resolve from the ancestor lane row's
-   cp-subj class, giving each bar the saturated subject mid-tone. */
+   Highlighter-wash treatment matches LaneCard and Weekly cards:
+     1. Vertical gradient of color-mix() translucent subject color.
+     2. Left accent edge (ingredient 3) at full var(--c) saturation.
+     3. Inset top highlight + light drop shadow (ingredient 4). */
 .unitBar {
   position: absolute;
   top: 8px;
   height: 60px;
-  border-radius: 8px;
-  /* Saturated subject mid-tone fill — same register as the Weekly card stripe */
-  background: var(--c);
-  border: 1px solid color-mix(in oklch, var(--cd) 25%, transparent);
+  border-radius: var(--r-8);
+  /* Ingredient 2 + 1: vertical highlighter-wash gradient */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--c) 55%, transparent) 0%,
+    color-mix(in srgb, var(--c) 38%, transparent) 100%
+  );
+  /* Ingredient 3: left accent edge at full saturation */
+  border-left: 4px solid var(--c);
+  border-top: 1px solid color-mix(in srgb, var(--cd) 15%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--cd) 10%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--cd) 18%, transparent);
+  /* Ingredient 4: inset top highlight + shadow */
   box-shadow:
-    inset 0 -2px 0 rgba(0, 0, 0, 0.06),
-    inset 0 2px 0 rgba(255, 255, 255, 0.25);
+    inset 0 1px 0 color-mix(in srgb, #fff 45%, transparent),
+    0 1px 2px color-mix(in srgb, var(--ink-900) 8%, transparent);
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 10px 0 8px;
   gap: 8px;
   overflow: hidden;
 }
@@ -245,8 +256,8 @@
   font-weight: 800;
   letter-spacing: 0.3px;
   flex-shrink: 0;
-  /* White tile on the saturated bar */
-  background: rgba(255, 255, 255, 0.55);
+  /* White tile sits cleanly on the translucent wash */
+  background: rgba(255, 255, 255, 0.6);
   color: var(--cd);
 }
 
@@ -256,10 +267,9 @@
   gap: 4px;
   font-size: 10.5px;
   font-weight: 600;
-  opacity: 0.9;
   white-space: nowrap;
   overflow: hidden;
-  /* Deep subject tone for text on the mid-tone bar */
+  /* Deep subject tone for legibility on the translucent wash */
   color: var(--cd);
 }
 
