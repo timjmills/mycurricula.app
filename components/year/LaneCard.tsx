@@ -3,10 +3,16 @@
 // LaneCard — left-edge lane summary card.
 //
 // Shows the subject name, a student count (mock), and a % complete progress
-// bar in the lane's highlighter tone. Appears in both Roadmap and Progression
-// views as the fixed left column.
+// bar. Appears in both Roadmap and Progression views as the fixed left column.
+//
+// Colors come entirely from the canonical `.cp-subj.<subjectId>` cascade:
+//   var(--cl)  → saturated light fill for the card background
+//   var(--cd)  → deep subject tone for name + progress label text
+//   var(--c)   → saturated mid tone for the progress bar fill
+// This matches the Weekly card's visual register exactly.
 
-import type { RoadTone } from "./roadTones";
+import type { SubjectId } from "@/lib/types";
+import { subjectClassName } from "./roadTones";
 import styles from "./LaneCard.module.css";
 
 // Inline icon — avoids pulling a shared icon library.
@@ -27,46 +33,39 @@ const IconUsers = (p: React.SVGProps<SVGSVGElement>) => (
 
 interface LaneCardProps {
   name: string;
+  subjectId: SubjectId;
   /** Student count displayed under the name. */
   students?: number;
   /** Completion percentage, 0–100. */
   completePct: number;
-  tone: RoadTone;
   /** Card height is set by the parent row — the card fills available height. */
   fullHeight?: boolean;
 }
 
 export function LaneCard({
   name,
+  subjectId,
   students = 24,
   completePct,
-  tone,
   fullHeight = false,
 }: LaneCardProps) {
   return (
     <div
-      className={styles.card}
-      style={{
-        background: tone.lane,
-        height: fullHeight ? "100%" : undefined,
-      }}
+      className={`${styles.card} ${subjectClassName(subjectId)}`}
+      style={{ height: fullHeight ? "100%" : undefined }}
     >
-      {/* Subject name */}
-      <div className={styles.name} style={{ color: "#1F2A4E" }}>
-        {name}
-      </div>
+      {/* Subject name — var(--cd) from the cp-subj cascade */}
+      <div className={styles.name}>{name}</div>
 
       {/* Student count */}
       <div className={styles.meta}>
-        <IconUsers width={12} height={12} style={{ color: "#94A3B8" }} />
-        <span style={{ color: "#5B6580" }}>{students} students</span>
+        <IconUsers width={12} height={12} className={styles.metaIcon} />
+        <span>{students} students</span>
       </div>
 
       {/* % complete + progress bar */}
       <div className={styles.progress}>
-        <div className={styles.progressLabel} style={{ color: "#1F2A4E" }}>
-          {completePct}% Complete
-        </div>
+        <div className={styles.progressLabel}>{completePct}% Complete</div>
         <div
           className={styles.progressTrack}
           role="progressbar"
@@ -75,12 +74,10 @@ export function LaneCard({
           aria-valuemax={100}
           aria-label={`${name} ${completePct}% complete`}
         >
+          {/* Fill uses var(--c) — the saturated subject mid-tone */}
           <div
             className={styles.progressFill}
-            style={{
-              width: `${completePct}%`,
-              background: tone.check,
-            }}
+            style={{ width: `${completePct}%` }}
           />
         </div>
       </div>

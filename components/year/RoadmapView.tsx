@@ -7,6 +7,10 @@
 // colored blocks) spanning their week ranges, with status pills (IN PROGRESS /
 // COMPLETE / MODIFIED / UPCOMING), per-lesson dot rows, and checkpoint flags.
 //
+// Colors come exclusively from the canonical cp-subj cascade (app/tokens.css).
+// Each lane row carries `cp-subj <subjectId>` so var(--c) / var(--cl) /
+// var(--cd) resolve to the correct subject highlight color throughout the row.
+//
 // Data flow: reads lessons from usePlanner(). Units derived by grouping
 // lessons per subject. Week columns derived from the configured school week
 // (DEFAULT_WEEKS_IN_VIEW weeks).
@@ -19,7 +23,7 @@ import {
   DEFAULT_SCHOOL_WEEK,
   DEFAULT_WEEKS_IN_VIEW,
 } from "@/lib/year-calendar";
-import { toneForSubject } from "./roadTones";
+import { subjectClassName } from "./roadTones";
 import { LaneCard } from "./LaneCard";
 import styles from "./RoadmapView.module.css";
 import type { SubjectId, LessonStatus } from "@/lib/types";
@@ -84,11 +88,12 @@ const IconCheck = (p: React.SVGProps<SVGSVGElement>) => (
 type UnitStatus = "IN PROGRESS" | "COMPLETE" | "MODIFIED" | "UPCOMING";
 
 function StatusPill({ status }: { status: UnitStatus }) {
+  // Status pills use semantic / neutral tokens, not subject colors.
   const map: Record<UnitStatus, { bg: string; fg: string }> = {
-    "IN PROGRESS": { bg: "#FFE7A8", fg: "#7A4F08" },
-    COMPLETE: { bg: "#CFF0D8", fg: "#107D3A" },
-    MODIFIED: { bg: "#FFDDC2", fg: "#A4480A" },
-    UPCOMING: { bg: "#E2E5F0", fg: "#5B6580" },
+    "IN PROGRESS": { bg: "var(--important-bg)", fg: "var(--important)" },
+    COMPLETE: { bg: "var(--fyi-bg)", fg: "var(--reading-deep)" },
+    MODIFIED: { bg: "var(--catchup-bg)", fg: "var(--catchup)" },
+    UPCOMING: { bg: "var(--ink-100)", fg: "var(--ink-500)" },
   };
   const m = map[status] ?? map.UPCOMING;
   return (
@@ -147,8 +152,8 @@ export function RoadmapView() {
   // Per-subject lane data.
   const laneData = useMemo(() => {
     return SUBJECTS.map((subject) => {
-      const tone = toneForSubject(subject.id as SubjectId);
-      const completePct = subjectCompletePct(lessons, subject.id as SubjectId);
+      const subjectId = subject.id as SubjectId;
+      const completePct = subjectCompletePct(lessons, subjectId);
       const subjectLessons = lessons.filter((l) => l.subject === subject.id);
 
       // Group lessons by unit id.
@@ -218,7 +223,7 @@ export function RoadmapView() {
         ? lastUnit.firstWeekIdx + lastUnit.span
         : undefined;
 
-      return { subject, tone, completePct, units, checkpointWeekIdx };
+      return { subject, subjectId, completePct, units, checkpointWeekIdx };
     });
   }, [lessons, schoolWeekLen]);
 
@@ -248,19 +253,20 @@ export function RoadmapView() {
         </div>
       </div>
 
-      {/* Lane rows */}
+      {/* Lane rows — each row carries cp-subj so var(--c/--cl/--cd) resolve
+          to the correct subject color for all children in the row */}
       {laneData.map(
-        ({ subject, tone, completePct, units, checkpointWeekIdx }, li) => (
+        ({ subject, subjectId, completePct, units, checkpointWeekIdx }, li) => (
           <div
             key={subject.id}
-            className={styles.laneRow}
-            style={{ borderTop: li > 0 ? "1px solid #ECEEF7" : "none" }}
+            className={`${styles.laneRow} ${subjectClassName(subjectId)}`}
+            style={{ borderTop: li > 0 ? "1px solid var(--ink-150)" : "none" }}
           >
-            {/* Class summary card */}
+            {/* Class summary card — inherits cp-subj from the row */}
             <LaneCard
               name={subject.name}
+              subjectId={subjectId}
               completePct={completePct}
-              tone={tone}
               fullHeight
             />
 
@@ -281,7 +287,7 @@ export function RoadmapView() {
                   />
                 ))}
 
-                {/* Unit blocks */}
+                {/* Unit blocks — brush fills use var(--c) from the lane cascade */}
                 {units.map((u, ui) => (
                   <div
                     key={u.unitId}
@@ -292,29 +298,12 @@ export function RoadmapView() {
                       padding: "0 6px",
                     }}
                   >
-                    <div
-                      className={styles.brush}
-                      style={{
-                        background: tone.stroke,
-                        border: `1px solid color-mix(in oklch, ${tone.deep} 30%, transparent)`,
-                      }}
-                    >
-                      {/* Unit tile */}
-                      <span
-                        className={styles.unitTile}
-                        style={{
-                          background: "rgba(255,255,255,.6)",
-                          color: tone.deep,
-                        }}
-                      >
-                        U{ui + 1}
-                      </span>
+                    <div className={styles.brush}>
+                      {/* Unit tile: white tile on the saturated bar */}
+                      <span className={styles.unitTile}>U{ui + 1}</span>
                       {/* Unit name + status pill */}
                       <div className={styles.unitInfo}>
-                        <span
-                          className={styles.unitName}
-                          style={{ color: tone.text }}
-                        >
+                        <span className={styles.unitName}>
                           {subject.name} Unit {ui + 1}
                         </span>
                         <StatusPill status={u.status} />
@@ -323,7 +312,7 @@ export function RoadmapView() {
                   </div>
                 ))}
 
-                {/* Checkpoint flag */}
+                {/* Checkpoint flag — border + icon color from var(--c) */}
                 {checkpointWeekIdx !== undefined &&
                   checkpointWeekIdx < weekLabels.length && (
                     <div
@@ -333,13 +322,7 @@ export function RoadmapView() {
                         gridRow: 1,
                       }}
                     >
-                      <span
-                        className={styles.checkpointFlag}
-                        style={{
-                          border: `2px solid ${tone.check}`,
-                          color: tone.check,
-                        }}
-                      >
+                      <span className={styles.checkpointFlag}>
                         <IconFlag width={14} height={14} />
                       </span>
                       <span className={styles.checkpointLabel}>Checkpoint</span>
@@ -347,7 +330,10 @@ export function RoadmapView() {
                   )}
 
                 {/* Star (right edge) */}
-                <div className={styles.starBtn} style={{ color: "#CBD5E1" }}>
+                <div
+                  className={styles.starBtn}
+                  style={{ color: "var(--ink-300)" }}
+                >
                   <IconStar width={16} height={16} />
                 </div>
               </div>
@@ -383,22 +369,8 @@ export function RoadmapView() {
                           return (
                             <span
                               key={i}
-                              className={styles.dot}
-                              style={{
-                                left: `calc(${pct}% - 4px)`,
-                                background:
-                                  dotState === "done"
-                                    ? tone.check
-                                    : dotState === "current"
-                                      ? tone.stroke
-                                      : "#fff",
-                                borderColor:
-                                  dotState === "done"
-                                    ? tone.check
-                                    : dotState === "current"
-                                      ? tone.check
-                                      : "#CBD5E1",
-                              }}
+                              className={`${styles.dot} ${styles[`dot_${dotState}`]}`}
+                              style={{ left: `calc(${pct}% - 4px)` }}
                               aria-hidden="true"
                             />
                           );
@@ -407,7 +379,6 @@ export function RoadmapView() {
                         {u.status === "COMPLETE" && (
                           <span
                             className={styles.completeBadge}
-                            style={{ background: tone.check }}
                             aria-label="Unit complete"
                           >
                             <IconCheck width={10} height={10} />
@@ -442,22 +413,19 @@ export function RoadmapView() {
           <div className={styles.dotLegend}>
             <span className={styles.dotLegendItem}>
               <span
-                className={styles.dotSample}
-                style={{ background: "#10A050", borderColor: "#10A050" }}
+                className={`${styles.dotSample} ${styles.dotSample_done}`}
               />
               Complete
             </span>
             <span className={styles.dotLegendItem}>
               <span
-                className={styles.dotSample}
-                style={{ background: "#A0F0B8", borderColor: "#10A050" }}
+                className={`${styles.dotSample} ${styles.dotSample_current}`}
               />
               In Progress
             </span>
             <span className={styles.dotLegendItem}>
               <span
-                className={styles.dotSample}
-                style={{ background: "#fff", borderColor: "#CBD5E1" }}
+                className={`${styles.dotSample} ${styles.dotSample_upcoming}`}
               />
               Not Started
             </span>

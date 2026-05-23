@@ -4,22 +4,32 @@
 // Progression views.
 //
 // Four states, distinguishable by both color AND shape (not color alone):
-//   done     → filled circle with a white check mark
-//   current  → soft-fill circle with a dark ring (in progress)
-//   skipped  → hollow ring (white fill, gray border)
-//   upcoming → small gray dot
+//   done     → filled circle in --done green with a white check mark
+//   current  → soft-fill circle (--cl tint) with a --c ring (in progress)
+//   skipped  → hollow ring (white fill, ink-300 border)
+//   upcoming → small ink-100 dot with ink-200 border
 //
-// Tone is the lane's ROAD_TONE entry (provides fill and check colors).
-// Respects prefers-reduced-motion — no scale-in animation when set.
+// The cp-subj cascade (lib/palette.tsx) must be active on an ancestor element
+// for var(--c) / var(--cl) to resolve to the correct subject color. In both
+// views the lane row root carries the cp-subj class, so glyphs inside inherit
+// correctly. The inline wrapper here re-applies it for the legend, where glyphs
+// render outside a lane row.
+//
+// Respects prefers-reduced-motion — the scale-in animation collapses to instant.
 
 import styles from "./StatusGlyph.module.css";
-import type { RoadTone } from "./roadTones";
+import { subjectClassName } from "./roadTones";
 import type { GlyphState } from "@/lib/year-calendar";
+import type { SubjectId } from "@/lib/types";
 
 interface StatusGlyphProps {
   state: GlyphState;
-  /** The lane's highlighter tone. Used for "done" and "current" colors. */
-  tone?: RoadTone;
+  /**
+   * The owning subject — needed so the glyph can re-apply the cp-subj cascade
+   * when rendered outside a subject lane row (e.g., the bottom legend).
+   * Optional; omit when an ancestor already carries the cp-subj class.
+   */
+  subjectId?: SubjectId;
   size?: number;
   /** Accessible label override — defaults to the state name. */
   "aria-label"?: string;
@@ -27,22 +37,25 @@ interface StatusGlyphProps {
 
 export function StatusGlyph({
   state,
-  tone,
+  subjectId,
   size = 14,
   "aria-label": ariaLabel,
 }: StatusGlyphProps) {
   const label = ariaLabel ?? state;
+  // Re-apply cp-subj only when the caller supplies subjectId (legend context).
+  const subjectClass = subjectId ? subjectClassName(subjectId) : undefined;
 
   if (state === "done") {
-    // Filled circle in the lane's "check" (completion) color with a white SVG check.
+    // Filled circle in --done (semantic green) with a white SVG check.
+    // Shape: filled circle + checkmark icon.
     return (
       <span
-        className={styles.glyph}
+        className={`${styles.glyph} ${subjectClass ?? ""}`}
         style={{
           width: size,
           height: size,
           borderRadius: "50%",
-          background: tone?.check ?? "#107D3A",
+          background: "var(--done)",
           color: "#fff",
           display: "inline-flex",
           alignItems: "center",
@@ -70,17 +83,17 @@ export function StatusGlyph({
   }
 
   if (state === "skipped") {
-    // Hollow ring — white fill, gray border. Visually distinct from both
-    // "done" (filled+check) and "upcoming" (gray dot, no white fill).
+    // Hollow ring — white fill, ink-300 border.
+    // Shape: circle outline (no fill), distinct from "upcoming" gray dot.
     return (
       <span
-        className={styles.glyph}
+        className={`${styles.glyph} ${subjectClass ?? ""}`}
         style={{
           width: size,
           height: size,
           borderRadius: "50%",
           background: "#fff",
-          border: "1.8px solid #94A3B8",
+          border: "1.8px solid var(--ink-300)",
           display: "inline-flex",
           flexShrink: 0,
         }}
@@ -91,16 +104,17 @@ export function StatusGlyph({
   }
 
   if (state === "current") {
-    // Soft fill in the lane's stroke (highlight) color with a colored ring.
+    // Soft --cl fill with a --c ring — "in progress" feel using subject colors.
+    // Shape: solid circle with a colored border ring.
     return (
       <span
-        className={styles.glyph}
+        className={`${styles.glyph} ${subjectClass ?? ""}`}
         style={{
           width: size,
           height: size,
           borderRadius: "50%",
-          background: tone?.stroke ?? "#A0F0B8",
-          border: `2px solid ${tone?.check ?? "#10A050"}`,
+          background: "var(--cl)",
+          border: "2px solid var(--c)",
           display: "inline-flex",
           flexShrink: 0,
         }}
@@ -110,16 +124,17 @@ export function StatusGlyph({
     );
   }
 
-  // "upcoming" — small gray dot
+  // "upcoming" — small ink-100 dot with ink-200 border.
+  // Shape: tiny filled circle, fully neutral — minimal visual weight.
   return (
     <span
-      className={styles.glyph}
+      className={`${styles.glyph} ${subjectClass ?? ""}`}
       style={{
         width: size,
         height: size,
         borderRadius: "50%",
-        background: "#E6E9F4",
-        border: "1px solid #CFD4E2",
+        background: "var(--ink-100)",
+        border: "1px solid var(--ink-200)",
         display: "inline-flex",
         flexShrink: 0,
       }}

@@ -7,5 +7,4 @@ export { RoadmapView } from "./RoadmapView";
 export { ProgressionView } from "./ProgressionView";
 export { StatusGlyph } from "./StatusGlyph";
 export { LaneCard } from "./LaneCard";
-export { ROAD_TONES, toneForSubject, toneById } from "./roadTones";
-export type { RoadTone } from "./roadTones";
+export { subjectClassName } from "./roadTones";

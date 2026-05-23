@@ -153,16 +153,17 @@ const IconUsers = (p: React.SVGProps<SVGSVGElement>) => (
 );
 
 // ── Status filter glyphs (inline, no shared import needed) ────────────────
+// Colors from canonical tokens: --done for completed, --ink-* for neutral states.
 
 const StatusDot = ({ type }: { type: string }) => {
   const styles_: React.CSSProperties =
     type === "done"
-      ? { background: "#107D3A", borderColor: "#107D3A" }
+      ? { background: "var(--done)", borderColor: "var(--done)" }
       : type === "current"
-        ? { background: "#A0F0B8", borderColor: "#10A050" }
+        ? { background: "var(--reading-light)", borderColor: "var(--reading)" }
         : type === "skipped"
-          ? { background: "#fff", borderColor: "#94A3B8" }
-          : { background: "#E6E9F4", borderColor: "#CFD4E2" };
+          ? { background: "#fff", borderColor: "var(--ink-300)" }
+          : { background: "var(--ink-100)", borderColor: "var(--ink-200)" };
   return (
     <span
       style={{
