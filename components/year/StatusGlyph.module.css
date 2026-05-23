@@ -1,0 +1,24 @@
+/* StatusGlyph — per-day status icon.
+   Scale-in animation is suppressed under prefers-reduced-motion. */
+
+.glyph {
+  flex-shrink: 0;
+  animation: glyphIn 150ms ease-out both;
+}
+
+@keyframes glyphIn {
+  from {
+    opacity: 0;
+    scale: 0.7;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glyph {
+    animation: none;
+  }
+}

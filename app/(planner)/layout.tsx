@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AppStateProvider } from "@/lib/app-state";
 import { PlannerProvider } from "@/lib/planner-store";
+import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
   GlobalShortcuts,
   LeftFilterPanel,
@@ -31,38 +32,43 @@ export default function PlannerLayout({
   return (
     <AppStateProvider>
       <PlannerProvider>
-        {/* Skip-to-content (A11Y-004) — must be the first focusable element
+        {/* UnitNotesProvider hosts per-unit "Don't miss" callout persistence.
+            No seeds needed here — SubjectView reads from the live mock unit
+            data; any saved notes come from localStorage post-mount. */}
+        <UnitNotesProvider>
+          {/* Skip-to-content (A11Y-004) — must be the first focusable element
             in the DOM so keyboard users reach it before the top-bar chrome. */}
-        <a href="#main-content" className={styles.skipLink}>
-          Skip to content
-        </a>
-        <div
-          className="cp-root"
-          style={{
-            flex: 1,
-            minHeight: 0,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
+          <a href="#main-content" className={styles.skipLink}>
+            Skip to content
+          </a>
+          <div
+            className="cp-root"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
             Mounted as a client leaf so the layout stays a Server Component. */}
-          <GlobalShortcuts />
-          {/* Master-mode heads-up → persistent banner. Renders only while
+            <GlobalShortcuts />
+            {/* Master-mode heads-up → persistent banner. Renders only while
             the Master edit mode is active; pins above the top bar. */}
-          <MasterBanner />
-          <TopBar />
-          <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-            <LeftFilterPanel />
-            <main
-              id="main-content"
-              style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "auto" }}
-            >
-              {children}
-            </main>
-            <RightPanel />
+            <MasterBanner />
+            <TopBar />
+            <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+              <LeftFilterPanel />
+              <main
+                id="main-content"
+                style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "auto" }}
+              >
+                {children}
+              </main>
+              <RightPanel />
+            </div>
           </div>
-        </div>
+        </UnitNotesProvider>
       </PlannerProvider>
     </AppStateProvider>
   );

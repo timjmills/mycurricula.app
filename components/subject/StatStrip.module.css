@@ -1,0 +1,109 @@
+/* StatStrip.module.css — 5-stat horizontal strip for the Subject view.
+ *
+ * Tokens only — no hard-coded colors or font sizes.
+ * The subject deep color (--cd) drives the COMPLETE bar fill via the
+ * .cp-subj cascade in the parent SubjectView wrapper.
+ */
+
+/* ── Strip container ────────────────────────────────────────────────── */
+.strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  padding: 14px 0 16px;
+  border-bottom: 1px solid var(--ink-100);
+  margin-bottom: 4px;
+}
+
+/* ── Individual stat cell ───────────────────────────────────────────── */
+.cell {
+  padding: 0 16px;
+  border-right: 1px solid var(--ink-100);
+}
+
+.cell:last-child {
+  border-right: none;
+}
+
+.cell:first-child {
+  padding-left: 0;
+}
+
+.cellLabel {
+  font-size: var(--t-10);
+  color: var(--c);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 2px;
+}
+
+.cellValue {
+  font-size: var(--t-22);
+  font-weight: 700;
+  color: var(--ink-900);
+  letter-spacing: -0.4px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-bottom: 2px;
+}
+
+.cellCaption {
+  font-size: var(--t-11);
+  color: var(--ink-400);
+  margin-top: 1px;
+}
+
+/* ── Progress bar (COMPLETE cell only) ──────────────────────────────── */
+.barTrack {
+  height: 5px;
+  background: var(--ink-100);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 4px 0 2px;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--cd);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barFill {
+    transition: none;
+  }
+}
+
+/* ── Responsive: collapse to 3-column then 2-column on narrow widths ── */
+@media (max-width: 720px) {
+  .strip {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px 0;
+  }
+
+  .cell:nth-child(3) {
+    border-right: none;
+  }
+
+  .cell:nth-child(4),
+  .cell:nth-child(5) {
+    border-right: none;
+    border-right: 1px solid var(--ink-100);
+  }
+
+  .cell:nth-child(5) {
+    border-right: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cell:nth-child(even) {
+    border-right: none;
+  }
+}

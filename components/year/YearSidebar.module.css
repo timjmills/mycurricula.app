@@ -1,0 +1,96 @@
+/* YearSidebar — vertical sub-nav for the Year view. */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 140px;
+  flex-shrink: 0;
+  padding: 12px 8px;
+  border-right: 1px solid var(--ink-150, #e6e8ed);
+  background: var(--paper, #fff);
+}
+
+/* Base nav item — shared by active and inert */
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-8, 8px);
+  font-size: var(--t-13);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  min-height: 44px; /* WCAG AA touch target */
+  position: relative;
+}
+
+/* Active (clickable) — default state */
+.navItemIdle {
+  background: transparent;
+  color: var(--ink-500, #5b5e69);
+  border: none;
+  cursor: pointer;
+}
+
+.navItemIdle:hover {
+  background: var(--ink-50, #f6f7f9);
+  color: var(--ink-700, #2e3038);
+}
+
+/* Active (pressed) state */
+.navItemActive {
+  background: #eef0ff;
+  color: #5b61f4;
+  border: none;
+  cursor: pointer;
+}
+
+.navItemActive .navIcon {
+  color: #5b61f4;
+}
+
+/* Inert "coming soon" item */
+.navItemInert {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--ink-500, #5b5e69);
+  /* Not a button — no pointer events beyond the cursor change */
+}
+
+.navItemInert:hover .soonBadge {
+  opacity: 1;
+}
+
+.navIcon {
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.navLabel {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* "Soon" badge on inert items — appears on hover */
+.soonBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--ink-100, #eef0f4);
+  color: var(--ink-400, #8a8d99);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .soonBadge {
+    transition: none;
+  }
+}

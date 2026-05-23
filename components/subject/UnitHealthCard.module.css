@@ -1,0 +1,343 @@
+/* UnitHealthCard.module.css — per-unit health card in the Subject view.
+ *
+ * Colors come from the .cp-subj cascade in SubjectView (var(--c)/--cl/--cd)).
+ * Never hard-code hex values here.
+ */
+
+/* ── Card shell ─────────────────────────────────────────────────────── */
+.card {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-12);
+  padding: 14px 16px 14px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cardCurrent {
+  border-color: var(--c);
+  border-width: 2px;
+}
+
+/* 4px top stripe in the subject's mid color (--c) */
+.stripe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--c);
+  border-radius: var(--r-12) var(--r-12) 0 0;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 4px; /* clears the stripe */
+}
+
+/* U# tile — small rounded square in subject-light background */
+.unitTile {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-6);
+  background: var(--cl);
+  color: var(--cd);
+  font-size: var(--t-11);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.headerText {
+  flex: 1;
+  min-width: 0;
+}
+
+.unitName {
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink-900);
+  letter-spacing: -0.2px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* NOW pill — amber, matches the artboard */
+.nowPill {
+  font-size: var(--t-10);
+  font-weight: 700;
+  color: var(--important);
+  background: var(--important-bg);
+  padding: 2px 9px;
+  border-radius: 999px;
+  letter-spacing: 0.5px;
+  flex: 0 0 auto;
+}
+
+/* ── Progress bar ───────────────────────────────────────────────────── */
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progressLabel {
+  font-size: var(--t-10);
+  font-weight: 700;
+  color: var(--ink-500);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex: 0 0 auto;
+  width: 60px;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 6px;
+  background: var(--ink-100);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--cd);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    transition: none;
+  }
+}
+
+.progressPct {
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--cd);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+  min-width: 32px;
+  text-align: right;
+}
+
+.progressFraction {
+  font-size: var(--t-11);
+  color: var(--ink-400);
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Stat row ───────────────────────────────────────────────────────── */
+.statRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.statItemLabel {
+  font-size: var(--t-10);
+  font-weight: 700;
+  color: var(--ink-400);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statItemValue {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.statItemDenom {
+  color: var(--ink-400);
+  font-weight: 500;
+}
+
+.whenValue {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-500);
+}
+
+/* ── Don't miss callout ─────────────────────────────────────────────── */
+.callout {
+  background: var(--cl);
+  border-radius: var(--r-8);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.calloutHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* "DON'T MISS" badge — white pill on the subject-light background */
+.calloutLabel {
+  font-size: var(--t-10);
+  font-weight: 800;
+  color: var(--cd);
+  background: var(--paper);
+  padding: 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.6px;
+  flex: 0 0 auto;
+}
+
+.calloutEditor {
+  font-size: var(--t-10);
+  color: var(--cd);
+  font-weight: 500;
+  flex: 1;
+  opacity: 0.7;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Pencil edit button — ≥44px implied by the parent card height;
+   the button is a secondary control (not the primary call-to-action),
+   32px fits without breaking the dense layout. */
+.editBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-4);
+  color: var(--cd);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.editBtn:hover {
+  background: var(--paper);
+  border-color: var(--c);
+}
+
+.editBtn:focus-visible {
+  outline: 2px solid var(--cd);
+  outline-offset: 2px;
+}
+
+.calloutText {
+  font-size: var(--t-12);
+  color: var(--cd);
+  line-height: 1.5;
+  text-wrap: pretty;
+  margin: 0;
+}
+
+.calloutEmpty {
+  color: var(--ink-400);
+  font-style: italic;
+}
+
+/* ── Inline edit area ───────────────────────────────────────────────── */
+.editArea {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.editTextarea {
+  width: 100%;
+  border: 1px solid var(--c);
+  border-radius: var(--r-6);
+  padding: 7px 10px;
+  font-size: var(--t-12);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  color: var(--ink-900);
+  background: var(--paper);
+  resize: vertical;
+  outline: none;
+}
+
+.editTextarea:focus {
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--c) 30%, transparent);
+}
+
+.editActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.saveBtn,
+.cancelBtn {
+  padding: 3px 10px;
+  border-radius: var(--r-4);
+  font-size: var(--t-12);
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  min-height: 28px;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.saveBtn {
+  background: var(--cd);
+  color: var(--paper);
+  border-color: var(--cd);
+}
+
+.saveBtn:hover {
+  opacity: 0.88;
+}
+
+.saveBtn:focus-visible {
+  outline: 2px solid var(--cd);
+  outline-offset: 2px;
+}
+
+.cancelBtn {
+  background: transparent;
+  color: var(--ink-600);
+  border-color: var(--ink-200);
+}
+
+.cancelBtn:hover {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.cancelBtn:focus-visible {
+  outline: 2px solid var(--ink-400);
+  outline-offset: 2px;
+}
+
+.editHint {
+  font-size: var(--t-10);
+  color: var(--ink-400);
+  margin-left: auto;
+}

@@ -1,8 +1,9 @@
-/* SubjectView.module.css — layout and chrome for the year-long Subject view.
+/* SubjectView.module.css — layout and chrome for the S1 Subject view.
  *
- * The view is split into two columns:
+ * Layout:
  *   col 1 (220px) — subject switcher sidebar
- *   col 2 (flex)  — header + filter bar + lesson list + resource browser
+ *   col 2 (flex)  — header · stat strip · unit health cards ·
+ *                   filter bar · lesson list · resources sort
  *
  * All color, type, and spacing values reference tokens from app/tokens.css.
  * Never hard-code hex colors or px font sizes — use var(--token).
@@ -42,8 +43,7 @@
   padding: 0 6px 6px;
 }
 
-/* Each subject entry — 44px minimum touch target (CLAUDE.md: ≥44px on
-   primary nav actions). */
+/* Each subject entry — 44px minimum touch target. */
 .subjectBtn {
   display: flex;
   align-items: center;
@@ -116,16 +116,6 @@
   flex: 0 0 auto;
 }
 
-.headerTop {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-}
-
-.headerMeta {
-  flex: 0 0 auto;
-}
-
 .headerEyebrow {
   font-size: var(--t-11);
   color: var(--c);
@@ -147,9 +137,10 @@
 
 .headerTitle {
   font-size: var(--t-26);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.5px;
-  margin-top: 2px;
+  margin-top: 4px;
+  margin-bottom: 2px;
   color: var(--ink-900);
   line-height: 1.15;
 }
@@ -157,74 +148,52 @@
 .headerSub {
   font-size: var(--t-13);
   color: var(--ink-500);
-  margin-top: 2px;
+  margin: 0;
 }
 
-.headerSpacer {
+/* ── Scrollable content area ────────────────────────────────────────── */
+.content {
   flex: 1;
-}
-
-.headerStats {
+  padding: 0 24px 28px;
   display: flex;
-  gap: 14px;
-  flex: 0 0 auto;
+  flex-direction: column;
 }
 
-/* ── Stat block ─────────────────────────────────────────────────────── */
-.stat {
-  text-align: right;
+/* ── Section header ─────────────────────────────────────────────────── */
+.sectionHeader {
+  margin-top: 24px;
+  margin-bottom: 12px;
 }
 
-.statLabel {
+.sectionKicker {
   font-size: var(--t-10);
   color: var(--ink-400);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 500;
+  letter-spacing: 0.6px;
 }
 
-.statValue {
-  font-size: var(--t-22);
-  font-weight: 600;
-  letter-spacing: -0.4px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+.sectionTitle {
+  font-size: var(--t-18);
+  font-weight: 700;
+  color: var(--ink-900);
+  margin-top: 2px;
+  letter-spacing: -0.3px;
 }
 
-/* ── Year progress bar ──────────────────────────────────────────────── */
-.progressWrap {
-  margin-top: 18px;
+.sectionHint {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  margin-top: 4px;
+  line-height: 1.55;
+  text-wrap: pretty;
 }
 
-.progressTrack {
-  display: flex;
-  gap: 2px;
-  height: 8px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--ink-100);
-}
-
-.progressUnit {
-  display: flex;
-  /* flex set by inline style (proportional to lesson count) */
-}
-
-.progressDone {
-  background: var(--c);
-  /* flex set by inline style */
-}
-
-.progressRemain {
-  /* flex set by inline style */
-}
-
-.progressLabels {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 6px;
-  font-size: var(--t-10);
-  color: var(--ink-400);
+/* ── Unit health card grid — 2-up ───────────────────────────────────── */
+.unitHealthGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 /* ── Filter / grouping bar ──────────────────────────────────────────── */
@@ -232,9 +201,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 24px;
-  border-bottom: 1px solid var(--ink-100);
-  background: var(--paper);
+  padding: 10px 0;
   flex: 0 0 auto;
   flex-wrap: wrap;
 }
@@ -248,7 +215,6 @@
   margin-right: 2px;
 }
 
-/* Time-period filter chips */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -291,11 +257,6 @@
   margin: 0 2px;
 }
 
-/* Grouping toggle — "By Unit" / "By Week" segmented control (POLISH-008).
-   Each option is a separate pill so there is always a visible gap between
-   them. The active pill gets an ink-900 fill; the container itself carries
-   no border so there is no "one phrase" bleed between the two options.
-   Same visual treatment as the Personal/Master toggle in the top bar. */
 .groupToggle {
   display: inline-flex;
   gap: 3px;
@@ -332,20 +293,25 @@
 
 /* ── Lesson list area ───────────────────────────────────────────────── */
 .listArea {
-  padding: 14px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding-bottom: 8px;
 }
 
-/* ── Group block (unit or week) ─────────────────────────────────────── */
+/* List mode rows — vertical stack with a gap between rows. */
+.listRows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Group block ────────────────────────────────────────────────────── */
 .group {
   display: flex;
   flex-direction: column;
 }
 
-/* groupHeader is now a native <button> (fix #4) — reset browser defaults
-   then apply the same visual style as before. */
 .groupHeader {
   display: flex;
   align-items: center;
@@ -422,8 +388,6 @@
   flex: 0 0 auto;
 }
 
-/* groupExpandBtn: 32px min-height — secondary control within a primary button,
-   not a primary action itself, so 32px rather than 44px is appropriate. */
 .groupExpandBtn {
   font-size: var(--t-11);
   color: var(--ink-500);
@@ -461,7 +425,6 @@
   flex-direction: column;
 }
 
-/* One lesson row + its optional expanded detail. */
 .lessonItem {
   border-bottom: 1px solid var(--ink-100);
   position: relative;
@@ -471,7 +434,6 @@
   opacity: 0.55;
 }
 
-/* Dashed personal-lesson stripe down the left edge. */
 .personalStripe {
   position: absolute;
   left: 0;
@@ -518,11 +480,6 @@
   transform: rotate(90deg);
 }
 
-/* ── Completion toggle button wrapper ───────────────────────────────── */
-/* Invisible wrapper that makes CheckIcon a clickable target. The visual
-   affordance is the icon itself; the button resets all browser defaults so
-   the layout is unchanged. The 44px touch target is satisfied by the
-   parent .lessonRow which fully contains this button. */
 .checkBtn {
   display: inline-flex;
   align-items: center;
@@ -542,7 +499,6 @@
   outline-offset: 2px;
 }
 
-/* ── Completion check indicator ─────────────────────────────────────── */
 .checkIcon {
   display: inline-flex;
   align-items: center;
@@ -664,164 +620,38 @@
   border-radius: var(--r-4);
 }
 
-/* ── Resource section ───────────────────────────────────────────────── */
-.resourceSection {
-  padding: 0 24px 32px;
-  flex: 0 0 auto;
-}
-
-.resourceHeader {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 0 8px;
-  border-top: 1px solid var(--ink-150);
-  border-bottom: 1px solid var(--ink-150);
-  margin-bottom: 10px;
-}
-
-.resourceTitle {
-  font-size: var(--t-14);
-  font-weight: 600;
-  color: var(--ink-900);
-  flex: 1;
-}
-
-.resourceCount {
-  font-size: var(--t-11);
-  color: var(--ink-400);
-  font-variant-numeric: tabular-nums;
-}
-
-.resourceFilters {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.resourceFilterChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: var(--t-11);
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  color: var(--ink-600);
-  transition:
-    background 0.1s ease,
-    border-color 0.1s ease,
-    color 0.1s ease;
-  min-height: 24px;
-}
-
-.resourceFilterChip:hover {
-  border-color: var(--ink-300);
-  background: var(--ink-50);
-}
-
-.resourceFilterChipActive {
-  background: var(--ink-900);
-  border-color: var(--ink-900);
-  color: var(--paper);
-}
-
-.resourceFilterChipActive:hover {
-  background: var(--ink-900);
-  border-color: var(--ink-900);
-  color: var(--paper);
-}
-
-.resourceList {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  /* margin-top moved from inline style in ResourceSection (fix #7) */
-  margin-top: 10px;
-}
-
-/* resourceRow is a non-interactive display element (links come in a later
-   phase) — no hover styling to avoid a false affordance (fix #9). */
-.resourceRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 8px;
-  border-radius: var(--r-4);
-}
-
-.resourceTypeIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--r-4);
-  flex: 0 0 auto;
-}
-
-.resourceLabel {
-  flex: 1;
-  font-size: var(--t-13);
-  color: var(--ink-900);
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.resourceLesson {
-  font-size: var(--t-11);
-  color: var(--ink-400);
-  flex: 0 0 auto;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
-}
-
 /* ── Empty state ────────────────────────────────────────────────────── */
 .empty {
-  padding: 40px 24px;
+  padding: 40px 0;
   text-align: center;
   color: var(--ink-400);
   font-size: var(--t-13);
 }
 
 /* ── Focus visible ──────────────────────────────────────────────────── */
-/* Outline uses var(--c) so the ring follows the active subject color rather
-   than hard-coding a single subject's color (fix #6a). */
 .subjectBtn:focus-visible,
 .groupHeader:focus-visible,
 .lessonRow:focus-visible,
 .groupExpandBtn:focus-visible,
 .chip:focus-visible,
-.groupBtn:focus-visible,
-.resourceFilterChip:focus-visible {
+.groupBtn:focus-visible {
   outline: 2px solid var(--c);
   outline-offset: 2px;
 }
 
-/* ── Responsive: collapse two-column layout at narrow widths ─────────────
-   Base layout (≥721px): sidebar (220px) | main (1fr).
-   ≤720px: stack sidebar above the main column as a horizontal strip.
-   ≤540px: tighten header and filter bar padding.
-   ≤480px: hide sidebar label in the horizontal strip; compress indents.
-   All rules are additive — no base rule is touched. */
+/* ── Responsive ─────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .unitHealthGrid {
+    grid-template-columns: 1fr;
+  }
+}
 
 @media (max-width: 720px) {
-  /* Collapse the two-column grid to a single column so the main content
-     fills the full viewport width at narrow sizes. */
   .body {
     grid-template-columns: 1fr;
     overflow: visible;
   }
 
-  /* The sidebar becomes a horizontal scrollable strip above the main column.
-     Subject buttons flow in a row; overflow-x: auto contains them cleanly. */
   .sidebar {
     border-right: none;
     border-bottom: 1px solid var(--ink-150);
@@ -834,9 +664,6 @@
     gap: 6px;
   }
 
-  /* In horizontal mode each subject button is auto-width, minimum 80px so
-     subject names remain legible. The 44px min-height is preserved for
-     WCAG touch-target compliance. */
   .subjectBtn {
     flex: 0 0 auto;
     width: auto;
@@ -844,71 +671,40 @@
     min-width: 80px;
   }
 
-  /* The sidebar label becomes an inline leading label rather than a block
-     header — prevent it from wrapping. */
   .sidebarLabel {
     flex: 0 0 auto;
     white-space: nowrap;
     padding: 0 4px 0 0;
   }
 
-  /* Tighten the main content regions for the single-column narrow layout. */
   .header {
     padding: 14px 16px 10px;
   }
-  .filterBar {
-    padding: 8px 16px;
-  }
-  .listArea {
-    padding: 10px 16px 20px;
-  }
-  .resourceSection {
+
+  .content {
     padding: 0 16px 24px;
   }
 }
 
 @media (max-width: 540px) {
-  /* At 540px further reduce the header and content padding. The section
-     title and stats still render; we just recover horizontal breathing room. */
   .header {
     padding: 10px 12px 8px;
   }
 
-  /* Allow the header top row (title block + stats) to wrap so the stats
-     can drop below the title on very narrow screens without overflow. */
-  .headerTop {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .headerStats {
-    flex-basis: 100%;
-    justify-content: flex-start;
-    gap: 20px;
-  }
-
   .filterBar {
-    padding: 6px 12px;
-  }
-  .listArea {
-    padding: 8px 12px 16px;
-  }
-  .resourceSection {
-    padding: 0 12px 16px;
+    padding: 6px 0;
   }
 }
 
 @media (max-width: 480px) {
-  /* At 480px the sidebar label wastes horizontal space in the strip —
-     hide it so the subject buttons have the full strip width. */
   .sidebarLabel {
     display: none;
   }
 
-  /* Tighten the group body indents so lesson titles get more width. */
   .groupBody {
     padding-left: 6px;
   }
+
   .lessonRows {
     padding-left: 10px;
   }

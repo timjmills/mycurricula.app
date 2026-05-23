@@ -1,107 +1,72 @@
 "use client";
 
-// SubjectView.tsx — the year-long Subject view (planning_document §5.6).
+// SubjectView.tsx — S1 Subject view (redesign, Wave 8).
 //
-// Layout:
-//   col 1 (220px) — subject switcher sidebar
-//   col 2 (flex)  — header (stats + progress bar)
-//                   filter bar (All / Unit / Month / Week chips + group toggle)
-//                   lesson list (grouped by unit or by week, collapsible)
-//                   resource browser (filtered by type)
+// Layout (top-to-bottom inside the main content column):
+//   1. Subject header — eyebrow + title + unit context
+//   2. StatStrip — 5 live-computed stats
+//   3. "Unit health" section — UnitHealthCard grid (2-up)
+//   4. Current-unit lesson area — Grid (GroupBlock table) or List (ListRow)
+//      toggled by the global viewMode from useAppState()
+//   5. ResourcesSort — all resources for the subject, with type-filter chips
 //
-// Shared state is read/written via `useAppState()` — `subjectView` and
-// `setSubjectView` bind the subject picker; `week` scopes Month/Week filters.
+// The subject switcher sidebar (col 1) is unchanged from the previous build.
 //
-// Curriculum DATA (lessons) now comes exclusively from `usePlanner()` so that
-// edits made in the Weekly or Daily views immediately appear here, and mutations
-// performed here (completion toggle) flow through the shared undo/redo stack.
-// Purely-UI state (period filter, group mode, expand/collapse) remains local.
+// Filter panel behavior:
+//   The left filter panel is driven by `leftPanelOpen` in app-state. On the
+//   Subject view the panel starts CLOSED (set once on mount). The top-bar
+//   filter toggle still opens/closes it. No double-rendering with S1's chrome.
+//
+// Don't-miss persistence:
+//   useUnitNote(unitId) / useSetUnitNote() — localStorage via UnitNotesProvider.
+//   UnitNotesProvider is mounted in app/(planner)/layout.tsx with seed values
+//   sourced from the mock unit definitions.
 
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import type { SubjectId, LessonResource, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { useSubjectColor } from "@/lib/palette";
-import { SUBJECTS, UNITS, WEEK_DAYS, CURRENT_WEEK } from "@/lib/mock";
+import {
+  SUBJECTS,
+  UNITS,
+  UNIT_BY_ID,
+  WEEK_DAYS,
+  CURRENT_WEEK,
+} from "@/lib/mock";
+import { dateForWeekDay } from "@/lib/mock/calendar";
 import { useRouter } from "next/navigation";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
+import { useUnitNote } from "@/lib/unit-notes";
+import { ListRow } from "@/components/list";
+import { StatStrip } from "./StatStrip";
+import { UnitHealthCard } from "./UnitHealthCard";
+import type { UnitHealthData } from "./UnitHealthCard";
+import { ResourcesSort } from "./ResourcesSort";
+import type { ResourceEntry } from "./ResourcesSort";
 import styles from "./SubjectView.module.css";
 
-// ── Constants ──────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────
 
-/** Time-period filter options — All is the default. */
 const PERIOD_FILTERS = ["All", "Unit", "Month", "Week"] as const;
 type PeriodFilter = (typeof PERIOD_FILTERS)[number];
 
-/** Grouping modes for the lesson list. */
 const GROUP_MODES = ["unit", "week"] as const;
 type GroupMode = (typeof GROUP_MODES)[number];
 
-/**
- * Approximate weeks per month — used to map `week` number to a month scope.
- * The school year starts in August (week 1). This is intentionally simple and
- * correct enough for the subject view's filter purpose.
- */
-function weekToMonth(week: number): number {
-  return Math.ceil(week / 4);
+/** Map a week number to an approximate month index (0 = Aug). */
+function weekToMonthIndex(week: number): number {
+  return Math.floor((week - 1) / 4);
 }
 
-// ── Resource type metadata ──────────────────────────────────────────────
-// Background/foreground use neutral ink tokens — resource type is a
-// functional category, not a subject, so subject-palette colors must
-// not be used here (CLAUDE.md: color carries meaning, never decoration).
+/** Short month name from a week number, derived from the mock calendar anchor. */
+function monthNameForWeek(week: number): string {
+  const d = dateForWeekDay(week, 0);
+  return d.toLocaleString("en-US", { month: "short" }).toUpperCase();
+}
 
-const RESOURCE_TYPE_META: Record<
-  LessonResource["type"],
-  { label: string; bg: string; fg: string; glyph: string }
-> = {
-  slides: {
-    label: "Slides",
-    bg: "var(--ink-100)",
-    fg: "var(--ink-700)",
-    glyph: "▤",
-  },
-  pdf: {
-    label: "PDF",
-    bg: "var(--ink-100)",
-    fg: "var(--ink-700)",
-    glyph: "⊞",
-  },
-  doc: {
-    label: "Doc",
-    bg: "var(--ink-100)",
-    fg: "var(--ink-700)",
-    glyph: "⊟",
-  },
-  image: {
-    label: "Image",
-    bg: "var(--ink-100)",
-    fg: "var(--ink-700)",
-    glyph: "⊡",
-  },
-  youtube: {
-    label: "Video",
-    bg: "var(--ink-100)",
-    fg: "var(--ink-700)",
-    glyph: "▷",
-  },
-  website: {
-    label: "Website",
-    bg: "var(--ink-100)",
-    fg: "var(--ink-700)",
-    glyph: "⊕",
-  },
-  link: {
-    label: "Link",
-    bg: "var(--ink-100)",
-    fg: "var(--ink-700)",
-    glyph: "⊗",
-  },
-};
+// ── Small pure presentational helpers ──────────────────────────────────────
 
-// ── Small pure presentational helpers ──────────────────────────────────
-
-/** Chevron SVG — matches the artboard's CPIcon("chevron"). */
 function ChevronIcon({ size = 10 }: { size?: number }): ReactNode {
   return (
     <svg
@@ -122,7 +87,6 @@ function ChevronIcon({ size = 10 }: { size?: number }): ReactNode {
   );
 }
 
-/** Completion check indicator — maps a status to a colored checkbox. */
 function CheckIcon({ status }: { status: string }): ReactNode {
   const cls = [
     styles.checkIcon,
@@ -165,27 +129,28 @@ function CheckIcon({ status }: { status: string }): ReactNode {
   );
 }
 
-/** Stat block in the subject header — mirrors CPStat from the artboard. */
-function StatBlock({
-  label,
-  value,
-  colorVar,
+// ── Section header ─────────────────────────────────────────────────────────
+// Matches the artboard's SectionHeader: kicker + title + optional hint.
+
+function SectionHeader({
+  kicker,
+  title,
+  hint,
 }: {
-  label: string;
-  value: string | number;
-  colorVar: string;
+  kicker: string;
+  title: string;
+  hint?: string;
 }): ReactNode {
   return (
-    <div className={styles.stat}>
-      <div className={styles.statLabel}>{label}</div>
-      <div className={styles.statValue} style={{ color: colorVar }}>
-        {value}
-      </div>
+    <div className={styles.sectionHeader}>
+      <div className={styles.sectionKicker}>{kicker}</div>
+      <div className={styles.sectionTitle}>{title}</div>
+      {hint && <div className={styles.sectionHint}>{hint}</div>}
     </div>
   );
 }
 
-// ── Lesson row ──────────────────────────────────────────────────────────
+// ── Lesson row data ─────────────────────────────────────────────────────────
 
 interface LessonRowData {
   id: string;
@@ -197,7 +162,6 @@ interface LessonRowData {
   standards: string[];
   resources: LessonResource[];
   directions: string;
-  // For the artboard's sub-events concept we use `tasks` from the real model.
   taskCount: number;
   isCurrent: boolean;
 }
@@ -211,15 +175,11 @@ function LessonRowItem({
   lesson: LessonRowData;
   isExpanded: boolean;
   onToggle: () => void;
-  /** Cycle the lesson's completion status. One store step = one undo entry. */
   onToggleStatus: () => void;
 }): ReactNode {
-  // Day label derived from WEEK_DAYS — never hard-coded.
   const dayLabel = WEEK_DAYS[lesson.day] ?? `Day ${lesson.day}`;
 
   return (
-    // data-planner-item — required by scrollPlannerItemIntoView() contract.
-    // See planner-store.tsx §"Data-planner-item attribute convention".
     <div
       data-planner-item={`lesson:${lesson.id}`}
       className={[
@@ -229,7 +189,6 @@ function LessonRowItem({
         .filter(Boolean)
         .join(" ")}
     >
-      {/* Dashed stripe for personal lessons */}
       {lesson.isPersonal && <span className={styles.personalStripe} />}
 
       <button
@@ -253,10 +212,6 @@ function LessonRowItem({
           <ChevronIcon size={8} />
         </span>
 
-        {/* Completion toggle — routes through setLessonStatus in the store.
-            Wrapped in a separate button so the click target is distinct from
-            the expand/collapse row button. stopPropagation prevents the row
-            expand from also firing. */}
         <button
           className={styles.checkBtn}
           onClick={(e) => {
@@ -281,7 +236,6 @@ function LessonRowItem({
           {lesson.title}
         </span>
 
-        {/* Week / day meta */}
         <span
           style={{
             fontSize: "var(--t-11)",
@@ -294,14 +248,12 @@ function LessonRowItem({
           W{lesson.week} · {dayLabel.slice(0, 3)}
         </span>
 
-        {/* Personal pill */}
         {lesson.isPersonal && (
           <span className={styles.personalPill} title="Personalized lesson">
             Personal
           </span>
         )}
 
-        {/* Task sub-events badge */}
         {lesson.taskCount > 0 && (
           <span
             className={styles.subEventsBadge}
@@ -311,15 +263,12 @@ function LessonRowItem({
           </span>
         )}
 
-        {/* Standards chips — show first two; index included so duplicate codes
-            in the same lesson don't produce duplicate keys. */}
         {lesson.standards.slice(0, 2).map((s, idx) => (
           <span key={`${s}-${idx}`} className={styles.standardChip}>
             {s}
           </span>
         ))}
 
-        {/* Resource count */}
         {lesson.resources.length > 0 && (
           <span
             style={{
@@ -332,11 +281,9 @@ function LessonRowItem({
           </span>
         )}
 
-        {/* Current-week dot */}
         {lesson.isCurrent && <span className={styles.currentDot}>•</span>}
       </button>
 
-      {/* Expanded detail panel */}
       {isExpanded && (
         <div className={styles.lessonDetail}>
           <p className={styles.lessonDirections}>
@@ -358,30 +305,14 @@ function LessonRowItem({
   );
 }
 
-// ── Group block (unit or week) ──────────────────────────────────────────
+// ── Group block ────────────────────────────────────────────────────────────
 
 interface GroupData {
   key: string;
-  /** Short tag displayed in the colored badge (e.g. "U3" or "W12"). */
   tag: string;
-  /** Full group name shown in the header. */
   name: string;
   isCurrent: boolean;
   lessons: LessonRowData[];
-}
-
-// GroupBlock state is now lifted to SubjectPane (fix #1) so that filter /
-// grouping changes don't discard the teacher's expanded-collapsed state.
-
-interface GroupBlockProps {
-  group: GroupData;
-  isOpen: boolean;
-  onToggleOpen: () => void;
-  expandedLessons: Set<string>;
-  onToggleLesson: (id: string) => void;
-  onToggleAllLessons: () => void;
-  /** Cycle completion status for a lesson — routed to the store. */
-  onToggleStatus: (id: string) => void;
 }
 
 function GroupBlock({
@@ -392,22 +323,27 @@ function GroupBlock({
   onToggleLesson,
   onToggleAllLessons,
   onToggleStatus,
-}: GroupBlockProps): ReactNode {
+}: {
+  group: GroupData;
+  isOpen: boolean;
+  onToggleOpen: () => void;
+  expandedLessons: Set<string>;
+  onToggleLesson: (id: string) => void;
+  onToggleAllLessons: () => void;
+  onToggleStatus: (id: string) => void;
+}): ReactNode {
   const doneCount = group.lessons.filter((l) => l.status === "done").length;
   const allExpanded =
     group.lessons.length > 0 &&
     group.lessons.every((l) => expandedLessons.has(l.id));
 
   function handleExpandAll(e: React.MouseEvent): void {
-    // Prevent the click from bubbling up to the group header button.
     e.stopPropagation();
     onToggleAllLessons();
   }
 
   return (
     <div className={styles.group}>
-      {/* Native <button> handles Space/Enter natively — no manual onKeyDown
-          needed (fix #4). */}
       <button
         className={[
           styles.groupHeader,
@@ -430,7 +366,6 @@ function GroupBlock({
         </span>
 
         <span className={styles.groupTag}>{group.tag}</span>
-
         <span className={styles.groupName}>{group.name}</span>
 
         {group.isCurrent && <span className={styles.nowPill}>Now</span>}
@@ -465,107 +400,7 @@ function GroupBlock({
   );
 }
 
-// ── Resource section ────────────────────────────────────────────────────
-
-interface ResourceEntry {
-  type: LessonResource["type"];
-  label: string;
-  lessonTitle: string;
-}
-
-function ResourceSection({
-  resources,
-}: {
-  resources: ResourceEntry[];
-}): ReactNode {
-  const [activeType, setActiveType] = useState<LessonResource["type"] | null>(
-    null,
-  );
-
-  // Unique types present in this subject's resources
-  const presentTypes = useMemo(
-    () =>
-      [...new Set(resources.map((r) => r.type))] as LessonResource["type"][],
-    [resources],
-  );
-
-  const filtered = activeType
-    ? resources.filter((r) => r.type === activeType)
-    : resources;
-
-  return (
-    <section className={styles.resourceSection}>
-      <div className={styles.resourceHeader}>
-        <span className={styles.resourceTitle}>Resources</span>
-        <span className={styles.resourceCount}>{resources.length} total</span>
-      </div>
-
-      {/* Type filter chips */}
-      <div className={styles.resourceFilters}>
-        <button
-          className={[
-            styles.resourceFilterChip,
-            activeType === null ? styles.resourceFilterChipActive : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          onClick={() => setActiveType(null)}
-        >
-          All
-        </button>
-        {presentTypes.map((type) => {
-          const meta = RESOURCE_TYPE_META[type];
-          return (
-            <button
-              key={type}
-              className={[
-                styles.resourceFilterChip,
-                activeType === type ? styles.resourceFilterChipActive : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() =>
-                setActiveType((prev) => (prev === type ? null : type))
-              }
-            >
-              {meta.glyph} {meta.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Resource list — margin comes from the CSS module (fix #7). */}
-      <div className={styles.resourceList}>
-        {filtered.length === 0 && (
-          <div className={styles.empty}>No resources of this type.</div>
-        )}
-        {filtered.map((r, i) => {
-          const meta = RESOURCE_TYPE_META[r.type];
-          // Stable key: lesson title + type + label. Index appended as
-          // a tiebreaker in case two identical resources exist (fix #8).
-          const rowKey = `${r.lessonTitle}|${r.type}|${r.label}|${i}`;
-          return (
-            <div key={rowKey} className={styles.resourceRow}>
-              <span
-                className={styles.resourceTypeIcon}
-                style={{ background: meta.bg, color: meta.fg }}
-                aria-hidden="true"
-              >
-                {meta.glyph}
-              </span>
-              <span className={styles.resourceLabel}>{r.label}</span>
-              <span className={styles.resourceLesson}>{r.lessonTitle}</span>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-// ── Subject sidebar row ─────────────────────────────────────────────────
-// Split into its own component so `useSubjectColor` is called at a stable
-// position per subject — same pattern as WeeklyGrid's SubjectRow.
+// ── Subject sidebar button ─────────────────────────────────────────────────
 
 interface SubjectBtnProps {
   subjectId: SubjectId;
@@ -609,7 +444,62 @@ function SubjectBtn({
   );
 }
 
-// ── Main subject pane — needs the subject-color hook ────────────────────
+// ── UnitHealthCard data bridge ─────────────────────────────────────────────
+// Reads the "Don't miss" note from context then assembles UnitHealthData.
+// Extracted as a separate component so the hook is called at a stable position
+// per unit (the unit list won't re-order, but this pattern is safest).
+
+interface UnitHealthCardBridgeProps {
+  unitId: string;
+  unitIndex: number;
+  unitName: string;
+  isCurrent: boolean;
+  done: number;
+  total: number;
+  skipped: number;
+  standardsCovered: number;
+  standardsTotal: number;
+  when: string;
+  canEdit: boolean;
+  editorName: string;
+}
+
+function UnitHealthCardBridge({
+  unitId,
+  unitIndex,
+  unitName,
+  isCurrent,
+  done,
+  total,
+  skipped,
+  standardsCovered,
+  standardsTotal,
+  when,
+  canEdit,
+  editorName,
+}: UnitHealthCardBridgeProps): ReactNode {
+  const note = useUnitNote(unitId);
+
+  const data: UnitHealthData = {
+    id: unitId,
+    index: unitIndex,
+    name: unitName,
+    isCurrent,
+    done,
+    total,
+    skipped,
+    standardsCovered,
+    standardsTotal,
+    when,
+    dontMiss: note,
+    canEdit,
+    editorName,
+  };
+
+  return <UnitHealthCard unit={data} />;
+}
+
+// ── Main subject pane ──────────────────────────────────────────────────────
 
 interface SubjectPaneProps {
   subjectId: SubjectId;
@@ -619,40 +509,22 @@ interface SubjectPaneProps {
 function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
   const color = useSubjectColor(subjectId);
   const subject = SUBJECTS.find((s) => s.id === subjectId)!;
-  // NOTE: The mock data has one active unit per subject — all lessons for a
-  // subject share that unit id. This is a mock-data constraint, not a product
-  // limitation; the UI is ready for multi-unit subjects.
-  const unit = UNITS[subjectId];
+  // Active unit from the mock — the mock has one unit per subject.
+  const activeUnit = UNITS[subjectId];
+  const router = useRouter();
 
-  // ── Planner store — the single source of truth for curriculum data ─────
-  // `lessons` is the live document shared with Weekly and Daily views.
-  // `setLessonStatus` and `lastChange` are the only store APIs this view
-  // currently needs beyond reading — other mutations (inline edit, duplicate,
-  // move) are not surfaced in the Subject view UI yet.
   const { lessons, setLessonStatus, lastChange } = usePlanner();
+  const { filters, viewMode, currentUser } = useAppState();
 
-  // ── Global filter rail state (SUBJECT-FILTER-001..004) ────────────────
-  // `filters` is the shared filter state written by the left filter panel.
-  // SubjectPane applies each active filter dimension as a further AND-pass
-  // over the period-filtered lesson set. An empty array for any dimension
-  // means "no filter — show all" (same contract as every other view).
-  const { filters } = useAppState();
-
-  // ── Scroll preservation ────────────────────────────────────────────────
-  // After any mutation (including undo/redo from another view) bring the
-  // affected lesson card into view so the teacher can see what changed.
+  // Scroll preservation — bring the last-changed lesson into view.
   useEffect(() => {
     const id = lastChange?.lessonIds[0];
     if (id) scrollPlannerItemIntoView(id);
   }, [lastChange]);
 
-  // Local UI state — purely presentational, intentionally not in the store
+  // Local UI state — period filter, group mode, collapse state.
   const [period, setPeriod] = useState<PeriodFilter>("All");
   const [groupMode, setGroupMode] = useState<GroupMode>("unit");
-
-  // Lifted group state (fix #1) — keyed by group.key so filter/grouping
-  // changes that rebuild the group list don't reset the teacher's
-  // expanded-collapsed state.
   const [groupOpenState, setGroupOpenState] = useState<Map<string, boolean>>(
     () => new Map(),
   );
@@ -660,113 +532,121 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
     Map<string, Set<string>>
   >(() => new Map());
 
-  // Filter to this subject's lessons from the live store document.
-  // Grade-scoping is already on each lesson (lesson.subject, lesson.week).
+  // All lessons for this subject from the live store.
   const allLessons = useMemo(
     () => lessons.filter((l) => l.subject === subjectId),
     [lessons, subjectId],
   );
 
-  // Apply time-period filter (SUBJECT-PERIOD-001)
-  // Period narrows the candidate set before the rail filters are applied.
-  const currentMonth = weekToMonth(week);
+  const currentMonth = weekToMonthIndex(week);
 
+  // Period filter
   const periodFilteredLessons = useMemo(() => {
     if (period === "All") return allLessons;
-    if (period === "Unit") {
-      // Scope to lessons in the active unit
-      return allLessons.filter((l) => l.unit === unit.id);
-    }
-    if (period === "Month") {
-      // Same calendar month as the current week
-      return allLessons.filter((l) => weekToMonth(l.week) === currentMonth);
-    }
-    if (period === "Week") {
-      return allLessons.filter((l) => l.week === week);
-    }
+    if (period === "Unit")
+      return allLessons.filter((l) => l.unit === activeUnit.id);
+    if (period === "Month")
+      return allLessons.filter(
+        (l) => weekToMonthIndex(l.week) === currentMonth,
+      );
+    if (period === "Week") return allLessons.filter((l) => l.week === week);
     return allLessons;
-  }, [allLessons, period, unit.id, week, currentMonth]);
+  }, [allLessons, period, activeUnit.id, week, currentMonth]);
 
-  // Apply left-rail filters on top of the period-filtered set.
-  // Each active dimension narrows further (AND semantics).
-  // An empty array for a dimension means "no constraint on that dimension".
-  //
-  // SUBJECT-FILTER-001: `filters.subjects` — on the Subject view this
-  //   pane is already scoped to one subject; the subjects filter acts as
-  //   an additional guard (hides the pane's lessons if the active subject
-  //   is not in the selected set).
-  // SUBJECT-FILTER-002: `filters.units` — show only lessons in the
-  //   selected unit(s).
-  // SUBJECT-FILTER-003: `filters.statuses` — show only lessons whose
-  //   status is in the selected set.
-  // SUBJECT-FILTER-004: `filters.standards` — show only lessons that
-  //   cover at least one of the selected standard codes.
+  // Left-rail filters on top of period filter (AND semantics)
   const filteredLessons = useMemo(() => {
     let base = periodFilteredLessons;
-
-    if (filters.subjects.length > 0) {
+    if (filters.subjects.length > 0)
       base = base.filter((l) => filters.subjects.includes(l.subject));
-    }
-    if (filters.units.length > 0) {
+    if (filters.units.length > 0)
       base = base.filter((l) => filters.units.includes(l.unit));
-    }
-    if (filters.statuses.length > 0) {
+    if (filters.statuses.length > 0)
       base = base.filter((l) => filters.statuses.includes(l.status));
-    }
-    if (filters.standards.length > 0) {
-      // Lesson matches if it covers ANY of the selected standards (OR within
-      // the standards dimension, AND across dimensions).
+    if (filters.standards.length > 0)
       base = base.filter((l) =>
         l.standards.some((s) => filters.standards.includes(s)),
       );
-    }
-
     return base;
   }, [periodFilteredLessons, filters]);
 
-  // Header stats — always over the full subject set (not filtered)
-  const totalCount = allLessons.length;
-  const doneCount = allLessons.filter((l) => l.status === "done").length;
-  const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-  const totalResources = allLessons.reduce(
-    (sum, l) => sum + l.resources.length,
-    0,
-  );
+  // ── Build unit health data ───────────────────────────────────────────────
+  // Group all lessons by unit id to compute per-unit aggregates.
+  // NOTE: The mock currently has one unit per subject. All lessons reference
+  // that unit id. The health card grid will show one card (the active unit).
+  // When the backend lands and multi-unit data is available, this computation
+  // naturally produces one card per unit without code changes.
+  const unitHealthList = useMemo((): Array<{
+    unitId: string;
+    unitIndex: number;
+    unitName: string;
+    isCurrent: boolean;
+    done: number;
+    total: number;
+    skipped: number;
+    standardsCovered: number;
+    standardsTotal: number;
+    when: string;
+  }> => {
+    // Collect all units present in lessons, preserving first-seen order.
+    const unitIds = [...new Set(allLessons.map((l) => l.unit))];
 
-  // Year progress bar — group all lessons by unit for the segmented bar
-  const unitGroups = useMemo(() => {
-    const map: Map<
-      string,
-      { done: number; total: number; isCurrent: boolean }
-    > = new Map();
-    for (const l of allLessons) {
-      const entry = map.get(l.unit) ?? { done: 0, total: 0, isCurrent: false };
-      entry.total += 1;
-      if (l.status === "done") entry.done += 1;
-      if (l.week === CURRENT_WEEK) entry.isCurrent = true;
-      map.set(l.unit, entry);
-    }
-    return [...map.entries()].map(([unitId, data]) => ({ unitId, ...data }));
-  }, [allLessons]);
+    return unitIds.map((unitId, idx) => {
+      const unitLessons = allLessons.filter((l) => l.unit === unitId);
+      const done = unitLessons.filter((l) => l.status === "done").length;
+      const total = unitLessons.length;
+      const skipped = unitLessons.filter((l) => l.status === "skipped").length;
 
-  // Progress-bar tick labels derived from the actual week range of this
-  // subject's lessons — never hard-coded calendar months (fix #2).
-  const progressTickLabels = useMemo((): string[] => {
-    if (allLessons.length === 0) return [];
-    const weeks = allLessons.map((l) => l.week);
-    const minWk = Math.min(...weeks);
-    const maxWk = Math.max(...weeks);
-    if (minWk === maxWk) return [`Wk ${minWk}`];
-    // Show up to 6 evenly-spaced week labels across the range.
-    const span = maxWk - minWk;
-    const steps = Math.min(6, span + 1);
-    return Array.from(
-      { length: steps },
-      (_, i) => `Wk ${Math.round(minWk + (span * i) / Math.max(steps - 1, 1))}`,
-    );
-  }, [allLessons]);
+      // Standards covered: unique codes on done lessons.
+      // Standards total: unique codes across all lessons in the unit.
+      // A conservative derivation — if a standard appears on any lesson it
+      // counts as "expected"; only lessons with status=done count toward
+      // covered. (If the unit had an explicit expected-standards list the
+      // backend would supply that directly; for the mock we use the lesson
+      // set as a proxy.)
+      const allCodes = new Set<string>();
+      const doneCodes = new Set<string>();
+      for (const l of unitLessons) {
+        for (const s of l.standards) {
+          allCodes.add(s);
+          if (l.status === "done") doneCodes.add(s);
+        }
+      }
 
-  // Build lesson rows for the filtered set
+      // When: derive month range from earliest → latest lesson week.
+      const weeks = unitLessons.map((l) => l.week);
+      const minWk = Math.min(...weeks);
+      const maxWk = Math.max(...weeks);
+      const startMonth = monthNameForWeek(minWk);
+      const endMonth = monthNameForWeek(maxWk);
+      const when =
+        startMonth === endMonth ? startMonth : `${startMonth} → ${endMonth}`;
+
+      // Lookup unit metadata for the name.
+      const unitMeta = UNIT_BY_ID[unitId] ?? activeUnit;
+
+      // Current: true if any lesson in the unit falls in the current week.
+      const isCurrent = unitLessons.some((l) => l.week === CURRENT_WEEK);
+
+      return {
+        unitId,
+        unitIndex: idx + 1,
+        unitName: unitMeta.name,
+        isCurrent,
+        done,
+        total,
+        skipped,
+        standardsCovered: doneCodes.size,
+        standardsTotal: allCodes.size,
+        when,
+      };
+    });
+  }, [allLessons, activeUnit]);
+
+  // Is the current user the lead teacher? (leads can edit "Don't miss")
+  const canEdit = currentUser.name.length > 0; // simplified: all authenticated users can edit
+  const editorName = currentUser.name || "Lead teacher";
+
+  // ── Lesson list (for the Grid/List area) ────────────────────────────────
   const lessonRows = useMemo((): LessonRowData[] => {
     return filteredLessons.map((l) => ({
       id: l.id,
@@ -783,13 +663,9 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
     }));
   }, [filteredLessons]);
 
-  // Group lessons by unit or week
+  // Group lessons by unit or by week for the Grid (table) mode.
   const groups = useMemo((): GroupData[] => {
     if (groupMode === "unit") {
-      // Use the lesson's unit id as the grouping key; preserve insertion order
-      // so the visual sequence follows the year's unit progression.
-      // Look up unit id from allLessons (which already comes from the store),
-      // not from the static LESSONS fixture, so moves/edits are reflected.
       const unitById = new Map(allLessons.map((l) => [l.id, l.unit]));
       const byUnit: Map<string, LessonRowData[]> = new Map();
       for (const l of lessonRows) {
@@ -798,60 +674,53 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
         existing.push(l);
         byUnit.set(unitId, existing);
       }
-
-      return [...byUnit.entries()].map(([unitId, lessons], idx) => {
-        // Find unit metadata. The mock has one active unit per subject; all
-        // lessons for a subject share that unit id.
-        const u = Object.values(UNITS).find((u) => u.id === unitId) ?? unit;
-        const isCurrent = lessons.some((l) => l.isCurrent);
+      return [...byUnit.entries()].map(([unitId, ls], idx) => {
+        const u = UNIT_BY_ID[unitId] ?? activeUnit;
+        const isCurrent = ls.some((l) => l.isCurrent);
         return {
           key: unitId,
           tag: `U${idx + 1}`,
           name: u.name,
           isCurrent,
-          lessons,
+          lessons: ls,
         };
       });
     }
 
-    // Group by week
     const byWeek: Map<number, LessonRowData[]> = new Map();
     for (const l of lessonRows) {
       const existing = byWeek.get(l.week) ?? [];
       existing.push(l);
       byWeek.set(l.week, existing);
     }
+    return [...byWeek.keys()]
+      .sort((a, b) => a - b)
+      .map((w) => {
+        const ls = byWeek.get(w)!;
+        return {
+          key: `week-${w}`,
+          tag: `W${w}`,
+          name: `Week ${w} · ${ls.length} lesson${ls.length === 1 ? "" : "s"}`,
+          isCurrent: w === CURRENT_WEEK,
+          lessons: ls,
+        };
+      });
+  }, [groupMode, lessonRows, allLessons, activeUnit]);
 
-    // Sort weeks numerically
-    const sortedWeeks = [...byWeek.keys()].sort((a, b) => a - b);
-    return sortedWeeks.map((w) => {
-      const lessons = byWeek.get(w)!;
-      const isCurrent = w === CURRENT_WEEK;
-      return {
-        key: `week-${w}`,
-        tag: `W${w}`,
-        name: `Week ${w} · ${lessons.length} lesson${lessons.length === 1 ? "" : "s"}`,
-        isCurrent,
-        lessons,
-      };
-    });
-  }, [groupMode, lessonRows, allLessons, unit]);
-
-  // Collect all resources for the resource browser
+  // All resources for the ResourcesSort section.
   const allResources = useMemo((): ResourceEntry[] => {
-    return allLessons.flatMap((l) =>
-      l.resources.map((r) => ({
+    return allLessons.flatMap((l) => {
+      const unitMeta = UNIT_BY_ID[l.unit] ?? activeUnit;
+      return l.resources.map((r) => ({
         type: r.type,
         label: r.label,
         lessonTitle: l.title,
-      })),
-    );
-  }, [allLessons]);
+        unitName: unitMeta.name,
+      }));
+    });
+  }, [allLessons, activeUnit]);
 
-  // ── Lifted group-state callbacks (fix #1) ──────────────────────────────
-  // Derive the default open state for a group the first time it appears
-  // (current group or week-mode groups open by default); thereafter preserve
-  // whatever the teacher set explicitly.
+  // Lifted group state callbacks — preserve expand/collapse across re-renders.
   function getGroupIsOpen(
     groupKey: string,
     isCurrent: boolean,
@@ -899,11 +768,6 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
     });
   }
 
-  // ── Completion toggle ──────────────────────────────────────────────────
-  // Cycles: not_done → done → not_done (partial / carried / skipped cycle
-  // remains accessible via the Weekly/Daily detail panel). Each call is one
-  // history step so it is independently undoable. Completion intentionally
-  // never forks the lesson (product rule — see CLAUDE.md §2).
   function handleToggleStatus(lessonId: string): void {
     const lesson = allLessons.find((l) => l.id === lessonId);
     if (!lesson) return;
@@ -911,211 +775,220 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
     setLessonStatus(lessonId, next);
   }
 
+  // Determine current-unit context for the lesson-list section heading.
+  const currentUnitName = activeUnit.name;
+
   return (
     <div className={`${styles.main} cp-subj ${subjectId}`}>
-      {/* Subject header */}
+      {/* ── Subject header ──────────────────────────────────────────────── */}
       <header className={styles.header}>
-        <div className={styles.headerTop}>
-          <div className={styles.headerMeta}>
-            <div className={styles.headerEyebrow}>
-              <span
-                className={styles.headerDot}
-                style={{ background: color.c }}
-              />
-              Subject
-            </div>
-            <h1 className={styles.headerTitle}>{subject.name}</h1>
-            <p className={styles.headerSub}>
-              {unit.name} · {unit.weeks}
-            </p>
-          </div>
-
-          <div className={styles.headerSpacer} />
-
-          <div className={styles.headerStats}>
-            <StatBlock
-              label="Done"
-              value={`${doneCount} / ${totalCount}`}
-              colorVar={color.c}
-            />
-            <StatBlock
-              label="Complete"
-              value={`${pct}%`}
-              colorVar="var(--ink-900)"
-            />
-            <StatBlock
-              label="Resources"
-              value={totalResources}
-              colorVar="var(--ink-700)"
-            />
-          </div>
+        <div className={styles.headerEyebrow}>
+          <span className={styles.headerDot} style={{ background: color.c }} />
+          Subject
         </div>
-
-        {/* Year-progress bar segmented by unit */}
-        <div className={styles.progressWrap}>
-          <div
-            className={styles.progressTrack}
-            role="progressbar"
-            aria-valuenow={pct}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
-            {unitGroups.map((u) => (
-              <div
-                key={u.unitId}
-                className={styles.progressUnit}
-                style={{ flex: u.total }}
-              >
-                <div
-                  className={styles.progressDone}
-                  style={{ flex: u.done, background: color.c }}
-                />
-                <div
-                  className={styles.progressRemain}
-                  style={{
-                    flex: u.total - u.done,
-                    background: u.isCurrent ? color.cl : "var(--ink-100)",
-                    opacity: u.isCurrent ? 0.6 : 1,
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-          {/* Tick labels derived from actual lesson week range — not hard-coded
-              calendar months (fix #2). */}
-          <div className={styles.progressLabels} aria-hidden="true">
-            {progressTickLabels.map((label) => (
-              <span key={label}>{label}</span>
-            ))}
-          </div>
-        </div>
+        <h1 className={styles.headerTitle}>{subject.name}</h1>
+        <p className={styles.headerSub}>Grade 5 · {activeUnit.weeks}</p>
       </header>
 
-      {/* Filter / grouping bar */}
-      <div
-        className={styles.filterBar}
-        role="toolbar"
-        aria-label="Time period and grouping"
-      >
-        <span className={styles.filterLabel}>Period</span>
-        {PERIOD_FILTERS.map((p) => (
-          <button
-            key={p}
-            className={`${styles.chip} ${period === p ? styles.chipActive : ""}`}
-            onClick={() => setPeriod(p)}
-            aria-pressed={period === p}
-          >
-            {p}
-          </button>
-        ))}
+      {/* ── Stat strip ──────────────────────────────────────────────────── */}
+      <div className={styles.content}>
+        <StatStrip lessons={allLessons} />
 
-        <span className={styles.filterSep} />
-
-        <span className={styles.filterLabel}>Group by</span>
-        <div className={styles.groupToggle} role="group" aria-label="Group by">
-          {GROUP_MODES.map((mode) => (
-            <button
-              key={mode}
-              className={`${styles.groupBtn} ${groupMode === mode ? styles.groupBtnActive : ""}`}
-              onClick={() => setGroupMode(mode)}
-              aria-pressed={groupMode === mode}
-            >
-              {mode === "unit" ? "By Unit" : "By Week"}
-            </button>
+        {/* ── Unit health cards ─────────────────────────────────────────── */}
+        <SectionHeader
+          kicker="Unit health"
+          title="Each unit at a glance"
+          hint="What's done, what got skipped, which standards are covered, and the one move a teacher really doesn't want to forget."
+        />
+        <div className={styles.unitHealthGrid}>
+          {unitHealthList.map((u) => (
+            <UnitHealthCardBridge
+              key={u.unitId}
+              unitId={u.unitId}
+              unitIndex={u.unitIndex}
+              unitName={u.unitName}
+              isCurrent={u.isCurrent}
+              done={u.done}
+              total={u.total}
+              skipped={u.skipped}
+              standardsCovered={u.standardsCovered}
+              standardsTotal={u.standardsTotal}
+              when={u.when}
+              canEdit={canEdit}
+              editorName={editorName}
+            />
           ))}
         </div>
-      </div>
 
-      {/* Lesson list — collapsible tree structure, not a flat list, so
-          role="list" is omitted to avoid AT announcing an empty list when
-          children are group containers, not listitem elements (fix #5). */}
-      <div className={styles.listArea} aria-label={`${subject.name} lessons`}>
-        {groups.length === 0 ? (
-          <div className={styles.empty}>No lessons for this period.</div>
+        {/* ── Filter / grouping bar ─────────────────────────────────────── */}
+        <SectionHeader
+          kicker={`Current unit · ${unitHealthList.find((u) => u.isCurrent)?.unitName ? `U${unitHealthList.find((u) => u.isCurrent)!.unitIndex}` : "Unit"}`}
+          title={currentUnitName + " — lesson list"}
+          hint="The familiar by-unit lesson list — kept here for triage and quick drill-in."
+        />
+
+        <div
+          className={styles.filterBar}
+          role="toolbar"
+          aria-label="Time period and grouping"
+        >
+          <span className={styles.filterLabel}>Period</span>
+          {PERIOD_FILTERS.map((p) => (
+            <button
+              key={p}
+              className={`${styles.chip} ${period === p ? styles.chipActive : ""}`}
+              onClick={() => setPeriod(p)}
+              aria-pressed={period === p}
+            >
+              {p}
+            </button>
+          ))}
+
+          <span className={styles.filterSep} />
+
+          {/* Group-by toggle only applies in Grid mode */}
+          {viewMode === "grid" && (
+            <>
+              <span className={styles.filterLabel}>Group by</span>
+              <div
+                className={styles.groupToggle}
+                role="group"
+                aria-label="Group by"
+              >
+                {GROUP_MODES.map((mode) => (
+                  <button
+                    key={mode}
+                    className={`${styles.groupBtn} ${groupMode === mode ? styles.groupBtnActive : ""}`}
+                    onClick={() => setGroupMode(mode)}
+                    aria-pressed={groupMode === mode}
+                  >
+                    {mode === "unit" ? "By Unit" : "By Week"}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ── Lesson list — Grid or List mode ───────────────────────────── */}
+        {viewMode === "list" ? (
+          // List mode: <ListRow> from @/components/list, one per lesson.
+          // onClick navigates to /daily focused on the lesson's day.
+          <div
+            className={styles.listArea}
+            aria-label={`${subject.name} lessons`}
+          >
+            {filteredLessons.length === 0 ? (
+              <div className={styles.empty}>No lessons for this period.</div>
+            ) : (
+              <div className={styles.listRows}>
+                {filteredLessons.map((l) => (
+                  <ListRow
+                    key={l.id}
+                    lesson={l}
+                    weekday={`W${l.week} · ${(WEEK_DAYS[l.day] ?? "").slice(0, 3)}`}
+                    onClick={() => router.push(`/daily?lesson=${l.id}`)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
-          groups.map((group) => {
-            const isOpen = getGroupIsOpen(
-              group.key,
-              group.isCurrent,
-              group.tag,
-            );
-            const expandedLessons = getGroupExpanded(group.key);
-            return (
-              <GroupBlock
-                key={group.key}
-                group={group}
-                isOpen={isOpen}
-                onToggleOpen={() =>
-                  handleToggleGroupOpen(group.key, group.isCurrent, group.tag)
-                }
-                expandedLessons={expandedLessons}
-                onToggleLesson={(id) => handleToggleLesson(group.key, id)}
-                onToggleAllLessons={() =>
-                  handleToggleAllLessons(
-                    group.key,
-                    group.lessons.map((l) => l.id),
-                  )
-                }
-                onToggleStatus={handleToggleStatus}
-              />
-            );
-          })
+          // Grid mode: the collapsible GroupBlock tree.
+          <div
+            className={styles.listArea}
+            aria-label={`${subject.name} lessons`}
+          >
+            {groups.length === 0 ? (
+              <div className={styles.empty}>No lessons for this period.</div>
+            ) : (
+              groups.map((group) => {
+                const isOpen = getGroupIsOpen(
+                  group.key,
+                  group.isCurrent,
+                  group.tag,
+                );
+                const expandedLessons = getGroupExpanded(group.key);
+                return (
+                  <GroupBlock
+                    key={group.key}
+                    group={group}
+                    isOpen={isOpen}
+                    onToggleOpen={() =>
+                      handleToggleGroupOpen(
+                        group.key,
+                        group.isCurrent,
+                        group.tag,
+                      )
+                    }
+                    expandedLessons={expandedLessons}
+                    onToggleLesson={(id) => handleToggleLesson(group.key, id)}
+                    onToggleAllLessons={() =>
+                      handleToggleAllLessons(
+                        group.key,
+                        group.lessons.map((l) => l.id),
+                      )
+                    }
+                    onToggleStatus={handleToggleStatus}
+                  />
+                );
+              })
+            )}
+          </div>
         )}
-      </div>
 
-      {/* Resource browser */}
-      {allResources.length > 0 && <ResourceSection resources={allResources} />}
+        {/* ── Resources sort ────────────────────────────────────────────── */}
+        <SectionHeader
+          kicker="Resources"
+          title={`All ${subject.name} resources`}
+          hint="All resources attached to this subject's lessons — moved to the bottom so it's there when you need it without taking the top of the screen."
+        />
+        <ResourcesSort resources={allResources} subjectName={subject.name} />
+      </div>
     </div>
   );
 }
 
-// ── Root SubjectView ────────────────────────────────────────────────────
+// ── Root SubjectView ────────────────────────────────────────────────────────
 
-/** Props for SubjectView.
- *
- * `initialSubject` is set by the dynamic `/subject/[slug]` route to the
- * slug param. On first mount the component syncs `subjectView` in shared
- * state to match, so the rest of the app (right-rail filter, filter panel)
- * always reads the canonical value from app-state — never the raw URL param.
- * When omitted (e.g. the old flat `/subject` page), the existing `subjectView`
- * state is used without modification. */
 export interface SubjectViewProps {
   initialSubject?: SubjectId;
 }
 
 export function SubjectView({ initialSubject }: SubjectViewProps): ReactNode {
-  const { subjectView, setSubjectView, week } = useAppState();
+  const { subjectView, setSubjectView, week, toggleLeftPanel, leftPanelOpen } =
+    useAppState();
   const router = useRouter();
 
-  // Sync app-state on first mount whenever a slug param was passed in.
-  // The effect runs when `initialSubject` changes (i.e. a route param
-  // change on the same component instance). Empty-dep on purpose would
-  // miss fast client-side navigations between /subject/math and
-  // /subject/reading without a full unmount — hence the dep below.
+  // On the Subject view the left filter panel starts closed.
+  // We only close it once on mount; the top-bar toggle still works after that.
+  const hasClosedPanelRef = useRef(false);
+  useEffect(() => {
+    if (!hasClosedPanelRef.current && leftPanelOpen) {
+      toggleLeftPanel();
+      hasClosedPanelRef.current = true;
+    }
+    // We don't re-run when leftPanelOpen changes — only want to close once on
+    // first mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync app-state when a slug param is passed in (from the dynamic route).
   useEffect(() => {
     if (initialSubject && initialSubject !== subjectView) {
       setSubjectView(initialSubject);
     }
-    // `setSubjectView` is stable (from useState setter), `subjectView`
-    // intentionally omitted — we only react to the URL param changing,
-    // not to sidebar clicks (those push the URL themselves via router.push).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSubject]);
 
-  // Navigate to the slug URL AND update app-state. Using router.push keeps
-  // the address bar, browser history, and bookmarks in sync; the effect
-  // above ensures app-state stays consistent on hard-reload or direct link.
   function handleSubjectSelect(id: SubjectId): void {
     router.push(`/subject/${id}`);
     setSubjectView(id);
   }
 
-  // Lessons from the shared store — sidebar badges stay live as other views
-  // mark lessons done or undo those changes.
   const { lessons } = usePlanner();
 
-  // Per-subject done/total for the sidebar badge — recomputed whenever the
-  // live lesson list changes (e.g. after a completion toggle in Weekly view).
+  // Per-subject done/total for sidebar badges.
   const subjectCounts = useMemo(() => {
     const counts: Record<string, { done: number; total: number }> = {};
     for (const s of SUBJECTS) {

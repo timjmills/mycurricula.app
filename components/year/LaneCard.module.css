@@ -1,0 +1,57 @@
+/* LaneCard — fixed left-edge lane summary. */
+
+.card {
+  width: 200px;
+  flex: 0 0 200px;
+  border-right: 1px solid #eceef7;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.name {
+  font-size: var(--t-13);
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  line-height: 1.2;
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--t-11);
+  font-weight: 500;
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progressLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+}
+
+.progressTrack {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 400ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    transition: none;
+  }
+}

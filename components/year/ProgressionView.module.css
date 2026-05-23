@@ -1,0 +1,294 @@
+/* ProgressionView — day-by-day calendar (List mode). */
+
+.root {
+  background: #fff;
+  border: 1px solid var(--ink-150, #e6e9f4);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+/* Gradient month-header strip */
+.monthStrip {
+  display: flex;
+  height: 28px;
+  background: linear-gradient(
+    90deg,
+    #6fd7c5 0%,
+    #b6e4a3 40%,
+    #ffe780 75%,
+    #5bc7b5 100%
+  );
+}
+
+.monthCells {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.monthCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 1.2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  border-right: 1px solid rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.monthCell:last-child {
+  border-right: none;
+}
+
+/* Day header row */
+.dayHeader {
+  display: flex;
+  border-bottom: 1px solid #eceef7;
+  background: #fff;
+}
+
+.cornerCell {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  border-right: 1px solid #eceef7;
+}
+
+.cornerLabel {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.cornerSub {
+  font-size: 10px;
+  color: #5b6580;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.dayCols {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.dayCol {
+  flex: 0 0 auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0 3px;
+  border-left: 1px solid #f5f6fa;
+}
+
+.dayCol.monthBoundary {
+  border-left: 2px solid #eceef7;
+}
+
+.todayCol {
+  background: rgba(91, 97, 244, 0.08);
+}
+
+.todayPill {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #5b61f4;
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.dayWkd {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.dayNum {
+  font-size: 10px;
+  font-weight: 600;
+  color: #5b6580;
+}
+
+/* Lane rows */
+.laneRow {
+  display: flex;
+  position: relative;
+  min-height: 80px;
+}
+
+/* Scroll container for the day grid */
+.laneGrid {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* TODAY column highlight — absolute overlay over the grid */
+.todayHighlight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(91, 97, 244, 0.06);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* LESSONS row — per-day StatusGlyph cells */
+.glyphRow {
+  display: flex;
+  height: 32px;
+  border-bottom: 1px solid #f5f6fa;
+  position: relative;
+  z-index: 1;
+}
+
+.glyphCell {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid #f5f6fa;
+}
+
+.glyphCell.monthBoundary {
+  border-left: 2px solid #eceef7;
+}
+
+/* UNITS row — highlighter bars */
+.unitRow {
+  position: relative;
+  min-height: 76px;
+  display: flex;
+}
+
+.unitGridLine {
+  flex: 0 0 auto;
+  height: 100%;
+  border-left: 1px solid #f5f6fa;
+}
+
+.unitGridLine.monthBoundary {
+  border-left: 2px solid #eceef7;
+}
+
+/* Highlighter unit bar — absolutely positioned over the unit row */
+.unitBar {
+  position: absolute;
+  top: 8px;
+  height: 60px;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.04),
+    inset 0 2px 0 rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.unitTile {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.unitMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Kebab menu */
+.kebab {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  min-height: 44px; /* touch target */
+  border-radius: 6px;
+  background: transparent;
+  border: 0;
+  color: #94a3b8;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.kebab:hover {
+  background: var(--ink-100, #eef0f4);
+  color: var(--ink-700, #2e3038);
+}
+
+/* Bottom legend strip */
+.legend {
+  display: flex;
+  gap: 14px;
+  padding: 10px 16px;
+  align-items: center;
+  border-top: 1px solid #f5f6fa;
+  background: #fafbfc;
+  flex-wrap: wrap;
+}
+
+.legendLabel {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #5b6580;
+  font-weight: 500;
+}
+
+.legendDivider {
+  width: 1px;
+  height: 16px;
+  background: #e2e5f0;
+  flex-shrink: 0;
+}
