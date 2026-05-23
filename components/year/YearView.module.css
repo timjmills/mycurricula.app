@@ -16,8 +16,8 @@
   align-items: flex-start;
   gap: 16px;
   padding: 22px 24px 14px;
-  background: var(--paper, #fff);
-  border-bottom: 1px solid var(--ink-150, #e6e8ed);
+  background: var(--paper);
+  border-bottom: 1px solid var(--ink-150);
 }
 
 .pageHeaderLeft {
@@ -26,9 +26,10 @@
 
 .pageTitle {
   margin: 0;
-  font-size: var(--t-26);
-  font-weight: 700;
-  color: #1f2a4e;
+  /* var(--t-24) matches the spec; weight 800 for bold hierarchy. */
+  font-size: var(--t-24);
+  font-weight: 800;
+  color: var(--ink-900);
   letter-spacing: -0.5px;
   line-height: 1.1;
 }
@@ -36,7 +37,7 @@
 .pageSubtitle {
   margin: 4px 0 0;
   font-size: var(--t-13);
-  color: #6e78a0;
+  color: var(--ink-500);
   font-weight: 400;
 }
 
@@ -52,19 +53,28 @@
   align-items: center;
   gap: 7px;
   padding: 8px 14px;
-  border-radius: 10px;
-  background: var(--paper, #fff);
-  color: #1f2a4e;
-  border: 1px solid var(--ink-150, #e6e8ed);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  color: var(--ink-700);
+  border: 1px solid var(--ink-150);
   font-size: var(--t-13);
   font-weight: 600;
   letter-spacing: -0.1px;
   cursor: pointer;
   min-height: 44px;
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .actionBtn:hover {
-  background: var(--ink-50, #f6f7f9);
+  background: var(--ink-50);
+  box-shadow: var(--shadow-card);
+}
+
+.actionBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
 }
 
 /* ── Main body layout ────────────────────────────────────────────────── */
@@ -94,13 +104,13 @@
   gap: 10px;
 }
 
-/* Roadmap | Progression toggle */
+/* Roadmap | Progression toggle — the prominent dark/light pill pair. */
 .viewToggle {
   display: inline-flex;
   padding: 4px;
-  background: var(--paper, #fff);
-  border: 1px solid var(--ink-150, #e6e8ed);
-  border-radius: 10px;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-8);
   gap: 2px;
 }
 
@@ -108,83 +118,42 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
-  border-radius: 7px;
-  border: 0;
+  padding: 7px 16px;
+  border-radius: var(--r-6);
+  border: 1px solid transparent;
   cursor: pointer;
-  background: transparent;
-  color: #6e78a0;
-  font-size: 12.5px;
+  /* Inactive: white fill + ink-700 text + soft border */
+  background: var(--paper);
+  color: var(--ink-700);
+  font-size: var(--t-13);
   font-weight: 700;
   letter-spacing: -0.1px;
   min-height: 44px;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
+/* Active pill: dark ink fill + white text. */
 .toggleBtnActive {
-  background: #eef0ff;
-  color: #5b61f4;
+  background: var(--ink-900);
+  color: var(--paper);
+  border-color: transparent;
+}
+
+.toggleBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
 }
 
 .toggleSub {
-  font-size: 10px;
+  font-size: var(--t-10);
   font-weight: 500;
   color: inherit;
-  opacity: 0.75;
+  opacity: 0.7;
 }
 
-/* Status filter pill bar */
-.filterBar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background: var(--paper, #fff);
-  border: 1px solid var(--ink-150, #e6e8ed);
-  border-radius: 12px;
-  flex-wrap: wrap;
-}
-
-.filterBarLabel {
-  font-size: 11.5px;
-  color: #5b6580;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.filterPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
-  border-radius: 999px;
-  background: var(--paper, #fff);
-  color: #1f2a4e;
-  border: 1px solid var(--ink-150, #e6e8ed);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  min-height: 36px;
-}
-
-.filterPillActive {
-  background: #eef0ff;
-  color: #5b61f4;
-  border-color: #d8dafb;
-}
-
-.filterClear {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  background: transparent;
-  color: #5b6580;
-  border: 0;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-left: auto;
-}
+/* Status filter pill bar is now in StatusFilterBar.module.css */
 
 /* ── View body ───────────────────────────────────────────────────────── */
 
@@ -195,9 +164,9 @@
 /* ── Bottom stat strip ───────────────────────────────────────────────── */
 
 .statStrip {
-  background: var(--paper, #fff);
-  border: 1px solid var(--ink-150, #e6e8ed);
-  border-radius: 14px;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-12);
   box-shadow: var(--shadow-card);
   padding: 16px 22px;
   display: grid;
@@ -214,9 +183,9 @@
 .statIcon {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
-  background: var(--ink-100, #eef0f4);
-  color: var(--ink-700, #2e3038);
+  border-radius: var(--r-12);
+  background: var(--ink-100);
+  color: var(--ink-700);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -224,26 +193,33 @@
 }
 
 .statLabel {
-  font-size: 12px;
-  color: #6e78a0;
+  font-size: var(--t-12);
+  color: var(--ink-500);
   font-weight: 500;
 }
 
 .statValue {
   font-size: var(--t-18);
   font-weight: 700;
-  color: #1f2a4e;
+  color: var(--ink-900);
   letter-spacing: -0.3px;
 }
 
 .statCaption {
-  font-size: 10.5px;
-  color: #94a3b8;
+  font-size: var(--t-10);
+  color: var(--ink-400);
   margin-top: 1px;
 }
 
 @media (max-width: 900px) {
   .statStrip {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actionBtn,
+  .toggleBtn {
+    transition: none;
   }
 }

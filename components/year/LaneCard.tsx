@@ -18,6 +18,8 @@
 // cascade defined in app/tokens.css — no hex values here.
 
 import type { SubjectId } from "@/lib/types";
+import type { PacingStatus } from "@/lib/year-pacing";
+import { pacingLabel } from "@/lib/year-pacing";
 import { subjectClassName } from "./roadTones";
 import styles from "./LaneCard.module.css";
 
@@ -42,6 +44,12 @@ interface LaneCardProps {
   completePct: number;
   /** Card height is set by the parent row — the card fills available height. */
   fullHeight?: boolean;
+  /**
+   * Pacing status computed by pacingFor() in lib/year-pacing.ts.
+   * When provided, renders a colored dot + one-line status sentence below
+   * the progress bar. Omit to hide the row entirely.
+   */
+  pacing?: PacingStatus;
 }
 
 export function LaneCard({
@@ -50,6 +58,7 @@ export function LaneCard({
   students = 24,
   completePct,
   fullHeight = false,
+  pacing,
 }: LaneCardProps) {
   const monogram = CHIP_MONOGRAM[subjectId] ?? name.slice(0, 2);
 
@@ -73,7 +82,7 @@ export function LaneCard({
         </div>
       </div>
 
-      {/* White body — completion percentage + progress bar */}
+      {/* White body — completion percentage + progress bar + pacing row */}
       <div className={styles.body}>
         <div className={styles.progressLabel}>{completePct}% Complete</div>
         <div
@@ -90,6 +99,19 @@ export function LaneCard({
             style={{ width: `${completePct}%` }}
           />
         </div>
+
+        {/* Pacing row — only rendered when the parent passes a pacing status.
+            Dot color is keyed to the status kind via data-pacing; see the CSS. */}
+        {pacing !== undefined && (
+          <div className={styles.pacingRow}>
+            <span
+              className={styles.pacingDot}
+              data-pacing={pacing.kind}
+              aria-hidden="true"
+            />
+            <span className={styles.pacingLabel}>{pacingLabel(pacing)}</span>
+          </div>
+        )}
       </div>
     </div>
   );

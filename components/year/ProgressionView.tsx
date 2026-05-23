@@ -28,6 +28,7 @@ import {
   DEFAULT_TERM_START,
   DEFAULT_WEEKS_IN_VIEW,
 } from "@/lib/year-calendar";
+import { pacingFor } from "@/lib/year-pacing";
 import { subjectClassName } from "./roadTones";
 import { StatusGlyph } from "./StatusGlyph";
 import { LaneCard } from "./LaneCard";
@@ -159,9 +160,14 @@ export function ProgressionView() {
       }
       const unitBars = [...unitMap.values()];
 
-      return { subject, subjectId, glyphMap, completePct, unitBars };
+      // Pacing status for the LaneCard summary row.
+      const pacing = pacingFor(subjectId, lessons, todayFlatIdx, {
+        dayCount: schoolWeekLen,
+      });
+
+      return { subject, subjectId, glyphMap, completePct, unitBars, pacing };
     });
-  }, [lessons, schoolWeekLen]);
+  }, [lessons, schoolWeekLen, todayFlatIdx]);
 
   const totalCols = schoolDays.length;
 
@@ -229,7 +235,10 @@ export function ProgressionView() {
             to the correct subject color for all children in the row.
             data-lane-subject enables IntersectionObserver lane detection. */}
         {subjectData.map(
-          ({ subject, subjectId, glyphMap, completePct, unitBars }, li) => (
+          (
+            { subject, subjectId, glyphMap, completePct, unitBars, pacing },
+            li,
+          ) => (
             <div
               key={subject.id}
               data-lane-subject={subject.id}
@@ -247,6 +256,7 @@ export function ProgressionView() {
                 name={subject.name}
                 subjectId={subjectId}
                 completePct={completePct}
+                pacing={pacing}
                 fullHeight
               />
 

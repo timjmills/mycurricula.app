@@ -18,13 +18,21 @@
 // globals.css (outside our file ownership). The current layout is readable and
 // functional without that change.
 
+import { useState, useMemo } from "react";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECTS } from "@/lib/mock";
-import { DEFAULT_WEEKS_IN_VIEW } from "@/lib/year-calendar";
+import {
+  DEFAULT_WEEKS_IN_VIEW,
+  monthsForQuarter,
+  weeksInQuarter,
+} from "@/lib/year-calendar";
 import { YearSidebar } from "./YearSidebar";
 import { RoadmapView } from "./RoadmapView";
 import { ProgressionView } from "./ProgressionView";
+import { QuarterMonthWeekHeader } from "./QuarterMonthWeekHeader";
+import { StatusFilterBar } from "./StatusFilterBar";
+import type { StatusFilterId } from "./StatusFilterBar";
 import styles from "./YearView.module.css";
 
 // ── Inline icons ──────────────────────────────────────────────────────────
@@ -152,33 +160,6 @@ const IconUsers = (p: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-// ── Status filter glyphs (inline, no shared import needed) ────────────────
-// Colors from canonical tokens: --done for completed, --ink-* for neutral states.
-
-const StatusDot = ({ type }: { type: string }) => {
-  const styles_: React.CSSProperties =
-    type === "done"
-      ? { background: "var(--done)", borderColor: "var(--done)" }
-      : type === "current"
-        ? { background: "var(--reading-light)", borderColor: "var(--reading)" }
-        : type === "skipped"
-          ? { background: "#fff", borderColor: "var(--ink-300)" }
-          : { background: "var(--ink-100)", borderColor: "var(--ink-200)" };
-  return (
-    <span
-      style={{
-        width: 11,
-        height: 11,
-        borderRadius: "50%",
-        border: "1.5px solid",
-        flexShrink: 0,
-        display: "inline-block",
-        ...styles_,
-      }}
-    />
-  );
-};
-
 // ── Bottom stat strip ──────────────────────────────────────────────────────
 
 function StatItem({
@@ -206,13 +187,56 @@ function StatItem({
   );
 }
 
+// ── Constants shared with RoadmapView ──────────────────────────────────────
+
+/** Width in px of each week column — must match RoadmapView's WEEK_COL_MIN. */
+const COLUMN_WIDTH_PX = 108;
+/** Width in px of the left rail — matches ProgressionView's LANE_COL. */
+const LEFT_RAIL_WIDTH_PX = 200;
+
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function YearView() {
   const { viewMode, setViewMode } = useAppState();
   const { lessons } = usePlanner();
 
-  // Live-computed stat strip values.
+  // ── Quarter state ─────────────────────────────────────────────────────
+  // Starts at Q1; the quarter picker button is visual-only for now.
+  const [quarter, setQuarter] = useState(1);
+
+  // ── Status filter state ───────────────────────────────────────────────
+  // "all" is the default active filter. A Set makes toggling O(1).
+  const [activeFilters, setActiveFilters] = useState<Set<StatusFilterId>>(
+    () => new Set(["all"] as StatusFilterId[]),
+  );
+
+  const handleFilterToggle = (id: StatusFilterId) => {
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (id === "all") {
+        // Selecting "All" clears everything else.
+        return new Set(["all"] as StatusFilterId[]);
+      }
+      // Toggle individual filter; clear "all" when any specific filter is active.
+      if (next.has(id)) {
+        next.delete(id);
+        if (next.size === 0) next.add("all");
+      } else {
+        next.delete("all");
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleFilterClear = () =>
+    setActiveFilters(new Set(["all"] as StatusFilterId[]));
+
+  // ── QuarterMonthWeekHeader data ───────────────────────────────────────
+  const quarterMonths = useMemo(() => monthsForQuarter(quarter), [quarter]);
+  const quarterWeeks = useMemo(() => weeksInQuarter(quarter), [quarter]);
+
+  // ── Stat strip values ─────────────────────────────────────────────────
   const totalUnits = new Set(lessons.map((l) => l.unit)).size;
   const totalLessons = lessons.length;
   const activeLanes = SUBJECTS.length; // all 8 subjects are active curriculum lanes
@@ -220,23 +244,31 @@ export function YearView() {
 
   return (
     <div className={styles.page} data-route="year">
-      {/* Page header */}
+      {/* ── Page header ──────────────────────────────────────────────── */}
       <div className={styles.pageHeader}>
         <div className={styles.pageHeaderLeft}>
           <h1 className={styles.pageTitle}>Yearly View</h1>
           <p className={styles.pageSubtitle}>
-            Day-by-day timeline of every unit across your curriculum
+            High-level roadmap of units across your curriculum
           </p>
         </div>
         <div className={styles.pageHeaderActions}>
+          {/* Today — scrolls to the current week (stub: functional scroll not yet wired) */}
           <button className={styles.actionBtn} aria-label="Go to today">
             <IconCal width={15} height={15} />
             Today
           </button>
-          <button className={styles.actionBtn} aria-label="Select quarter">
-            Quarter 1
+          {/* Quarter picker — visual-only dropdown stub */}
+          <button
+            className={styles.actionBtn}
+            aria-label={`Select quarter, currently Quarter ${quarter}`}
+            aria-haspopup="listbox"
+            onClick={() => setQuarter((q) => (q % 4) + 1)}
+          >
+            Quarter {quarter}
             <IconChev width={13} height={13} />
           </button>
+          {/* Filters and Export are stubs for later waves */}
           <button className={styles.actionBtn} aria-label="Open filters">
             <IconFilter width={14} height={14} />
             Filters
@@ -248,14 +280,13 @@ export function YearView() {
         </div>
       </div>
 
-      {/* Main body: sidebar + content */}
+      {/* ── Main body: sidebar + content ─────────────────────────────── */}
       <div className={styles.body}>
         <YearSidebar />
 
         <div className={styles.contentArea}>
-          {/* In-page Roadmap | Progression toggle + status filter bar */}
+          {/* In-page Roadmap | Progression toggle */}
           <div className={styles.controls}>
-            {/* View toggle — same state as the top-bar Grid|List pill */}
             <div
               className={styles.viewToggle}
               role="group"
@@ -268,9 +299,7 @@ export function YearView() {
               >
                 <IconRoadmap width={14} height={14} />
                 Roadmap
-                <span className={styles.toggleSub}>
-                  {viewMode === "grid" ? "Weekly overview" : "Weekly overview"}
-                </span>
+                <span className={styles.toggleSub}>Weekly overview</span>
               </button>
               <button
                 className={`${styles.toggleBtn} ${viewMode === "list" ? styles.toggleBtnActive : ""}`}
@@ -279,61 +308,26 @@ export function YearView() {
               >
                 <IconProgression width={14} height={14} />
                 Progression
-                <span className={styles.toggleSub}>
-                  {viewMode === "list"
-                    ? "Day-by-day calendar"
-                    : "Day-by-day calendar"}
-                </span>
+                <span className={styles.toggleSub}>Day-by-day calendar</span>
               </button>
             </div>
 
-            {/* Status filter pill bar (visual only — wire in a later wave) */}
-            <div
-              className={styles.filterBar}
-              role="group"
-              aria-label="Status filter"
-            >
-              <span className={styles.filterBarLabel}>Status filter</span>
-              <button
-                className={`${styles.filterPill} ${styles.filterPillActive}`}
-                aria-pressed="true"
-              >
-                All
-              </button>
-              {[
-                { label: "Completed", type: "done" },
-                { label: "In progress", type: "current" },
-                { label: "Skipped", type: "skipped" },
-                { label: "Not yet encountered", type: "upcoming" },
-              ].map((s) => (
-                <button
-                  key={s.type}
-                  className={styles.filterPill}
-                  aria-pressed="false"
-                >
-                  <StatusDot type={s.type} />
-                  {s.label}
-                </button>
-              ))}
-              <button
-                className={styles.filterClear}
-                aria-label="Clear all filters"
-              >
-                Clear filters
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  aria-hidden="true"
-                >
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
+            {/* Status filter pill bar — wired to local state */}
+            <StatusFilterBar
+              active={activeFilters}
+              onToggle={handleFilterToggle}
+              onClear={handleFilterClear}
+            />
           </div>
+
+          {/* Sticky Quarter / Month / Week timeline header */}
+          <QuarterMonthWeekHeader
+            quarter={quarter}
+            months={quarterMonths}
+            weeks={quarterWeeks}
+            columnWidthPx={COLUMN_WIDTH_PX}
+            leftRailWidthPx={LEFT_RAIL_WIDTH_PX}
+          />
 
           {/* The active view */}
           <div className={styles.viewBody}>
@@ -356,7 +350,7 @@ export function YearView() {
               icon={IconCal}
               label="Weeks in View"
               value={`${weeksInView} weeks`}
-              caption="Academic Q1"
+              caption={`Academic Q${quarter}`}
             />
             <StatItem
               icon={IconUsers}

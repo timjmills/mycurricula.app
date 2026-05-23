@@ -1,12 +1,14 @@
-/* RoadmapView — weekly-column grid (Grid mode). */
+/* RoadmapView — unit-bar lane stack (Grid mode).
+   Unit bars are absolutely positioned inside a fixed-width timeline div;
+   the grid-based unit block layout from the previous wave is removed. */
 
 .root {
   background: var(--paper, #fff);
   border: 1px solid var(--ink-150, #e6e9f4);
   border-radius: 14px;
   box-shadow: var(--shadow-card);
-  /* overflow: clip — lets position:sticky children work while still
-     visually clipping to the border-radius. */
+  /* overflow:clip — lets position:sticky children work while visually
+     clipping to the border-radius. */
   overflow: clip;
 }
 
@@ -23,23 +25,19 @@
 .headerRow {
   display: grid;
   grid-template-columns: 200px 1fr;
-  border-bottom: 1px solid #eceef7;
-  /* Neutral base shown before the first IntersectionObserver callback fires. */
-  background: var(--paper, #fff);
+  border-bottom: 1px solid var(--ink-150);
+  background: var(--paper);
   position: sticky;
   top: 0;
   z-index: 5;
-  /* background shorthand catches both background-color and background-image,
-     giving a best-effort smooth transition on the gradient swap. */
   transition:
     background 200ms ease,
     border-color 200ms ease;
 }
 
 /* Active-subject chameleon fill: vertical gradient dark-top → light-bottom,
-   matching the Weekly card header feel. var(--c) and var(--cl) come from the
-   cp-subj class JS places on this element.
-   !important is required: this rule competes with the neutral .headerRow base. */
+   matching the Weekly card header feel. var(--c) and var(--cl) come from
+   the cp-subj class JS places on this element. */
 .headerRowChameleon {
   background: linear-gradient(180deg, var(--c) 0%, var(--cl) 100%) !important;
   border-bottom: 1px solid color-mix(in srgb, var(--cd) 12%, transparent) !important;
@@ -55,7 +53,6 @@
   padding: 14px 16px;
   display: flex;
   align-items: center;
-  gap: 8px;
   font-size: var(--t-13);
   font-weight: 700;
   color: var(--ink-900);
@@ -70,249 +67,79 @@
 .weekGrid {
   display: grid;
   font-size: 10.5px;
-  color: #94a3b8;
+  color: var(--ink-400);
   font-weight: 600;
   padding: 0 4px;
 }
 
 .weekCell {
   text-align: center;
+  padding: 2px 0;
+  position: relative;
 }
 
 .weekBorder {
-  border-left: 1px dashed #eceef7;
+  border-left: 1px dashed var(--ink-150);
+}
+
+/* Today week column — bolder label color */
+.weekCellToday {
+  color: var(--fyi);
+  font-weight: 700;
+}
+
+/* Today indicator dot in the week header */
+.todayDot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fyi);
+  vertical-align: middle;
+  margin-left: 4px;
+  flex-shrink: 0;
 }
 
 /* Lane row */
 .laneRow {
   display: grid;
   grid-template-columns: 200px 1fr;
+  overflow: hidden;
 }
 
-/* Timeline scroll area */
+/* Timeline right column — holds bg grid lines + absolutely positioned unit bars.
+   containerType enables CSS container queries in UnitBar for responsive collapse. */
 .timeline {
   position: relative;
-  padding: 16px 4px;
   overflow-x: auto;
   scrollbar-width: thin;
+  flex-shrink: 0;
 }
 
-/* Unit bars row — CSS grid with ROAD_WEEKS columns */
-.unitBarRow {
+/* Background grid — absolute fill, drawn behind the unit bars. */
+.bgGrid {
+  position: absolute;
+  inset: 0;
   display: grid;
-  position: relative;
-  align-items: center;
-  min-height: 90px;
+  pointer-events: none;
+  z-index: 0;
 }
 
-/* Background grid lines */
+/* One background column — purely structural; weekBorder draws the dashed line. */
 .bgLine {
-  grid-row: 1;
-  height: 90px;
+  height: 100%;
 }
 
-/* Unit block occupies week columns via grid-column */
-.unitBlock {
-  display: flex;
-  align-items: center;
-  z-index: 1;
+/* Today week column background — subtle tint */
+.bgLineToday {
+  background: color-mix(in srgb, var(--fyi) 5%, transparent);
 }
 
-/* Colored bar (Brush style).
-   Same four-ingredient highlighter-wash treatment as LaneCard and unit bars:
-     1. Near-solid vertical gradient via color-mix() — ~90% throughout.
-     2. Left accent edge at full var(--c) saturation.
-     3. Inset top highlight + drop shadow for dimension. */
-.brush {
-  width: 100%;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: var(--r-8);
-  padding: 0 10px 0 8px;
-  overflow: hidden;
-  /* Ingredient 2 + 1: near-solid vertical gradient — 92% → 88% */
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--c) 92%, transparent) 0%,
-    color-mix(in srgb, var(--c) 88%, transparent) 100%
-  );
-  /* Ingredient 3: strong left accent edge */
-  border-left: 4px solid var(--c);
-  border-top: 1px solid color-mix(in srgb, var(--cd) 15%, transparent);
-  border-right: 1px solid color-mix(in srgb, var(--cd) 10%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--cd) 18%, transparent);
-  /* Ingredient 4: inset top highlight + soft shadow */
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 45%, transparent),
-    0 1px 2px color-mix(in srgb, var(--ink-900) 8%, transparent);
-}
+/* ── Legend row ─────────────────────────────────────────────────────────── */
 
-.unitTile {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  flex-shrink: 0;
-  /* White tile sits cleanly on the translucent wash */
-  background: rgba(255, 255, 255, 0.65);
-  color: var(--cd);
-}
-
-.unitInfo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow: hidden;
-  min-width: 0;
-  flex: 1;
-}
-
-.unitName {
-  font-size: var(--t-13);
-  font-weight: 700;
-  letter-spacing: -0.1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  /* Deep subject tone for strong legibility on the saturated bar */
-  color: var(--cd);
-}
-
-.statusPill {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* Checkpoint flag */
-.checkpoint {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding-top: 2px;
-}
-
-.checkpointFlag {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #fff;
-  /* var(--c) border and icon color from the lane cascade */
-  border: 2px solid var(--c);
-  color: var(--c);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.checkpointLabel {
-  font-size: 10px;
-  font-weight: 600;
-  color: #5b6580;
-  text-align: center;
-  line-height: 1.2;
-}
-
-/* Star (right edge) */
-.starBtn {
-  position: absolute;
-  top: 14px;
-  right: 8px;
-}
-
-/* Dot row */
-.dotRow {
-  display: grid;
-  gap: 0;
-  margin-top: 6px;
-  align-items: center;
-}
-
-.dotBlock {
-  padding: 0 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.dotBlockLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10.5px;
-  color: #5b6580;
-  font-weight: 500;
-}
-
-.dotTrack {
-  position: relative;
-  height: 14px;
-  width: 100%;
-}
-
-/* Dots use modifier classes set in RoadmapView.tsx to pick state colors. */
-.dot {
-  position: absolute;
-  top: 2px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  border-width: 1.5px;
-  border-style: solid;
-}
-
-/* done → var(--done) semantic green; matches StatusGlyph done state */
-.dot_done {
-  background: var(--done);
-  border-color: var(--done);
-}
-
-/* current → subject --cl fill with --c border (in-progress feel) */
-.dot_current {
-  background: var(--cl);
-  border-color: var(--c);
-}
-
-/* upcoming → neutral ink-100 with ink-200 border */
-.dot_upcoming {
-  background: #fff;
-  border-color: var(--ink-300);
-}
-
-.completeBadge {
-  position: absolute;
-  right: -22px;
-  top: -1px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  /* var(--done) for the completion badge — same semantic green as done dots */
-  background: var(--done);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Legend row at the bottom */
 .legendRow {
-  border-top: 1px solid #eceef7;
-  background: #fafbfc;
+  border-top: 1px solid var(--ink-150);
+  background: var(--ink-50);
   padding: 16px 22px;
   display: grid;
   grid-template-columns: 1fr 1fr 1.4fr;
@@ -328,18 +155,53 @@
 
 .legendTitle {
   font-size: 10.5px;
-  color: #94a3b8;
+  color: var(--ink-400);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
 
+/* Status legend pills — colors keyed to data-status attribute so they
+   visually match StatusBadge without importing its styles here. */
 .pillGroup {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
 }
 
+.legendPill {
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+
+/* Match StatusBadge color scheme via data-status attribute */
+.legendPill[data-status="completed"] {
+  background: color-mix(in srgb, var(--done) 18%, white);
+  color: var(--done);
+}
+.legendPill[data-status="in_progress"] {
+  background: color-mix(in srgb, var(--fyi) 18%, white);
+  color: var(--fyi);
+}
+.legendPill[data-status="modified"] {
+  background: color-mix(in srgb, var(--important) 18%, white);
+  color: var(--important);
+}
+.legendPill[data-status="behind"] {
+  background: color-mix(in srgb, var(--catchup) 16%, white);
+  color: var(--catchup);
+}
+.legendPill[data-status="not_started"] {
+  background: var(--ink-100);
+  color: var(--ink-500);
+}
+
+/* Dot legend */
 .dotLegend {
   display: flex;
   gap: 14px;
@@ -352,7 +214,7 @@
   align-items: center;
   gap: 5px;
   font-size: 11.5px;
-  color: #1f2a4e;
+  color: var(--ink-900);
 }
 
 .dotSample {
@@ -365,7 +227,6 @@
   display: inline-block;
 }
 
-/* Legend sample dots match the dot_* state colors above */
 .dotSample_done {
   background: var(--done);
   border-color: var(--done);
@@ -377,9 +238,11 @@
 }
 
 .dotSample_upcoming {
-  background: #fff;
+  background: var(--paper);
   border-color: var(--ink-300);
 }
+
+/* ── Summary stats ──────────────────────────────────────────────────────── */
 
 .summaryStats {
   display: flex;
@@ -396,12 +259,12 @@
 .smallStatValue {
   font-size: var(--t-14);
   font-weight: 700;
-  color: #1f2a4e;
+  color: var(--ink-900);
   letter-spacing: -0.2px;
   line-height: 1;
 }
 
 .smallStatLabel {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--ink-400);
 }

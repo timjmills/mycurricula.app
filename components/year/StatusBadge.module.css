@@ -1,0 +1,17 @@
+/* StatusBadge — small uppercase pill for UnitBar status. */
+
+.badge {
+  /* Type */
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  /* Geometry */
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  /* Inline flex so it lines up cleanly inside the UnitBar flex row */
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}

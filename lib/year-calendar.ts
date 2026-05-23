@@ -221,3 +221,88 @@ export const DEFAULT_TERM_START = new Date(2025, 10, 2); // 2025-11-02
 
 /** Default weeks in view for the Year view (one academic quarter, ~13 weeks). */
 export const DEFAULT_WEEKS_IN_VIEW = 13;
+
+// ── Quarter helpers ────────────────────────────────────────────────────────
+//
+// The academic year is divided into 4 quarters of 9 weeks each (36 weeks
+// total — matching the common US/international school-year convention). Any
+// excess weeks in the mock fixture beyond 36 are treated as Q4.
+//
+// Week indices here are 0-based, matching the week field produced by
+// buildSchoolDays and the 0-based convention in the Roadmap grid.
+// IMPORTANT: Lesson.week in the mock fixtures is 1-based; subtract 1
+// before passing to these helpers.
+
+/** Number of academic weeks per quarter. */
+const WEEKS_PER_QUARTER = 9;
+
+/**
+ * Return the quarter number (1–4) for a given 0-based week index.
+ * Week 0 → Q1; week 8 → Q1; week 9 → Q2; week 35 → Q4; week ≥36 → Q4.
+ */
+export function quarterForWeek(weekIdx: number): number {
+  return Math.min(4, Math.floor(weekIdx / WEEKS_PER_QUARTER) + 1);
+}
+
+/**
+ * Return the month bands visible inside a given quarter.
+ *
+ * Each band carries:
+ *   label  — display name of the month (e.g. "November")
+ *   weeks  — how many week columns of the quarter fall within that month
+ *
+ * Anchored to `DEFAULT_TERM_START`; the school week must not be hard-coded —
+ * uses the first day of each academic week (7-day strides) to determine
+ * which calendar month each week falls in.
+ *
+ * @param quarter  - 1..4
+ * @param year     - calendar year of the term start (default: term-start year)
+ */
+export function monthsForQuarter(
+  quarter: number,
+  year: number = DEFAULT_TERM_START.getFullYear(),
+): { label: string; weeks: number }[] {
+  const termStart = new Date(
+    year,
+    DEFAULT_TERM_START.getMonth(),
+    DEFAULT_TERM_START.getDate(),
+  );
+  const firstWeek = (quarter - 1) * WEEKS_PER_QUARTER; // 0-based week index
+  const lastWeek = firstWeek + WEEKS_PER_QUARTER - 1;
+
+  // Build a month→week-count map, preserving insertion order.
+  const map = new Map<string, number>();
+  for (let w = firstWeek; w <= lastWeek; w++) {
+    // The first calendar day of week w.
+    const d = new Date(
+      termStart.getFullYear(),
+      termStart.getMonth(),
+      termStart.getDate() + w * 7,
+    );
+    const label = d.toLocaleString("en-US", { month: "long" });
+    map.set(label, (map.get(label) ?? 0) + 1);
+  }
+
+  return Array.from(map.entries()).map(([label, weeks]) => ({ label, weeks }));
+}
+
+/**
+ * Return one entry per week column in the given quarter.
+ *
+ * @param quarter  - 1..4
+ * @param year     - calendar year of the term start (default: term-start year)
+ */
+export function weeksInQuarter(
+  quarter: number,
+  year: number = DEFAULT_TERM_START.getFullYear(),
+): { idx: number; label: string }[] {
+  // Suppress unused-parameter lint — year is accepted for API consistency
+  // with monthsForQuarter even though label generation is index-only here.
+  void year;
+
+  const firstWeek = (quarter - 1) * WEEKS_PER_QUARTER; // 0-based
+  return Array.from({ length: WEEKS_PER_QUARTER }, (_, i) => {
+    const idx = firstWeek + i;
+    return { idx, label: `Wk ${idx + 1}` };
+  });
+}

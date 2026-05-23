@@ -1,0 +1,93 @@
+/* StatusFilterBar — pill row above the timeline. */
+
+.bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-12);
+}
+
+/* ── Pill ────────────────────────────────────────────────────────────── */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
+  /* Default (inactive) state */
+  background: var(--pill-bg, var(--paper));
+  color: var(--pill-color, var(--ink-700));
+  border: 1px solid var(--pill-border, var(--ink-150));
+  font-size: var(--t-13);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 36px;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+  white-space: nowrap;
+}
+
+.pill:hover {
+  background: var(--ink-50);
+}
+
+/* When aria-pressed="true" the --pill-* vars override the defaults via
+   the inline style; this selector provides an extra affordance for
+   keyboard focus so the ring is clearly visible. */
+.pill:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Status dot ──────────────────────────────────────────────────────── */
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Clear button ────────────────────────────────────────────────────── */
+
+.clearBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--ink-500);
+  border: 0;
+  font-size: var(--t-12);
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: auto;
+  min-height: 36px;
+  transition:
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+.clearBtn:hover {
+  color: var(--ink-900);
+}
+
+.clearBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+  border-radius: var(--r-4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill,
+  .clearBtn {
+    transition: none;
+  }
+}

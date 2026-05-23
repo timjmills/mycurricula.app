@@ -1,0 +1,130 @@
+/* QuarterMonthWeekHeader — Sticky 3-row timeline header.
+   Position: sticky; anchors to the page <main> scroll context.
+   Background covers scrolling lane content underneath. */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--paper);
+  border-bottom: 1px solid var(--ink-150);
+  /* Prevent the sticky block from shrinking narrower than the rail. */
+  min-width: calc(var(--left-rail, 200px) + 200px);
+}
+
+/* ── Shared row base ─────────────────────────────────────────────────── */
+
+.row {
+  display: grid;
+  align-items: stretch;
+}
+
+/* ── Rail cell (left column, above LaneCard) ─────────────────────────── */
+
+.railCell {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 4px 12px 5px;
+  border-right: 1px solid var(--ink-150);
+  background: var(--paper);
+  /* Stay crisp — no bleed from the month band bg. */
+  z-index: 1;
+}
+
+.eyebrowLine1 {
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-400);
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.eyebrowLine2 {
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-300);
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+/* ── Row 1: Quarter ──────────────────────────────────────────────────── */
+
+.quarterCell {
+  display: flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-right: none;
+}
+
+.quarterLabel {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-700);
+  letter-spacing: -0.1px;
+}
+
+/* ── Row 2: Month bands ──────────────────────────────────────────────── */
+
+.monthRow {
+  background: var(--ink-50);
+}
+
+.monthCell {
+  padding: 5px 10px;
+  font-size: var(--t-12);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--ink-700);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.monthBorder {
+  border-left: 1px solid var(--ink-150);
+}
+
+/* ── Row 3: Week labels ──────────────────────────────────────────────── */
+
+.weekRow {
+  /* Slightly lighter than month row so the hierarchy reads top-down. */
+  background: var(--paper);
+}
+
+.weekCell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-500);
+  white-space: nowrap;
+}
+
+.weekBorder {
+  border-left: 1px solid var(--ink-150);
+}
+
+/* Today highlight — the cell for the current week gets a subtle tint. */
+.weekCellToday {
+  color: var(--fyi);
+  background: var(--fyi-bg);
+}
+
+/* Dot marker below the week label, centered horizontally. */
+.todayDot {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fyi);
+}

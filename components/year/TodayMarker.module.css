@@ -1,0 +1,40 @@
+/* TodayMarker — vertical column marker for the current week.
+   Parent must be position:relative with a known height.
+   The root is absolutely positioned; --fyi serves as the "today" accent color. */
+
+.root {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Centered on the column via JS-supplied `left`. Transform brings it to
+     true center: the element itself is 1px wide so -0.5px centers the line. */
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Above unit bars (z-index 1) but below popovers */
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* "TODAY" pill — sits at the top, just above the lane rows */
+.pill {
+  background: var(--fyi);
+  color: #fff;
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  box-shadow: 0 1px 4px rgba(31, 111, 184, 0.35);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Thin indigo line — fills the remaining height */
+.line {
+  flex: 1;
+  width: 1.5px;
+  background: var(--fyi);
+  opacity: 0.45;
+}

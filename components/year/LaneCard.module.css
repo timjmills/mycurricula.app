@@ -162,6 +162,70 @@
   }
 }
 
+/* ── Pacing row ─────────────────────────────────────────────────────────── */
+/* Appears below the progress bar when the parent passes a pacing status.    */
+
+.pacingRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* 8×8px status dot; color driven by data-pacing attribute. */
+.pacingDot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  /* Default — neutral pending */
+  background: var(--ink-500);
+}
+
+/* on_pace and in_progress → green-family "done" token */
+.pacingDot[data-pacing="on_pace"],
+.pacingDot[data-pacing="in_progress"],
+.pacingDot[data-pacing="completed"] {
+  background: var(--done);
+}
+
+/* behind → flame-red "catchup" token */
+.pacingDot[data-pacing="behind"] {
+  background: var(--catchup);
+}
+
+/* ahead → blue "fyi" token */
+.pacingDot[data-pacing="ahead"] {
+  background: var(--fyi);
+}
+
+/* starts_next_week → neutral-500, already the default; kept explicit */
+.pacingDot[data-pacing="starts_next_week"] {
+  background: var(--ink-500);
+}
+
+/* starts_in_days → same neutral-500 pending shade */
+.pacingDot[data-pacing="starts_in_days"] {
+  background: var(--ink-500);
+}
+
+/* not_started → ink-400, the most muted neutral */
+.pacingDot[data-pacing="not_started"] {
+  background: var(--ink-400);
+}
+
+/* Pacing status sentence — 12px, 500, ink-700. WCAG AA at this size + weight. */
+.pacingLabel {
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-700);
+  line-height: 1.3;
+  /* Clip gracefully if the card is narrowed below 160px */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
