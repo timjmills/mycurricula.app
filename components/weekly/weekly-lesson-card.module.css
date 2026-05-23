@@ -166,13 +166,29 @@
 
 /* BUG-002: Row 2 — status indicators (moved arrow, Modified pill).
    Rendered only when the card carries moved/modified state so clean cards
-   pay no layout cost. flex:0 0 auto on each child prevents growth/overlap. */
+   pay no layout cost. flex:0 0 auto on each child prevents growth/overlap.
+   Hidden at rest — the dashed left stripe is the at-rest visual cue for
+   modified cards. Controls reveal on card hover/focus (Option 2). */
 .bandStatusRow {
   display: flex;
   align-items: center;
   gap: 4px;
   margin-top: 3px;
   flex-wrap: nowrap;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.card:hover .bandStatusRow,
+.card:focus-within .bandStatusRow {
+  opacity: 1;
+}
+
+/* Touch devices: always show status indicators. */
+@media (hover: none) {
+  .bandStatusRow {
+    opacity: 1;
+  }
 }
 
 /* 2-letter subject code badge — leading edge of the header band in full mode.
@@ -215,12 +231,14 @@
   line-height: 1;
 }
 
-/* Subject name — strong uppercase eyebrow: the zone's primary label. */
+/* Subject name — rendered inline with time as a single muted metadata line.
+   Low weight + muted opacity so it recedes behind the dominant title below.
+   The separator dot (·) is a text character; no extra element needed. */
 .bandSubject {
-  font-size: var(--t-10);
-  font-weight: 800;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
+  font-size: var(--t-11);
+  font-weight: 400;
+  letter-spacing: 0.1px;
+  /* NOT uppercase — reads as a label line, not a badge */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -240,9 +258,9 @@
 }
 
 .bandTime {
-  font-size: var(--t-10);
-  font-weight: 600;
-  letter-spacing: 0.15px;
+  font-size: var(--t-11);
+  font-weight: 400;
+  letter-spacing: 0.1px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -303,13 +321,17 @@
   height: 44px;
   border-radius: var(--r-6);
   background: transparent;
-  opacity: 0.5;
+  /* Hidden at rest — revealed by hover/focus on the card (Option 2). The
+     visible glyph is hidden but the 44px hit area stays in the DOM for
+     keyboard access; Tab brings focus and instantly reveals the control. */
+  opacity: 0;
   transition: opacity 0.12s ease;
 }
 
-/* Drag handle: always fully visible — it is the primary move affordance. */
+/* Drag handle: same as other affordances — hidden at rest, visible on hover.
+   The hit area remains so keyboard / pointer users can always reach it. */
 .dragHandle {
-  opacity: 1;
+  opacity: 0;
 }
 
 .affordanceVisual {
@@ -326,6 +348,7 @@
     background 0.12s ease;
 }
 
+/* Reveal controls on card hover or when any control gains keyboard focus. */
 .card:hover .affordance,
 .card:focus-within .affordance {
   opacity: 1;
@@ -341,16 +364,16 @@
   outline-offset: -4px;
 }
 
+/* Touch devices: always show controls since there is no hover. */
 @media (hover: none) {
   .affordance {
     opacity: 1;
   }
 }
 
-/* ── Lesson title — prominent second line of the band ────────────────────── */
-/* One size step up from the meta row, weight 600 — reads as the headline
-   of the labeled header zone. Stays compact (1.25 line-height) so it doesn't
-   dominate a small cell when the title wraps to two lines.
+/* ── Lesson title — dominant headline of the band ───────────────────────── */
+/* The title is the eye-catch: larger and bolder than the metadata line above.
+   Weight 700 + t-16 makes it the visual anchor of the card at a glance.
    Clamped to a maximum of 2 lines so a long title can never make the
    collapsed card overflow its fixed-height grid cell (~206px matrix).
    CARD-TITLE-002: 2-line clamp prevents pasted-long-text from exploding height.
@@ -358,9 +381,9 @@
    of underscores) so they wrap instead of escaping the band width. */
 .bandTitle {
   margin: 4px 0 0;
-  font-size: var(--t-14);
-  font-weight: 600;
-  line-height: 1.25;
+  font-size: var(--t-16);
+  font-weight: 700;
+  line-height: 1.2;
   text-wrap: pretty;
   /* CARD-TITLE-003: break long unbroken tokens (URLs, underscores) at any
      character boundary so they wrap rather than overflow the band. */
@@ -372,6 +395,23 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Em-dash subtitle — the qualifier fragment after ` — ` in the lesson title.
+   Appears below the main title, visually subordinate. Smaller + muted so it
+   reads as a qualifier, not a second headline. */
+.bandTitleSub {
+  display: block;
+  margin-top: 1px;
+  font-size: var(--t-11);
+  font-weight: 400;
+  line-height: 1.3;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Not clamped — single line only (it's a short qualifier by nature). */
+  padding-right: 20px;
 }
 
 /* ── Expand caret — bottom-right of the band ─────────────────────────────── */
@@ -904,6 +944,7 @@
   .caret,
   .affordance,
   .affordanceVisual,
+  .bandStatusRow,
   .notesToggle,
   .footerBtn,
   .editableText,

@@ -5,31 +5,33 @@
 // Shows the subject name, a student count (mock), and a % complete progress
 // bar. Appears in both Roadmap and Progression views as the fixed left column.
 //
-// Colors come entirely from the canonical `.cp-subj.<subjectId>` cascade:
-//   var(--cl)  → saturated light fill for the card background
-//   var(--cd)  → deep subject tone for name + progress label text
-//   var(--c)   → saturated mid tone for the progress bar fill
-// This matches the Weekly card's visual register exactly.
+// Layered design treatment:
+//   • White body (--paper) so the card reads in the premium dashboard register.
+//   • Tinted header strip — gradient from --c-surface-strong (top) to
+//     --c-surface (bottom) — carries the subject identity.
+//   • 4px deep-tone left border (--c-deep) asserts subject color at a glance.
+//   • Hairline subject-tinted border on the other three sides (--c-border).
+//   • Subject identity chip (28×32px) in the header top-right.
+//   • Soft drop shadow (--shadow-card); lifts on hover (--shadow-card-hover).
+//
+// All colors resolve from the new role variables inside the `.cp-subj.<id>`
+// cascade defined in app/tokens.css — no hex values here.
 
 import type { SubjectId } from "@/lib/types";
 import { subjectClassName } from "./roadTones";
 import styles from "./LaneCard.module.css";
 
-// Inline icon — avoids pulling a shared icon library.
-const IconUsers = (p: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    {...p}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.7"
-    aria-hidden="true"
-  >
-    <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
-    <circle cx="10" cy="7" r="4" />
-    <path d="M21 21v-2a4 4 0 0 0-3-3.9M15 3.1a4 4 0 0 1 0 7.8" />
-  </svg>
-);
+// Two-letter monogram for the subject identity chip.
+const CHIP_MONOGRAM: Record<SubjectId, string> = {
+  math: "Ma",
+  reading: "Re",
+  writing: "Wr",
+  grammar: "Gr",
+  spelling: "Sp",
+  ufli: "Uf",
+  explorers: "Ex",
+  sel: "Se",
+};
 
 interface LaneCardProps {
   name: string;
@@ -49,22 +51,30 @@ export function LaneCard({
   completePct,
   fullHeight = false,
 }: LaneCardProps) {
+  const monogram = CHIP_MONOGRAM[subjectId] ?? name.slice(0, 2);
+
   return (
     <div
       className={`${styles.card} ${subjectClassName(subjectId)}`}
       style={{ height: fullHeight ? "100%" : undefined }}
     >
-      {/* Subject name — var(--cd) from the cp-subj cascade */}
-      <div className={styles.name}>{name}</div>
+      {/* Tinted header — gradient --c-surface-strong → --c-surface */}
+      <div className={styles.header}>
+        <div className={styles.headerText}>
+          {/* Subject title — var(--c-deep) for strong contrast on the tint */}
+          <div className={styles.name}>{name}</div>
+          {/* Student count — neutral secondary below the title */}
+          <div className={styles.meta}>{students} students</div>
+        </div>
 
-      {/* Student count */}
-      <div className={styles.meta}>
-        <IconUsers width={12} height={12} className={styles.metaIcon} />
-        <span>{students} students</span>
+        {/* Subject identity chip — top-right corner of the header */}
+        <div className={styles.chip} aria-hidden="true">
+          {monogram}
+        </div>
       </div>
 
-      {/* % complete + progress bar */}
-      <div className={styles.progress}>
+      {/* White body — completion percentage + progress bar */}
+      <div className={styles.body}>
         <div className={styles.progressLabel}>{completePct}% Complete</div>
         <div
           className={styles.progressTrack}
@@ -74,7 +84,7 @@ export function LaneCard({
           aria-valuemax={100}
           aria-label={`${name} ${completePct}% complete`}
         >
-          {/* Fill uses var(--c) — the saturated subject mid-tone */}
+          {/* Fill uses --c-progress-fill — the subject's mid tone */}
           <div
             className={styles.progressFill}
             style={{ width: `${completePct}%` }}

@@ -65,6 +65,10 @@ import type {
   ContextAction,
   ContextActionPayload,
 } from "@/components/lesson-card/context-menu";
+import { RelocatePicker } from "@/components/lesson-card/relocate-picker";
+import type { RelocateTarget } from "@/components/lesson-card/relocate-picker";
+import { CompareToMaster } from "@/components/lesson-card/compare-to-master";
+import { ArchiveToast } from "@/components/lesson-card/archive-toast";
 import {
   CompletionCheck,
   ResourceList,
@@ -224,7 +228,17 @@ export function WeeklyLessonCard({
   // BUG-006 — canonical resource source: derive resources from the planner
   // sections store (the same source the right-rail and daily detail use) so
   // all three surfaces agree on the same list (audit finding BUG-006).
-  const { getSections, addSectionResource } = usePlanner();
+  const {
+    getSections,
+    addSectionResource,
+    bumpLesson,
+    archiveLesson,
+    unarchiveLesson,
+    restoreLesson,
+    relocateLesson,
+    duplicateLesson,
+    setLessonStatus,
+  } = usePlanner();
   const sectionResources = lessonResources(getSections(lesson.id));
 
   // Respect prefers-reduced-motion (spec §2.5 / §2.4): under reduced motion,
@@ -237,6 +251,14 @@ export function WeeklyLessonCard({
   const [hovered, setHovered] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  // Sub-surface state — each is a boolean open flag. Only one can be open
+  // at a time in practice (the menu closes before any of these open).
+  const [relocateOpen, setRelocateOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  // archiveToastKey: incremented each time an archive fires so a new toast
+  // instance mounts even if the previous one hasn't finished dismissing.
+  const [archiveToastKey, setArchiveToastKey] = useState(0);
+  const [archiveToastVisible, setArchiveToastVisible] = useState(false);
 
   // ── Save-target dialog state ───────────────────────────────────────────
   // dirty: true when at least one real content change has been committed via
@@ -451,6 +473,43 @@ export function WeeklyLessonCard({
     () => lesson.objective.replace(/^I can\s+/i, ""),
     [lesson.objective],
   );
+
+  // Em-dash title split (Option 1) — if the plain-text title contains " — "
+  // (em-dash with surrounding spaces), break on the first occurrence so the
+  // body of the title stands alone as the dominant headline and the trailing
+  // qualifier becomes a muted subtitle line below. When editing, the full
+  // HTML title is shown as-is so the teacher edits the canonical string.
+  // We operate on the stripped plain-text for the split; the raw HTML is used
+  // for the main title span so RTE formatting is preserved.
+  const { titleMain, titleSub } = useMemo(() => {
+    const plain = stripHtml(lesson.title);
+    const splitIdx = plain.indexOf(" — "); // " — " (em-dash)
+    if (splitIdx === -1) return { titleMain: lesson.title, titleSub: null };
+    // Find the character offset of the separator in the HTML string.
+    // We reconstruct the HTML up to that plain-text position, similar to
+    // the TITLE_MAX_CHARS logic above — a best-effort slice that stays safe.
+    let visible = 0;
+    let inTag = false;
+    let htmlCutIdx = lesson.title.length;
+    for (let i = 0; i < lesson.title.length; i++) {
+      if (lesson.title[i] === "<") {
+        inTag = true;
+      } else if (lesson.title[i] === ">") {
+        inTag = false;
+      } else if (!inTag) {
+        if (visible === splitIdx) {
+          htmlCutIdx = i;
+          break;
+        }
+        visible++;
+      }
+    }
+    return {
+      titleMain: lesson.title.slice(0, htmlCutIdx),
+      // Subtitle is plain text — the qualifier after the em-dash.
+      titleSub: plain.slice(splitIdx + 3), // 3 = " — ".length
+    };
+  }, [lesson.title]);
 
   // CARD-TITLE-002 — enforce a 120-char plain-text ceiling on the title field.
   // The RichTextEditor produces HTML; we measure the stripped plain-text length
@@ -702,20 +761,6 @@ export function WeeklyLessonCard({
 
               {/* ── Band row 1: identity + fixed affordances ─────────────────── */}
               <div className={styles.bandTop}>
-                {/* 2-letter subject code badge — leading edge of the header band.
-              Mirrors the compact chip's "XX · Title" prefix so the subject
-              is scannable at a glance in full mode too.
-              Styled with design tokens only; inherits subject deep color (--cd)
-              from the band. aria-hidden because the subject name in bandMeta
-              already provides the accessible label. */}
-                <span
-                  aria-hidden="true"
-                  className={styles.bandSubjectCode}
-                  style={{ color: color.cd }}
-                >
-                  {subjectCode}
-                </span>
-
                 {/* Completion check — always on top of the faded state so it's
               reachable even when done=true. */}
                 <div
@@ -730,12 +775,11 @@ export function WeeklyLessonCard({
                   />
                 </div>
 
-                {/* Subject eyebrow + time — grouped identifier row.
-              Subject name: uppercase eyebrow label (strong, compact).
-              Time: tabular-numeric, slightly softer weight, separated by
-              a thin vertical rule so the two pieces read as one unit.
-              flex:1 + min-width:0 so it takes up available space while
-              allowing the trailing affordances to stay at their natural width. */}
+                {/* Subject · time — single muted metadata line (Option 1).
+              No uppercase, no pill. The card's color background already
+              signals subject; this line is just a quiet label reference.
+              Color inherits color.cd from the band gradient context so
+              the text is readable on any subject's tint without hardcoding. */}
                 <div className={styles.bandMeta} style={{ color: color.cd }}>
                   <span className={styles.bandSubject}>{subject.name}</span>
                   <span className={styles.bandMetaSep} aria-hidden />
@@ -839,9 +883,12 @@ export function WeeklyLessonCard({
                 </div>
               )}
 
-              {/* Lesson title — prominent second line of the band. Weight 600,
-            one size step up from before, so it reads as the headline of
-            the labeled zone rather than a secondary detail.
+              {/* Lesson title — dominant headline of the band (t-16 / weight 700).
+            The eye-catch: larger and bolder than the metadata line above.
+            If the title contains an em-dash split (" — "), titleMain is the
+            body of the title; the qualifier appears as a muted subtitle
+            (.bandTitleSub) below. When editing, the editor shows the full
+            canonical HTML so the teacher edits the complete string.
             Double-click enters inline rich-text edit mode (suppresses expand). */}
               <h3
                 className={styles.bandTitle}
@@ -883,10 +930,22 @@ export function WeeklyLessonCard({
                     // read the complete text when the 2-line clamp truncates it.
                     title={stripHtml(lesson.title)}
                     // eslint-disable-next-line react/no-danger
-                    dangerouslySetInnerHTML={{ __html: lesson.title }}
+                    dangerouslySetInnerHTML={{ __html: titleMain }}
                   />
                 )}
               </h3>
+              {/* Em-dash subtitle — the qualifier after " — " in the title.
+              aria-hidden because the aria-label on the card root already uses
+              the full title (stripHtml), so screen-reader users hear it intact. */}
+              {titleSub && editingField !== "title" && (
+                <span
+                  className={styles.bandTitleSub}
+                  style={{ color: color.cd }}
+                  aria-hidden="true"
+                >
+                  {titleSub}
+                </span>
+              )}
 
               {/* Caret — indicates expand state, positioned at bottom-right of band */}
               <span
@@ -1350,14 +1409,105 @@ export function WeeklyLessonCard({
           y={menu.y}
           onClose={() => setMenu(null)}
           onAction={(action, payload) => {
-            // The status submenu carries an explicit target status; route it
-            // through onToggleComplete so the completion state actually updates,
-            // then also report the raw action to the host.
-            if (action === "mark-status" && payload?.status) {
-              onToggleComplete?.(lesson.id, payload.status);
+            // Actions handled directly by the card (store calls + sub-surface
+            // opens). Actions the card doesn't handle are forwarded to the host
+            // grid via onContextAction.
+            switch (action) {
+              // ── Status / completion ──────────────────────────────────────
+              case "mark-status":
+                if (payload?.status) {
+                  setLessonStatus(lesson.id, payload.status);
+                  onToggleComplete?.(lesson.id, payload.status);
+                }
+                break;
+              case "skip-quick":
+                setLessonStatus(lesson.id, "skipped");
+                onToggleComplete?.(lesson.id, "skipped");
+                break;
+
+              // ── Movement ─────────────────────────────────────────────────
+              case "bump":
+                bumpLesson(lesson.id);
+                break;
+              case "duplicate":
+                duplicateLesson(lesson.id);
+                break;
+              case "relocate":
+                setRelocateOpen(true);
+                break;
+
+              // ── Forking ──────────────────────────────────────────────────
+              case "restore-master":
+              case "reset-to-master":
+                restoreLesson(lesson.id);
+                break;
+              case "compare-master":
+                setCompareOpen(true);
+                break;
+              case "copy-to-personal":
+                // setSaveTarget is the planner action for this; delegate to
+                // host so the grid can handle it as before.
+                onContextAction?.(action, lesson.id, payload);
+                break;
+
+              // ── Archive ───────────────────────────────────────────────────
+              case "archive":
+                archiveLesson(lesson.id);
+                // Mount a fresh toast (supersedes any previous one via key change).
+                setArchiveToastKey((k) => k + 1);
+                setArchiveToastVisible(true);
+                break;
+
+              // ── Template stub ─────────────────────────────────────────────
+              case "save-template":
+                // TODO: wire to lib/lesson-templates once a fast-path save
+                // action is exposed. For now surface a no-op toast-style
+                // feedback via onContextAction so the host can show a toast.
+                // The template store (LESSON_TEMPLATE_BY_ID in planner-store)
+                // already exists; the needed action is "saveAsTemplate".
+                onContextAction?.("save-template", lesson.id, payload);
+                break;
+
+              // ── All other actions → host grid ─────────────────────────────
+              default:
+                onContextAction?.(action, lesson.id, payload);
+                break;
             }
-            onContextAction?.(action, lesson.id, payload);
           }}
+        />
+      )}
+
+      {/* Relocate picker — opened by "Relocate…" menu item */}
+      {relocateOpen && (
+        <RelocatePicker
+          lesson={lesson}
+          onClose={() => setRelocateOpen(false)}
+          onRelocate={(target: RelocateTarget, keepOriginal: boolean) => {
+            relocateLesson(lesson.id, target, keepOriginal);
+          }}
+        />
+      )}
+
+      {/* Compare-to-master modal — opened by "Compare to Master" menu item */}
+      {compareOpen && (
+        <CompareToMaster
+          lesson={lesson}
+          onClose={() => setCompareOpen(false)}
+          onRestore={() => restoreLesson(lesson.id)}
+        />
+      )}
+
+      {/* Archive toast — shown for 5 seconds after "Archive" */}
+      {archiveToastVisible && (
+        <ArchiveToast
+          key={archiveToastKey}
+          lessonTitle={
+            typeof lesson.title === "string"
+              ? lesson.title.replace(/<[^>]*>/g, "")
+              : lesson.title
+          }
+          onUndo={() => unarchiveLesson(lesson.id)}
+          onDismiss={() => setArchiveToastVisible(false)}
         />
       )}
 

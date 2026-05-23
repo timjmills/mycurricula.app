@@ -80,19 +80,21 @@
 }
 
 .cornerLabel {
-  font-size: 10px;
-  color: #94a3b8;
-  font-weight: 700;
+  /* DATE eyebrow — quieter, more letter-spaced, lower contrast */
+  font-size: var(--t-11);
+  color: var(--ink-400);
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.7px;
+  letter-spacing: 0.12em;
 }
 
 .cornerSub {
-  font-size: 10px;
-  color: #5b6580;
-  font-weight: 700;
+  /* CURRICULUM LANES eyebrow — slightly more prominent than DATE */
+  font-size: var(--t-11);
+  color: var(--ink-600, var(--ink-500));
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.7px;
+  letter-spacing: 0.12em;
 }
 
 .dayCols {

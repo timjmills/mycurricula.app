@@ -41,6 +41,10 @@ import { arrayMove } from "@dnd-kit/sortable";
 import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import type { LessonSectionContent, SectionResource } from "@/lib/lesson-flow";
 import {
+  nextInstructionalDay,
+  DEFAULT_SCHOOL_WEEK_CONFIG,
+} from "@/lib/lesson-schedule";
+import {
   newLessonSection,
   newSectionResource,
   instantiateSections,
@@ -150,6 +154,38 @@ type DuplicateWeekAction = {
   targetWeek: number;
 };
 
+/** Move a lesson to its next instructional day for the same subject. */
+type BumpLessonAction = {
+  type: "bumpLesson";
+  id: string;
+};
+
+/** Soft-delete a lesson by setting lesson.archived = true. */
+type ArchiveLessonAction = {
+  type: "archiveLesson";
+  id: string;
+};
+
+/** Restore a soft-deleted lesson by setting lesson.archived = false. */
+type UnarchiveLessonAction = {
+  type: "unarchiveLesson";
+  id: string;
+};
+
+/** Revert a personally-modified lesson back to its master/core state. */
+type RestoreLessonAction = {
+  type: "restoreLesson";
+  id: string;
+};
+
+/** Relocate a lesson to a target day/subject/week, with optional copy. */
+type RelocateLessonAction = {
+  type: "relocateLesson";
+  id: string;
+  target: { day?: number; subject?: SubjectId; week?: number };
+  keepOriginal: boolean;
+};
+
 type SetSaveTargetAction = {
   type: "setSaveTarget";
   id: string;
@@ -249,6 +285,11 @@ type PlannerAction =
   | DuplicateWeekAction
   | SetSaveTargetAction
   | SetCellLayoutAction
+  | BumpLessonAction
+  | ArchiveLessonAction
+  | UnarchiveLessonAction
+  | RestoreLessonAction
+  | RelocateLessonAction
   | SetSectionsAction
   | ReorderSectionsAction
   | EditSectionAction
@@ -280,6 +321,16 @@ function labelFor(action: PlannerAction): string {
       return "Save to " + action.target;
     case "setCellLayout":
       return "Arrange cell";
+    case "bumpLesson":
+      return "Bump lesson";
+    case "archiveLesson":
+      return "Archive lesson";
+    case "unarchiveLesson":
+      return "Unarchive lesson";
+    case "restoreLesson":
+      return "Restore lesson";
+    case "relocateLesson":
+      return "Relocate lesson";
     case "setSections":
       return "Edit sections";
     case "reorderSections":
@@ -546,6 +597,112 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
         nextLayouts[action.key] = action.layout;
       }
       return { ...doc, cellLayouts: nextLayouts };
+    }
+
+    case "bumpLesson": {
+      // Compute the next free instructional slot for this lesson's subject,
+      // then delegate to the moveLesson reducer logic so moved/across-weeks
+      // is set consistently and the source cell layout is pruned.
+      const lesson = doc.lessons.find((l) => l.id === action.id);
+      if (!lesson) return doc;
+
+      const slot = nextInstructionalDay(
+        lesson,
+        doc.lessons,
+        DEFAULT_SCHOOL_WEEK_CONFIG,
+      );
+      // No-op when no future slot is available in the data range.
+      if (!slot) return doc;
+
+      // Reuse the moveLesson reducer path to get consistent moved-flag handling
+      // and layout pruning.
+      return applyDocAction(doc, {
+        type: "moveLesson",
+        id: action.id,
+        patch: { week: slot.week, day: slot.day },
+      });
+    }
+
+    case "archiveLesson": {
+      // Soft-delete: mark the lesson archived. Views must filter archived
+      // lessons out of all visible surfaces (weekly grid, daily list, subject
+      // view, year view). Undoable via unarchiveLesson.
+      return {
+        ...doc,
+        lessons: doc.lessons.map((l) =>
+          l.id === action.id ? { ...l, archived: true } : l,
+        ),
+      };
+    }
+
+    case "unarchiveLesson": {
+      // Restore a soft-deleted lesson to visible surfaces.
+      return {
+        ...doc,
+        lessons: doc.lessons.map((l) =>
+          l.id === action.id ? { ...l, archived: false } : l,
+        ),
+      };
+    }
+
+    case "restoreLesson": {
+      // Revert a personally-modified lesson back to its master/core appearance.
+      // Sets the forking flags to their "unforked" state: modified=false,
+      // moved=null, isPersonal=false.
+      //
+      // NOTE: This does NOT revert content fields (title, objective, preview,
+      // directions, etc.) because the master snapshot is not yet stored in the
+      // data model. When master snapshots land (planned alongside the Supabase
+      // backend), this case must also restore the content fields from the
+      // snapshot. Until then only the forking metadata is cleared.
+      return {
+        ...doc,
+        lessons: doc.lessons.map((l) =>
+          l.id !== action.id
+            ? l
+            : { ...l, modified: false, moved: null, isPersonal: false },
+        ),
+      };
+    }
+
+    case "relocateLesson": {
+      // Move (or copy-then-move) a lesson to a target slot.
+      //
+      // keepOriginal = false: move the source lesson to the target (behaves
+      //   exactly like moveLesson — delegates to it for consistency).
+      // keepOriginal = true: duplicate the source lesson first, then move
+      //   the NEW copy to the target. The original stays in its current slot.
+      //
+      // Both paths use the moveLesson reducer so the moved / across-weeks
+      // flag is set consistently and the source cell layout is pruned.
+
+      if (!action.keepOriginal) {
+        // Simple relocate — just a rename for moveLesson.
+        return applyDocAction(doc, {
+          type: "moveLesson",
+          id: action.id,
+          patch: action.target,
+        });
+      }
+
+      // Copy-then-move: duplicate the lesson, then move the copy.
+      const afterDup = applyDocAction(doc, {
+        type: "duplicateLesson",
+        id: action.id,
+      });
+
+      // The duplicate is inserted immediately after the source; find it by
+      // scanning backwards from the source position for the newly inserted id.
+      const srcIdx = afterDup.lessons.findIndex((l) => l.id === action.id);
+      if (srcIdx === -1) return doc; // guard: source vanished (shouldn't happen)
+      const copy = afterDup.lessons[srcIdx + 1];
+      if (!copy) return doc; // guard: duplicate not found
+
+      return applyDocAction(afterDup, {
+        type: "moveLesson",
+        id: copy.id,
+        patch: action.target,
+      });
     }
 
     // ── Section actions ────────────────────────────────────────────────
@@ -878,6 +1035,11 @@ function buildLastChange(action: PlannerAction): LastChange {
     case "editLesson":
     case "duplicateLesson":
     case "setSaveTarget":
+    case "bumpLesson":
+    case "archiveLesson":
+    case "unarchiveLesson":
+    case "restoreLesson":
+    case "relocateLesson":
       return { kind: action.type, lessonIds: [action.id] };
 
     case "duplicateWeek":
@@ -992,6 +1154,44 @@ export interface PlannerValue {
    * Pass layout=null to revert the cell to the default CardStack view.
    */
   setCellLayout: (key: string, layout: CellLayout | null) => void;
+  /**
+   * Move a lesson to its next instructional day for the same subject.
+   * Skips to the next free slot using the configured school week (default:
+   * Sun–Thu, dayCount=5). If the lesson is already on the last day of the
+   * week, it wraps to the same day of the next week.
+   * No-op when no future slot is available in the data range.
+   */
+  bumpLesson: (id: string) => void;
+  /**
+   * Soft-delete a lesson by setting lesson.archived = true.
+   * Views must filter archived lessons out of all visible surfaces
+   * (weekly grid, daily list, subject view, year view).
+   * Undoable via unarchiveLesson + the store's existing history stack.
+   */
+  archiveLesson: (id: string) => void;
+  /** Restore an archived lesson. Pair with archiveLesson for the undo toast. */
+  unarchiveLesson: (id: string) => void;
+  /**
+   * Revert a personally-modified lesson back to its master/core state.
+   * Sets lesson.modified = false, lesson.moved = null, lesson.isPersonal = false.
+   * NOTE: content fields (title, objective, etc.) are NOT reverted — the
+   * master snapshot is not yet in the data model. This will be extended
+   * when snapshots land with the Supabase backend.
+   */
+  restoreLesson: (id: string) => void;
+  /**
+   * Relocate a lesson to a target day/subject/week.
+   * - keepOriginal = false → behaves like moveLesson: the source is updated.
+   * - keepOriginal = true  → duplicates the lesson first, then moves the
+   *   NEW copy to the target. The original stays put.
+   * Both paths use the existing moveLesson reducer for the placement so
+   * the moved/across-weeks flag is set consistently. Undoable.
+   */
+  relocateLesson: (
+    id: string,
+    target: { day?: number; subject?: SubjectId; week?: number },
+    keepOriginal: boolean,
+  ) => void;
 
   // ── Section mutation actions ───────────────────────────────────────────
   /**
@@ -1176,6 +1376,33 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [],
   );
 
+  const bumpLesson = useCallback((id: string) => {
+    dispatchRef.current({ type: "bumpLesson", id });
+  }, []);
+
+  const archiveLesson = useCallback((id: string) => {
+    dispatchRef.current({ type: "archiveLesson", id });
+  }, []);
+
+  const unarchiveLesson = useCallback((id: string) => {
+    dispatchRef.current({ type: "unarchiveLesson", id });
+  }, []);
+
+  const restoreLesson = useCallback((id: string) => {
+    dispatchRef.current({ type: "restoreLesson", id });
+  }, []);
+
+  const relocateLesson = useCallback(
+    (
+      id: string,
+      target: { day?: number; subject?: SubjectId; week?: number },
+      keepOriginal: boolean,
+    ) => {
+      dispatchRef.current({ type: "relocateLesson", id, target, keepOriginal });
+    },
+    [],
+  );
+
   const setSections = useCallback(
     (lessonId: string, next: LessonSectionContent[]) => {
       dispatchRef.current({ type: "setSections", lessonId, next });
@@ -1315,6 +1542,11 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       duplicateWeek,
       setSaveTarget,
       setCellLayout,
+      bumpLesson,
+      archiveLesson,
+      unarchiveLesson,
+      restoreLesson,
+      relocateLesson,
       setSections,
       reorderSections,
       editSection,
@@ -1345,6 +1577,11 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       duplicateWeek,
       setSaveTarget,
       setCellLayout,
+      bumpLesson,
+      archiveLesson,
+      unarchiveLesson,
+      restoreLesson,
+      relocateLesson,
       setSections,
       reorderSections,
       editSection,

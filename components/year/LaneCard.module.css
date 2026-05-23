@@ -1,95 +1,199 @@
-/* LaneCard — fixed left-edge lane summary.
-   Color cascade: the root carries cp-subj.<id> so --c / --cl / --cd resolve
-   to the canonical highlight palette for that subject.
+/* LaneCard — fixed left-edge lane summary card.
+   Color cascade: the root carries cp-subj.<id> so the new role variables
+   (--c-surface, --c-surface-strong, --c-border, --c-progress-track,
+   --c-progress-fill, --c-deep) resolve to the correct per-subject values.
 
-   Highlighter-wash treatment (four ingredients, matching the Weekly card):
-     1. Near-solid fill via color-mix(): var(--c) at ~90% — visually solid but
-        retains a sliver of translucency for polish, matching the Weekly card.
-     2. Subtle vertical gradient — 92% top → 88% bottom — adds dimension.
-     3. Left accent edge: 5px solid var(--c) anchors subject identity.
-     4. Inset top highlight + drop shadow for polish and depth.
+   Layered treatment — replaces the flat near-solid subject wash:
+     1. White body (--paper) anchors the card to the premium dashboard register.
+     2. Tinted header strip — vertical gradient --c-surface-strong → --c-surface.
+     3. 4px subject-dark left border (--c-deep) asserts subject identity strongly.
+     4. Hairline subject-toned border on the other three sides (--c-border).
+     5. Subject identity chip (28×32px) in the header top-right.
+     6. Soft drop shadow — barely-visible polish, not a hard depth cue.
 */
 
 .card {
   width: 200px;
   flex: 0 0 200px;
-  /* Ingredient 2 + 1: near-solid vertical gradient — 92% → 88% gives the
-     saturated marker feel the user wants while keeping a hair of translucency */
+  /* White body — all subject color is in the header strip and borders. */
+  background: var(--paper);
+  border-radius: var(--r-12);
+  /* Ingredient 3: 4px deep-tone left accent anchors subject identity */
+  border-left: 4px solid var(--c-deep);
+  /* Ingredient 4: hairline subject-tinted border on the remaining sides */
+  border-top: 1px solid var(--c-border);
+  border-right: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--c-border);
+  /* Ingredient 6: soft, barely-visible polish shadow */
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Lift + shadow deepen on hover */
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+/* ── Hover / focus states ───────────────────────────────────────────────── */
+
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--c) 45%, transparent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ── Header strip ───────────────────────────────────────────────────────── */
+/* Ingredient 2: tinted gradient — more saturated at top, surface-light at bottom */
+
+.header {
+  /* Gradient: surface-strong (slightly richer) → surface (the existing light) */
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--c) 92%, transparent) 0%,
-    color-mix(in srgb, var(--c) 88%, transparent) 100%
+    var(--c-surface-strong) 0%,
+    var(--c-surface) 100%
   );
-  /* Ingredient 3: strong left accent edge anchors subject color at a glance */
-  border-left: 5px solid var(--c);
-  /* Ingredient 3 (secondary): soft bottom edge for structure */
-  border-bottom: 1px solid color-mix(in srgb, var(--cd) 20%, transparent);
-  border-right: 1px solid color-mix(in srgb, var(--cd) 12%, transparent);
-  /* Ingredient 4: inset white highlight + soft drop shadow */
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 45%, transparent),
-    0 1px 2px color-mix(in srgb, var(--ink-900) 8%, transparent);
-  border-radius: var(--r-8);
-  padding: 14px 14px 14px 10px;
+  padding: 10px 10px 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.headerText {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 8px;
+  gap: 3px;
+  min-width: 0;
 }
 
+/* Subject name — deep tone on the tinted surface */
 .name {
-  font-size: var(--t-13);
+  font-size: var(--t-16);
   font-weight: 700;
-  letter-spacing: -0.1px;
+  letter-spacing: -0.2px;
   line-height: 1.2;
-  /* var(--cd) — deep subject tone for strong contrast on the translucent fill */
-  color: var(--cd);
+  color: var(--c-deep);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* Student count — neutral, secondary */
 .meta {
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-500);
+  line-height: 1.2;
+}
+
+/* ── Subject identity chip ──────────────────────────────────────────────── */
+/* 28×32px rounded rect, top-right of the header */
+
+.chip {
+  flex-shrink: 0;
+  width: 28px;
+  height: 32px;
+  border-radius: var(--r-6);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: var(--t-11);
-  font-weight: 500;
-  /* Mid-depth ink — readable on any subject wash */
-  color: var(--ink-500);
-}
-
-.metaIcon {
-  color: var(--ink-400);
-}
-
-.progress {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.progressLabel {
+  justify-content: center;
   font-size: var(--t-11);
   font-weight: 700;
-  color: var(--cd);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--c-deep);
+  /* Ensure the chip stays accessible at small widths */
+  flex-basis: 28px;
 }
 
+/* ── Body ───────────────────────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Completion percentage label */
+.progressLabel {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-900);
+  line-height: 1.2;
+}
+
+/* Progress track */
 .progressTrack {
   height: 6px;
-  /* White at 55% sits cleanly over the wash fill */
-  background: rgba(255, 255, 255, 0.55);
-  border-radius: 999px;
+  background: var(--c-progress-track);
+  border-radius: var(--r-pill);
   overflow: hidden;
 }
 
+/* Progress fill — 180ms width transition */
 .progressFill {
   height: 100%;
-  border-radius: 999px;
-  /* var(--c) — saturated subject mid-tone; same register as the weekly stripe */
-  background: var(--c);
-  transition: width 400ms ease;
+  border-radius: var(--r-pill);
+  background: var(--c-progress-fill);
+  transition: width 180ms ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .progressFill {
     transition: none;
+  }
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .header {
+    padding: 8px 8px 8px 10px;
+  }
+  .body {
+    padding: 8px 10px 10px;
+  }
+  .name {
+    font-size: var(--t-14);
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    width: 160px;
+    flex: 0 0 160px;
+  }
+  .header {
+    padding: 7px 7px 7px 8px;
+    gap: 4px;
+  }
+  .body {
+    padding: 7px 8px 8px;
+  }
+  .name {
+    font-size: var(--t-13);
+  }
+  .chip {
+    width: 24px;
+    height: 28px;
+    font-size: var(--t-10);
   }
 }

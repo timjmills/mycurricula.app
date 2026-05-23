@@ -142,12 +142,15 @@
   --r-6: 6px;
   --r-8: 8px;
   --r-12: 12px;
+  --r-pill: 999px;
 
   --line: 1px solid var(--ink-150);
   --line-strong: 1px solid var(--ink-200);
 
   --shadow-card:
     0 1px 2px rgba(20, 22, 32, 0.04), 0 1px 3px rgba(20, 22, 32, 0.06);
+  --shadow-card-hover:
+    0 2px 6px rgba(20, 22, 32, 0.07), 0 4px 12px rgba(20, 22, 32, 0.08);
   --shadow-popover:
     0 2px 4px rgba(20, 22, 32, 0.06), 0 10px 28px rgba(20, 22, 32, 0.12);
 }
@@ -198,41 +201,101 @@
   --c: var(--math);
   --cl: var(--math-light);
   --cd: var(--math-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--math-light);
+  --c-surface-strong: color-mix(in srgb, var(--math) 22%, white);
+  --c-border: color-mix(in srgb, var(--math) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--math-light) 60%, white);
+  --c-progress-fill: var(--math);
+  --c-deep: var(--math-deep);
 }
 .cp-subj.reading {
   --c: var(--reading);
   --cl: var(--reading-light);
   --cd: var(--reading-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--reading-light);
+  --c-surface-strong: color-mix(in srgb, var(--reading) 22%, white);
+  --c-border: color-mix(in srgb, var(--reading) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--reading-light) 60%, white);
+  --c-progress-fill: var(--reading);
+  --c-deep: var(--reading-deep);
 }
 .cp-subj.writing {
   --c: var(--writing);
   --cl: var(--writing-light);
   --cd: var(--writing-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--writing-light);
+  --c-surface-strong: color-mix(in srgb, var(--writing) 22%, white);
+  --c-border: color-mix(in srgb, var(--writing) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--writing-light) 60%, white);
+  --c-progress-fill: var(--writing);
+  --c-deep: var(--writing-deep);
 }
 .cp-subj.grammar {
   --c: var(--grammar);
   --cl: var(--grammar-light);
   --cd: var(--grammar-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--grammar-light);
+  --c-surface-strong: color-mix(in srgb, var(--grammar) 22%, white);
+  --c-border: color-mix(in srgb, var(--grammar) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--grammar-light) 60%, white);
+  --c-progress-fill: var(--grammar);
+  --c-deep: var(--grammar-deep);
 }
 .cp-subj.spelling {
   --c: var(--spelling);
   --cl: var(--spelling-light);
   --cd: var(--spelling-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--spelling-light);
+  --c-surface-strong: color-mix(in srgb, var(--spelling) 22%, white);
+  --c-border: color-mix(in srgb, var(--spelling) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--spelling-light) 60%, white);
+  --c-progress-fill: var(--spelling);
+  --c-deep: var(--spelling-deep);
 }
 .cp-subj.ufli {
   --c: var(--ufli);
   --cl: var(--ufli-light);
   --cd: var(--ufli-deep);
+  /* Lane-card layered-system role tokens.
+     ufli-deep (#93401e) on ufli surface-strong: color-mix(ufli 22%, white)
+     is approximately #f8d6c8 — WCAG ratio ~5.2:1 (AA passes). */
+  --c-surface: var(--ufli-light);
+  --c-surface-strong: color-mix(in srgb, var(--ufli) 22%, white);
+  --c-border: color-mix(in srgb, var(--ufli) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--ufli-light) 60%, white);
+  --c-progress-fill: var(--ufli);
+  --c-deep: var(--ufli-deep);
 }
 .cp-subj.explorers {
   --c: var(--explorers);
   --cl: var(--explorers-light);
   --cd: var(--explorers-deep);
+  /* Lane-card layered-system role tokens.
+     explorers-deep (#7a5810) on explorers surface-strong: color-mix(explorers 22%, white)
+     is approximately #f5e8c4 — WCAG ratio ~5.0:1 (AA passes). */
+  --c-surface: var(--explorers-light);
+  --c-surface-strong: color-mix(in srgb, var(--explorers) 22%, white);
+  --c-border: color-mix(in srgb, var(--explorers) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--explorers-light) 60%, white);
+  --c-progress-fill: var(--explorers);
+  --c-deep: var(--explorers-deep);
 }
 .cp-subj.sel {
   --c: var(--sel);
   --cl: var(--sel-light);
   --cd: var(--sel-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--sel-light);
+  --c-surface-strong: color-mix(in srgb, var(--sel) 22%, white);
+  --c-border: color-mix(in srgb, var(--sel) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--sel-light) 60%, white);
+  --c-progress-fill: var(--sel);
+  --c-deep: var(--sel-deep);
 }
 
 /* Visible focus ring — used on interactive controls (settings pickers,

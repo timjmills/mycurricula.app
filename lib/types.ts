@@ -111,6 +111,13 @@ export interface Lesson {
   unreadComments: number;
   /** Sub-events; empty for a single-event lesson. */
   tasks: LessonTask[];
+  /**
+   * Soft-deleted flag. When true the lesson is hidden from all visible
+   * surfaces (weekly grid, daily list, subject view, year view). Views must
+   * filter `lesson.archived === true` out of every rendered collection.
+   * Falsy by default — the field is absent on fixture lessons.
+   */
+  archived?: boolean;
 }
 
 export type NoteScope = "shared" | "personal";

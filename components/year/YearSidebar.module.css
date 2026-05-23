@@ -8,7 +8,9 @@
   flex-shrink: 0;
   padding: 12px 8px;
   border-right: 1px solid var(--ink-150, #e6e8ed);
-  background: var(--paper, #fff);
+  /* Soft neutral — matches the page background so the sidebar blends into
+     the overall surface rather than popping as a bright white panel. */
+  background: var(--ink-50, #f6f7f9);
 }
 
 /* Base nav item — shared by active and inert */

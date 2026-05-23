@@ -4,7 +4,9 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  background: var(--ink-50, #f6f7f9);
+  /* Soft neutral surface behind the cards — ink-50 → ink-100 gradient adds
+     gentle depth without competing with the lane card subject colors. */
+  background: linear-gradient(180deg, var(--ink-50) 0%, var(--ink-100) 100%);
 }
 
 /* ── Page header ─────────────────────────────────────────────────────── */

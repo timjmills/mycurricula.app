@@ -33,6 +33,18 @@ import type { Lesson } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
 import styles from "./ListRow.module.css";
 
+// ── Em-dash title split ───────────────────────────────────────────────────────
+// If the title contains " — " (em-dash with spaces), split on the first
+// occurrence so the body of the title stands alone as the dominant headline
+// and the qualifier becomes a muted subtitle line below.
+// Returns { main, sub } where sub is null when no split point is found.
+
+function splitTitle(title: string): { main: string; sub: string | null } {
+  const idx = title.indexOf(" — ");
+  if (idx === -1) return { main: title, sub: null };
+  return { main: title.slice(0, idx), sub: title.slice(idx + 3) };
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface ListRowProps {
@@ -187,6 +199,13 @@ export function ListRow({
     return base.join(" ");
   }, [lesson.subject, lesson.modified, isDone]);
 
+  // Em-dash title split — body of the title is the dominant headline;
+  // the qualifier (after " — ") becomes a muted subtitle line below.
+  const { main: titleMain, sub: titleSub } = useMemo(
+    () => splitTitle(lesson.title),
+    [lesson.title],
+  );
+
   // Toggle completion without bubbling to the row's onClick.
   function handleCheckboxClick(e: React.MouseEvent): void {
     e.stopPropagation();
@@ -230,13 +249,18 @@ export function ListRow({
         {chipLabel && <span className={styles.timeLabel}>{chipLabel}</span>}
       </span>
 
-      {/* Title + optional preview */}
+      {/* Title + optional subtitle + optional preview.
+          titleMain is the dominant headline; titleSub is the em-dash
+          qualifier rendered as a smaller muted line below the title.
+          The move indicator sits on the title row so it scans alongside
+          the primary text without visual competition. */}
       <span className={styles.body}>
         <span className={styles.titleRow}>
-          <span className={styles.title}>{lesson.title}</span>
+          <span className={styles.title}>{titleMain}</span>
           {/* Move indicator — only when lesson was relocated */}
           <MoveArrow moved={lesson.moved} />
         </span>
+        {titleSub && <span className={styles.titleSub}>{titleSub}</span>}
         {!dense && lesson.preview && (
           <span className={styles.preview}>{lesson.preview}</span>
         )}

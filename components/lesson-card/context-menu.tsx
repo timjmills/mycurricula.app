@@ -3,9 +3,17 @@
 // context-menu.tsx — the lesson context menu.
 //
 // Opened by right-click on the card or by the `⋯` affordance. Items match
-// planning_document §6.5. "Move to…" and "Mark status…" open a one-level
-// submenu in place. The menu is positioned at a viewport point and clamps
-// itself inside the window; it closes on outside-click, Esc, or selection.
+// the expanded action set from planning_document §6.5 and the audit-fixes
+// spec. "Mark status…" opens a one-level submenu in place. The menu is
+// positioned at a viewport point and clamps itself inside the window; it
+// closes on outside-click, Esc, or selection.
+//
+// Action groups (separated by dividers):
+//   1. Navigation  — Open in Daily, Relocate, Bump, Duplicate, Save as template
+//   2. Status/work — Mark status (submenu), Skip (quick), Add resource, Add to to-do, See standards
+//   3. Forking     — Restore from Master*, Compare to Master*, Copy to personal*
+//   4. Printing    — Print this lesson, Archive
+//   (* conditional on lesson.modified)
 
 import {
   useCallback,
@@ -14,20 +22,36 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { Icon } from "./icon";
 import { STATUS_LABEL } from "./status";
+// RelocatePicker, CompareToMaster, ArchiveToast are imported by the
+// caller (lesson-card.tsx / weekly-lesson-card.tsx) via a shared
+// menu state; the context menu itself fires string actions and lets
+// the host handle opening the sub-surfaces. This keeps the menu tree
+// shallow and avoids nesting portals inside portals.
 
 /** Stable action ids handed back through `onContextAction`. */
 export type ContextAction =
-  | "move"
+  | "open-daily"
+  | "relocate"
+  | "bump"
   | "duplicate"
-  | "copy-to-personal"
-  | "reset-to-master"
+  | "save-template"
   | "mark-status"
+  | "skip-quick"
+  | "add-resource"
   | "add-to-todo"
   | "see-standards"
+  | "restore-master"
+  | "compare-master"
+  | "copy-to-personal"
   | "print"
+  | "archive"
+  // Legacy aliases kept so existing onContextAction consumers do not break.
+  | "move"
+  | "reset-to-master"
   | "delete";
 
 /**
@@ -62,7 +86,7 @@ interface ContextMenuProps {
   onAction: (action: ContextAction, payload?: ContextActionPayload) => void;
 }
 
-type Submenu = "move" | "status" | null;
+type Submenu = "status" | null;
 
 interface MenuRow {
   kind?: "item" | "head" | "divider";
@@ -70,6 +94,8 @@ interface MenuRow {
   chevron?: boolean;
   kbd?: string;
   danger?: boolean;
+  /** When true the row is omitted entirely — not greyed, not rendered. */
+  hidden?: boolean;
   onSelect?: () => void;
 }
 
@@ -84,6 +110,7 @@ export function LessonContextMenu({
   const ref = useRef<HTMLDivElement>(null);
   const [sub, setSub] = useState<Submenu>(null);
   const [pos, setPos] = useState({ x, y });
+  const router = useRouter();
 
   // Clamp the menu inside the viewport once it has measured itself.
   useLayoutEffect(() => {
@@ -120,34 +147,9 @@ export function LessonContextMenu({
   );
 
   let rows: MenuRow[];
-  if (sub === "move") {
-    rows = [
-      { kind: "head", label: "Move to day" },
-      // Day indices follow the model: 0 = Sunday … 4 = Thursday.
-      ...["Sun", "Mon", "Tue", "Wed", "Thu"].map((d, i) => ({
-        label: d,
-        onSelect: () => fire("move", { day: i }),
-      })),
-      { kind: "divider" },
-      { kind: "head", label: "Move to week" },
-      {
-        label: "← Week 11 (last week)",
-        onSelect: () => fire("move", { week: 11 }),
-      },
-      {
-        label: "→ Week 13 (next week)",
-        onSelect: () => fire("move", { week: 13 }),
-      },
-      { label: "Pick a week…", chevron: true, onSelect: () => fire("move") },
-      { kind: "divider" },
-      { kind: "head", label: "Move to unit" },
-      {
-        label: "Choose another unit…",
-        chevron: true,
-        onSelect: () => fire("move"),
-      },
-    ];
-  } else if (sub === "status") {
+
+  if (sub === "status") {
+    // Mark-status submenu — one entry per status, plus a back button above.
     const statuses: LessonStatus[] = [
       "done",
       "partial",
@@ -164,27 +166,95 @@ export function LessonContextMenu({
       })),
     ];
   } else {
+    // Main menu — four groups separated by dividers.
     rows = [
-      { label: "Move to…", chevron: true, onSelect: () => setSub("move") },
-      { label: "Duplicate", kbd: "⌘D", onSelect: () => fire("duplicate") },
-      lesson.isPersonal
-        ? {
-            label: "Reset to master",
-            onSelect: () => fire("reset-to-master"),
-          }
-        : {
-            label: "Copy to my personal",
-            onSelect: () => fire("copy-to-personal"),
-          },
+      // ── Group 1: navigation & movement ──────────────────────────────────
+      {
+        label: "Open in Daily",
+        onSelect: () => {
+          router.push(`/daily?lesson=${lesson.id}`);
+          onClose();
+        },
+      },
+      {
+        label: "Relocate…",
+        onSelect: () => fire("relocate"),
+      },
+      {
+        label: "Bump",
+        onSelect: () => fire("bump"),
+      },
+      {
+        label: "Duplicate",
+        kbd: "⌘D",
+        onSelect: () => fire("duplicate"),
+      },
+      {
+        label: "Save as template",
+        onSelect: () => fire("save-template"),
+      },
+
+      { kind: "divider" },
+
+      // ── Group 2: status, resources, standards ────────────────────────────
       {
         label: "Mark status…",
         chevron: true,
         onSelect: () => setSub("status"),
       },
+      {
+        label: "Skip (quick)",
+        onSelect: () => fire("skip-quick"),
+      },
+      {
+        label: "Add resource…",
+        onSelect: () => fire("add-resource"),
+      },
+      {
+        label: "Add to to-do list",
+        onSelect: () => fire("add-to-todo"),
+      },
+      {
+        label: "See standards",
+        onSelect: () => fire("see-standards"),
+      },
+
       { kind: "divider" },
-      { label: "Add to to-do list", onSelect: () => fire("add-to-todo") },
-      { label: "See standards", onSelect: () => fire("see-standards") },
-      { label: "Print this lesson", kbd: "⌘P", onSelect: () => fire("print") },
+
+      // ── Group 3: forking — conditional on lesson.modified ────────────────
+      // "Restore from Master" and "Compare to Master" are only relevant when
+      // a personal overlay exists; "Copy to personal" is only relevant when
+      // there is no overlay yet. The audit rule: never grey out, fully omit.
+      {
+        label: "Restore from Master",
+        hidden: !lesson.modified,
+        onSelect: () => fire("restore-master"),
+      },
+      {
+        label: "Compare to Master",
+        hidden: !lesson.modified,
+        onSelect: () => fire("compare-master"),
+      },
+      {
+        label: "Copy to my personal",
+        hidden: lesson.modified,
+        onSelect: () => fire("copy-to-personal"),
+      },
+
+      { kind: "divider" },
+
+      // ── Group 4: print + archive ─────────────────────────────────────────
+      {
+        label: "Print this lesson",
+        kbd: "⌘P",
+        onSelect: () => fire("print"),
+      },
+      {
+        label: "Archive",
+        onSelect: () => fire("archive"),
+      },
+
+      // Master-only destructive item — only in Core Curriculum mode.
       ...(isMaster
         ? ([
             { kind: "divider" },
@@ -196,6 +266,26 @@ export function LessonContextMenu({
           ] as MenuRow[])
         : []),
     ];
+  }
+
+  // Filter out fully-hidden rows (conditional forking items) and collapse
+  // consecutive/leading/trailing dividers that become adjacent after filtering.
+  const visibleRows = rows.filter((r) => !r.hidden);
+  const cleanedRows: MenuRow[] = [];
+  for (const row of visibleRows) {
+    if (row.kind === "divider") {
+      // Skip leading divider or consecutive dividers.
+      const last = cleanedRows[cleanedRows.length - 1];
+      if (!last || last.kind === "divider") continue;
+    }
+    cleanedRows.push(row);
+  }
+  // Drop trailing divider.
+  while (
+    cleanedRows.length > 0 &&
+    cleanedRows[cleanedRows.length - 1].kind === "divider"
+  ) {
+    cleanedRows.pop();
   }
 
   return (
@@ -210,7 +300,7 @@ export function LessonContextMenu({
         top: pos.y,
         left: pos.x,
         zIndex: 1000,
-        minWidth: 200,
+        minWidth: 210,
         background: "var(--paper)",
         borderRadius: 6,
         border: "1px solid var(--ink-150)",
@@ -219,6 +309,7 @@ export function LessonContextMenu({
         fontSize: 13,
       }}
     >
+      {/* Back button shown only when a submenu is open */}
       {sub && (
         <button
           type="button"
@@ -243,7 +334,8 @@ export function LessonContextMenu({
           Back
         </button>
       )}
-      {rows.map((row, i) => {
+
+      {cleanedRows.map((row, i) => {
         if (row.kind === "divider") {
           return (
             <div
