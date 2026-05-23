@@ -41,15 +41,18 @@ interface ViewDef {
   soon?: boolean;
 }
 
+// Top-bar tab order, left → right: Daily · Weekly · Yearly · Curriculum · Schedule.
+// Yearly is a label rename of the Year route (/year stays the canonical URL).
+// Curriculum is a label rename of the Subject route (/subject/[slug] stays the
+// canonical URL — "subject" is the data-model entity; "Curriculum" is just the
+// chrome label that teachers see).
+// The "Unit" SOON tab was retired — units live inside the Curriculum tab.
 const VIEWS: ViewDef[] = [
-  { label: "Weekly", href: "/weekly" },
   { label: "Daily", href: "/daily" },
-  { label: "Subject", href: "/subject" },
+  { label: "Weekly", href: "/weekly" },
+  { label: "Yearly", href: "/year" },
+  { label: "Curriculum", href: "/subject" },
   { label: "Schedule", soon: true },
-  { label: "Unit", soon: true },
-  // Year tab activated — stub page at app/(planner)/year/page.tsx.
-  // Schedule and Unit remain SOON until their build waves.
-  { label: "Year", href: "/year" },
 ];
 
 // ── TopBar ───────────────────────────────────────────────────────────────

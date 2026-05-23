@@ -142,22 +142,20 @@ export function RoadmapView() {
   const schoolWeekLen = DEFAULT_SCHOOL_WEEK.length;
 
   // ── Chameleon banner state ────────────────────────────────────────────
-  // Tracks which subject lane is topmost in the scroll area so the sticky
-  // week-column header can adopt that subject's --cl color.
+  // Tracks which subject lane is topmost in the viewport so the sticky
+  // week-column header can adopt that subject's color gradient.
   const [activeSubjectId, setActiveSubjectId] = useState<SubjectId>(
     SUBJECTS[0].id as SubjectId,
   );
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const laneRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
+    // root: null → observe against the viewport (page scroll context).
     // rootMargin: -1px top clears the sticky header itself; -90% bottom means
-    // only lanes whose top edge is in the top 10% of the scroll area are active.
+    // only lanes whose top edge is in the top 10% of the viewport are active.
     const observer = new IntersectionObserver(
       (entries) => {
+        // Pick the intersecting entry with the smallest top — topmost lane.
         const intersecting = entries
           .filter((e) => e.isIntersecting)
           .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
@@ -168,7 +166,7 @@ export function RoadmapView() {
         }
       },
       {
-        root: container,
+        root: null,
         rootMargin: "-1px 0px -90% 0px",
       },
     );
@@ -268,9 +266,10 @@ export function RoadmapView() {
 
   return (
     <div className={styles.root}>
-      {/* Scrollable area — gives the sticky week-column header its anchoring
-          scroll context. IntersectionObserver uses this as its root. */}
-      <div className={styles.lanesScrollArea} ref={scrollContainerRef}>
+      {/* Lanes container — display:contents in CSS so it introduces no scroll
+          context. The sticky header anchors to the page (<main>) scroll
+          context; IntersectionObserver uses root:null (the viewport). */}
+      <div className={styles.lanesScrollArea}>
         {/* Week-column header — STICKY. Carries the active subject's cp-subj
             class so var(--cl) / var(--cd) resolve to the chameleon color. */}
         <div

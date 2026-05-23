@@ -11,37 +11,15 @@
   overflow: clip;
 }
 
-/* Gradient month-header strip.
-   Two-axis gradient (horizontal subject flow × vertical fade):
-     Horizontal: flows through the subject canonical order
-       (math → reading → writing → grammar → spelling → ufli → explorers → sel)
-       using per-subject --c tokens, echoing the lane stack below.
-     Vertical: 55% → 38% color-mix fade (ingredient 2) gives the highlighter-wash
-       depth consistent with the LaneCard and Weekly card header.
-   All stops use var(--subject) tokens via color-mix() — no hard-coded hex.
-   The inset top highlight (ingredient 4) adds the polished dimensional feel. */
+/* Month-header strip.
+   Neutral base so the strip is clean before/after any subject lane is
+   active. The multicolor subject gradient has been removed — the chameleon
+   banner (dayHeaderChameleon) is now the sole source of per-subject color. */
 .monthStrip {
   display: flex;
   height: 32px;
-  background:
-    /* Vertical fade overlaid on the horizontal subject gradient */
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.18) 0%,
-      rgba(255, 255, 255, 0) 100%
-    ),
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--math) 72%, transparent) 0%,
-      color-mix(in srgb, var(--reading) 72%, transparent) 18%,
-      color-mix(in srgb, var(--writing) 72%, transparent) 33%,
-      color-mix(in srgb, var(--grammar) 72%, transparent) 47%,
-      color-mix(in srgb, var(--spelling) 72%, transparent) 61%,
-      color-mix(in srgb, var(--ufli) 72%, transparent) 74%,
-      color-mix(in srgb, var(--explorers) 72%, transparent) 87%,
-      color-mix(in srgb, var(--sel) 72%, transparent) 100%
-    );
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 30%, transparent);
+  background: var(--paper, #fff);
+  border-bottom: 1px solid var(--ink-150, #e6e9f4);
 }
 
 .monthCells {
@@ -50,16 +28,20 @@
   overflow: hidden;
 }
 
+/* Month label cells on the neutral .monthStrip background.
+   The multicolor gradient that previously sat behind these cells is gone,
+   so white-on-* with a shadow no longer reads. Switched to a deep ink
+   token for AA contrast on the neutral paper ground. */
 .monthCell {
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  color: #fff;
+  color: var(--ink-700);
   letter-spacing: 1.2px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-  border-right: 1px solid rgba(255, 255, 255, 0.4);
+  text-shadow: none;
+  border-right: 1px solid var(--ink-150);
   flex-shrink: 0;
 }
 
@@ -67,18 +49,23 @@
   border-right: none;
 }
 
-/* Day header row — sticky so it pins to the top of .lanesScrollArea as the
-   user scrolls down through the lane stack (chameleon banner behavior). */
+/* Day header row — sticky against the PAGE scroll context (html/body), not
+   any inner overflow container. .lanesScrollArea is display:contents so it
+   introduces no scroll ancestor; the nearest scrolling ancestor is <main>. */
 .dayHeader {
   display: flex;
   border-bottom: 1px solid #eceef7;
+  /* Neutral base shown before the first IntersectionObserver callback fires.
+     .dayHeaderChameleon overrides this once a subject lane enters the viewport. */
   background: var(--paper, #fff);
   position: sticky;
   top: 0;
   z-index: 5;
-  /* Color transition — skipped under reduced motion (see media query below) */
+  /* background transitions don't animate smoothly on all browsers; using
+     background (shorthand) catches both background-color and background-image
+     transitions without degrading to a hard snap on most engines. */
   transition:
-    background-color 200ms ease,
+    background 200ms ease,
     border-color 200ms ease;
 }
 
@@ -309,22 +296,20 @@
   color: var(--ink-700, #2e3038);
 }
 
-/* Scroll container that gives sticky its anchor.
-   Wraps the day header + all lane rows so the chameleon banner can stick
-   to the top of the scroll area as the user scrolls the lane stack. */
+/* Lanes wrapper — display:contents makes it transparent to layout and
+   scroll-context detection. No overflow constraint here; the page itself
+   (html/body/<main>) is the scroll context for both sticky positioning and
+   the IntersectionObserver (root: null). */
 .lanesScrollArea {
-  max-height: 600px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  /* So IntersectionObserver can use this element as root. */
-  position: relative;
+  display: contents;
 }
 
-/* Active-subject color fill: var(--cl) from the cp-subj cascade placed on
-   .dayHeader by JS. The hairline border-bottom provides a soft seam. */
+/* Active-subject chameleon fill: vertical gradient dark-top → light-bottom,
+   matching the Weekly card header feel. var(--c) and var(--cl) come from the
+   cp-subj class JS places on this element.
+   !important is required: this rule competes with the neutral .dayHeader base. */
 .dayHeaderChameleon {
-  /* var(--cl) from the cp-subj class on the element */
-  background: var(--cl) !important;
+  background: linear-gradient(180deg, var(--c) 0%, var(--cl) 100%) !important;
   border-bottom: 1px solid color-mix(in srgb, var(--cd) 12%, transparent) !important;
 }
 

@@ -62,25 +62,21 @@ export function ProgressionView() {
   const { lessons } = usePlanner();
 
   // ── Chameleon banner state ────────────────────────────────────────────
-  // Tracks which subject lane is currently topmost in the scroll area so
-  // the sticky day-header banner can adopt that subject's --cl color.
+  // Tracks which subject lane is currently topmost in the viewport so the
+  // sticky day-header banner can adopt that subject's color gradient.
   const [activeSubjectId, setActiveSubjectId] = useState<SubjectId>(
     SUBJECTS[0].id as SubjectId,
   );
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const laneRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    // rootMargin: -1px top crops the sticky banner itself; -90% bottom means
-    // only lanes whose top edge has crossed into the top 10% of the viewport
-    // (just below the banner) are considered "active."
+    // root: null → observe against the viewport (page scroll context).
+    // rootMargin: -1px top clears the sticky banner itself; -90% bottom means
+    // only lanes whose top edge is in the top 10% of the viewport trigger a
+    // color change.
     const observer = new IntersectionObserver(
       (entries) => {
-        // Find entries that are intersecting and pick the one with the
-        // smallest boundingClientRect.top — that's the topmost visible lane.
+        // Pick the intersecting entry with the smallest top — topmost lane.
         const intersecting = entries
           .filter((e) => e.isIntersecting)
           .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
@@ -91,7 +87,7 @@ export function ProgressionView() {
         }
       },
       {
-        root: container,
+        root: null,
         rootMargin: "-1px 0px -90% 0px",
       },
     );
@@ -188,9 +184,10 @@ export function ProgressionView() {
         </div>
       </div>
 
-      {/* Scrollable area — gives the sticky day-header its anchoring
-          scroll context. IntersectionObserver uses this as its root. */}
-      <div className={styles.lanesScrollArea} ref={scrollContainerRef}>
+      {/* Lanes container — display:contents in CSS so it introduces no scroll
+          context. The sticky day-header anchors to the page (<main>) scroll
+          context; IntersectionObserver uses root:null (the viewport). */}
+      <div className={styles.lanesScrollArea}>
         {/* Day-column header (weekday label + date number) — STICKY.
             Carries the active subject's cp-subj class so var(--cl) and
             var(--cd) resolve to the correct chameleon color. */}

@@ -10,34 +10,38 @@
   overflow: clip;
 }
 
-/* Scroll container that gives the sticky week-column header its anchor.
-   Wraps the headerRow + all lane rows. */
+/* Lanes wrapper — display:contents makes it transparent to layout and
+   scroll-context detection. The sticky header anchors to the page scroll
+   context; IntersectionObserver uses root:null (the viewport). */
 .lanesScrollArea {
-  max-height: 600px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  position: relative;
+  display: contents;
 }
 
-/* Header row with lane-card spacer and week labels — sticky so it pins
-   to the top of .lanesScrollArea as lanes scroll beneath it. */
+/* Header row with lane-card spacer and week labels — sticky against the PAGE
+   scroll context (html/body/<main>). display:contents on .lanesScrollArea
+   ensures no intermediate scroll ancestor intercepts sticky positioning. */
 .headerRow {
   display: grid;
   grid-template-columns: 200px 1fr;
   border-bottom: 1px solid #eceef7;
+  /* Neutral base shown before the first IntersectionObserver callback fires. */
+  background: var(--paper, #fff);
   position: sticky;
   top: 0;
   z-index: 5;
-  /* Color transition for the chameleon effect */
+  /* background shorthand catches both background-color and background-image,
+     giving a best-effort smooth transition on the gradient swap. */
   transition:
-    background-color 200ms ease,
+    background 200ms ease,
     border-color 200ms ease;
-  background: var(--paper, #fff);
 }
 
-/* Active-subject color fill — cp-subj class placed on .headerRow by JS. */
+/* Active-subject chameleon fill: vertical gradient dark-top → light-bottom,
+   matching the Weekly card header feel. var(--c) and var(--cl) come from the
+   cp-subj class JS places on this element.
+   !important is required: this rule competes with the neutral .headerRow base. */
 .headerRowChameleon {
-  background: var(--cl) !important;
+  background: linear-gradient(180deg, var(--c) 0%, var(--cl) 100%) !important;
   border-bottom: 1px solid color-mix(in srgb, var(--cd) 12%, transparent) !important;
 }
 
