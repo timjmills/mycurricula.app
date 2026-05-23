@@ -96,6 +96,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { IconRail, PaneSplitter, RightRail } from "@/components/daily";
 import { WeeklyGrid } from "@/components/grid";
+import { WeeklyList } from "@/components/list";
 import { useAppState } from "@/lib/app-state";
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import { usePlanner } from "@/lib/planner-store";
@@ -430,7 +431,7 @@ export function WeeklyShell(): ReactNode {
   // <WeeklyGrid> already reads. We don't pin a local copy here; the
   // RightRail just needs the current value to scope its Resources +
   // Shoutbox panels.
-  const { week, selectedDay, selectedLessonId, setSelectedLessonId } =
+  const { week, selectedDay, selectedLessonId, setSelectedLessonId, viewMode } =
     useAppState();
   const { lessons } = usePlanner();
 
@@ -731,13 +732,23 @@ export function WeeklyShell(): ReactNode {
   // top-left corner without touching the inner component's root.
 
   function renderGridPanel(grip: ReactNode): ReactNode {
+    // In List mode the bulk-select / duplicate-week toolbar (grid-only
+    // affordances) are not shown — the drag grip is still available so
+    // the teacher can reorder the panel. The right rail and splitter
+    // remain in both modes.
     return (
       <div className={styles.columnWithGrip} data-pane="grid">
         {grip}
-        {/* WeeklyGrid renders untouched in the center slot. The outer slot
-            wrapper already carries min-width: 0 so the grid can shrink
-            gracefully when the rail grows. */}
-        <WeeklyGrid />
+        {viewMode === "list" ? (
+          // WeeklyList replaces the grid but occupies the same 1fr slot
+          // so the splitter and rail math are unaffected.
+          <WeeklyList />
+        ) : (
+          /* WeeklyGrid renders untouched in the center slot. The outer slot
+             wrapper already carries min-width: 0 so the grid can shrink
+             gracefully when the rail grows. */
+          <WeeklyGrid />
+        )}
       </div>
     );
   }

@@ -367,31 +367,6 @@
     background 0.12s ease;
 }
 
-/* ── View-mode overrides (TOPBAR-006) ───────────────────────────────────────
- *
- * .cellSimple — "simple" mode: cards are forced to compact density (28px
- *   chips), so the cell min-height shrinks to avoid a cavernous void below
- *   the chips. Row height is driven by content, not the 232px baseline.
- *
- * .cellTask — "task" mode: full cards retain their baseline height, but the
- *   cell background gets a slight neutral tint so each subject band reads as
- *   a distinct row — easier to scan task status across the week at a glance.
- *   The data-view-mode="task" attribute on the same element is available for
- *   deeper descendant selectors (e.g. when weekly-lesson-card.tsx gains a
- *   viewMode prop, it can pick up the attribute automatically).
- */
-.cellSimple {
-  min-height: 40px;
-}
-
-.cellTask {
-  background: color-mix(
-    in oklch,
-    var(--cell-bg, var(--ink-50)) 80%,
-    var(--ink-100)
-  );
-}
-
 /* Drop target highlight — subject-tinted border while a card hovers over.
    Legacy class kept in place; new dnd-kit glow uses .cellDropGlow below. */
 .cellDragOver {

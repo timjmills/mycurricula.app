@@ -135,6 +135,7 @@ import { RightRail } from "./RightRail";
 import { PaneSplitter } from "./PaneSplitter";
 import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
+import { DailyList } from "@/components/list/DailyList";
 import styles from "./DailyView.module.css";
 
 // ── Pane width persistence — NO fixed clamps; sanity-bounded by container ─
@@ -975,7 +976,8 @@ function ColumnDragGhost({ id }: { id: ColumnId }): ReactNode {
 
 export function DailyView(): ReactNode {
   // selectedDay is shared planner state — the top bar may also change it.
-  const { week, selectedDay, setSelectedDay } = useAppState();
+  // viewMode drives the list vs. grid rendering choice.
+  const { viewMode, week, selectedDay, setSelectedDay } = useAppState();
 
   // Lessons come from the planner store so completions, edits, and undo/redo
   // are immediately reflected in the left pane list and right pane detail.
@@ -1764,73 +1766,89 @@ export function DailyView(): ReactNode {
         {columnAnnouncement}
       </div>
 
-      {/* ── Body row: icon rail + three-track reorderable content body ── */}
-      {/* The icon rail sits as a SIBLING of the body and is NOT part of
-          the column-reorder group — it stays pinned to the far left.
-          The three big content columns inside the body are wrapped in a
-          DndContext + SortableContext (horizontalListSortingStrategy)
-          so the teacher can reorder them by dragging the small
-          GripHorizontal in each column's top-left corner. */}
+      {/* ── Body row: icon rail + content body ─────────────────────────────
+          In Grid mode: three-track reorderable columns (list, detail, rail).
+          In List mode: DailyList fills the list+detail area; the right rail
+          stays visible at its fixed width beside it. The icon rail is always
+          pinned to the far left as a sibling of the body — it is NOT part
+          of either the grid or list layout. */}
       <div className={styles.bodyRow}>
         {/* ── Far-left: slim icon nav rail (sibling of the body) ─── */}
         <IconRail />
-        {/* ── Three-track reorderable content body ─────────────────────
-            data-narrow-pane drives the narrow (single-column) layout: CSS
-            shows exactly one pane on narrow viewports and ignores it
-            wide. The grid template is computed from columnOrder above;
-            each column wrapper carries a data-column attribute so the
-            splitter drag math can find its column track via querySelector
-            on bodyRef. */}
-        <div
-          id="daily-pane-body"
-          ref={bodyRef}
-          className={styles.body}
-          role="tabpanel"
-          aria-labelledby={`daily-tab-${selectedDay}`}
-          data-narrow-pane={narrowPane}
-          style={{ gridTemplateColumns: gridTemplate }}
-        >
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleColumnDragStart}
-            onDragEnd={handleColumnDragEnd}
-            onDragCancel={handleColumnDragCancel}
+        {viewMode === "list" ? (
+          /* ── List mode body ──────────────────────────────────────────────
+              DailyList occupies the list+detail area (flex:1). The right
+              rail stays mounted beside it at its fixed width. This keeps
+              Resources / To-do / Chat visible in both modes, per the user
+              decision documented in the task brief. */
+          <div className={styles.listModeBody}>
+            <DailyList
+              onOpenAddLesson={() => {
+                setAddEventOpen(false);
+                setAddLessonOpen(true);
+              }}
+            />
+            <RightRail lesson={selectedLesson} week={week} day={selectedDay} />
+          </div>
+        ) : (
+          /* ── Grid mode body (three-track reorderable) ────────────────────
+              data-narrow-pane drives the narrow (single-column) layout: CSS
+              shows exactly one pane on narrow viewports and ignores it on
+              wide. The grid template is computed from columnOrder above;
+              each column wrapper carries a data-column attribute so the
+              splitter drag math can find its column track via querySelector
+              on bodyRef. */
+          <div
+            id="daily-pane-body"
+            ref={bodyRef}
+            className={styles.body}
+            role="tabpanel"
+            aria-labelledby={`daily-tab-${selectedDay}`}
+            data-narrow-pane={narrowPane}
+            style={{ gridTemplateColumns: gridTemplate }}
           >
-            <SortableContext
-              items={columnOrder}
-              strategy={horizontalListSortingStrategy}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleColumnDragStart}
+              onDragEnd={handleColumnDragEnd}
+              onDragCancel={handleColumnDragCancel}
             >
-              {columnOrder.map((id, i) => {
-                const render = COLUMN_RENDERERS[id];
-                // Build a unique CSS class per column id so its inner
-                // chrome (lesson-list card vs. right-rail track) keeps
-                // its existing look regardless of position.
-                return (
-                  <Fragment key={id}>
-                    <SortableColumn id={id} className={styles.columnSlot}>
-                      {(grip) => render(grip)}
-                    </SortableColumn>
-                    {/* Splitter sits between this column and the next; the
-                        last column has no trailing splitter. */}
-                    {i < columnOrder.length - 1 && (
-                      <PaneSplitter
-                        {...splitterPropsFor(id, columnOrder[i + 1]!)}
-                      />
-                    )}
-                  </Fragment>
-                );
-              })}
-            </SortableContext>
+              <SortableContext
+                items={columnOrder}
+                strategy={horizontalListSortingStrategy}
+              >
+                {columnOrder.map((id, i) => {
+                  const render = COLUMN_RENDERERS[id];
+                  // Build a unique CSS class per column id so its inner
+                  // chrome (lesson-list card vs. right-rail track) keeps
+                  // its existing look regardless of position.
+                  return (
+                    <Fragment key={id}>
+                      <SortableColumn id={id} className={styles.columnSlot}>
+                        {(grip) => render(grip)}
+                      </SortableColumn>
+                      {/* Splitter sits between this column and the next; the
+                          last column has no trailing splitter. */}
+                      {i < columnOrder.length - 1 && (
+                        <PaneSplitter
+                          {...splitterPropsFor(id, columnOrder[i + 1]!)}
+                        />
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </SortableContext>
 
-            {/* Floating ghost of the dragged column — a small chip with
-                the column's label, reusing the right-rail panel-ghost
-                visual vocabulary (paper card + hairline + soft lift). */}
-            <DragOverlay>
-              {draggingColumnId && <ColumnDragGhost id={draggingColumnId} />}
-            </DragOverlay>
-          </DndContext>
-        </div>
+              {/* Floating ghost of the dragged column — a small chip with
+                  the column's label, reusing the right-rail panel-ghost
+                  visual vocabulary (paper card + hairline + soft lift). */}
+              <DragOverlay>
+                {draggingColumnId && <ColumnDragGhost id={draggingColumnId} />}
+              </DragOverlay>
+            </DndContext>
+          </div>
+        )}
       </div>
 
       {/* ── Add-lesson / add-event forms ──────────────────────────────────

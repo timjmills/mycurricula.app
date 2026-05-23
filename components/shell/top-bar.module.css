@@ -289,7 +289,11 @@
   box-shadow: 0 1px 2px rgba(227, 107, 126, 0.25);
 }
 
-/* ── View-mode pill (Simple | Task | Advanced) ──────────────────────── */
+/* ── View-mode pill (Grid | List) ───────────────────────────────────── */
+/* Two-option segmented control: muted ink-50 tray, paper+shadow on the
+   active option. Mirrors the Personal/Master pill treatment so the two
+   controls read as a visual pair on the top bar. The 1px separator span
+   (.viewModeSep) between Grid and List makes the boundary explicit. */
 .viewModePill {
   display: flex;
   align-items: center;
@@ -298,15 +302,27 @@
   border: 1px solid var(--ink-200);
   background: var(--ink-50);
   padding: 2px;
-  gap: 1px;
+  /* No gap — buttons sit flush against the separator; the separator
+     itself provides visual spacing via its own width. */
+  gap: 0;
   flex: 0 0 auto;
+}
+
+/* Visible 1px separator between Grid and List options. */
+.viewModeSep {
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  background: var(--ink-200);
+  flex: 0 0 auto;
+  align-self: center;
 }
 
 .viewModeBtn {
   display: inline-flex;
   align-items: center;
   height: 26px;
-  padding: 0 10px;
+  padding: 0 11px;
   border-radius: var(--r-6);
   border: none;
   background: transparent;

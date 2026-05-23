@@ -6,8 +6,8 @@
 //
 // It holds *view state*, not domain data: which week is showing, which
 // day is selected, the active filters, the Personal/Master edit mode, the
-// Simple/Task/Advanced view mode, and which panels are open. Domain data
-// still comes from `lib/mock`.
+// Grid/List view mode, and which panels are open. Domain data still comes
+// from `lib/mock`.
 //
 // Routing owns the *active view* (Weekly vs Daily vs …) — read it with
 // `usePathname()`; it is intentionally not duplicated here.
@@ -26,8 +26,13 @@ import type { LessonStatus, SubjectId } from "@/lib/types";
 import { CURRENT_WEEK, ME } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/client";
 
-/** Low-floor / high-ceiling UI complexity — the top-bar three-way pill. */
-export type ViewMode = "simple" | "task" | "grid";
+/**
+ * Grid (matrix/canvas view of lessons in a subject × day grid) vs
+ * List (flat list of lessons for the focused week or day). The active view
+ * component (WeeklyGrid / WeeklyList, DailyView / DailyList) is chosen by
+ * the shell based on this value; it does not affect filtering or edit mode.
+ */
+export type ViewMode = "grid" | "list";
 
 /** Personal-first (default) vs. the gated team-wide Master surface. */
 export type EditMode = "personal" | "master";
@@ -111,7 +116,7 @@ function toCurrentUser(user: User): CurrentUser {
 }
 
 export interface AppStateValue {
-  /** Simple / Task / Advanced — persists per teacher in a real backend. */
+  /** Grid (matrix/canvas) vs List (flat list of lessons) — persists per teacher. */
   viewMode: ViewMode;
   setViewMode: (m: ViewMode) => void;
 

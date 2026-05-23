@@ -1,0 +1,229 @@
+/* ListRow.module.css — the shared lesson-row primitive for List views.
+   Used by WeeklyList (grouped by day) and DailyList (all lessons for a day).
+
+   ── Token rules (CLAUDE.md §4) ─────────────────────────────────────────
+   All color / type / spacing comes from var(--…). No hex values; no raw
+   px font sizes. Subject color enters only through the .cp-subj cascade
+   (--c, --cl, --cd) so the row never invents colors.
+
+   ── Left-edge stripe ───────────────────────────────────────────────────
+   The 4px left edge is rendered with ::before positioned absolutely so
+   it sits flush against the card's left border without altering layout.
+   Dashed mode (lesson.modified) is a repeating-linear-gradient pattern:
+   alternating subject-color and transparent bands at 6px / 4px rhythm
+   — matches the artboard visual precisely.
+*/
+
+/* ── Row wrapper ────────────────────────────────────────────────────── */
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px 9px 16px; /* 16px left room for the ::before stripe */
+  min-height: 44px; /* ≥44px touch target */
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-8);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-sans);
+  color: var(--ink-900);
+}
+
+.row:hover {
+  background: var(--ink-50);
+  box-shadow: var(--shadow-card);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Done-status dimming — completion is readable but subordinate */
+.row.done {
+  opacity: 0.65;
+}
+
+/* ── Left-edge stripe (::before) ────────────────────────────────────── */
+/* Solid stripe: subject base color fills the full height */
+
+.row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  border-radius: 99px;
+  background: var(--c, var(--ink-300));
+}
+
+/* Dashed stripe (modified): alternating deep / transparent bands */
+
+.rowModified::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--cd, var(--ink-500)) 0px,
+    var(--cd, var(--ink-500)) 6px,
+    transparent 6px,
+    transparent 10px
+  );
+}
+
+/* ── Subject monogram tile ───────────────────────────────────────────── */
+
+.tile {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-6);
+  /* .cp-subj cascade provides --cl (light) and --cd (deep) */
+  background: var(--cl, var(--ink-100));
+  color: var(--cd, var(--ink-700));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+/* ── Time / weekday chip ─────────────────────────────────────────────── */
+
+.timeCol {
+  flex: 0 0 auto;
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.subjLabel {
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cd, var(--ink-500));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeLabel {
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Title + preview ─────────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-900);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.moveIcon {
+  font-size: var(--t-12);
+  color: var(--ink-400);
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.preview {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  margin-top: 2px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── CCSS chip ───────────────────────────────────────────────────────── */
+
+.ccssChip {
+  flex: 0 0 auto;
+  font-size: var(--t-10);
+  font-weight: 700;
+  color: var(--ink-500);
+  background: var(--ink-100);
+  padding: 2px 7px;
+  border-radius: var(--r-4);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+/* ── Resource count ──────────────────────────────────────────────────── */
+
+.resourceCount {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-500);
+  min-width: 32px;
+  justify-content: flex-end;
+}
+
+/* ── Completion checkbox ─────────────────────────────────────────────── */
+
+.checkbox {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-4);
+  border: 1.5px solid var(--ink-200);
+  background: var(--paper);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background 120ms,
+    border-color 120ms;
+  /* Ensure the checkbox is at least 44px tap area via the parent row,
+     but the visual stays 16px for density. */
+}
+
+.checkbox.checked {
+  background: var(--done);
+  border-color: var(--done);
+}
+
+/* Reduced motion — strip transitions */
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .checkbox {
+    transition: none;
+  }
+}

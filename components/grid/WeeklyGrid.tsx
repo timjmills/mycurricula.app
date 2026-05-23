@@ -66,7 +66,6 @@ import {
 import { useReducedMotion } from "framer-motion";
 import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
-import type { ViewMode } from "@/lib/app-state";
 import { useTheme } from "@/lib/theme";
 import { useSubjectColor } from "@/lib/palette";
 import {
@@ -109,7 +108,7 @@ function weekBounds(lessons: Lesson[]): { min: number; max: number } {
 
 export function WeeklyGrid(): ReactNode {
   const { style } = useTheme();
-  const { week, setWeek, search, viewMode, filters } = useAppState();
+  const { week, setWeek, search, filters } = useAppState();
   const prefersReducedMotion = useReducedMotion();
 
   // ── Planner store — single source of truth for lessons and layouts ─────────
@@ -685,7 +684,6 @@ export function WeeklyGrid(): ReactNode {
                 subjectId={subject.id}
                 cells={bySubjectDay[subject.id]}
                 style={style}
-                viewMode={viewMode}
                 dragState={dragState}
                 density={density}
                 expandedIds={expandedIds}
@@ -795,7 +793,9 @@ interface SubjectRowProps {
   subjectId: SubjectId;
   cells: Lesson[][];
   style: ReturnType<typeof useTheme>["style"];
-  viewMode: ViewMode;
+  // viewMode is no longer threaded through the grid — the Grid/List axis is
+  // resolved by WeeklyShell, which renders WeeklyGrid only in "grid" mode.
+  // Density during drag is driven by DragState (board-level collapse-on-drag).
   dragState: DragState;
   density: Density;
   expandedIds: Set<string>;
@@ -828,7 +828,6 @@ function SubjectRow({
   subjectId,
   cells,
   style,
-  viewMode,
   dragState,
   density,
   expandedIds,
@@ -875,7 +874,6 @@ function SubjectRow({
           day={day}
           lessons={cells?.[day] ?? []}
           shade={shade}
-          viewMode={viewMode}
           dragState={dragState}
           density={density}
           expandedIds={expandedIds}

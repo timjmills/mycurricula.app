@@ -4,7 +4,7 @@
 //
 // Sticky chrome bar at the top of every planner view. Left-to-right order:
 //   wordmark → panel collapse → view switcher → week jumper →
-//   undo/redo → master/personal toggle → view-mode pill → search →
+//   undo/redo → master/personal toggle → view-mode pill (Grid|List) → search →
 //   to-do button → comments button (with badge) → profile avatar.
 //
 // State from useAppState() — including `currentUser`, derived from the
@@ -47,7 +47,9 @@ const VIEWS: ViewDef[] = [
   { label: "Subject", href: "/subject" },
   { label: "Schedule", soon: true },
   { label: "Unit", soon: true },
-  { label: "Year", soon: true },
+  // Year tab activated — stub page at app/(planner)/year/page.tsx.
+  // Schedule and Unit remain SOON until their build waves.
+  { label: "Year", href: "/year" },
 ];
 
 // ── TopBar ───────────────────────────────────────────────────────────────
@@ -336,25 +338,41 @@ export function TopBar(): ReactNode {
 
       <div className={styles.divider} aria-hidden="true" />
 
-      {/* ── View-mode pill (Simple | Task | Grid) ─────────────────── */}
+      {/* ── View-mode pill (Grid | List) ─────────────────────────────
+          Two-option segmented control: Grid renders the subject × day matrix;
+          List renders a flat chronological list of lessons. The active option
+          gets the paper background + shadow (viewModeBtnActive); the inactive
+          option is muted. A 1px separator span between the two options makes
+          the boundary explicit so the pair reads as two distinct choices.
+          aria-pressed on each button communicates selection to assistive tech.
+          Min 44px touch target via the .viewModePill height (32px pill, 44px
+          bar) — the bar centers the pill in the 52px chrome row. */}
       <div
         className={styles.viewModePill}
         role="group"
-        aria-label="View detail level"
+        aria-label="Layout mode"
       >
-        {(["simple", "task", "grid"] as const).map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            className={`${styles.viewModeBtn} ${
-              viewMode === mode ? styles.viewModeBtnActive : ""
-            }`}
-            onClick={() => setViewMode(mode)}
-            aria-pressed={viewMode === mode}
-          >
-            {mode.charAt(0).toUpperCase() + mode.slice(1)}
-          </button>
-        ))}
+        <button
+          type="button"
+          className={`${styles.viewModeBtn} ${
+            viewMode === "grid" ? styles.viewModeBtnActive : ""
+          }`}
+          onClick={() => setViewMode("grid")}
+          aria-pressed={viewMode === "grid"}
+        >
+          Grid
+        </button>
+        <span className={styles.viewModeSep} aria-hidden="true" />
+        <button
+          type="button"
+          className={`${styles.viewModeBtn} ${
+            viewMode === "list" ? styles.viewModeBtnActive : ""
+          }`}
+          onClick={() => setViewMode("list")}
+          aria-pressed={viewMode === "list"}
+        >
+          List
+        </button>
       </div>
 
       {/* Push remaining controls to the right */}

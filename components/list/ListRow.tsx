@@ -1,0 +1,280 @@
+"use client";
+
+// ListRow.tsx — the shared list-row primitive for all List view surfaces.
+//
+// Used by WeeklyList (one row per lesson in the day-grouped weekly list)
+// and by DailyList (one row per lesson on a single day). The visual rhythm
+// is consistent across both surfaces so a teacher's eye adjusts instantly
+// when switching between views.
+//
+// ── Layout (left→right) ────────────────────────────────────────────────
+//   [subject monogram tile] [time / weekday chip] [title + preview]
+//   [CCSS chip] [resource count] [completion checkbox]
+//
+// ── Modified / moved visuals ───────────────────────────────────────────
+//   modified === true  → 4px DASHED left edge in the subject's deep color
+//   moved !== null     → move-arrow icon inline near the title
+//                        "same-week" → ↔   "across-weeks" → ⤴
+//   No "MODIFIED" pill — that lives on the grid card, not the list row.
+//
+// ── Completion ─────────────────────────────────────────────────────────
+//   The checkbox toggles lesson.status between "not_done" and "done" via
+//   usePlanner().setLessonStatus. The toggle is a separate button so the
+//   click does not bubble to the row's onClick (navigate to daily view).
+//
+// ── Accessibility ──────────────────────────────────────────────────────
+//   • The row is a <button> so it is keyboard reachable (Enter / Space).
+//   • min-height: 44px (via CSS module) meets the touch-target floor.
+//   • The checkbox is a nested <button> with an aria-label.
+
+import type { ReactNode } from "react";
+import { useMemo } from "react";
+import type { Lesson } from "@/lib/types";
+import { usePlanner } from "@/lib/planner-store";
+import styles from "./ListRow.module.css";
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+export interface ListRowProps {
+  /** The lesson to display. */
+  lesson: Lesson;
+  /**
+   * Time-slot label shown in the chip, e.g. "8:10–9:10".
+   * When omitted, falls back to lesson.time. The `weekday` prop is used
+   * instead when the row appears in a subject-scoped list (e.g. "W12 · Mon").
+   */
+  time?: string;
+  /**
+   * Alternative to `time` for subject or unit list contexts.
+   * E.g. "W12 · Mon". Shown instead of `time` when both are provided.
+   */
+  weekday?: string;
+  /**
+   * When true, the 1-line preview text below the title is suppressed.
+   * Useful in ultra-compact contexts where vertical space is scarce.
+   */
+  dense?: boolean;
+  /** Called when the row body is clicked (not the checkbox). */
+  onClick?: () => void;
+}
+
+// ── Monogram helper ──────────────────────────────────────────────────────────
+// Derives the 2-letter monogram from a subject id, matching the artboard's
+// M523_SUBJ short values: math→Ma, reading→Re, writing→Wr, grammar→Gr,
+// spelling→Sp, ufli→Uf, explorers→Ex, sel→Se.
+
+const MONOGRAM: Record<string, string> = {
+  math: "Ma",
+  reading: "Re",
+  writing: "Wr",
+  grammar: "Gr",
+  spelling: "Sp",
+  ufli: "Uf",
+  explorers: "Ex",
+  sel: "Se",
+};
+
+function monogramFor(subjectId: string): string {
+  return (
+    MONOGRAM[subjectId] ??
+    subjectId.slice(0, 2).replace(/^\w/, (c) => c.toUpperCase())
+  );
+}
+
+// ── Subject label helper ─────────────────────────────────────────────────────
+// Short uppercase label shown above the time chip, matches artboard vocabulary.
+
+const SUBJECT_LABEL: Record<string, string> = {
+  math: "MATH",
+  reading: "READING",
+  writing: "WRITING",
+  grammar: "GRAMMAR",
+  spelling: "SPELLING",
+  ufli: "UFLI",
+  explorers: "EXPLORERS",
+  sel: "SEL",
+};
+
+function subjectLabelFor(subjectId: string): string {
+  return SUBJECT_LABEL[subjectId] ?? subjectId.toUpperCase();
+}
+
+// ── Move-arrow icon ──────────────────────────────────────────────────────────
+// Inline unicode arrows communicate how the lesson was relocated.
+// same-week → ↔ (left-right arrow)   across-weeks → ⤴ (up+right arrow)
+
+function MoveArrow({ moved }: { moved: Lesson["moved"] }): ReactNode {
+  if (!moved) return null;
+  const symbol = moved === "across-weeks" ? "⤴" : "↔";
+  const label =
+    moved === "across-weeks" ? "Moved across weeks" : "Moved within the week";
+  return (
+    <span
+      className={styles.moveIcon}
+      aria-label={label}
+      title={label}
+      role="img"
+    >
+      {symbol}
+    </span>
+  );
+}
+
+// ── Resource link icon ───────────────────────────────────────────────────────
+// A minimal paperclip SVG that signals "N resources attached."
+
+function LinkIcon(): ReactNode {
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
+// ── Checkmark icon ───────────────────────────────────────────────────────────
+
+function CheckIcon(): ReactNode {
+  return (
+    <svg
+      width="10"
+      height="10"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 8l3 3 7-7" />
+    </svg>
+  );
+}
+
+// ── ListRow ──────────────────────────────────────────────────────────────────
+
+export function ListRow({
+  lesson,
+  time,
+  weekday,
+  dense = false,
+  onClick,
+}: ListRowProps): ReactNode {
+  const { setLessonStatus } = usePlanner();
+
+  // Resolved time/weekday display — weekday takes precedence when provided.
+  const chipLabel = weekday ?? time ?? lesson.time ?? "";
+
+  const isDone = lesson.status === "done";
+
+  // Row CSS classes — subject class drives --c/--cl/--cd via the .cp-subj
+  // cascade (palette bridge in lib/palette.tsx), modified adds dashed edge.
+  const rowClasses = useMemo(() => {
+    const base = [styles.row, `cp-subj ${lesson.subject}`];
+    if (lesson.modified) base.push(styles.rowModified);
+    if (isDone) base.push(styles.done);
+    return base.join(" ");
+  }, [lesson.subject, lesson.modified, isDone]);
+
+  // Toggle completion without bubbling to the row's onClick.
+  function handleCheckboxClick(e: React.MouseEvent): void {
+    e.stopPropagation();
+    setLessonStatus(lesson.id, isDone ? "not_done" : "done");
+  }
+
+  function handleCheckboxKeyDown(e: React.KeyboardEvent): void {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      setLessonStatus(lesson.id, isDone ? "not_done" : "done");
+    }
+  }
+
+  function handleRowKeyDown(e: React.KeyboardEvent): void {
+    if ((e.key === "Enter" || e.key === " ") && onClick) {
+      e.preventDefault();
+      onClick();
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={rowClasses}
+      onClick={onClick}
+      onKeyDown={handleRowKeyDown}
+      data-planner-item={`lesson:${lesson.id}`}
+      aria-label={`${subjectLabelFor(lesson.subject)} — ${lesson.title}${isDone ? " (done)" : ""}`}
+    >
+      {/* Subject monogram tile — background color from .cp-subj cascade */}
+      <span className={styles.tile} aria-hidden="true">
+        {monogramFor(lesson.subject)}
+      </span>
+
+      {/* Time / weekday chip */}
+      <span className={styles.timeCol} aria-hidden="true">
+        <span className={styles.subjLabel}>
+          {subjectLabelFor(lesson.subject)}
+        </span>
+        {chipLabel && <span className={styles.timeLabel}>{chipLabel}</span>}
+      </span>
+
+      {/* Title + optional preview */}
+      <span className={styles.body}>
+        <span className={styles.titleRow}>
+          <span className={styles.title}>{lesson.title}</span>
+          {/* Move indicator — only when lesson was relocated */}
+          <MoveArrow moved={lesson.moved} />
+        </span>
+        {!dense && lesson.preview && (
+          <span className={styles.preview}>{lesson.preview}</span>
+        )}
+      </span>
+
+      {/* CCSS chip — count of standards attached */}
+      {lesson.standards.length > 0 && (
+        <span
+          className={`${styles.ccssChip} cp-mono`}
+          aria-label={`${lesson.standards.length} CCSS standard${lesson.standards.length === 1 ? "" : "s"}`}
+        >
+          CCSS·{lesson.standards.length}
+        </span>
+      )}
+
+      {/* Resource count */}
+      {lesson.resources.length > 0 && (
+        <span
+          className={styles.resourceCount}
+          aria-label={`${lesson.resources.length} resource${lesson.resources.length === 1 ? "" : "s"}`}
+        >
+          <LinkIcon />
+          {lesson.resources.length}
+        </span>
+      )}
+
+      {/* Completion checkbox — separate interactive target */}
+      <span
+        role="checkbox"
+        aria-checked={isDone}
+        aria-label={isDone ? "Mark not done" : "Mark done"}
+        tabIndex={0}
+        className={`${styles.checkbox}${isDone ? ` ${styles.checked}` : ""}`}
+        onClick={handleCheckboxClick}
+        onKeyDown={handleCheckboxKeyDown}
+      >
+        {isDone && <CheckIcon />}
+      </span>
+    </button>
+  );
+}

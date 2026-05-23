@@ -1,0 +1,103 @@
+/* WeeklyList.module.css — chrome for the Weekly List view.
+   Replaces the WeeklyGrid in the grid slot of WeeklyShell when
+   viewMode === "list". The RightRail column and splitter stay unchanged.
+
+   ── Token rules (CLAUDE.md §4) ─────────────────────────────────────────
+   All color / type / spacing comes from var(--…). No hex values; no raw
+   px font sizes. Layout/spacing utilities may also use Tailwind classes
+   per CLAUDE.md §4 (Tailwind for layout/spacing only).
+*/
+
+/* ── Scroll container ──────────────────────────────────────────────────── */
+/* Matches the Weekly grid's scroll model: full height, internal scroll,
+   neutral ink-50 background so the white lesson rows pop. */
+
+.container {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--paper);
+  padding: 16px 20px 28px;
+}
+
+/* ── Page heading ────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.kicker {
+  font-size: var(--t-10);
+  font-weight: 700;
+  color: var(--ink-400);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.headingRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex: 1;
+}
+
+.heading {
+  font-size: var(--t-22);
+  font-weight: 700;
+  color: var(--ink-900);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.hint {
+  font-size: var(--t-11);
+  color: var(--ink-400);
+  white-space: nowrap;
+}
+
+/* ── Day section ─────────────────────────────────────────────────────── */
+
+.daySection {
+  margin-bottom: 20px;
+}
+
+.dayHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.dayName {
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink-900);
+  letter-spacing: -0.01em;
+}
+
+.lessonCount {
+  font-size: var(--t-11);
+  color: var(--ink-400);
+}
+
+/* ── Lesson rows stack ───────────────────────────────────────────────── */
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Empty-day state ─────────────────────────────────────────────────── */
+
+.emptyDay {
+  font-size: var(--t-12);
+  color: var(--ink-300);
+  padding: 8px 12px;
+  font-style: italic;
+}
