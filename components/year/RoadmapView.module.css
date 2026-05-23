@@ -1,18 +1,50 @@
 /* RoadmapView — weekly-column grid (Grid mode). */
 
 .root {
-  background: #fff;
+  background: var(--paper, #fff);
   border: 1px solid var(--ink-150, #e6e9f4);
   border-radius: 14px;
   box-shadow: var(--shadow-card);
-  overflow: hidden;
+  /* overflow: clip — lets position:sticky children work while still
+     visually clipping to the border-radius. */
+  overflow: clip;
 }
 
-/* Header row with lane-card spacer and week labels */
+/* Scroll container that gives the sticky week-column header its anchor.
+   Wraps the headerRow + all lane rows. */
+.lanesScrollArea {
+  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Header row with lane-card spacer and week labels — sticky so it pins
+   to the top of .lanesScrollArea as lanes scroll beneath it. */
 .headerRow {
   display: grid;
   grid-template-columns: 200px 1fr;
   border-bottom: 1px solid #eceef7;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  /* Color transition for the chameleon effect */
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease;
+  background: var(--paper, #fff);
+}
+
+/* Active-subject color fill — cp-subj class placed on .headerRow by JS. */
+.headerRowChameleon {
+  background: var(--cl) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--cd) 12%, transparent) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .headerRow {
+    transition: none;
+  }
 }
 
 .headerSpacer {
@@ -84,7 +116,7 @@
 
 /* Colored bar (Brush style).
    Same four-ingredient highlighter-wash treatment as LaneCard and unit bars:
-     1. Translucent vertical gradient via color-mix().
+     1. Near-solid vertical gradient via color-mix() — ~90% throughout.
      2. Left accent edge at full var(--c) saturation.
      3. Inset top highlight + drop shadow for dimension. */
 .brush {
@@ -96,11 +128,11 @@
   border-radius: var(--r-8);
   padding: 0 10px 0 8px;
   overflow: hidden;
-  /* Ingredient 2 + 1: vertical highlighter-wash gradient */
+  /* Ingredient 2 + 1: near-solid vertical gradient — 92% → 88% */
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--c) 55%, transparent) 0%,
-    color-mix(in srgb, var(--c) 38%, transparent) 100%
+    color-mix(in srgb, var(--c) 92%, transparent) 0%,
+    color-mix(in srgb, var(--c) 88%, transparent) 100%
   );
   /* Ingredient 3: strong left accent edge */
   border-left: 4px solid var(--c);

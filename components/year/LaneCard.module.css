@@ -3,9 +3,9 @@
    to the canonical highlight palette for that subject.
 
    Highlighter-wash treatment (four ingredients, matching the Weekly card):
-     1. Translucent pastel fill via color-mix(): var(--c) at ~48% gives the
-        saturated-but-see-through marker-wash feel without inventing a new color.
-     2. Subtle vertical gradient — 55% top → 38% bottom — adds dimension.
+     1. Near-solid fill via color-mix(): var(--c) at ~90% — visually solid but
+        retains a sliver of translucency for polish, matching the Weekly card.
+     2. Subtle vertical gradient — 92% top → 88% bottom — adds dimension.
      3. Left accent edge: 5px solid var(--c) anchors subject identity.
      4. Inset top highlight + drop shadow for polish and depth.
 */
@@ -13,11 +13,12 @@
 .card {
   width: 200px;
   flex: 0 0 200px;
-  /* Ingredient 2 + 1: vertical gradient of translucent subject color */
+  /* Ingredient 2 + 1: near-solid vertical gradient — 92% → 88% gives the
+     saturated marker feel the user wants while keeping a hair of translucency */
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--c) 55%, transparent) 0%,
-    color-mix(in srgb, var(--c) 38%, transparent) 100%
+    color-mix(in srgb, var(--c) 92%, transparent) 0%,
+    color-mix(in srgb, var(--c) 88%, transparent) 100%
   );
   /* Ingredient 3: strong left accent edge anchors subject color at a glance */
   border-left: 5px solid var(--c);

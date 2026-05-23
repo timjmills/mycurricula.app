@@ -15,7 +15,7 @@
 // via lib/year-calendar.ts helpers. School week is read from the mock
 // constants — never hard-coded.
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
 import {
@@ -60,6 +60,49 @@ const LANE_COL = 200;
 
 export function ProgressionView() {
   const { lessons } = usePlanner();
+
+  // ── Chameleon banner state ────────────────────────────────────────────
+  // Tracks which subject lane is currently topmost in the scroll area so
+  // the sticky day-header banner can adopt that subject's --cl color.
+  const [activeSubjectId, setActiveSubjectId] = useState<SubjectId>(
+    SUBJECTS[0].id as SubjectId,
+  );
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const laneRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // rootMargin: -1px top crops the sticky banner itself; -90% bottom means
+    // only lanes whose top edge has crossed into the top 10% of the viewport
+    // (just below the banner) are considered "active."
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Find entries that are intersecting and pick the one with the
+        // smallest boundingClientRect.top — that's the topmost visible lane.
+        const intersecting = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (intersecting.length > 0) {
+          const el = intersecting[0].target as HTMLElement;
+          const sid = el.dataset.laneSubject as SubjectId | undefined;
+          if (sid) setActiveSubjectId(sid);
+        }
+      },
+      {
+        root: container,
+        rootMargin: "-1px 0px -90% 0px",
+      },
+    );
+
+    // Observe all registered lane rows.
+    laneRefs.current.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, []);
+
+  // ── Calendar data ─────────────────────────────────────────────────────
 
   // Build the flat school-day array for the view window.
   const schoolDays = useMemo(
@@ -145,142 +188,160 @@ export function ProgressionView() {
         </div>
       </div>
 
-      {/* Day-column header (weekday label + date number) */}
-      <div className={styles.dayHeader}>
-        {/* Corner cell */}
-        <div className={styles.cornerCell} style={{ width: LANE_COL }}>
-          <span className={styles.cornerLabel}>DATE</span>
-          <span className={styles.cornerSub}>CURRICULUM LANES</span>
-        </div>
-        {/* Day columns */}
-        <div className={styles.dayCols} style={{ width: totalCols * COL }}>
-          {schoolDays.map((d, i) => {
-            const isToday = i === todayFlatIdx;
-            return (
-              <div
-                key={i}
-                className={`${styles.dayCol} ${isToday ? styles.todayCol : ""} ${d.firstOfMonth && i > 0 ? styles.monthBoundary : ""}`}
-                style={{ width: COL }}
-                aria-label={
-                  isToday ? `${d.wkd} ${d.dateNum} (today)` : undefined
-                }
-              >
-                {isToday && (
-                  <span className={styles.todayPill} aria-hidden="true">
-                    TODAY
-                  </span>
-                )}
-                <span className={styles.dayWkd}>{d.wkd}</span>
-                <span className={styles.dayNum}>{d.dateNum}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Lane rows — each row carries cp-subj so var(--c/--cl/--cd) resolve
-          to the correct subject color for all children in the row */}
-      {subjectData.map(
-        ({ subject, subjectId, glyphMap, completePct, unitBars }, li) => (
-          <div
-            key={subject.id}
-            className={`${styles.laneRow} ${subjectClassName(subjectId)}`}
-            style={{
-              borderTop: li > 0 ? "1px solid var(--ink-150)" : "none",
-            }}
-          >
-            {/* Lane card — inherits cp-subj from the row */}
-            <LaneCard
-              name={subject.name}
-              subjectId={subjectId}
-              completePct={completePct}
-              fullHeight
-            />
-
-            {/* Grid area: glyph row + unit bars overlay */}
-            <div className={styles.laneGrid} style={{ width: totalCols * COL }}>
-              {/* TODAY column highlight */}
-              {todayFlatIdx >= 0 && todayFlatIdx < totalCols && (
+      {/* Scrollable area — gives the sticky day-header its anchoring
+          scroll context. IntersectionObserver uses this as its root. */}
+      <div className={styles.lanesScrollArea} ref={scrollContainerRef}>
+        {/* Day-column header (weekday label + date number) — STICKY.
+            Carries the active subject's cp-subj class so var(--cl) and
+            var(--cd) resolve to the correct chameleon color. */}
+        <div
+          className={`${styles.dayHeader} ${styles.dayHeaderChameleon} ${subjectClassName(activeSubjectId)}`}
+        >
+          {/* Corner cell */}
+          <div className={styles.cornerCell} style={{ width: LANE_COL }}>
+            <span className={styles.cornerLabel}>DATE</span>
+            <span className={styles.cornerSub}>CURRICULUM LANES</span>
+          </div>
+          {/* Day columns */}
+          <div className={styles.dayCols} style={{ width: totalCols * COL }}>
+            {schoolDays.map((d, i) => {
+              const isToday = i === todayFlatIdx;
+              return (
                 <div
-                  className={styles.todayHighlight}
-                  style={{ left: todayFlatIdx * COL, width: COL }}
-                  aria-hidden="true"
-                />
-              )}
+                  key={i}
+                  className={`${styles.dayCol} ${isToday ? styles.todayCol : ""} ${d.firstOfMonth && i > 0 ? styles.monthBoundary : ""}`}
+                  style={{ width: COL }}
+                  aria-label={
+                    isToday ? `${d.wkd} ${d.dateNum} (today)` : undefined
+                  }
+                >
+                  {isToday && (
+                    <span className={styles.todayPill} aria-hidden="true">
+                      TODAY
+                    </span>
+                  )}
+                  <span className={styles.dayWkd}>{d.wkd}</span>
+                  <span className={styles.dayNum}>{d.dateNum}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
-              {/* LESSONS row — per-day StatusGlyph cells */}
-              <div className={styles.glyphRow}>
-                {schoolDays.map((d, i) => {
-                  const state = glyphMap.get(i) ?? "upcoming";
-                  return (
+        {/* Lane rows — each row carries cp-subj so var(--c/--cl/--cd) resolve
+            to the correct subject color for all children in the row.
+            data-lane-subject enables IntersectionObserver lane detection. */}
+        {subjectData.map(
+          ({ subject, subjectId, glyphMap, completePct, unitBars }, li) => (
+            <div
+              key={subject.id}
+              data-lane-subject={subject.id}
+              ref={(el) => {
+                if (el) laneRefs.current.set(subject.id, el);
+                else laneRefs.current.delete(subject.id);
+              }}
+              className={`${styles.laneRow} ${subjectClassName(subjectId)}`}
+              style={{
+                borderTop: li > 0 ? "1px solid var(--ink-150)" : "none",
+              }}
+            >
+              {/* Lane card — inherits cp-subj from the row */}
+              <LaneCard
+                name={subject.name}
+                subjectId={subjectId}
+                completePct={completePct}
+                fullHeight
+              />
+
+              {/* Grid area: glyph row + unit bars overlay */}
+              <div
+                className={styles.laneGrid}
+                style={{ width: totalCols * COL }}
+              >
+                {/* TODAY column highlight */}
+                {todayFlatIdx >= 0 && todayFlatIdx < totalCols && (
+                  <div
+                    className={styles.todayHighlight}
+                    style={{ left: todayFlatIdx * COL, width: COL }}
+                    aria-hidden="true"
+                  />
+                )}
+
+                {/* LESSONS row — per-day StatusGlyph cells */}
+                <div className={styles.glyphRow}>
+                  {schoolDays.map((d, i) => {
+                    const state = glyphMap.get(i) ?? "upcoming";
+                    return (
+                      <div
+                        key={i}
+                        className={`${styles.glyphCell} ${d.firstOfMonth && i > 0 ? styles.monthBoundary : ""}`}
+                        style={{ width: COL }}
+                      >
+                        {/* No subjectId needed: cp-subj is on the ancestor row */}
+                        <StatusGlyph state={state} size={13} />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* UNITS row — unit bars colored by var(--c) from the row cascade */}
+                <div className={styles.unitRow}>
+                  {/* Background grid lines */}
+                  {schoolDays.map((d, i) => (
                     <div
                       key={i}
-                      className={`${styles.glyphCell} ${d.firstOfMonth && i > 0 ? styles.monthBoundary : ""}`}
+                      className={`${styles.unitGridLine} ${d.firstOfMonth && i > 0 ? styles.monthBoundary : ""}`}
                       style={{ width: COL }}
-                    >
-                      {/* No subjectId needed: cp-subj is on the ancestor row */}
-                      <StatusGlyph state={state} size={13} />
-                    </div>
-                  );
-                })}
-              </div>
+                    />
+                  ))}
 
-              {/* UNITS row — unit bars colored by var(--c) from the row cascade */}
-              <div className={styles.unitRow}>
-                {/* Background grid lines */}
-                {schoolDays.map((d, i) => (
-                  <div
-                    key={i}
-                    className={`${styles.unitGridLine} ${d.firstOfMonth && i > 0 ? styles.monthBoundary : ""}`}
-                    style={{ width: COL }}
-                  />
-                ))}
-
-                {/* Unit marker bars, absolutely positioned */}
-                {unitBars.map((u, ui) => {
-                  const left = u.minIdx * COL + 4;
-                  const width = (u.maxIdx - u.minIdx + 1) * COL - 8;
-                  if (width <= 0) return null;
-                  return (
-                    <div
-                      key={u.unitId}
-                      className={styles.unitBar}
-                      style={{ left, width }}
-                      title={`${u.lessonCount} lessons`}
-                    >
-                      {/* Unit tile */}
-                      <span className={styles.unitTile}>U{ui + 1}</span>
-                      {/* Unit label, clipped */}
-                      <div className={styles.unitMeta}>
-                        <IconBook width={10} height={10} />
-                        <span>{u.lessonCount} lessons</span>
+                  {/* Unit marker bars, absolutely positioned */}
+                  {unitBars.map((u, ui) => {
+                    const left = u.minIdx * COL + 4;
+                    const width = (u.maxIdx - u.minIdx + 1) * COL - 8;
+                    if (width <= 0) return null;
+                    return (
+                      <div
+                        key={u.unitId}
+                        className={styles.unitBar}
+                        style={{ left, width }}
+                        title={`${u.lessonCount} lessons`}
+                      >
+                        {/* Unit tile */}
+                        <span className={styles.unitTile}>U{ui + 1}</span>
+                        {/* Unit label, clipped */}
+                        <div className={styles.unitMeta}>
+                          <IconBook width={10} height={10} />
+                          <span>{u.lessonCount} lessons</span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            {/* Kebab menu */}
-            <button
-              className={styles.kebab}
-              aria-label={`Options for ${subject.name}`}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
+              {/* Kebab menu */}
+              <button
+                className={styles.kebab}
+                aria-label={`Options for ${subject.name}`}
               >
-                <circle cx="12" cy="5" r="1.6" />
-                <circle cx="12" cy="12" r="1.6" />
-                <circle cx="12" cy="19" r="1.6" />
-              </svg>
-            </button>
-          </div>
-        ),
-      )}
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="5" r="1.6" />
+                  <circle cx="12" cy="12" r="1.6" />
+                  <circle cx="12" cy="19" r="1.6" />
+                </svg>
+              </button>
+            </div>
+          ),
+        )}
+      </div>
+      {/* end .lanesScrollArea */}
 
       {/* Bottom legend */}
       <div className={styles.legend}>

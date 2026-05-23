@@ -1,11 +1,14 @@
 /* ProgressionView — day-by-day calendar (List mode). */
 
 .root {
-  background: #fff;
+  background: var(--paper, #fff);
   border: 1px solid var(--ink-150, #e6e9f4);
   border-radius: 14px;
   box-shadow: var(--shadow-card);
-  overflow: hidden;
+  /* overflow: clip rather than hidden so position:sticky descendants still
+     work — clip blocks scroll like hidden but does not create a scroll
+     container (sticky requires no blocking scroll ancestor above it). */
+  overflow: clip;
 }
 
 /* Gradient month-header strip.
@@ -64,11 +67,19 @@
   border-right: none;
 }
 
-/* Day header row */
+/* Day header row — sticky so it pins to the top of .lanesScrollArea as the
+   user scrolls down through the lane stack (chameleon banner behavior). */
 .dayHeader {
   display: flex;
   border-bottom: 1px solid #eceef7;
-  background: #fff;
+  background: var(--paper, #fff);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  /* Color transition — skipped under reduced motion (see media query below) */
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease;
 }
 
 .cornerCell {
@@ -215,7 +226,7 @@
 
 /* Unit marker bar — absolutely positioned over the unit row.
    Highlighter-wash treatment matches LaneCard and Weekly cards:
-     1. Vertical gradient of color-mix() translucent subject color.
+     1. Near-solid vertical gradient via color-mix() — ~90% opacity throughout.
      2. Left accent edge (ingredient 3) at full var(--c) saturation.
      3. Inset top highlight + light drop shadow (ingredient 4). */
 .unitBar {
@@ -223,11 +234,11 @@
   top: 8px;
   height: 60px;
   border-radius: var(--r-8);
-  /* Ingredient 2 + 1: vertical highlighter-wash gradient */
+  /* Ingredient 2 + 1: near-solid vertical gradient — 92% → 88% */
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--c) 55%, transparent) 0%,
-    color-mix(in srgb, var(--c) 38%, transparent) 100%
+    color-mix(in srgb, var(--c) 92%, transparent) 0%,
+    color-mix(in srgb, var(--c) 88%, transparent) 100%
   );
   /* Ingredient 3: left accent edge at full saturation */
   border-left: 4px solid var(--c);
@@ -296,6 +307,31 @@
 .kebab:hover {
   background: var(--ink-100, #eef0f4);
   color: var(--ink-700, #2e3038);
+}
+
+/* Scroll container that gives sticky its anchor.
+   Wraps the day header + all lane rows so the chameleon banner can stick
+   to the top of the scroll area as the user scrolls the lane stack. */
+.lanesScrollArea {
+  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* So IntersectionObserver can use this element as root. */
+  position: relative;
+}
+
+/* Active-subject color fill: var(--cl) from the cp-subj cascade placed on
+   .dayHeader by JS. The hairline border-bottom provides a soft seam. */
+.dayHeaderChameleon {
+  /* var(--cl) from the cp-subj class on the element */
+  background: var(--cl) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--cd) 12%, transparent) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dayHeader {
+    transition: none;
+  }
 }
 
 /* Bottom legend strip */
