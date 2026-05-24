@@ -14,6 +14,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { tryClaudeBypassInMiddleware } from "@/lib/claude-bypass";
+
 /** Path prefixes that must pass through without an authenticated user. */
 const PUBLIC_PATHS = ["/login", "/auth"];
 
@@ -38,6 +40,15 @@ function isPublicPath(pathname: string) {
  * response, or a redirect to /login carrying those same cookies.
  */
 export async function updateSession(request: NextRequest) {
+  // Claude auth-bypass (lib/claude-bypass.ts). When the request carries
+  // a valid `?claude=<token>` URL param (or a Bearer header) this short-
+  // circuits the SSO gate, mints a Supabase session for CLAUDE_USER_EMAIL,
+  // and redirects to a clean URL with the session cookies attached.
+  // Falls through on invalid / missing / rate-limited tokens — those
+  // land on the normal auth flow below.
+  const bypass = await tryClaudeBypassInMiddleware(request);
+  if (bypass.bypassed) return bypass.response;
+
   // The response whose cookies the Supabase client writes to. Recreated
   // alongside the request whenever a cookie is set, per the @supabase/ssr
   // middleware pattern.
