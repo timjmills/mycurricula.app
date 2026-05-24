@@ -29,7 +29,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppState, type CurrentUser } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
-import { ToggleGroup } from "@/components/ui";
+import { Button, Tooltip, ToggleGroup } from "@/components/ui";
 import styles from "./top-bar.module.css";
 
 // ── View definitions ─────────────────────────────────────────────────────
@@ -179,17 +179,24 @@ export function TopBar(): ReactNode {
           leftPanelOpen boolean. The panel itself is rendered by another agent
           (WeeklyShell / planner layout) — this button is solely responsible
           for toggling the state that controls it. */}
-      <button
-        type="button"
-        className={`${styles.iconBtn} ${leftPanelOpen ? styles.iconBtnActive : ""}`}
-        onClick={toggleLeftPanel}
-        aria-label={
+      <Tooltip
+        content={
           leftPanelOpen ? "Collapse filter panel" : "Expand filter panel"
         }
-        aria-expanded={leftPanelOpen}
+        side="bottom"
       >
-        <PanelLeftIcon />
-      </button>
+        <Button
+          variant="icon"
+          iconAriaLabel={
+            leftPanelOpen ? "Collapse filter panel" : "Expand filter panel"
+          }
+          onClick={toggleLeftPanel}
+          aria-expanded={leftPanelOpen}
+          className={leftPanelOpen ? styles.iconActive : undefined}
+        >
+          <PanelLeftIcon />
+        </Button>
+      </Tooltip>
 
       <div className={styles.divider} aria-hidden="true" />
 
@@ -273,33 +280,39 @@ export function TopBar(): ReactNode {
 
       {/* ── Undo / Redo ───────────────────────────────────────────── */}
       {/* A paired group of icon buttons. Keyboard shortcuts: Cmd/Ctrl+Z and
-          Cmd/Ctrl+Shift+Z (or Ctrl+Y). Disabled state prevents interaction
-          and meets WCAG AA contrast via the .iconBtnDisabled modifier. */}
+          Cmd/Ctrl+Shift+Z (or Ctrl+Y). Button's disabled prop handles the
+          non-interactive / faded state; Tooltip carries the label. */}
       <div
         className={styles.undoRedoGroup}
         role="group"
         aria-label="Undo and redo"
       >
-        <button
-          type="button"
-          className={`${styles.iconBtn} ${!canUndo ? styles.iconBtnDisabled : ""}`}
-          onClick={undo}
-          disabled={!canUndo}
-          aria-label="Undo"
-          title={canUndo ? `Undo: ${undoLabel}` : "Nothing to undo"}
+        <Tooltip
+          content={canUndo ? `Undo: ${undoLabel}` : "Nothing to undo"}
+          side="bottom"
         >
-          <UndoIcon />
-        </button>
-        <button
-          type="button"
-          className={`${styles.iconBtn} ${!canRedo ? styles.iconBtnDisabled : ""}`}
-          onClick={redo}
-          disabled={!canRedo}
-          aria-label="Redo"
-          title={canRedo ? `Redo: ${redoLabel}` : "Nothing to redo"}
+          <Button
+            variant="icon"
+            iconAriaLabel="Undo"
+            onClick={undo}
+            disabled={!canUndo}
+          >
+            <UndoIcon />
+          </Button>
+        </Tooltip>
+        <Tooltip
+          content={canRedo ? `Redo: ${redoLabel}` : "Nothing to redo"}
+          side="bottom"
         >
-          <RedoIcon />
-        </button>
+          <Button
+            variant="icon"
+            iconAriaLabel="Redo"
+            onClick={redo}
+            disabled={!canRedo}
+          >
+            <RedoIcon />
+          </Button>
+        </Tooltip>
       </div>
 
       <div className={styles.divider} aria-hidden="true" />
@@ -401,48 +414,48 @@ export function TopBar(): ReactNode {
           />
         </div>
       ) : (
-        <button
-          type="button"
-          className={styles.iconBtn}
-          aria-label="Search lessons"
-          title="Search lessons"
-          data-search-trigger
-          onClick={() => {
-            setSearchOpen(true);
-            // Focus the input on the next frame after it mounts.
-            requestAnimationFrame(() => searchInputRef.current?.focus());
-          }}
-        >
-          <SearchIcon />
-        </button>
+        <Tooltip content="Search lessons" side="bottom">
+          <Button
+            variant="icon"
+            iconAriaLabel="Search lessons"
+            data-search-trigger
+            onClick={() => {
+              setSearchOpen(true);
+              // Focus the input on the next frame after it mounts.
+              requestAnimationFrame(() => searchInputRef.current?.focus());
+            }}
+          >
+            <SearchIcon />
+          </Button>
+        </Tooltip>
       )}
 
       {/* ── To-do panel toggle ────────────────────────────────────── */}
-      <button
-        type="button"
-        className={`${styles.iconBtn} ${todoPanelOpen ? styles.iconBtnActive : ""}`}
+      <Button
+        variant="icon"
+        iconAriaLabel={todoPanelOpen ? "Close to-do panel" : "Open to-do panel"}
         onClick={toggleTodoPanel}
-        aria-label={todoPanelOpen ? "Close to-do panel" : "Open to-do panel"}
         aria-expanded={todoPanelOpen}
+        className={todoPanelOpen ? styles.iconActive : undefined}
       >
         <TodoIcon />
-      </button>
+      </Button>
 
       {/* ── Comments panel toggle with unread badge ───────────────── */}
       <div className={styles.badgeWrap}>
-        <button
-          type="button"
-          className={`${styles.iconBtn} ${commentsPanelOpen ? styles.iconBtnActive : ""}`}
-          onClick={toggleCommentsPanel}
-          aria-label={
+        <Button
+          variant="icon"
+          iconAriaLabel={
             commentsPanelOpen
               ? "Close comments panel"
               : `Open comments panel${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`
           }
+          onClick={toggleCommentsPanel}
           aria-expanded={commentsPanelOpen}
+          className={commentsPanelOpen ? styles.iconActive : undefined}
         >
           <CommentsIcon />
-        </button>
+        </Button>
         {unreadCount > 0 && (
           <span className={styles.badge} aria-hidden="true">
             {unreadCount > 99 ? "99+" : unreadCount}
@@ -461,16 +474,19 @@ export function TopBar(): ReactNode {
       {/* ── Sign out ──────────────────────────────────────────────── */}
       {/* Native form POST to the /auth/signout route handler, which clears
           the Supabase session and redirects to /login. A plain form keeps
-          this working even if the icon button loses its JS handler. */}
+          this working even if the icon button loses its JS handler.
+          NOTE: Button primitive hardcodes type="button" so we keep a bespoke
+          <button type="submit"> here — the submit semantics are load-bearing. */}
       <form action="/auth/signout" method="post" className={styles.signOutForm}>
-        <button
-          type="submit"
-          className={styles.iconBtn}
-          aria-label="Sign out"
-          title="Sign out"
-        >
-          <SignOutIcon />
-        </button>
+        <Tooltip content="Sign out" side="bottom">
+          <button
+            type="submit"
+            className={styles.signOutBtn}
+            aria-label="Sign out"
+          >
+            <SignOutIcon />
+          </button>
+        </Tooltip>
       </form>
     </header>
   );

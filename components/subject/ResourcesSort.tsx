@@ -12,6 +12,7 @@
 import type { ReactNode } from "react";
 import { useState, useMemo } from "react";
 import type { LessonResource } from "@/lib/types";
+import { Chip } from "@/components/ui";
 import styles from "./ResourcesSort.module.css";
 
 // ── Type metadata ─────────────────────────────────────────────────────────
@@ -114,38 +115,32 @@ export function ResourcesSort({
 
   return (
     <section className={styles.section} aria-label={`${subjectName} resources`}>
-      {/* Type-filter chips */}
+      {/* Type-filter chips — Chip variant="filter" toggles aria-pressed and
+           applies the active fill automatically via the primitive's CSS. */}
       <div className={styles.chips} role="toolbar" aria-label="Filter by type">
         {/* All chip */}
-        <button
-          className={[styles.chip, activeType === null ? styles.chipActive : ""]
-            .filter(Boolean)
-            .join(" ")}
+        <Chip
+          variant="filter"
+          active={activeType === null}
           onClick={() => setActiveType(null)}
-          aria-pressed={activeType === null}
         >
           All
-        </button>
+        </Chip>
 
         {presentTypes.map((type) => {
           const meta = TYPE_META[type];
           return (
-            <button
+            <Chip
               key={type}
-              className={[
-                styles.chip,
-                activeType === type ? styles.chipActive : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
+              variant="filter"
+              active={activeType === type}
+              leadingIcon={<span>{meta.glyph}</span>}
               onClick={() =>
                 setActiveType((prev) => (prev === type ? null : type))
               }
-              aria-pressed={activeType === type}
             >
-              <span aria-hidden="true">{meta.glyph}</span>
               {meta.label}
-            </button>
+            </Chip>
           );
         })}
 

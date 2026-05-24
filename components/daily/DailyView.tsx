@@ -135,6 +135,7 @@ import { RightRail } from "./RightRail";
 import { PaneSplitter } from "./PaneSplitter";
 import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
+import { Button } from "@/components/ui";
 import { DailyList } from "@/components/list/DailyList";
 import styles from "./DailyView.module.css";
 
@@ -1493,8 +1494,9 @@ export function DailyView(): ReactNode {
             <span className={styles.lessonsLabel}>Lessons</span>
             <div className={styles.lessonsLabelActions}>
               {/* Collapse all / Expand all — keyboard-accessible button. */}
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 className={styles.collapseAllBtn}
                 onClick={() => setCollapsedAll((c) => !c)}
                 aria-pressed={collapsedAll}
@@ -1503,23 +1505,24 @@ export function DailyView(): ReactNode {
                     ? "Expand all lesson rows"
                     : "Collapse all lesson rows"
                 }
+                leadingIcon={
+                  <span
+                    className={`${styles.collapseAllIcon} ${
+                      collapsedAll ? styles.collapseAllIconCollapsed : ""
+                    }`}
+                    aria-hidden="true"
+                  >
+                    <ChevronDownIcon />
+                  </span>
+                }
               >
-                <span
-                  className={`${styles.collapseAllIcon} ${
-                    collapsedAll ? styles.collapseAllIconCollapsed : ""
-                  }`}
-                  aria-hidden="true"
-                >
-                  <ChevronDownIcon />
-                </span>
                 {collapsedAll ? "Expand all" : "Collapse all"}
-              </button>
+              </Button>
               {/* Filled blue "+" add-lesson button (DAILY-ADD-LESSON-001). */}
-              <button
-                type="button"
+              <Button
+                variant="icon"
+                iconAriaLabel="Add a lesson"
                 className={styles.addLessonBtn}
-                aria-label="Add a lesson"
-                title="Add a lesson"
                 aria-pressed={addLessonOpen}
                 onClick={() => {
                   setAddEventOpen(false);
@@ -1541,7 +1544,7 @@ export function DailyView(): ReactNode {
                     strokeLinecap="round"
                   />
                 </svg>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -1615,8 +1618,9 @@ export function DailyView(): ReactNode {
                 </span>
               </div>
               {/* Add-event button (DAILY-ADD-EVENT-001). */}
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 className={styles.addEventBtn}
                 aria-label="Add an event"
                 aria-pressed={addEventOpen}
@@ -1624,23 +1628,25 @@ export function DailyView(): ReactNode {
                   setAddLessonOpen(false);
                   setAddEventOpen((v) => !v);
                 }}
+                leadingIcon={
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 11 11"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M5.5 1v9M1 5.5h9"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                }
               >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 11 11"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M5.5 1v9M1 5.5h9"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
                 Add an event
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1657,13 +1663,14 @@ export function DailyView(): ReactNode {
         {grip}
         <div className={styles.rightPane}>
           {/* Narrow-mode "← Back to list" affordance. */}
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             className={styles.backToList}
             onClick={() => setNarrowPane("list")}
           >
             <span aria-hidden="true">←</span> Back to list
-          </button>
+          </Button>
 
           {selectedLesson ? (
             <LessonDetail

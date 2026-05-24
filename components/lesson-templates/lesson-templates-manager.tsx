@@ -3,7 +3,7 @@
 // lesson-templates-manager.tsx — Settings → Lesson templates page content.
 //
 // Layout, top to bottom:
-//   • Page heading (PageHeader primitive)
+//   • Breadcrumb + page heading
 //   • Built-in templates  — 15 read-only cards in a grid.
 //   • Your templates      — teacher-created custom templates.
 //   • Editor panel        — appears below the lists when a custom template
@@ -153,7 +153,7 @@ function CustomRow({
           variant="destructive"
           size="sm"
           onClick={onDelete}
-          aria-label={`Delete ${template.name}`}
+          iconAriaLabel={`Delete ${template.name}`}
           leadingIcon={
             <svg
               aria-hidden
@@ -328,7 +328,7 @@ export function LessonTemplatesManager(): ReactNode {
   return (
     <div className={styles.page}>
       <div className={styles.inner}>
-        {/* Page header — breadcrumb eyebrow + page title via PageHeader primitive */}
+        {/* Page header — breadcrumb + title + subtitle via PageHeader primitive */}
         <PageHeader
           eyebrow="Settings"
           title="Lesson templates"

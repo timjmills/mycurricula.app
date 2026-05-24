@@ -260,9 +260,11 @@ export function LessonCard({
             {lesson.moved === "across-weeks" ? "⤴" : "↔"}
           </span>
         )}
+        {/* Modified pill — bespoke: subject-color background (color.deep), no
+            Badge semantic match. The deep tone clears AA vs white text in all
+            palettes; the saturated stripe tone fails AA on warm hues. */}
         {lesson.modified && (
           <span
-            title="Personally modified from the Core Curriculum"
             style={{
               fontSize: 9,
               fontWeight: 600,
@@ -270,9 +272,6 @@ export function LessonCard({
               textTransform: "uppercase",
               padding: "1px 6px",
               borderRadius: 999,
-              // Always the deep (~700–800) tone: white text on it clears
-              // AA in every style/palette. The saturated `stripe` tone
-              // fails AA for warm hues (amber/lemon) in the Normal palette.
               background: color.deep,
               color: "var(--paper)",
             }}
@@ -282,6 +281,8 @@ export function LessonCard({
         )}
         {/* Interactive affordances — each a full 44×44 touch target. */}
         <span className={styles.affordanceRow}>
+          {/* Drag handle — bespoke: dnd-kit spreads dragHandleProps here; cannot
+              be a <Button> as it receives an external ref and event spread. */}
           {dragHandleProps && (
             <span
               {...dragHandleProps}
@@ -297,6 +298,9 @@ export function LessonCard({
               </span>
             </span>
           )}
+          {/* ⋯ menu button — <Button variant="icon"> with <Tooltip>. The
+              styles.affordance className overrides Button's own styles to
+              preserve the hover-reveal behaviour defined in lesson-card.module.css. */}
           <Tooltip content="More actions" side="top">
             <Button
               variant="icon"
@@ -382,6 +386,8 @@ export function LessonCard({
           </h3>
         </div>
 
+        {/* Expand caret — bespoke: structural, has styles.caretOpen rotation
+            animation; keeping as native button per task spec. */}
         <button
           type="button"
           className={styles.caret}
@@ -404,6 +410,9 @@ export function LessonCard({
       <div style={{ padding: `0 ${padX}px 5px ${padX + 3}px` }}>
         {lesson.objective && (
           <div
+            // title= on a non-interactive div: provides a browser tooltip for
+            // sighted pointer users. Not a control, so no Tooltip primitive
+            // is needed; WCAG requires Tooltip only on interactive elements.
             title="Lesson objective (I Can statement)"
             style={{
               display: "flex",
@@ -482,6 +491,9 @@ export function LessonCard({
 
           {lesson.notes && (
             <div>
+              {/* Notes toggle — <Button variant="ghost" size="sm">; the
+                  styles.notesToggle className overrides to match the existing
+                  hover-reveal style defined in lesson-card.module.css. */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -622,9 +634,9 @@ export function LessonCard({
           </span>
         )}
         <div style={{ flex: 1 }} />
-        {lesson.pendingMaster && (
-          <Badge variant="warn">Core ↑</Badge>
-        )}
+        {/* pendingMaster — <Badge variant="warn">: maps to --important token pair. */}
+        {lesson.pendingMaster && <Badge variant="warn">Core ↑</Badge>}
+        {/* carried — <Badge variant="danger">: maps to --catchup token pair. */}
         {lesson.status === "carried" && (
           <Badge variant="danger">carry-over</Badge>
         )}

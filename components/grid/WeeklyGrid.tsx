@@ -55,7 +55,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import {
   DndContext,
   DragOverlay,
@@ -611,16 +611,21 @@ export function WeeklyGrid(): ReactNode {
         </div>
 
         {/* BIG-2: Duplicate this week into the next week. */}
-        <button
-          type="button"
-          className={styles.dupeWeekBtn}
-          onClick={handleDuplicateWeek}
-          title={`Copy all lessons from week ${week} into week ${week + 1}`}
-          aria-label={`Duplicate week ${week} into week ${week + 1}`}
+        <Tooltip
+          content={`Copy all lessons from week ${week} into week ${week + 1}`}
+          side="top"
         >
-          <CopyIcon />
-          Duplicate week
-        </button>
+          <Button
+            variant="secondary"
+            size="sm"
+            leadingIcon={<CopyIcon />}
+            className={styles.dupeWeekBtn}
+            onClick={handleDuplicateWeek}
+            aria-label={`Duplicate week ${week} into week ${week + 1}`}
+          >
+            Duplicate week
+          </Button>
+        </Tooltip>
 
         {/* Inline confirmation toast — shown for 4 s after a duplicate. */}
         {dupeToast && (
@@ -761,27 +766,29 @@ export function WeeklyGrid(): ReactNode {
             aria-label="Move to day"
           >
             {WEEK_DAYS.map((dayName, dayIdx) => (
-              <button
+              <Button
                 key={dayName}
-                type="button"
+                variant="ghost"
+                size="sm"
                 className={styles.bulkDayBtn}
                 onClick={() => handleBulkMove(dayIdx)}
                 aria-label={`Move selected lessons to ${dayName}`}
               >
                 {WEEK_DAYS_SHORT[dayIdx] ?? dayName}
-              </button>
+              </Button>
             ))}
           </div>
 
           {/* Clear selection. */}
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             className={styles.bulkClearBtn}
             onClick={clearBulkSelection}
             aria-label="Clear selection"
           >
             Clear
-          </button>
+          </Button>
         </div>
       )}
     </div>

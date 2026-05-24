@@ -107,11 +107,19 @@ const LEGEND_STATUSES: { status: UnitBarStatus; label: string }[] = [
 export interface RoadmapViewProps {
   /** Called when the topmost intersecting lane changes (chameleon driver). */
   onActiveSubjectChange?: (subjectId: SubjectId) => void;
+  /**
+   * Subjects to show. null = show all. Pass from useCurriculumFilter() in
+   * YearView via the <CurriculumFilter> component.
+   */
+  subjectFilter?: Set<SubjectId> | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
 
-export function RoadmapView({ onActiveSubjectChange }: RoadmapViewProps = {}) {
+export function RoadmapView({
+  onActiveSubjectChange,
+  subjectFilter,
+}: RoadmapViewProps = {}) {
   const { lessons } = usePlanner();
   const schoolWeekLen = DEFAULT_SCHOOL_WEEK.length;
   const { isMinimized, toggle } = useMinimizedSubjects();
@@ -250,11 +258,17 @@ export function RoadmapView({ onActiveSubjectChange }: RoadmapViewProps = {}) {
     return [...expanded, ...minimized];
   }, [laneData, isMinimized]);
 
+  // Apply subject filter: null means show all; otherwise show only matching lanes.
+  const visibleLanes =
+    subjectFilter == null
+      ? orderedLanes
+      : orderedLanes.filter((l) => subjectFilter.has(l.subjectId));
+
   return (
     <div className={styles.root}>
       {/* Lane rows */}
       <div className={styles.lanes}>
-        {orderedLanes.map(
+        {visibleLanes.map(
           ({ subject, subjectId, completePct, units, pacing }, li) => {
             const minimized = isMinimized(subjectId);
             return (

@@ -79,11 +79,14 @@
 .unitGridLine {
   flex: 0 0 auto;
   height: 100%;
-  border-left: 1px solid var(--ink-100);
+  /* Solid paper fill + right hairline — matches RoadmapView bgLine treatment. */
+  background: var(--paper);
+  border-right: 1px solid var(--ink-150);
 }
 
+/* Month boundary — thicker right edge for visual month separation. */
 .unitGridLine.monthBoundary {
-  border-left: 2px solid var(--ink-150);
+  border-right: 1px solid var(--ink-200);
 }
 
 /* Unit marker bar — absolutely positioned over the unit row.

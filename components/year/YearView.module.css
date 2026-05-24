@@ -82,6 +82,11 @@
   display: flex;
   flex: 1;
   min-height: 0;
+  /* Prevent the flex child from overflowing its column-flex parent (.page).
+     Without min-width: 0 the row can't shrink below its intrinsic content
+     width, so .timelineScroll never gets a finite track and the page scrolls
+     horizontally. This is the standard "flex child won't shrink" fix. */
+  min-width: 0;
 }
 
 /* ── Content area (right of sidebar) ────────────────────────────────── */

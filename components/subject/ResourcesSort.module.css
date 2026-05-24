@@ -10,53 +10,14 @@
 }
 
 /* ── Type-filter chips ──────────────────────────────────────────────── */
+/* Chip button styles are provided by components/ui/Chip. Only the
+   layout container and spacer remain here. */
 .chips {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
   margin-bottom: 10px;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-600);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  cursor: pointer;
-  transition:
-    background 0.1s ease,
-    border-color 0.1s ease,
-    color 0.1s ease;
-  min-height: 28px;
-}
-
-.chip:hover {
-  border-color: var(--ink-300);
-  background: var(--ink-50);
-}
-
-.chipActive {
-  background: var(--ink-900);
-  border-color: var(--ink-900);
-  color: var(--paper);
-}
-
-.chipActive:hover {
-  background: var(--ink-900);
-  border-color: var(--ink-900);
-  color: var(--paper);
-}
-
-.chip:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
 }
 
 .chipSpacer {

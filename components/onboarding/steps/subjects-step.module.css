@@ -57,6 +57,7 @@
 }
 
 /* ── Reorder handle / arrows ────────────────────────────────────────────── */
+/* Arrow buttons use Button primitive (icon, sm) — no local styles needed. */
 
 .reorderCol {
   display: flex;
@@ -64,43 +65,6 @@
   gap: 1px;
   flex: 0 0 auto;
   align-self: center;
-}
-
-.arrowBtn {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 22px;
-  border-radius: var(--r-4);
-  color: var(--ink-400);
-  cursor: pointer;
-  transition:
-    color 0.1s,
-    background 0.1s;
-}
-
-/* Expand touch target to ≥44px without changing layout. */
-.arrowBtn::after {
-  content: "";
-  position: absolute;
-  inset: -11px -10px;
-}
-
-.arrowBtn:hover {
-  color: var(--ink-700);
-  background: var(--ink-150);
-}
-
-.arrowBtn:disabled {
-  opacity: 0.25;
-  cursor: default;
-}
-
-.arrowBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 1px;
 }
 
 /* ── Name input ─────────────────────────────────────────────────────────── */
@@ -210,6 +174,7 @@
 }
 
 /* ── Academic / non-academic picker ────────────────────────────────────── */
+/* Uses ToggleGroup primitive — only layout column wrapper needed here. */
 
 .planCol {
   flex: 0 0 auto;
@@ -227,132 +192,18 @@
   margin-bottom: 2px;
 }
 
-.segment {
-  display: flex;
-  gap: 0;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-6);
-  overflow: hidden;
-  background: var(--paper);
-}
-
-.segBtn {
-  flex: 1;
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-500);
-  background: transparent;
-  border: none;
-  padding: 8px 10px;
-  min-height: 44px; /* touch target */
-  cursor: pointer;
-  line-height: 1.3;
-  text-align: center;
-  transition:
-    color 0.12s,
-    background 0.12s;
-  white-space: nowrap;
-}
-
-.segBtn + .segBtn {
-  border-left: 1px solid var(--ink-200);
-}
-
-.segBtn:hover:not(.segBtnActive) {
-  background: var(--ink-50);
-  color: var(--ink-700);
-}
-
-.segBtnActive {
-  background: var(--ink-900);
-  color: var(--paper);
-  font-weight: 600;
-}
-
-/* Non-academic active button uses a softer fill to keep the row muted. */
-.segBtnActiveNonAcademic {
-  background: var(--ink-400);
-  color: var(--paper);
-}
-
-.segBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: -2px;
-}
-
 /* ── Remove button ──────────────────────────────────────────────────────── */
+/* Uses Button primitive (icon, sm) — no local styles needed. */
 
 .removeCol {
   flex: 0 0 auto;
   align-self: center;
 }
 
-.removeBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--r-6);
-  color: var(--ink-400);
-  cursor: pointer;
-  transition:
-    color 0.1s,
-    background 0.1s;
-}
-
-.removeBtn:hover {
-  color: var(--urgent);
-  background: var(--urgent-bg);
-}
-
-.removeBtn:disabled {
-  opacity: 0.2;
-  cursor: default;
-}
-
-.removeBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
 /* ── Add subject button ─────────────────────────────────────────────────── */
+/* Uses Button primitive (secondary, md) — only full-width override. */
 
 .addBtn {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--t-13);
-  font-weight: 500;
-  color: var(--ink-500);
-  padding: 10px 12px;
-  min-height: 44px; /* touch target */
-  border-radius: var(--r-6);
-  border: 1.5px dashed var(--ink-200);
-  background: transparent;
-  cursor: pointer;
   width: 100%;
-  justify-content: center;
-  transition:
-    color 0.12s,
-    border-color 0.12s,
-    background 0.12s;
   margin-top: 4px;
-}
-
-.addBtn:hover {
-  color: var(--ink-900);
-  border-color: var(--ink-400);
-  background: var(--ink-50);
-}
-
-.addBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
-/* Leading "+" glyph inside the add button — slightly larger than the label. */
-.addIcon {
-  font-size: var(--t-16);
-  line-height: 1;
 }

@@ -39,6 +39,7 @@
 // lesson-flow.tsx.
 
 import type { ReactNode } from "react";
+import { Button, Tooltip } from "@/components/ui";
 import styles from "./section-toolbar.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -150,7 +151,9 @@ export function SectionToolbar({
 }
 
 // ── ManageButton ──────────────────────────────────────────────────────────
-// Shared small icon-button + tooltip unit for the management row.
+// Shared small icon-button + Tooltip unit for the management row.
+// Button variant="icon" carries the 44px touch target, focus ring, and
+// hover/disabled states. Tooltip replaces the bespoke inline tooltip span.
 
 interface ManageButtonProps {
   label: string;
@@ -181,22 +184,20 @@ function ManageButton({
     .join(" ");
 
   return (
-    <button
-      type="button"
-      className={className}
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      // aria-pressed only on toggle buttons; always a boolean so screen readers
-      // can announce both the on and off states correctly.
-      aria-pressed={toggle ? active : undefined}
-    >
-      {icon}
-      {/* Tooltip — always rendered; opacity controlled by CSS :hover/:focus-visible */}
-      <span className={styles.tooltip} aria-hidden="true">
-        {label}
-      </span>
-    </button>
+    <Tooltip content={label} side="top">
+      <Button
+        variant="icon"
+        size="sm"
+        iconAriaLabel={label}
+        className={className}
+        onClick={onClick}
+        disabled={disabled}
+        // aria-pressed only on toggle buttons — carried through Button's {...rest}.
+        aria-pressed={toggle ? active : undefined}
+      >
+        {icon}
+      </Button>
+    </Tooltip>
   );
 }
 

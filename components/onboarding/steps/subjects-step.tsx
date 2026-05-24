@@ -17,6 +17,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useOnboarding } from "@/lib/onboarding-state";
 import type { OnboardingSubject } from "@/lib/onboarding-state";
+import { Button, ToggleGroup } from "@/components/ui";
+import type { ToggleOption } from "@/components/ui";
 import styles from "./subjects-step.module.css";
 
 // ── Subject-color token keys (team-wide, locked) ────────────────────────
@@ -111,10 +113,15 @@ interface AcademicPickerProps {
   onChange: (isAcademic: boolean) => void;
 }
 
-// Two-button segmented control: "I plan lessons for this" vs
-// "I don't plan lessons for this". Academic subjects follow the
-// lesson-flow template; non-academic blocks (lunch, recess, assembly)
-// are title + note only.
+// Academic-type options for the ToggleGroup.
+const ACADEMIC_OPTIONS: readonly ToggleOption<"academic" | "non-academic">[] = [
+  { value: "academic", label: "I plan lessons" },
+  { value: "non-academic", label: "No lessons" },
+] as const;
+
+// Two-button segmented control via ToggleGroup: "I plan lessons" vs
+// "No lessons". Academic subjects follow the lesson-flow template;
+// non-academic blocks (lunch, recess, assembly) are title + note only.
 function AcademicPicker({
   isAcademic,
   onChange,
@@ -124,39 +131,14 @@ function AcademicPicker({
       <span className={styles.planLabel} aria-hidden>
         Type
       </span>
-      <div
-        className={styles.segment}
-        role="group"
-        aria-label="Lesson planning type"
-      >
-        <button
-          type="button"
-          className={[styles.segBtn, isAcademic ? styles.segBtnActive : ""]
-            .filter(Boolean)
-            .join(" ")}
-          aria-pressed={isAcademic}
-          onClick={() => onChange(true)}
-        >
-          I plan lessons
-          <br />
-          for this
-        </button>
-        <button
-          type="button"
-          className={[
-            styles.segBtn,
-            !isAcademic ? styles.segBtnActiveNonAcademic : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          aria-pressed={!isAcademic}
-          onClick={() => onChange(false)}
-        >
-          I don&apos;t plan
-          <br />
-          lessons
-        </button>
-      </div>
+      <ToggleGroup
+        options={[...ACADEMIC_OPTIONS]}
+        value={isAcademic ? "academic" : "non-academic"}
+        onChange={(v) => onChange(v === "academic")}
+        ariaLabel="Lesson planning type"
+        variant="subtle"
+        size="sm"
+      />
     </div>
   );
 }
@@ -245,24 +227,24 @@ function SubjectRow({
         className={styles.reorderCol}
         aria-label={`Reorder ${subject.name || "subject"}`}
       >
-        <button
-          type="button"
-          className={styles.arrowBtn}
+        <Button
+          variant="icon"
+          size="sm"
           onClick={() => onMoveUp(index)}
           disabled={index === 0}
-          aria-label={`Move ${subject.name || "subject"} up`}
+          iconAriaLabel={`Move ${subject.name || "subject"} up`}
         >
           <ArrowUpIcon />
-        </button>
-        <button
-          type="button"
-          className={styles.arrowBtn}
+        </Button>
+        <Button
+          variant="icon"
+          size="sm"
           onClick={() => onMoveDown(index)}
           disabled={index === total - 1}
-          aria-label={`Move ${subject.name || "subject"} down`}
+          iconAriaLabel={`Move ${subject.name || "subject"} down`}
         >
           <ArrowDownIcon />
-        </button>
+        </Button>
       </div>
 
       {/* Name input */}
@@ -291,15 +273,15 @@ function SubjectRow({
 
       {/* Remove button */}
       <div className={styles.removeCol}>
-        <button
-          type="button"
-          className={styles.removeBtn}
+        <Button
+          variant="icon"
+          size="sm"
           onClick={() => onRemove(subject.id)}
           disabled={total <= 1}
-          aria-label={`Remove ${subject.name || "subject"}`}
+          iconAriaLabel={`Remove ${subject.name || "subject"}`}
         >
           <RemoveIcon />
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -386,12 +368,15 @@ export function SubjectsStep(): ReactNode {
         ))}
       </ul>
 
-      <button type="button" className={styles.addBtn} onClick={handleAdd}>
-        <span aria-hidden className={styles.addIcon}>
-          +
-        </span>
+      <Button
+        variant="secondary"
+        size="md"
+        onClick={handleAdd}
+        className={styles.addBtn}
+        leadingIcon={<span aria-hidden>+</span>}
+      >
         Add subject
-      </button>
+      </Button>
     </div>
   );
 }

@@ -80,6 +80,7 @@ import { SUBJECT_BY_ID, describeStandard, lessonTime } from "@/lib/mock";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
 import { usePlanner } from "@/lib/planner-store";
+import { Button } from "@/components/ui";
 import detailStyles from "./lesson-detail.module.css";
 
 // ── Completion checkbox (status-aware) ───────────────────────────────────
@@ -404,10 +405,10 @@ export function LessonDetail({
         <div className={detailStyles.bandRight}>
           <p className={detailStyles.bandTime}>{timeLabel}</p>
           <div className={detailStyles.bandIcons}>
-            <button
-              type="button"
+            <Button
+              variant="icon"
+              iconAriaLabel="More options"
               className={detailStyles.bandIconBtn}
-              aria-label="More options"
               aria-haspopup="menu"
             >
               {/* Vertical three-dots — kebab overflow per spec §1.2(C). */}
@@ -422,11 +423,11 @@ export function LessonDetail({
                 <circle cx="8" cy="8" r="1.4" />
                 <circle cx="8" cy="12.8" r="1.4" />
               </svg>
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="icon"
+              iconAriaLabel="Expand to full screen"
               className={detailStyles.bandIconBtn}
-              aria-label="Expand to full screen"
             >
               {/* Expand / full-screen — diagonal arrows pointing outward. */}
               <svg
@@ -444,7 +445,7 @@ export function LessonDetail({
                   strokeLinejoin="round"
                 />
               </svg>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -542,8 +543,9 @@ export function LessonDetail({
               header band's right region per spec §1. */}
           <div className={detailStyles.actionRow}>
             <div className={detailStyles.actionLeft}>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 className={`${detailStyles.markDone} ${
                   lesson.status === "done" ? detailStyles.markDoneDone : ""
                 }`}
@@ -551,35 +553,40 @@ export function LessonDetail({
                 aria-label={
                   lesson.status === "done" ? "Mark as not done" : "Mark as done"
                 }
+                leadingIcon={
+                  <StatusCheckbox status={lesson.status} size={16} />
+                }
               >
-                <StatusCheckbox status={lesson.status} size={16} />
                 {lesson.status === "done" ? "Done" : "Mark done"}
-              </button>
+              </Button>
               {/* Add status — stub for a future status submenu (urgent /
                   important / fyi / catch-up tags). */}
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 className={detailStyles.actionBtn}
                 aria-label="Add status"
                 aria-haspopup="menu"
+                leadingIcon={
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    {/* Bookmark / tag glyph */}
+                    <path
+                      d="M3.5 2h7v10l-3.5-2.2L3.5 12V2z"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                }
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 14 14"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  {/* Bookmark / tag glyph */}
-                  <path
-                    d="M3.5 2h7v10l-3.5-2.2L3.5 12V2z"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinejoin="round"
-                  />
-                </svg>
                 Add status
-              </button>
+              </Button>
             </div>
             <div className={detailStyles.actionRight}>
               {/* Lesson notes — scrolls the My-notes section into view and
@@ -587,35 +594,38 @@ export function LessonDetail({
                   in the document; this is a jump-link, not a popover.
                   Styled as a quieter trailing link (no border) per spec
                   §5's "Lesson notes link on the far right". */}
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 className={detailStyles.notesLink}
                 onClick={scrollToNotes}
                 aria-label="Jump to lesson notes"
+                leadingIcon={
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    {/* Page with arrow — "lesson notes" / "send to notes" */}
+                    <path
+                      d="M2.5 2.5h6L11 5v6.5a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V2.5z"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M8 2.5V5h2.5"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                }
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 14 14"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  {/* Page with arrow — "lesson notes" / "send to notes" */}
-                  <path
-                    d="M2.5 2.5h6L11 5v6.5a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V2.5z"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M8 2.5V5h2.5"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinejoin="round"
-                  />
-                </svg>
                 Lesson notes
-              </button>
+              </Button>
             </div>
           </div>
 

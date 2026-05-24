@@ -5,9 +5,6 @@
 // Displays a grid of selectable grade chips (K–12 plus "Multiple grades").
 // The selected chip is highlighted; clicking a chip writes `grade` via
 // useOnboarding(). The wizard shell owns the navigation footer.
-//
-// Arrow-key navigation is handled by an onKeyDown on the group container
-// so individual Chip elements remain unmodified primitives.
 
 import type { KeyboardEvent, ReactNode } from "react";
 import { useOnboarding } from "@/lib/onboarding-state";
@@ -43,14 +40,10 @@ const GRADE_OPTIONS: readonly GradeOption[] = [
 export function GradeStep(): ReactNode {
   const { data, update } = useOnboarding();
 
-  // Arrow-key navigation on the group container: move focus + selection to
-  // the next/previous chip. Attaching to the container (not individual chips)
-  // keeps each <Chip> an unmodified primitive while preserving full keyboard
-  // reachability via event bubbling.
+  // Arrow-key navigation within the chip group: move focus + selection to the
+  // next/previous chip so the group behaves like a radio group.
   function handleGroupKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
-    const currentIndex = GRADE_OPTIONS.findIndex(
-      (o) => o.value === data.grade,
-    );
+    const currentIndex = GRADE_OPTIONS.findIndex((o) => o.value === data.grade);
     let nextIndex: number | null = null;
     if (e.key === "ArrowRight" || e.key === "ArrowDown") {
       nextIndex = (currentIndex + 1) % GRADE_OPTIONS.length;
@@ -63,10 +56,9 @@ export function GradeStep(): ReactNode {
     const next = GRADE_OPTIONS[nextIndex];
     update({ grade: next.value });
     // Move DOM focus to the newly selected chip button.
-    const buttons =
-      (e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>(
-        "button",
-      );
+    const buttons = (
+      e.currentTarget as HTMLElement
+    ).querySelectorAll<HTMLButtonElement>("button");
     buttons?.[nextIndex]?.focus();
   }
 
@@ -80,9 +72,8 @@ export function GradeStep(): ReactNode {
       </p>
 
       {/* role="group" + onKeyDown on the container provides arrow-key
-          navigation across chips. Each <Chip variant="filter"> renders as a
-          toggle button with aria-pressed, which is the correct ARIA pattern
-          for a group of mutually-exclusive toggle buttons. */}
+          navigation; each Chip (rendered as a toggle button) carries
+          aria-pressed for its selected state. */}
       <div
         className={styles.chipGrid}
         role="group"

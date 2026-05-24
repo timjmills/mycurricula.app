@@ -41,6 +41,7 @@
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
+import { Button, Tooltip } from "@/components/ui";
 import styles from "./IconRail.module.css";
 
 // ── Icon set ─────────────────────────────────────────────────────────────
@@ -195,18 +196,17 @@ export function IconRail(): ReactNode {
       <ul className={styles.list} role="list">
         {/* Today — this IS the daily view; mark active and no-op navigate. */}
         <li className={styles.item}>
-          <button
-            type="button"
-            aria-pressed={true}
-            aria-label="Today (daily view)"
-            title="Today"
-            className={`${styles.button} ${styles.buttonActive}`}
-            onClick={() => router.push("/daily")}
-          >
-            <span className={styles.iconSlot} aria-hidden="true">
+          <Tooltip content="Today" side="right">
+            <Button
+              variant="icon"
+              iconAriaLabel="Today (daily view)"
+              aria-pressed={true}
+              className={`${styles.button} ${styles.buttonActive}`}
+              onClick={() => router.push("/daily")}
+            >
               <TodayIcon />
-            </span>
-          </button>
+            </Button>
+          </Tooltip>
         </li>
 
         {/* Schedule — coming soon; inert affordance.
@@ -229,18 +229,19 @@ export function IconRail(): ReactNode {
 
         {/* To-dos — wired to the right-rail to-do panel toggle. */}
         <li className={styles.item}>
-          <button
-            type="button"
-            aria-pressed={todoPanelOpen}
-            aria-label={todoPanelOpen ? "Close to-do list" : "Open to-do list"}
-            title="To-dos"
-            className={`${styles.button} ${todoPanelOpen ? styles.buttonActive : ""}`}
-            onClick={toggleTodoPanel}
-          >
-            <span className={styles.iconSlot} aria-hidden="true">
+          <Tooltip content="To-dos" side="right">
+            <Button
+              variant="icon"
+              iconAriaLabel={
+                todoPanelOpen ? "Close to-do list" : "Open to-do list"
+              }
+              aria-pressed={todoPanelOpen}
+              className={`${styles.button} ${todoPanelOpen ? styles.buttonActive : ""}`}
+              onClick={toggleTodoPanel}
+            >
               <TodosIcon />
-            </span>
-          </button>
+            </Button>
+          </Tooltip>
         </li>
 
         {/* Year / month overview — coming soon; inert affordance. */}
@@ -279,17 +280,16 @@ export function IconRail(): ReactNode {
             without scrolling, even when the nav is taller than the
             viewport. */}
       <div className={styles.bottom}>
-        <button
-          type="button"
-          aria-label="Settings"
-          title="Settings"
-          className={styles.button}
-          onClick={() => router.push("/settings/appearance")}
-        >
-          <span className={styles.iconSlot} aria-hidden="true">
+        <Tooltip content="Settings" side="right">
+          <Button
+            variant="icon"
+            iconAriaLabel="Settings"
+            className={styles.button}
+            onClick={() => router.push("/settings/appearance")}
+          >
             <SettingsIcon />
-          </span>
-        </button>
+          </Button>
+        </Tooltip>
       </div>
     </nav>
   );

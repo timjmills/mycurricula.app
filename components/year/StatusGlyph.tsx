@@ -6,7 +6,7 @@
 // Four states, distinguishable by both color AND shape (not color alone):
 //   done     → filled circle in --done green with a white check mark
 //   current  → soft-fill circle (--cl tint) with a --c ring (in progress)
-//   skipped  → hollow ring (white fill, ink-300 border)
+//   skipped  → hollow ring (white fill, --catchup red border)
 //   upcoming → small ink-100 dot with ink-200 border
 //
 // The cp-subj cascade (lib/palette.tsx) must be active on an ancestor element
@@ -83,7 +83,7 @@ export function StatusGlyph({
   }
 
   if (state === "skipped") {
-    // Hollow ring — white fill, ink-300 border.
+    // Hollow ring — white fill, --catchup red border.
     // Shape: circle outline (no fill), distinct from "upcoming" gray dot.
     return (
       <span
@@ -92,8 +92,8 @@ export function StatusGlyph({
           width: size,
           height: size,
           borderRadius: "50%",
-          background: "#fff",
-          border: "1.8px solid var(--ink-300)",
+          background: "var(--paper)",
+          border: "1.8px solid var(--catchup)",
           display: "inline-flex",
           flexShrink: 0,
         }}

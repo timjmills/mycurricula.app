@@ -16,6 +16,7 @@
 // toast simply fades in/out instead (spec §2.4).
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui";
 
 // ── Constants ─────────────────────────────────────────────────────────────
 const DISMISS_MS = 5000;
@@ -149,49 +150,33 @@ export function ArchiveToast({
       </span>
 
       {/* Undo button — distinct from the dismiss × so the teacher can scan
-          quickly and find "Undo" in the expected position. */}
-      <button
-        type="button"
+          quickly and find "Undo" in the expected position.
+          The dark toast background (ink-900) requires an inverted color
+          treatment; className carries the overrides on top of Button's tokens. */}
+      <Button
+        variant="ghost"
+        size="md"
         onClick={handleUndo}
         style={{
-          minHeight: 44,
-          padding: "0 12px",
-          borderRadius: 6,
           border: "1px solid rgba(255,255,255,0.22)",
-          background: "transparent",
           color: "var(--paper)",
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: "pointer",
           letterSpacing: 0.2,
           flexShrink: 0,
         }}
       >
         Undo
-      </button>
+      </Button>
 
-      {/* Dismiss × */}
-      <button
-        type="button"
+      {/* Dismiss × — icon-only, dark-context override via style. */}
+      <Button
+        variant="icon"
+        size="md"
+        iconAriaLabel="Dismiss notification"
         onClick={handleDismiss}
-        aria-label="Dismiss notification"
-        style={{
-          minHeight: 44,
-          width: 44,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: 6,
-          border: "none",
-          background: "transparent",
-          color: "var(--ink-400)",
-          fontSize: 16,
-          cursor: "pointer",
-          flexShrink: 0,
-        }}
+        style={{ color: "var(--ink-400)", flexShrink: 0 }}
       >
         ×
-      </button>
+      </Button>
     </div>
   );
 }

@@ -35,6 +35,7 @@
 
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import React, { useCallback } from "react";
+import { Button, Tooltip } from "@/components/ui";
 import { useDroppable } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -418,29 +419,40 @@ export function GridCell({
         {isEmpty ? (
           <div className={styles.emptyCell}>
             <p className={styles.emptyHint}>Drag a lesson here or click +</p>
-            <button
-              type="button"
-              className={styles.cellAdd}
-              onClick={() => onAdd(subjectId, day)}
-              aria-label="Add a lesson to this day"
-            >
-              <PlusIcon />
-            </button>
+            <Tooltip content="Add a lesson" side="top">
+              <Button
+                variant="icon"
+                size="sm"
+                iconAriaLabel="Add a lesson to this day"
+                className={styles.cellAdd}
+                onClick={() => onAdd(subjectId, day)}
+              >
+                <PlusIcon />
+              </Button>
+            </Tooltip>
           </div>
         ) : (
           <>
             {hasMultiple && (
-              <button
-                type="button"
-                className={styles.collapseBtn}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleMaximize(subjectId, day);
-                }}
-                aria-label={maximized ? "Collapse cards" : "Expand all cards"}
+              <Tooltip
+                content={maximized ? "Collapse cards" : "Expand all cards"}
+                side="top"
               >
-                {maximized ? <CollapseIcon /> : <ExpandIcon />}
-              </button>
+                <Button
+                  variant="icon"
+                  size="sm"
+                  iconAriaLabel={
+                    maximized ? "Collapse cards" : "Expand all cards"
+                  }
+                  className={styles.collapseBtn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleMaximize(subjectId, day);
+                  }}
+                >
+                  {maximized ? <CollapseIcon /> : <ExpandIcon />}
+                </Button>
+              </Tooltip>
             )}
 
             {cellLayout !== null ? (
@@ -456,17 +468,20 @@ export function GridCell({
             {/* Compact "+" affordance — absolutely positioned bottom-right,
                 revealed on cell hover/focus. Takes ZERO flow space so the
                 lesson card fills 100% of the cell. */}
-            <button
-              type="button"
-              className={styles.cellAddInline}
-              onClick={(e) => {
-                e.stopPropagation();
-                onAdd(subjectId, day);
-              }}
-              aria-label="Add another lesson to this day"
-            >
-              <PlusIcon small />
-            </button>
+            <Tooltip content="Add another lesson" side="top">
+              <Button
+                variant="icon"
+                size="sm"
+                iconAriaLabel="Add another lesson to this day"
+                className={styles.cellAddInline}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAdd(subjectId, day);
+                }}
+              >
+                <PlusIcon small />
+              </Button>
+            </Tooltip>
           </>
         )}
       </SortableContext>

@@ -27,6 +27,7 @@
 // Never hard-code hex or px values.
 
 import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
+import { Button } from "@/components/ui";
 import styles from "./save-target-dialog.module.css";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -237,14 +238,15 @@ export function SaveTargetDialog({
         {/* Keyboard users can reach Cancel via Tab; it is the last focusable
             element so the trap boundary is clearly defined. */}
         <div className={styles.footer}>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             className={styles.cancelBtn}
             onClick={onClose}
             aria-label="Cancel — dismiss without saving"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     </div>

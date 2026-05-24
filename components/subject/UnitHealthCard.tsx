@@ -20,6 +20,7 @@
 import type { ReactNode } from "react";
 import { useState, useRef, useEffect } from "react";
 import { useSetUnitNote } from "@/lib/unit-notes";
+import { Button, Tooltip } from "@/components/ui";
 import styles from "./UnitHealthCard.module.css";
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -198,16 +199,20 @@ export function UnitHealthCard({ unit }: { unit: UnitHealthData }): ReactNode {
           <span className={styles.calloutLabel}>DON&apos;T MISS</span>
           <span className={styles.calloutEditor}>{unit.editorName}</span>
           {unit.canEdit && !editing && (
-            <button
-              className={styles.editBtn}
-              onClick={() => {
-                setDraft(displayNote);
-                setEditing(true);
-              }}
-              aria-label="Edit don't-miss callout"
-            >
-              <PencilIcon />
-            </button>
+            <Tooltip content="Edit don't-miss callout" side="top">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={styles.editBtn}
+                onClick={() => {
+                  setDraft(displayNote);
+                  setEditing(true);
+                }}
+                aria-label="Edit don't-miss callout"
+              >
+                <PencilIcon />
+              </Button>
+            </Tooltip>
           )}
         </div>
 
@@ -224,20 +229,24 @@ export function UnitHealthCard({ unit }: { unit: UnitHealthData }): ReactNode {
               placeholder="What's the one move not to miss in this unit?"
             />
             <div className={styles.editActions}>
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 className={styles.saveBtn}
                 onClick={handleSave}
                 aria-label="Save callout"
               >
                 Save
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 className={styles.cancelBtn}
                 onClick={handleCancel}
                 aria-label="Cancel edit"
               >
                 Cancel
-              </button>
+              </Button>
               <span className={styles.editHint}>
                 ⌘↵ to save · Esc to cancel
               </span>

@@ -15,6 +15,7 @@
 import type { ReactNode } from "react";
 import type { LessonTemplateSection } from "@/lib/lesson-templates";
 import { newTemplateSection } from "@/lib/custom-templates";
+import { Button, Tooltip } from "@/components/ui";
 import styles from "./template-section-editor.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -134,46 +135,57 @@ export function TemplateSectionEditor({
               role="group"
               aria-label={`Controls for section ${index + 1}`}
             >
-              <button
-                type="button"
-                className={styles.iconBtn}
-                onClick={() => moveUp(index)}
-                disabled={index === 0}
-                aria-label={`Move section ${index + 1} up`}
-                title="Move up"
-              >
-                <ArrowUpIcon />
-              </button>
-              <button
-                type="button"
-                className={styles.iconBtn}
-                onClick={() => moveDown(index)}
-                disabled={index === sections.length - 1}
-                aria-label={`Move section ${index + 1} down`}
-                title="Move down"
-              >
-                <ArrowDownIcon />
-              </button>
-              <button
-                type="button"
-                className={`${styles.iconBtn} ${styles.removeBtn}`}
-                onClick={() => removeSection(index)}
-                disabled={sections.length <= 1}
-                aria-label={`Remove section ${index + 1}`}
-                title="Remove section"
-              >
-                <RemoveIcon />
-              </button>
+              <Tooltip content="Move up" side="top">
+                <Button
+                  variant="icon"
+                  size="sm"
+                  className={styles.iconBtn}
+                  onClick={() => moveUp(index)}
+                  disabled={index === 0}
+                  iconAriaLabel={`Move section ${index + 1} up`}
+                >
+                  <ArrowUpIcon />
+                </Button>
+              </Tooltip>
+              <Tooltip content="Move down" side="top">
+                <Button
+                  variant="icon"
+                  size="sm"
+                  className={styles.iconBtn}
+                  onClick={() => moveDown(index)}
+                  disabled={index === sections.length - 1}
+                  iconAriaLabel={`Move section ${index + 1} down`}
+                >
+                  <ArrowDownIcon />
+                </Button>
+              </Tooltip>
+              <Tooltip content="Remove section" side="top">
+                <Button
+                  variant="icon"
+                  size="sm"
+                  className={`${styles.iconBtn} ${styles.removeBtn}`}
+                  onClick={() => removeSection(index)}
+                  disabled={sections.length <= 1}
+                  iconAriaLabel={`Remove section ${index + 1}`}
+                >
+                  <RemoveIcon />
+                </Button>
+              </Tooltip>
             </div>
           </li>
         ))}
       </ol>
 
       {/* ── Add section ─────────────────────────────────────────────── */}
-      <button type="button" className={styles.addBtn} onClick={addSection}>
-        <AddIcon />
+      <Button
+        variant="ghost"
+        size="sm"
+        className={styles.addBtn}
+        onClick={addSection}
+        leadingIcon={<AddIcon />}
+      >
         Add section
-      </button>
+      </Button>
     </div>
   );
 }

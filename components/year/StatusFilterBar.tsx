@@ -76,9 +76,9 @@ const FILTERS: FilterDef[] = [
   {
     id: "skipped",
     label: "Skipped",
-    dotVar: "var(--writing)",
-    activeVar: "color-mix(in srgb, var(--writing) 12%, white)",
-    activeTextVar: "var(--writing-deep)",
+    dotVar: "var(--catchup)",
+    activeVar: "color-mix(in srgb, var(--catchup) 12%, white)",
+    activeTextVar: "var(--catchup)",
   },
   {
     id: "not_started",

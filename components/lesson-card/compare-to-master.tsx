@@ -28,6 +28,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Lesson } from "@/lib/types";
+import { Button } from "@/components/ui";
 import { STATUS_LABEL } from "./status";
 import { WEEK_DAYS } from "@/lib/mock";
 
@@ -242,28 +243,15 @@ export function CompareToMaster({
               {stripHtml(lesson.title)}
             </div>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="icon"
+            size="sm"
+            iconAriaLabel="Close comparison"
             onClick={close}
-            aria-label="Close comparison"
-            style={{
-              width: 28,
-              height: 28,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 6,
-              border: "1px solid var(--ink-150)",
-              background: "var(--paper)",
-              color: "var(--ink-500)",
-              cursor: "pointer",
-              fontSize: 16,
-              lineHeight: 1,
-              flexShrink: 0,
-            }}
+            style={{ flexShrink: 0 }}
           >
             ×
-          </button>
+          </Button>
         </div>
 
         {/* ── Stub notice ──────────────────────────────────────────────────── */}
@@ -417,80 +405,36 @@ export function CompareToMaster({
                 This will replace your personal version with the Master. Are you
                 sure?
               </span>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="md"
                 onClick={() => setConfirmRestore(false)}
-                style={{
-                  minHeight: 40,
-                  padding: "0 14px",
-                  borderRadius: 6,
-                  border: "1px solid var(--ink-200)",
-                  background: "var(--paper)",
-                  color: "var(--ink-700)",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                }}
               >
                 Cancel
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="destructive"
+                size="md"
                 onClick={() => {
                   onRestore();
                   close();
                 }}
-                style={{
-                  minHeight: 40,
-                  padding: "0 16px",
-                  borderRadius: 6,
-                  border: "none",
-                  background: "var(--urgent)",
-                  color: "var(--paper)",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
               >
                 Restore from Master
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="md"
                 onClick={() => setConfirmRestore(true)}
-                style={{
-                  minHeight: 40,
-                  padding: "0 16px",
-                  borderRadius: 6,
-                  border: "1px solid var(--ink-200)",
-                  background: "var(--paper)",
-                  color: "var(--ink-700)",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                }}
               >
                 Restore from Master
-              </button>
-              <button
-                type="button"
-                onClick={close}
-                style={{
-                  minHeight: 40,
-                  padding: "0 18px",
-                  borderRadius: 6,
-                  border: "none",
-                  background: "var(--ink-900)",
-                  color: "var(--paper)",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
+              </Button>
+              <Button variant="primary" size="md" onClick={close}>
                 Close
-              </button>
+              </Button>
             </>
           )}
         </div>

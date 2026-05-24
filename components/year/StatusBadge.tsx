@@ -37,9 +37,9 @@ const STATUS_STYLES: Record<
     label: "Modified",
   },
   skipped: {
-    // --writing (#6b46c1) — purple at 14% tint; contrast ~5.1:1 (AA).
-    bg: "color-mix(in srgb, var(--writing) 14%, white)",
-    color: "var(--writing)",
+    // --catchup (#e0431a) — flame red at 14% tint → ~#fae8e4; contrast ~4.7:1 (AA).
+    bg: "color-mix(in srgb, var(--catchup) 14%, white)",
+    color: "var(--catchup)",
     label: "Skipped",
   },
   not_started: {

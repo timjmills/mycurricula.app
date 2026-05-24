@@ -217,34 +217,24 @@
   text-overflow: ellipsis;
 }
 
-/* Pencil edit button — ≥44px implied by the parent card height;
-   the button is a secondary control (not the primary call-to-action),
-   32px fits without breaking the dense layout. */
+/* Pencil edit button — overrides the Button ghost variant's ink-700
+   default color with the subject's deep color (--cd) so it reads
+   within the subject-tinted callout box. Size + border handled by Button. */
 .editBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  color: var(--cd);
   width: 24px;
   height: 24px;
-  border-radius: var(--r-4);
-  color: var(--cd);
-  background: transparent;
-  border: 1px solid transparent;
-  cursor: pointer;
   flex: 0 0 auto;
-  transition:
-    background 0.1s ease,
-    border-color 0.1s ease;
 }
 
 .editBtn:hover {
   background: var(--paper);
   border-color: var(--c);
+  color: var(--cd);
 }
 
 .editBtn:focus-visible {
-  outline: 2px solid var(--cd);
-  outline-offset: 2px;
+  outline-color: var(--cd);
 }
 
 .calloutText {
@@ -291,49 +281,26 @@
   gap: 6px;
 }
 
-.saveBtn,
-.cancelBtn {
-  padding: 3px 10px;
-  border-radius: var(--r-4);
-  font-size: var(--t-12);
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid transparent;
-  min-height: 28px;
-  transition:
-    background 0.1s ease,
-    border-color 0.1s ease;
-}
-
+/* Save button — overrides Button primary's ink-900 with the subject's
+   deep color (--cd) for callout-box context. */
 .saveBtn {
   background: var(--cd);
-  color: var(--paper);
   border-color: var(--cd);
+  color: var(--paper);
 }
 
-.saveBtn:hover {
+.saveBtn:hover:not(:disabled) {
+  background: var(--cd);
   opacity: 0.88;
 }
 
 .saveBtn:focus-visible {
-  outline: 2px solid var(--cd);
-  outline-offset: 2px;
+  outline-color: var(--cd);
 }
 
+/* Cancel button — no overrides needed; Button ghost handles it. */
 .cancelBtn {
-  background: transparent;
   color: var(--ink-600);
-  border-color: var(--ink-200);
-}
-
-.cancelBtn:hover {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
-}
-
-.cancelBtn:focus-visible {
-  outline: 2px solid var(--ink-400);
-  outline-offset: 2px;
 }
 
 .editHint {

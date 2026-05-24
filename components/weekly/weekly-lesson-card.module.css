@@ -287,18 +287,6 @@
   flex: 0 0 auto;
 }
 
-/* "Modified" pill. */
-.modifiedPill {
-  font-size: var(--t-10);
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  padding: 1px 6px;
-  border-radius: 999px;
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
 /* ── Affordance cluster — drag handle + ⋯ ──────────────────────────────────── */
 /* Each affordance is a full 44×44 touch target (WCAG 2.5.5 / iPad minimum).
    POLISH-013/A11Y-003: negative margin collapses the row's layout footprint so

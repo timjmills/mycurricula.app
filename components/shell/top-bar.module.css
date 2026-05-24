@@ -68,12 +68,26 @@
   margin: 0 2px;
 }
 
-/* ── Icon button — shared base for collapse toggle, to-do, comments ── */
-.iconBtn {
+/* ── Icon button modifiers — applied via className on the Button primitive ── */
+
+/* Active state: panel is open. Layered on top of Button's icon variant to
+   signal the "pressed/open" state without touching the primitive stylesheet. */
+.iconActive {
+  background: var(--ink-100) !important;
+  border-color: var(--ink-200) !important;
+  color: var(--ink-900) !important;
+}
+
+/* ── Sign-out submit button ───────────────────────────────────────────────── */
+/* Bespoke <button type="submit"> inside the form POST wrapper. Cannot use the
+ * Button primitive because it hardcodes type="button"; the submit semantics are
+ * load-bearing for the Supabase session clear. Visual treatment matches the
+ * Button icon variant exactly so the bar reads uniformly. */
+.signOutBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* RES-MED-003: grew from 36×36 to 44×44 — meets WCAG 2.5.5 minimum. */
+  /* RES-MED-003: 44×44 meets WCAG 2.5.5 minimum touch target. */
   width: 44px;
   height: 44px;
   border-radius: var(--r-8);
@@ -83,39 +97,23 @@
   cursor: pointer;
   flex: 0 0 auto;
   transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
-.iconBtn:hover {
-  background: var(--ink-50);
-  border-color: var(--ink-150);
+.signOutBtn:hover {
+  background: var(--ink-100);
   color: var(--ink-900);
 }
 
-.iconBtn:focus-visible {
+.signOutBtn:focus-visible {
   outline: 2px solid var(--ink-900);
   outline-offset: 2px;
 }
 
-.iconBtn:active {
-  background: var(--ink-100);
-}
-
-/* Active state: panel open */
-.iconBtnActive {
-  background: var(--ink-100);
-  border-color: var(--ink-200);
-  color: var(--ink-900);
-}
-
-/* Disabled state — WCAG AA contrast via reduced opacity on the neutral token.
- * Applied alongside .iconBtn (not a replacement), so transitions still work. */
-.iconBtnDisabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  pointer-events: none;
+.signOutBtn:active {
+  background: var(--ink-150);
 }
 
 /* ── View switcher ──────────────────────────────────────────────────── */

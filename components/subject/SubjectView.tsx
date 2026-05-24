@@ -38,7 +38,7 @@ import { dateForWeekDay } from "@/lib/mock/calendar";
 import { useRouter } from "next/navigation";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { useUnitNote } from "@/lib/unit-notes";
-import { ToggleGroup } from "@/components/ui";
+import { ToggleGroup, Tooltip } from "@/components/ui";
 import { ListRow } from "@/components/list";
 import { StatStrip } from "./StatStrip";
 import { UnitHealthCard } from "./UnitHealthCard";
@@ -249,18 +249,20 @@ function LessonRowItem({
         </span>
 
         {lesson.isPersonal && (
-          <span className={styles.personalPill} title="Personalized lesson">
-            Personal
-          </span>
+          <Tooltip content="Personalized lesson" side="top">
+            <span className={styles.personalPill}>Personal</span>
+          </Tooltip>
         )}
 
         {lesson.taskCount > 0 && (
-          <span
-            className={styles.subEventsBadge}
-            title={`${lesson.taskCount} task${lesson.taskCount === 1 ? "" : "s"}`}
+          <Tooltip
+            content={`${lesson.taskCount} task${lesson.taskCount === 1 ? "" : "s"}`}
+            side="top"
           >
-            <span className={styles.subEventsBadgeDot} />+{lesson.taskCount}
-          </span>
+            <span className={styles.subEventsBadge}>
+              <span className={styles.subEventsBadgeDot} />+{lesson.taskCount}
+            </span>
+          </Tooltip>
         )}
 
         {lesson.standards.slice(0, 2).map((s, idx) => (
