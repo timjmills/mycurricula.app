@@ -142,6 +142,20 @@ The visual system has two independent axes, both set as `<html>` data attributes
   targets on primary actions.
 - Motion is allowed where it clarifies (card expand ~200ms, slide-outs ~250ms,
   drag ghosting). No bounce, parallax, or confetti.
+- **Responsive is a hard requirement, not a polish pass.** Every page, view, and
+  feature must lay out and remain usable at **three viewport tiers**:
+  - **Phone** — 360–480px
+  - **Tablet** — 600–900px
+  - **Desktop** — 1024–1920px
+
+  No page-level horizontal scroll at any tier; every primary control reachable
+  without a horizontal scroll or off-screen overflow; touch targets ≥44px on
+  phone and tablet; sticky chrome must not eat more than ~30% of the viewport
+  height on phone. Internal element scroll (e.g. a wide grid inside a
+  scrollable container) is acceptable; the document itself must not scroll
+  sideways. Work is only "done" once it has been verified at all three tiers
+  (DevTools device emulation is fine; document in the PR/commit message which
+  widths were checked).
 
 ---
 
@@ -164,6 +178,11 @@ planning_document.md` has a screen-by-screen section (§5) and the data model (�
 - **Build the data shapes for infrastructure (audit log, coverage snapshots, roles)
   when the backend lands**, even if there is no UI for them yet.
 - **Run `npm run lint` and `npm run format:check`** before considering work done.
+- **Verify the responsive contract.** Before declaring a screen done, eyeball it at
+  ~400px, ~768px, and ~1280px in DevTools device emulation. Confirm: no
+  document-level horizontal scroll, all primary controls reachable, touch
+  targets ≥44px on phone/tablet, chrome doesn't crowd the content on phone.
+  See §4 for the full responsive rule.
 - **Track multi-step work with the task tools** and, for parallelizable work, split it
   across agents with clear, non-overlapping file ownership.
 
