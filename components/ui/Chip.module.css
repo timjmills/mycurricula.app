@@ -1,0 +1,135 @@
+/* Chip — inline pill for tags, filters, and removable items.
+   Three variants share this module. Variant states are applied via
+   inline style variables or aria attributes where possible.
+   Tokens only — zero hex, zero raw rgb/hsl. */
+
+/* ── Shared base ─────────────────────────────────────────────────────────── */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  font-size: var(--t-12);
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  line-height: 1;
+}
+
+/* ── default variant ─────────────────────────────────────────────────────── */
+/* Static inline pill — no hover, no interaction. */
+
+.default {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+/* ── filter variant ──────────────────────────────────────────────────────── */
+/* Clickable toggle pill — aria-pressed conveyed visually. */
+
+.filter {
+  background: var(--paper);
+  color: var(--ink-700);
+  border-color: var(--ink-200);
+  cursor: pointer;
+  /* ≥44px touch target on phone/tablet via transparent padding inflation */
+  min-height: 36px;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.filter:hover {
+  background: var(--ink-50);
+}
+
+/* Active state (aria-pressed="true") */
+.filter[aria-pressed="true"] {
+  background: var(--ink-900);
+  color: var(--paper);
+  border-color: transparent;
+}
+
+/* Active hover — subtle — keep dark bg, just signal interactivity */
+.filter[aria-pressed="true"]:hover {
+  background: var(--ink-700);
+}
+
+.filter:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* On phone/tablet inflate touch target */
+@media (max-width: 900px) {
+  .filter {
+    min-height: 44px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+/* ── removable variant ───────────────────────────────────────────────────── */
+
+.removable {
+  background: var(--ink-100);
+  color: var(--ink-700);
+  /* Extra right padding to give room for the × button */
+  padding-right: 4px;
+}
+
+/* The × remove button inside a removable chip */
+.removeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Visually small, but touch-inflated via padding */
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: var(--ink-500);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.removeBtn:hover {
+  background: var(--ink-200);
+  color: var(--ink-900);
+}
+
+.removeBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Inflate touch target on phone/tablet */
+@media (max-width: 900px) {
+  .removeBtn {
+    /* Use padding to reach 44px without changing visual size */
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* ── Leading icon slot ───────────────────────────────────────────────────── */
+
+.leadingIcon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .filter,
+  .removeBtn {
+    transition: none;
+  }
+}

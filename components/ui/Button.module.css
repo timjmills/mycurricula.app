@@ -1,0 +1,257 @@
+/* Button.module.css — canonical button primitive.
+   All color / type / spacing from var(--…) only. Zero hex.
+   Tailwind supplies no styling here — this file owns the visual.
+
+   ── Hit-area inflation trick (§8 BUILD_STANDARD) ───────────────────────
+   On phone/tablet (≤900px) sm and md buttons are visually smaller than
+   44px, so we inflate the hit area with a ::before pseudo-element that
+   expands the clickable surface without altering the visual layout.
+   lg is already ≥44px visually, no inflation needed.
+*/
+
+/* ── Base ────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+  /* Prevent text selection on rapid clicks */
+  user-select: none;
+}
+
+/* Focus ring — keyboard users see a clear ink-900 outline.
+   Kept off mouse/touch clicks via :focus-visible. */
+.btn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Disabled state — faded, non-interactive */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Sizes ───────────────────────────────────────────────────────────── */
+
+/* sm: 32px visual, 8px h-padding, t-12 */
+.sm {
+  height: 32px;
+  padding: 0 8px;
+  font-size: var(--t-12);
+  font-weight: 500;
+  border-radius: var(--r-8);
+}
+
+/* md: 40px visual, 12–14px h-padding, t-13. Default. */
+.md {
+  height: 40px;
+  padding: 0 14px;
+  font-size: var(--t-13);
+  font-weight: 500;
+  border-radius: var(--r-8);
+}
+
+/* lg: 48px visual, 16–20px h-padding, t-14. Primary CTAs. */
+.lg {
+  height: 48px;
+  padding: 0 20px;
+  font-size: var(--t-14);
+  font-weight: 600;
+  border-radius: var(--r-8);
+}
+
+/* icon overrides: square proportions regardless of size */
+.icon.sm {
+  width: 32px;
+  padding: 0;
+}
+.icon.md {
+  width: 40px;
+  padding: 0;
+}
+.icon.lg {
+  width: 48px;
+  padding: 0;
+}
+
+/* ── Hit-area inflation — phone / tablet (≤900px) ────────────────────── */
+/* sm and md inflate to ≥44px via a transparent ::before overlay so the
+   visual stays compact while the touch target meets WCAG 2.5.5. */
+
+@media (max-width: 900px) {
+  .sm::before,
+  .md::before {
+    content: "";
+    position: absolute;
+    /* Center the inflated area on the button.
+       For sm (32px) we need +12px each side to reach 44px; use 6px overlap.
+       For md (40px) we need +4px each side; use 2px overlap. */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 44px;
+    min-height: 44px;
+    /* Full-coverage of the button geometry */
+    width: 100%;
+    height: 100%;
+  }
+}
+
+/* ── Variants ────────────────────────────────────────────────────────── */
+
+/* primary — filled ink-900, paper text. Dominant action. */
+.primary {
+  background: var(--ink-900);
+  color: var(--paper);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-card);
+}
+
+.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink-900) 88%, white);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--shadow-card);
+}
+
+/* secondary — white body, ink-200 border, ink-900 text. Default. */
+.secondary {
+  background: var(--paper);
+  color: var(--ink-900);
+  border: 1px solid var(--ink-200);
+  box-shadow: var(--shadow-card);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.secondary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--shadow-card);
+}
+
+/* ghost — transparent body, ink-700 text. Hover fills ink-100. */
+.ghost {
+  background: transparent;
+  color: var(--ink-700);
+  border: 1px solid transparent;
+}
+
+.ghost:hover:not(:disabled) {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.ghost:active:not(:disabled) {
+  background: var(--ink-150);
+}
+
+/* icon — square ghost-style for icon-only triggers */
+.icon {
+  background: transparent;
+  color: var(--ink-500);
+  border: 1px solid transparent;
+}
+
+.icon:hover:not(:disabled) {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.icon:active:not(:disabled) {
+  background: var(--ink-150);
+}
+
+/* destructive — catchup-tinted fill, paper text. Archive/Delete. */
+.destructive {
+  background: color-mix(in srgb, var(--catchup) 85%, white);
+  color: var(--paper);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-card);
+}
+
+.destructive:hover:not(:disabled) {
+  background: var(--catchup);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.destructive:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Icon slots ──────────────────────────────────────────────────────── */
+
+.leadingIcon,
+.trailingIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  /* Slot inherits current color from the button variant */
+  color: inherit;
+}
+
+/* ── Spinner ──────────────────────────────────────────────────────────── */
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  animation: btn-spin 0.7s linear infinite;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Loading state ───────────────────────────────────────────────────── */
+
+/* When loading, reduce label opacity slightly so the spinner reads as
+   the primary visual signal, not the text. The button stays visually
+   enabled (not faded) since it is actively doing work. */
+.loading .label {
+  opacity: 0.6;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+  .btn:hover:not(:disabled) {
+    transform: none;
+  }
+  .spinner {
+    animation: none;
+    opacity: 0.5;
+  }
+}

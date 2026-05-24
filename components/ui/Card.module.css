@@ -1,0 +1,161 @@
+/* Card — generalized Weekly-card recipe.
+   Two variants share the same layout/shadow/shape rules; borders and header
+   tint differ. Both are driven by CSS custom properties so they pick up the
+   cp-subj cascade automatically (subject variant) or fall through to the
+   ink-ramp neutrals (neutral variant).
+
+   Subject variant (root carries .cp-subj.<id>):
+     • 4px var(--c-deep) left border
+     • 1px var(--c-border) on the remaining three sides
+     • Header: linear-gradient(180deg, --c-surface-strong, --c-surface)
+     • Focus ring: color-mix(in srgb, var(--c) 45%, transparent)
+
+   Neutral variant (.neutral class, no subject cascade):
+     • 4px var(--ink-200) left border
+     • 1px var(--ink-150) on the remaining three sides
+     • Header: var(--ink-50) flat + var(--ink-150) hairline bottom
+     • Focus ring: var(--ink-900)
+*/
+
+/* ── Base card shape (shared by both variants) ──────────────────────────── */
+
+.card {
+  position: relative;
+  background: var(--paper);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Smooth hover lift; reduced-motion guard below collapses to near-zero */
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+  /* Reset button defaults when the root is a <button> */
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+/* Interactive mode — the whole card is the hit target */
+button.card {
+  cursor: pointer;
+  /* Guarantee at least 44px tall on touch devices so the target meets
+     the ≥44×44 touch-target requirement at every density. */
+  min-height: 44px;
+}
+
+/* Hover lift — only applies when the root is an interactive button */
+button.card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  button.card:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ── Subject variant ─────────────────────────────────────────────────────── */
+
+.subject {
+  border-left: 4px solid var(--c-deep);
+  border-top: 1px solid var(--c-border);
+  border-right: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--c-border);
+}
+
+button.subject:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--c) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.subject .header {
+  background: linear-gradient(
+    180deg,
+    var(--c-surface-strong) 0%,
+    var(--c-surface) 100%
+  );
+}
+
+/* ── Neutral variant ─────────────────────────────────────────────────────── */
+
+.neutral {
+  border-left: 4px solid var(--ink-200);
+  border-top: 1px solid var(--ink-150);
+  border-right: 1px solid var(--ink-150);
+  border-bottom: 1px solid var(--ink-150);
+}
+
+button.neutral:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.neutral .header {
+  background: var(--ink-50);
+  border-bottom: 1px solid var(--ink-150);
+}
+
+/* ── Header strip ─────────────────────────────────────────────────────────
+   Rendered only when the caller passes a `header` prop.
+   Padding scales with density (comfortable / compact). */
+
+.header {
+  flex-shrink: 0;
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────────
+   White surface; flex-grow so it fills available height when the card is
+   stretched to a fixed row (e.g. Year lane columns). */
+
+.body {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Density variants ──────────────────────────────────────────────────── */
+
+.comfortable .header {
+  padding: 12px 14px;
+}
+
+.comfortable .body {
+  padding: 12px 14px;
+}
+
+.compact .header {
+  padding: 8px 12px;
+}
+
+.compact .body {
+  padding: 8px 12px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+/* Tablet: slightly tighter internal padding */
+@media (max-width: 900px) {
+  .comfortable .header,
+  .comfortable .body {
+    padding: 10px 12px;
+  }
+}
+
+/* Phone: compress further; comfortable reduces toward compact values */
+@media (max-width: 480px) {
+  .comfortable .header,
+  .comfortable .body {
+    padding: 8px 12px;
+  }
+
+  .compact .header,
+  .compact .body {
+    padding: 6px 10px;
+  }
+}

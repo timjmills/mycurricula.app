@@ -1,0 +1,115 @@
+/* Tooltip — hover + focus tooltip.
+   The tooltip div is portaled to document.body via a React portal so it
+   escapes overflow:hidden containers. An auto-flip mechanism in the component
+   recalculates --tip-x / --tip-y at mount / resize.
+
+   Touch devices (@media (hover: none)): hover is suppressed entirely;
+   the tooltip only shows on keyboard focus. This matches common native
+   behavior — showing tooltips on touch requires long-press handling that
+   adds complexity and surprises users accustomed to the platform pattern.
+   This choice is documented in Tooltip.tsx. */
+
+/* ── Wrapper ─────────────────────────────────────────────────────────────── */
+/* The wrapper must be inline (not block) to avoid disturbing surrounding
+   text/flex layouts. Position relative is set so non-portal usage can
+   work, but the portal path uses fixed positioning on the tooltip itself. */
+
+.wrapper {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+
+/* ── Tooltip bubble ──────────────────────────────────────────────────────── */
+
+.tooltip {
+  position: fixed;
+  z-index: 9000;
+  pointer-events: none;
+  /* Visual */
+  background: var(--ink-900);
+  color: var(--paper);
+  font-size: var(--t-12);
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 6px 10px;
+  border-radius: var(--r-6);
+  box-shadow: var(--shadow-card);
+  /* Prevent the tooltip from wrapping mid-word on short labels */
+  white-space: nowrap;
+  max-width: 260px;
+  white-space: normal;
+  /* Fade in/out — respects reduced-motion via the .instant modifier */
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.tooltip.visible {
+  opacity: 1;
+}
+
+/* Under prefers-reduced-motion skip the fade — show/hide instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .tooltip {
+    transition: none;
+  }
+}
+
+/* Touch devices: suppress hover-triggered tooltips. Focus-triggered
+   tooltips (keyboard navigation) still work. */
+@media (hover: none) {
+  .tooltip.hoverOnly {
+    display: none;
+  }
+}
+
+/* ── Small arrow ─────────────────────────────────────────────────────────── */
+/* CSS triangle via a pseudo-element. Positioned based on --tip-side attribute
+   set by the component at render time. */
+
+.arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  /* Arrow is a 6px equilateral-ish triangle */
+}
+
+/* Arrow for side="top": points downward, sits at the bottom of the bubble */
+.tooltip[data-side="top"] .arrow {
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid var(--ink-900);
+}
+
+/* Arrow for side="bottom": points upward, sits at the top */
+.tooltip[data-side="bottom"] .arrow {
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 5px solid var(--ink-900);
+}
+
+/* Arrow for side="left": points rightward, sits on the right edge */
+.tooltip[data-side="left"] .arrow {
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 5px solid var(--ink-900);
+}
+
+/* Arrow for side="right": points leftward, sits on the left edge */
+.tooltip[data-side="right"] .arrow {
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 5px solid var(--ink-900);
+}

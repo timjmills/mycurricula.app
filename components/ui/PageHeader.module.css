@@ -1,0 +1,100 @@
+/* PageHeader — page-level title row.
+   Matches the pattern established in YearView.module.css .pageHeader but
+   as a standalone importable primitive with responsive padding and the
+   actions-wrap behavior at narrow widths. */
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px;
+  /* Callers may place PageHeader directly on a colored background
+     (e.g. var(--paper) with border-bottom); background is intentionally
+     transparent here so the caller's surface shows through. */
+  background: transparent;
+}
+
+/* ── Left column: eyebrow → title → subtitle ───────────────────────────── */
+
+.left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Eyebrow — var(--t-11) weight 800 uppercase, muted ink-500 */
+.eyebrow {
+  display: block;
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+/* Title — dominant H1, weight 800, tight tracking */
+.title {
+  margin: 0;
+  font-size: var(--t-24);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  color: var(--ink-900);
+}
+
+/* Subtitle — muted secondary below the title */
+.subtitle {
+  margin: 4px 0 0;
+  font-size: var(--t-13);
+  font-weight: 400;
+  color: var(--ink-500);
+  line-height: 1.4;
+}
+
+/* ── Actions cluster ────────────────────────────────────────────────────── */
+/* Right-aligned; wraps below the title block at ≤540px. */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+/* Tablet */
+@media (max-width: 900px) {
+  .header {
+    padding: 20px 20px;
+  }
+}
+
+/* Narrow phone / tablet edge — actions drop to a second line */
+@media (max-width: 540px) {
+  .header {
+    flex-wrap: wrap;
+  }
+
+  .actions {
+    /* Stretch the actions cluster to full row width when wrapped */
+    flex-basis: 100%;
+    flex-shrink: 1;
+  }
+}
+
+/* Phone */
+@media (max-width: 480px) {
+  .header {
+    padding: 16px 16px;
+  }
+
+  .title {
+    font-size: var(--t-22);
+  }
+}

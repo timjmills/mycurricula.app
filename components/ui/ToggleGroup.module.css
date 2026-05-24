@@ -1,0 +1,172 @@
+/* ToggleGroup.module.css — canonical segmented-toggle primitive.
+   Replaces every inline segmented control in the app once the migration
+   wave lands. Ships with a deliberately premium redesigned visual.
+
+   ── Token rules (CLAUDE.md §4) ─────────────────────────────────────────
+   All color / type / spacing from var(--…) only. Zero hex.
+
+   ── Variants ───────────────────────────────────────────────────────────
+   subtle    — in-page contextual switches. Active chip: paper fill +
+               shadow-card. Tray: ink-100 background.
+   prominent — primary mode switches. Active chip: ink-900 fill, paper
+               text. Tray: ink-100 background.
+
+   ── Anatomy ─────────────────────────────────────────────────────────────
+   .tray — outer rounded pill that contains all options.
+   .option — each selectable item; transitions between active/inactive.
+   .active/.inactive — state classes applied per option.
+*/
+
+/* ── Tray (outer container) ──────────────────────────────────────────── */
+
+.tray {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px; /* 2px gap between chips inside the tray */
+  padding: 3px; /* 3px internal padding so chips don't touch the tray edge */
+  border-radius: var(--r-8);
+  background: var(--ink-100);
+  /* A faint border grounds the tray without drawing attention */
+  border: 1px solid var(--ink-150);
+  position: relative;
+}
+
+/* ── Sizes ───────────────────────────────────────────────────────────── */
+
+/* md: default. Visual height ~34px inside a 40px tray.
+   lg equivalent — the tray grows to fit. */
+.md .option {
+  height: 34px;
+  padding: 0 12px;
+  font-size: var(--t-13);
+  font-weight: 500;
+  border-radius: var(--r-6);
+}
+
+.md .option.active {
+  font-weight: 600;
+}
+
+/* sm: compact. Visual height ~26px inside a 32px tray. */
+.sm .option {
+  height: 26px;
+  padding: 0 8px;
+  font-size: var(--t-12);
+  font-weight: 500;
+  border-radius: var(--r-6);
+}
+
+.sm .option.active {
+  font-weight: 600;
+}
+
+/* ── Touch-target inflation — phone / tablet (≤900px) ───────────────── */
+/* Visual stays compact; ::before expands the hit area to ≥44px. */
+
+@media (max-width: 900px) {
+  .md .option::before,
+  .sm .option::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 44px;
+    min-height: 44px;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Tray must not clip the inflated hit areas */
+  .tray {
+    overflow: visible;
+  }
+}
+
+/* ── Options ─────────────────────────────────────────────────────────── */
+
+.option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  position: relative;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  border: none;
+  /* Smooth active↔inactive transitions — 150ms per spec */
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
+  user-select: none;
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Icon slot */
+.optionIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+/* ── Subtle variant (default) ────────────────────────────────────────── */
+/* Active chip: paper fill, shadow-card, ink-900 text.
+   Inactive: transparent background, ink-500 text. */
+
+.subtle .inactive {
+  background: transparent;
+  color: var(--ink-500);
+}
+
+.subtle .inactive:hover {
+  color: var(--ink-700);
+  background: color-mix(in srgb, var(--ink-100) 60%, transparent);
+}
+
+.subtle .active {
+  background: var(--paper);
+  color: var(--ink-900);
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Prominent variant ───────────────────────────────────────────────── */
+/* Active chip: ink-900 fill, paper text — bold, assertive, no ambiguity.
+   Inactive: transparent, ink-500. The ink-900 active reads immediately
+   as "this mode is in force." */
+
+.prominent .inactive {
+  background: transparent;
+  color: var(--ink-500);
+}
+
+.prominent .inactive:hover {
+  color: var(--ink-700);
+  background: color-mix(in srgb, var(--ink-100) 60%, transparent);
+}
+
+.prominent .active {
+  background: var(--ink-900);
+  color: var(--paper);
+  /* Slight shadow to lift the chip off the tray surface */
+  box-shadow:
+    0 1px 3px color-mix(in srgb, var(--ink-900) 20%, transparent),
+    0 1px 2px color-mix(in srgb, var(--ink-900) 12%, transparent);
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .option {
+    transition: none;
+  }
+}

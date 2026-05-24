@@ -1,0 +1,113 @@
+/* EmptyState — centered "nothing to show" pattern.
+   The root is a flex column centered on both axes.
+   `flex: 1` makes it fill available height in a flex-column container
+   so it naturally centers itself in the leftover space on a page. */
+
+/* ── Root ───────────────────────────────────────────────────────────────── */
+
+.root {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  /* Do not break out of a fixed-height container */
+  min-height: 0;
+}
+
+/* ── Size: md (default) ──────────────────────────────────────────────────── */
+
+.md {
+  padding: 48px 24px;
+}
+
+.md .iconArea {
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.md .heading {
+  font-size: var(--t-16);
+  font-weight: 700;
+}
+
+.md .body {
+  font-size: var(--t-13);
+}
+
+/* ── Size: sm ────────────────────────────────────────────────────────────── */
+
+.sm {
+  padding: 24px 16px;
+}
+
+.sm .iconArea {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sm .heading {
+  font-size: var(--t-14);
+  font-weight: 700;
+}
+
+.sm .body {
+  font-size: var(--t-12);
+}
+
+/* ── Text ────────────────────────────────────────────────────────────────── */
+
+.heading {
+  margin: 0;
+  color: var(--ink-900);
+  text-align: center;
+  line-height: 1.3;
+}
+
+.body {
+  margin: 0;
+  color: var(--ink-500);
+  text-align: center;
+  line-height: 1.5;
+  max-width: 400px;
+}
+
+/* ── Action ─────────────────────────────────────────────────────────────── */
+
+.action {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+/* Phone: reduce padding, tighten icon sizes */
+@media (max-width: 480px) {
+  .md {
+    padding: 32px 16px;
+  }
+
+  .md .iconArea {
+    width: 72px;
+    height: 72px;
+  }
+
+  .sm {
+    padding: 16px 12px;
+  }
+
+  .sm .iconArea {
+    width: 44px;
+    height: 44px;
+  }
+}
