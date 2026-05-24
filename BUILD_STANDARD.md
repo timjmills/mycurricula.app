@@ -1,4 +1,4 @@
-# MyCurricula — Build Standard
+# mycurriculum.app — Build Standard
 
 The visual, structural, and responsive contract every page must follow.
 Read this file at the start of every build session. CLAUDE.md links to it.
@@ -25,7 +25,7 @@ When building a new page, redesigning an existing one, or reviewing work:
    touches a primary surface.
 
 CLAUDE.md §4 (the responsive hard rule) and §5 (the verification step)
-are the policy backbone behind this doc. This file is the *content* —
+are the policy backbone behind this doc. This file is the _content_ —
 what the design actually is.
 
 ---
@@ -70,7 +70,7 @@ for color, type, or semantic spacing.
 - Zero hex anywhere in `components/` or `lib/`. Period.
 - Zero raw `rgb()` / `hsl()` for color anywhere in components. Use
   `var(--token)` directly, or `color-mix(in srgb, var(--token) X%,
-  white|transparent)` if you need a derived variant.
+white|transparent)` if you need a derived variant.
 - Mechanical pixel math (`44`, `28`, `8` for hit-area inflation; `1px`
   hairlines; absolute positioning offsets) **is allowed** in CSS files
   for layout math. Color/font/spacing values must come from tokens.
@@ -89,17 +89,17 @@ for color, type, or semantic spacing.
 Every subject (`math`, `reading`, `writing`, `grammar`, `spelling`,
 `ufli`, `explorers`, `sel`) has:
 
-| Token | Use |
-| --- | --- |
-| `var(--<id>)` | Mid-tone — the saturated subject color. Use for accents, progress bar fills, dots, buttons. |
-| `var(--<id>-light)` | Light tint — surface fills. |
-| `var(--<id>-deep)` | Deep — text on light, borders, deep accents. |
-| `var(--c-surface)` | Light card surface (via cp-subj cascade). |
-| `var(--c-surface-strong)` | Slightly more saturated card header tint. |
-| `var(--c-border)` | Hairline subject-tinted border. |
-| `var(--c-progress-track)` | Progress bar track. |
-| `var(--c-progress-fill)` | Progress bar fill. |
-| `var(--c-deep)` | Deep accent (left border, title text). |
+| Token                     | Use                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------- |
+| `var(--<id>)`             | Mid-tone — the saturated subject color. Use for accents, progress bar fills, dots, buttons. |
+| `var(--<id>-light)`       | Light tint — surface fills.                                                                 |
+| `var(--<id>-deep)`        | Deep — text on light, borders, deep accents.                                                |
+| `var(--c-surface)`        | Light card surface (via cp-subj cascade).                                                   |
+| `var(--c-surface-strong)` | Slightly more saturated card header tint.                                                   |
+| `var(--c-border)`         | Hairline subject-tinted border.                                                             |
+| `var(--c-progress-track)` | Progress bar track.                                                                         |
+| `var(--c-progress-fill)`  | Progress bar fill.                                                                          |
+| `var(--c-deep)`           | Deep accent (left border, title text).                                                      |
 
 The cp-subj cascade is set by `lib/palette.tsx`; any element with
 `className="cp-subj <subjectId>"` inherits the full set as `--c`,
@@ -109,15 +109,15 @@ The cp-subj cascade is set by `lib/palette.tsx`; any element with
 
 Non-subject status colors are NOT subject colors. Use:
 
-| Token | Meaning |
-| --- | --- |
-| `var(--done)` | Completion, success |
-| `var(--fyi)` / `var(--fyi-bg)` | Informational |
-| `var(--important)` | Modified, attention |
-| `var(--catchup)` / `var(--catchup-bg)` | Behind, needs catch-up |
-| `var(--ink-50…900)` | Neutral ink ramp |
-| `var(--paper)` | The card body white |
-| `var(--tag-*)` | 10 tag colors for chips |
+| Token                                  | Meaning                 |
+| -------------------------------------- | ----------------------- |
+| `var(--done)`                          | Completion, success     |
+| `var(--fyi)` / `var(--fyi-bg)`         | Informational           |
+| `var(--important)`                     | Modified, attention     |
+| `var(--catchup)` / `var(--catchup-bg)` | Behind, needs catch-up  |
+| `var(--ink-50…900)`                    | Neutral ink ramp        |
+| `var(--paper)`                         | The card body white     |
+| `var(--tag-*)`                         | 10 tag colors for chips |
 
 A blue ring on a Reading card means "this is math" — never use a
 subject color for a non-subject signal. Selection states, focus rings,
@@ -129,28 +129,28 @@ and informational accents use `--fyi`, `--ink-900`, or a tag color.
 
 ### Hierarchy on every card-style surface
 
-| Role | Token | Weight | Color |
-| --- | --- | --- | --- |
-| Metadata top line (Subject · time) | `var(--t-11)` | 400 (muted) | `var(--cd)` or `var(--ink-500)` |
-| Dominant title | `var(--t-16)` | 700 | `var(--cd)` on subject card, else `var(--ink-900)` |
-| Subtitle (em-dash split) | `var(--t-11)` | 400 | `var(--ink-500)`, opacity 0.75 |
-| Body / preview | `var(--t-13)` | 400 | `var(--ink-700)` |
-| Eyebrow / section label | `var(--t-11)` | 800 | `var(--ink-400)` or `--ink-600`, uppercase, `letter-spacing: 0.12em` |
+| Role                               | Token         | Weight      | Color                                                                |
+| ---------------------------------- | ------------- | ----------- | -------------------------------------------------------------------- |
+| Metadata top line (Subject · time) | `var(--t-11)` | 400 (muted) | `var(--cd)` or `var(--ink-500)`                                      |
+| Dominant title                     | `var(--t-16)` | 700         | `var(--cd)` on subject card, else `var(--ink-900)`                   |
+| Subtitle (em-dash split)           | `var(--t-11)` | 400         | `var(--ink-500)`, opacity 0.75                                       |
+| Body / preview                     | `var(--t-13)` | 400         | `var(--ink-700)`                                                     |
+| Eyebrow / section label            | `var(--t-11)` | 800         | `var(--ink-400)` or `--ink-600`, uppercase, `letter-spacing: 0.12em` |
 
 ### Em-dash subtitle split
 
-If a lesson title contains ` — ` (em-dash with spaces), split on it:
+If a lesson title contains `—` (em-dash with spaces), split on it:
 the part before is the dominant title, the part after becomes the
 small subtitle below. Heading-cleanup pattern; apply on Weekly card,
 ListRow, and any other surface that displays a lesson title.
 
 ### Page-level type
 
-| Role | Token | Weight |
-| --- | --- | --- |
-| Page title (e.g. "Yearly View") | `var(--t-24)` or `--t-22` | 800 |
-| Page subtitle | `var(--t-13)` | 400 |
-| Section header | `var(--t-15)` | 700 |
+| Role                            | Token                     | Weight |
+| ------------------------------- | ------------------------- | ------ |
+| Page title (e.g. "Yearly View") | `var(--t-24)` or `--t-22` | 800    |
+| Page subtitle                   | `var(--t-13)`             | 400    |
+| Section header                  | `var(--t-15)`             | 700    |
 
 ---
 
@@ -185,27 +185,27 @@ primitive instead of inventing one locally.
 
 ### Existing primitives (already in the repo — use these)
 
-| Primitive | Location | What it does |
-| --- | --- | --- |
-| `LessonCard` | `components/lesson-card/` | The weekly card. Subject-tinted body, title band, status, fork indicator. |
-| `ListRow` | `components/list/ListRow.tsx` | The shared list row. Subject monogram + time + title + chip + count + completion check; dashed left edge for modified. |
-| `LaneCard` | `components/year/LaneCard.tsx` | The Year subject lane card. White body + tinted header + 4px subject-deep border + chip. |
-| `StatusBadge` | `components/year/StatusBadge.tsx` | Status pill: completed / in_progress / modified / skipped / not_started / behind. |
-| `PaneSplitter` | `components/daily/PaneSplitter.tsx` | Resizable separator. Vertical or horizontal. |
-| `ResourceComposer`, `AddLessonForm`, `AddEventForm` | `components/daily/` | Modal patterns. Focus-trap, Esc-close, ≥44px controls. |
+| Primitive                                           | Location                            | What it does                                                                                                           |
+| --------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `LessonCard`                                        | `components/lesson-card/`           | The weekly card. Subject-tinted body, title band, status, fork indicator.                                              |
+| `ListRow`                                           | `components/list/ListRow.tsx`       | The shared list row. Subject monogram + time + title + chip + count + completion check; dashed left edge for modified. |
+| `LaneCard`                                          | `components/year/LaneCard.tsx`      | The Year subject lane card. White body + tinted header + 4px subject-deep border + chip.                               |
+| `StatusBadge`                                       | `components/year/StatusBadge.tsx`   | Status pill: completed / in_progress / modified / skipped / not_started / behind.                                      |
+| `PaneSplitter`                                      | `components/daily/PaneSplitter.tsx` | Resizable separator. Vertical or horizontal.                                                                           |
+| `ResourceComposer`, `AddLessonForm`, `AddEventForm` | `components/daily/`                 | Modal patterns. Focus-trap, Esc-close, ≥44px controls.                                                                 |
 
 ### To build (next wave) — `components/ui/`
 
-| Primitive | Variants | Purpose |
-| --- | --- | --- |
-| `Button` | primary / secondary / ghost / icon-only / destructive | Single source for every button. Tokens, ≥44px on phone/tablet. |
-| `Card` | subject-tinted / neutral | The layered Weekly recipe, generic. Wraps any content with the same border / shadow / header treatment. |
-| `PageHeader` | with-actions / plain | Page title + subtitle + right-aligned action buttons. Used on every route page. |
-| `EmptyState` | centered illustration + heading + CTA | Standard empty pattern for empty days, empty subject filters, empty search. |
-| `Chip` | static / removable / filterable | Inline tag chip (used by ListRow, ResourcesSort, StatusFilterBar). |
-| `Badge` | success / info / warn / danger / neutral | Status badge primitive (StatusBadge becomes a subject-aware specialization). |
-| `ToggleGroup` | 2-button / 3-button segmented | The Personal/Master, By-Unit/By-Week, Grid/List, Roadmap/Progression pattern. **Toggle redesign is in flight — see §12 open items.** |
-| `Tooltip` | hover / focus | Replaces ad-hoc `title=""` everywhere. Keyboard-reachable. |
+| Primitive     | Variants                                              | Purpose                                                                                                                              |
+| ------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `Button`      | primary / secondary / ghost / icon-only / destructive | Single source for every button. Tokens, ≥44px on phone/tablet.                                                                       |
+| `Card`        | subject-tinted / neutral                              | The layered Weekly recipe, generic. Wraps any content with the same border / shadow / header treatment.                              |
+| `PageHeader`  | with-actions / plain                                  | Page title + subtitle + right-aligned action buttons. Used on every route page.                                                      |
+| `EmptyState`  | centered illustration + heading + CTA                 | Standard empty pattern for empty days, empty subject filters, empty search.                                                          |
+| `Chip`        | static / removable / filterable                       | Inline tag chip (used by ListRow, ResourcesSort, StatusFilterBar).                                                                   |
+| `Badge`       | success / info / warn / danger / neutral              | Status badge primitive (StatusBadge becomes a subject-aware specialization).                                                         |
+| `ToggleGroup` | 2-button / 3-button segmented                         | The Personal/Master, By-Unit/By-Week, Grid/List, Roadmap/Progression pattern. **Toggle redesign is in flight — see §12 open items.** |
+| `Tooltip`     | hover / focus                                         | Replaces ad-hoc `title=""` everywhere. Keyboard-reachable.                                                                           |
 
 When you need a new primitive variant: add to the existing component
 with a new prop. Do not duplicate.
@@ -216,11 +216,11 @@ with a new prop. Do not duplicate.
 
 Three viewport tiers. Every page works at every tier.
 
-| Tier | Width range | Primary device |
-| --- | --- | --- |
-| **Phone** | 360 – 480px | Phone portrait |
-| **Tablet** | 600 – 900px | Tablet portrait, phone landscape |
-| **Desktop** | 1024 – 1920px | Laptop, monitor |
+| Tier        | Width range   | Primary device                   |
+| ----------- | ------------- | -------------------------------- |
+| **Phone**   | 360 – 480px   | Phone portrait                   |
+| **Tablet**  | 600 – 900px   | Tablet portrait, phone landscape |
+| **Desktop** | 1024 – 1920px | Laptop, monitor                  |
 
 ### Hard rules at every tier
 
@@ -252,13 +252,13 @@ Three viewport tiers. Every page works at every tier.
 
 ### Top-bar collapse cascade (do not regress)
 
-| Breakpoint | Behavior |
-| --- | --- |
-| ≤ 1280px | "Soon" view tabs hidden |
-| ≤ 1024px | Save indicator + view-mode pill hidden |
-| ≤ 768px | Week label + undo/redo hidden |
-| ≤ 540px | View-tab + edit-toggle padding compressed |
-| ≤ 480px | Master/Personal labels become "P | M"; bar padding tightens |
+| Breakpoint | Behavior                                  |
+| ---------- | ----------------------------------------- | ------------------------ |
+| ≤ 1280px   | "Soon" view tabs hidden                   |
+| ≤ 1024px   | Save indicator + view-mode pill hidden    |
+| ≤ 768px    | Week label + undo/redo hidden             |
+| ≤ 540px    | View-tab + edit-toggle padding compressed |
+| ≤ 480px    | Master/Personal labels become "P          | M"; bar padding tightens |
 
 ### Verification
 
@@ -273,7 +273,7 @@ the riskiest tier — do not skip it.
 - **Hover-reveal:** secondary controls (drag handles, ⋯ menus, status
   pills, chevrons) are `opacity: 0` at rest. Reveal on `:hover` /
   `:focus-within` over a 120ms transition. Touch devices (`@media
-  (hover: none)`) show everything. Reduced motion skips the transition.
+(hover: none)`) show everything. Reduced motion skips the transition.
 - **Modified lesson signal:** dashed left edge in `var(--c-deep)` is
   the always-on signal. The "MODIFIED" pill is hover-revealed on the
   Weekly card; absent on the ListRow (the dashed edge alone carries
@@ -287,7 +287,7 @@ the riskiest tier — do not skip it.
   3. Personally moved — move-arrow icon + (on Weekly) the lesson's
      prior placement shown in the MODIFIED pill tooltip.
 - **Reduced motion:** every transition has a `@media
-  (prefers-reduced-motion: reduce)` block that drops it. No bounce,
+(prefers-reduced-motion: reduce)` block that drops it. No bounce,
   parallax, confetti, or surprise motion.
 
 ---

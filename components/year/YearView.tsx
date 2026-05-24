@@ -33,6 +33,7 @@ import { ProgressionView } from "./ProgressionView";
 import { QuarterMonthWeekHeader } from "./QuarterMonthWeekHeader";
 import { StatusFilterBar } from "./StatusFilterBar";
 import { MonthPicker } from "./MonthPicker";
+import { CurriculumFilter, useCurriculumFilter } from "./CurriculumFilter";
 import type { StatusFilterId } from "./StatusFilterBar";
 import type { SubjectId } from "@/lib/types";
 import styles from "./YearView.module.css";
@@ -192,6 +193,13 @@ export function YearView() {
   // CURRENT_WEEK is 1-based; convert to 0-based for index math.
   const currentWeekIdx = CURRENT_WEEK - 1;
 
+  // ── Curriculum (subject) filter ──────────────────────────────────────
+  const {
+    subjectFilter,
+    selectedIds: curriculumSelectedIds,
+    setSelectedIds: setCurriculumSelectedIds,
+  } = useCurriculumFilter();
+
   // ── Status filter state ───────────────────────────────────────────────
   const [activeFilters, setActiveFilters] = useState<Set<StatusFilterId>>(
     () => new Set(["all"] as StatusFilterId[]),
@@ -309,6 +317,11 @@ export function YearView() {
             onPickMonth={handlePickMonth}
           />
 
+          <CurriculumFilter
+            selectedIds={curriculumSelectedIds}
+            onChange={setCurriculumSelectedIds}
+          />
+
           <button
             type="button"
             className={styles.actionBtn}
@@ -376,9 +389,15 @@ export function YearView() {
 
             <div className={styles.viewBody}>
               {viewMode === "grid" ? (
-                <RoadmapView onActiveSubjectChange={setActiveSubjectId} />
+                <RoadmapView
+                  onActiveSubjectChange={setActiveSubjectId}
+                  subjectFilter={subjectFilter}
+                />
               ) : (
-                <ProgressionView onActiveSubjectChange={setActiveSubjectId} />
+                <ProgressionView
+                  onActiveSubjectChange={setActiveSubjectId}
+                  subjectFilter={subjectFilter}
+                />
               )}
             </div>
           </div>

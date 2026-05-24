@@ -48,13 +48,17 @@
 
 .bgLine {
   height: 100%;
+  /* Solid paper fill + right hairline separator — cleaner than transparent + border-left. */
+  background: var(--paper);
+  border-right: 1px solid var(--ink-150);
 }
 
+/* Month boundary — thicker right edge so month transitions read clearly. */
 .weekBorder {
-  border-left: 1px dashed var(--ink-150);
+  border-right: 1px solid var(--ink-200);
 }
 
-/* Today week column background — solid fyi-bg token */
+/* Today week column background — solid fyi-bg token overlays paper fill. */
 .bgLineToday {
   background: var(--fyi-bg);
 }

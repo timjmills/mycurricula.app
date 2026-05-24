@@ -63,12 +63,18 @@ const COL = 30;
 export interface ProgressionViewProps {
   /** Called when the topmost intersecting lane changes (chameleon driver). */
   onActiveSubjectChange?: (subjectId: SubjectId) => void;
+  /**
+   * Subjects to show. null = show all. Pass from useCurriculumFilter() in
+   * YearView via the <CurriculumFilter> component.
+   */
+  subjectFilter?: Set<SubjectId> | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function ProgressionView({
   onActiveSubjectChange,
+  subjectFilter,
 }: ProgressionViewProps = {}) {
   const { lessons } = usePlanner();
   const { isMinimized, toggle } = useMinimizedSubjects();
@@ -174,11 +180,17 @@ export function ProgressionView({
 
   const totalCols = schoolDays.length;
 
+  // Apply subject filter: null means show all; otherwise show only matching lanes.
+  const visibleLanes =
+    subjectFilter == null
+      ? orderedLanes
+      : orderedLanes.filter((l) => subjectFilter.has(l.subjectId));
+
   return (
     <div className={styles.root}>
       {/* Lane rows */}
       <div className={styles.lanes}>
-        {orderedLanes.map(
+        {visibleLanes.map(
           (
             { subject, subjectId, glyphMap, completePct, unitBars, pacing },
             li,

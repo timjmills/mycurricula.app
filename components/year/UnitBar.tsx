@@ -157,6 +157,11 @@ export function UnitBar({
       {/* Spacer */}
       <div className={styles.spacer} />
 
+      {/* N of M complete counter — most-important inline data; survives narrow widths */}
+      <span className={styles.counter}>
+        {unit.completedLessons} of {unit.lessons} complete
+      </span>
+
       {/* Segmented dot progress + percentage */}
       <DotProgress
         lessons={unit.lessons}

@@ -1,0 +1,125 @@
+/* CurriculumFilter — multi-select popover for Year view subject lanes.
+   Token-only: zero hex. The cp-subj cascade handles monogram tile colors. */
+
+/* ── Panel ────────────────────────────────────────────────────────────── */
+
+.panel {
+  position: fixed;
+  z-index: var(--z-popover, 400);
+  min-width: 224px;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-card-hover);
+  /* Hidden before position is computed — panel starts off-screen. */
+  opacity: 0;
+  /* No transition when reduced-motion is set — see media block below. */
+  transition: opacity 120ms ease;
+  /* Prevent the panel itself from participating in layout flow. */
+  pointer-events: none;
+}
+
+.panelVisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.panelTitle {
+  font-size: var(--t-11);
+  font-weight: 800;
+  color: var(--ink-400);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.quickActions {
+  display: flex;
+  gap: 4px;
+}
+
+/* ── Checklist ───────────────────────────────────────────────────────── */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+}
+
+.listItem {
+  /* Each row is the touch target — full-width clickable via <label>. */
+}
+
+.itemLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+  /* ≥44px touch target height on phone/tablet. */
+  min-height: 44px;
+  transition: background 100ms ease;
+}
+
+.itemLabel:hover {
+  background: var(--ink-50);
+}
+
+/* ── Subject monogram tile ───────────────────────────────────────────── */
+
+/* The cp-subj cascade (set on the span in JSX) injects --c, --cl, --cd.
+   We read --c-surface and --c-deep from those role tokens. */
+.monogram {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-8);
+  background: var(--c-surface, var(--ink-100));
+  color: var(--c-deep, var(--ink-700));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--t-11);
+  font-weight: 800;
+  flex-shrink: 0;
+  letter-spacing: 0;
+}
+
+/* ── Subject name ─────────────────────────────────────────────────────── */
+
+.subjectName {
+  flex: 1;
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-800);
+}
+
+/* ── Checkbox ─────────────────────────────────────────────────────────── */
+
+.checkbox {
+  /* Keep the native checkbox reachable by keyboard but style it subtly. */
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--ink-900);
+  flex-shrink: 0;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    transition: none;
+  }
+  .itemLabel {
+    transition: none;
+  }
+}

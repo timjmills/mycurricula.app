@@ -4,8 +4,8 @@
 
    All color comes from the .cp-subj cascade on the ancestor lane row:
      --c              subject mid-tone (border accent)
-     --c-surface      subject light tint (gradient bottom)
-     --c-surface-strong   slightly richer tint (gradient top)
+     --cl             subject light tint (solid card background — matches Weekly card recipe)
+     --c-surface      subject light tint (legacy; used for tile bg)
      --c-border       hairline border color
      --c-progress-fill   dot fill for completed lessons
      --c-deep         tile text + title text
@@ -18,12 +18,8 @@
   top: 50%;
   transform: translateY(-50%);
 
-  /* Premium vertical gradient: surface-strong → surface */
-  background: linear-gradient(
-    180deg,
-    var(--c-surface-strong) 0%,
-    var(--c-surface) 100%
-  );
+  /* Solid subject-light fill — matches the Weekly card var(--cl) recipe exactly. */
+  background: var(--cl);
 
   /* 1px subject border */
   border: 1px solid var(--c-border);
@@ -185,9 +181,25 @@
   white-space: nowrap;
 }
 
+/* ── N of M counter ─────────────────────────────────────────────────────── */
+
+/* Inline "N of M complete" — shown immediately before the dot progress row.
+   Survives narrow widths where .meta is hidden: the counter is the most
+   important inline data so it has a wider collapse threshold than dots. */
+.counter {
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--c-deep);
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: -0.1px;
+}
+
 /* ── Responsive collapse ───────────────────────────────────────────────── */
 /* When the bar is narrower than ~280px, hide the metadata subtitle.
-   When narrower than ~180px, also hide the progress dots + pct. */
+   The counter stays visible — it is the most-important inline data.
+   When narrower than ~180px, hide dots + pct but keep the counter.
+   Only at very narrow (<120px) does the counter itself hide. */
 
 @container (max-width: 279px) {
   .meta {
@@ -197,6 +209,12 @@
 
 @container (max-width: 179px) {
   .dotProgress {
+    display: none;
+  }
+}
+
+@container (max-width: 119px) {
+  .counter {
     display: none;
   }
 }

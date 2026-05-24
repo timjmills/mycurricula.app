@@ -1,4 +1,4 @@
-# MyCurricula — Project Guide
+# mycurriculum.app — Project Guide
 
 This file is the source of truth for **what this project is, how we build it, and the
 rules every contributor (human or agent) must follow**. Read it before touching code.
@@ -6,7 +6,7 @@ rules every contributor (human or agent) must follow**. Read it before touching 
 > **Companion file — read this too:** `BUILD_STANDARD.md` at the repo root is the
 > visual, structural, and responsive contract — what every page must look and behave
 > like. The Weekly view (`/weekly`) is the canonical reference. CLAUDE.md is the
-> *policy* (rules, phasing, what not to do); BUILD_STANDARD.md is the *content*
+> _policy_ (rules, phasing, what not to do); BUILD*STANDARD.md is the \_content*
 > (color recipe, type hierarchy, spacing scale, canonical primitives, new-page
 > prompt template). Read both at the start of every build session.
 
@@ -14,12 +14,12 @@ rules every contributor (human or agent) must follow**. Read it before touching 
 
 ## 1. What this app is
 
-**MyCurricula** is a weekly curriculum planning web app for school teaching teams. Its
-first deployment is a Grade 5 team (4–6 teachers) at a school in Qatar, but the product
-is built for any school. It consolidates five fragmented planning surfaces — Padlet
-resource boards, a week-by-week lesson doc, a weekly-focus doc, a CCSS standards doc,
-and per-teacher personal copies — into **one filterable, editable curriculum operating
-system**.
+**`mycurriculum.app`** is a Learning Management System (LMS) for school teaching teams.
+Its first deployment is a Grade 5 team (4–6 teachers) at a school in Qatar, but the
+product is built for any school. It consolidates five fragmented planning surfaces —
+Padlet resource boards, a week-by-week lesson doc, a weekly-focus doc, a CCSS standards
+doc, and per-teacher personal copies — into **one filterable, editable curriculum
+operating system**.
 
 - **Users:** teachers only. No student, parent, or admin-facing product in scope.
 - **Core job:** "What are we teaching this week, and where am I in the plan?"
@@ -40,7 +40,7 @@ system**.
   instructional days, a 6-day rotation, etc.). Schedules can be edited and reset. Never
   assume a single fixed daily schedule or a weekly-only cycle.
 
-It is **not** a gradebook, an LMS, an attendance tracker, a student portal, or a
+It is **not** a gradebook, an attendance tracker, a student portal, or a
 marketplace. See §6 for the full out-of-scope list.
 
 ---
@@ -230,7 +230,7 @@ All under `Documents/` (reference only — never imported by the app):
   §5 screen-by-screen, §6 design system, §7 tech architecture, §8 phased roadmap,
   §9 acceptance criteria, §10 open questions.
 - `Project Files/5.16.26 conversation_record.md` — the decision history behind the spec.
-- `Project Files/5.16.26 MyCurricula_Business_Plan_Addendum.md` — positioning, pricing.
+- `Project Files/5.16.26 mycurriculum.app_Business_Plan_Addendum.md` — positioning, pricing.
 - `Project Files/5.16.26 *Competetor Anaylisis*` + `5.12.26 *Planbook*` — competitive
   context; selectively absorbed features.
 - `Claude Design/5.16.26 Build A Curriculum-handoff/` — the design handoff bundle.
