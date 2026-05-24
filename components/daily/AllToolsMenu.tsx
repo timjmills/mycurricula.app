@@ -71,6 +71,7 @@ import {
 } from "react";
 import type { CapturedItem } from "./ResourceComposer";
 import { fileToCapturedItem } from "./ResourceComposer";
+import { Button } from "@/components/ui";
 import styles from "./AllToolsMenu.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -439,6 +440,8 @@ export function AllToolsMenu({
     <div role="region" aria-labelledby={titleId}>
       {/* ── Header ────────────────────────────────────────────────── */}
       <div className={styles.header}>
+        {/* ref held for focus-management on mount — Button doesn't forward
+            refs, so this stays as a raw button. All styling via .backBtn. */}
         <button
           ref={backRef}
           type="button"
@@ -535,14 +538,15 @@ export function AllToolsMenu({
               onKeyDown={onYouTubeKeyDown}
               aria-label="YouTube URL"
             />
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               className={styles.inlineAddBtn}
               onClick={onYouTubeConfirm}
               disabled={!ytValue.trim() || !URL_REGEX.test(ytValue.trim())}
             >
               Add video
-            </button>
+            </Button>
           </div>
         )}
 

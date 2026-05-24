@@ -34,6 +34,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { TODOS, TAG_BY_ID } from "@/lib/mock";
 import type { Todo } from "@/lib/types";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
+import { Button } from "@/components/ui";
 import type { PanelDragHandleProps } from "./RightRail";
 import styles from "./TodayTodos.module.css";
 
@@ -310,16 +311,15 @@ export function TodayTodos({
           Expanded → the small inline composer.
           Full management still lives in the to-do slide-out panel. */}
       {!composerOpen ? (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           className={styles.addLink}
           onClick={() => setComposerOpen(true)}
+          leadingIcon={<PlusIcon />}
         >
-          <span className={styles.addLinkIcon} aria-hidden="true">
-            <PlusIcon />
-          </span>
           Add a to-do
-        </button>
+        </Button>
       ) : (
         <form className={styles.composer} onSubmit={handleSubmit}>
           <span className={styles.composerIcon} aria-hidden="true">
@@ -343,14 +343,15 @@ export function TodayTodos({
             autoFocus
             aria-label="Add a to-do"
           />
-          <button
+          <Button
+            variant="primary"
+            size="sm"
             type="submit"
             className={styles.composerAdd}
             disabled={draft.trim().length === 0}
-            aria-label="Add to-do"
           >
             Add
-          </button>
+          </Button>
         </form>
       )}
     </>
@@ -384,20 +385,19 @@ export function TodayTodos({
         </span>
         {/* Chevron collapse toggle — pushed to the far right. */}
         {onToggleCollapsed && (
-          <button
-            type="button"
-            className={styles.collapseBtn}
-            onClick={onToggleCollapsed}
-            aria-expanded={!collapsed}
-            aria-label={
+          <Button
+            variant="icon"
+            iconAriaLabel={
               collapsed
                 ? "Expand To-do List panel"
                 : "Collapse To-do List panel"
             }
-            title={collapsed ? "Expand" : "Collapse"}
+            className={styles.collapseBtn}
+            onClick={onToggleCollapsed}
+            aria-expanded={!collapsed}
           >
             <ChevronToggleIcon collapsed={collapsed} />
-          </button>
+          </Button>
         )}
       </header>
 

@@ -8,6 +8,7 @@
 // derived from the lesson fixture by the parent.
 
 import type { ReactNode } from "react";
+import { Button, Tooltip } from "@/components/ui";
 import styles from "./WeeklyGrid.module.css";
 
 interface WeekNavigatorProps {
@@ -46,34 +47,41 @@ export function WeekNavigator({
       </div>
 
       <div className={styles.navControls}>
-        <button
-          type="button"
-          className={styles.navArrow}
-          onClick={() => onChange(week - 1)}
-          disabled={atStart}
-          aria-label="Previous week"
-        >
-          <ChevronLeft />
-        </button>
+        <Tooltip content="Previous week" side="bottom">
+          <Button
+            variant="icon"
+            size="sm"
+            iconAriaLabel="Previous week"
+            className={styles.navArrow}
+            onClick={() => onChange(week - 1)}
+            disabled={atStart}
+          >
+            <ChevronLeft />
+          </Button>
+        </Tooltip>
 
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           className={styles.navToday}
           onClick={() => onChange(currentWeek)}
           disabled={isCurrent}
         >
           Today
-        </button>
+        </Button>
 
-        <button
-          type="button"
-          className={styles.navArrow}
-          onClick={() => onChange(week + 1)}
-          disabled={atEnd}
-          aria-label="Next week"
-        >
-          <ChevronRight />
-        </button>
+        <Tooltip content="Next week" side="bottom">
+          <Button
+            variant="icon"
+            size="sm"
+            iconAriaLabel="Next week"
+            className={styles.navArrow}
+            onClick={() => onChange(week + 1)}
+            disabled={atEnd}
+          >
+            <ChevronRight />
+          </Button>
+        </Tooltip>
       </div>
     </header>
   );

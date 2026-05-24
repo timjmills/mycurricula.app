@@ -39,6 +39,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { Button } from "@/components/ui";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { CURRENT_WEEK, WEEK_DAYS, WEEK_DAYS_SHORT } from "@/lib/mock";
@@ -334,8 +335,10 @@ export function WeeklyBoard(): ReactNode {
 
       {/* ── Move-mode toolbar ── slim sticky bar below the week navigator. */}
       <div className={styles.moveToolbar}>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
+          leadingIcon={<MoveIcon active={compactManual} />}
           className={`${styles.moveModeBtn} ${compactManual ? styles.moveModeBtnActive : ""}`}
           onClick={() => setCompactManual((v) => !v)}
           aria-pressed={compactManual}
@@ -345,9 +348,8 @@ export function WeeklyBoard(): ReactNode {
               : "Enter Move mode (compact view)"
           }
         >
-          <MoveIcon active={compactManual} />
           {compactManual ? "Exit Move mode" : "Move mode"}
-        </button>
+        </Button>
       </div>
 
       {/* ── Board scroll region ── */}
@@ -608,8 +610,10 @@ function DayColumn({
 
       {/* "+ Add lesson" stub — non-functional; lesson creation is out of
           scope for this increment. Visible on column hover only. */}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
+        leadingIcon={<PlusIcon />}
         className={styles.addLesson}
         aria-label={`Add lesson on ${dayName}`}
         // Click handler intentionally omitted — stub affordance only.
@@ -617,9 +621,8 @@ function DayColumn({
           /* lesson creation is a future increment */
         }}
       >
-        <PlusIcon />
         Add lesson
-      </button>
+      </Button>
     </div>
   );
 }

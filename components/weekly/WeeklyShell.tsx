@@ -80,6 +80,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Button, Tooltip } from "@/components/ui";
 import {
   DndContext,
   DragOverlay,
@@ -817,17 +818,19 @@ export function WeeklyShell(): ReactNode {
       >
         {/* Hide-rail toggle button — always visible so the teacher can
             re-expand after collapsing. Positioned at the top of the slot. */}
-        <button
-          type="button"
-          className={styles.railToggleBtn}
-          onClick={handleToggleRail}
-          aria-label={
-            railHidden ? "Show resources rail" : "Hide resources rail"
-          }
-          title={railHidden ? "Show rail" : "Hide rail"}
-        >
-          <RailToggleIcon hidden={railHidden} />
-        </button>
+        <Tooltip content={railHidden ? "Show rail" : "Hide rail"} side="left">
+          <Button
+            variant="icon"
+            size="sm"
+            iconAriaLabel={
+              railHidden ? "Show resources rail" : "Hide resources rail"
+            }
+            className={styles.railToggleBtn}
+            onClick={handleToggleRail}
+          >
+            <RailToggleIcon hidden={railHidden} />
+          </Button>
+        </Tooltip>
 
         {/* The drag grip sits above the toggle so both affordances live in
             the top-left region without overlap. The grip is hidden (same

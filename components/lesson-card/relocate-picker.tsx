@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Lesson, SubjectId } from "@/lib/types";
 import { SUBJECTS, WEEK_DAYS_SHORT } from "@/lib/mock";
+import { Button } from "@/components/ui";
 
 // ── Focus-trap selector (mirrors command-palette.tsx) ─────────────────────
 const FOCUSABLE =
@@ -409,39 +410,12 @@ export function RelocatePicker({
               marginTop: 2,
             }}
           >
-            <button
-              type="button"
-              onClick={close}
-              style={{
-                minHeight: 44,
-                padding: "0 16px",
-                borderRadius: 6,
-                border: "1px solid var(--ink-200)",
-                background: "var(--paper)",
-                color: "var(--ink-700)",
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: "pointer",
-              }}
-            >
+            <Button variant="secondary" size="md" type="button" onClick={close}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              style={{
-                minHeight: 44,
-                padding: "0 18px",
-                borderRadius: 6,
-                border: "none",
-                background: "var(--ink-900)",
-                color: "var(--paper)",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
+            </Button>
+            <Button variant="primary" size="md" type="submit">
               {keepOriginal ? "Duplicate to here" : "Move here"}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

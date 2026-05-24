@@ -52,6 +52,7 @@ import type { CSSProperties, MouseEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Density } from "@/lib/collapse-on-drag";
 import { DRAG_CHIP, DRAG_MOTION } from "@/lib/collapse-on-drag";
+import { Badge, Button, Tooltip } from "@/components/ui";
 import { SaveTargetDialog } from "@/components/weekly/save-target-dialog";
 import { NotePopover } from "@/components/weekly/note-popover";
 import type { Lesson, LessonStatus, WeeklyCardDeck } from "@/lib/types";
@@ -810,18 +811,20 @@ export function WeeklyLessonCard({
                         </span>
                       </span>
                     )}
-                    <button
-                      type="button"
-                      className={styles.affordance}
-                      onClick={handleAffordance}
-                      title="More actions"
-                      aria-label="More actions"
-                      aria-haspopup="menu"
-                    >
-                      <span aria-hidden className={styles.affordanceVisual}>
-                        <Icon name="dots" size={11} />
-                      </span>
-                    </button>
+                    <Tooltip content="More actions" side="top">
+                      <Button
+                        variant="icon"
+                        size="sm"
+                        iconAriaLabel="More actions"
+                        className={styles.affordance}
+                        onClick={handleAffordance}
+                        aria-haspopup="menu"
+                      >
+                        <span className={styles.affordanceVisual}>
+                          <Icon name="dots" size={11} />
+                        </span>
+                      </Button>
+                    </Tooltip>
                   </span>
                 </div>
               </div>
@@ -858,27 +861,27 @@ export function WeeklyLessonCard({
                     </span>
                   )}
                   {lesson.modified && (
-                    <span
-                      className={styles.modifiedPill}
-                      // MED-7: richer tooltip describing what changed and who.
-                      // The Lesson model carries no actor/timestamp fields — ME.name
-                      // is the viewing teacher (best-effort). If moved, include
-                      // the day the lesson was moved from so the tooltip is
-                      // actionable ("Moved Sun→Mon by Lena Haddad").
-                      // Note: lesson.day is the CURRENT day; prior placement is
-                      // not stored, so we describe the type of move only.
-                      title={
+                    // MED-7: richer tooltip describing what changed and who.
+                    // The Lesson model carries no actor/timestamp fields — ME.name
+                    // is the viewing teacher (best-effort). If moved, include
+                    // the day the lesson was moved from so the tooltip is
+                    // actionable ("Moved Sun→Mon by Lena Haddad").
+                    // Note: lesson.day is the CURRENT day; prior placement is
+                    // not stored, so we describe the type of move only.
+                    <Tooltip
+                      content={
                         lesson.moved === "across-weeks"
                           ? `Moved to another week by ${ME.name} · personally modified from Core Curriculum`
                           : lesson.moved === "same-week"
                             ? `Moved to ${WEEK_DAYS[lesson.day] ?? "another day"} by ${ME.name} · personally modified from Core Curriculum`
                             : `Personally modified from the Core Curriculum by ${ME.name}`
                       }
-                      // Deep (~700–800) tone: white text clears AA in every palette.
-                      style={{ background: color.deep, color: "var(--paper)" }}
+                      side="top"
                     >
-                      Modified
-                    </span>
+                      <Badge variant="warn" size="sm">
+                        MODIFIED
+                      </Badge>
+                    </Tooltip>
                   )}
                 </div>
               )}
@@ -1129,8 +1132,10 @@ export function WeeklyLessonCard({
                       sectionLabel = "Notes";
                       sectionContent = (
                         <>
-                          <button
-                            type="button"
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            leadingIcon={<Icon name="eye" size={11} />}
                             className={styles.notesToggle}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1138,11 +1143,10 @@ export function WeeklyLessonCard({
                             }}
                             aria-expanded={notesOpen}
                           >
-                            <Icon name="eye" size={11} />
                             {notesOpen
                               ? "Hide teacher notes"
                               : "Show teacher notes"}
-                          </button>
+                          </Button>
                           {notesOpen &&
                             (editingField === "notes" ? (
                               <RichEditorWrapper
@@ -1244,19 +1248,22 @@ export function WeeklyLessonCard({
                       (the canonical resource container) via addSectionResource — the
                       same action the right-rail and daily detail use (BUG-006). */}
                   <div className={styles.expandedFooter}>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leadingIcon={<Icon name="plus" size={11} />}
                       className={styles.footerBtn}
                       onClick={(e) => {
                         e.stopPropagation();
                         onContextAction?.("add-to-todo", lesson.id);
                       }}
                     >
-                      <Icon name="plus" size={11} />
                       Add section
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leadingIcon={<Icon name="plus" size={11} />}
                       className={styles.footerBtn}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1273,11 +1280,11 @@ export function WeeklyLessonCard({
                       }}
                       aria-label="Add resource to this lesson"
                     >
-                      <Icon name="plus" size={11} />
                       Add resource
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className={styles.footerBtn}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1285,7 +1292,7 @@ export function WeeklyLessonCard({
                       }}
                     >
                       Edit Template
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1367,33 +1374,38 @@ export function WeeklyLessonCard({
           navigate to the pagerCounter live region first. */}
       {!isCompact && hasPager && deck && (
         <div className={styles.pager}>
-          <button
-            type="button"
+          {/* POLISH-012: aria-labels include positional context so screen-reader
+              users know where they are in the deck without navigating to the
+              pagerCounter live region first. */}
+          <Button
+            variant="icon"
+            size="sm"
+            iconAriaLabel={`Previous lesson, ${deck.index + 1} of ${deck.total}`}
             className={styles.pagerArrow}
             disabled={deck.index === 0}
-            aria-label={`Previous lesson, ${deck.index + 1} of ${deck.total}`}
             onClick={(e) => {
               e.stopPropagation();
               deck.onPrev();
             }}
           >
             <span aria-hidden>‹</span>
-          </button>
+          </Button>
           <span className={styles.pagerCounter} aria-live="polite">
             {deck.index + 1} of {deck.total}
           </span>
-          <button
-            type="button"
+          <Button
+            variant="icon"
+            size="sm"
+            iconAriaLabel={`Next lesson, ${deck.index + 2} of ${deck.total}`}
             className={styles.pagerArrow}
             disabled={deck.index === deck.total - 1}
-            aria-label={`Next lesson, ${deck.index + 2} of ${deck.total}`}
             onClick={(e) => {
               e.stopPropagation();
               deck.onNext();
             }}
           >
             <span aria-hidden>›</span>
-          </button>
+          </Button>
         </div>
       )}
 
@@ -1760,26 +1772,30 @@ function ReorderableSectionRow({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            className={styles.sectionMoveBtn}
-            onClick={() => moveKeyboard("up")}
-            disabled={isFirst}
-            aria-label={`Move ${label} section up`}
-            title={`Move ${label} section up`}
-          >
-            <ChevronUpIcon />
-          </button>
-          <button
-            type="button"
-            className={styles.sectionMoveBtn}
-            onClick={() => moveKeyboard("down")}
-            disabled={isLast}
-            aria-label={`Move ${label} section down`}
-            title={`Move ${label} section down`}
-          >
-            <ChevronDownIcon />
-          </button>
+          <Tooltip content={`Move ${label} section up`} side="top">
+            <Button
+              variant="icon"
+              size="sm"
+              iconAriaLabel={`Move ${label} section up`}
+              className={styles.sectionMoveBtn}
+              onClick={() => moveKeyboard("up")}
+              disabled={isFirst}
+            >
+              <ChevronUpIcon />
+            </Button>
+          </Tooltip>
+          <Tooltip content={`Move ${label} section down`} side="top">
+            <Button
+              variant="icon"
+              size="sm"
+              iconAriaLabel={`Move ${label} section down`}
+              className={styles.sectionMoveBtn}
+              onClick={() => moveKeyboard("down")}
+              disabled={isLast}
+            >
+              <ChevronDownIcon />
+            </Button>
+          </Tooltip>
         </div>
       </div>
 

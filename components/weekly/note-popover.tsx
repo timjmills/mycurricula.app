@@ -25,7 +25,8 @@
 // Under prefers-reduced-motion the open/close fade is suppressed (the CSS
 // module zeroes the transition duration).
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Button, Tooltip } from "@/components/ui";
 import styles from "./note-popover.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -132,24 +133,29 @@ export function NotePopover({ reason }: NotePopoverProps) {
           button itself; the negative margin pulls the oversized target back
           so it does not bloat the footer / band-controls cluster it sits in
           (same trick as the card's `.affordance` controls). stopPropagation
-          keeps the click from reaching the card's expand/select handlers. */}
-      <button
-        ref={triggerRef}
-        type="button"
-        className={styles.trigger}
-        aria-label="Why this lesson did not go as planned"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-      >
-        <span aria-hidden className={styles.triggerVisual}>
-          <AlertIcon size={11} />
-        </span>
-      </button>
+          keeps the click from reaching the card's expand/select handlers.
+          Raw <button> retained here because Tooltip.cloneElement injects ref
+          and the Button primitive does not forward ref. The trigger also needs
+          aria-haspopup="dialog" + aria-controls which are dialog-specific. */}
+      <Tooltip content="Why this lesson did not go as planned" side="top">
+        <button
+          ref={triggerRef}
+          type="button"
+          className={styles.trigger}
+          aria-label="Why this lesson did not go as planned"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={open ? panelId : undefined}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
+          }}
+        >
+          <span aria-hidden className={styles.triggerVisual}>
+            <AlertIcon size={11} />
+          </span>
+        </button>
+      </Tooltip>
 
       {/* Floating panel — absolutely positioned, anchored above-right of the
           trigger. Only mounted while open. role="dialog" + aria-label so it
@@ -169,10 +175,11 @@ export function NotePopover({ reason }: NotePopoverProps) {
               <AlertIcon size={12} />
             </span>
             <span className={styles.panelTitle}>Note</span>
-            <button
-              type="button"
+            <Button
+              variant="icon"
+              size="sm"
+              iconAriaLabel="Close note"
               className={styles.panelClose}
-              aria-label="Close note"
               onClick={(e) => {
                 e.stopPropagation();
                 close();
@@ -180,7 +187,7 @@ export function NotePopover({ reason }: NotePopoverProps) {
               }}
             >
               <CloseIcon size={11} />
-            </button>
+            </Button>
           </div>
 
           {/* Body: the reason text. `reasonNotDone` is a plain string, so

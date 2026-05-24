@@ -44,6 +44,7 @@
 import type { ReactNode } from "react";
 import { memo, useCallback, useEffect, useId, useState } from "react";
 import type { SectionResource } from "@/lib/lesson-flow";
+import { Button } from "@/components/ui";
 import { ResourceTypePill } from "./resource-type-pill";
 import styles from "./section-resources.module.css";
 
@@ -204,16 +205,17 @@ export const SectionResources = memo(function SectionResources({
 
         {/* Footer — "+ Add quick resource". The dashed top border lives in
             CSS, not as a separate <hr>, so it tracks the card's padding. */}
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           className={styles.miniAddBtn}
           onClick={onAdd}
           disabled={!onAdd}
           aria-label="Add a quick resource to this section"
+          leadingIcon={<PlusGlyph />}
         >
-          <PlusGlyph />
           Add quick resource
-        </button>
+        </Button>
       </section>
     );
   }
@@ -249,16 +251,17 @@ export const SectionResources = memo(function SectionResources({
       )}
 
       {/* Centered "+ Add resource" link beneath the grid. */}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         className={styles.expandedAddBtn}
         onClick={onAdd}
         disabled={!onAdd}
         aria-label="Add a resource to this section"
+        leadingIcon={<PlusGlyph />}
       >
-        <PlusGlyph />
         Add resource
-      </button>
+      </Button>
 
       {/* "More resources" sub-panel — only mounted when there are extras. */}
       {more.length > 0 && (
@@ -272,14 +275,15 @@ export const SectionResources = memo(function SectionResources({
           {/* "Show more" affordance — non-functional placeholder for Phase 1A
               (the "more" list is already fully visible). Kept per spec so the
               UI matches Reference A; the click is a no-op for now. */}
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             className={styles.showMoreBtn}
             aria-label="Show more resources"
+            trailingIcon={<ShowMoreChevron />}
           >
             Show more
-            <ShowMoreChevron />
-          </button>
+          </Button>
         </div>
       )}
     </section>
@@ -397,6 +401,8 @@ function urlPreviewFor(res: SectionResource): string {
 }
 
 // ── ToggleButton — the expanded/minimized swap control ──────────────────
+// Button variant="icon" carries the touch target, focus ring, and disabled
+// state. aria-pressed passes through {...rest} to the native <button>.
 
 function ToggleButton({
   minimized,
@@ -406,17 +412,18 @@ function ToggleButton({
   onClick: () => void;
 }): ReactNode {
   return (
-    <button
-      type="button"
+    <Button
+      variant="icon"
+      size="sm"
       className={styles.toggleBtn}
       onClick={onClick}
-      // Spec §4.1: tooltip flips with state.
-      aria-label={minimized ? "Expand resources" : "Minimize resources"}
-      title={minimized ? "Expand resources" : "Minimize resources"}
+      iconAriaLabel={minimized ? "Expand resources" : "Minimize resources"}
+      // Spec §4.1: aria-pressed reflects the minimized state — pressed=true
+      // when minimized; the label and glyph convey the transition direction.
       aria-pressed={minimized}
     >
       {minimized ? <ExpandGlyph /> : <MinimizeGlyph />}
-    </button>
+    </Button>
   );
 }
 

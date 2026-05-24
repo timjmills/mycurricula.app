@@ -30,6 +30,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { TEACHER_BY_ID, ME, shoutboxForDay } from "@/lib/mock";
 import type { ShoutboxMessage } from "@/lib/mock";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
+import { Button } from "@/components/ui";
 import type { PanelDragHandleProps } from "./RightRail";
 import styles from "./Shoutbox.module.css";
 
@@ -314,35 +315,34 @@ export function Shoutbox({
           aria-label="Write a shoutbox message"
         />
         <div className={styles.composerActions}>
-          <button
-            type="button"
+          {/* Stub for Phase 1A — no emoji picker yet. */}
+          <Button
+            variant="icon"
+            iconAriaLabel="Add emoji"
             className={styles.iconBtn}
-            aria-label="Add emoji"
-            title="Add emoji"
-            // Stub for Phase 1A — no emoji picker yet.
             onClick={(e) => e.preventDefault()}
           >
             <EmojiIcon />
-          </button>
-          <button
-            type="button"
+          </Button>
+          {/* Stub for Phase 1A — file attach lands with Cloudflare R2 (1B+). */}
+          <Button
+            variant="icon"
+            iconAriaLabel="Attach file"
             className={styles.iconBtn}
-            aria-label="Attach file"
-            title="Attach file"
-            // Stub for Phase 1A — file attach lands with Cloudflare R2 (1B+).
             onClick={(e) => e.preventDefault()}
           >
             <AttachIcon />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
             type="submit"
+            iconAriaLabel="Post message"
             className={`${styles.iconBtn} ${styles.sendBtn}`}
             disabled={draft.trim().length === 0}
-            aria-label="Post message"
-            title="Post message"
           >
             <SendIcon />
-          </button>
+          </Button>
         </div>
       </form>
     </>
@@ -378,20 +378,19 @@ export function Shoutbox({
         )}
         {/* Chevron collapse toggle — pushed to the far right. */}
         {onToggleCollapsed && (
-          <button
-            type="button"
-            className={styles.collapseBtn}
-            onClick={onToggleCollapsed}
-            aria-expanded={!collapsed}
-            aria-label={
+          <Button
+            variant="icon"
+            iconAriaLabel={
               collapsed
                 ? "Expand Day Shoutbox panel"
                 : "Collapse Day Shoutbox panel"
             }
-            title={collapsed ? "Expand" : "Collapse"}
+            className={styles.collapseBtn}
+            onClick={onToggleCollapsed}
+            aria-expanded={!collapsed}
           >
             <ChevronToggleIcon collapsed={collapsed} />
-          </button>
+          </Button>
         )}
       </header>
 

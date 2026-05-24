@@ -84,6 +84,7 @@ import type { Lesson, LessonResource, SubjectId } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECTS } from "@/lib/mock";
 import { useLabels } from "@/lib/labels";
+import { Button } from "@/components/ui";
 import { AllToolsMenu } from "./AllToolsMenu";
 import styles from "./ResourceComposer.module.css";
 
@@ -737,27 +738,26 @@ export function ResourceComposer({
       >
         {/* ── Top bar: × close · spacer · Add ─────────────────────────── */}
         <header className={styles.topBar}>
-          <button
-            type="button"
+          <Button
+            variant="icon"
+            iconAriaLabel="Close add-resource dialog"
             className={styles.closeBtn}
             onClick={onClose}
-            aria-label="Close add-resource dialog"
-            title="Close"
           >
             <CloseIcon />
-          </button>
+          </Button>
           <span id={headingId} className={styles.srOnly}>
             Add a resource
           </span>
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="sm"
             className={styles.addBtn}
             onClick={handleAdd}
             disabled={!canAdd}
-            aria-label="Add resource"
           >
             Add
-          </button>
+          </Button>
         </header>
 
         {/* ── Main composer body OR the "All tools" expanded grid ───── */}
@@ -850,15 +850,16 @@ export function ResourceComposer({
             cover the 80% case; this button exposes the long-tail tool
             palette (Lesson Padlet, YouTube, Camera, etc.) without
             cluttering the standard composer. */}
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               className={styles.allToolsBtn}
               onClick={() => setAllToolsOpen(true)}
               aria-label="Show all tools"
+              leadingIcon={<MoreDotsIcon />}
             >
-              <MoreDotsIcon />
-              <span>All tools</span>
-            </button>
+              All tools
+            </Button>
 
             {/* Hidden file inputs — driven by the tool tiles' clicks. */}
             <input
@@ -898,14 +899,15 @@ export function ResourceComposer({
                   onKeyDown={onLinkKeyDown}
                   aria-label="Resource URL"
                 />
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   className={styles.inlineAddBtn}
                   onClick={onLinkConfirm}
                   disabled={!linkValue.trim()}
                 >
                   Add link
-                </button>
+                </Button>
               </div>
             )}
 

@@ -80,33 +80,6 @@
   line-height: 1.2;
 }
 
-.closeBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: var(--r-6);
-  background: transparent;
-  color: var(--ink-400);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease;
-}
-
-.closeBtn:hover {
-  background: var(--ink-100);
-  color: var(--ink-700);
-}
-
-.closeBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
 /* ── Scrollable body ──────────────────────────────────────────────────────── */
 .body {
   flex: 1 1 auto;
@@ -222,8 +195,5 @@
   }
   .panel {
     animation-duration: 0.001ms !important;
-  }
-  .closeBtn {
-    transition-duration: 0.001ms !important;
   }
 }

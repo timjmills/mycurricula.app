@@ -24,6 +24,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { Lesson, LessonStatus } from "@/lib/types";
+import { Button } from "@/components/ui";
 import { Icon } from "./icon";
 import { STATUS_LABEL } from "./status";
 // RelocatePicker, CompareToMaster, ArchiveToast are imported by the
@@ -311,16 +312,20 @@ export function LessonContextMenu({
     >
       {/* Back button shown only when a submenu is open */}
       {sub && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setSub(null)}
+          leadingIcon={
+            <span
+              style={{ transform: "rotate(180deg)", display: "inline-flex" }}
+            >
+              <Icon name="chevron" size={9} />
+            </span>
+          }
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
             width: "100%",
-            padding: "5px 10px",
-            borderRadius: 4,
+            justifyContent: "flex-start",
             color: "var(--ink-500)",
             fontSize: 11,
             fontWeight: 500,
@@ -328,11 +333,8 @@ export function LessonContextMenu({
             textTransform: "uppercase",
           }}
         >
-          <span style={{ transform: "rotate(180deg)", display: "inline-flex" }}>
-            <Icon name="chevron" size={9} />
-          </span>
           Back
-        </button>
+        </Button>
       )}
 
       {cleanedRows.map((row, i) => {
@@ -366,32 +368,34 @@ export function LessonContextMenu({
             </div>
           );
         }
+        // Menu items: Button ghost sm with role="menuitem" threaded through
+        // {...rest} — Button spreads all extra props onto the native <button>
+        // so role, aria-* attributes and keyboard semantics are fully preserved.
         return (
-          <button
+          <Button
             key={`i-${i}`}
-            type="button"
+            variant="ghost"
+            size="sm"
             role="menuitem"
             onClick={row.onSelect}
             className="cp-card-menuitem"
+            trailingIcon={
+              row.chevron ? (
+                <Icon name="chevron" size={10} />
+              ) : row.kbd ? (
+                <span style={{ color: "var(--ink-400)", fontSize: 11 }}>
+                  {row.kbd}
+                </span>
+              ) : undefined
+            }
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
               width: "100%",
-              padding: "6px 10px",
-              borderRadius: 4,
-              textAlign: "left",
+              justifyContent: "flex-start",
               color: row.danger ? "var(--urgent)" : "var(--ink-900)",
             }}
           >
-            <span style={{ flex: 1 }}>{row.label}</span>
-            {row.chevron && <Icon name="chevron" size={10} />}
-            {row.kbd && (
-              <span style={{ color: "var(--ink-400)", fontSize: 11 }}>
-                {row.kbd}
-              </span>
-            )}
-          </button>
+            {row.label}
+          </Button>
         );
       })}
     </div>

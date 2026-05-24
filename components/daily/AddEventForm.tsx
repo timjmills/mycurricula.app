@@ -23,6 +23,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { ReactNode, KeyboardEvent, FormEvent } from "react";
 import { WEEK_DAYS } from "@/lib/mock";
+import { Button } from "@/components/ui";
 import styles from "./AddEventForm.module.css";
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -173,9 +174,9 @@ export function AddEventForm({
         <header className={styles.header}>
           <h2 className={styles.title}>Add an event</h2>
           <span className={styles.dayBadge}>{dayLabel}</span>
-          <button
-            type="button"
-            aria-label="Close add-event form"
+          <Button
+            variant="icon"
+            iconAriaLabel="Close add-event form"
             className={styles.closeBtn}
             onClick={onClose}
           >
@@ -193,7 +194,7 @@ export function AddEventForm({
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
-          </button>
+          </Button>
         </header>
 
         <form
@@ -263,21 +264,23 @@ export function AddEventForm({
 
           {/* Action row. */}
           <div className={styles.actions}>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               className={styles.btnCancel}
               onClick={onClose}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
               type="submit"
               className={styles.btnSave}
               disabled={!label.trim() || !!timeError}
-              aria-disabled={!label.trim() || !!timeError}
             >
               Add event
-            </button>
+            </Button>
           </div>
 
           {submitted && (

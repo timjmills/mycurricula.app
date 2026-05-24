@@ -62,6 +62,7 @@ import { ResourceTile } from "@/components/lesson-flow";
 import { usePlanner } from "@/lib/planner-store";
 import { lessonResources } from "@/lib/lesson-resources";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
+import { Button } from "@/components/ui";
 import type { PanelDragHandleProps } from "./RightRail";
 import {
   ResourceComposer,
@@ -584,11 +585,10 @@ function TileWithOverflow({
           top: 6px right: 6px / 36px). Hidden on a stack tile because the
           whole wrapper IS the click target there. */}
       {!isStack && (
-        <button
-          type="button"
+        <Button
+          variant="icon"
+          iconAriaLabel={`More actions for ${resource.label || resource.type}`}
           className={styles.tileMenuBtn}
-          aria-label={`More actions for ${resource.label || resource.type}`}
-          title="More actions"
           onClick={(e) => {
             // The stub click is contained — don't bubble into a future
             // tile-click handler when one lands.
@@ -596,7 +596,7 @@ function TileWithOverflow({
           }}
         >
           <OverflowIcon />
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -970,15 +970,14 @@ export function ResourcesPanel({
             aggregate. Uses a chevron-left + label combination so it
             reads as a navigation back-action, not a destructive button. */}
         {!isWeek && lesson !== null && onClearLesson && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             className={styles.backBtn}
             onClick={onClearLesson}
             aria-label="Back to week resources"
-            title="Show all week's resources"
-          >
-            <BackIcon />
-          </button>
+            leadingIcon={<BackIcon />}
+          />
         )}
         {/* Headline:
             • Week mode: "Resources · Week 12" (or just "Resources").
@@ -1012,17 +1011,16 @@ export function ResourcesPanel({
             no lesson to route to, so the rail head reads as "no context
             yet" rather than offering a control that can't act. */}
         {composerLesson && (
-          <button
-            type="button"
+          <Button
+            variant="icon"
+            iconAriaLabel="Add a resource to this lesson"
             className={styles.addBtn}
             onClick={openComposer}
             aria-haspopup="dialog"
             aria-expanded={composerOpen}
-            aria-label="Add a resource to this lesson"
-            title="Add a resource"
           >
             <PlusIcon />
-          </button>
+          </Button>
         )}
         {/* The list/grid toggle is anchored to the right of the head
             row. Hidden when there are zero combined resources — the body
@@ -1035,48 +1033,45 @@ export function ResourcesPanel({
             role="group"
             aria-label="Resource view mode"
           >
-            <button
-              type="button"
+            <Button
+              variant="icon"
+              iconAriaLabel="List view"
               aria-pressed={viewMode === "list"}
-              aria-label="List view"
-              title="List view"
               className={`${styles.modeBtn} ${
                 viewMode === "list" ? styles.modeBtnActive : ""
               }`}
               onClick={() => setViewMode("list")}
             >
               <ListIcon />
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="icon"
+              iconAriaLabel="Grid view"
               aria-pressed={viewMode === "grid"}
-              aria-label="Grid view"
-              title="Grid view"
               className={`${styles.modeBtn} ${
                 viewMode === "grid" ? styles.modeBtnActive : ""
               }`}
               onClick={() => setViewMode("grid")}
             >
               <GridIcon />
-            </button>
+            </Button>
           </div>
         )}
         {/* Chevron collapse toggle — flush right, after every other
             header control. Rendered only when RightRail wires the
             onToggleCollapsed callback. */}
         {onToggleCollapsed && (
-          <button
-            type="button"
+          <Button
+            variant="icon"
+            iconAriaLabel={
+              collapsed ? "Expand Resources panel" : "Collapse Resources panel"
+            }
             className={styles.collapseBtn}
             onClick={onToggleCollapsed}
             aria-expanded={!collapsed}
-            aria-label={
-              collapsed ? "Expand Resources panel" : "Collapse Resources panel"
-            }
-            title={collapsed ? "Expand" : "Collapse"}
           >
             <ChevronToggleIcon collapsed={collapsed} />
-          </button>
+          </Button>
         )}
       </header>
 

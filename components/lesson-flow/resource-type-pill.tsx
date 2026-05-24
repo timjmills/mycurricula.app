@@ -4,10 +4,12 @@
 // the "More resources" sub-list (expanded SectionResources card) and the
 // "Resource quick access" minimized card.
 //
-// Spec exception (per Plugin Directions §4.4): these pills carry EXACT hex
-// color pairs (background / text). They are the published color language for
-// resource types and are not part of the subject-color cascade. All other
-// color in this folder still flows through var(--token).
+// NOT migrated to Badge primitive — by design.
+//
+// The Badge primitive uses the semantic palette (success/info/warn/danger/
+// neutral) and derives background + text from design tokens. The resource-
+// type pills use EXACT HEX color pairs mandated by the spec (Plugin
+// Directions §4.4) as the published visual language for resource types:
 //
 //   VIDEO    #fce7f3 / #9d174d
 //   DOCX     #dbeafe / #1e40af
@@ -15,6 +17,14 @@
 //   LINK     #f3f4f6 / #374151
 //   SLIDES   #fef3c7 / #92400e
 //   IMAGE    #dcfce7 / #166534
+//
+// These pairs are bespoke, spec-locked, and not expressible through the
+// token system without adding six new token groups. Badge does not accept a
+// raw hex pair; adding a "resource" variant would bleed domain-specific
+// knowledge into a generic primitive. The correct solution (when the design
+// matures) is a subject-neutral ResourceTypePill primitive in components/ui/
+// that accepts a colorway prop — not retrofitting Badge. Until then, this
+// component stays bespoke and explicitly documented as such.
 //
 // The pill is purely decorative — the surrounding resource row already names
 // the resource via its title/URL subtitle, so the pill is just a quick visual

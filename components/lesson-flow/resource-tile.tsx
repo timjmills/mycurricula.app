@@ -29,6 +29,7 @@
 import type { ReactNode } from "react";
 import { useId, useState } from "react";
 import type { SectionResource } from "@/lib/lesson-flow";
+import { Button } from "@/components/ui";
 import styles from "./resource-tile.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -95,28 +96,28 @@ export function ResourceTile({
           <BigResourceIcon type={resource.type} />
         </span>
 
-        {/* Minimize-to-links control, pinned to the tile's top-right. Flips
-            the whole section's resources to the compact inline-link list. */}
-        <button
-          type="button"
+        {/* Minimize-to-links control, pinned to the tile's top-right.
+            Button variant="icon" carries the 44px touch target + focus ring. */}
+        <Button
+          variant="icon"
+          size="sm"
           className={styles.collapseBtn}
           onClick={onCollapse}
-          aria-label={`Minimize resources to a link list (from ${label})`}
-          title="Minimize to link list"
+          iconAriaLabel={`Minimize resources to a link list (from ${label})`}
         >
           <CollapseIcon />
-        </button>
+        </Button>
 
         {/* Remove control, pinned beside collapse. */}
-        <button
-          type="button"
+        <Button
+          variant="icon"
+          size="sm"
           className={styles.removeBtn}
           onClick={onRemove}
-          aria-label={`Remove resource: ${label}`}
-          title="Remove resource"
+          iconAriaLabel={`Remove resource: ${label}`}
         >
           <RemoveIcon />
-        </button>
+        </Button>
       </div>
 
       {/* ── Caption row — small type icon + label + type tag ──────────── */}

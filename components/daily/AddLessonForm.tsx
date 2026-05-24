@@ -33,6 +33,7 @@ import type { ReactNode, KeyboardEvent, FormEvent } from "react";
 import type { SubjectId } from "@/lib/types";
 import { SUBJECTS } from "@/lib/mock";
 import { WEEK_DAYS } from "@/lib/mock";
+import { Button } from "@/components/ui";
 import styles from "./AddLessonForm.module.css";
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -154,9 +155,9 @@ export function AddLessonForm({
         <header className={styles.header}>
           <h2 className={styles.title}>Add a lesson</h2>
           <span className={styles.dayBadge}>{dayLabel}</span>
-          <button
-            type="button"
-            aria-label="Close add-lesson form"
+          <Button
+            variant="icon"
+            iconAriaLabel="Close add-lesson form"
             className={styles.closeBtn}
             onClick={onClose}
           >
@@ -175,7 +176,7 @@ export function AddLessonForm({
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
-          </button>
+          </Button>
         </header>
 
         <form
@@ -238,21 +239,23 @@ export function AddLessonForm({
 
           {/* Action row. */}
           <div className={styles.actions}>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               className={styles.btnCancel}
               onClick={onClose}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
               type="submit"
               className={styles.btnSave}
               disabled={!title.trim()}
-              aria-disabled={!title.trim()}
             >
               Add lesson
-            </button>
+            </Button>
           </div>
 
           {/* Submitted flash — visible only in the same paint cycle before

@@ -15,6 +15,7 @@
 // Token rules: var(--token) only — no hard-coded hex or px font sizes.
 
 import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
+import { Button } from "@/components/ui";
 import styles from "./shortcuts-overlay.module.css";
 
 // ── Shortcut table data ────────────────────────────────────────────────────────
@@ -84,7 +85,10 @@ export function ShortcutsOverlay({
 }: ShortcutsOverlayProps): ReactNode {
   const headingId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  // Wraps the close Button — used to programmatically focus the button on open.
+  // We cannot pass a ref directly to Button (no forwardRef), so we query the
+  // button element inside this wrapper span on mount.
+  const closeBtnWrapRef = useRef<HTMLSpanElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   // ── Open / close effects ─────────────────────────────────────────────────
@@ -93,7 +97,10 @@ export function ShortcutsOverlay({
     if (open) {
       previousFocusRef.current = document.activeElement as HTMLElement | null;
       const frame = requestAnimationFrame(() => {
-        closeBtnRef.current?.focus();
+        // Query the button inside the wrapper span since Button has no forwardRef.
+        closeBtnWrapRef.current
+          ?.querySelector<HTMLButtonElement>("button")
+          ?.focus();
       });
       return () => cancelAnimationFrame(frame);
     } else {
@@ -164,15 +171,16 @@ export function ShortcutsOverlay({
           <h2 id={headingId} className={styles.heading}>
             Keyboard shortcuts
           </h2>
-          <button
-            ref={closeBtnRef}
-            type="button"
-            className={styles.closeBtn}
-            onClick={onClose}
-            aria-label="Close keyboard shortcuts"
-          >
-            <CloseIcon />
-          </button>
+          <span ref={closeBtnWrapRef}>
+            <Button
+              variant="icon"
+              size="sm"
+              iconAriaLabel="Close keyboard shortcuts"
+              onClick={onClose}
+            >
+              <CloseIcon />
+            </Button>
+          </span>
         </div>
 
         {/* Shortcut groups */}

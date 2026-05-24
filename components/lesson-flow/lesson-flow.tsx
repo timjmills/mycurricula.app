@@ -96,6 +96,7 @@ import {
   useDndSensors,
 } from "@/lib/collapse-on-drag";
 import { usePlanner } from "@/lib/planner-store";
+import { Button, Tooltip } from "@/components/ui";
 import { RichTextEditor } from "@/components/rich-text";
 import { SectionToolbar } from "./section-toolbar";
 import { SectionResources } from "./section-resources";
@@ -418,22 +419,26 @@ const SortableSection = memo(function SortableSection({
             className={styles.headingRow}
             onClick={() => onToggleCollapsed(rowId)}
           >
-            {/* Drag grip — only on store-backed rows (Standards is fixed). */}
+            {/* Drag grip — only on store-backed rows (Standards is fixed).
+                Kept as raw <button>: dnd-kit's setActivatorNodeRef requires a
+                DOM ref, and Button does not expose forwardRef yet. Tooltip
+                wraps it to replace the bespoke title="" attribute. */}
             {storeSection && (
-              <button
-                type="button"
-                ref={setActivatorNodeRef}
-                className={styles.dragGrip}
-                aria-label={`Drag to reorder section ${canonical.index}: ${canonical.title}`}
-                title="Drag to reorder section"
-                // Stop click bubbling so dragging the grip doesn't toggle
-                // collapse.
-                onClick={(e) => e.stopPropagation()}
-                {...listeners}
-                {...attributes}
-              >
-                <GripVerticalIcon />
-              </button>
+              <Tooltip content="Drag to reorder section" side="top">
+                <button
+                  type="button"
+                  ref={setActivatorNodeRef}
+                  className={styles.dragGrip}
+                  aria-label={`Drag to reorder section ${canonical.index}: ${canonical.title}`}
+                  // Stop click bubbling so dragging the grip doesn't toggle
+                  // collapse.
+                  onClick={(e) => e.stopPropagation()}
+                  {...listeners}
+                  {...attributes}
+                >
+                  <GripVerticalIcon />
+                </button>
+              </Tooltip>
             )}
 
             {/* Title + helper stack.
@@ -448,25 +453,25 @@ const SortableSection = memo(function SortableSection({
             </div>
 
             {/* Right-side chevron — `v` when expanded, `>` when collapsed
-                (spec §3.2). The button is a separate hit target so screen
-                readers announce the expand/collapse intent. */}
-            <button
-              type="button"
+                (spec §3.2). Button variant="icon" carries the hit target;
+                aria-expanded passes through {...rest} to the native <button>. */}
+            <Button
+              variant="icon"
+              size="sm"
               className={styles.collapseChevron}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleCollapsed(rowId);
               }}
               aria-expanded={!isCollapsed}
-              aria-label={
+              iconAriaLabel={
                 isCollapsed
                   ? `Expand section ${canonical.index}: ${canonical.title}`
                   : `Collapse section ${canonical.index}: ${canonical.title}`
               }
-              title={isCollapsed ? "Expand section" : "Collapse section"}
             >
               <ChevronRightIcon collapsed={isCollapsed} />
-            </button>
+            </Button>
 
             {/* Section management trigger ("···" overflow) — only on
                 store-backed rows. Clicking opens the SectionToolbar popup
@@ -475,6 +480,9 @@ const SortableSection = memo(function SortableSection({
                 SectionResources card as the "+ Add resource" button. */}
             {storeSection && (
               <div className={styles.menuTriggerWrap}>
+                {/* Kept as raw <button>: triggerRef is required by the
+                    click-outside handler in the parent effect, and Button does
+                    not expose forwardRef yet. */}
                 <button
                   type="button"
                   ref={triggerRef}
@@ -495,7 +503,6 @@ const SortableSection = memo(function SortableSection({
                       ? `Close actions for ${canonical.title}`
                       : `Actions for ${canonical.title}`
                   }
-                  title="Section actions"
                 >
                   <OverflowIcon />
                 </button>
@@ -994,24 +1001,24 @@ export function LessonFlow({
           role="group"
           aria-label="Expand or collapse all sections"
         >
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             className={styles.globalToggleBtn}
             onClick={expandAll}
             disabled={noneCollapsed}
-            title="Expand every section"
           >
             Expand all
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             className={styles.globalToggleBtn}
             onClick={collapseAll}
             disabled={allCollapsed}
-            title="Collapse every section to its heading"
           >
             Collapse all
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1100,22 +1107,23 @@ export function LessonFlow({
 
       {/* ── Footer — "+ Add section" + template stub (preserved per §5) */}
       <div className={styles.footer}>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           className={styles.addSectionBtn}
           onClick={addSection}
+          leadingIcon={<AddIcon />}
         >
-          <AddIcon />
           Add section
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           className={styles.templateBtn}
           aria-label="Edit lesson flow template (coming soon)"
-          title="Edit the lesson flow template — coming soon"
         >
           Edit lesson flow / template
-        </button>
+        </Button>
       </div>
 
       {/* ── ResourceComposer — shared "Add resource" dialog ─────────── */}
