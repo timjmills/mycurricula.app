@@ -225,11 +225,20 @@ export function TopBar(): ReactNode {
           }
           const isActive =
             pathname === v.href || pathname.startsWith(v.href + "/");
+          // RES-CRIT-002: at phone widths the master/personal toggle must
+          // remain visible per CLAUDE.md §4. To keep the bar within the
+          // viewport budget at ≤480px we hide the less-used Yearly +
+          // Curriculum tabs. The data-narrow attribute drives the CSS
+          // media-query hide below. Daily / Weekly / Schedule are the
+          // three primary tabs and stay visible at every width.
+          const narrowOnly =
+            v.label === "Yearly" || v.label === "Curriculum";
           return (
             <Link
               key={v.label}
               href={v.href!}
               className={`${styles.viewTab} ${isActive ? styles.viewTabActive : ""}`}
+              data-narrow-hide={narrowOnly ? "true" : undefined}
               aria-current={isActive ? "page" : undefined}
             >
               {v.label}

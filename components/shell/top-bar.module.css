@@ -502,13 +502,84 @@
     font-size: var(--t-12);
   }
 
-  /* Reclaim ~176px from the right cluster — at ≤540 the panel collapse
-     toggle is useless (LeftFilterPanel hides at ≤900 anyway), search is
-     reachable via the `/` keyboard shortcut, and signout is reachable
-     through the profile-avatar settings page. The to-do + comments
-     buttons stay because they're the only entry into those panels. */
+  /* RES-CRIT-001 (B): the right cluster has too many icon buttons for a
+     ≤540 viewport — at least ~280px of avatar + signout + comments +
+     to-do + flame + search even after the cascade above. With the bar
+     using overflow-x: clip the controls don't push doc width, but they
+     ARE invisible (clipped past the right edge), which means the
+     teacher can't reach them. Hide the non-essential ones and keep
+     only the must-haves: master/personal toggle + avatar (settings +
+     signout entry).
+       • signOutForm   — signout via profile avatar → settings page.
+       • search-trigger — reachable via the `/` keyboard shortcut.
+       • todoPanel + commentsPanel — Phase-1B affordance; for now both
+         panels are reachable from the in-grid bars (catch-up bar, etc).
+       • catchup flame button — already hides ≤540 in its own module CSS.
+     The panel-collapse toggle stays because it doubles as the page-
+     level menu affordance once the LeftFilterPanel is hidden at ≤900;
+     and the master/personal toggle is NEVER hidden (RES-CRIT-002). */
   .signOutForm {
     display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  /* The LeftFilterPanel hides at ≤900 (left-filter-panel.module.css),
+     so the panel-collapse toggle in the top bar serves no purpose
+     until the viewport widens again. Hide it to reclaim 44px for the
+     other right-cluster controls. The button's state in app-state is
+     preserved untouched. */
+  .bar :global(button[aria-label*="filter panel" i]) {
+    display: none;
+  }
+}
+
+@media (max-width: 540px) {
+  /* Hide non-essential right-cluster buttons. Use descendant selectors
+     (no `>`) because the to-do button is a direct child of the bar but
+     the comments button is wrapped in `.badgeWrap`. The flame button
+     hides itself via its own module CSS at ≤540 — listed here too as
+     a belt-and-braces. */
+  .bar :global(button[data-search-trigger]),
+  .bar :global(button[aria-label*="to-do panel" i]),
+  .bar :global(button[aria-label*="comments panel" i]) {
+    display: none;
+  }
+  /* When the comments button is hidden, also hide its wrapper so the
+     bar's flex layout doesn't reserve any space. */
+  .bar
+    :global(div.top-bar_badgeWrap__6Z4pm):has(
+      button[aria-label*="comments panel" i]
+    ) {
+    display: none;
+  }
+  /* Avatar stays visible — once Yearly + Curriculum tabs are hidden at
+     ≤480 (the rule further down + the data-narrow-hide attribute on
+     the Link), the bar fits within the viewport with master toggle +
+     avatar both showing. Avatar links to settings; signout is one tap
+     deeper inside settings. */
+}
+
+@media (max-width: 480px) {
+  /* RES-CRIT-002: drop Yearly + Curriculum tabs at ≤480 to reclaim
+     ~120px so the master/personal toggle (must-show) and avatar
+     (settings entry) fit. Daily / Weekly / Schedule are the three
+     primary tabs and stay visible. Teachers can still reach Yearly /
+     Curriculum on phone via `3` keyboard nav, a deep link, or by
+     widening the viewport. */
+  .viewTab[data-narrow-hide="true"] {
+    display: none;
+  }
+}
+
+@media (max-width: 360px) {
+  /* At the smallest phone width the Schedule tab text "Schedule" is the
+     longest of the five live tabs — abbreviate it to a chevron icon
+     would be a bigger UX change; for now just compress tab padding
+     once more so all five tabs survive the clip. */
+  .viewTab {
+    padding: 0 4px;
+    font-size: var(--t-11);
   }
 }
 

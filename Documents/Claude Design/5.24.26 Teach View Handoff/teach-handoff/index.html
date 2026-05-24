@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>5.24.26 — Teach View Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="tokens.css" />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html,body{margin:0;padding:0;height:100%;font-family:"Inter", system-ui, -apple-system, sans-serif;color:#0B1220;background:#F4F6FB}
+  #root{min-height:100%}
+  .page{max-width:1560px;margin:0 auto;padding:20px}
+  .pagetitle{display:flex;align-items:baseline;gap:14px;margin-bottom:14px}
+  .pagetitle h1{margin:0;font-size:26px;font-weight:800;color:#0B1220;letter-spacing:-0.5px}
+  .pagetitle .sub{font-size:13px;color:#4B5563}
+  .pageintro{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:16px 20px;margin-bottom:18px}
+  .pageintro h2{margin:0 0 6px;font-size:17px;font-weight:700;color:#0B1220;letter-spacing:-0.3px}
+  .pageintro p{margin:0;font-size:13px;color:#4B5563;line-height:1.55;text-wrap:pretty}
+  .ab-card{background:#fff;border:1px solid #E5E7EB;border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(11,18,32,.04);margin-bottom:18px}
+  .ab-header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #EEF0F4;background:#FAFBFC;font-size:12px;color:#4B5563}
+  .ab-header .num{font-family:"JetBrains Mono", "Geist Mono", ui-monospace, monospace;color:#9CA3AF;font-size:11px;font-weight:500}
+  .ab-header .title{color:#0B1220;font-weight:700;font-size:14px;letter-spacing:-0.1px}
+  .ab-header .desc{flex:1;color:#4B5563;font-size:11.5px;text-wrap:pretty}
+  .ab-frame{position:relative;width:100%;background:#fff;overflow:hidden}
+  .teach-widget:hover .teach-chrome { opacity: 1 !important; }
+  .cp-mono { font-family: "JetBrains Mono", "Geist Mono", ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="teach524.jsx"></script>
+<script type="text/babel" data-presets="react">
+function Artboard({ num, title, desc, h = 980, children }) {
+  return (
+    <div className="ab-card">
+      <div className="ab-header">
+        {num && <span className="num">{num}</span>}
+        <span className="title">{title}</span>
+        {desc && <span className="desc">— {desc}</span>}
+      </div>
+      <div className="ab-frame" style={{ height: h }}>{children}</div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div className="page">
+      <div className="pagetitle">
+        <h1>5.24.26 — Teach View Prototype</h1>
+        <span className="sub">Top-level Teach tab · live in-class board · collapsible side panels</span>
+      </div>
+      <div className="pageintro">
+        <h2>What's on this page</h2>
+        <p>
+          Rebuilt to match the new reference. <strong>Top bar</strong> with MyCurricula / Grade 5 / Dashboard / Plan / <strong>Teach</strong> / Assess / Report / Resources. <strong>Sub-toolbar</strong> with Week + Math selectors, numbered board tabs (Warm-Up active), + Add Board, blue Present, Pop-Out / Duplicate / Full Screen. <strong>64px left icon rail</strong> with labels (Lessons / Boards / Groups / Class / Notes / Timer / Tools). <strong>Left panel</strong>: Lesson card → subject-tagged lessons list → Teaching Boards thumbs with mini-previews. <strong>Center</strong>: drawing toolbar + widget grid + floating tool dock (select / text / pen / sticky / timer / stopwatch / dice / poll / group maker / traffic light / more). <strong>Right panel</strong>: Resources with search, Grid/List toggle, type-filter chips, thumb cards with hover-action menu (Embed to Board / Open Large). <strong>Footer</strong>: Panels / Lessons / Resources / Notes, Board 1 of 5, Saved, ⌘P shortcut.<br/><br/>
+          The side panels collapse into 64px icon rails (see T2). <strong>Extends</strong> the 5.23.26 Daily/Weekly/Subject flow.
+        </p>
+      </div>
+
+      <Artboard num="T1" title="Default Teach view (matched to reference)" desc="Warm-Up board active. I Can spans 2 cols, Visual Timer right, Student Groups + Model It + Agenda in row 2, Manipulatives spans 2 cols + Teacher Notes in row 3. Hover any widget for drag/expand chrome. Resource hover menu shows on Fraction Strips." h={1100}>
+        <window.ABTeachDefault />
+      </Artboard>
+
+      <Artboard num="T2" title="Collapsed side panels — icon rails on both edges" desc="Both side panels collapse into 64px icon rails (left + right). The board canvas widens. Tap any icon to expand its rail back into the full panel." h={1100}>
+        <window.ABTeachCollapsed />
+      </Artboard>
+
+      <Artboard num="T3" title="Resource opened in center board" desc="Click a resource (Fraction Wall Poster PDF) to load it as the main canvas. PDF viewer toolbar with page count + zoom controls, annotation toolbar at the bottom with pen / highlighter / eraser / shapes / text / undo-redo / color swatches. Left panel: Lesson card · I CAN widget · Agenda · Teaching Boards. Right panel: pinned Visual Timer above the Resources grid." h={1100}>
+        <window.ABTeachResourceFocus />
+      </Artboard>
+
+      <Artboard num="T4" title="Resource opened — both side panels collapsed" desc="Same state as T3 but both side panels are collapsed into 64px icon rails. The PDF canvas takes nearly the full width. Tap any icon to re-expand its rail back into the full panel." h={1100}>
+        <window.ABTeachResourceFocusCollapsed />
+      </Artboard>
+
+      <Artboard num="T5" title="Widget picker popover" desc="+ on an empty cell opens a centered picker overlaying the board. 12 widget types in a 4-column grid: Timer · I Can · Groups · Agenda · Notes · Model It · Slides · YouTube · Poll · Names · Manipulatives · Embed link. Search at the top filters." h={1100}>
+        <window.ABTeachWidgetPicker />
+      </Artboard>
+
+      <Artboard num="T6" title="Present mode — chrome hidden, board fullscreened" desc="Click the Present button in the sub-bar. All chrome hides — only a thin presenting strip on top with the board name, slide counter, prev/next, and Esc-to-exit hints. Widget chrome stays hidden for projection clarity." h={920}>
+        <window.ABTeachPresent />
+      </Artboard>
+
+      <Artboard num="T7" title="Focus mode — one widget fullscreen" desc="Click the expand icon on any widget to focus it. Chrome stays, but the canvas dims and the focused widget fills the board area. Esc returns to the board. Demonstrated on the Visual Timer." h={1100}>
+        <window.ABTeachFocus />
+      </Artboard>
+
+      <Artboard num="T8" title="Drag-drop a resource onto an empty cell" desc="An empty 1×1 cell shows a dashed math-blue drop-target. The dragged resource (Fraction Strips) floats with a rotated drag-ghost; releasing adds it as the appropriate widget at the dropped cell." h={1100}>
+        <window.ABTeachDragDrop />
+      </Artboard>
+
+      <Artboard num="T9" title="Empty board state" desc="A new or cleared board shows a centered call-to-action: 'Add your first widget' with one-tap widget pills below. Resources can still be dragged in from the right panel." h={1100}>
+        <window.ABTeachEmpty />
+      </Artboard>
+
+      <Artboard num="T10" title="Mini Lesson board active — different widget mix" desc="Board tab 2 active. Slides anchor spans 2 rows on the left, with Model It + YouTube + Name Picker + Poll filling the remaining grid. Proves the board-tabs switch flips both active state and the widget mix on the canvas." h={1100}>
+        <window.ABTeachMiniLesson />
+      </Artboard>
+
+      <Artboard num="T11" title="Pop-Out (detached window for second monitor)" desc="Click Pop-Out in the sub-bar to open the active board in its own browser window — for projecting on a second screen while the laptop stays on the planning view. Minimal chrome: title bar, board name, Full-screen and Reattach actions." h={920}>
+        <window.ABTeachPopOut />
+      </Artboard>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
