@@ -74,7 +74,7 @@ export function PaletteToggle(): ReactNode {
                 padding: "12px 14px",
                 minHeight: 44,
                 borderRadius: 10,
-                background: selected ? "var(--ink-100)" : "#fff",
+                background: selected ? "var(--ink-100)" : "var(--paper)",
                 border: selected
                   ? "1.5px solid var(--ink-900)"
                   : "1px solid var(--ink-150)",

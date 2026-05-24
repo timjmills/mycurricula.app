@@ -135,36 +135,39 @@ export function TemplateSectionEditor({
               role="group"
               aria-label={`Controls for section ${index + 1}`}
             >
-              <button
-                type="button"
-                className={styles.iconBtn}
-                onClick={() => moveUp(index)}
-                disabled={index === 0}
-                aria-label={`Move section ${index + 1} up`}
-                title="Move up"
-              >
-                <ArrowUpIcon />
-              </button>
-              <button
-                type="button"
-                className={styles.iconBtn}
-                onClick={() => moveDown(index)}
-                disabled={index === sections.length - 1}
-                aria-label={`Move section ${index + 1} down`}
-                title="Move down"
-              >
-                <ArrowDownIcon />
-              </button>
-              <button
-                type="button"
-                className={`${styles.iconBtn} ${styles.removeBtn}`}
-                onClick={() => removeSection(index)}
-                disabled={sections.length <= 1}
-                aria-label={`Remove section ${index + 1}`}
-                title="Remove section"
-              >
-                <RemoveIcon />
-              </button>
+              <Tooltip content="Move up" side="top">
+                <button
+                  type="button"
+                  className={styles.iconBtn}
+                  onClick={() => moveUp(index)}
+                  disabled={index === 0}
+                  aria-label={`Move section ${index + 1} up`}
+                >
+                  <ArrowUpIcon />
+                </button>
+              </Tooltip>
+              <Tooltip content="Move down" side="top">
+                <button
+                  type="button"
+                  className={styles.iconBtn}
+                  onClick={() => moveDown(index)}
+                  disabled={index === sections.length - 1}
+                  aria-label={`Move section ${index + 1} down`}
+                >
+                  <ArrowDownIcon />
+                </button>
+              </Tooltip>
+              <Tooltip content="Remove section" side="top">
+                <button
+                  type="button"
+                  className={`${styles.iconBtn} ${styles.removeBtn}`}
+                  onClick={() => removeSection(index)}
+                  disabled={sections.length <= 1}
+                  aria-label={`Remove section ${index + 1}`}
+                >
+                  <RemoveIcon />
+                </button>
+              </Tooltip>
             </div>
           </li>
         ))}

@@ -38,6 +38,7 @@ import {
 } from "./parts";
 import { cycleStatus } from "./status";
 import { TaskRow } from "./task-row";
+import { Badge, Button, Tooltip } from "@/components/ui";
 import styles from "./lesson-card.module.css";
 import "./lesson-card.css";
 
@@ -619,28 +620,10 @@ export function LessonCard({
         )}
         <div style={{ flex: 1 }} />
         {lesson.pendingMaster && (
-          <span
-            title="Core curriculum has updates for this lesson"
-            style={{
-              fontSize: 9,
-              fontWeight: 600,
-              letterSpacing: 0.3,
-              textTransform: "uppercase",
-              padding: "1px 5px",
-              borderRadius: 3,
-              background: "var(--important-bg)",
-              color: "var(--important)",
-            }}
-          >
-            Core ↑
-          </span>
+          <Badge variant="warn">Core ↑</Badge>
         )}
         {lesson.status === "carried" && (
-          <span
-            style={{ fontSize: 10, color: "var(--catchup)", fontWeight: 500 }}
-          >
-            carry-over
-          </span>
+          <Badge variant="danger">carry-over</Badge>
         )}
       </div>
 
