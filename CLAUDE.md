@@ -3,6 +3,13 @@
 This file is the source of truth for **what this project is, how we build it, and the
 rules every contributor (human or agent) must follow**. Read it before touching code.
 
+> **Companion file — read this too:** `BUILD_STANDARD.md` at the repo root is the
+> visual, structural, and responsive contract — what every page must look and behave
+> like. The Weekly view (`/weekly`) is the canonical reference. CLAUDE.md is the
+> *policy* (rules, phasing, what not to do); BUILD_STANDARD.md is the *content*
+> (color recipe, type hierarchy, spacing scale, canonical primitives, new-page
+> prompt template). Read both at the start of every build session.
+
 ---
 
 ## 1. What this app is
