@@ -75,20 +75,35 @@ function recordHit(): boolean {
 
 // ── Token check ─────────────────────────────────────────────────────────
 
+/** Where the bypass token was found on the request. Lets the caller
+ *  pick the right post-mint behavior: URL params get redirected (so
+ *  the secret is stripped from the visible URL); a Bearer header is
+ *  not visible in the URL bar anyway, so we just continue with cookies
+ *  attached — that avoids an infinite redirect loop when a follower
+ *  re-sends the header on the redirected request (curl -L's default). */
+type TokenSource = "url" | "header";
+
+interface ExtractedToken {
+  token: string;
+  source: TokenSource;
+}
+
 /** Pull the token from a NextRequest. Looks at `?claude=<token>` first
  *  (the middleware-bypass convention used on any URL), then `?token=`
  *  (the explicit /auth/claude-login route-handler convention), then
  *  `Authorization: Bearer <token>` for command-line clients that prefer
  *  headers. Accepting all three keeps every Claude surface working
  *  without per-surface translation. */
-function extractToken(request: NextRequest): string | null {
+function extractToken(request: NextRequest): ExtractedToken | null {
   const url = request.nextUrl;
   const fromClaude = url.searchParams.get(BYPASS_PARAM);
-  if (fromClaude) return fromClaude;
+  if (fromClaude) return { token: fromClaude, source: "url" };
   const fromToken = url.searchParams.get("token");
-  if (fromToken) return fromToken;
+  if (fromToken) return { token: fromToken, source: "url" };
   const auth = request.headers.get("authorization");
-  if (auth?.startsWith("Bearer ")) return auth.slice("Bearer ".length).trim();
+  if (auth?.startsWith("Bearer ")) {
+    return { token: auth.slice("Bearer ".length).trim(), source: "header" };
+  }
   return null;
 }
 
@@ -289,8 +304,8 @@ interface BypassResult {
 export async function tryClaudeBypassInMiddleware(
   request: NextRequest,
 ): Promise<BypassResult> {
-  const presented = extractToken(request);
-  if (!presented)
+  const extracted = extractToken(request);
+  if (!extracted)
     return { bypassed: false, response: NextResponse.next({ request }) };
 
   const pathname = request.nextUrl.pathname;
@@ -306,7 +321,7 @@ export async function tryClaudeBypassInMiddleware(
     return { bypassed: false, response: NextResponse.next({ request }) };
   }
 
-  if (!(await isValidToken(presented))) {
+  if (!(await isValidToken(extracted.token))) {
     void audit({
       ok: false,
       pathname,
@@ -316,20 +331,35 @@ export async function tryClaudeBypassInMiddleware(
     return { bypassed: false, response: NextResponse.next({ request }) };
   }
 
-  // Redirect target depends on whether this is the explicit
-  // /auth/claude-login endpoint (use `?next` as the landing path) or
-  // any other URL (strip the token param and redirect to self so the
-  // teacher's URL bar doesn't carry the secret). Either way the
-  // redirect carries the session cookies we mint here so the next
-  // request is fully authenticated.
-  const isLoginEndpoint = request.nextUrl.pathname === "/auth/claude-login";
-  const target = isLoginEndpoint
-    ? new URL(
-        safeNext(request.nextUrl.searchParams.get("next")),
-        request.nextUrl.origin,
-      )
-    : stripBypassParam(request.nextUrl);
-  const response = NextResponse.redirect(target);
+  // Response shape depends on where the token came from:
+  //
+  //   • URL param (?claude= or ?token=) → redirect to a clean URL so
+  //     the secret doesn't echo in the browser URL bar or history. On
+  //     /auth/claude-login the clean URL is the `?next` value; on any
+  //     other route it is the same URL with the token param stripped.
+  //
+  //   • Authorization Bearer header → continue with the current
+  //     response (NextResponse.next) and just attach the freshly-minted
+  //     session cookies. Redirecting in the header case causes follow-
+  //     redirect clients (curl -L, fetch with redirect:follow) to
+  //     re-send the header on the redirected request, which fires the
+  //     bypass again, which redirects again — an infinite loop until
+  //     the client hits its max-redirect ceiling. Skipping the redirect
+  //     short-circuits the loop and is safe because a header doesn't
+  //     show up in the URL bar.
+  let response: NextResponse;
+  if (extracted.source === "url") {
+    const isLoginEndpoint = request.nextUrl.pathname === "/auth/claude-login";
+    const target = isLoginEndpoint
+      ? new URL(
+          safeNext(request.nextUrl.searchParams.get("next")),
+          request.nextUrl.origin,
+        )
+      : stripBypassParam(request.nextUrl);
+    response = NextResponse.redirect(target);
+  } else {
+    response = NextResponse.next({ request });
+  }
 
   const result = await mintSession(request, response);
   if (!result.ok) {
@@ -353,12 +383,12 @@ export async function tryClaudeBypassInMiddleware(
 export async function handleClaudeLogin(
   request: NextRequest,
 ): Promise<NextResponse> {
-  const presented = extractToken(request);
+  const extracted = extractToken(request);
   const next = safeNext(request.nextUrl.searchParams.get("next"));
   const pathname = request.nextUrl.pathname;
   const userAgent = request.headers.get("user-agent");
 
-  if (!presented) {
+  if (!extracted) {
     void audit({ ok: false, pathname, userAgent, reason: "no_token" });
     return new NextResponse("Missing token", { status: 401 });
   }
@@ -366,7 +396,7 @@ export async function handleClaudeLogin(
     void audit({ ok: false, pathname, userAgent, reason: "rate_limited" });
     return new NextResponse("Too many requests", { status: 429 });
   }
-  if (!(await isValidToken(presented))) {
+  if (!(await isValidToken(extracted.token))) {
     void audit({ ok: false, pathname, userAgent, reason: "invalid_token" });
     return new NextResponse("Invalid token", { status: 401 });
   }
