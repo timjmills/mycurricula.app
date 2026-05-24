@@ -260,9 +260,11 @@ export function LessonCard({
             {lesson.moved === "across-weeks" ? "⤴" : "↔"}
           </span>
         )}
+        {/* Modified pill — bespoke: subject-color background (color.deep), no
+            Badge semantic match. The deep tone clears AA vs white text in all
+            palettes; the saturated stripe tone fails AA on warm hues. */}
         {lesson.modified && (
           <span
-            title="Personally modified from the Core Curriculum"
             style={{
               fontSize: 9,
               fontWeight: 600,
@@ -270,9 +272,6 @@ export function LessonCard({
               textTransform: "uppercase",
               padding: "1px 6px",
               borderRadius: 999,
-              // Always the deep (~700–800) tone: white text on it clears
-              // AA in every style/palette. The saturated `stripe` tone
-              // fails AA for warm hues (amber/lemon) in the Normal palette.
               background: color.deep,
               color: "var(--paper)",
             }}
@@ -282,6 +281,8 @@ export function LessonCard({
         )}
         {/* Interactive affordances — each a full 44×44 touch target. */}
         <span className={styles.affordanceRow}>
+          {/* Drag handle — bespoke: dnd-kit spreads dragHandleProps here; cannot
+              be a <Button> as it receives an external ref and event spread. */}
           {dragHandleProps && (
             <span
               {...dragHandleProps}
@@ -297,18 +298,23 @@ export function LessonCard({
               </span>
             </span>
           )}
-          <button
-            type="button"
-            className={styles.affordance}
-            onClick={handleAffordance}
-            title="More actions"
-            aria-label="More actions"
-            aria-haspopup="menu"
-          >
-            <span aria-hidden className={styles.affordanceVisual}>
-              <Icon name="dots" size={12} />
-            </span>
-          </button>
+          {/* ⋯ menu button — <Button variant="icon"> with <Tooltip>. The
+              styles.affordance className overrides Button's own styles to
+              preserve the hover-reveal behaviour defined in lesson-card.module.css. */}
+          <Tooltip content="More actions" side="top">
+            <Button
+              variant="icon"
+              size="sm"
+              className={styles.affordance}
+              onClick={handleAffordance}
+              iconAriaLabel="More actions"
+              aria-haspopup="menu"
+            >
+              <span className={styles.affordanceVisual}>
+                <Icon name="dots" size={12} />
+              </span>
+            </Button>
+          </Tooltip>
         </span>
       </div>
 
@@ -380,6 +386,8 @@ export function LessonCard({
           </h3>
         </div>
 
+        {/* Expand caret — bespoke: structural, has styles.caretOpen rotation
+            animation; keeping as native button per task spec. */}
         <button
           type="button"
           className={styles.caret}
@@ -480,18 +488,22 @@ export function LessonCard({
 
           {lesson.notes && (
             <div>
-              <button
-                type="button"
+              {/* Notes toggle — <Button variant="ghost" size="sm">; the
+                  styles.notesToggle className overrides to match the existing
+                  hover-reveal style defined in lesson-card.module.css. */}
+              <Button
+                variant="ghost"
+                size="sm"
                 className={styles.notesToggle}
                 onClick={(e) => {
                   e.stopPropagation();
                   setNotesOpen((v) => !v);
                 }}
                 aria-expanded={notesOpen}
+                leadingIcon={<Icon name="eye" size={12} />}
               >
-                <Icon name="eye" size={12} />
                 {notesOpen ? "Hide teacher notes" : "Show teacher notes"}
-              </button>
+              </Button>
               {notesOpen && (
                 <p
                   style={{
@@ -619,9 +631,9 @@ export function LessonCard({
           </span>
         )}
         <div style={{ flex: 1 }} />
-        {lesson.pendingMaster && (
-          <Badge variant="warn">Core ↑</Badge>
-        )}
+        {/* pendingMaster — <Badge variant="warn">: maps to --important token pair. */}
+        {lesson.pendingMaster && <Badge variant="warn">Core ↑</Badge>}
+        {/* carried — <Badge variant="danger">: maps to --catchup token pair. */}
         {lesson.status === "carried" && (
           <Badge variant="danger">carry-over</Badge>
         )}

@@ -43,11 +43,7 @@ export function SettingsCard({
     </div>
   );
 
-  return (
-    <Card header={header}>
-      {children}
-    </Card>
-  );
+  return <Card header={header}>{children}</Card>;
 }
 
 /** Filled-circle radio indicator. */

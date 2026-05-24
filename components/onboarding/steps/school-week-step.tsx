@@ -2,11 +2,10 @@
 
 // school-week-step.tsx — onboarding step 3: school-week configuration.
 //
-// Two preset buttons (Sunday–Thursday, Monday–Friday) set both `weekPreset`
-// and `weekdays` at once via weekdaysForPreset(). A third Custom button
-// reveals individual weekday toggles; toggling adds or removes a day while
-// preserving WEEKDAY_ORDER order. Below the presets, two date inputs capture
-// school-year start and end dates.
+// A <ToggleGroup> with three options (Sun–Thu / Mon–Fri / Custom) sets the
+// week preset. When Custom is selected, individual weekday <Chip> toggles
+// appear so the teacher can pick any combination of days. Below the presets,
+// two date inputs capture school-year start and end dates.
 //
 // The wizard shell owns navigation. This component owns only its controls.
 
@@ -109,55 +108,20 @@ export function SchoolWeekStep(): ReactNode {
         and pacing — derives its calendar from this choice.
       </p>
 
-      {/* ── Preset buttons ────────────────────────────────────────────── */}
-      <div
+      {/* ── Preset segmented control ──────────────────────────────────── */}
+      {/* ToggleGroup handles arrow-key navigation and aria-checked internally. */}
+      <ToggleGroup
+        options={PRESET_OPTIONS}
+        value={data.weekPreset ?? "sun_thu"}
+        onChange={handlePresetChange}
+        ariaLabel="School-week preset"
+        variant="prominent"
         className={styles.presetRow}
-        role="radiogroup"
-        aria-label="School-week preset"
-      >
-        {PRESETS.map((p, i) => {
-          const selected = data.weekPreset === p.id;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => handlePreset(p.id)}
-              onKeyDown={(e) => handlePresetKeyDown(e, i)}
-              className={[
-                styles.presetBtn,
-                selected ? styles.presetBtnSelected : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              <span className={styles.presetLabel}>{p.label}</span>
-              <span className={styles.presetSub}>{p.sub}</span>
-            </button>
-          );
-        })}
-
-        {/* Custom preset button */}
-        <button
-          type="button"
-          role="radio"
-          aria-checked={isCustom}
-          tabIndex={isCustom ? 0 : -1}
-          onClick={handleCustom}
-          onKeyDown={(e) => handlePresetKeyDown(e, PRESETS.length)}
-          className={[
-            styles.presetBtn,
-            isCustom ? styles.presetBtnSelected : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <span className={styles.presetLabel}>Custom</span>
-          <span className={styles.presetSub}>Pick individual days below</span>
-        </button>
-      </div>
+      />
+      {/* Sub-description for the currently selected preset */}
+      <p className={styles.presetSub}>
+        {PRESETS.find((p) => p.id === data.weekPreset)?.sub ?? ""}
+      </p>
 
       {/* ── Custom weekday toggles — revealed only when Custom is active ── */}
       {isCustom && (
@@ -169,20 +133,14 @@ export function SchoolWeekStep(): ReactNode {
           {WEEKDAY_ORDER.map((day) => {
             const active = data.weekdays.includes(day);
             return (
-              <button
+              <Chip
                 key={day}
-                type="button"
-                aria-pressed={active}
+                variant="filter"
+                active={active}
                 onClick={() => toggleDay(day)}
-                className={[
-                  styles.weekdayToggle,
-                  active ? styles.weekdayActive : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
               >
                 {WEEKDAY_LABEL[day]}
-              </button>
+              </Chip>
             );
           })}
         </div>

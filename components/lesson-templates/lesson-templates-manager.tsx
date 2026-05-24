@@ -22,13 +22,7 @@ import {
 } from "@/lib/lesson-templates";
 import { useCustomTemplates, isCustomTemplateId } from "@/lib/custom-templates";
 import { TemplateSectionEditor } from "./template-section-editor";
-import {
-  Badge,
-  Button,
-  Chip,
-  EmptyState,
-  PageHeader,
-} from "@/components/ui";
+import { Badge, Button, Chip, EmptyState, PageHeader } from "@/components/ui";
 import styles from "./lesson-templates-manager.module.css";
 
 // ── Built-in card ───────────────────────────────────────────────────────────

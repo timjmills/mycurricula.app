@@ -43,9 +43,7 @@ export function GradeStep(): ReactNode {
   // Arrow-key navigation within the chip group: move focus + selection to the
   // next/previous chip so the group behaves like a radio group.
   function handleGroupKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
-    const currentIndex = GRADE_OPTIONS.findIndex(
-      (o) => o.value === data.grade,
-    );
+    const currentIndex = GRADE_OPTIONS.findIndex((o) => o.value === data.grade);
     let nextIndex: number | null = null;
     if (e.key === "ArrowRight" || e.key === "ArrowDown") {
       nextIndex = (currentIndex + 1) % GRADE_OPTIONS.length;
@@ -58,10 +56,9 @@ export function GradeStep(): ReactNode {
     const next = GRADE_OPTIONS[nextIndex];
     update({ grade: next.value });
     // Move DOM focus to the newly selected chip button.
-    const buttons =
-      (e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>(
-        "button",
-      );
+    const buttons = (
+      e.currentTarget as HTMLElement
+    ).querySelectorAll<HTMLButtonElement>("button");
     buttons?.[nextIndex]?.focus();
   }
 
