@@ -1,0 +1,65 @@
+
+──── PHONE (400x800) ─────────────────
+  [H-SCROLL]  weekly                               status=200 doc= 775/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  weekly-schedule                      status=200 doc= 775/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [H-SCROLL]  weekly-schedule-lessons-only         status=200 doc= 775/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [H-SCROLL]  daily                                status=200 doc= 775/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  daily-schedule-rail                  status=200 doc= 775/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [H-SCROLL]  schedule-tab                         status=200 doc= 775/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  catch-up                             status=200 doc= 775/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  year                                 status=200 doc= 775/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+  [OK]        settings-appearance                  status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+  [OK]        settings-catch-up                    status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+
+──── TABLET (768x1024) ─────────────────
+  [H-SCROLL]  weekly                               status=200 doc=1018/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  weekly-schedule                      status=200 doc=1018/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [H-SCROLL]  weekly-schedule-lessons-only         status=200 doc=1018/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [H-SCROLL]  daily                                status=200 doc=1018/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  daily-schedule-rail                  status=200 doc=1018/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [H-SCROLL]  schedule-tab                         status=200 doc=1018/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  catch-up                             status=200 doc=1018/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  year                                 status=200 doc=1018/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+  [OK]        settings-appearance                  status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+  [OK]        settings-catch-up                    status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+
+──── DESKTOP (1280x900) ─────────────────
+  [H-SCROLL]  weekly                               status=200 doc=1346/1280 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  weekly-schedule                      status=200 doc=1346/1280 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [H-SCROLL]  weekly-schedule-lessons-only         status=200 doc=1346/1280 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [H-SCROLL]  daily                                status=200 doc=1346/1280 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  daily-schedule-rail                  status=200 doc=1346/1280 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [H-SCROLL]  schedule-tab                         status=200 doc=1346/1280 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  catch-up                             status=200 doc=1346/1280 title="MyCurricula — Grade 5 Curriculum Planner"
+  [H-SCROLL]  year                                 status=200 doc=1346/1280 title="MyCurricula — Grade 5 Curriculum Planner"
+  [OK]        settings-appearance                  status=200 doc=1280/1280 title="MyCurricula — Grade 5 Curriculum Planner"
+  [OK]        settings-catch-up                    status=200 doc=1280/1280 title="MyCurricula — Grade 5 Curriculum Planner"
+
+Screenshots written to C:\Users\losey\Projects\mycurricula.app\docs\screenshots

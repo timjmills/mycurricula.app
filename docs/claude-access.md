@@ -1,0 +1,276 @@
+# Claude access — auth bypass + audit log
+
+How AI assistants (Claude Code, Claude Chat, Claude Co-work, Claude Code
+Cloud) authenticate to `mycurricula.app`, what the access surface is, and
+how to monitor + rotate the bypass.
+
+Companion files:
+
+- `docs/claude-bypass.sql` — DDL for the audit-log table. Run once in the
+  Supabase SQL editor before flipping `CLAUDE_BYPASS_TOKEN` on.
+- `lib/claude-bypass.ts` — the bypass implementation. The header comment
+  there is the source of truth for the security model.
+- `lib/supabase/middleware.ts` — calls the bypass before the SSO gate.
+- `app/auth/claude-login/route.ts` — the cookie-redirect endpoint.
+
+---
+
+## What the bypass is
+
+`mycurricula.app` is gated behind Google SSO restricted to a specific
+school domain. AI assistants do not have a Google account to sign in
+with, so they can't reach the planner the way a human teacher does.
+
+The bypass is a **shared-secret short-circuit** of the SSO gate. When a
+request presents a valid `CLAUDE_BYPASS_TOKEN`, the middleware mints a
+Supabase session for `CLAUDE_USER_EMAIL` (currently
+`timothyjamesmills@gmail.com`) server-side, attaches the session cookies
+to the response, and the request continues authenticated.
+
+The token grants **the same access** as that account — currently
+read/write. Treat it as a password.
+
+---
+
+## Three ways for Claude to authenticate
+
+### 1. URL query parameter — works everywhere
+
+Append `?claude=<token>` (or `?claude=<token>&…`) to any URL. The
+middleware validates, mints a session, then redirects to a clean URL
+(token stripped). Subsequent requests carry the session cookie.
+
+```
+https://mycurricula.app/weekly?claude=<token>
+https://mycurricula.app/schedule?claude=<token>
+https://mycurricula.app/catch-up?claude=<token>
+```
+
+Best for:
+
+- **Claude Code WebFetch** — each call is stateless; the token-in-URL
+  pattern works without cookie persistence.
+- **Claude Chat** with web browsing — same shape.
+- **Quick manual tests** in a browser tab (URL is visible in history
+  during the moment between page load and the strip-and-redirect, so
+  not great for shoulder-surfing scenarios; the `Bearer` header path
+  below is cleaner there).
+
+### 2. `Authorization: Bearer <token>` header — best for curl / scripts
+
+```
+curl -H "Authorization: Bearer <token>" https://mycurricula.app/weekly
+```
+
+The bypass detects the header, mints a session, and returns the page
+with the session cookie attached **on the same response** (no redirect).
+Follow-redirect clients (`curl -L`, `fetch` with `redirect: "follow"`,
+etc.) won't get caught in a loop because the bypass deliberately skips
+the redirect when the source is a header.
+
+Best for:
+
+- **Claude Code Bash** — `curl`-based tests of authenticated routes.
+- **Programmatic SDK clients** (`fetch`, `axios`, etc.) — add the
+  header once on every request; no cookie jar required.
+
+### 3. Cookie-redirect endpoint — best for browser-based Claude
+
+```
+https://mycurricula.app/auth/claude-login?token=<token>&next=/weekly
+```
+
+A 307 redirect to the `?next` path with the Supabase session cookies
+attached. After this hop, **the browser holds a real session cookie** —
+every follow-up request to `mycurricula.app/*` passes the SSO gate
+naturally with no token needed.
+
+Best for:
+
+- **Claude Co-work** and any other Claude surface that drives a real
+  browser / cookie jar.
+- **Once-per-session login** flows where the agent visits many pages
+  after.
+
+The `?next` parameter is optional (defaults to `/weekly`) and must be a
+relative in-app path (absolute / external URLs are rejected as a safety
+measure).
+
+---
+
+## Audit log
+
+Every successful and failed bypass attempt writes one row to
+`public.claude_access_log` (DDL in `docs/claude-bypass.sql`). The
+failure reasons cover token-guess attempts, rate-limit triggers,
+provisioning failures, and session-mint failures — useful for
+detecting both misuse and misconfiguration.
+
+> **Schema contract.** The middleware writes to columns `ok`,
+> `pathname`, `user_agent`, `reason`, `created_at`. If you previously
+> created the table by hand (e.g. before `docs/claude-bypass.sql`
+> landed), the columns may be named `success` and `path` instead. In
+> that case the inserts silently fail because audit-log writes are
+> non-fatal by design. Fix in one paste:
+>
+> ```sql
+> alter table public.claude_access_log rename column success to ok;
+> alter table public.claude_access_log rename column path    to pathname;
+> alter table public.claude_access_log add column if not exists user_agent text;
+> alter table public.claude_access_log add column if not exists reason     text;
+> ```
+
+### Useful queries
+
+```sql
+-- Last 50 access attempts, newest first.
+select created_at, ok, pathname, user_agent, reason
+from public.claude_access_log
+order by created_at desc
+limit 50;
+
+-- Today's activity grouped by path.
+select pathname, count(*) as hits
+from public.claude_access_log
+where ok = true and created_at >= current_date
+group by pathname
+order by hits desc;
+
+-- Anything failing in the last 24 hours.
+select created_at, pathname, user_agent, reason
+from public.claude_access_log
+where ok = false and created_at >= now() - interval '24 hours'
+order by created_at desc;
+
+-- Count of bypass hits per day for the last 30 days.
+select date_trunc('day', created_at) as day, count(*) as hits
+from public.claude_access_log
+where ok = true and created_at >= now() - interval '30 days'
+group by 1
+order by 1 desc;
+
+-- Token-guess flood detection: any minute with >20 invalid_token failures.
+select date_trunc('minute', created_at) as minute, count(*) as guesses
+from public.claude_access_log
+where reason = 'invalid_token'
+group by 1
+having count(*) > 20
+order by 1 desc;
+```
+
+---
+
+## Cloudflare worker — secrets management
+
+The deployed worker reads four env vars. All four are stored as
+Cloudflare worker secrets (encrypted at rest, never visible after upload).
+
+| Secret | Purpose | Required? |
+|---|---|---|
+| `CLAUDE_BYPASS_TOKEN` | The shared secret. ≥16 chars; 32 random bytes recommended. Unset to disable the bypass entirely. | Yes |
+| `CLAUDE_USER_EMAIL` | The Supabase auth user Claude signs in as. | Yes |
+| `CLAUDE_BYPASS_PROVISION` | `"1"` (default) to auto-create the user on first hit; `"0"` to require pre-registration. | Optional |
+| `SUPABASE_SERVICE_ROLE_KEY` | Used server-side to mint sessions + write the audit log. | Yes |
+
+### Set or rotate a secret
+
+```sh
+# Generate a fresh 32-byte token:
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# Upload it to the worker (you'll be prompted for the value):
+npx wrangler secret put CLAUDE_BYPASS_TOKEN
+npx wrangler secret put CLAUDE_USER_EMAIL
+npx wrangler secret put CLAUDE_BYPASS_PROVISION
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+```
+
+New secret values take effect on the next worker invocation; no
+re-deploy is required. After rotating the token, update the value
+everywhere Claude consumes it (Claude.ai connector settings, local
+`.env.local`, any saved curl scripts, etc.).
+
+### Disable the bypass
+
+```sh
+npx wrangler secret delete CLAUDE_BYPASS_TOKEN
+```
+
+With the token unset, the bypass becomes a no-op — every request goes
+through the normal Google SSO gate.
+
+### List current secrets
+
+```sh
+npx wrangler secret list
+```
+
+Lists secret names + their last-update timestamps (values are never
+shown).
+
+---
+
+## Local development
+
+`.env.local` (gitignored) carries the same four env vars for `npm run
+dev`. Copy them from your password manager or generate fresh:
+
+```
+CLAUDE_BYPASS_TOKEN=<long-random-base64>
+CLAUDE_USER_EMAIL=timothyjamesmills@gmail.com
+CLAUDE_BYPASS_PROVISION=1
+SUPABASE_SERVICE_ROLE_KEY=<from-supabase-dashboard>
+```
+
+The dev server bypass uses the same code path as production, so any
+behavior you confirm locally will hold on Cloudflare.
+
+---
+
+## Security checklist
+
+The bypass is implemented with these protections (wired in
+`lib/claude-bypass.ts`):
+
+- **Token comparison** is constant-time (SHA-256 hash + byte-by-byte XOR
+  loop). No timing channel reveals the value.
+- **Minimum length** of 16 chars enforced before any compare runs.
+- **Rate limiting**: 120 bypass hits per worker instance per minute. Soft
+  cap (in-process); layer Cloudflare's own rate-limit rules in front for
+  production-grade defense.
+- **Audit log**: every success + failure is recorded with timestamp,
+  path, user-agent, and failure reason. Visible to any authenticated
+  Supabase user via the RLS policy in the SQL file.
+- **URL-bar hygiene**: bypass strips the token from the URL via redirect
+  before browser history sees it (URL-param case only; Bearer header is
+  never in the URL bar).
+- **Service-role key is server-only** — never sent to the browser, never
+  prefixed with `NEXT_PUBLIC_`.
+- **Audit-log insert failures are non-fatal** — the bypass still works
+  even if the log table is missing or unreachable.
+
+### What's still your responsibility
+
+- **Rotate the token regularly** — monthly is a sensible cadence;
+  immediately if you ever paste it where it might be logged.
+- **Watch the audit log** — any `reason = invalid_token` cluster is a
+  sign of a token-guess flood.
+- **Decide on RLS** — `timothyjamesmills@gmail.com` is an
+  authenticated Supabase user; whatever RLS you put on lesson /
+  curriculum tables applies to it. Scope down if you only want Claude
+  to read.
+- **Don't share the token in chat / commits / screenshots** — if you
+  must paste it somewhere, prefer a password manager or a `wrangler
+  secret put` invocation that reads from stdin.
+
+---
+
+## How to invoke the bypass from each Claude surface
+
+| Surface | Recommended entry |
+|---|---|
+| **Claude Code** (this CLI) | `Bearer` header on curl, or `?claude=` URL param on WebFetch |
+| **Claude Chat** (browse / web search) | `?claude=` URL param |
+| **Claude Co-work** (browser sessions) | `/auth/claude-login?token=…&next=/weekly` once at session start |
+| **Claude Code Cloud** | `Bearer` header for scripted access |
+| **Anthropic Custom Connector** | `?claude=` URL param in connector config (rotate the connector secret in lockstep with `CLAUDE_BYPASS_TOKEN`) |

@@ -237,6 +237,16 @@ All under `Documents/` (reference only — never imported by the app):
   `project/*.jsx` are per-surface artboards; `project/tokens.css` is the token source;
   `project/README.md` explains the handoff.
 
+**Operational docs** (under `docs/`, checked into the repo, not reference-only):
+
+- `docs/claude-access.md` — how AI assistants (Claude Code / Chat / Co-work / Code
+  Cloud) authenticate to the deployed app via the token-gated bypass. Includes the
+  three entry points, audit-log queries, Cloudflare secret-rotation procedure, and
+  the security checklist. Read this before changing auth, middleware, or the
+  Supabase service-role surface.
+- `docs/claude-bypass.sql` — DDL for `public.claude_access_log` (the bypass audit
+  table). Run once in the Supabase SQL editor.
+
 **Phasing reminder:** Phase 1A = beta-ready core (Weekly/Daily/basic Subject views,
 Master/Personal toggle, Simple/Task/Advanced view modes, standards tagging, daily notes,
 basic print/export). Phase 1B fills in the rest of Phase 1. Phase 2 brings Vivid +
