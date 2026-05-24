@@ -410,6 +410,9 @@ export function LessonCard({
       <div style={{ padding: `0 ${padX}px 5px ${padX + 3}px` }}>
         {lesson.objective && (
           <div
+            // title= on a non-interactive div: provides a browser tooltip for
+            // sighted pointer users. Not a control, so no Tooltip primitive
+            // is needed; WCAG requires Tooltip only on interactive elements.
             title="Lesson objective (I Can statement)"
             style={{
               display: "flex",
