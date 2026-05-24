@@ -773,8 +773,19 @@ export function WeeklyShell(): ReactNode {
   // track between the two panels for the splitter. The grid is always 1fr;
   // the rail is `effectiveRailWidth`px.
   const gridTemplate = useMemo(() => {
+    // RES-CRIT-001: the grid panel track is `minmax(0, 1fr)` rather than
+    // bare `1fr`. CSS Grid resolves `1fr` to `minmax(auto, 1fr)`, where
+    // `auto` is the track content's `min-content`. Our gridSlot contains
+    // a WeeklyGrid with a 1082px intrinsic min-width — so bare `1fr`
+    // refuses to shrink below that and forces the planner shell past
+    // the viewport at every desktop tier. `minmax(0, 1fr)` lets the
+    // track shrink and the WeeklyGrid's internal `.scroll` overflow
+    // takes over inside the slot instead. The same applies even at
+    // wide desktop where the rail is open: shrinking the grid track
+    // when the rail is dragged wide should never push the bodyRow
+    // wider than its container.
     const trackFor = (id: PanelId): string =>
-      id === "rail" ? `${effectiveRailWidth}px` : "1fr";
+      id === "rail" ? `${effectiveRailWidth}px` : "minmax(0, 1fr)";
     const parts: string[] = [];
     columnOrder.forEach((id, i) => {
       parts.push(trackFor(id));

@@ -55,6 +55,17 @@
 
 .body {
   flex: 1;
+  /* RES-CRIT-001: without `min-width: 0`, a flex item defaults to
+     `min-width: auto` and refuses to shrink below its content's
+     intrinsic min-width. The body's first grid track is the gridSlot,
+     which contains a WeeklyGrid with `min-width: 1082px`. Without this
+     line the body stays ≥1082px and the planner shell pushes the
+     document past the viewport at every desktop tier. The gridSlot's
+     own `min-width: 0` is necessary but not sufficient — both the
+     flex parent AND the grid track need to allow shrinking for the
+     internal scroll inside .scroll (WeeklyGrid.module.css) to take
+     over. */
+  min-width: 0;
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr auto 320px;
@@ -332,21 +343,32 @@
 
 @media (max-width: 1280px) {
   .body {
-    /* Force the rail and its splitter track to zero — only the grid 1fr
+    /* Force the rail and its splitter track to zero — only the grid
        track is visible. The JS-driven inline gridTemplateColumns is
        overridden here by !important so the measured body width and the
-       JS state remain available without causing layout jank. */
-    grid-template-columns: 1fr 0 0 !important;
+       JS state remain available without causing layout jank.
+       RES-CRIT-001: must use `minmax(0, 1fr)` rather than bare `1fr`
+       — a plain `1fr` track resolves to `minmax(auto, 1fr)`, where
+       `auto` is the track content's `min-content` (the WeeklyGrid's
+       1082px intrinsic min-width). That pins the track open and
+       forces the planner shell past the viewport. `minmax(0, 1fr)`
+       lets the track shrink to 0 so the grid's internal `.scroll`
+       overflow takes over instead. */
+    grid-template-columns: minmax(0, 1fr) 0 0 !important;
   }
   .railSlot,
   .railColumnWithGrip {
-    /* Hide the slot entirely (display: none would lose state; visibility:
-       hidden + width: 0 keeps React mounted while removing it from the
-       flow). The 1px border is also suppressed so no stray line appears. */
-    width: 0;
-    overflow: hidden;
-    border-left: none;
-    visibility: hidden;
+    /* RES-CRIT-001: was visibility:hidden + width:0 — that keeps the
+       descendants in the layout tree at their natural width, which
+       inflates document.documentElement.scrollWidth (the children sit
+       past the viewport even though they're visually clipped) and
+       therefore violates the CLAUDE.md §4 no-horizontal-scroll rule.
+       `display: none` is the right tool: the rail is unreachable below
+       1280px anyway (no UI affords opening it), so losing any in-rail
+       React state for a viewport the teacher can't interact with isn't
+       a real regression. State recovers automatically the moment the
+       teacher widens past 1281px. */
+    display: none;
   }
 }
 

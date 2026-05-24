@@ -17,7 +17,7 @@ import { chromium } from "playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const BASE = "https://mycurricula.app";
+const BASE = process.env.RESPONSIVE_CHECK_BASE ?? "https://mycurricula.app";
 const TOKEN = process.env.CLAUDE_BYPASS_TOKEN;
 if (!TOKEN) {
   console.error("CLAUDE_BYPASS_TOKEN is required.");

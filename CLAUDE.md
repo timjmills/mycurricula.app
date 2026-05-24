@@ -239,10 +239,10 @@ All under `Documents/` (reference only — never imported by the app):
 
 **Operational docs** (under `docs/`, checked into the repo, not reference-only):
 
-- `docs/claude-access.md` — how AI assistants (Claude Code / Chat / Co-work / Code
-  Cloud) authenticate to the deployed app via the token-gated bypass. Includes the
-  three entry points, audit-log queries, Cloudflare secret-rotation procedure, and
-  the security checklist. Read this before changing auth, middleware, or the
+- `docs/5.24.26 claude-access.md` — how AI assistants (Claude Code / Chat / Co-work /
+  Code Cloud) authenticate to the deployed app via the token-gated bypass. Includes
+  the three entry points, audit-log queries, Cloudflare secret-rotation procedure,
+  and the security checklist. Read this before changing auth, middleware, or the
   Supabase service-role surface.
 - `docs/claude-bypass.sql` — DDL for `public.claude_access_log` (the bypass audit
   table). Run once in the Supabase SQL editor.

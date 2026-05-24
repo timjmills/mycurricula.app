@@ -25,10 +25,21 @@
   position: sticky;
   top: 0;
   z-index: 30;
-  /* TOPBAR-001: no horizontal scroll — bar content is sized to fit.
-     overflow:visible lets the focused search input expand into the bar
-     without being clipped. */
-  overflow: visible;
+  /* RES-CRIT-001: the bar is sticky + flex with many children. With
+     `overflow: visible` (the historical setting), any controls beyond
+     the viewport-fit budget push the document past the viewport and
+     force horizontal page scroll. The hide cascade below (≤1280 / 1024
+     / 768 / 540 / 480) trims controls progressively, but at 1280 the
+     right cluster (search + flame + todo + comments + avatar + signout)
+     still adds ~66px past the viewport.
+     `overflow-x: clip` contains any leftover bar content inside the
+     viewport. `clip` is safer than `hidden` here because the bar is
+     `position: sticky` and `hidden` can disable sticky on some
+     engines. The bar's keyboard search expansion still works — the
+     search input expands inline INSIDE the bar; nothing relies on it
+     extending outside. */
+  overflow-x: clip;
+  overflow-y: visible;
   /* min-width:0 lets the bar shrink inside its flex/grid parent. */
   min-width: 0;
 }
@@ -466,10 +477,22 @@
 
   /* Condense the bar to 44px — saves vertical space on portrait phone while
      still meeting the ≥44px touch-target requirement (buttons fill bar height
-     via align-items:center on the flex container). */
+     via align-items:center on the flex container).
+
+     RES-CRIT-001: the bar is sticky + flex with many children. Without an
+     overflow guard the right cluster (search / flame / todo / comments /
+     avatar / signout — ~220px of icon buttons even after the hides below)
+     pushes total bar width past the viewport, which inflates the document
+     scrollWidth and forces page-level horizontal scroll. `overflow-x: clip`
+     contains the bar's children to the viewport box (`clip` is safer than
+     `hidden` here because the bar is `position: sticky` and `hidden` would
+     break sticky scrolling on some browsers). `min-width: 0` lets the bar
+     shrink inside its flex parent below its intrinsic content width. */
   .bar {
     height: 44px;
     gap: 4px;
+    min-width: 0;
+    overflow-x: clip;
   }
 
   /* Compress view-tab padding so all four live tabs fit at 480–540px.
@@ -477,6 +500,15 @@
   .viewTab {
     padding: 0 7px;
     font-size: var(--t-12);
+  }
+
+  /* Reclaim ~176px from the right cluster — at ≤540 the panel collapse
+     toggle is useless (LeftFilterPanel hides at ≤900 anyway), search is
+     reachable via the `/` keyboard shortcut, and signout is reachable
+     through the profile-avatar settings page. The to-do + comments
+     buttons stay because they're the only entry into those panels. */
+  .signOutForm {
+    display: none;
   }
 }
 

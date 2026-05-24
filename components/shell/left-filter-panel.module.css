@@ -29,6 +29,23 @@
   border-right: none;
 }
 
+/* ── Narrow-viewport hide (RES-CRIT-001) ──────────────────────────────────
+ * CLAUDE.md §4 forbids document-level horizontal scroll. At tablet/phone
+ * widths the 240px default-open panel + the WeeklyShell's own icon rail +
+ * right rail compose to a width larger than the viewport, which forces
+ * the document to scroll sideways even before any content renders. Hide
+ * the panel entirely below 900px (the same isNarrow gate WeeklyShell uses
+ * to force List mode). The top-bar collapse toggle remains in the bar so
+ * a desktop user who shrinks past the breakpoint keeps the affordance —
+ * the panel just doesn't take any layout space until the viewport grows
+ * back. The teacher's `leftPanelOpen` state is preserved untouched. */
+@media (max-width: 900px) {
+  .panel,
+  .panelClosed {
+    display: none;
+  }
+}
+
 /* ── Panel header ──────────────────────────────────────────────────────── */
 
 .header {
