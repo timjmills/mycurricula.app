@@ -38,6 +38,7 @@ import {
 } from "./parts";
 import { cycleStatus } from "./status";
 import { TaskRow } from "./task-row";
+import { Badge, Button, Tooltip } from "@/components/ui";
 import styles from "./lesson-card.module.css";
 import "./lesson-card.css";
 
@@ -296,18 +297,20 @@ export function LessonCard({
               </span>
             </span>
           )}
-          <button
-            type="button"
-            className={styles.affordance}
-            onClick={handleAffordance}
-            title="More actions"
-            aria-label="More actions"
-            aria-haspopup="menu"
-          >
-            <span aria-hidden className={styles.affordanceVisual}>
-              <Icon name="dots" size={12} />
-            </span>
-          </button>
+          <Tooltip content="More actions" side="top">
+            <Button
+              variant="icon"
+              size="sm"
+              className={styles.affordance}
+              onClick={handleAffordance}
+              iconAriaLabel="More actions"
+              aria-haspopup="menu"
+            >
+              <span className={styles.affordanceVisual}>
+                <Icon name="dots" size={12} />
+              </span>
+            </Button>
+          </Tooltip>
         </span>
       </div>
 
@@ -479,18 +482,19 @@ export function LessonCard({
 
           {lesson.notes && (
             <div>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 className={styles.notesToggle}
                 onClick={(e) => {
                   e.stopPropagation();
                   setNotesOpen((v) => !v);
                 }}
                 aria-expanded={notesOpen}
+                leadingIcon={<Icon name="eye" size={12} />}
               >
-                <Icon name="eye" size={12} />
                 {notesOpen ? "Hide teacher notes" : "Show teacher notes"}
-              </button>
+              </Button>
               {notesOpen && (
                 <p
                   style={{
@@ -619,28 +623,10 @@ export function LessonCard({
         )}
         <div style={{ flex: 1 }} />
         {lesson.pendingMaster && (
-          <span
-            title="Core curriculum has updates for this lesson"
-            style={{
-              fontSize: 9,
-              fontWeight: 600,
-              letterSpacing: 0.3,
-              textTransform: "uppercase",
-              padding: "1px 5px",
-              borderRadius: 3,
-              background: "var(--important-bg)",
-              color: "var(--important)",
-            }}
-          >
-            Core ↑
-          </span>
+          <Badge variant="warn">Core ↑</Badge>
         )}
         {lesson.status === "carried" && (
-          <span
-            style={{ fontSize: 10, color: "var(--catchup)", fontWeight: 500 }}
-          >
-            carry-over
-          </span>
+          <Badge variant="danger">carry-over</Badge>
         )}
       </div>
 

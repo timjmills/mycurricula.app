@@ -25,6 +25,8 @@ import {
 import type { ThemePalette } from "@/lib/theme";
 import { SUBJECTS } from "@/lib/mock/subjects";
 import { SettingsCard } from "./settings-card";
+import { Button, ToggleGroup, Tooltip } from "@/components/ui";
+import type { ToggleOption } from "@/components/ui";
 
 type Scope = "team" | "personal";
 
@@ -46,6 +48,12 @@ const PERSONAL_DEFAULT_MAPPING: Record<string, string> = {
   "morning-meeting": "lemon",
   "afternoon-circle": "mint",
 };
+
+// ToggleGroup options for the Team / Personal scope selector.
+const SCOPE_OPTIONS: ToggleOption<Scope>[] = [
+  { value: "team", label: "Team subjects" },
+  { value: "personal", label: "Personal subjects" },
+];
 
 interface SubjectColorsProps {
   /** Core-subject mapping (controlled by the parent page). */
@@ -113,49 +121,14 @@ export function SubjectColors({
       title="Which swatch represents each subject"
       hint="Team subjects are set in the Core Curriculum — only your team lead can change them. Personal subjects (Morning Meeting, Afternoon Circle) you own and edit."
       action={
-        <div
-          role="tablist"
-          aria-label="Subject scope"
-          style={{
-            display: "inline-flex",
-            padding: 3,
-            background: "var(--ink-100)",
-            borderRadius: 8,
-            gap: 1,
-          }}
-        >
-          {(
-            [
-              ["team", "Team subjects"],
-              ["personal", "Personal subjects"],
-            ] as const
-          ).map(([id, label]) => {
-            const active = scope === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => switchScope(id)}
-                className="cp-focusable"
-                style={{
-                  padding: "8px 14px",
-                  minHeight: 36,
-                  fontSize: 12.5,
-                  fontWeight: 500,
-                  borderRadius: 6,
-                  background: active ? "#fff" : "transparent",
-                  color: active ? "var(--ink-900)" : "var(--ink-500)",
-                  boxShadow: active ? "0 1px 2px rgba(20,22,32,.06)" : "none",
-                  cursor: "pointer",
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        // Scope selector — true radiogroup (Team / Personal), migrated to ToggleGroup.
+        <ToggleGroup<Scope>
+          options={SCOPE_OPTIONS}
+          value={scope}
+          onChange={switchScope}
+          ariaLabel="Subject scope"
+          size="sm"
+        />
       }
     >
       {/* Locked banner — team subjects are read-only for a teacher. */}
@@ -165,11 +138,11 @@ export function SubjectColors({
           style={{
             marginTop: 14,
             background: "var(--important-bg)",
-            border: "1px solid #facc15",
+            border: "1px solid var(--important)",
             borderRadius: 8,
             padding: "9px 12px",
             fontSize: 12.5,
-            color: "#7a4f08",
+            color: "var(--important)",
             display: "flex",
             alignItems: "flex-start",
             gap: 8,
@@ -210,7 +183,7 @@ export function SubjectColors({
                 minHeight: 56,
                 border: "1px solid var(--ink-150)",
                 borderRadius: 10,
-                background: editing ? "var(--ink-100)" : "#fff",
+                background: editing ? "var(--ink-100)" : "var(--paper)",
                 opacity: locked ? 0.85 : 1,
               }}
             >
@@ -245,32 +218,16 @@ export function SubjectColors({
                   {swatch.name}
                 </div>
               </div>
-              <button
-                type="button"
+              {/* Change / Done / Locked button — canonical <Button> primitive. */}
+              <Button
+                variant={editing ? "primary" : "secondary"}
+                size="sm"
                 disabled={locked}
                 aria-expanded={editing}
                 onClick={() => setEditingSubject(editing ? null : subject.id)}
-                className="cp-focusable"
-                style={{
-                  padding: "8px 14px",
-                  minHeight: 36,
-                  borderRadius: 999,
-                  background: editing ? "var(--ink-900)" : "#fff",
-                  color: editing
-                    ? "#fff"
-                    : locked
-                      ? "var(--ink-400)"
-                      : "var(--ink-900)",
-                  border: editing
-                    ? "1px solid var(--ink-900)"
-                    : "1px solid var(--ink-200)",
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  cursor: locked ? "not-allowed" : "pointer",
-                }}
               >
                 {locked ? "Locked" : editing ? "Done" : "Change"}
-              </button>
+              </Button>
             </div>
           );
         })}
@@ -311,51 +268,52 @@ export function SubjectColors({
             {PALETTE_20.map((s) => {
               const active = swatchIdFor(editingSubject) === s.id;
               return (
-                <button
-                  key={s.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  aria-label={s.name}
-                  title={s.name}
-                  onClick={() => assignSwatch(editingSubject, s.id)}
-                  className="cp-focusable"
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: 6,
-                    minHeight: 44,
-                    borderRadius: 8,
-                    background: active ? "#fff" : "transparent",
-                    border: active
-                      ? "1.5px solid var(--ink-900)"
-                      : "1.5px solid transparent",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span
-                    aria-hidden
+                // Tooltip wraps each swatch button — replaces the hand-rolled title="".
+                <Tooltip key={s.id} content={s.name}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    aria-label={s.name}
+                    onClick={() => assignSwatch(editingSubject, s.id)}
+                    className="cp-focusable"
                     style={{
-                      width: 32,
-                      height: 32,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 5,
+                      padding: 6,
+                      minHeight: 44,
                       borderRadius: 8,
-                      background: swatchColor(s.id, palette),
-                      boxShadow: active ? `0 0 0 2px ${s.deep}` : "none",
-                      border: `1px solid ${s.deep}26`,
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontSize: 9.5,
-                      color: "var(--ink-500)",
-                      fontWeight: 500,
+                      background: active ? "var(--paper)" : "transparent",
+                      border: active
+                        ? "1.5px solid var(--ink-900)"
+                        : "1.5px solid transparent",
+                      cursor: "pointer",
                     }}
                   >
-                    {s.name}
-                  </span>
-                </button>
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: swatchColor(s.id, palette),
+                        boxShadow: active ? `0 0 0 2px ${s.deep}` : "none",
+                        border: `1px solid ${s.deep}26`,
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 9.5,
+                        color: "var(--ink-500)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {s.name}
+                    </span>
+                  </button>
+                </Tooltip>
               );
             })}
           </div>

@@ -15,6 +15,7 @@ import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useOnboarding } from "@/lib/onboarding-state";
+import { Button } from "@/components/ui";
 import { WelcomeStep } from "./steps/welcome-step";
 import { GradeStep } from "./steps/grade-step";
 import { SchoolWeekStep } from "./steps/school-week-step";
@@ -113,28 +114,25 @@ export function OnboardingWizard(): ReactNode {
 
       <div className={styles.footer}>
         {!isFirst && (
-          <button
-            type="button"
-            className={styles.back}
+          <Button
+            variant="secondary"
+            size="md"
             onClick={back}
             aria-label="Go to previous step"
+            leadingIcon={<span aria-hidden="true">←</span>}
           >
-            <span aria-hidden="true">←</span> Back
-          </button>
+            Back
+          </Button>
         )}
         <div className={styles.spacer} />
         {SKIPPABLE.has(stepId) && (
-          <button type="button" className={styles.skip} onClick={next}>
+          <Button variant="ghost" size="md" onClick={next}>
             Skip for now
-          </button>
+          </Button>
         )}
-        <button
-          type="button"
-          className={styles.continue}
-          onClick={handleContinue}
-        >
+        <Button variant="primary" size="lg" onClick={handleContinue}>
           {continueLabel}
-        </button>
+        </Button>
       </div>
     </div>
   );

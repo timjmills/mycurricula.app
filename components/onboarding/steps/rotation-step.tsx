@@ -2,7 +2,8 @@
 
 // rotation-step.tsx — onboarding step 4: schedule rotation type.
 //
-// Three option cards let the teacher choose how their daily timetable repeats:
+// A <ToggleGroup variant="prominent"> with three options lets the teacher
+// choose how their daily timetable repeats:
 //   • "none"  — same every week (the most common case)
 //   • "ab"    — alternates between two distinct day layouts
 //   • "cycle" — repeats on a numbered cycle independent of the calendar week
@@ -10,12 +11,16 @@
 // When "cycle" is selected, a number input for the cycle length (2–20 days)
 // is revealed. The wizard shell owns the navigation footer.
 
-import type { KeyboardEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useOnboarding } from "@/lib/onboarding-state";
+import { ToggleGroup } from "@/components/ui";
+import type { ToggleOption } from "@/components/ui";
 import styles from "./steps.module.css";
 
+type RotationValue = "none" | "ab" | "cycle";
+
 interface RotationOption {
-  value: "none" | "ab" | "cycle";
+  value: RotationValue;
   label: string;
   desc: string;
 }
@@ -39,30 +44,24 @@ const ROTATION_OPTIONS: readonly RotationOption[] = [
   },
 ] as const;
 
+// ToggleGroup options derived from ROTATION_OPTIONS so label changes stay
+// in one place.
+const TOGGLE_OPTIONS: Array<ToggleOption<RotationValue>> = ROTATION_OPTIONS.map(
+  (o) => ({
+    value: o.value,
+    label: o.label,
+    ariaLabel: o.label,
+  }),
+);
+
 /** Step 4 — rotation type selection with optional cycle-length input. */
 export function RotationStep(): ReactNode {
   const { data, update } = useOnboarding();
 
-  // Arrow-key navigation for the rotation radiogroup.
-  function handleRadioKeyDown(
-    e: KeyboardEvent<HTMLButtonElement>,
-    currentIndex: number,
-  ): void {
-    let nextIndex: number | null = null;
-    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
-      nextIndex = (currentIndex + 1) % ROTATION_OPTIONS.length;
-    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
-      nextIndex =
-        (currentIndex - 1 + ROTATION_OPTIONS.length) % ROTATION_OPTIONS.length;
-    }
-    if (nextIndex === null) return;
-    e.preventDefault();
-    update({ rotation: ROTATION_OPTIONS[nextIndex].value });
-    const group = (e.currentTarget as HTMLElement).parentElement;
-    const buttons =
-      group?.querySelectorAll<HTMLButtonElement>('[role="radio"]');
-    buttons?.[nextIndex]?.focus();
-  }
+  // The selected option's description — shown beneath the toggle group so the
+  // teacher gets the full plain-language explanation for their current choice.
+  const selectedDesc =
+    ROTATION_OPTIONS.find((o) => o.value === data.rotation)?.desc ?? "";
 
   return (
     <section aria-labelledby="rotation-heading">
@@ -75,48 +74,19 @@ export function RotationStep(): ReactNode {
         your school.
       </p>
 
-      {/* ── Option cards ─────────────────────────────────────────────── */}
-      <div
+      {/* ── ToggleGroup — prominent variant for a primary mode choice ─── */}
+      {/* ToggleGroup handles arrow-key navigation and aria-checked internally. */}
+      <ToggleGroup
+        options={TOGGLE_OPTIONS}
+        value={data.rotation ?? "none"}
+        onChange={(v) => update({ rotation: v })}
+        ariaLabel="Schedule rotation type"
+        variant="prominent"
         className={styles.optionList}
-        role="radiogroup"
-        aria-label="Schedule rotation type"
-      >
-        {ROTATION_OPTIONS.map((opt, i) => {
-          const selected = data.rotation === opt.value;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => update({ rotation: opt.value })}
-              onKeyDown={(e) => handleRadioKeyDown(e, i)}
-              className={[
-                styles.optionCard,
-                selected ? styles.optionCardSelected : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              {/* Radio dot indicator */}
-              <div
-                className={[
-                  styles.radioDot,
-                  selected ? styles.radioDotSelected : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                aria-hidden="true"
-              />
-              <span className={styles.optionText}>
-                <span className={styles.optionLabel}>{opt.label}</span>
-                <span className={styles.optionDesc}>{opt.desc}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      />
+
+      {/* Description for the currently selected rotation type */}
+      <p className={styles.optionDesc}>{selectedDesc}</p>
 
       {/* ── Cycle-length input — revealed only for numbered cycle ──────── */}
       {data.rotation === "cycle" && (

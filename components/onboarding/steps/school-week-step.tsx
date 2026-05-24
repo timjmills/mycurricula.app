@@ -2,15 +2,14 @@
 
 // school-week-step.tsx — onboarding step 3: school-week configuration.
 //
-// Two preset buttons (Sunday–Thursday, Monday–Friday) set both `weekPreset`
-// and `weekdays` at once via weekdaysForPreset(). A third Custom button
-// reveals individual weekday toggles; toggling adds or removes a day while
-// preserving WEEKDAY_ORDER order. Below the presets, two date inputs capture
-// school-year start and end dates.
+// A <ToggleGroup> with three options (Sun–Thu / Mon–Fri / Custom) sets the
+// week preset. When Custom is selected, individual weekday <Chip> toggles
+// appear so the teacher can pick any combination of days. Below the presets,
+// two date inputs capture school-year start and end dates.
 //
 // The wizard shell owns navigation. This component owns only its controls.
 
-import type { KeyboardEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   useOnboarding,
   WEEKDAY_ORDER,
@@ -18,12 +17,16 @@ import {
   weekdaysForPreset,
 } from "@/lib/onboarding-state";
 import type { WeekdayId } from "@/lib/onboarding-state";
+import { Chip, ToggleGroup } from "@/components/ui";
+import type { ToggleOption } from "@/components/ui";
 import styles from "./steps.module.css";
 
 // ----- Preset definitions ---------------------------------------------------
 
+type PresetId = "sun_thu" | "mon_fri" | "custom";
+
 interface WeekPreset {
-  id: "sun_thu" | "mon_fri";
+  id: PresetId;
   label: string;
   sub: string;
 }
@@ -31,15 +34,27 @@ interface WeekPreset {
 const PRESETS: readonly WeekPreset[] = [
   {
     id: "sun_thu",
-    label: "Sunday – Thursday",
+    label: "Sun – Thu",
     sub: "Common in the Middle East and North Africa",
   },
   {
     id: "mon_fri",
-    label: "Monday – Friday",
+    label: "Mon – Fri",
     sub: "Standard in most of North America and Europe",
   },
+  {
+    id: "custom",
+    label: "Custom",
+    sub: "Pick individual days below",
+  },
 ] as const;
+
+// ToggleGroup options derived from PRESETS so label changes stay in one place.
+const PRESET_OPTIONS: Array<ToggleOption<PresetId>> = PRESETS.map((p) => ({
+  value: p.id,
+  label: p.label,
+  ariaLabel: p.label,
+}));
 
 // ----- Component ------------------------------------------------------------
 
@@ -50,45 +65,19 @@ export function SchoolWeekStep(): ReactNode {
 
   // ── Preset selection ──────────────────────────────────────────────────────
 
-  // All three preset options in display order, used for arrow-key navigation.
-  const ALL_PRESETS = [...PRESETS.map((p) => p.id), "custom"] as const;
-
-  function handlePreset(id: "sun_thu" | "mon_fri"): void {
-    update({
-      weekPreset: id,
-      weekdays: weekdaysForPreset(id),
-    });
-  }
-
-  function handleCustom(): void {
-    update({ weekPreset: "custom" });
-    // Keep whatever weekdays are already set so the user sees a starting
-    // point if they previously picked a preset.
-  }
-
-  // Arrow-key navigation for the preset radiogroup.
-  function handlePresetKeyDown(
-    e: KeyboardEvent<HTMLButtonElement>,
-    currentIndex: number,
-  ): void {
-    let nextIndex: number | null = null;
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-      nextIndex = (currentIndex + 1) % ALL_PRESETS.length;
-    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-      nextIndex = (currentIndex - 1 + ALL_PRESETS.length) % ALL_PRESETS.length;
-    }
-    if (nextIndex === null) return;
-    e.preventDefault();
-    const nextId = ALL_PRESETS[nextIndex];
-    if (nextId === "custom") {
-      handleCustom();
+  // ToggleGroup handles arrow-key navigation internally; we only need to
+  // respond to the selected value change.
+  function handlePresetChange(id: PresetId): void {
+    if (id === "custom") {
+      // Keep whatever weekdays are already set so the user sees a starting
+      // point if they previously picked a preset.
+      update({ weekPreset: "custom" });
     } else {
-      handlePreset(nextId);
+      update({
+        weekPreset: id,
+        weekdays: weekdaysForPreset(id),
+      });
     }
-    const group = (e.currentTarget as HTMLElement).parentElement;
-    const buttons =
-      group?.querySelectorAll<HTMLButtonElement>('[role="radio"]');
-    buttons?.[nextIndex]?.focus();
   }
 
   // ── Custom weekday toggle ─────────────────────────────────────────────────
@@ -119,55 +108,20 @@ export function SchoolWeekStep(): ReactNode {
         and pacing — derives its calendar from this choice.
       </p>
 
-      {/* ── Preset buttons ────────────────────────────────────────────── */}
-      <div
+      {/* ── Preset segmented control ──────────────────────────────────── */}
+      {/* ToggleGroup handles arrow-key navigation and aria-checked internally. */}
+      <ToggleGroup
+        options={PRESET_OPTIONS}
+        value={data.weekPreset ?? "sun_thu"}
+        onChange={handlePresetChange}
+        ariaLabel="School-week preset"
+        variant="prominent"
         className={styles.presetRow}
-        role="radiogroup"
-        aria-label="School-week preset"
-      >
-        {PRESETS.map((p, i) => {
-          const selected = data.weekPreset === p.id;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => handlePreset(p.id)}
-              onKeyDown={(e) => handlePresetKeyDown(e, i)}
-              className={[
-                styles.presetBtn,
-                selected ? styles.presetBtnSelected : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              <span className={styles.presetLabel}>{p.label}</span>
-              <span className={styles.presetSub}>{p.sub}</span>
-            </button>
-          );
-        })}
-
-        {/* Custom preset button */}
-        <button
-          type="button"
-          role="radio"
-          aria-checked={isCustom}
-          tabIndex={isCustom ? 0 : -1}
-          onClick={handleCustom}
-          onKeyDown={(e) => handlePresetKeyDown(e, PRESETS.length)}
-          className={[
-            styles.presetBtn,
-            isCustom ? styles.presetBtnSelected : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <span className={styles.presetLabel}>Custom</span>
-          <span className={styles.presetSub}>Pick individual days below</span>
-        </button>
-      </div>
+      />
+      {/* Sub-description for the currently selected preset */}
+      <p className={styles.presetSub}>
+        {PRESETS.find((p) => p.id === data.weekPreset)?.sub ?? ""}
+      </p>
 
       {/* ── Custom weekday toggles — revealed only when Custom is active ── */}
       {isCustom && (
@@ -179,20 +133,14 @@ export function SchoolWeekStep(): ReactNode {
           {WEEKDAY_ORDER.map((day) => {
             const active = data.weekdays.includes(day);
             return (
-              <button
+              <Chip
                 key={day}
-                type="button"
-                aria-pressed={active}
+                variant="filter"
+                active={active}
                 onClick={() => toggleDay(day)}
-                className={[
-                  styles.weekdayToggle,
-                  active ? styles.weekdayActive : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
               >
                 {WEEKDAY_LABEL[day]}
-              </button>
+              </Chip>
             );
           })}
         </div>

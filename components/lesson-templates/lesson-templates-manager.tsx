@@ -3,7 +3,7 @@
 // lesson-templates-manager.tsx — Settings → Lesson templates page content.
 //
 // Layout, top to bottom:
-//   • Breadcrumb + page heading
+//   • Page heading (PageHeader primitive)
 //   • Built-in templates  — 15 read-only cards in a grid.
 //   • Your templates      — teacher-created custom templates.
 //   • Editor panel        — appears below the lists when a custom template
@@ -22,6 +22,7 @@ import {
 } from "@/lib/lesson-templates";
 import { useCustomTemplates, isCustomTemplateId } from "@/lib/custom-templates";
 import { TemplateSectionEditor } from "./template-section-editor";
+import { Badge, Button, Chip, EmptyState, PageHeader } from "@/components/ui";
 import styles from "./lesson-templates-manager.module.css";
 
 // ── Built-in card ───────────────────────────────────────────────────────────
@@ -37,9 +38,9 @@ function BuiltinCard({ template, onDuplicate }: BuiltinCardProps): ReactNode {
       <div className={styles.builtinCardTop}>
         <span className={styles.builtinName}>{template.name}</span>
         {template.recommended && (
-          <span className={styles.recommendedBadge} aria-label="Recommended">
+          <Badge variant="warn" aria-label="Recommended">
             Recommended
-          </span>
+          </Badge>
         )}
       </div>
 
@@ -48,43 +49,43 @@ function BuiltinCard({ template, onDuplicate }: BuiltinCardProps): ReactNode {
       {/* Section chips — show the ordered phase names at a glance */}
       <div className={styles.sectionChips} aria-label="Sections">
         {template.sections.map((sec) => (
-          <span key={sec.id} className={styles.sectionChip}>
-            {sec.label}
-          </span>
+          <Chip key={sec.id}>{sec.label}</Chip>
         ))}
       </div>
 
       <div className={styles.builtinActions}>
-        <button
-          type="button"
-          className={styles.duplicateBtn}
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => onDuplicate(template)}
           aria-label={`Duplicate and edit ${template.name}`}
+          leadingIcon={
+            <svg
+              aria-hidden
+              width="13"
+              height="13"
+              viewBox="0 0 16 16"
+              fill="none"
+            >
+              <rect
+                x="5"
+                y="5"
+                width="9"
+                height="9"
+                rx="2"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M11 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+            </svg>
+          }
         >
-          <svg
-            aria-hidden
-            width="13"
-            height="13"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <rect
-              x="5"
-              y="5"
-              width="9"
-              height="9"
-              rx="2"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            />
-            <path
-              d="M11 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            />
-          </svg>
           Duplicate &amp; edit
-        </button>
+        </Button>
       </div>
     </article>
   );
@@ -125,11 +126,11 @@ function CustomRow({
         </div>
       </div>
       <div className={styles.customRowActions}>
-        <button
-          type="button"
-          className={styles.iconBtn}
+        <Button
+          variant="icon"
+          size="sm"
           onClick={onEdit}
-          aria-label={`Edit ${template.name}`}
+          iconAriaLabel={`Edit ${template.name}`}
           aria-pressed={isEditing}
         >
           {/* Pencil icon */}
@@ -147,30 +148,32 @@ function CustomRow({
               strokeLinejoin="round"
             />
           </svg>
-        </button>
-        <button
-          type="button"
-          className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
           onClick={onDelete}
           aria-label={`Delete ${template.name}`}
+          leadingIcon={
+            <svg
+              aria-hidden
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="none"
+            >
+              <path
+                d="M2 4h12M6 4V2h4v2M5 4l1 9h4l1-9"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
         >
-          {/* Trash icon */}
-          <svg
-            aria-hidden
-            width="14"
-            height="14"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <path
-              d="M2 4h12M6 4V2h4v2M5 4l1 9h4l1-9"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+          Delete
+        </Button>
       </div>
     </div>
   );
@@ -203,14 +206,14 @@ function EditorPanel({
             {template.name || "Untitled template"}
           </h2>
         </div>
-        <button
-          type="button"
-          className={styles.doneBtn}
+        <Button
+          variant="primary"
+          size="sm"
           onClick={onDone}
           aria-label="Done editing template"
         >
           Done
-        </button>
+        </Button>
       </div>
 
       {/* Name + description fields */}
@@ -325,25 +328,22 @@ export function LessonTemplatesManager(): ReactNode {
   return (
     <div className={styles.page}>
       <div className={styles.inner}>
-        {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
-          <span className={styles.breadcrumbRoot}>Settings</span>
-          <span className={styles.breadcrumbSep} aria-hidden>
-            /
-          </span>
-          <span className={styles.breadcrumbCurrent} aria-current="page">
-            Lesson templates
-          </span>
-        </nav>
+        {/* Page header — breadcrumb eyebrow + page title via PageHeader primitive */}
+        <PageHeader
+          eyebrow="Settings"
+          title="Lesson templates"
+          subtitle="15 research-backed structures, plus your own custom templates."
+          className={styles.pageHeader}
+        />
 
         {/* ── Built-in templates ───────────────────────────────────────── */}
         <section className={styles.card} aria-labelledby="builtin-heading">
           <div className={styles.cardHeader}>
             <div className={styles.cardHeaderText}>
               <div className={styles.cardEyebrow}>Built-in library</div>
-              <h1 className={styles.cardTitle} id="builtin-heading">
+              <h2 className={styles.cardTitle} id="builtin-heading">
                 Lesson templates
-              </h1>
+              </h2>
               <p className={styles.cardHint}>
                 15 research-backed lesson structures. They are read-only — use
                 &ldquo;Duplicate &amp; edit&rdquo; to create your own variation.
@@ -375,28 +375,30 @@ export function LessonTemplatesManager(): ReactNode {
                 every new lesson in an academic subject will start with it.
               </p>
             </div>
-            <button
-              type="button"
-              className={styles.createBtn}
+            <Button
+              variant="primary"
+              size="sm"
               onClick={handleCreateNew}
               aria-label="Create a new lesson template"
+              leadingIcon={
+                <svg
+                  aria-hidden
+                  width="13"
+                  height="13"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                >
+                  <path
+                    d="M8 2v12M2 8h12"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              }
             >
-              <svg
-                aria-hidden
-                width="13"
-                height="13"
-                viewBox="0 0 16 16"
-                fill="none"
-              >
-                <path
-                  d="M8 2v12M2 8h12"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
               Create a template
-            </button>
+            </Button>
           </div>
 
           {/* Guard for hydration flash */}
@@ -405,17 +407,12 @@ export function LessonTemplatesManager(): ReactNode {
               Loading your templates…
             </div>
           ) : templates.length === 0 ? (
-            <div className={styles.emptyState}>
-              <div className={styles.emptyStateIcon} aria-hidden>
-                ☐
-              </div>
-              <p className={styles.emptyStateText}>
-                You haven&rsquo;t created any custom templates yet.
-                <br />
-                Duplicate a built-in above to get started, or click{" "}
-                <strong>Create a template</strong> for a blank slate.
-              </p>
-            </div>
+            <EmptyState
+              size="sm"
+              heading="No custom templates yet."
+              body="Duplicate a built-in above to get started, or click Create a template for a blank slate."
+              className={styles.emptyState}
+            />
           ) : (
             <div className={styles.customList} aria-label="Your templates">
               {templates.map((tpl) =>
