@@ -26,7 +26,6 @@
 
 .pageTitle {
   margin: 0;
-  /* var(--t-24) matches the spec; weight 800 for bold hierarchy. */
   font-size: var(--t-24);
   font-weight: 800;
   color: var(--ink-900);
@@ -104,12 +103,20 @@
   gap: 10px;
 }
 
-/* Status filter pill bar is now in StatusFilterBar.module.css */
+/* ── Shared horizontal scroll wrapper ───────────────────────────────── */
 
-/* ── View body ───────────────────────────────────────────────────────── */
+.timelineScroll {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: visible;
+  border-radius: 14px;
+  /* Subtle horizontal scrollbar; matches the rest of the app. */
+  scrollbar-width: thin;
+}
 
 .viewBody {
-  flex: 1;
+  /* The active view (RoadmapView or ProgressionView) sits below the sticky
+     header. No padding here — the views' own .root carries the card chrome. */
 }
 
 /* ── Bottom stat strip ───────────────────────────────────────────────── */
@@ -170,9 +177,7 @@
   }
 }
 
-/* At 720px the sidebar collapses into a horizontal strip above the content.
-   Mirror the proven pattern from SubjectView: body goes single-column,
-   sidebar switches to a flex row with horizontal scroll. */
+/* At 720px the sidebar collapses into a horizontal strip above the content. */
 @media (max-width: 720px) {
   .body {
     flex-direction: column;

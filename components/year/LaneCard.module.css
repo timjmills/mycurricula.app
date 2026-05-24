@@ -1,76 +1,26 @@
-/* LaneCard — fixed left-edge lane summary card.
-   Color cascade: the root carries cp-subj.<id> so the new role variables
-   (--c-surface, --c-surface-strong, --c-border, --c-progress-track,
-   --c-progress-fill, --c-deep) resolve to the correct per-subject values.
+/* LaneCard — left-edge lane summary; consumes the canonical Card primitive.
+   Styles here scope to the slots Card renders (.header / .body) and to the
+   minimized pill mode. All subject color flows from the cp-subj cascade
+   Card injects via its `subjectId` prop. */
 
-   Layered treatment — replaces the flat near-solid subject wash:
-     1. White body (--paper) anchors the card to the premium dashboard register.
-     2. Tinted header strip — vertical gradient --c-surface-strong → --c-surface.
-     3. 4px subject-dark left border (--c-deep) asserts subject identity strongly.
-     4. Hairline subject-toned border on the other three sides (--c-border).
-     5. Subject identity chip (28×32px) in the header top-right.
-     6. Soft drop shadow — barely-visible polish, not a hard depth cue.
-*/
-
+/* The Card primitive owns shell + shadow + border. We just size it. */
 .card {
   width: 200px;
   flex: 0 0 200px;
-  /* White body — all subject color is in the header strip and borders. */
-  background: var(--paper);
-  border-radius: var(--r-12);
-  /* Ingredient 3: 4px deep-tone left accent anchors subject identity */
-  border-left: 4px solid var(--c-deep);
-  /* Ingredient 4: hairline subject-tinted border on the remaining sides */
-  border-top: 1px solid var(--c-border);
-  border-right: 1px solid var(--c-border);
-  border-bottom: 1px solid var(--c-border);
-  /* Ingredient 6: soft, barely-visible polish shadow */
-  box-shadow: var(--shadow-card);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  /* Lift + shadow deepen on hover */
-  transition:
-    transform 180ms ease,
-    box-shadow 180ms ease;
 }
 
-/* ── Hover / focus states ───────────────────────────────────────────────── */
-
-.card:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-card-hover);
+.fullHeight {
+  height: 100%;
 }
 
-.card:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--c) 45%, transparent);
-  outline-offset: 2px;
-}
+/* ── Header inner ─────────────────────────────────────────────────────── */
 
-@media (prefers-reduced-motion: reduce) {
-  .card,
-  .card:hover {
-    transition: none;
-    transform: none;
-  }
-}
-
-/* ── Header strip ───────────────────────────────────────────────────────── */
-/* Ingredient 2: tinted gradient — more saturated at top, surface-light at bottom */
-
-.header {
-  /* Gradient: surface-strong (slightly richer) → surface (the existing light) */
-  background: linear-gradient(
-    180deg,
-    var(--c-surface-strong) 0%,
-    var(--c-surface) 100%
-  );
-  padding: 10px 10px 10px 12px;
+.headerInner {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
-  flex-shrink: 0;
+  width: 100%;
 }
 
 .headerText {
@@ -78,9 +28,9 @@
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  flex: 1;
 }
 
-/* Subject name — deep tone on the tinted surface */
 .name {
   font-size: var(--t-16);
   font-weight: 700;
@@ -92,7 +42,6 @@
   text-overflow: ellipsis;
 }
 
-/* Student count — neutral, secondary */
 .meta {
   font-size: var(--t-13);
   font-weight: 500;
@@ -100,8 +49,13 @@
   line-height: 1.2;
 }
 
-/* ── Subject identity chip ──────────────────────────────────────────────── */
-/* 28×32px rounded rect, top-right of the header */
+/* Right-side header controls — chip + minimize toggle */
+.headerControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
 
 .chip {
   flex-shrink: 0;
@@ -118,21 +72,50 @@
   letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--c-deep);
-  /* Ensure the chip stays accessible at small widths */
-  flex-basis: 28px;
 }
 
-/* ── Body ───────────────────────────────────────────────────────────────── */
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  /* Padding-trick keeps the visual size compact while the hit target is ≥44px
+     on phone/tablet via the surrounding header padding. */
+  border-radius: var(--r-6);
+  background: transparent;
+  border: 0;
+  color: var(--c-deep);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.toggleBtn:hover {
+  background: var(--c-surface);
+}
+
+.toggleBtn:focus-visible {
+  outline: 2px solid var(--c);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggleBtn {
+    transition: none;
+  }
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────── */
 
 .body {
-  flex: 1;
-  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-/* Completion percentage label */
 .progressLabel {
   font-size: var(--t-13);
   font-weight: 700;
@@ -140,7 +123,6 @@
   line-height: 1.2;
 }
 
-/* Progress track */
 .progressTrack {
   height: 6px;
   background: var(--c-progress-track);
@@ -148,7 +130,6 @@
   overflow: hidden;
 }
 
-/* Progress fill — 180ms width transition */
 .progressFill {
   height: 100%;
   border-radius: var(--r-pill);
@@ -162,79 +143,110 @@
   }
 }
 
-/* ── Pacing row ─────────────────────────────────────────────────────────── */
-/* Appears below the progress bar when the parent passes a pacing status.    */
+/* ── Pacing row ───────────────────────────────────────────────────────── */
 
 .pacingRow {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
-/* 8×8px status dot; color driven by data-pacing attribute. */
 .pacingDot {
   flex-shrink: 0;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  /* Default — neutral pending */
   background: var(--ink-500);
 }
 
-/* on_pace and in_progress → green-family "done" token */
 .pacingDot[data-pacing="on_pace"],
 .pacingDot[data-pacing="in_progress"],
 .pacingDot[data-pacing="completed"] {
   background: var(--done);
 }
 
-/* behind → flame-red "catchup" token */
 .pacingDot[data-pacing="behind"] {
   background: var(--catchup);
 }
 
-/* ahead → blue "fyi" token */
 .pacingDot[data-pacing="ahead"] {
   background: var(--fyi);
 }
 
-/* starts_next_week → neutral-500, already the default; kept explicit */
-.pacingDot[data-pacing="starts_next_week"] {
-  background: var(--ink-500);
-}
-
-/* starts_in_days → same neutral-500 pending shade */
+.pacingDot[data-pacing="starts_next_week"],
 .pacingDot[data-pacing="starts_in_days"] {
   background: var(--ink-500);
 }
 
-/* not_started → ink-400, the most muted neutral */
 .pacingDot[data-pacing="not_started"] {
   background: var(--ink-400);
 }
 
-/* Pacing status sentence — 12px, 500, ink-700. WCAG AA at this size + weight. */
 .pacingLabel {
   font-size: var(--t-12);
   font-weight: 500;
   color: var(--ink-700);
   line-height: 1.3;
-  /* Clip gracefully if the card is narrowed below 160px */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* ── Minimized pill mode ───────────────────────────────────────────────── */
+
+/* The pill is a Card render with density=compact and just a body slot.
+   We override width so it grows beyond the 200px default for a one-row layout. */
+.pill {
+  width: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.pillRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.pillChip {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-6);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--c-deep);
+}
+
+.pillName {
+  flex: 1;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--c-deep);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pillPct {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-700);
+  flex-shrink: 0;
+}
+
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
-  .header {
-    padding: 8px 8px 8px 10px;
-  }
-  .body {
-    padding: 8px 10px 10px;
-  }
   .name {
     font-size: var(--t-14);
   }
@@ -244,13 +256,6 @@
   .card {
     width: 160px;
     flex: 0 0 160px;
-  }
-  .header {
-    padding: 7px 7px 7px 8px;
-    gap: 4px;
-  }
-  .body {
-    padding: 7px 8px 8px;
   }
   .name {
     font-size: var(--t-13);

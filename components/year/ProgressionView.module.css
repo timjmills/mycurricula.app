@@ -1,151 +1,20 @@
-/* ProgressionView — day-by-day calendar (List mode). */
+/* ProgressionView — day-by-day calendar (List mode).
+   No internal scroll or header — YearView's shared scroll + sticky
+   QuarterMonthWeekHeader handle those.
+   All colors come from tokens or the cp-subj cascade — no hex literals. */
 
 .root {
-  background: var(--paper, #fff);
-  border: 1px solid var(--ink-150, #e6e9f4);
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
   border-radius: 14px;
   box-shadow: var(--shadow-card);
-  /* overflow: clip rather than hidden so position:sticky descendants still
-     work — clip blocks scroll like hidden but does not create a scroll
-     container (sticky requires no blocking scroll ancestor above it). */
   overflow: clip;
 }
 
-/* Month-header strip.
-   Neutral base so the strip is clean before/after any subject lane is
-   active. The multicolor subject gradient has been removed — the chameleon
-   banner (dayHeaderChameleon) is now the sole source of per-subject color. */
-.monthStrip {
-  display: flex;
-  height: 32px;
-  background: var(--paper, #fff);
-  border-bottom: 1px solid var(--ink-150, #e6e9f4);
-}
-
-.monthCells {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-/* Month label cells on the neutral .monthStrip background.
-   The multicolor gradient that previously sat behind these cells is gone,
-   so white-on-* with a shadow no longer reads. Switched to a deep ink
-   token for AA contrast on the neutral paper ground. */
-.monthCell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--ink-700);
-  letter-spacing: 1.2px;
-  text-shadow: none;
-  border-right: 1px solid var(--ink-150);
-  flex-shrink: 0;
-}
-
-.monthCell:last-child {
-  border-right: none;
-}
-
-/* Day header row — sticky against the PAGE scroll context (html/body), not
-   any inner overflow container. .lanesScrollArea is display:contents so it
-   introduces no scroll ancestor; the nearest scrolling ancestor is <main>. */
-.dayHeader {
-  display: flex;
-  border-bottom: 1px solid #eceef7;
-  /* Neutral base shown before the first IntersectionObserver callback fires.
-     .dayHeaderChameleon overrides this once a subject lane enters the viewport. */
-  background: var(--paper, #fff);
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  /* background transitions don't animate smoothly on all browsers; using
-     background (shorthand) catches both background-color and background-image
-     transitions without degrading to a hard snap on most engines. */
-  transition:
-    background 200ms ease,
-    border-color 200ms ease;
-}
-
-.cornerCell {
-  flex-shrink: 0;
-  padding: 8px 14px;
+/* Lane stack */
+.lanes {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  border-right: 1px solid #eceef7;
-}
-
-.cornerLabel {
-  /* DATE eyebrow — quieter, more letter-spaced, lower contrast */
-  font-size: var(--t-11);
-  color: var(--ink-400);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-
-.cornerSub {
-  /* CURRICULUM LANES eyebrow — slightly more prominent than DATE */
-  font-size: var(--t-11);
-  color: var(--ink-600, var(--ink-500));
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-
-.dayCols {
-  display: flex;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
-.dayCol {
-  flex: 0 0 auto;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 4px 0 3px;
-  border-left: 1px solid #f5f6fa;
-}
-
-.dayCol.monthBoundary {
-  border-left: 2px solid #eceef7;
-}
-
-.todayCol {
-  background: rgba(91, 97, 244, 0.08);
-}
-
-.todayPill {
-  position: absolute;
-  top: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #5b61f4;
-  color: #fff;
-  font-size: 8.5px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 999px;
-  letter-spacing: 0.4px;
-  white-space: nowrap;
-}
-
-.dayWkd {
-  font-size: 9.5px;
-  font-weight: 600;
-  color: #94a3b8;
-}
-
-.dayNum {
-  font-size: 10px;
-  font-weight: 600;
-  color: #5b6580;
 }
 
 /* Lane rows */
@@ -155,22 +24,26 @@
   min-height: 80px;
 }
 
-/* Scroll container for the day grid */
+.laneRowMinimized {
+  min-height: 0;
+  align-items: stretch;
+}
+
+/* Day grid area — no overflow:auto here; parent shared-scroll handles it. */
 .laneGrid {
   flex: 1;
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  flex-shrink: 0;
 }
 
-/* TODAY column highlight — absolute overlay over the grid */
+/* TODAY column highlight — absolute overlay over the grid. */
 .todayHighlight {
   position: absolute;
   top: 0;
   bottom: 0;
-  background: rgba(91, 97, 244, 0.06);
+  background: var(--fyi-bg);
   pointer-events: none;
   z-index: 0;
 }
@@ -179,7 +52,7 @@
 .glyphRow {
   display: flex;
   height: 32px;
-  border-bottom: 1px solid #f5f6fa;
+  border-bottom: 1px solid var(--ink-100);
   position: relative;
   z-index: 1;
 }
@@ -189,11 +62,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-left: 1px solid #f5f6fa;
+  border-left: 1px solid var(--ink-100);
 }
 
 .glyphCell.monthBoundary {
-  border-left: 2px solid #eceef7;
+  border-left: 2px solid var(--ink-150);
 }
 
 /* UNITS row — highlighter bars */
@@ -206,38 +79,35 @@
 .unitGridLine {
   flex: 0 0 auto;
   height: 100%;
-  border-left: 1px solid #f5f6fa;
+  border-left: 1px solid var(--ink-100);
 }
 
 .unitGridLine.monthBoundary {
-  border-left: 2px solid #eceef7;
+  border-left: 2px solid var(--ink-150);
 }
 
 /* Unit marker bar — absolutely positioned over the unit row.
-   Highlighter-wash treatment matches LaneCard and Weekly cards:
-     1. Near-solid vertical gradient via color-mix() — ~90% opacity throughout.
-     2. Left accent edge (ingredient 3) at full var(--c) saturation.
-     3. Inset top highlight + light drop shadow (ingredient 4). */
+   Solid token-driven recipe matching LaneCard and Weekly cards:
+     • Vertical gradient --c-surface-strong → --c-surface (no transparency).
+     • Left accent edge at full var(--c) saturation.
+     • Inset top highlight + light drop shadow. */
 .unitBar {
   position: absolute;
   top: 8px;
   height: 60px;
   border-radius: var(--r-8);
-  /* Ingredient 2 + 1: near-solid vertical gradient — 92% → 88% */
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--c) 92%, transparent) 0%,
-    color-mix(in srgb, var(--c) 88%, transparent) 100%
+    var(--c-surface-strong) 0%,
+    var(--c-surface) 100%
   );
-  /* Ingredient 3: left accent edge at full saturation */
   border-left: 4px solid var(--c);
-  border-top: 1px solid color-mix(in srgb, var(--cd) 15%, transparent);
-  border-right: 1px solid color-mix(in srgb, var(--cd) 10%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--cd) 18%, transparent);
-  /* Ingredient 4: inset top highlight + shadow */
+  border-top: 1px solid var(--c-border);
+  border-right: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--c-border);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 45%, transparent),
-    0 1px 2px color-mix(in srgb, var(--ink-900) 8%, transparent);
+    inset 0 1px 0 color-mix(in oklch, var(--paper) 60%, transparent),
+    var(--shadow-card);
   display: flex;
   align-items: center;
   padding: 0 10px 0 8px;
@@ -256,9 +126,9 @@
   font-weight: 800;
   letter-spacing: 0.3px;
   flex-shrink: 0;
-  /* White tile sits cleanly on the translucent wash */
-  background: rgba(255, 255, 255, 0.6);
-  color: var(--cd);
+  background: var(--paper);
+  border: 1px solid var(--c-border);
+  color: var(--c-deep);
 }
 
 .unitMeta {
@@ -269,56 +139,7 @@
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
-  /* Deep subject tone for legibility on the translucent wash */
-  color: var(--cd);
-}
-
-/* Kebab menu */
-.kebab {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 24px;
-  min-height: 44px; /* touch target */
-  border-radius: 6px;
-  background: transparent;
-  border: 0;
-  color: #94a3b8;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-.kebab:hover {
-  background: var(--ink-100, #eef0f4);
-  color: var(--ink-700, #2e3038);
-}
-
-/* Lanes wrapper — display:contents makes it transparent to layout and
-   scroll-context detection. No overflow constraint here; the page itself
-   (html/body/<main>) is the scroll context for both sticky positioning and
-   the IntersectionObserver (root: null). */
-.lanesScrollArea {
-  display: contents;
-}
-
-/* Active-subject chameleon fill: vertical gradient dark-top → light-bottom,
-   matching the Weekly card header feel. var(--c) and var(--cl) come from the
-   cp-subj class JS places on this element.
-   !important is required: this rule competes with the neutral .dayHeader base. */
-.dayHeaderChameleon {
-  background: linear-gradient(180deg, var(--c) 0%, var(--cl) 100%) !important;
-  border-bottom: 1px solid color-mix(in srgb, var(--cd) 12%, transparent) !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dayHeader {
-    transition: none;
-  }
+  color: var(--c-deep);
 }
 
 /* Bottom legend strip */
@@ -327,14 +148,14 @@
   gap: 14px;
   padding: 10px 16px;
   align-items: center;
-  border-top: 1px solid #f5f6fa;
-  background: #fafbfc;
+  border-top: 1px solid var(--ink-100);
+  background: var(--ink-50);
   flex-wrap: wrap;
 }
 
 .legendLabel {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--ink-400);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -345,13 +166,13 @@
   align-items: center;
   gap: 5px;
   font-size: 11px;
-  color: #5b6580;
+  color: var(--ink-700);
   font-weight: 500;
 }
 
 .legendDivider {
   width: 1px;
   height: 16px;
-  background: #e2e5f0;
+  background: var(--ink-150);
   flex-shrink: 0;
 }

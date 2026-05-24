@@ -306,3 +306,69 @@ export function weeksInQuarter(
     return { idx, label: `Wk ${idx + 1}` };
   });
 }
+
+// ── Full-year helpers ──────────────────────────────────────────────────────
+//
+// The school year is WEEKS_PER_QUARTER × 4 = 36 weeks. The Year view loads
+// all of them at once and lets the user pan / jump within a single
+// horizontally scrolling timeline.
+
+/** Total weeks in one academic year. */
+export const WEEKS_IN_YEAR = WEEKS_PER_QUARTER * 4;
+
+/** Return every week of the academic year as `{ idx, label }`. */
+export function allYearWeeks(): { idx: number; label: string }[] {
+  return Array.from({ length: WEEKS_IN_YEAR }, (_, i) => ({
+    idx: i,
+    label: `Wk ${i + 1}`,
+  }));
+}
+
+/**
+ * Group the 36 academic weeks by calendar month, anchored at
+ * `DEFAULT_TERM_START`. Each band records its label, the number of week
+ * columns inside the band, and the 0-based week index where the band starts —
+ * the MonthPicker uses `startWeekIdx` to scroll the timeline directly.
+ */
+export function allYearMonths(
+  year: number = DEFAULT_TERM_START.getFullYear(),
+): { label: string; weeks: number; startWeekIdx: number }[] {
+  const termStart = new Date(
+    year,
+    DEFAULT_TERM_START.getMonth(),
+    DEFAULT_TERM_START.getDate(),
+  );
+
+  const bands: { label: string; weeks: number; startWeekIdx: number }[] = [];
+  for (let w = 0; w < WEEKS_IN_YEAR; w++) {
+    const d = new Date(
+      termStart.getFullYear(),
+      termStart.getMonth(),
+      termStart.getDate() + w * 7,
+    );
+    const label = d.toLocaleString("en-US", { month: "long" });
+    const last = bands[bands.length - 1];
+    if (!last || last.label !== label) {
+      bands.push({ label, weeks: 1, startWeekIdx: w });
+    } else {
+      last.weeks += 1;
+    }
+  }
+  return bands;
+}
+
+/**
+ * Return the 0-based week index for the band containing `weekIdx`. Useful for
+ * highlighting the active month in the MonthPicker as the user scrolls.
+ */
+export function monthIndexForWeek(
+  weekIdx: number,
+  months: { weeks: number }[] = allYearMonths(),
+): number {
+  let cursor = 0;
+  for (let i = 0; i < months.length; i++) {
+    cursor += months[i].weeks;
+    if (weekIdx < cursor) return i;
+  }
+  return months.length - 1;
+}

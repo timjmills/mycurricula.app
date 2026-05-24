@@ -1,5 +1,5 @@
-/* QuarterMonthWeekHeader — Sticky 3-row timeline header.
-   Position: sticky; anchors to the page <main> scroll context.
+/* QuarterMonthWeekHeader — sticky 2-row timeline header.
+   Position: sticky against the YearView shared horizontal scroll container.
    Background covers scrolling lane content underneath. */
 
 .header {
@@ -8,8 +8,24 @@
   z-index: 10;
   background: var(--paper);
   border-bottom: 1px solid var(--ink-150);
-  /* Prevent the sticky block from shrinking narrower than the rail. */
-  min-width: calc(var(--left-rail, 200px) + 200px);
+  /* Header transitions when the chameleon subject changes. */
+  transition:
+    background 200ms ease,
+    border-color 200ms ease;
+}
+
+/* Active-subject chameleon fill — vertical gradient dark-top → light-bottom,
+   matching the Weekly card header feel. var(--c) / var(--cl) resolve via the
+   cp-subj cascade applied by the consumer. */
+.chameleon {
+  background: linear-gradient(180deg, var(--c) 0%, var(--cl) 100%);
+  border-bottom: 1px solid color-mix(in srgb, var(--cd) 12%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header {
+    transition: none;
+  }
 }
 
 /* ── Shared row base ─────────────────────────────────────────────────── */
@@ -28,7 +44,7 @@
   padding: 4px 12px 5px;
   border-right: 1px solid var(--ink-150);
   background: var(--paper);
-  /* Stay crisp — no bleed from the month band bg. */
+  /* Stay crisp — never inherit the chameleon gradient. */
   z-index: 1;
 }
 
@@ -50,30 +66,15 @@
   text-transform: uppercase;
 }
 
-/* ── Row 1: Quarter ──────────────────────────────────────────────────── */
-
-.quarterCell {
-  display: flex;
-  align-items: center;
-  padding: 6px 14px;
-  border-right: none;
-}
-
-.quarterLabel {
-  font-size: var(--t-13);
-  font-weight: 600;
-  color: var(--ink-700);
-  letter-spacing: -0.1px;
-}
-
-/* ── Row 2: Month bands ──────────────────────────────────────────────── */
+/* ── Row 1: Month bands ──────────────────────────────────────────────── */
 
 .monthRow {
-  background: var(--ink-50);
+  /* Transparent so the .chameleon gradient shows through on subject mode. */
+  background: transparent;
 }
 
 .monthCell {
-  padding: 5px 10px;
+  padding: 6px 10px;
   font-size: var(--t-12);
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -84,15 +85,24 @@
   text-overflow: ellipsis;
 }
 
+/* In subject mode the month label needs strong contrast on the gradient — the
+   gradient sits between var(--c) and var(--cl), so a deep tone reads cleanly. */
+.chameleon .monthCell {
+  color: var(--cd);
+}
+
 .monthBorder {
   border-left: 1px solid var(--ink-150);
 }
 
-/* ── Row 3: Week labels ──────────────────────────────────────────────── */
+.chameleon .monthBorder {
+  border-left: 1px solid color-mix(in srgb, var(--cd) 18%, transparent);
+}
+
+/* ── Row 2: Week labels ──────────────────────────────────────────────── */
 
 .weekRow {
-  /* Slightly lighter than month row so the hierarchy reads top-down. */
-  background: var(--paper);
+  background: transparent;
 }
 
 .weekCell {
@@ -107,14 +117,23 @@
   white-space: nowrap;
 }
 
+.chameleon .weekCell {
+  color: color-mix(in srgb, var(--cd) 80%, transparent);
+}
+
 .weekBorder {
   border-left: 1px solid var(--ink-150);
+}
+
+.chameleon .weekBorder {
+  border-left: 1px dashed color-mix(in srgb, var(--cd) 18%, transparent);
 }
 
 /* Today highlight — the cell for the current week gets a subtle tint. */
 .weekCellToday {
   color: var(--fyi);
   background: var(--fyi-bg);
+  font-weight: 700;
 }
 
 /* Dot marker below the week label, centered horizontally. */

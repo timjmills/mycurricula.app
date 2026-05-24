@@ -2,6 +2,7 @@
 // Consumers import from "@/components/year" — never from deep files.
 
 export { YearView } from "./YearView";
+export { YearMobile } from "./YearMobile";
 export { YearSidebar } from "./YearSidebar";
 export { RoadmapView } from "./RoadmapView";
 export { ProgressionView } from "./ProgressionView";
@@ -16,3 +17,5 @@ export { QuarterMonthWeekHeader } from "./QuarterMonthWeekHeader";
 export type { QuarterMonthWeekHeaderProps } from "./QuarterMonthWeekHeader";
 export { StatusFilterBar } from "./StatusFilterBar";
 export type { StatusFilterBarProps, StatusFilterId } from "./StatusFilterBar";
+export { MonthPicker } from "./MonthPicker";
+export type { MonthPickerProps } from "./MonthPicker";

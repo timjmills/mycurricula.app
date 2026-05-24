@@ -1,68 +1,46 @@
-/* YearSidebar — vertical sub-nav for the Year view. */
+/* YearSidebar — narrow icon-only sub-nav for the Year view. */
 
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  width: 140px;
+  gap: 4px;
+  width: 56px;
   flex-shrink: 0;
-  padding: 12px 8px;
-  border-right: 1px solid var(--ink-150, #e6e8ed);
-  /* Soft neutral — matches the page background so the sidebar blends into
-     the overall surface rather than popping as a bright white panel. */
-  background: var(--ink-50, #f6f7f9);
+  padding: 12px 6px;
+  border-right: 1px solid var(--ink-150);
+  /* Soft neutral — matches the page background so the sidebar blends in. */
+  background: var(--ink-50);
 }
 
-/* Base nav item — shared by active and inert */
+/* Icon-only nav item. All entries are <button disabled>; the tooltip
+   wrapper carries the label for hover and focus. */
 .navItem {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--r-8, 8px);
-  font-size: var(--t-13);
-  font-weight: 600;
-  line-height: 1.2;
-  text-align: left;
-  min-height: 44px; /* WCAG AA touch target */
-  position: relative;
-}
-
-/* Active (clickable) — default state */
-.navItemIdle {
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-8);
   background: transparent;
-  color: var(--ink-500, #5b5e69);
-  border: none;
-  cursor: pointer;
-}
-
-.navItemIdle:hover {
-  background: var(--ink-50, #f6f7f9);
-  color: var(--ink-700, #2e3038);
-}
-
-/* Active (pressed) state */
-.navItemActive {
-  background: #eef0ff;
-  color: #5b61f4;
-  border: none;
-  cursor: pointer;
-}
-
-.navItemActive .navIcon {
-  color: #5b61f4;
-}
-
-/* Inert "coming soon" item */
-.navItemInert {
-  opacity: 0.45;
+  color: var(--ink-500);
+  border: 0;
+  padding: 0;
   cursor: not-allowed;
-  color: var(--ink-500, #5b5e69);
-  /* Not a button — no pointer events beyond the cursor change */
+  /* disabled <button> needs an explicit visual treatment — the default
+     dimming varies by browser. */
+  opacity: 0.55;
+  transition: opacity 150ms ease;
 }
 
-.navItemInert:hover .soonBadge {
+.navItem:hover {
   opacity: 1;
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.navItem:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
 }
 
 .navIcon {
@@ -70,74 +48,31 @@
   color: currentColor;
 }
 
-.navLabel {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* "Soon" badge on inert items — appears on hover */
-.soonBadge {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: var(--ink-100, #eef0f4);
-  color: var(--ink-400, #8a8d99);
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 150ms ease;
-}
-
 /* ── Responsive ─────────────────────────────────────────────────────── */
 
 /* At 720px the sidebar folds into a horizontal scrolling strip above the
-   main content — the same pattern used by SubjectView's sidebar collapse.
-   Items become flex: 0 0 auto (no shrink/grow) so they scroll naturally. */
+   main content — same pattern SubjectView uses. */
 @media (max-width: 720px) {
   .sidebar {
     width: auto;
     flex-direction: row;
     align-items: center;
     gap: 4px;
-    padding: 8px 10px;
+    padding: 6px 10px;
     border-right: none;
-    border-bottom: 1px solid var(--ink-150, #e6e8ed);
+    border-bottom: 1px solid var(--ink-150);
     overflow-x: auto;
     overflow-y: hidden;
-    /* Prevent the strip from shrinking to nothing in the flex column parent. */
     flex-shrink: 0;
   }
 
   .navItem {
     flex: 0 0 auto;
-    width: auto;
-    min-width: 80px;
-    /* Keep vertical centering; icon + label sit side-by-side as before. */
-  }
-
-  /* On small horizontal strips the "Soon" badge takes too much space;
-     keep it hidden at rest, visible on hover (same as desktop). */
-}
-
-/* At 480px tighten the item padding while keeping ≥44px touch targets. */
-@media (max-width: 480px) {
-  .sidebar {
-    padding: 6px 8px;
-    gap: 3px;
-  }
-
-  .navItem {
-    padding: 6px 8px;
-    font-size: var(--t-12);
-    min-width: 70px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .soonBadge {
+  .navItem {
     transition: none;
   }
 }

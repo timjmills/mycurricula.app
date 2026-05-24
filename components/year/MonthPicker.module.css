@@ -1,0 +1,126 @@
+/* MonthPicker — popover dropdown for jumping to a calendar month. */
+
+.root {
+  position: relative;
+}
+
+/* Default <summary> bullet marker — disable it. */
+.root > summary::-webkit-details-marker {
+  display: none;
+}
+.root > summary {
+  list-style: none;
+}
+
+/* Trigger styled to match YearView's action buttons. */
+.summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: var(--r-8);
+  background: var(--paper);
+  color: var(--ink-700);
+  border: 1px solid var(--ink-150);
+  font-size: var(--t-13);
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  cursor: pointer;
+  min-height: 44px;
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.summary:hover {
+  background: var(--ink-50);
+  box-shadow: var(--shadow-card);
+}
+
+.summary:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.root[open] > .summary {
+  background: var(--ink-50);
+  box-shadow: var(--shadow-card);
+}
+
+.label {
+  white-space: nowrap;
+}
+
+.chev {
+  flex-shrink: 0;
+  transition: transform 120ms ease;
+}
+
+.root[open] .chev {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .summary,
+  .chev {
+    transition: none;
+  }
+}
+
+/* ── Popover panel ──────────────────────────────────────────────────────── */
+
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-card-hover);
+  min-width: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--r-6);
+  background: transparent;
+  border: 0;
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-700);
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.item:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+.itemActive,
+.itemActive:hover {
+  background: var(--fyi-bg);
+  color: var(--fyi);
+  font-weight: 700;
+}

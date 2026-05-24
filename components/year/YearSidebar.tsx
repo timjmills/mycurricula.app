@@ -1,47 +1,18 @@
 "use client";
 
-// YearSidebar — vertical icon+label sub-nav for the Year view.
+// YearSidebar — narrow icon-only sub-nav for the Year view.
 //
-// Roadmap and Progression are active and flip the in-page viewMode.
-// The remaining items (Calendar, Units, Lessons, Checkpoints, Reports,
-// Students, Settings, Help) are inert "coming soon" items rendered as
-// non-interactive <span> elements with aria-disabled and a tooltip.
-//
-// Active items are <button> elements; inert items use <span> so they
-// are NOT reachable by keyboard (no aria-pressed, no tab stop).
+// The in-page Roadmap | Progression ToggleGroup is now the canonical mode
+// switch — the two items have been removed from this sidebar. The rail's
+// remaining items (Calendar, Units, Lessons, …) are inert "Coming soon"
+// affordances rendered as <button disabled>: reachable by AT, never
+// tabbable, never clickable. Each one is wrapped in a Tooltip carrying
+// the label so the rail stays comprehensible at icon-only width.
 
-import { useAppState } from "@/lib/app-state";
-import type { ViewMode } from "@/lib/app-state";
+import { Tooltip } from "@/components/ui";
 import styles from "./YearSidebar.module.css";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
-
-const IconRoadmap = (p: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    {...p}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.7"
-    aria-hidden="true"
-  >
-    <path d="M3 12h6l3-8 3 16 3-8h3" />
-  </svg>
-);
-
-const IconProgression = (p: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    {...p}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.7"
-    aria-hidden="true"
-  >
-    <rect x="3" y="4" width="18" height="16" rx="2" />
-    <path d="M9 4v16" />
-  </svg>
-);
 
 const IconCal = (p: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -154,90 +125,48 @@ const IconHelp = (p: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-// ── Nav items config ─────────────────────────────────────────────────────
+// ── Nav items ─────────────────────────────────────────────────────────────
 
-interface ActiveNavItem {
-  kind: "active";
-  id: "roadmap" | "progression";
-  label: string;
-  icon: React.FC<React.SVGProps<SVGSVGElement>>;
-  viewMode: ViewMode;
-}
-
-interface InertNavItem {
-  kind: "inert";
+interface NavItem {
   id: string;
   label: string;
   icon: React.FC<React.SVGProps<SVGSVGElement>>;
 }
 
-type NavItem = ActiveNavItem | InertNavItem;
-
 const NAV_ITEMS: NavItem[] = [
-  {
-    kind: "active",
-    id: "roadmap",
-    label: "Roadmap",
-    icon: IconRoadmap,
-    viewMode: "grid",
-  },
-  {
-    kind: "active",
-    id: "progression",
-    label: "Progression",
-    icon: IconProgression,
-    viewMode: "list",
-  },
-  { kind: "inert", id: "calendar", label: "Calendar", icon: IconCal },
-  { kind: "inert", id: "units", label: "Units", icon: IconLayers },
-  { kind: "inert", id: "lessons", label: "Lessons", icon: IconBook },
-  { kind: "inert", id: "checkpoints", label: "Checkpoints", icon: IconFlag },
-  { kind: "inert", id: "reports", label: "Reports", icon: IconBarChart },
-  { kind: "inert", id: "students", label: "Students", icon: IconUsers },
-  { kind: "inert", id: "settings", label: "Settings", icon: IconSettings },
-  { kind: "inert", id: "help", label: "Help", icon: IconHelp },
+  { id: "calendar", label: "Calendar", icon: IconCal },
+  { id: "units", label: "Units", icon: IconLayers },
+  { id: "lessons", label: "Lessons", icon: IconBook },
+  { id: "checkpoints", label: "Checkpoints", icon: IconFlag },
+  { id: "reports", label: "Reports", icon: IconBarChart },
+  { id: "students", label: "Students", icon: IconUsers },
+  { id: "settings", label: "Settings", icon: IconSettings },
+  { id: "help", label: "Help", icon: IconHelp },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function YearSidebar() {
-  const { viewMode, setViewMode } = useAppState();
-
   return (
     <nav className={styles.sidebar} aria-label="Year view navigation">
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
-
-        if (item.kind === "active") {
-          const isActive = viewMode === item.viewMode;
-          return (
+        return (
+          <Tooltip
+            key={item.id}
+            content={`${item.label} — coming soon`}
+            side="right"
+          >
             <button
-              key={item.id}
-              className={`${styles.navItem} ${isActive ? styles.navItemActive : styles.navItemIdle}`}
-              onClick={() => setViewMode(item.viewMode)}
-              aria-pressed={isActive}
+              type="button"
+              className={styles.navItem}
               aria-label={item.label}
-              title={item.label}
+              aria-disabled="true"
+              disabled
             >
               <Icon className={styles.navIcon} width={20} height={20} />
-              <span className={styles.navLabel}>{item.label}</span>
             </button>
-          );
-        }
-
-        // Inert item — rendered as a non-interactive <span>.
-        // No tabIndex, no role="button", cursor:not-allowed.
-        return (
-          <span
-            key={item.id}
-            className={`${styles.navItem} ${styles.navItemInert}`}
-            aria-disabled="true"
-            title="Coming soon"
-          >
-            <Icon className={styles.navIcon} width={20} height={20} />
-            <span className={styles.navLabel}>{item.label}</span>
-            <span className={styles.soonBadge}>Soon</span>
-          </span>
+          </Tooltip>
         );
       })}
     </nav>

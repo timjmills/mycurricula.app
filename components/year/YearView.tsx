@@ -1,31 +1,30 @@
 "use client";
 
-// YearView — the full Year tab composition.
+// YearView — the full Year tab composition (desktop / tablet).
 //
 // Layout: [YearSidebar] [main column].
 // The main column contains a page header, an in-page Roadmap | Progression
-// toggle wired to viewMode, a status filter pill bar (visual only this wave),
-// and either <RoadmapView> (grid) or <ProgressionView> (list) based on
-// viewMode. A bottom stat strip shows live-computed totals.
+// toggle wired to viewMode, a status filter pill bar, and a single shared
+// horizontally scrolling container holding the sticky QuarterMonthWeekHeader
+// + the active view's lane stack. A bottom stat strip shows live totals.
 //
 // The global Grid|List pill in the top bar and the in-page toggle both
 // control the same viewMode — they stay in sync automatically since they
 // both read/write useAppState().viewMode.
 //
-// The icon-rail from (planner)/layout.tsx is still visible on /year;
-// YearSidebar sits in the main content area to the left of the view body.
-// Hiding the icon-rail via body:has([data-route="year"]) would require editing
-// globals.css (outside our file ownership). The current layout is readable and
-// functional without that change.
+// Active subject for the chameleon header is lifted here: the inner view
+// observes its lanes via IntersectionObserver and calls
+// `onActiveSubjectChange(sid)`; YearView feeds that into the
+// QuarterMonthWeekHeader.
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
-import { SUBJECTS } from "@/lib/mock";
+import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
 import {
-  DEFAULT_WEEKS_IN_VIEW,
-  monthsForQuarter,
-  weeksInQuarter,
+  allYearWeeks,
+  allYearMonths,
+  monthIndexForWeek,
 } from "@/lib/year-calendar";
 import { ToggleGroup } from "@/components/ui";
 import { YearSidebar } from "./YearSidebar";
@@ -33,7 +32,9 @@ import { RoadmapView } from "./RoadmapView";
 import { ProgressionView } from "./ProgressionView";
 import { QuarterMonthWeekHeader } from "./QuarterMonthWeekHeader";
 import { StatusFilterBar } from "./StatusFilterBar";
+import { MonthPicker } from "./MonthPicker";
 import type { StatusFilterId } from "./StatusFilterBar";
+import type { SubjectId } from "@/lib/types";
 import styles from "./YearView.module.css";
 
 // ── Inline icons ──────────────────────────────────────────────────────────
@@ -75,19 +76,6 @@ const IconExport = (p: React.SVGProps<SVGSVGElement>) => (
     aria-hidden="true"
   >
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-  </svg>
-);
-
-const IconChev = (p: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    {...p}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    aria-hidden="true"
-  >
-    <path d="M9 6l6 6-6 6" />
   </svg>
 );
 
@@ -188,11 +176,11 @@ function StatItem({
   );
 }
 
-// ── Constants shared with RoadmapView ──────────────────────────────────────
+// ── Layout constants ──────────────────────────────────────────────────────
 
-/** Width in px of each week column — must match RoadmapView's WEEK_COL_MIN. */
-const COLUMN_WIDTH_PX = 108;
-/** Width in px of the left rail — matches ProgressionView's LANE_COL. */
+/** Width in px of each week column. Must match RoadmapView's WEEK_COL_PX. */
+const COLUMN_WIDTH_PX = 120;
+/** Width in px of the left lane-card rail. Must match RoadmapView's grid. */
 const LEFT_RAIL_WIDTH_PX = 200;
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -201,12 +189,10 @@ export function YearView() {
   const { viewMode, setViewMode } = useAppState();
   const { lessons } = usePlanner();
 
-  // ── Quarter state ─────────────────────────────────────────────────────
-  // Starts at Q1; the quarter picker button is visual-only for now.
-  const [quarter, setQuarter] = useState(1);
+  // CURRENT_WEEK is 1-based; convert to 0-based for index math.
+  const currentWeekIdx = CURRENT_WEEK - 1;
 
   // ── Status filter state ───────────────────────────────────────────────
-  // "all" is the default active filter. A Set makes toggling O(1).
   const [activeFilters, setActiveFilters] = useState<Set<StatusFilterId>>(
     () => new Set(["all"] as StatusFilterId[]),
   );
@@ -215,10 +201,8 @@ export function YearView() {
     setActiveFilters((prev) => {
       const next = new Set(prev);
       if (id === "all") {
-        // Selecting "All" clears everything else.
         return new Set(["all"] as StatusFilterId[]);
       }
-      // Toggle individual filter; clear "all" when any specific filter is active.
       if (next.has(id)) {
         next.delete(id);
         if (next.size === 0) next.add("all");
@@ -233,15 +217,71 @@ export function YearView() {
   const handleFilterClear = () =>
     setActiveFilters(new Set(["all"] as StatusFilterId[]));
 
-  // ── QuarterMonthWeekHeader data ───────────────────────────────────────
-  const quarterMonths = useMemo(() => monthsForQuarter(quarter), [quarter]);
-  const quarterWeeks = useMemo(() => weeksInQuarter(quarter), [quarter]);
+  // ── Full-year calendar data ──────────────────────────────────────────
+  const months = useMemo(() => allYearMonths(), []);
+  const weeks = useMemo(() => allYearWeeks(), []);
+
+  // ── Shared horizontal scroll + scrollToWeek ──────────────────────────
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollToWeek = useCallback((weekIdx: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const target =
+      LEFT_RAIL_WIDTH_PX +
+      weekIdx * COLUMN_WIDTH_PX +
+      COLUMN_WIDTH_PX / 2 -
+      el.clientWidth / 2;
+    const left = Math.max(0, target);
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollTo({
+      left,
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+  }, []);
+
+  // ── Auto-center on today on mount ────────────────────────────────────
+  useEffect(() => {
+    // Defer to next frame so the scroll container has its final width.
+    const raf = requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const target =
+        LEFT_RAIL_WIDTH_PX +
+        currentWeekIdx * COLUMN_WIDTH_PX +
+        COLUMN_WIDTH_PX / 2 -
+        el.clientWidth / 2;
+      el.scrollLeft = Math.max(0, target); // instant on first mount
+    });
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Active month for the MonthPicker ─────────────────────────────────
+  // For now derived from today; a future wave can update this on scroll.
+  const activeMonthIdx = useMemo(
+    () => monthIndexForWeek(currentWeekIdx, months),
+    [currentWeekIdx, months],
+  );
+
+  const handlePickMonth = (monthIdx: number) => {
+    const band = months[monthIdx];
+    if (!band) return;
+    scrollToWeek(band.startWeekIdx);
+  };
+
+  // ── Active subject (chameleon driver) ─────────────────────────────────
+  const [activeSubjectId, setActiveSubjectId] = useState<SubjectId>(
+    SUBJECTS[0].id as SubjectId,
+  );
 
   // ── Stat strip values ─────────────────────────────────────────────────
   const totalUnits = new Set(lessons.map((l) => l.unit)).size;
   const totalLessons = lessons.length;
-  const activeLanes = SUBJECTS.length; // all 8 subjects are active curriculum lanes
-  const weeksInView = DEFAULT_WEEKS_IN_VIEW;
+  const activeLanes = SUBJECTS.length;
+  const weeksInView = weeks.length;
 
   return (
     <div className={styles.page} data-route="year">
@@ -254,27 +294,34 @@ export function YearView() {
           </p>
         </div>
         <div className={styles.pageHeaderActions}>
-          {/* Today — scrolls to the current week (stub: functional scroll not yet wired) */}
-          <button className={styles.actionBtn} aria-label="Go to today">
+          <button
+            type="button"
+            className={styles.actionBtn}
+            aria-label="Go to today"
+            onClick={() => scrollToWeek(currentWeekIdx)}
+          >
             <IconCal width={15} height={15} />
             Today
           </button>
-          {/* Quarter picker — visual-only dropdown stub */}
+
+          <MonthPicker
+            activeMonthIdx={activeMonthIdx}
+            onPickMonth={handlePickMonth}
+          />
+
           <button
+            type="button"
             className={styles.actionBtn}
-            aria-label={`Select quarter, currently Quarter ${quarter}`}
-            aria-haspopup="listbox"
-            onClick={() => setQuarter((q) => (q % 4) + 1)}
+            aria-label="Open filters"
           >
-            Quarter {quarter}
-            <IconChev width={13} height={13} />
-          </button>
-          {/* Filters and Export are stubs for later waves */}
-          <button className={styles.actionBtn} aria-label="Open filters">
             <IconFilter width={14} height={14} />
             Filters
           </button>
-          <button className={styles.actionBtn} aria-label="Export data">
+          <button
+            type="button"
+            className={styles.actionBtn}
+            aria-label="Export data"
+          >
             <IconExport width={14} height={14} />
             Export
           </button>
@@ -307,7 +354,6 @@ export function YearView() {
               ariaLabel="Year view mode"
             />
 
-            {/* Status filter pill bar — wired to local state */}
             <StatusFilterBar
               active={activeFilters}
               onToggle={handleFilterToggle}
@@ -315,18 +361,26 @@ export function YearView() {
             />
           </div>
 
-          {/* Sticky Quarter / Month / Week timeline header */}
-          <QuarterMonthWeekHeader
-            quarter={quarter}
-            months={quarterMonths}
-            weeks={quarterWeeks}
-            columnWidthPx={COLUMN_WIDTH_PX}
-            leftRailWidthPx={LEFT_RAIL_WIDTH_PX}
-          />
+          {/* Shared horizontal scroll container — owns the only overflow-x
+              on this page. The QuarterMonthWeekHeader sticks to the top of
+              this container; the active view renders only lane rows. */}
+          <div ref={scrollRef} className={styles.timelineScroll}>
+            <QuarterMonthWeekHeader
+              months={months}
+              weeks={weeks}
+              todayWeekIdx={currentWeekIdx}
+              columnWidthPx={COLUMN_WIDTH_PX}
+              leftRailWidthPx={LEFT_RAIL_WIDTH_PX}
+              subjectId={activeSubjectId}
+            />
 
-          {/* The active view */}
-          <div className={styles.viewBody}>
-            {viewMode === "grid" ? <RoadmapView /> : <ProgressionView />}
+            <div className={styles.viewBody}>
+              {viewMode === "grid" ? (
+                <RoadmapView onActiveSubjectChange={setActiveSubjectId} />
+              ) : (
+                <ProgressionView onActiveSubjectChange={setActiveSubjectId} />
+              )}
+            </div>
           </div>
 
           {/* Bottom stat strip */}
@@ -345,7 +399,7 @@ export function YearView() {
               icon={IconCal}
               label="Weeks in View"
               value={`${weeksInView} weeks`}
-              caption={`Academic Q${quarter}`}
+              caption="Full school year"
             />
             <StatItem
               icon={IconUsers}
