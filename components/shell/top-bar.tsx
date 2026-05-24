@@ -29,6 +29,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppState, type CurrentUser } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
+import { ToggleGroup } from "@/components/ui";
 import styles from "./top-bar.module.css";
 
 // ── View definitions ─────────────────────────────────────────────────────
@@ -304,100 +305,61 @@ export function TopBar(): ReactNode {
       <div className={styles.divider} aria-hidden="true" />
 
       {/* ── Personal / Master segmented control (POLISH-002/TOPBAR-005/QW-5)
-          Two-option pill: the active option gets a paper background + shadow
-          (editToggleBtnActive); the inactive option is muted. A 1px separator
-          div between the two options provides visible structural separation so
-          the pair reads as two distinct choices rather than a single label.
-          aria-pressed on each button communicates the selection to assistive
-          technology. The floating bullet dot has been removed — the pill active
-          state provides sufficient visual differentiation. The red Master active
-          style and the heads-up banner behavior are preserved unchanged.
+          Migrated to the ToggleGroup primitive (subtle variant, sm size).
+          The wrapper div applies .editToggleWrap so CSS can layer a red
+          var(--core-mode) fill onto the Master option when it is active —
+          scoped via a :global rule targeting [aria-label*="Master"] with
+          aria-checked="true" inside .editToggleWrap.
 
           RES-CRIT-002 fix (Option A): the toggle stays visible at every viewport
-          width. At ≤480px the labels abbreviate to "P" / "M" via CSS
-          .editToggleLabelFull / .editToggleLabelShort so the pill fits inside
-          the 360px bar without hiding or moving the control. The 44px touch
-          target is met by the 44px bar height at ≤540px combined with the full
-          hit area on the flex container. No layout changes; CSS-only at the
-          narrow breakpoints. */}
-      <div className={styles.editToggle} role="group" aria-label="Edit mode">
-        <button
-          type="button"
-          className={`${styles.editToggleBtn} ${
-            editMode === "personal" ? styles.editToggleBtnActive : ""
-          }`}
-          onClick={() => setEditMode("personal")}
-          aria-pressed={editMode === "personal"}
-          aria-label="Personal mode"
-        >
-          {/* Full label visible above 480px; abbreviated "P" at ≤480px. */}
-          <span className={styles.editToggleLabelFull} aria-hidden="true">
-            Personal
-          </span>
-          <span className={styles.editToggleLabelShort} aria-hidden="true">
-            P
-          </span>
-        </button>
-        {/* Visible 1px separator between the two options — confirms to the
-            teacher that these are two distinct, independent choices. */}
-        <span className={styles.editToggleSep} aria-hidden="true" />
-        <button
-          type="button"
-          className={`${styles.editToggleBtn} ${styles.editToggleBtnMaster} ${
-            editMode === "master" ? styles.editToggleBtnMasterActive : ""
-          }`}
-          onClick={() => setEditMode("master")}
-          aria-pressed={editMode === "master"}
-          aria-label="Master mode — changes affect the whole team"
-          title="Changes in Master mode affect the whole team"
-        >
-          {/* Full label visible above 480px; abbreviated "M" at ≤480px. */}
-          <span className={styles.editToggleLabelFull} aria-hidden="true">
-            Master
-          </span>
-          <span className={styles.editToggleLabelShort} aria-hidden="true">
-            M
-          </span>
-        </button>
+          width. The "P | M" short-label behavior is NOT preserved — full labels
+          ("Personal" / "Master") are used at all widths. The ToggleGroup
+          primitive renders a single <span> per option with no dual-span mechanism
+          for CSS-driven label swapping; extending the primitive just for this one
+          callsite is not warranted. At 360px the bar fits: both labels are short
+          and the sm tray adds only ~84px total. Touch target ≥44px is satisfied
+          by the primitive's ::before inflation at ≤900px. */}
+      <div className={styles.editToggleWrap}>
+        <ToggleGroup
+          options={[
+            {
+              value: "personal",
+              label: "Personal",
+              ariaLabel: "Personal mode",
+            },
+            {
+              value: "master",
+              label: "Master",
+              ariaLabel: "Master mode — changes affect the whole team",
+            },
+          ]}
+          value={editMode}
+          onChange={setEditMode}
+          variant="subtle"
+          size="sm"
+          ariaLabel="Edit mode"
+        />
       </div>
 
       <div className={styles.divider} aria-hidden="true" />
 
       {/* ── View-mode pill (Grid | List) ─────────────────────────────
-          Two-option segmented control: Grid renders the subject × day matrix;
-          List renders a flat chronological list of lessons. The active option
-          gets the paper background + shadow (viewModeBtnActive); the inactive
-          option is muted. A 1px separator span between the two options makes
-          the boundary explicit so the pair reads as two distinct choices.
-          aria-pressed on each button communicates selection to assistive tech.
-          Min 44px touch target via the .viewModePill height (32px pill, 44px
-          bar) — the bar centers the pill in the 52px chrome row. */}
-      <div
-        className={styles.viewModePill}
-        role="group"
-        aria-label="Layout mode"
-      >
-        <button
-          type="button"
-          className={`${styles.viewModeBtn} ${
-            viewMode === "grid" ? styles.viewModeBtnActive : ""
-          }`}
-          onClick={() => setViewMode("grid")}
-          aria-pressed={viewMode === "grid"}
-        >
-          Grid
-        </button>
-        <span className={styles.viewModeSep} aria-hidden="true" />
-        <button
-          type="button"
-          className={`${styles.viewModeBtn} ${
-            viewMode === "list" ? styles.viewModeBtnActive : ""
-          }`}
-          onClick={() => setViewMode("list")}
-          aria-pressed={viewMode === "list"}
-        >
-          List
-        </button>
+          Migrated to the ToggleGroup primitive (prominent variant, sm size).
+          BUILD_STANDARD §7 designates Grid/List as a primary mode switch →
+          prominent. Hidden below 1024px by .viewModePillWrap in the CSS
+          (mirrors the old .viewModePill display:none rule). */}
+      <div className={styles.viewModePillWrap}>
+        <ToggleGroup
+          options={[
+            { value: "grid", label: "Grid" },
+            { value: "list", label: "List" },
+          ]}
+          value={viewMode}
+          onChange={setViewMode}
+          variant="prominent"
+          size="sm"
+          ariaLabel="Layout mode"
+        />
       </div>
 
       {/* Push remaining controls to the right */}

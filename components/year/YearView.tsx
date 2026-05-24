@@ -27,6 +27,7 @@ import {
   monthsForQuarter,
   weeksInQuarter,
 } from "@/lib/year-calendar";
+import { ToggleGroup } from "@/components/ui";
 import { YearSidebar } from "./YearSidebar";
 import { RoadmapView } from "./RoadmapView";
 import { ProgressionView } from "./ProgressionView";
@@ -287,30 +288,24 @@ export function YearView() {
         <div className={styles.contentArea}>
           {/* In-page Roadmap | Progression toggle */}
           <div className={styles.controls}>
-            <div
-              className={styles.viewToggle}
-              role="group"
-              aria-label="View mode"
-            >
-              <button
-                className={`${styles.toggleBtn} ${viewMode === "grid" ? styles.toggleBtnActive : ""}`}
-                onClick={() => setViewMode("grid")}
-                aria-pressed={viewMode === "grid"}
-              >
-                <IconRoadmap width={14} height={14} />
-                Roadmap
-                <span className={styles.toggleSub}>Weekly overview</span>
-              </button>
-              <button
-                className={`${styles.toggleBtn} ${viewMode === "list" ? styles.toggleBtnActive : ""}`}
-                onClick={() => setViewMode("list")}
-                aria-pressed={viewMode === "list"}
-              >
-                <IconProgression width={14} height={14} />
-                Progression
-                <span className={styles.toggleSub}>Day-by-day calendar</span>
-              </button>
-            </div>
+            <ToggleGroup
+              variant="prominent"
+              options={[
+                {
+                  value: "grid",
+                  label: "Roadmap",
+                  icon: <IconRoadmap width={14} height={14} />,
+                },
+                {
+                  value: "list",
+                  label: "Progression",
+                  icon: <IconProgression width={14} height={14} />,
+                },
+              ]}
+              value={viewMode}
+              onChange={setViewMode}
+              ariaLabel="Year view mode"
+            />
 
             {/* Status filter pill bar — wired to local state */}
             <StatusFilterBar

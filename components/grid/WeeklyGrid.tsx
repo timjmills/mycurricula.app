@@ -55,6 +55,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { Button } from "@/components/ui";
 import {
   DndContext,
   DragOverlay,
@@ -578,31 +579,35 @@ export function WeeklyGrid(): ReactNode {
       />
 
       {/* ── Toolbar — anchored chrome (spec §3.5) ──────────────────────── */}
-      {/* POLISH-006: Expand-all / Minimize-all rendered as a segmented control
-          so the pair reads as a single compound action with a clear internal
-          boundary, consistent with the segmented-control treatment elsewhere. */}
+      {/* POLISH-006: Expand-all / Minimize-all are TWO INDEPENDENT ACTIONS
+          (not a stateful toggle): each calls a different function and there
+          is no single boolean tracking which is "active". They are rendered
+          as a visually-grouped pair of Button primitives rather than a
+          ToggleGroup (which would imply exclusive-select / radiogroup
+          semantics). The .expandBtnGroup wrapper matches the old .expandSegment
+          selector used in the responsive rule that hides it at ≤480px. */}
       <div className={styles.moveToolbar}>
         <div
-          className={styles.expandSegment}
+          className={styles.expandBtnGroup}
           role="group"
           aria-label="Card expansion"
         >
-          <button
-            type="button"
-            className={styles.expandSegmentBtn}
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={expandAll}
             aria-label="Expand all lesson cards"
           >
             Expand all
-          </button>
-          <button
-            type="button"
-            className={styles.expandSegmentBtn}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={collapseAll}
             aria-label="Minimize all lesson cards"
           >
             Minimize all
-          </button>
+          </Button>
         </div>
 
         {/* BIG-2: Duplicate this week into the next week. */}

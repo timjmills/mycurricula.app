@@ -38,6 +38,7 @@ import { dateForWeekDay } from "@/lib/mock/calendar";
 import { useRouter } from "next/navigation";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { useUnitNote } from "@/lib/unit-notes";
+import { ToggleGroup } from "@/components/ui";
 import { ListRow } from "@/components/list";
 import { StatStrip } from "./StatStrip";
 import { UnitHealthCard } from "./UnitHealthCard";
@@ -51,8 +52,7 @@ import styles from "./SubjectView.module.css";
 const PERIOD_FILTERS = ["All", "Unit", "Month", "Week"] as const;
 type PeriodFilter = (typeof PERIOD_FILTERS)[number];
 
-const GROUP_MODES = ["unit", "week"] as const;
-type GroupMode = (typeof GROUP_MODES)[number];
+type GroupMode = "unit" | "week";
 
 /** Map a week number to an approximate month index (0 = Aug). */
 function weekToMonthIndex(week: number): number {
@@ -850,22 +850,17 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
           {viewMode === "grid" && (
             <>
               <span className={styles.filterLabel}>Group by</span>
-              <div
-                className={styles.groupToggle}
-                role="group"
-                aria-label="Group by"
-              >
-                {GROUP_MODES.map((mode) => (
-                  <button
-                    key={mode}
-                    className={`${styles.groupBtn} ${groupMode === mode ? styles.groupBtnActive : ""}`}
-                    onClick={() => setGroupMode(mode)}
-                    aria-pressed={groupMode === mode}
-                  >
-                    {mode === "unit" ? "By Unit" : "By Week"}
-                  </button>
-                ))}
-              </div>
+              <ToggleGroup
+                variant="subtle"
+                size="sm"
+                options={[
+                  { value: "unit", label: "By Unit" },
+                  { value: "week", label: "By Week" },
+                ]}
+                value={groupMode}
+                onChange={setGroupMode}
+                ariaLabel="Group lessons by"
+              />
             </>
           )}
         </div>

@@ -151,57 +151,18 @@
   z-index: 19;
 }
 
-/* ── Expand-all / Minimize-all segmented control (POLISH-006) ───────────────
+/* ── Expand-all / Minimize-all action pair (POLISH-006) ─────────────────────
  *
- * The two buttons share a single rounded border (the container), separated
- * by a 1px hairline divider. This reads as a compound control rather than
- * two independent buttons, consistent with the segmented-control treatment
- * used elsewhere in the shell this wave.
- *
- * Layout: .expandSegment is the container (border + border-radius).
- *   Each .expandSegmentBtn shares the container border; the first button
- *   gets a right hairline via box-shadow so no extra element is needed.
- * Touch targets: min 44px height, ≥44px width via padding.
+ * Two independent Button primitives (secondary/sm) grouped visually. These
+ * are action buttons, not a stateful toggle — ToggleGroup (radiogroup
+ * semantics) would be wrong here. The wrapper provides a flex row with a
+ * small gap so the two buttons read as a paired group. Touch targets and
+ * focus rings are handled by the Button primitive.
  */
-.expandSegment {
-  display: inline-flex;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-8);
-  overflow: hidden;
-  background: var(--paper);
-}
-
-.expandSegmentBtn {
+.expandBtnGroup {
   display: inline-flex;
   align-items: center;
-  height: 44px;
-  padding: 0 14px;
-  background: transparent;
-  color: var(--ink-700);
-  font-size: var(--t-13);
-  font-weight: 500;
-  border: none;
-  /* Internal divider between the two buttons — right-side hairline on the
-     first button, rendered via box-shadow so it doesn't affect layout. */
-  transition:
-    background 0.12s ease,
-    color 0.12s ease;
-}
-
-/* The first button gets a right hairline to divide the pair. */
-.expandSegmentBtn:first-child {
-  box-shadow: inset -1px 0 0 var(--ink-200);
-}
-
-.expandSegmentBtn:hover:not(:disabled) {
-  background: var(--ink-50);
-}
-
-.expandSegmentBtn:focus-visible {
-  outline: 2px solid var(--math);
-  outline-offset: -2px; /* inset so the outline stays inside the container */
-  z-index: 1; /* sit above sibling so the outline isn't clipped */
-  position: relative;
+  gap: 4px;
 }
 
 /* Separator between toolbar controls and the week-nav arrows. */
@@ -860,10 +821,10 @@
 }
 
 @media (max-width: 480px) {
-  /* The expand/minimize segmented control is a convenience at narrow
-     widths — a teacher on a 480px viewport is primarily scrolling and
-     reading. Remove it so the nav arrows have the full toolbar width. */
-  .expandSegment {
+  /* The expand/minimize action pair is a convenience at narrow widths —
+     a teacher on a 480px viewport is primarily scrolling and reading.
+     Remove it so the nav arrows have the full toolbar width. */
+  .expandBtnGroup {
     display: none;
   }
   /* Allow the bulk action bar to wrap its day-button row onto a second

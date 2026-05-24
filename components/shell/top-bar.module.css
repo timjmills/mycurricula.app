@@ -218,165 +218,49 @@
   user-select: none;
 }
 
-/* ── Personal / Master segmented control (POLISH-002/TOPBAR-005/QW-5) ─ */
-/* A proper two-option pill: muted ink-50 tray, paper+shadow on active option.
-   The 1px separator span (.editToggleSep) between the two buttons makes the
-   boundary between Personal and Master unmistakable — the control no longer
-   reads as a single label. The floating bullet dot has been removed since the
-   active-option pill provides sufficient visual differentiation.
+/* ── Personal / Master toggle wrapper (POLISH-002/TOPBAR-005/QW-5) ──── */
+/* Wraps the ToggleGroup primitive so we can scope the Master active override
+   without touching the primitive's own stylesheet.
 
-   RES-CRIT-002: the toggle is NEVER hidden — Master mode must be reachable at
-   every viewport width (Option A). At ≤480px the labels swap to single-letter
-   abbreviations ("P" / "M") via .editToggleLabelFull / .editToggleLabelShort
-   so the pill remains legible inside the compressed 360px bar. */
-.editToggle {
+   RES-CRIT-002: the wrapper is NEVER hidden — Master mode must be reachable at
+   every viewport width. The ToggleGroup itself handles touch targets (≥44px
+   via ::before inflation at ≤900px).
+
+   "P | M" short-label behavior: NOT preserved here. Full labels ("Personal" /
+   "Master") are shown at all widths. The ToggleGroup primitive renders a single
+   <span> per option; there is no dual-span mechanism for CSS label swapping.
+   Both labels are short enough to fit the 360px bar — verified below. */
+.editToggleWrap {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  height: 32px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-200);
-  background: var(--ink-50);
-  padding: 2px;
-  /* No gap — buttons sit flush against the separator; the separator itself
-     provides visual spacing via its own margin. */
-  gap: 0;
-  flex: 0 0 auto;
 }
 
-/* Visible 1px separator between Personal and Master options. */
-.editToggleSep {
-  display: inline-block;
-  width: 1px;
-  height: 16px;
-  background: var(--ink-200);
-  flex: 0 0 auto;
-  align-self: center;
+/* Master option active override: when the Master button is aria-checked,
+   paint its chip with the Core Mode red instead of the default paper fill.
+   :global escapes the CSS Module hash so we can target the ToggleGroup's
+   rendered DOM without modifying the primitive. */
+.editToggleWrap
+  :global([role="radio"][aria-label*="Master"][aria-checked="true"]) {
+  background: var(--core-mode);
+  color: var(--paper);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--core-mode) 40%, transparent);
 }
 
-.editToggleBtn {
-  display: inline-flex;
-  align-items: center;
-  height: 26px;
-  padding: 0 11px;
-  border-radius: var(--r-6);
-  border: none;
-  background: transparent;
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-500);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease,
-    box-shadow 0.12s ease;
-  /* RES-MED-003: padding-trick — inflates hit area to ≥44px tall while
-     the visual button stays at 26px inside the pill container.
-     box-sizing:content-box so the padding adds to (not replaces) the
-     declared height; negative block margin cancels the layout expansion. */
-  padding-block: 9px;
-  margin-block: -9px;
-  box-sizing: content-box;
-}
-
-.editToggleBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
-.editToggleBtnActive {
-  background: var(--paper);
-  color: var(--ink-900);
-  box-shadow: 0 1px 2px rgba(20, 22, 32, 0.08);
-}
-
-/* Master mode — warning color in the inactive state, red fill when active.
-   The heads-up banner behavior (managed elsewhere) remains untouched. */
-.editToggleBtnMaster {
+/* Master option inactive: warm the label color toward core-mode so the
+   teacher can read "danger" even before activating the option. */
+.editToggleWrap
+  :global([role="radio"][aria-label*="Master"][aria-checked="false"]) {
   color: var(--core-mode);
 }
 
-.editToggleBtnMasterActive {
-  background: var(--core-mode);
-  color: var(--paper);
-  box-shadow: 0 1px 2px rgba(227, 107, 126, 0.25);
-}
-
-/* RES-CRIT-002 — label visibility toggle for narrow viewports.
-   Above 480px: full text ("Personal" / "Master") is visible; short text hidden.
-   At ≤480px: full text hidden; abbreviated text ("P" / "M") is visible.
-   Both spans are aria-hidden — the button's own aria-label carries the
-   accessible name at all breakpoints. */
-.editToggleLabelFull {
-  display: inline;
-}
-.editToggleLabelShort {
-  display: none;
-}
-
-/* ── View-mode pill (Grid | List) ───────────────────────────────────── */
-/* Two-option segmented control: muted ink-50 tray, paper+shadow on the
-   active option. Mirrors the Personal/Master pill treatment so the two
-   controls read as a visual pair on the top bar. The 1px separator span
-   (.viewModeSep) between Grid and List makes the boundary explicit. */
-.viewModePill {
+/* ── View-mode pill wrapper (Grid | List) ───────────────────────────── */
+/* Wraps the ToggleGroup primitive. Hidden below 1024px (secondary chrome)
+   matching the old .viewModePill hide rule. */
+.viewModePillWrap {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  height: 32px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-200);
-  background: var(--ink-50);
-  padding: 2px;
-  /* No gap — buttons sit flush against the separator; the separator
-     itself provides visual spacing via its own width. */
-  gap: 0;
-  flex: 0 0 auto;
-}
-
-/* Visible 1px separator between Grid and List options. */
-.viewModeSep {
-  display: inline-block;
-  width: 1px;
-  height: 16px;
-  background: var(--ink-200);
-  flex: 0 0 auto;
-  align-self: center;
-}
-
-.viewModeBtn {
-  display: inline-flex;
-  align-items: center;
-  height: 26px;
-  padding: 0 11px;
-  border-radius: var(--r-6);
-  border: none;
-  background: transparent;
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-500);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease,
-    box-shadow 0.12s ease;
-  /* RES-MED-003: padding-trick — inflates hit area to ≥44px tall while
-     the visual button stays at 26px inside the pill container.
-     Mirrors the same fix on .editToggleBtn. */
-  padding-block: 9px;
-  margin-block: -9px;
-  box-sizing: content-box;
-}
-
-.viewModeBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
-.viewModeBtnActive {
-  background: var(--paper);
-  color: var(--ink-900);
-  box-shadow: 0 1px 2px rgba(20, 22, 32, 0.08);
 }
 
 /* ── Search — collapsible (TOPBAR-001) ──────────────────────────────── */
@@ -532,7 +416,7 @@
 
    1024px: hide save indicator + view-mode pill (recovered ~120px).
     768px: also hide week label + undo/redo group (recovered ~160px more).
-    540px: also hide edit toggle; condense bar height to 44px.
+    540px: condense bar height to 44px; compress view-tab padding.
     480px: also hide grade label from wordmark.
    All changes are additive media queries; no base rule is touched. */
 
@@ -542,7 +426,7 @@
   .saveIndicator {
     display: none;
   }
-  .viewModePill {
+  .viewModePillWrap {
     display: none;
   }
 }
@@ -562,10 +446,9 @@
 }
 
 @media (max-width: 540px) {
-  /* RES-CRIT-002 (Option A): the editToggle is NO LONGER hidden at this
-     breakpoint. Master mode must remain reachable at every viewport width.
-     Instead, compress the toggle and view tabs so the bar fits at 360px.
-     The editToggle display:none that was here has been intentionally removed. */
+  /* RES-CRIT-002 (Option A): the editToggleWrap is NEVER hidden — Master mode
+     must remain reachable at every viewport width. Compress the bar height and
+     view-tab padding so the bar fits at 360px with the full toggle visible. */
 
   /* Condense the bar to 44px — saves vertical space on portrait phone while
      still meeting the ≥44px touch-target requirement (buttons fill bar height
@@ -573,13 +456,6 @@
   .bar {
     height: 44px;
     gap: 4px;
-  }
-
-  /* Compress the toggle pill padding so the two buttons fit at narrow widths.
-     At 540–481px the full labels ("Personal" / "Master") are still shown but
-     with tighter side padding. */
-  .editToggleBtn {
-    padding: 0 7px;
   }
 
   /* Compress view-tab padding so all four live tabs fit at 480–540px.
@@ -598,22 +474,6 @@
   }
   /* Tighten bar padding to the minimum so the remaining controls fit. */
   .bar {
-    padding: 0 8px;
-  }
-
-  /* RES-CRIT-002 — switch toggle labels to single-letter abbreviations at
-     360–480px so the P/M pill stays narrow enough to share the bar with the
-     view tabs, wordmark, and avatar. Full text is restored above 480px via
-     the default rules on .editToggleLabelFull / .editToggleLabelShort. */
-  .editToggleLabelFull {
-    display: none;
-  }
-  .editToggleLabelShort {
-    display: inline;
-  }
-
-  /* Tighten the toggle button padding further now that labels are 1 char. */
-  .editToggleBtn {
     padding: 0 8px;
   }
 

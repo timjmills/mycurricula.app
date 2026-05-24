@@ -104,55 +104,6 @@
   gap: 10px;
 }
 
-/* Roadmap | Progression toggle — the prominent dark/light pill pair. */
-.viewToggle {
-  display: inline-flex;
-  padding: 4px;
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-8);
-  gap: 2px;
-}
-
-.toggleBtn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
-  border-radius: var(--r-6);
-  border: 1px solid transparent;
-  cursor: pointer;
-  /* Inactive: white fill + ink-700 text + soft border */
-  background: var(--paper);
-  color: var(--ink-700);
-  font-size: var(--t-13);
-  font-weight: 700;
-  letter-spacing: -0.1px;
-  min-height: 44px;
-  transition:
-    background 120ms ease,
-    color 120ms ease;
-}
-
-/* Active pill: dark ink fill + white text. */
-.toggleBtnActive {
-  background: var(--ink-900);
-  color: var(--paper);
-  border-color: transparent;
-}
-
-.toggleBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
-.toggleSub {
-  font-size: var(--t-10);
-  font-weight: 500;
-  color: inherit;
-  opacity: 0.7;
-}
-
 /* Status filter pill bar is now in StatusFilterBar.module.css */
 
 /* ── View body ───────────────────────────────────────────────────────── */
@@ -252,8 +203,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .actionBtn,
-  .toggleBtn {
+  .actionBtn {
     transition: none;
   }
 }

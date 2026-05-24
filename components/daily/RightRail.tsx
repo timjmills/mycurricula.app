@@ -34,6 +34,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { ToggleGroup } from "@/components/ui";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
@@ -581,36 +582,41 @@ export function RightRail({
       ? "Week resources and day planning"
       : "Lesson resources and day planning";
 
-  // ── Mode toggle control — rendered in both modes as a compact segmented
-  // control. In tabbed mode it sits alongside the tab strip; in stacked mode
-  // it appears in a thin header bar above the panels.
+  // ── Mode toggle control — rendered in both modes as a compact ToggleGroup.
+  // In tabbed mode it sits alongside the tab strip; in stacked mode it appears
+  // in a thin header bar above the panels.
+  //
+  // This is a STATEFUL TOGGLE (single `railMode` string, exclusive selection)
+  // so ToggleGroup (radiogroup semantics) is the correct primitive.
+  //
+  // Icon choice: the rail is narrow so we pair a short text label ("Tabs" /
+  // "Stack") with each icon. This keeps the control scannable without being
+  // icon-only — screen readers also get the ariaLabel on each option for a
+  // natural-language description. Passing label="" would render a visible empty
+  // span inside the Button, so short text is the clean choice here.
   const modeToggle = (
-    <div
-      className={styles.modeToggle}
-      role="group"
-      aria-label="Rail display mode"
-    >
-      <button
-        type="button"
-        className={`${styles.modeBtn} ${railMode === "tabbed" ? styles.modeBtnActive : ""}`}
-        aria-pressed={railMode === "tabbed"}
-        aria-label="Tabbed mode"
-        title="Tabbed mode"
-        onClick={() => selectMode("tabbed")}
-      >
-        <TabbedIcon />
-      </button>
-      <button
-        type="button"
-        className={`${styles.modeBtn} ${railMode === "stacked" ? styles.modeBtnActive : ""}`}
-        aria-pressed={railMode === "stacked"}
-        aria-label="Stacked mode"
-        title="Stacked mode"
-        onClick={() => selectMode("stacked")}
-      >
-        <StackedIcon />
-      </button>
-    </div>
+    <ToggleGroup<RailMode>
+      options={[
+        {
+          value: "tabbed",
+          label: "Tabs",
+          icon: <TabbedIcon />,
+          ariaLabel: "Tabbed mode",
+        },
+        {
+          value: "stacked",
+          label: "Stack",
+          icon: <StackedIcon />,
+          ariaLabel: "Stacked mode",
+        },
+      ]}
+      value={railMode}
+      onChange={selectMode}
+      variant="subtle"
+      size="sm"
+      ariaLabel="Rail display mode"
+      className={styles.modeTogglePositioned}
+    />
   );
 
   return (

@@ -28,64 +28,17 @@
   border-left: 1px solid var(--ink-150);
 }
 
-/* ── Mode toggle (shared between tabbed + stacked headers) ─────────────── */
-/* A compact two-button segmented control — TabbedIcon and StackedIcon.
-   The active button gets ink-900 background + paper text; inactive buttons
-   are muted so the distinction is clear at WCAG AA. The control always
-   appears at the far-right edge of whatever header row it lives in. */
+/* ── Mode toggle positioning ──────────────────────────────────────────── */
+/* The ToggleGroup primitive is placed inside both the tab strip (tabbed
+   mode) and the stacked header (stacked mode). margin-left: auto pushes it
+   flush right in both contexts, matching the old .modeToggle behavior. The
+   right padding gives it breathing room from the rail edge. */
 
-.modeToggle {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+.modeTogglePositioned {
   margin-left: auto;
-  padding: 0 8px;
+  margin-right: 8px;
   flex-shrink: 0;
-}
-
-.modeBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  /* RES-MED-003: padding-trick — visual stays 28×26, hit area inflated to
-     ≥44×44 via padding (inline: 8px, block: 9px) + matching negative
-     margins. box-sizing:content-box keeps 28/26 as the visual size. */
-  width: 28px;
-  height: 26px;
-  padding: 9px 8px;
-  margin: -9px -8px;
-  box-sizing: content-box;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-4);
-  background: transparent;
-  color: var(--ink-400);
-  cursor: pointer;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease,
-    border-color 0.1s ease;
-}
-
-.modeBtn:hover {
-  color: var(--ink-700);
-  border-color: var(--ink-300);
-}
-
-.modeBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 1px;
-}
-
-/* Active state: filled button signals the current mode. */
-.modeBtnActive {
-  background: var(--ink-900);
-  color: var(--paper);
-  border-color: var(--ink-900);
-}
-
-.modeBtnActive:hover {
-  color: var(--paper);
-  border-color: var(--ink-900);
+  align-self: center;
 }
 
 /* ── TABBED mode ─────────────────────────────────────────────────────────
@@ -307,9 +260,6 @@
 /* ── Reduced motion ──────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .tab {
-    transition: none;
-  }
-  .modeBtn {
     transition: none;
   }
   .railSplitter {
