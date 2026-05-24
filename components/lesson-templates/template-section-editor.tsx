@@ -15,6 +15,7 @@
 import type { ReactNode } from "react";
 import type { LessonTemplateSection } from "@/lib/lesson-templates";
 import { newTemplateSection } from "@/lib/custom-templates";
+import { Tooltip } from "@/components/ui";
 import styles from "./template-section-editor.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@
 
 import type { KeyboardEvent, ReactNode } from "react";
 import { useOnboarding } from "@/lib/onboarding-state";
+import { Chip } from "@/components/ui";
 import styles from "./steps.module.css";
 
 interface GradeOption {
@@ -39,12 +40,12 @@ const GRADE_OPTIONS: readonly GradeOption[] = [
 export function GradeStep(): ReactNode {
   const { data, update } = useOnboarding();
 
-  // Arrow-key navigation within the radiogroup: move focus + selection to the
-  // next/previous option so the group behaves as a native radio group.
-  function handleRadioKeyDown(
-    e: KeyboardEvent<HTMLButtonElement>,
-    currentIndex: number,
-  ): void {
+  // Arrow-key navigation within the chip group: move focus + selection to the
+  // next/previous chip so the group behaves like a radio group.
+  function handleGroupKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
+    const currentIndex = GRADE_OPTIONS.findIndex(
+      (o) => o.value === data.grade,
+    );
     let nextIndex: number | null = null;
     if (e.key === "ArrowRight" || e.key === "ArrowDown") {
       nextIndex = (currentIndex + 1) % GRADE_OPTIONS.length;
@@ -56,10 +57,11 @@ export function GradeStep(): ReactNode {
     e.preventDefault();
     const next = GRADE_OPTIONS[nextIndex];
     update({ grade: next.value });
-    // Move DOM focus to the newly selected button.
-    const group = (e.currentTarget as HTMLElement).parentElement;
+    // Move DOM focus to the newly selected chip button.
     const buttons =
-      group?.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+      (e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        "button",
+      );
     buttons?.[nextIndex]?.focus();
   }
 
@@ -72,34 +74,27 @@ export function GradeStep(): ReactNode {
         This helps us configure the right curriculum defaults for your team.
       </p>
 
+      {/* role="group" + onKeyDown on the container provides arrow-key
+          navigation; each Chip (rendered as a toggle button) carries
+          aria-pressed for its selected state. */}
       <div
         className={styles.chipGrid}
-        role="radiogroup"
+        role="group"
         aria-label="Grade level"
+        onKeyDown={handleGroupKeyDown}
       >
-        {GRADE_OPTIONS.map((opt, i) => {
+        {GRADE_OPTIONS.map((opt) => {
           const selected = data.grade === opt.value;
           return (
-            <button
+            <Chip
               key={opt.value}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              // Only the selected chip is in the tab order; others are
-              // reachable via arrow keys, matching the radio-group pattern.
-              tabIndex={selected ? 0 : -1}
+              variant="filter"
+              active={selected}
               onClick={() => update({ grade: opt.value })}
-              onKeyDown={(e) => handleRadioKeyDown(e, i)}
-              className={[
-                styles.chip,
-                selected ? styles.chipSelected : "",
-                opt.wide ? styles.chipWide : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
+              className={opt.wide ? styles.chipWide : undefined}
             >
               {opt.label}
-            </button>
+            </Chip>
           );
         })}
       </div>

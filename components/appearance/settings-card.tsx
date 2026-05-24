@@ -2,12 +2,14 @@
 
 // settings-card.tsx — small shared primitives for the Appearance panel.
 //
-//   • SettingsCard — the white rounded panel with an eyebrow/title/hint
-//     header. Every section in artboard A2 uses this frame.
+//   • SettingsCard — composes <Card neutral> with the eyebrow/title/hint
+//     header pattern (module CSS). Every section in artboard A2 uses this.
 //   • RadioDot     — the filled-circle radio indicator shared by the
 //     style picker and palette toggle.
 
 import type { ReactNode } from "react";
+import { Card } from "@/components/ui";
+import styles from "./settings-card.module.css";
 
 interface SettingsCardProps {
   /** Small uppercase label above the title. */
@@ -21,7 +23,8 @@ interface SettingsCardProps {
   children: ReactNode;
 }
 
-/** White rounded panel with a consistent header — the A2 section frame. */
+/** White rounded panel with a consistent header — the A2 section frame.
+ *  Delegates border / shadow / radius / background to <Card neutral>. */
 export function SettingsCard({
   eyebrow,
   title,
@@ -29,60 +32,21 @@ export function SettingsCard({
   action,
   children,
 }: SettingsCardProps): ReactNode {
-  return (
-    <section
-      style={{
-        background: "#fff",
-        border: "1px solid var(--ink-150)",
-        borderRadius: 14,
-        padding: "18px 18px 16px",
-        boxShadow: "var(--shadow-card)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--ink-400)",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: 0.6,
-            }}
-          >
-            {eyebrow}
-          </div>
-          {title && (
-            <h2
-              style={{
-                margin: "4px 0 0",
-                fontSize: 15,
-                fontWeight: 700,
-                color: "var(--ink-900)",
-                letterSpacing: -0.2,
-              }}
-            >
-              {title}
-            </h2>
-          )}
-          {hint && (
-            <p
-              style={{
-                margin: "3px 0 0",
-                fontSize: 12,
-                color: "var(--ink-500)",
-                lineHeight: 1.55,
-                textWrap: "pretty",
-              }}
-            >
-              {hint}
-            </p>
-          )}
-        </div>
-        {action && <div style={{ flex: "0 0 auto" }}>{action}</div>}
+  const header = (
+    <div className={styles.header}>
+      <div className={styles.headerText}>
+        <span className={styles.eyebrow}>{eyebrow}</span>
+        {title && <h2 className={styles.title}>{title}</h2>}
+        {hint && <p className={styles.hint}>{hint}</p>}
       </div>
+      {action && <div className={styles.action}>{action}</div>}
+    </div>
+  );
+
+  return (
+    <Card header={header}>
       {children}
-    </section>
+    </Card>
   );
 }
 
@@ -91,28 +55,11 @@ export function RadioDot({ selected }: { selected: boolean }): ReactNode {
   return (
     <span
       aria-hidden
-      style={{
-        width: 18,
-        height: 18,
-        borderRadius: 999,
-        flex: "0 0 auto",
-        border: `2px solid ${selected ? "var(--ink-900)" : "var(--ink-300)"}`,
-        background: selected ? "var(--ink-900)" : "#fff",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
+      className={[styles.radioDot, selected ? styles.radioDotSelected : ""]
+        .filter(Boolean)
+        .join(" ")}
     >
-      {selected && (
-        <span
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: 999,
-            background: "#fff",
-          }}
-        />
-      )}
+      {selected && <span className={styles.radioDotInner} />}
     </span>
   );
 }

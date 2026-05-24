@@ -34,6 +34,8 @@ import { PaletteToggle } from "@/components/appearance/palette-toggle";
 import { LivePreview } from "@/components/appearance/live-preview";
 import { SubjectColors } from "@/components/appearance/subject-colors";
 import { PaletteReference } from "@/components/appearance/palette-reference";
+import { SettingsCard } from "@/components/appearance/settings-card";
+import { Button, PageHeader, Tooltip } from "@/components/ui";
 
 export default function AppearancePage(): ReactNode {
   // Core Curriculum subject → swatch mapping. Local state for this build:
@@ -57,34 +59,12 @@ export default function AppearancePage(): ReactNode {
           gap: 16,
         }}
       >
-        {/* Breadcrumb header */}
-        <nav
-          aria-label="Breadcrumb"
-          style={{ display: "flex", alignItems: "center", gap: 10 }}
-        >
-          <span
-            style={{
-              fontSize: 11,
-              color: "var(--ink-400)",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: 0.6,
-            }}
-          >
-            Settings
-          </span>
-          <span style={{ fontSize: 11, color: "var(--ink-300)" }}>/</span>
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--ink-700)",
-            }}
-            aria-current="page"
-          >
-            Appearance
-          </span>
-        </nav>
+        {/* Page header */}
+        <PageHeader
+          eyebrow="Settings"
+          title="Appearance"
+          subtitle="Personalise how your planner looks. Changes are yours alone."
+        />
 
         {/* Style + palette pickers */}
         <div
@@ -169,84 +149,33 @@ function HierarchyLabelsCard(): ReactNode {
     labels.lesson !== DEFAULT_LABELS.lesson ||
     labels.section !== DEFAULT_LABELS.section;
 
-  return (
-    <section
-      aria-label="Hierarchy labels"
-      style={{
-        background: "var(--paper)",
-        border: "1px solid var(--ink-150)",
-        borderRadius: "var(--r-12)",
-        padding: "18px 18px 16px",
-        boxShadow: "var(--shadow-card)",
-      }}
+  // Restore-defaults action pinned to the card header's top-right corner.
+  const restoreAction = (
+    <Tooltip
+      content={
+        hasOverrides
+          ? "Restore the factory-default labels"
+          : "Already at defaults"
+      }
     >
-      {/* Header — matches the SettingsCard idiom used by sibling sections:
-          a small uppercase eyebrow, a title, a one-line hint, and an
-          optional top-right action. The action is the Restore-defaults
-          affordance. */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: "var(--t-11)",
-              color: "var(--ink-400)",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: 0.6,
-            }}
-          >
-            Vocabulary
-          </div>
-          <h2
-            style={{
-              margin: "4px 0 0",
-              fontSize: "var(--t-16)",
-              fontWeight: 700,
-              color: "var(--ink-900)",
-              letterSpacing: -0.2,
-            }}
-          >
-            Hierarchy labels
-          </h2>
-          <p
-            style={{
-              margin: "3px 0 0",
-              fontSize: "var(--t-12)",
-              color: "var(--ink-500)",
-              lineHeight: 1.55,
-            }}
-          >
-            Rename what your school calls each planning level. Captions update
-            everywhere; behavior is unchanged.
-          </p>
-        </div>
-        <div style={{ flex: "0 0 auto" }}>
-          <button
-            type="button"
-            onClick={onRestoreDefaults}
-            disabled={!hasOverrides}
-            style={{
-              minHeight: 32,
-              padding: "0 12px",
-              fontSize: "var(--t-12)",
-              fontWeight: 600,
-              color: hasOverrides ? "var(--ink-700)" : "var(--ink-300)",
-              background: "var(--paper)",
-              border: "1px solid var(--ink-200)",
-              borderRadius: "var(--r-6)",
-              cursor: hasOverrides ? "pointer" : "not-allowed",
-            }}
-            title={
-              hasOverrides
-                ? "Restore the factory-default labels"
-                : "Already at defaults"
-            }
-          >
-            Restore defaults
-          </button>
-        </div>
-      </div>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onRestoreDefaults}
+        disabled={!hasOverrides}
+      >
+        Restore defaults
+      </Button>
+    </Tooltip>
+  );
 
+  return (
+    <SettingsCard
+      eyebrow="Vocabulary"
+      title="Hierarchy labels"
+      hint="Rename what your school calls each planning level. Captions update everywhere; behavior is unchanged."
+      action={restoreAction}
+    >
       {/* Four labeled text inputs — comfortable two-column grid that
           collapses to one column on narrower viewports. Save on blur. */}
       <div
@@ -290,7 +219,7 @@ function HierarchyLabelsCard(): ReactNode {
           onBlur={onCommit("section")}
         />
       </div>
-    </section>
+    </SettingsCard>
   );
 }
 
