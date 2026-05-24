@@ -14,6 +14,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useOnboarding } from "@/lib/onboarding-state";
 import { LESSON_TEMPLATES, type LessonTemplate } from "@/lib/lesson-templates";
+import { Badge, Chip, Button } from "@/components/ui";
 import styles from "./lesson-template-step.module.css";
 
 // ── LessonTemplateStep ───────────────────────────────────────────────────
@@ -102,9 +103,9 @@ function TemplateCard({
         <div className={styles.nameRow}>
           <span className={styles.name}>{template.name}</span>
           {template.recommended && (
-            <span className={styles.badge} aria-label="Recommended">
+            <Badge variant="info" size="sm">
               Recommended
-            </span>
+            </Badge>
           )}
         </div>
 
@@ -123,14 +124,18 @@ function TemplateCard({
       {/* ── Section chips ───────────────────────────────────────────── */}
       <div className={styles.chips} aria-label="Lesson sections">
         {template.sections.map((section, i) => (
-          <span key={section.id} className={styles.chip}>
+          <Chip
+            key={section.id}
+            variant="default"
+            className={styles.sectionChip}
+          >
             {i > 0 && (
               <span className={styles.chipDot} aria-hidden="true">
                 ·
               </span>
             )}
             {section.label}
-          </span>
+          </Chip>
         ))}
       </div>
 
@@ -138,16 +143,17 @@ function TemplateCard({
       <p className={styles.fit}>{template.fit}</p>
 
       {/* ── Preview toggle ──────────────────────────────────────────── */}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         className={styles.previewToggle}
         onClick={handlePreviewToggle}
         aria-expanded={previewOpen}
         aria-controls={previewId}
+        leadingIcon={<ChevronIcon open={previewOpen} />}
       >
-        <ChevronIcon open={previewOpen} />
         {previewOpen ? "Hide sections" : "Preview sections"}
-      </button>
+      </Button>
 
       {/* ── Preview panel ───────────────────────────────────────────── */}
       {previewOpen && (

@@ -11,7 +11,7 @@ export { Button } from "./Button";
 export type { ButtonProps } from "./Button";
 
 export { ToggleGroup } from "./ToggleGroup";
-export type { ToggleGroupProps } from "./ToggleGroup";
+export type { ToggleGroupProps, ToggleOption } from "./ToggleGroup";
 
 export { Card } from "./Card";
 export type { CardProps } from "./Card";

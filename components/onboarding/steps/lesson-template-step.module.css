@@ -123,27 +123,7 @@
   line-height: 1.3;
 }
 
-/* "Recommended" badge — only on templates where recommended === true */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: var(--r-4);
-  background: var(--math-light);
-  color: var(--math-deep);
-  font-size: var(--t-10);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  white-space: nowrap;
-  /* When the card is selected the badge shifts to a filled look for legibility. */
-}
-
-.cardSelected .badge {
-  background: var(--math-deep);
-  color: var(--paper);
-}
+/* "Recommended" badge uses Badge primitive — no local styles needed. */
 
 /* Check icon container — invisible until selected */
 .check {
@@ -188,16 +168,22 @@
      by the dot + surrounding whitespace. */
 }
 
-.chip {
+/* Section chips use Chip primitive (default) — size/color overrides only. */
+.sectionChip {
   display: inline-flex;
   align-items: center;
   font-size: var(--t-11);
   font-weight: 500;
   color: var(--ink-500);
   white-space: nowrap;
+  /* Reset Chip primitive padding so dots sit flush. */
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
-/* Separator dot between chips */
+/* Separator dot between section chips */
 .chipDot {
   margin: 0 4px;
   color: var(--ink-300);
@@ -205,7 +191,7 @@
   line-height: 1;
 }
 
-.cardSelected .chip {
+.cardSelected .sectionChip {
   color: var(--math-deep);
 }
 
@@ -228,42 +214,12 @@
 }
 
 /* ── Preview toggle button ──────────────────────────────────────────── */
+/* Uses Button primitive (ghost, sm) — only self-alignment override needed. */
 .previewToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 44px;
-  padding: 0 8px;
-  margin: 0 -8px;
-  border-radius: var(--r-6);
-  border: none;
-  background: transparent;
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-500);
-  cursor: pointer;
   align-self: flex-start;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease;
-}
-
-.previewToggle:hover {
-  background: var(--ink-100);
-  color: var(--ink-900);
-}
-
-.previewToggle:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
-}
-
-.cardSelected .previewToggle {
-  color: var(--math-deep);
-}
-
-.cardSelected .previewToggle:hover {
-  background: var(--math-light);
+  /* Negative margin compensates for Button's built-in padding so the
+     left edge of the text aligns with the card's other content. */
+  margin-left: -8px;
 }
 
 /* ── Section preview panel ──────────────────────────────────────────── */

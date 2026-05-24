@@ -12,6 +12,7 @@
 
 import type { ReactNode } from "react";
 import { useOnboarding } from "@/lib/onboarding-state";
+import { Badge } from "@/components/ui";
 import styles from "./standards-step.module.css";
 
 /** A standards framework offered as a toggle option. */
@@ -135,9 +136,11 @@ export function StandardsStep(): ReactNode {
       {/* Selection count — only shown once at least one is chosen. */}
       {data.standards.length > 0 && (
         <p className={styles.tally} aria-live="polite">
-          {data.standards.length === 1
-            ? "1 framework selected"
-            : `${data.standards.length} frameworks selected`}
+          <Badge variant="info" size="md">
+            {data.standards.length === 1
+              ? "1 framework selected"
+              : `${data.standards.length} frameworks selected`}
+          </Badge>
         </p>
       )}
     </div>

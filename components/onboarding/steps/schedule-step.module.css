@@ -88,44 +88,9 @@
   gap: 4px;
   flex: 0 0 auto;
 }
+/* Move buttons use Button primitive (icon, sm) — no local button styles needed. */
 
-/* ≥44px touch region on each arrow button. */
-.moveBtn {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--r-6);
-  border: 1px solid var(--ink-150);
-  font-size: var(--t-14);
-  color: var(--ink-500);
-  background: var(--paper);
-  cursor: pointer;
-  transition:
-    color 0.1s,
-    background 0.1s,
-    border-color 0.1s;
-}
-
-.moveBtn:hover:not(:disabled) {
-  color: var(--ink-900);
-  background: var(--ink-100);
-  border-color: var(--ink-300);
-}
-
-.moveBtn:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
-/* Empty-state message when no academic subjects exist. */
-.empty {
-  margin: 0;
-  font-size: var(--t-14);
-  color: var(--ink-400);
-  font-style: italic;
-}
+/* Empty state uses EmptyState primitive — no local empty styles needed. */
 
 /* Soft note below the list. */
 .note {
