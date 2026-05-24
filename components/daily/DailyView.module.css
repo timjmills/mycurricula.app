@@ -422,7 +422,13 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  /* RES-MED-003: padding-trick — visual stays ~28px tall; padding-block
+     inflates the hit area to ≥44px; negative margin-block cancels the
+     layout expansion. box-sizing:content-box so padding adds to height. */
   padding: 5px 8px;
+  padding-block: 13px;
+  margin-block: -8px;
+  box-sizing: content-box;
   border: 1px solid var(--ink-200);
   border-radius: var(--r-4);
   background: var(--paper);
@@ -453,16 +459,21 @@
 }
 
 /* Filled blue add-lesson button — Phase 1A stub, non-functional like the
-   "Add an event" affordance. ≥28px square so the icon is comfortably
-   tappable; aria-label carries the meaning. Disabled state keeps the
-   filled look but dims to telegraph "not yet". */
+   "Add an event" affordance. Visual stays 28×28; the padding-trick inflates
+   the hit area to ≥44×44. aria-label carries the meaning. Disabled state
+   keeps the filled look but dims to telegraph "not yet". */
 .addLessonBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* RES-MED-003: padding-trick — 28px visual, 44px hit area.
+     padding: 8px on all sides; negative margin cancels layout expansion.
+     box-sizing:content-box so the 28px width/height is the visual only. */
   width: 28px;
   height: 28px;
-  padding: 0;
+  padding: 8px;
+  margin: -8px;
+  box-sizing: content-box;
   border: none;
   border-radius: var(--r-4);
   background: var(--math);
@@ -1370,16 +1381,18 @@
 }
 
 .modeToggleBtn {
-  /* 28px target — the rail is narrow and the row holds title + count + a
-     two-button toggle, so we deliberately undersize this. A title hint +
-     aria-label still keeps it operable; touch targets meet the spec via
-     the comfortable ink-100 background extending outside the icon box. */
+  /* RES-MED-003: padding-trick — visual stays 26×22, hit area inflated to
+     ≥44×44 via padding (inline: 9px, block: 11px) and matching negative
+     margins. box-sizing:content-box so the declared width/height are
+     the visual box only. */
   width: 26px;
   height: 22px;
+  padding: 11px 9px;
+  margin: -11px -9px;
+  box-sizing: content-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
   border: none;
   border-radius: var(--r-2);
   background: transparent;
@@ -1738,10 +1751,20 @@
 @media (max-width: 480px) {
   /* At 480px the week-strip day pills (5 pills across) need every pixel.
      Tighten their outer padding while keeping the 56px min-height on each
-     pill so the ≥44px touch target is preserved. */
+     pill so the ≥44px touch target is preserved.
+     overflow-x: auto lets the strip absorb any overflow internally so the
+     page body never gets a horizontal scrollbar (CLAUDE.md §4). */
   .weekStrip {
     padding: 2px 6px 4px;
     gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Shorten the pill padding a touch further on very narrow viewports so
+     pills sit comfortably when they share a 360-px column. */
+  .weekStripPill {
+    padding: 2px 4px 4px;
   }
   /* Compress the column-header eyebrow padding to give more height to the
      scrollable lesson list below. */

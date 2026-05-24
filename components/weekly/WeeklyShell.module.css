@@ -117,8 +117,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* ≥44×44px touch target */
-  min-width: 28px;
+  /* RES-MED-003: grew min-width 28px → 44px so both dimensions meet
+     WCAG 2.5.5. min-height was already ≥44px. */
+  min-width: 44px;
   min-height: 44px;
   padding: 4px;
   background: transparent;

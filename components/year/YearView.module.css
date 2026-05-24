@@ -211,9 +211,43 @@
   margin-top: 1px;
 }
 
+/* ── Responsive ─────────────────────────────────────────────────────── */
+
 @media (max-width: 900px) {
   .statStrip {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* At 720px the sidebar collapses into a horizontal strip above the content.
+   Mirror the proven pattern from SubjectView: body goes single-column,
+   sidebar switches to a flex row with horizontal scroll. */
+@media (max-width: 720px) {
+  .body {
+    flex-direction: column;
+  }
+
+  .contentArea {
+    padding: 14px 16px 24px;
+  }
+}
+
+/* At 480px drop the stat strip to a single column so each stat has room. */
+@media (max-width: 480px) {
+  .statStrip {
+    grid-template-columns: repeat(1, 1fr);
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .pageHeader {
+    padding: 14px 16px 10px;
+    flex-wrap: wrap;
+  }
+
+  .pageHeaderActions {
+    flex-wrap: wrap;
+    gap: 6px;
   }
 }
 

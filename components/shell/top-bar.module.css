@@ -73,8 +73,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  /* RES-MED-003: grew from 36×36 to 44×44 — meets WCAG 2.5.5 minimum. */
+  width: 44px;
+  height: 44px;
   border-radius: var(--r-8);
   border: 1px solid transparent;
   background: transparent;
@@ -269,6 +270,13 @@
     background 0.12s ease,
     color 0.12s ease,
     box-shadow 0.12s ease;
+  /* RES-MED-003: padding-trick — inflates hit area to ≥44px tall while
+     the visual button stays at 26px inside the pill container.
+     box-sizing:content-box so the padding adds to (not replaces) the
+     declared height; negative block margin cancels the layout expansion. */
+  padding-block: 9px;
+  margin-block: -9px;
+  box-sizing: content-box;
 }
 
 .editToggleBtn:focus-visible {
@@ -352,6 +360,12 @@
     background 0.12s ease,
     color 0.12s ease,
     box-shadow 0.12s ease;
+  /* RES-MED-003: padding-trick — inflates hit area to ≥44px tall while
+     the visual button stays at 26px inside the pill container.
+     Mirrors the same fix on .editToggleBtn. */
+  padding-block: 9px;
+  margin-block: -9px;
+  box-sizing: content-box;
 }
 
 .viewModeBtn:focus-visible {

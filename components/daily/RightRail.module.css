@@ -47,8 +47,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* RES-MED-003: padding-trick — visual stays 28×26, hit area inflated to
+     ≥44×44 via padding (inline: 8px, block: 9px) + matching negative
+     margins. box-sizing:content-box keeps 28/26 as the visual size. */
   width: 28px;
   height: 26px;
+  padding: 9px 8px;
+  margin: -9px -8px;
+  box-sizing: content-box;
   border: 1px solid var(--ink-200);
   border-radius: var(--r-4);
   background: transparent;
@@ -91,7 +97,9 @@
   display: flex;
   align-items: stretch;
   flex: 0 0 auto;
-  height: 38px;
+  /* RES-MED-003: grew from 38px to 44px so tabs (align-items:stretch)
+     meet the WCAG 2.5.5 minimum touch-target height. */
+  height: 44px;
   background: var(--paper);
   border-bottom: 1px solid var(--ink-150);
   /* Clip the active tab's bottom indicator to the strip height — prevents
@@ -172,7 +180,9 @@
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  height: 38px;
+  /* RES-MED-003: grew from 38px to 44px to match tabStrip height and
+     ensure the modeToggle buttons inside meet the touch-target minimum. */
+  height: 44px;
   background: var(--paper);
   border-bottom: 1px solid var(--ink-150);
   padding-left: 10px;

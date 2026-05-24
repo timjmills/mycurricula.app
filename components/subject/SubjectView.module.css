@@ -701,6 +701,21 @@
     display: none;
   }
 
+  /* At ≤480px the horizontal subject row holds 8 buttons; each needs less
+     horizontal padding and a lower min-width so all 8 fit (or scroll
+     smoothly) without crowding. min-width: 64px keeps the label legible
+     and meets the ≥44px touch-target requirement via the 44px min-height
+     already on .subjectBtn. Labels truncate with ellipsis at this width;
+     the full name is in the title attribute for tooltip access. */
+  .subjectBtn {
+    padding: 6px 8px;
+    min-width: 64px;
+  }
+
+  .subjectBtnName {
+    font-size: var(--t-11);
+  }
+
   .groupBody {
     padding-left: 6px;
   }

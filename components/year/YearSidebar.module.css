@@ -91,6 +91,51 @@
   transition: opacity 150ms ease;
 }
 
+/* ── Responsive ─────────────────────────────────────────────────────── */
+
+/* At 720px the sidebar folds into a horizontal scrolling strip above the
+   main content — the same pattern used by SubjectView's sidebar collapse.
+   Items become flex: 0 0 auto (no shrink/grow) so they scroll naturally. */
+@media (max-width: 720px) {
+  .sidebar {
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 10px;
+    border-right: none;
+    border-bottom: 1px solid var(--ink-150, #e6e8ed);
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Prevent the strip from shrinking to nothing in the flex column parent. */
+    flex-shrink: 0;
+  }
+
+  .navItem {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 80px;
+    /* Keep vertical centering; icon + label sit side-by-side as before. */
+  }
+
+  /* On small horizontal strips the "Soon" badge takes too much space;
+     keep it hidden at rest, visible on hover (same as desktop). */
+}
+
+/* At 480px tighten the item padding while keeping ≥44px touch targets. */
+@media (max-width: 480px) {
+  .sidebar {
+    padding: 6px 8px;
+    gap: 3px;
+  }
+
+  .navItem {
+    padding: 6px 8px;
+    font-size: var(--t-12);
+    min-width: 70px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .soonBadge {
     transition: none;
