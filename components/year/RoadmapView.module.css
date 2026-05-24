@@ -1,103 +1,19 @@
 /* RoadmapView — unit-bar lane stack (Grid mode).
-   Unit bars are absolutely positioned inside a fixed-width timeline div;
-   the grid-based unit block layout from the previous wave is removed. */
+   Unit bars are absolutely positioned inside a fixed-width timeline div.
+   YearView's shared horizontal scroll wrapper owns the panning behavior. */
 
 .root {
-  background: var(--paper, #fff);
-  border: 1px solid var(--ink-150, #e6e9f4);
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
   border-radius: 14px;
   box-shadow: var(--shadow-card);
-  /* overflow:clip — lets position:sticky children work while visually
-     clipping to the border-radius. */
   overflow: clip;
 }
 
-/* Lanes wrapper — display:contents makes it transparent to layout and
-   scroll-context detection. The sticky header anchors to the page scroll
-   context; IntersectionObserver uses root:null (the viewport). */
-.lanesScrollArea {
-  display: contents;
-}
-
-/* Header row with lane-card spacer and week labels — sticky against the PAGE
-   scroll context (html/body/<main>). display:contents on .lanesScrollArea
-   ensures no intermediate scroll ancestor intercepts sticky positioning. */
-.headerRow {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  border-bottom: 1px solid var(--ink-150);
-  background: var(--paper);
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  transition:
-    background 200ms ease,
-    border-color 200ms ease;
-}
-
-/* Active-subject chameleon fill: vertical gradient dark-top → light-bottom,
-   matching the Weekly card header feel. var(--c) and var(--cl) come from
-   the cp-subj class JS places on this element. */
-.headerRowChameleon {
-  background: linear-gradient(180deg, var(--c) 0%, var(--cl) 100%) !important;
-  border-bottom: 1px solid color-mix(in srgb, var(--cd) 12%, transparent) !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .headerRow {
-    transition: none;
-  }
-}
-
-.headerSpacer {
-  padding: 14px 16px;
+/* Lane stack */
+.lanes {
   display: flex;
-  align-items: center;
-  font-size: var(--t-13);
-  font-weight: 700;
-  color: var(--ink-900);
-}
-
-.weekHeader {
-  overflow-x: auto;
-  padding: 10px 4px 8px;
-  scrollbar-width: thin;
-}
-
-.weekGrid {
-  display: grid;
-  font-size: 10.5px;
-  color: var(--ink-400);
-  font-weight: 600;
-  padding: 0 4px;
-}
-
-.weekCell {
-  text-align: center;
-  padding: 2px 0;
-  position: relative;
-}
-
-.weekBorder {
-  border-left: 1px dashed var(--ink-150);
-}
-
-/* Today week column — bolder label color */
-.weekCellToday {
-  color: var(--fyi);
-  font-weight: 700;
-}
-
-/* Today indicator dot in the week header */
-.todayDot {
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--fyi);
-  vertical-align: middle;
-  margin-left: 4px;
-  flex-shrink: 0;
+  flex-direction: column;
 }
 
 /* Lane row */
@@ -107,12 +23,17 @@
   overflow: hidden;
 }
 
+/* Minimized rows collapse vertically — no timeline column, header padding only. */
+.laneRowMinimized {
+  display: flex;
+  align-items: stretch;
+}
+
 /* Timeline right column — holds bg grid lines + absolutely positioned unit bars.
+   No overflow:auto here; the parent <YearView> shared scroll handles panning.
    containerType enables CSS container queries in UnitBar for responsive collapse. */
 .timeline {
   position: relative;
-  overflow-x: auto;
-  scrollbar-width: thin;
   flex-shrink: 0;
 }
 
@@ -125,14 +46,17 @@
   z-index: 0;
 }
 
-/* One background column — purely structural; weekBorder draws the dashed line. */
 .bgLine {
   height: 100%;
 }
 
-/* Today week column background — subtle tint */
+.weekBorder {
+  border-left: 1px dashed var(--ink-150);
+}
+
+/* Today week column background — solid fyi-bg token */
 .bgLineToday {
-  background: color-mix(in srgb, var(--fyi) 5%, transparent);
+  background: var(--fyi-bg);
 }
 
 /* ── Legend row ─────────────────────────────────────────────────────────── */
@@ -161,8 +85,6 @@
   letter-spacing: 0.6px;
 }
 
-/* Status legend pills — colors keyed to data-status attribute so they
-   visually match StatusBadge without importing its styles here. */
 .pillGroup {
   display: flex;
   gap: 6px;
@@ -179,21 +101,21 @@
   white-space: nowrap;
 }
 
-/* Match StatusBadge color scheme via data-status attribute */
 .legendPill[data-status="completed"] {
-  background: color-mix(in srgb, var(--done) 18%, white);
+  /* No --done-bg token defined; mix done into paper to keep the swatch readable. */
+  background: color-mix(in oklch, var(--done) 14%, var(--paper));
   color: var(--done);
 }
 .legendPill[data-status="in_progress"] {
-  background: color-mix(in srgb, var(--fyi) 18%, white);
+  background: var(--fyi-bg);
   color: var(--fyi);
 }
 .legendPill[data-status="modified"] {
-  background: color-mix(in srgb, var(--important) 18%, white);
+  background: var(--important-bg);
   color: var(--important);
 }
 .legendPill[data-status="behind"] {
-  background: color-mix(in srgb, var(--catchup) 16%, white);
+  background: var(--catchup-bg);
   color: var(--catchup);
 }
 .legendPill[data-status="not_started"] {
@@ -201,7 +123,6 @@
   color: var(--ink-500);
 }
 
-/* Dot legend */
 .dotLegend {
   display: flex;
   gap: 14px;
@@ -267,4 +188,12 @@
 .smallStatLabel {
   font-size: 10px;
   color: var(--ink-400);
+}
+
+/* Legend collapses to a single column on phone so it stays readable. */
+@media (max-width: 720px) {
+  .legendRow {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
 }

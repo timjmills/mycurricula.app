@@ -7,37 +7,31 @@
 //   • Right column: a relative-positioned area of weekCount × WEEK_COL_PX.
 //     Unit bars are absolutely positioned inside this area per start/end week.
 //
-// A single <TodayMarker> overlays each lane's timeline, centered on CURRENT_WEEK.
+// The view loads ALL 36 weeks of the school year. There is no internal
+// horizontal scroll — YearView's shared scroll wrapper handles that so the
+// timeline pans as one piece. There is no internal sticky header either:
+// YearView's <QuarterMonthWeekHeader> sits above the lane stack and carries
+// the chameleon gradient for whichever subject lane is topmost (the parent
+// observes lanes and passes activeSubjectId in).
+//
+// A single <TodayMarker> overlays each lane's timeline, centered on the
+// current week.
 //
 // Colors come exclusively from the canonical cp-subj cascade (app/tokens.css).
 // Each lane row carries `cp-subj <subjectId>` so var(--c) / var(--cl) /
 // var(--cd) resolve to the correct subject highlight color throughout the row.
-//
-// ── Unit status derivation ────────────────────────────────────────────────
-// Given a unit's lessons, the status is derived as:
-//   completedLessons / total === 1              → "completed"
-//   total === 0 or startWeekIdx > currentWeekIdx → "not_started"
-//   anyModified (lesson.modified === true)       → "modified"
-//   completedLessons > 0                         → "in_progress"
-//   startWeekIdx <= currentWeekIdx               → "behind" (past, nothing done)
-// "skipped" is reserved for future expansion — no mock signal today.
-//
-// ── Bar positioning ───────────────────────────────────────────────────────
-// Each lane's right column is position:relative with a fixed pixel width.
-// Unit bars are position:absolute with:
-//   left  = startWeekIdx × WEEK_COL_PX
-//   width = (endWeekIdx − startWeekIdx + 1) × WEEK_COL_PX − BAR_GAP_PX
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
 import {
   subjectCompletePct,
   lessonToFlatIndex,
+  allYearWeeks,
   DEFAULT_SCHOOL_WEEK,
-  DEFAULT_WEEKS_IN_VIEW,
 } from "@/lib/year-calendar";
 import { pacingFor } from "@/lib/year-pacing";
+import { useMinimizedSubjects } from "@/lib/year-state";
 import { subjectClassName } from "./roadTones";
 import { LaneCard } from "./LaneCard";
 import { UnitBar } from "./UnitBar";
@@ -48,7 +42,7 @@ import type { UnitBarStatus } from "./UnitBar";
 
 // ── Layout constants ───────────────────────────────────────────────────────
 
-/** Width in px of each week column — must match the header grid. */
+/** Width in px of each week column — must match the YearView header. */
 const WEEK_COL_PX = 120;
 
 /** Horizontal gap in px subtracted from each unit bar's computed width. */
@@ -108,36 +102,37 @@ const LEGEND_STATUSES: { status: UnitBarStatus; label: string }[] = [
   { status: "not_started", label: "Not Started" },
 ];
 
+// ── Props ─────────────────────────────────────────────────────────────────
+
+export interface RoadmapViewProps {
+  /** Called when the topmost intersecting lane changes (chameleon driver). */
+  onActiveSubjectChange?: (subjectId: SubjectId) => void;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 
-export function RoadmapView() {
+export function RoadmapView({ onActiveSubjectChange }: RoadmapViewProps = {}) {
   const { lessons } = usePlanner();
   const schoolWeekLen = DEFAULT_SCHOOL_WEEK.length;
+  const { isMinimized, toggle } = useMinimizedSubjects();
 
   // CURRENT_WEEK is 1-based in the fixture; convert to 0-based for index math.
   const currentWeekIdx = CURRENT_WEEK - 1;
 
-  // ── Chameleon banner state ────────────────────────────────────────────
-  // Tracks which subject lane is topmost in the viewport so the sticky
-  // week-column header can adopt that subject's color gradient.
-  const [activeSubjectId, setActiveSubjectId] = useState<SubjectId>(
-    SUBJECTS[0].id as SubjectId,
-  );
+  // ── Chameleon: notify parent which lane is topmost ───────────────────
   const laneRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
-    // root: null → viewport. rootMargin: only lanes whose top edge is in the
-    // top 10% of the viewport trigger the color swap.
+    if (!onActiveSubjectChange) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        // Pick the intersecting entry with the smallest top — topmost lane.
         const intersecting = entries
           .filter((e) => e.isIntersecting)
           .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
         if (intersecting.length > 0) {
           const el = intersecting[0].target as HTMLElement;
           const sid = el.dataset.laneSubject as SubjectId | undefined;
-          if (sid) setActiveSubjectId(sid);
+          if (sid) onActiveSubjectChange(sid);
         }
       },
       {
@@ -148,21 +143,14 @@ export function RoadmapView() {
 
     laneRefs.current.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, []);
+  }, [onActiveSubjectChange]);
 
-  // ── Week labels ───────────────────────────────────────────────────────
+  // ── Full-year week labels ─────────────────────────────────────────────
 
-  const weekLabels = useMemo(
-    () =>
-      Array.from({ length: DEFAULT_WEEKS_IN_VIEW }, (_, i) => `Wk ${i + 1}`),
-    [],
-  );
-
-  // Total pixel width of the timeline right column.
+  const weekLabels = useMemo(() => allYearWeeks(), []);
   const timelineWidthPx = weekLabels.length * WEEK_COL_PX;
 
   // 0-based flat school-day index for "today" — passed to pacingFor.
-  // Day 0 of the current week: (CURRENT_WEEK - 1) × weekLen + 0.
   const todaySchoolDayIdx = useMemo(
     () => lessonToFlatIndex(CURRENT_WEEK, 0, schoolWeekLen),
     [schoolWeekLen],
@@ -237,10 +225,8 @@ export function RoadmapView() {
           startWeekIdx,
           endWeekIdx,
           startDate: weekIdxToDateLabel(startWeekIdx),
-          // End date label = start of the week after the last unit week.
           endDate: weekIdxToDateLabel(endWeekIdx + 1),
           lessons: u.lessons.length,
-          // schoolDays = span × days-per-week (only instructional days).
           schoolDays: spanWeeks * schoolWeekLen,
           completePct: completePctUnit,
           completedLessons,
@@ -248,7 +234,7 @@ export function RoadmapView() {
         };
       });
 
-      // Pacing status for the LaneCard body row — computed by year-pacing.ts.
+      // Pacing status for the LaneCard body row.
       const pacing = pacingFor(subjectId, lessons, todaySchoolDayIdx, {
         dayCount: schoolWeekLen,
       });
@@ -257,128 +243,92 @@ export function RoadmapView() {
     });
   }, [lessons, schoolWeekLen, todaySchoolDayIdx, currentWeekIdx]);
 
+  // Sort: expanded subjects first (in canonical order), minimized at the bottom.
+  const orderedLanes = useMemo(() => {
+    const expanded = laneData.filter((l) => !isMinimized(l.subjectId));
+    const minimized = laneData.filter((l) => isMinimized(l.subjectId));
+    return [...expanded, ...minimized];
+  }, [laneData, isMinimized]);
+
   return (
     <div className={styles.root}>
-      {/* Lanes container — display:contents makes it transparent to scroll
-          context so the sticky header anchors to the page scroll context.
-          IntersectionObserver uses root:null (the viewport). */}
-      <div className={styles.lanesScrollArea}>
-        {/* Sticky week-column header — carries the active subject's cp-subj
-            class so var(--cl) / var(--cd) resolve to the chameleon color. */}
-        <div
-          className={`${styles.headerRow} ${styles.headerRowChameleon} ${subjectClassName(activeSubjectId)}`}
-        >
-          {/* Spacer cell aligning with the LaneCard column */}
-          <div className={styles.headerSpacer} />
-          {/* Week label strip */}
-          <div className={styles.weekHeader}>
-            <div
-              className={styles.weekGrid}
-              style={{
-                width: timelineWidthPx,
-                gridTemplateColumns: `repeat(${weekLabels.length}, ${WEEK_COL_PX}px)`,
-              }}
-            >
-              {weekLabels.map((label, i) => (
-                <div
-                  key={i}
-                  className={`${styles.weekCell} ${i > 0 ? styles.weekBorder : ""} ${i === currentWeekIdx ? styles.weekCellToday : ""}`}
-                >
-                  {label}
-                  {i === currentWeekIdx && (
-                    <span
-                      className={styles.todayDot}
-                      aria-label="Current week"
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Lane rows — each row carries cp-subj so var(--c/--cl/--cd) resolve
-            to the correct subject color for all its children.
-            data-lane-subject is read by IntersectionObserver for lane detection. */}
-        {laneData.map(
-          ({ subject, subjectId, completePct, units, pacing }, li) => (
-            <div
-              key={subject.id}
-              data-lane-subject={subject.id}
-              ref={(el) => {
-                if (el) laneRefs.current.set(subject.id, el);
-                else laneRefs.current.delete(subject.id);
-              }}
-              className={`${styles.laneRow} ${subjectClassName(subjectId)}`}
-              style={{
-                borderTop: li > 0 ? "1px solid var(--ink-150)" : "none",
-              }}
-            >
-              {/* Fixed left column: lane summary card with pacing status */}
-              <LaneCard
-                name={subject.name}
-                subjectId={subjectId}
-                completePct={completePct}
-                pacing={pacing}
-                fullHeight
-              />
-
-              {/* Timeline right column — UnitBars are absolutely positioned
-                inside this relative container.
-                containerType enables CSS container queries for responsive
-                bar collapse in UnitBar.module.css. */}
+      {/* Lane rows */}
+      <div className={styles.lanes}>
+        {orderedLanes.map(
+          ({ subject, subjectId, completePct, units, pacing }, li) => {
+            const minimized = isMinimized(subjectId);
+            return (
               <div
-                className={styles.timeline}
+                key={subject.id}
+                data-lane-subject={subject.id}
+                ref={(el) => {
+                  if (el) laneRefs.current.set(subject.id, el);
+                  else laneRefs.current.delete(subject.id);
+                }}
+                className={`${styles.laneRow} ${minimized ? styles.laneRowMinimized : ""} ${subjectClassName(subjectId)}`}
                 style={{
-                  width: timelineWidthPx,
-                  height: LANE_HEIGHT_PX,
-                  containerType: "inline-size",
+                  borderTop: li > 0 ? "1px solid var(--ink-150)" : "none",
                 }}
               >
-                {/* Background vertical grid lines — one per week column */}
-                <div
-                  className={styles.bgGrid}
-                  style={{
-                    gridTemplateColumns: `repeat(${weekLabels.length}, ${WEEK_COL_PX}px)`,
-                  }}
-                >
-                  {weekLabels.map((_, i) => (
-                    <div
-                      key={i}
-                      className={`${styles.bgLine} ${i > 0 ? styles.weekBorder : ""} ${i === currentWeekIdx ? styles.bgLineToday : ""}`}
-                    />
-                  ))}
-                </div>
-
-                {/* Unit bars — absolutely positioned per startWeekIdx/endWeekIdx */}
-                {units.map((unit) => (
-                  <UnitBar
-                    key={unit.id}
-                    unit={unit}
-                    columnWidthPx={WEEK_COL_PX}
-                    gapPx={BAR_GAP_PX}
-                    // onClick is a stub; wire to a side-panel in a later wave.
-                    onClick={undefined}
-                  />
-                ))}
-
-                {/* TodayMarker — leftRailWidthPx is 0 because it is relative
-                  to the timeline element, not the full row. */}
-                <TodayMarker
-                  todayWeekIdx={currentWeekIdx}
-                  columnWidthPx={WEEK_COL_PX}
-                  leftRailWidthPx={0}
+                <LaneCard
+                  name={subject.name}
+                  subjectId={subjectId}
+                  completePct={completePct}
+                  pacing={pacing}
+                  fullHeight={!minimized}
+                  minimized={minimized}
+                  onToggleMinimize={() => toggle(subjectId)}
                 />
+
+                {/* The timeline column is only rendered when expanded. */}
+                {!minimized && (
+                  <div
+                    className={styles.timeline}
+                    style={{
+                      width: timelineWidthPx,
+                      height: LANE_HEIGHT_PX,
+                      containerType: "inline-size",
+                    }}
+                  >
+                    <div
+                      className={styles.bgGrid}
+                      style={{
+                        gridTemplateColumns: `repeat(${weekLabels.length}, ${WEEK_COL_PX}px)`,
+                      }}
+                    >
+                      {weekLabels.map((_, i) => (
+                        <div
+                          key={i}
+                          className={`${styles.bgLine} ${i > 0 ? styles.weekBorder : ""} ${i === currentWeekIdx ? styles.bgLineToday : ""}`}
+                        />
+                      ))}
+                    </div>
+
+                    {units.map((unit) => (
+                      <UnitBar
+                        key={unit.id}
+                        unit={unit}
+                        columnWidthPx={WEEK_COL_PX}
+                        gapPx={BAR_GAP_PX}
+                        onClick={undefined}
+                      />
+                    ))}
+
+                    <TodayMarker
+                      todayWeekIdx={currentWeekIdx}
+                      columnWidthPx={WEEK_COL_PX}
+                      leftRailWidthPx={0}
+                    />
+                  </div>
+                )}
               </div>
-            </div>
-          ),
+            );
+          },
         )}
       </div>
-      {/* end .lanesScrollArea */}
 
       {/* ── Legend + summary strip ──────────────────────────────────────── */}
       <div className={styles.legendRow}>
-        {/* Status legend */}
         <div className={styles.legendSection}>
           <div className={styles.legendTitle}>STATUS LEGEND</div>
           <div className={styles.pillGroup}>
@@ -394,7 +344,6 @@ export function RoadmapView() {
           </div>
         </div>
 
-        {/* Lesson progress dot legend */}
         <div className={styles.legendSection}>
           <div className={styles.legendTitle}>LESSON PROGRESS</div>
           <div className={styles.dotLegend}>
@@ -419,7 +368,6 @@ export function RoadmapView() {
           </div>
         </div>
 
-        {/* Roadmap summary stats */}
         <div className={styles.legendSection}>
           <div className={styles.legendTitle}>ROADMAP SUMMARY</div>
           <RoadmapSummary lessons={lessons} />

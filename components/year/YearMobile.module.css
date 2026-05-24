@@ -1,0 +1,182 @@
+/* YearMobile — phone-only stacked subject summary. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 16px 14px 28px;
+  background: linear-gradient(180deg, var(--ink-50) 0%, var(--ink-100) 100%);
+  gap: 14px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--t-20);
+  font-weight: 800;
+  color: var(--ink-900);
+  letter-spacing: -0.4px;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--ink-500);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Card chrome ──────────────────────────────────────────────────────── */
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.cardHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cardName {
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--c-deep);
+  letter-spacing: -0.2px;
+  line-height: 1.2;
+}
+
+.cardStudents {
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-500);
+}
+
+.cardChip {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-6);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--c-deep);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Current unit ────────────────────────────────────────────────────── */
+
+.unitRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.unitTag {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: var(--c-deep);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+}
+
+.unitText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.unitName {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-900);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.unitRange {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  font-weight: 500;
+}
+
+.unitEmpty {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  font-style: italic;
+}
+
+/* ── Progress ─────────────────────────────────────────────────────────── */
+
+.progressLabel {
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.progressTrack {
+  height: 6px;
+  background: var(--c-progress-track);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--c-progress-fill);
+  transition: width 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    transition: none;
+  }
+}
+
+/* ── Pacing ───────────────────────────────────────────────────────────── */
+
+.pacing {
+  font-size: var(--t-12);
+  color: var(--ink-700);
+  font-weight: 500;
+}

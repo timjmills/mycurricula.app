@@ -2,25 +2,18 @@
 
 // LaneCard — left-edge lane summary card.
 //
-// Shows the subject name, a student count (mock), and a % complete progress
-// bar. Appears in both Roadmap and Progression views as the fixed left column.
+// Two display modes:
+//   • full    — subject name, student count, completion %, progress bar, pacing.
+//   • minimized — single-row pill (monogram + name + completion % + restore).
 //
-// Layered design treatment:
-//   • White body (--paper) so the card reads in the premium dashboard register.
-//   • Tinted header strip — gradient from --c-surface-strong (top) to
-//     --c-surface (bottom) — carries the subject identity.
-//   • 4px deep-tone left border (--c-deep) asserts subject color at a glance.
-//   • Hairline subject-tinted border on the other three sides (--c-border).
-//   • Subject identity chip (28×32px) in the header top-right.
-//   • Soft drop shadow (--shadow-card); lifts on hover (--shadow-card-hover).
-//
-// All colors resolve from the new role variables inside the `.cp-subj.<id>`
-// cascade defined in app/tokens.css — no hex values here.
+// Both modes consume the canonical <Card subjectId={…}> primitive from
+// components/ui so the lane chrome matches Weekly's card recipe exactly —
+// subject-tinted header gradient, 4px deep left border, soft shadow.
 
+import { Card, Tooltip } from "@/components/ui";
 import type { SubjectId } from "@/lib/types";
 import type { PacingStatus } from "@/lib/year-pacing";
 import { pacingLabel } from "@/lib/year-pacing";
-import { subjectClassName } from "./roadTones";
 import styles from "./LaneCard.module.css";
 
 // Two-letter monogram for the subject identity chip.
@@ -35,6 +28,36 @@ const CHIP_MONOGRAM: Record<SubjectId, string> = {
   sel: "Se",
 };
 
+// ── Icons ──────────────────────────────────────────────────────────────────
+
+const IconMinimize = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    {...p}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+  >
+    <path d="M6 15l6-6 6 6" />
+  </svg>
+);
+
+const IconRestore = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    {...p}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+  >
+    <path d="M6 9l6 6 6-6" />
+  </svg>
+);
+
+// ── Props ──────────────────────────────────────────────────────────────────
+
 interface LaneCardProps {
   name: string;
   subjectId: SubjectId;
@@ -42,15 +65,17 @@ interface LaneCardProps {
   students?: number;
   /** Completion percentage, 0–100. */
   completePct: number;
-  /** Card height is set by the parent row — the card fills available height. */
+  /** Card height stretches to fill the lane row. */
   fullHeight?: boolean;
-  /**
-   * Pacing status computed by pacingFor() in lib/year-pacing.ts.
-   * When provided, renders a colored dot + one-line status sentence below
-   * the progress bar. Omit to hide the row entirely.
-   */
+  /** Pacing status — when provided, renders a dot + sentence below the bar. */
   pacing?: PacingStatus;
+  /** Minimized state — collapses the card to a single-row pill. */
+  minimized?: boolean;
+  /** Click handler for the minimize / restore chevron. */
+  onToggleMinimize?: () => void;
 }
+
+// ── Component ─────────────────────────────────────────────────────────────
 
 export function LaneCard({
   name,
@@ -59,30 +84,73 @@ export function LaneCard({
   completePct,
   fullHeight = false,
   pacing,
+  minimized = false,
+  onToggleMinimize,
 }: LaneCardProps) {
   const monogram = CHIP_MONOGRAM[subjectId] ?? name.slice(0, 2);
 
-  return (
-    <div
-      className={`${styles.card} ${subjectClassName(subjectId)}`}
-      style={{ height: fullHeight ? "100%" : undefined }}
-    >
-      {/* Tinted header — gradient --c-surface-strong → --c-surface */}
-      <div className={styles.header}>
-        <div className={styles.headerText}>
-          {/* Subject title — var(--c-deep) for strong contrast on the tint */}
-          <div className={styles.name}>{name}</div>
-          {/* Student count — neutral secondary below the title */}
-          <div className={styles.meta}>{students} students</div>
+  // ── Minimized pill mode ─────────────────────────────────────────────
+  if (minimized) {
+    return (
+      <Card subjectId={subjectId} density="compact" className={styles.pill}>
+        <div className={styles.pillRow}>
+          <span className={styles.pillChip} aria-hidden="true">
+            {monogram}
+          </span>
+          <span className={styles.pillName}>{name}</span>
+          <span className={styles.pillPct}>{completePct}%</span>
+          {onToggleMinimize && (
+            <Tooltip content={`Restore ${name}`} side="top">
+              <button
+                type="button"
+                className={styles.toggleBtn}
+                onClick={onToggleMinimize}
+                aria-label={`Restore ${name}`}
+              >
+                <IconRestore width={14} height={14} />
+              </button>
+            </Tooltip>
+          )}
         </div>
+      </Card>
+    );
+  }
 
-        {/* Subject identity chip — top-right corner of the header */}
+  // ── Full card mode ──────────────────────────────────────────────────
+  const header = (
+    <div className={styles.headerInner}>
+      <div className={styles.headerText}>
+        <div className={styles.name}>{name}</div>
+        <div className={styles.meta}>{students} students</div>
+      </div>
+
+      <div className={styles.headerControls}>
         <div className={styles.chip} aria-hidden="true">
           {monogram}
         </div>
+        {onToggleMinimize && (
+          <Tooltip content={`Minimize ${name}`} side="top">
+            <button
+              type="button"
+              className={styles.toggleBtn}
+              onClick={onToggleMinimize}
+              aria-label={`Minimize ${name}`}
+            >
+              <IconMinimize width={14} height={14} />
+            </button>
+          </Tooltip>
+        )}
       </div>
+    </div>
+  );
 
-      {/* White body — completion percentage + progress bar + pacing row */}
+  return (
+    <Card
+      subjectId={subjectId}
+      header={header}
+      density="compact"
+      className={`${styles.card} ${fullHeight ? styles.fullHeight : ""}`}
+    >
       <div className={styles.body}>
         <div className={styles.progressLabel}>{completePct}% Complete</div>
         <div
@@ -93,15 +161,12 @@ export function LaneCard({
           aria-valuemax={100}
           aria-label={`${name} ${completePct}% complete`}
         >
-          {/* Fill uses --c-progress-fill — the subject's mid tone */}
           <div
             className={styles.progressFill}
             style={{ width: `${completePct}%` }}
           />
         </div>
 
-        {/* Pacing row — only rendered when the parent passes a pacing status.
-            Dot color is keyed to the status kind via data-pacing; see the CSS. */}
         {pacing !== undefined && (
           <div className={styles.pacingRow}>
             <span
@@ -113,6 +178,6 @@ export function LaneCard({
           </div>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
