@@ -424,6 +424,21 @@ function ColumnDragGhost({ id }: { id: PanelId }): ReactNode {
   );
 }
 
+// ── Narrow-viewport breakpoint ────────────────────────────────────────────
+// The Weekly grid has a hard min-width (~1082px) that forces document-level
+// horizontal scroll on any viewport narrower than that. To keep the
+// document scroll-free at Tablet/Phone tiers (CLAUDE.md §4 responsive
+// hard rule), we detect narrow viewports via matchMedia and fall back to
+// the List layout regardless of the user's saved viewMode.
+//
+// The query is 900px — wide enough to guarantee the grid always fits on
+// true desktop, tight enough to catch all tablet/phone sizes.
+//
+// The user's viewMode is LEFT UNCHANGED so returning to a ≥901px viewport
+// restores Grid automatically without any preference mutation.
+
+const NARROW_MQ = "(max-width: 900px)";
+
 // ── WeeklyShell ──────────────────────────────────────────────────────────
 
 export function WeeklyShell(): ReactNode {
@@ -434,6 +449,35 @@ export function WeeklyShell(): ReactNode {
   const { week, selectedDay, selectedLessonId, setSelectedLessonId, viewMode } =
     useAppState();
   const { lessons } = usePlanner();
+
+  // ── Narrow-viewport state — SSR-safe matchMedia ───────────────────────
+  // Default to false so the server-rendered HTML matches the first client
+  // render (a server has no viewport; false ≡ "assume desktop"). A
+  // post-mount effect syncs to the real viewport width and subscribes to
+  // changes so tablet/phone users who resize into desktop get Grid back.
+  // This is the same post-mount SSR-guard pattern used for localStorage
+  // hydration elsewhere in this file.
+  const [isNarrow, setIsNarrow] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia(NARROW_MQ);
+    // Sync once on mount — covers the common case where the page loaded
+    // on a narrow device; without this we'd miss the first frame.
+    setIsNarrow(mq.matches);
+    // Subscribe to future viewport changes (orientation flip, DevTools
+    // resize, etc.). addEventListener on MediaQueryList is the modern API;
+    // browsers that only have addListener also get the polyfill path.
+    const handler = (e: MediaQueryListEvent): void => setIsNarrow(e.matches);
+    if (mq.addEventListener) {
+      mq.addEventListener("change", handler);
+      return () => mq.removeEventListener("change", handler);
+    } else {
+      // Older Safari / Chrome (pre-2020) shipped addListener.
+      mq.addListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
+      return () => mq.removeListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
+    }
+  }, []);
 
   // ── Lessons-for-this-week — fed to RightRail for week-mode aggregation ─
   // Filter once per (lessons, week) change so the right rail's
@@ -732,14 +776,20 @@ export function WeeklyShell(): ReactNode {
   // top-left corner without touching the inner component's root.
 
   function renderGridPanel(grip: ReactNode): ReactNode {
-    // In List mode the bulk-select / duplicate-week toolbar (grid-only
-    // affordances) are not shown — the drag grip is still available so
-    // the teacher can reorder the panel. The right rail and splitter
-    // remain in both modes.
+    // Render WeeklyList when:
+    //   • The user chose List mode (viewMode === "list"), OR
+    //   • The viewport is too narrow for the grid (isNarrow === true).
+    //
+    // In the narrow case the user's saved viewMode is "grid" but we
+    // override the render silently — no UI feedback needed. When the
+    // viewport widens past 900px, isNarrow flips false and Grid returns
+    // automatically. The drag grip stays so the teacher can still reorder
+    // the panel at any width.
+    const showList = isNarrow || viewMode === "list";
     return (
       <div className={styles.columnWithGrip} data-pane="grid">
         {grip}
-        {viewMode === "list" ? (
+        {showList ? (
           // WeeklyList replaces the grid but occupies the same 1fr slot
           // so the splitter and rail math are unaffected.
           <WeeklyList />

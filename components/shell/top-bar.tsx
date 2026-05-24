@@ -311,7 +311,15 @@ export function TopBar(): ReactNode {
           aria-pressed on each button communicates the selection to assistive
           technology. The floating bullet dot has been removed — the pill active
           state provides sufficient visual differentiation. The red Master active
-          style and the heads-up banner behavior are preserved unchanged. */}
+          style and the heads-up banner behavior are preserved unchanged.
+
+          RES-CRIT-002 fix (Option A): the toggle stays visible at every viewport
+          width. At ≤480px the labels abbreviate to "P" / "M" via CSS
+          .editToggleLabelFull / .editToggleLabelShort so the pill fits inside
+          the 360px bar without hiding or moving the control. The 44px touch
+          target is met by the 44px bar height at ≤540px combined with the full
+          hit area on the flex container. No layout changes; CSS-only at the
+          narrow breakpoints. */}
       <div className={styles.editToggle} role="group" aria-label="Edit mode">
         <button
           type="button"
@@ -320,8 +328,15 @@ export function TopBar(): ReactNode {
           }`}
           onClick={() => setEditMode("personal")}
           aria-pressed={editMode === "personal"}
+          aria-label="Personal mode"
         >
-          Personal
+          {/* Full label visible above 480px; abbreviated "P" at ≤480px. */}
+          <span className={styles.editToggleLabelFull} aria-hidden="true">
+            Personal
+          </span>
+          <span className={styles.editToggleLabelShort} aria-hidden="true">
+            P
+          </span>
         </button>
         {/* Visible 1px separator between the two options — confirms to the
             teacher that these are two distinct, independent choices. */}
@@ -333,9 +348,16 @@ export function TopBar(): ReactNode {
           }`}
           onClick={() => setEditMode("master")}
           aria-pressed={editMode === "master"}
+          aria-label="Master mode — changes affect the whole team"
           title="Changes in Master mode affect the whole team"
         >
-          Master
+          {/* Full label visible above 480px; abbreviated "M" at ≤480px. */}
+          <span className={styles.editToggleLabelFull} aria-hidden="true">
+            Master
+          </span>
+          <span className={styles.editToggleLabelShort} aria-hidden="true">
+            M
+          </span>
         </button>
       </div>
 

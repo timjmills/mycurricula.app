@@ -222,7 +222,12 @@
    The 1px separator span (.editToggleSep) between the two buttons makes the
    boundary between Personal and Master unmistakable — the control no longer
    reads as a single label. The floating bullet dot has been removed since the
-   active-option pill provides sufficient visual differentiation. */
+   active-option pill provides sufficient visual differentiation.
+
+   RES-CRIT-002: the toggle is NEVER hidden — Master mode must be reachable at
+   every viewport width (Option A). At ≤480px the labels swap to single-letter
+   abbreviations ("P" / "M") via .editToggleLabelFull / .editToggleLabelShort
+   so the pill remains legible inside the compressed 360px bar. */
 .editToggle {
   display: flex;
   align-items: center;
@@ -287,6 +292,18 @@
   background: var(--core-mode);
   color: var(--paper);
   box-shadow: 0 1px 2px rgba(227, 107, 126, 0.25);
+}
+
+/* RES-CRIT-002 — label visibility toggle for narrow viewports.
+   Above 480px: full text ("Personal" / "Master") is visible; short text hidden.
+   At ≤480px: full text hidden; abbreviated text ("P" / "M") is visible.
+   Both spans are aria-hidden — the button's own aria-label carries the
+   accessible name at all breakpoints. */
+.editToggleLabelFull {
+  display: inline;
+}
+.editToggleLabelShort {
+  display: none;
 }
 
 /* ── View-mode pill (Grid | List) ───────────────────────────────────── */
@@ -531,21 +548,31 @@
 }
 
 @media (max-width: 540px) {
-  /* At 540px the Personal/Master toggle needs space to be readable; the
-     view-switcher tabs can compress. Hide the edit toggle here — teachers
-     on very narrow viewports work in Personal mode by default. The Master
-     toggle can be reached by rotating to landscape. */
-  .editToggle {
-    display: none;
-  }
-  /* Condense the bar slightly so it doesn't consume too much vertical
-     space on short mobile screens in landscape orientation. */
+  /* RES-CRIT-002 (Option A): the editToggle is NO LONGER hidden at this
+     breakpoint. Master mode must remain reachable at every viewport width.
+     Instead, compress the toggle and view tabs so the bar fits at 360px.
+     The editToggle display:none that was here has been intentionally removed. */
+
+  /* Condense the bar to 44px — saves vertical space on portrait phone while
+     still meeting the ≥44px touch-target requirement (buttons fill bar height
+     via align-items:center on the flex container). */
   .bar {
     height: 44px;
-  }
-  /* Tighten horizontal padding so the remaining controls have room. */
-  .bar {
     gap: 4px;
+  }
+
+  /* Compress the toggle pill padding so the two buttons fit at narrow widths.
+     At 540–481px the full labels ("Personal" / "Master") are still shown but
+     with tighter side padding. */
+  .editToggleBtn {
+    padding: 0 7px;
+  }
+
+  /* Compress view-tab padding so all four live tabs fit at 480–540px.
+     Font size steps down one size to keep the text legible in the smaller hit. */
+  .viewTab {
+    padding: 0 7px;
+    font-size: var(--t-12);
   }
 }
 
@@ -555,9 +582,30 @@
   .wordmarkGrade {
     display: none;
   }
-  /* Tighten bar padding to the minimum so the remaining wordmark +
-     tab row + avatar fit without overflow. */
+  /* Tighten bar padding to the minimum so the remaining controls fit. */
   .bar {
-    padding: 0 10px;
+    padding: 0 8px;
+  }
+
+  /* RES-CRIT-002 — switch toggle labels to single-letter abbreviations at
+     360–480px so the P/M pill stays narrow enough to share the bar with the
+     view tabs, wordmark, and avatar. Full text is restored above 480px via
+     the default rules on .editToggleLabelFull / .editToggleLabelShort. */
+  .editToggleLabelFull {
+    display: none;
+  }
+  .editToggleLabelShort {
+    display: inline;
+  }
+
+  /* Tighten the toggle button padding further now that labels are 1 char. */
+  .editToggleBtn {
+    padding: 0 8px;
+  }
+
+  /* Further compress view-tab padding so tabs + toggle fit at 360px. */
+  .viewTab {
+    padding: 0 5px;
+    font-size: var(--t-11);
   }
 }
