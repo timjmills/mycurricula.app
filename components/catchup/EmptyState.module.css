@@ -1,0 +1,63 @@
+/* EmptyState — celebratory "Caught up." panel. */
+
+.root {
+  padding: 32px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.emoji {
+  font-size: 56px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.heading {
+  font-size: var(--t-18);
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--ink-900);
+}
+
+.sub {
+  font-size: var(--t-13);
+  color: var(--ink-500);
+}
+
+.link {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-700);
+  text-decoration: none;
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-pill);
+  background: var(--paper);
+  /* Inflate the hit target on phone/tablet without growing the chip. */
+  min-height: 44px;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.link:hover {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link {
+    transition: none;
+  }
+}

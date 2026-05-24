@@ -1,0 +1,88 @@
+/* catchup-flame-button.module.css — styles specific to the flame badge.
+ *
+ * The badge re-uses the top-bar's `.badgeWrap` + `.badge` positioning so it
+ * sits in the same visual slot as the comments-unread chip. The only
+ * differences vs the comments badge:
+ *   • The chip is `var(--catchup)` instead of `var(--urgent)` so the count
+ *     reads in the rust/flame color.
+ *   • The flame icon button itself uses the same ghost-icon recipe as the
+ *     sibling top-bar icon buttons.
+ *
+ * All values via var(--token) — no hex.
+ */
+
+/* ── Flame icon button ──────────────────────────────────────────────── */
+/* Visual size 44×44 (so the chip clips inside the button bounds the same
+   way the comments unread chip clips inside its Button-icon variant).
+   Color stays neutral at rest — the catch-up rust shows up only in the
+   superimposed badge chip; the button itself stays calm so the bar reads
+   as a uniform icon row. */
+
+.flameBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--r-8);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.flameBtn:hover {
+  background: var(--ink-100);
+  color: var(--catchup);
+}
+
+.flameBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.flameBtn:active {
+  background: var(--ink-150);
+}
+
+/* ── Catchup badge chip override ──────────────────────────────────── */
+/* `.catchupBadge` is layered on top of the top-bar's shared `.badge`
+   class. We only need to swap the fill — the position, size, font, and
+   radius are inherited from the shared rule. */
+
+.catchupBadge {
+  background: var(--catchup);
+}
+
+/* ── Responsive — fold into the top-bar collapse cascade ──────────────
+   BUILD_STANDARD §8: the top-bar must fit at 1024 / 768 / 540 / 480 with
+   no horizontal scroll. At ≤540px the bar already shrinks its height and
+   compresses padding. Hiding the flame button below 540px keeps the
+   right cluster from pushing into the left cluster — the count remains
+   visible on the in-grid CatchupWeekBar, the `g c` shortcut still works,
+   and the dedicated Catch-up screen stays reachable from Settings. */
+
+@media (max-width: 540px) {
+  .flameBtn {
+    display: none;
+  }
+  /* Hide the chip too, otherwise the absolutely-positioned 16px badge
+     floats over the next button in the cluster. */
+  .catchupBadge {
+    display: none;
+  }
+}
+
+/* ── Reduced motion — drop hover transitions ─────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .flameBtn {
+    transition: none;
+  }
+}

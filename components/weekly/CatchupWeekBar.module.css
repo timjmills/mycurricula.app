@@ -1,0 +1,147 @@
+/* CatchupWeekBar.module.css — the Layer-2 in-grid catch-up banner.
+ *
+ * Sits between the WeeklyShell's body chrome and the grid. The visual
+ * vocabulary matches the artboard's stage-2 ("On") banner: a soft
+ * catch-up-tinted surface with a hairline bottom border in the same hue.
+ *
+ * All color / type values go through var(--token). The bar's height is
+ * controlled by its padding (8px vertical) so the surrounding shell does
+ * not need to reserve fixed vertical space. */
+
+/* ── Outer bar ──────────────────────────────────────────────────────── */
+
+.bar {
+  display: flex;
+  align-items: center;
+  /* gap + padding stay on the 4-8-12-16-24-32 scale (BUILD_STANDARD §6). */
+  gap: 12px;
+  padding: 8px 16px;
+  /* 8% rust tint on paper — same recipe as the artboard's stage-2 banner. */
+  background: color-mix(in srgb, var(--catchup) 8%, var(--paper));
+  border-bottom: 1px solid color-mix(in srgb, var(--catchup) 25%, transparent);
+  /* min-width:0 lets the flex children shrink if the column narrows. */
+  min-width: 0;
+}
+
+/* ── Eyebrow — "🔥 Catch-up" ───────────────────────────────────────── */
+/* Catch-up colored label that anchors the bar. Weight 600 so it reads as
+   a signal without screaming. The icon sits inline at the same color. */
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--catchup);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* ── Count — the "N items not covered" copy ───────────────────────── */
+
+.count {
+  font-size: var(--t-12);
+  color: var(--ink-700);
+  white-space: nowrap;
+  /* min-width:0 + overflow lets the long string truncate gracefully on
+     narrow phones rather than forcing the bar to overflow the row. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Spacer — flex push to the right edge ─────────────────────────── */
+
+.spacer {
+  flex: 1 1 auto;
+  min-width: 4px;
+}
+
+/* ── View-all link — deep-link into /catch-up ─────────────────────── */
+/* Underlined, catch-up colored, weight 500. The padding inflates the tap
+   target to ≥44×44 on phone/tablet (visual feels lighter; the hit area is
+   spacious). */
+
+.viewAll {
+  display: inline-flex;
+  align-items: center;
+  /* RES-MED-003: 44px tap target via vertical padding inflation. */
+  padding: 12px 6px;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--catchup);
+  text-decoration: underline;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  border-radius: var(--r-4);
+  transition: background 120ms ease;
+}
+
+.viewAll:hover {
+  background: color-mix(in srgb, var(--catchup) 12%, transparent);
+}
+
+.viewAll:focus-visible {
+  outline: 2px solid var(--catchup);
+  outline-offset: 2px;
+}
+
+/* ── Dismiss button — ✕ closes the bar for the current week ────── */
+/* The visible glyph is ~16px; the wrapping button pads to 44×44 so phone
+   and tablet users have a comfortable hit target. */
+
+.dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 44×44 minimum touch target. */
+  width: 44px;
+  height: 44px;
+  /* Negative margin cancels the bar's 8px vertical padding so the 44px
+     button fits without ballooning the bar height. Kept on the scale (-12). */
+  margin: -12px 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-4);
+  color: var(--catchup);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.dismiss:hover {
+  background: color-mix(in srgb, var(--catchup) 12%, transparent);
+}
+
+.dismiss:focus-visible {
+  outline: 2px solid var(--catchup);
+  outline-offset: 2px;
+}
+
+/* ── Responsive — tighten padding on phone so the bar doesn't crowd ── */
+
+@media (max-width: 540px) {
+  .bar {
+    /* Compress to fit a narrow phone bar without dropping below the scale. */
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  /* On a narrow phone, the explicit "this week" suffix is implied by
+     context — drop the descriptor to give the count + actions more room.
+     We keep the count text intact and let ellipsis handle overflow. */
+  .count {
+    font-size: var(--t-11);
+  }
+}
+
+/* ── Reduced motion — drop all transitions ────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .viewAll,
+  .dismiss {
+    transition: none;
+  }
+}

@@ -1,0 +1,125 @@
+/* BulkActionBar — slides up from the bottom when ≥1 row is selected.
+   Fixed inside the Catch-up screen so it floats over the scroll surface
+   without pushing content. Mirrors the artboard's dark pill bar. */
+
+.bar {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 5;
+  background: var(--ink-900);
+  color: var(--paper);
+  padding: 8px 16px;
+  border-radius: var(--r-8);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ink-900) 25%, transparent);
+  animation: cp-bulk-slide-up 200ms ease-out;
+}
+
+@keyframes cp-bulk-slide-up {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: none;
+  }
+}
+
+.count {
+  font-size: var(--t-13);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.divider {
+  width: 1px;
+  height: 16px;
+  background: color-mix(in srgb, var(--paper) 18%, transparent);
+  flex-shrink: 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.btn,
+.btnPrimary,
+.btnGhost {
+  font: inherit;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--paper);
+  background: color-mix(in srgb, var(--paper) 10%, transparent);
+  border: 0;
+  border-radius: var(--r-6);
+  padding: 8px 12px;
+  /* Inflate the hit target on phone/tablet without growing the visual. */
+  min-height: 44px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease;
+}
+
+.btn:hover,
+.btnPrimary:hover,
+.btnGhost:hover {
+  background: color-mix(in srgb, var(--paper) 18%, transparent);
+}
+
+.btnPrimary {
+  background: var(--catchup);
+  font-weight: 600;
+}
+
+.btnPrimary:hover {
+  background: color-mix(in srgb, var(--catchup) 88%, white);
+}
+
+.btnGhost {
+  background: transparent;
+  color: color-mix(in srgb, var(--paper) 75%, transparent);
+}
+
+.btnGhost:hover {
+  background: color-mix(in srgb, var(--paper) 10%, transparent);
+  color: var(--paper);
+}
+
+.btn:focus-visible,
+.btnPrimary:focus-visible,
+.btnGhost:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .btnPrimary,
+  .btnGhost {
+    transition: none;
+  }
+}
+
+/* Desktop refinement — keep the bar inset further from the edges so it
+   reads as floating rather than docked. Inset uses the 4-8-12-16-24-32
+   spacing scale (BUILD_STANDARD §6) — 22 / 18 / 10 were off-scale. */
+@media (min-width: 768px) {
+  .bar {
+    left: 24px;
+    right: 24px;
+    bottom: 16px;
+    padding: 12px 16px;
+  }
+}

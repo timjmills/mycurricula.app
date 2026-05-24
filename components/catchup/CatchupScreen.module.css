@@ -1,0 +1,399 @@
+/* CatchupScreen — page layout, header, sticky filter bar, grouped rows.
+   The screen fills the planner's <main> overflow container so internal
+   scrolling stays inside the body region and the filter bar can stick to
+   the top of that container. */
+
+.root {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ink-50);
+  /* The planner shell's <main> already scrolls; keeping the screen as a
+     flex column lets the body region grow without producing a second
+     scroll bar. */
+  position: relative;
+}
+
+/* ── Disabled notice (Layer-1 off in Settings) ───────────────────── */
+
+.disabledNotice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px;
+  background: var(--catchup-bg);
+  color: var(--catchup);
+  font-size: var(--t-12);
+  border-bottom: 1px solid var(--ink-100);
+}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+
+.header {
+  padding: 16px 24px 12px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.headerInner {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.titleBlock {
+  flex: 1;
+  min-width: 0;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--t-11);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--catchup);
+}
+
+.title {
+  margin: 4px 0 0;
+  font-size: var(--t-22);
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  color: var(--ink-900);
+  line-height: 1.2;
+}
+
+.subtitle {
+  margin-top: 4px;
+  font-size: var(--t-13);
+  color: var(--ink-500);
+}
+
+.coverage {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.coverageStat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.coveragePct {
+  font-size: var(--t-28);
+  font-weight: 600;
+  letter-spacing: -0.6px;
+  color: var(--ink-900);
+  line-height: 1;
+}
+
+.coverageUnit {
+  font-size: var(--t-18);
+  color: var(--ink-400);
+  font-weight: 600;
+}
+
+.coverageLabel {
+  font-size: var(--t-13);
+  color: var(--ink-500);
+}
+
+.coverageDetail {
+  font-size: var(--t-11);
+  color: var(--catchup);
+  font-weight: 500;
+}
+
+/* ── Coverage bar ────────────────────────────────────────────────── */
+
+.coverageBar {
+  margin-top: 12px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--ink-100);
+  overflow: hidden;
+  display: flex;
+}
+
+.coverageBarFill {
+  height: 100%;
+}
+
+/* ── Sticky filter row ───────────────────────────────────────────── */
+
+.filterBar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--paper);
+  border-bottom: 1px solid var(--ink-100);
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterEyebrow {
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterDivider {
+  width: 1px;
+  height: 18px;
+  background: var(--ink-200);
+  flex-shrink: 0;
+}
+
+.filterSpacer {
+  flex: 1;
+}
+
+/* ── Scope chip ──────────────────────────────────────────────────── */
+
+.scopeChip {
+  font: inherit;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-700);
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-pill);
+  padding: 4px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 32px;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.scopeChip:hover {
+  background: var(--ink-50);
+}
+
+.scopeChip[data-active] {
+  background: var(--ink-900);
+  color: var(--paper);
+  border-color: var(--ink-900);
+}
+
+.scopeChip:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Status chip ─────────────────────────────────────────────────── */
+
+.statusChip {
+  font: inherit;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--chip-color, var(--ink-500));
+  background: var(--chip-bg, var(--paper));
+  border: 1px solid var(--chip-border, var(--ink-200));
+  border-radius: var(--r-pill);
+  padding: 4px 12px 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.statusChip:hover {
+  background: var(--ink-50);
+}
+
+.statusChip:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Group-by select ─────────────────────────────────────────────── */
+
+.groupByLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--t-11);
+  color: var(--ink-500);
+}
+
+.groupByEyebrow {
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.groupBySelect {
+  font: inherit;
+  font-size: var(--t-12);
+  color: var(--ink-900);
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-4);
+  padding: 4px 8px;
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.groupBySelect:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Body ───────────────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  padding: 16px 24px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── Group ──────────────────────────────────────────────────────── */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-6);
+}
+
+.groupStripe {
+  width: 4px;
+  height: 16px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.groupLabel {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.groupCount {
+  font-size: var(--t-11);
+  color: var(--ink-400);
+}
+
+/* ── Rows wrapper — 1px gap reveals the ink-150 divider line ───── */
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--ink-150);
+  border-radius: var(--r-6);
+  border: 1px solid var(--ink-150);
+  overflow: hidden;
+}
+
+/* ── Touch-target floor on phone/tablet ─────────────────────────── */
+
+@media (max-width: 900px) {
+  .scopeChip,
+  .statusChip,
+  .groupBySelect {
+    min-height: 44px;
+    padding: 8px 14px;
+  }
+  .statusChip {
+    padding: 8px 14px 8px 10px;
+  }
+}
+
+/* ── Phone refinement (≤480px) ──────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .header {
+    padding: 16px 16px 12px;
+  }
+  .headerInner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .coverage {
+    text-align: left;
+    align-items: flex-start;
+  }
+  .filterBar {
+    padding: 8px 16px;
+    gap: 12px;
+  }
+  /* On phone, push the group-by select to its own row so the chips have
+     full width. */
+  .filterSpacer {
+    flex-basis: 100%;
+    height: 0;
+  }
+  .filterDivider {
+    display: none;
+  }
+  .body {
+    padding: 12px 16px 96px;
+    gap: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scopeChip,
+  .statusChip {
+    transition: none;
+  }
+}

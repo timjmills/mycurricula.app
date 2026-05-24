@@ -12,6 +12,7 @@
 //   /  focus the top-bar search input
 //   ⌘/Ctrl+K  open command palette
 //   ?  open shortcuts overlay
+//   g c  two-key sequence → /catch-up (planning-doc §1262)
 //
 // Critical constraint: every single-key shortcut is suppressed when the
 // keyboard event originates from a text input of any kind — INPUT,
@@ -29,10 +30,19 @@
 // Mount this hook exactly once — in PlannerLayout — via a thin wrapper
 // component that can call the React hooks it depends on (useRouter, etc.).
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { CURRENT_WEEK } from "@/lib/mock";
+
+// ── Two-key sequence state ────────────────────────────────────────────
+// vim-style chord: pressing `g` arms a 1.5-second window during which a
+// follow-up key can complete a sequence (e.g. `g c` → /catch-up). The
+// window is generous enough for an unhurried second press but short
+// enough that a stray `g` doesn't leave the chord dangling. The arm-state
+// lives in a useRef so it survives across handler re-creations (the
+// handleKeyDown closure rebuilds whenever its deps change).
+const CHORD_WINDOW_MS = 1500;
 
 export interface KeyboardShortcutsOptions {
   /** Called when ⌘/Ctrl+K or the palette shortcut fires. */
@@ -59,6 +69,12 @@ export function useKeyboardShortcuts({
   const router = useRouter();
   const { week, setWeek, subjectView, setSearch } = useAppState();
 
+  // Two-key chord state — outside the useCallback so the arm-state survives
+  // every handler re-creation (the callback rebuilds whenever week changes).
+  // null means "no chord currently armed"; populated when the teacher has
+  // just pressed `g` and we're waiting for the completer.
+  const chordRef = useRef<{ key: string; expiresAt: number } | null>(null);
+
   // Keep a stable ref to week so the event listener closure doesn't go stale.
   // useCallback on the handler re-creates it when week changes.
   const handleKeyDown = useCallback(
@@ -79,6 +95,35 @@ export function useKeyboardShortcuts({
       // Ignore any shortcut combined with a modifier key (no accidental
       // ⌘1, Alt-/, etc.) — those are OS / browser reserved combinations.
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // ── Two-key chord — `g c` → /catch-up ─────────────────────────
+      // First branch: an armed `g` is waiting for a completer.
+      const armed = chordRef.current;
+      if (armed && armed.expiresAt > Date.now()) {
+        if (armed.key === "g" && e.key === "c") {
+          e.preventDefault();
+          chordRef.current = null;
+          router.push("/catch-up");
+          return;
+        }
+        // Any other key (or an expired chord) clears the arm-state and
+        // falls through so the second key still gets its normal handling.
+        chordRef.current = null;
+      } else if (armed) {
+        // Expired — drop it.
+        chordRef.current = null;
+      }
+
+      // Second branch: a fresh `g` arms the chord. Note: a lone `g` has no
+      // single-key meaning, so we don't preventDefault here — letting it
+      // through avoids stealing focus from anything that might want it.
+      if (e.key === "g") {
+        chordRef.current = {
+          key: "g",
+          expiresAt: Date.now() + CHORD_WINDOW_MS,
+        };
+        return;
+      }
 
       switch (e.key) {
         case "[":

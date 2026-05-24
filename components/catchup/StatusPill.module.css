@@ -1,0 +1,16 @@
+/* StatusPill — uppercase pill for a CatchupItem.status. Mirrors the
+   StatusBadge primitive in components/year/ but tuned for the smaller
+   density of a Catch-up row. */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  flex-shrink: 0;
+}

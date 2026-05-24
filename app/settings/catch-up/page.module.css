@@ -1,0 +1,85 @@
+/* Settings → Catch-up page styles.
+ *
+ * Mirrors the centered max-width-1100 column the Appearance page uses so the
+ * settings tree reads as a single product surface. All values via var(--token).
+ */
+
+.page {
+  padding: 24px;
+}
+
+.inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Toggle row ─────────────────────────────────────────────────────────
+   Sits inside a SettingsCard. A simple flex row so the toggle hugs the
+   left edge and the explainer paragraph flows beneath it. */
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+}
+
+/* ── Explainer paragraph ──────────────────────────────────────────────
+   Short prose summarising what the three layers do. Token-driven sizing
+   so the typography stays in lockstep with the rest of Settings. */
+
+.explainer {
+  margin: 14px 0 0;
+  font-size: var(--t-13);
+  line-height: 1.55;
+  color: var(--ink-700);
+  text-wrap: pretty;
+  max-width: 64ch;
+}
+
+.inlineLink {
+  color: var(--catchup);
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.inlineLink:hover {
+  color: color-mix(in srgb, var(--catchup) 70%, var(--ink-900));
+}
+
+.inlineLink:focus-visible {
+  outline: 2px solid var(--catchup);
+  outline-offset: 2px;
+  border-radius: var(--r-4);
+}
+
+/* ── "Open Catch-up screen" link wrapper ────────────────────────────
+   The Button primitive is the visible affordance; the wrapping Link
+   carries the navigation. We strip the link's default underline so the
+   button looks like a button, not a link. */
+
+.openRow {
+  display: flex;
+  margin-top: 4px;
+}
+
+.openLink {
+  text-decoration: none;
+  display: inline-flex;
+}
+
+.openLink:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+  border-radius: var(--r-8);
+}
+
+/* ── Phone tighten — match Appearance page's responsive feel ────── */
+
+@media (max-width: 540px) {
+  .page {
+    padding: 16px;
+  }
+}

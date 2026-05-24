@@ -98,6 +98,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { IconRail, PaneSplitter, RightRail } from "@/components/daily";
 import { WeeklyGrid } from "@/components/grid";
 import { WeeklyList } from "@/components/list";
+import { CatchupWeekBar } from "./CatchupWeekBar";
 import { useAppState } from "@/lib/app-state";
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import { usePlanner } from "@/lib/planner-store";
@@ -880,6 +881,13 @@ export function WeeklyShell(): ReactNode {
       >
         {columnAnnouncement}
       </div>
+
+      {/* ── Layer-2 catch-up bar (planning-doc §1262) ──────────────────
+          The bar self-gates on enabled + per-week count + per-week dismissal,
+          so the WeeklyShell stays decoupled from the catch-up state. It
+          consumes no width — only a slim band of height — and never appears
+          on a week with zero uncovered lessons. */}
+      <CatchupWeekBar />
 
       {/* ── Body row: icon rail (fixed) + reorderable grid/rail body ───── */}
       <div className={styles.bodyRow}>

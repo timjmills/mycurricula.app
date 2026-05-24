@@ -43,6 +43,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["["], description: "Previous week" },
       { keys: ["]"], description: "Next week" },
       { keys: ["T"], description: "Jump to current week" },
+      { keys: ["g", "c"], description: "Open Catch-up screen" },
     ],
   },
   {

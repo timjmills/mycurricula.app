@@ -30,6 +30,7 @@ import { usePathname } from "next/navigation";
 import { useAppState, type CurrentUser } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip, ToggleGroup } from "@/components/ui";
+import { CatchupFlameButton } from "./catchup-flame-button";
 import styles from "./top-bar.module.css";
 
 // ── View definitions ─────────────────────────────────────────────────────
@@ -429,6 +430,12 @@ export function TopBar(): ReactNode {
           </Button>
         </Tooltip>
       )}
+
+      {/* ── Layer-3 Catch-up flame badge (planning-doc §1262) ────────
+          Self-gates on enabled + total uncovered count > 0. Renders the
+          same .badgeWrap/.badge geometry as the comments unread chip but
+          tints the chip with var(--catchup). Click navigates to /catch-up. */}
+      <CatchupFlameButton />
 
       {/* ── To-do panel toggle ────────────────────────────────────── */}
       <Button
