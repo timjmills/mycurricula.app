@@ -1,0 +1,138 @@
+/* /schedule route — wraps the ScheduleDayPane with a page header + a
+   Sun…Thu day-strip selector. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  min-height: 100%;
+  background: var(--ink-50);
+}
+
+.pageHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eyebrow {
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.title {
+  font-size: var(--t-22);
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--ink-900);
+  margin: 0;
+}
+
+/* ── Day-strip selector ─────────────────────────────────────────────────── */
+
+.dayStrip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dayChip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* min-height/width inflate the touch target to ≥44 × 44px without
+     bloating the visual. */
+  min-width: 56px;
+  min-height: 44px;
+  padding: 4px 12px;
+  background: var(--paper);
+  color: var(--ink-700);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-8);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background 120ms ease-out,
+    border-color 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.dayChip:hover {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.dayChip:focus-visible {
+  outline: 2px solid var(--fyi);
+  outline-offset: 2px;
+}
+
+.dayChipActive {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+  color: var(--paper);
+}
+
+.dayChipActive:hover {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+}
+
+/* Today gets a subtle catchup ring even when not the active selection,
+   so a teacher always sees where "today" lives. */
+.dayChipToday:not(.dayChipActive) {
+  border-color: var(--catchup);
+  color: var(--catchup);
+}
+
+.chipDay {
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chipDate {
+  font-size: var(--t-13);
+  font-weight: 600;
+}
+
+/* ── Pane slot ──────────────────────────────────────────────────────────── */
+
+.paneSlot {
+  /* The pane sets its own max-width (720px on variant="page"). We
+     left-align it so the day-strip and pane share the same x-axis anchor;
+     a centered pane reads as floating relative to the strip. */
+  display: flex;
+  justify-content: flex-start;
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 600px) {
+  .root {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .title {
+    font-size: var(--t-20);
+  }
+
+  .paneSlot {
+    /* Phone: pane fills width minus the page padding. */
+    justify-content: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dayChip {
+    transition: none;
+  }
+}

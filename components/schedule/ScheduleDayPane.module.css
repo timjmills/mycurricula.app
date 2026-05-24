@@ -1,0 +1,180 @@
+/* ScheduleDayPane — vertical Schedule Pane for one day.
+
+   Spacing scale (4-8-12-16-24-32): every padding/gap/margin below is on
+   scale. The rail vs page variants differ only in horizontal padding +
+   max-width. */
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--paper);
+  border: 1px solid var(--ink-100);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.variantRail {
+  /* Sized to slot into Daily's right rail (~320px). The integration agent
+     gates the actual width at the shell level; the pane just fills it. */
+  width: 100%;
+}
+
+.variantPage {
+  /* The /schedule route renders a centered, comfortable max-width. The
+     720px ceiling keeps line lengths readable on wide monitors. */
+  width: 100%;
+  max-width: 720px;
+}
+
+/* ── Title strip ────────────────────────────────────────────────────────── */
+
+.titleStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 8px;
+}
+
+.eyebrow {
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+
+.iconMenu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-4);
+  background: transparent;
+  border: none;
+  color: var(--ink-400);
+  cursor: not-allowed;
+  /* Padding-inflation trick so the 28px visual still meets the 44px touch
+     contract on phone/tablet. */
+  position: relative;
+  transition: background 120ms ease-out;
+}
+
+.iconMenu::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  pointer-events: none;
+}
+
+.iconMenu:hover:not(:disabled) {
+  background: var(--ink-100);
+}
+
+.iconMenu:focus-visible {
+  outline: 2px solid var(--fyi);
+  outline-offset: 2px;
+}
+
+/* ── Tabs row ──────────────────────────────────────────────────────────── */
+
+.tabsRow {
+  padding: 0 16px 12px;
+}
+
+/* ── Date strip ────────────────────────────────────────────────────────── */
+
+.dateStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--ink-100);
+}
+
+.dateText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dateLabel {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weekLabel {
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+/* ── Body (rows or empty state) ─────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--ink-100);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Add-block CTA ─────────────────────────────────────────────────────── */
+
+.addRow {
+  padding: 12px 16px;
+  border-top: 1px solid var(--ink-100);
+}
+
+.addButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 16px;
+  /* min-height keeps the touch target ≥44px on phone/tablet. */
+  min-height: 44px;
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-500);
+  background: transparent;
+  border: 1px dashed var(--ink-200);
+  border-radius: var(--r-8);
+  cursor: not-allowed;
+  transition:
+    background 120ms ease-out,
+    border-color 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.addButton:hover:not(:disabled) {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+  color: var(--ink-700);
+}
+
+.addButton:focus-visible {
+  outline: 2px solid var(--fyi);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconMenu,
+  .addButton {
+    transition: none;
+  }
+}

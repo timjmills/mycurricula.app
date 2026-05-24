@@ -54,7 +54,7 @@ const VIEWS: ViewDef[] = [
   { label: "Weekly", href: "/weekly" },
   { label: "Yearly", href: "/year" },
   { label: "Curriculum", href: "/subject" },
-  { label: "Schedule", soon: true },
+  { label: "Schedule", href: "/schedule" },
 ];
 
 // ── TopBar ───────────────────────────────────────────────────────────────
@@ -361,7 +361,13 @@ export function TopBar(): ReactNode {
           Migrated to the ToggleGroup primitive (prominent variant, sm size).
           BUILD_STANDARD §7 designates Grid/List as a primary mode switch →
           prominent. Hidden below 1024px by .viewModePillWrap in the CSS
-          (mirrors the old .viewModePill display:none rule). */}
+          (mirrors the old .viewModePill display:none rule).
+
+          Schedule mode is NOT a value here — it is controlled by inline
+          pills inside each view's own chrome (Weekly + Daily). The
+          dedicated `/schedule` route renders the Schedule day-pane
+          directly. Keeping this toggle 2-way preserves the top-bar
+          collapse cascade unchanged. */}
       <div className={styles.viewModePillWrap}>
         <ToggleGroup
           options={[

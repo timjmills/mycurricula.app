@@ -254,11 +254,27 @@
 
 /* ── View-mode pill wrapper (Grid | List) ───────────────────────────── */
 /* Wraps the ToggleGroup primitive. Hidden below 1024px (secondary chrome)
-   matching the old .viewModePill hide rule. */
+   matching the old .viewModePill hide rule. The pill stays 2-way: Schedule
+   mode is controlled by inline pills inside the Weekly + Daily chrome, not
+   by this top-bar toggle. */
 .viewModePillWrap {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+}
+
+/* Between 1025 and 1280px the bar is tight: the Schedule tab is now a LIVE
+   route (no longer hidden as a "soon" tab below 1280px), so five live view
+   tabs show side-by-side AND the view-mode pill is still visible. Compress
+   the view-tab padding at this range so the extra live tab doesn't push
+   the bar into overflow. Above 1280px the bar has plenty of cushion and
+   the tabs breathe at the default padding. The pill itself is unchanged
+   from the pre-Schedule baseline (still Grid | List), so only the view
+   tabs need this defensive compression. */
+@media (min-width: 1025px) and (max-width: 1280px) {
+  .viewTab {
+    padding: 0 9px;
+  }
 }
 
 /* ── Search — collapsible (TOPBAR-001) ──────────────────────────────── */

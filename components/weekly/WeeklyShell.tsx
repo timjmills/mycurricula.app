@@ -98,8 +98,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { IconRail, PaneSplitter, RightRail } from "@/components/daily";
 import { WeeklyGrid } from "@/components/grid";
 import { WeeklyList } from "@/components/list";
+import { ScheduleTimeline } from "@/components/schedule";
 import { CatchupWeekBar } from "./CatchupWeekBar";
+import { WeeklySchedulePills } from "./weekly-schedule-pills";
 import { useAppState } from "@/lib/app-state";
+import { useWeeklyScheduleMode } from "@/lib/weekly-schedule-state";
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import { usePlanner } from "@/lib/planner-store";
 import type { Lesson } from "@/lib/types";
@@ -452,6 +455,15 @@ export function WeeklyShell(): ReactNode {
     useAppState();
   const { lessons } = usePlanner();
 
+  // Inline schedule-pill state (Subject↔Schedule + Lessons-only↔All). Lives
+  // in localStorage so a teacher's choice survives across sessions. The
+  // pills themselves render via <WeeklySchedulePills> inside the grid
+  // panel; this hook just exposes the derived booleans for the render
+  // branch below. `scheduleMode` is true when the Schedule pill is on;
+  // `includeAllEvents` is true when the Lessons-only/All-events pill is on
+  // "all" (i.e. non-academic blocks should appear in the timeline).
+  const { scheduleMode, includeAllEvents } = useWeeklyScheduleMode();
+
   // ── Narrow-viewport state — SSR-safe matchMedia ───────────────────────
   // Default to false so the server-rendered HTML matches the first client
   // render (a server has no viewport; false ≡ "assume desktop"). A
@@ -778,20 +790,35 @@ export function WeeklyShell(): ReactNode {
   // top-left corner without touching the inner component's root.
 
   function renderGridPanel(grip: ReactNode): ReactNode {
-    // Render WeeklyList when:
-    //   • The user chose List mode (viewMode === "list"), OR
-    //   • The viewport is too narrow for the grid (isNarrow === true).
+    // Render selection, in precedence order:
+    //   1. isNarrow (≤900px) → WeeklyList. The narrow-viewport gate WINS
+    //      over schedule mode because a 5-column timeline at 360–900px is
+    //      unusable; the dedicated /schedule route is the phone/tablet
+    //      entry. Forcing List in the shell at narrow widths keeps the
+    //      Weekly canvas usable.
+    //   2. Schedule pill ON (and not narrow) → ScheduleTimeline (week
+    //      scope), driven by the inline pill in the Weekly chrome. The
+    //      timeline replaces the grid in the same 1fr slot; splitter +
+    //      rail math is unaffected because the slot still spans 1fr.
+    //   3. viewMode === "list" → WeeklyList. Same as before.
+    //   4. Default → WeeklyGrid.
     //
-    // In the narrow case the user's saved viewMode is "grid" but we
-    // override the render silently — no UI feedback needed. When the
-    // viewport widens past 900px, isNarrow flips false and Grid returns
-    // automatically. The drag grip stays so the teacher can still reorder
-    // the panel at any width.
+    // The drag grip stays so the teacher can still reorder the panel at
+    // any width or mode. The pills bar sits above whatever renders below.
     const showList = isNarrow || viewMode === "list";
+    const showSchedule = !isNarrow && scheduleMode;
     return (
       <div className={styles.columnWithGrip} data-pane="grid">
         {grip}
-        {showList ? (
+        {/* Pills bar sits at the top of the grid panel slot so the chrome
+            stays inside the same drag-reorder host as the grid content.
+            Hidden at ≤900px (the narrow gate) because Schedule mode is
+            disabled there anyway — the dedicated /schedule route is the
+            entry. */}
+        {!isNarrow && <WeeklySchedulePills />}
+        {showSchedule ? (
+          <ScheduleTimeline scope="week" showNonAcademic={includeAllEvents} />
+        ) : showList ? (
           // WeeklyList replaces the grid but occupies the same 1fr slot
           // so the splitter and rail math are unaffected.
           <WeeklyList />

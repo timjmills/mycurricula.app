@@ -40,6 +40,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["1"], description: "Go to Weekly planner" },
       { keys: ["2"], description: "Go to Daily schedule" },
       { keys: ["3"], description: "Go to Subject view" },
+      { keys: ["4"], description: "Go to Schedule" },
       { keys: ["["], description: "Previous week" },
       { keys: ["]"], description: "Next week" },
       { keys: ["T"], description: "Jump to current week" },

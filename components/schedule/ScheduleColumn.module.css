@@ -1,0 +1,87 @@
+/* ScheduleColumn — sticky day-header + fixed-height body w/ gridlines.
+   The body's height is supplied inline by the React side from
+   DAY_HEIGHT_PX (the single source of truth for timeline geometry). */
+
+.column {
+  min-width: 0;
+}
+
+/* ── Sticky header strip ─────────────────────────────────────────────────── */
+
+.header {
+  position: sticky;
+  top: -1px;
+  z-index: 2;
+  background: var(--paper);
+  /* Artboard padding "0 2px 6px" → "0 4px 8px" (round to scale). */
+  padding: 0 4px 8px;
+  /* Artboard reserved 22px of paddingTop on the grid for the strip; we
+     mirror that exactly here. 24 would round to scale but visually loses
+     the tight compaction the artboard depends on; documenting the
+     deliberate exception. */
+  margin-top: -22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-11);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  border-bottom: 2px solid var(--ink-100);
+}
+
+.headerToday {
+  color: var(--catchup);
+  font-weight: 600;
+  border-bottom-color: var(--catchup);
+}
+
+/* Compact variant for the single-day rendering (day scope): the date
+   number is suppressed because the page header already carries the date. */
+.headerCompact {
+  /* Reserved for future tweaks; currently identical to the default. */
+}
+
+.dayLabel {
+  /* No extra rules — inherits the header's casing + tracking. */
+}
+
+.dateNum {
+  color: var(--ink-400);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ── Column body ─────────────────────────────────────────────────────────── */
+
+.body {
+  position: relative;
+  background: var(--ink-50);
+  border-radius: var(--r-4);
+  overflow: hidden;
+}
+
+.gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid color-mix(in srgb, var(--ink-100) 60%, transparent);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.emptyState {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  text-align: center;
+  color: var(--ink-400);
+  font-size: var(--t-11);
+  font-style: italic;
+  pointer-events: none;
+}

@@ -1,0 +1,75 @@
+"use client";
+
+// The /schedule route — the dedicated full-page surface for the vertical
+// Schedule Pane (planning_document §5.4).
+//
+// Renders a small Sun…Thu day-strip chip selector above
+// <ScheduleDayPane variant="page" day={selectedDay} />. Clicking a chip
+// updates the app-state `selectedDay`, which is also the index the Daily
+// view consumes — so a teacher who picks Tuesday here and then navigates
+// to /daily lands on Tuesday automatically.
+//
+// The Weekly and Daily shells mount the same <ScheduleDayPane /> directly
+// in their own chrome (Daily's rail, Weekly's grid replacement is the
+// <ScheduleTimeline /> family). Those integrations are owned by the sibling
+// agent; the public contract they consume is the barrel at
+// `@/components/schedule`.
+
+import { useAppState } from "@/lib/app-state";
+import { WEEK_DAYS_SHORT } from "@/lib/mock";
+import { dateNumberForWeekDay } from "@/lib/mock/calendar";
+import { todayDayIndex } from "@/lib/schedule-data";
+import { ScheduleDayPane } from "@/components/schedule";
+import styles from "./page.module.css";
+
+/** The five school-week days the page surfaces. Hard-coded for Sun–Thu
+ *  while the configured school week wires through. */
+const SCHOOL_WEEK_DAYS: readonly number[] = [0, 1, 2, 3, 4];
+
+export default function SchedulePage() {
+  const { week, selectedDay, setSelectedDay } = useAppState();
+  // app-state.selectedDay is plain `number` (default 0). We don't replace
+  // it with today; the user's last-chosen day persists across sessions.
+  const focusedDay = selectedDay;
+
+  return (
+    <div className={styles.root}>
+      <header className={styles.pageHeader}>
+        <span className={styles.eyebrow}>SCHEDULE</span>
+        <h1 className={styles.title}>Week {week} schedule</h1>
+      </header>
+
+      <nav className={styles.dayStrip} aria-label="Choose a day to view">
+        {SCHOOL_WEEK_DAYS.map((d) => {
+          const isActive = d === focusedDay;
+          const isToday = d === todayDayIndex();
+          const dayLabel = WEEK_DAYS_SHORT[d] ?? "Day";
+          const dateNum = dateNumberForWeekDay(week, d);
+          return (
+            <button
+              key={d}
+              type="button"
+              className={[
+                styles.dayChip,
+                isActive ? styles.dayChipActive : "",
+                isToday ? styles.dayChipToday : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => setSelectedDay(d)}
+              aria-pressed={isActive}
+              aria-label={`${dayLabel} ${dateNum}${isToday ? " (today)" : ""}`}
+            >
+              <span className={styles.chipDay}>{dayLabel}</span>
+              <span className={styles.chipDate}>{dateNum}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className={styles.paneSlot}>
+        <ScheduleDayPane day={focusedDay} variant="page" />
+      </div>
+    </div>
+  );
+}

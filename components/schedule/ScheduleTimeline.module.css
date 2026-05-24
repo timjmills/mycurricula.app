@@ -1,0 +1,37 @@
+/* ScheduleTimeline — the embeddable timeline canvas. This component owns
+   the outer padding + grid; ScheduleColumn owns the sticky header
+   behavior, and ScheduleTimeGutter sits inside the grid as its first
+   column.
+
+   Spacing-scale substitutions (artboard → 4-8-12-16-24-32):
+     padding "0 18px 18px"   → "0 16px 24px"
+*/
+
+.canvas {
+  flex: 1;
+  overflow: auto;
+  background: var(--paper);
+  padding: 0 16px 24px;
+}
+
+.grid {
+  display: grid;
+  /* gridTemplateColumns is set inline so the column count can vary by scope. */
+  gap: 4px;
+  position: relative;
+  /* Reserve room for the sticky day-header strip; the columns shift -22px
+     up via their .header margin so the body starts flush with the top edge. */
+  padding-top: 22px;
+}
+
+@media (max-width: 900px) {
+  .canvas {
+    padding: 0 12px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .canvas {
+    padding: 0 12px 16px;
+  }
+}

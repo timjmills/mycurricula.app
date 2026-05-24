@@ -9,6 +9,7 @@
 //   1  navigate to /weekly
 //   2  navigate to /daily
 //   3  navigate to /subject/<current subjectView>
+//   4  navigate to /schedule
 //   /  focus the top-bar search input
 //   ⌘/Ctrl+K  open command palette
 //   ?  open shortcuts overlay
@@ -159,6 +160,12 @@ export function useKeyboardShortcuts({
           // Navigate to the subject view scoped to the current subjectView.
           e.preventDefault();
           router.push(`/subject/${subjectView}`);
+          break;
+
+        case "4":
+          // Navigate to the dedicated Schedule timeline route.
+          e.preventDefault();
+          router.push("/schedule");
           break;
 
         case "/": {

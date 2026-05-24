@@ -137,6 +137,9 @@ import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
 import { Button } from "@/components/ui";
 import { DailyList } from "@/components/list/DailyList";
+import { ScheduleDayPane } from "@/components/schedule";
+import { DailySchedulePill } from "./daily-schedule-pill";
+import { useDailyScheduleMode } from "@/lib/daily-schedule-state";
 import styles from "./DailyView.module.css";
 
 // ── Pane width persistence — NO fixed clamps; sanity-bounded by container ─
@@ -1470,6 +1473,16 @@ export function DailyView(): ReactNode {
       <div className={styles.columnWithGrip} data-column="list">
         {grip}
         <div className={styles.leftPane}>
+          {/* ── Daily Schedule pill ──────────────────────────────
+              Placed at the top of the lesson-list column header area
+              (above the WEEK eyebrow) so it reads as primary chrome for
+              this column. Toggling the pill mounts <ScheduleDayPane
+              variant="rail" /> at the far right of the bodyRow — see the
+              rail mount below. The pill is rendered once globally just
+              after the breadcrumb so it is visible in BOTH grid and list
+              modes; placing it here inside the lesson-list column would
+              hide it in list mode. */}
+
           {/* ── WEEK eyebrow ───────────────────────────────────── */}
           <div className={styles.leftPaneEyebrow}>Week {week}</div>
 
@@ -1717,6 +1730,17 @@ export function DailyView(): ReactNode {
     ? SUBJECT_BY_ID[selectedLesson.subject]
     : null;
 
+  // ── Daily schedule-pill state ──────────────────────────────────────────
+  // The pill lives inline inside the Daily chrome (rendered by
+  // <DailySchedulePill /> just after the breadcrumb so it is visible in
+  // both grid and list modes). When ON, a <ScheduleDayPane variant="rail" />
+  // mounts as an ADDITIONAL right rail alongside the existing Resources /
+  // Todos rail — the 4-track layout is otherwise unchanged so toggling
+  // back restores everything immediately.
+  // The hook exposes a derived `scheduleMode` boolean so the render branch
+  // below doesn't need to compare strings.
+  const { scheduleMode: showScheduleRail } = useDailyScheduleMode();
+
   return (
     <div className={styles.page}>
       {/* ── Breadcrumb: Week N / Day / Subject (BIG-7) ───────────────────
@@ -1758,6 +1782,11 @@ export function DailyView(): ReactNode {
         </ol>
       </nav>
 
+      {/* ── Inline schedule-mode pill (Subject ↔ Schedule). Hidden ≤1280px
+          where the additional rail would not fit (same fold the existing
+          right rail uses). The pill state persists per-teacher. */}
+      <DailySchedulePill />
+
       {/* ── aria-live region: column reorder announcements ───────────────
           A visually hidden polite live region — when a column moves
           (mouse, touch, or keyboard) we write the new order into it so
@@ -1773,12 +1802,21 @@ export function DailyView(): ReactNode {
         {columnAnnouncement}
       </div>
 
-      {/* ── Body row: icon rail + content body ─────────────────────────────
+      {/* ── Body row: icon rail + content body + optional schedule rail ────
           In Grid mode: three-track reorderable columns (list, detail, rail).
           In List mode: DailyList fills the list+detail area; the right rail
           stays visible at its fixed width beside it. The icon rail is always
           pinned to the far left as a sibling of the body — it is NOT part
-          of either the grid or list layout. */}
+          of either the grid or list layout.
+
+          When the Daily Schedule pill is ON (showScheduleRail === true), a
+          <ScheduleDayPane scope="rail" /> mounts at the far right of the
+          bodyRow as an ADDITIONAL track beside the existing right rail.
+          This is additive — neither the lesson list, the detail, nor the
+          existing right rail change; the schedule pane sits alongside.
+          The CSS .scheduleRail rule reserves a fixed 320px track and folds
+          it away at ≤1280px so the lesson canvas keeps usable width on
+          tablet / phone. */}
       <div className={styles.bodyRow}>
         {/* ── Far-left: slim icon nav rail (sibling of the body) ─── */}
         <IconRail />
@@ -1855,6 +1893,21 @@ export function DailyView(): ReactNode {
               </DragOverlay>
             </DndContext>
           </div>
+        )}
+        {/* ── Schedule rail (Schedule pill ON) ─────────────────────────────
+            Mounted as an additional track on the right end of the bodyRow.
+            The existing 4-track layout (icon rail + list + detail + right
+            rail) stays intact above; this is purely additive. CSS hides it
+            at ≤1280px so the existing rail-collapse threshold matches.
+
+            ScheduleDayPane's `variant` prop switches between the "rail"
+            compact chrome and the "page" wider chrome used at /schedule.
+            selectedDay is already a non-nullable number on AppState, so no
+            `?? 0` fallback is needed. */}
+        {showScheduleRail && (
+          <aside className={styles.scheduleRail} aria-label="Schedule rail">
+            <ScheduleDayPane day={selectedDay} variant="rail" />
+          </aside>
         )}
       </div>
 

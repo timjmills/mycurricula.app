@@ -31,6 +31,12 @@ import { createClient } from "@/lib/supabase/client";
  * List (flat list of lessons for the focused week or day). The active view
  * component (WeeklyGrid / WeeklyList, DailyView / DailyList) is chosen by
  * the shell based on this value; it does not affect filtering or edit mode.
+ *
+ * Note: the new Schedule view (planning-doc §5.4) is **not** a value here.
+ * Schedule mode is controlled by inline pills inside each view's own
+ * chrome (`useWeeklyLayout` / `useDailyLayout` state) so the top-bar
+ * Grid/List toggle stays focused on the lesson-card layout choice. The
+ * dedicated `/schedule` route renders the Schedule day-pane directly.
  */
 export type ViewMode = "grid" | "list";
 
