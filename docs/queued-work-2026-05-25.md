@@ -167,3 +167,26 @@ User direction (after Wave 1A dispatch):
 
 This is a substantial wave — probably 3-4 hr parallelized. Defer to after
 Wave 1A (W + X) and Wave 1B (Y + Y-hol) settle.
+
+---
+
+## Late-session addition 3 — Subject-filtered chameleon calendar (Lane BG)
+
+User direction (after Lane X landed):
+> "The roadmap and progression calendar visuals should follow the color of the selected subject."
+
+Clarified via 3 AskUserQuestion answers:
+- **Trigger:** subject filter chips, BUT a new calendar is shown ABOVE the main roadmap — in the selected subject's color. So it stacks: per-subject tinted calendar(s) on top, neutral multi-subject roadmap below.
+- **Intensity:** Full chameleon (use the same `linear-gradient(var(--c), var(--cl))` pattern the QuarterMonthWeekHeader already uses — recently fixed by Lane M to span the full content width).
+- **No subject selected (or all selected):** Return to neutral (no extra calendar, just the main multi-subject view).
+
+**Lane BG file scope:**
+- MODIFY: `components/year/YearView.tsx` — when the subject filter has exactly N selected (where 0 < N < 8), render N subject-tinted calendars above the existing Roadmap/Progression mount. Each gets `subjectId={s}` so its descendant header carries the cp-subj cascade and chameleon class.
+- NEW: `components/year/SubjectCalendar.tsx` (+ `.module.css`) — a per-subject filtered view of the Roadmap layout, scoped to that one subject's units and tinted via the cp-subj cascade. Likely a thin wrapper over RoadmapView with a subjectFilter prop.
+- MODIFY: `components/year/RoadmapView.tsx` if needed to accept a single-subject filter prop (probably already does — it has `subjectFilter`).
+
+**Dependencies:** Lane W is in `components/year/YearView.tsx`'s header (Configure button) — Lane BG also touches YearView.tsx body. Wait for Lane W to merge to avoid collision.
+
+**Coordination notes:**
+- The chameleon gradient + sticky-left + sticky-top fixes from Lane M are reused — SubjectCalendar's header is a `<QuarterMonthWeekHeader subjectId={s} />` mount; the existing CSS already paints the chameleon when `subjectId` is set.
+- Default neutral state stays untouched.
