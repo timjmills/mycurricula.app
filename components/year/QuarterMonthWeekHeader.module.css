@@ -16,10 +16,24 @@
 
 /* Active-subject chameleon fill — vertical gradient dark-top → light-bottom,
    matching the Weekly card header feel. var(--c) / var(--cl) resolve via the
-   cp-subj cascade applied by the consumer. */
+   cp-subj cascade applied by the consumer.
+
+   The gradient lives on the .monthRow / .weekRow children rather than on
+   .header itself because .header is `position: sticky` and inherits its
+   ancestor .timelineScroll's viewport width (~992–1592px), not the inner
+   grid's full 3656px (200px rail + 36 × 96px columns). Painting the
+   background on the rows — which carry explicit gridTemplateColumns
+   matching the timeline content — lets the chameleon fill extend across
+   every visible week instead of cutting off mid-timeline (Lane M
+   blue-band fix, 2026-05-25, follow-up to the eyebrow sticky-left
+   work). */
 .chameleon {
-  background: linear-gradient(180deg, var(--c) 0%, var(--cl) 100%);
   border-bottom: 1px solid color-mix(in srgb, var(--cd) 12%, transparent);
+}
+
+.chameleon .monthRow,
+.chameleon .weekRow {
+  background: linear-gradient(180deg, var(--c) 0%, var(--cl) 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -33,6 +47,16 @@
 .row {
   display: grid;
   align-items: stretch;
+  /* The row's gridTemplateColumns is set inline to 200px + N × column-width
+     px and totals the full timeline content width (~3656px at 36 weeks).
+     Without `width: max-content` the row's own box collapses to its
+     parent .header's clientWidth (~992px) — the grid items extend past
+     the row's right edge but any background painted on the row stops at
+     ~992px, which is exactly the blue-band cutoff the user reported on
+     2026-05-25. Sizing the row to its grid content keeps row-level
+     backgrounds (the chameleon gradient on .chameleon .monthRow /
+     .weekRow) spanning every visible week (Lane M blue-band fix). */
+  width: max-content;
 }
 
 /* ── Rail cell (left column, above LaneCard) ─────────────────────────── */
@@ -44,8 +68,27 @@
   padding: 4px 12px 5px;
   border-right: 1px solid var(--ink-150);
   background: var(--paper);
-  /* Stay crisp — never inherit the chameleon gradient. */
-  z-index: 1;
+  /* Pin to the top-left corner during both scroll axes — the header itself
+     is already `position: sticky; top: 0`, so adding `position: sticky;
+     left: 0` here glues the eyebrow cell against the left edge of the
+     horizontally scrolling .timelineScroll container while the rest of
+     the header pans away with the timeline (Lane M eyebrow fix,
+     2026-05-25). Without this, panning to later weeks scrolls the
+     "DATE / CURRICULUM LANES" label out of view and leaves the lane
+     column unlabeled above the sticky-left LaneCards.
+
+     z-index 3 sits above Lane K's sticky-left lane wrappers (z:2) so
+     the corner cell occupies the visual intersection — the eyebrow
+     reads cleanly over any LaneCard that scrolls underneath when the
+     header row crosses the LaneCard's top edge. The parent .header
+     already carries z-index: 10, so the railCell as a whole still
+     stacks above all timeline content. Opaque var(--paper) background
+     prevents timeline month/week cells from bleeding through.
+
+     Stay crisp — never inherit the chameleon gradient. */
+  position: sticky;
+  left: 0;
+  z-index: 3;
 }
 
 .eyebrowLine1 {
@@ -69,7 +112,10 @@
 /* ── Row 1: Month bands ──────────────────────────────────────────────── */
 
 .monthRow {
-  /* Transparent so the .chameleon gradient shows through on subject mode. */
+  /* No background by default — the header's var(--paper) shows through.
+     In subject (chameleon) mode the gradient is painted directly on this
+     row (see `.chameleon .monthRow` above) so it spans the row's full
+     grid width instead of the sticky .header's clipped viewport width. */
   background: transparent;
 }
 
@@ -102,6 +148,8 @@
 /* ── Row 2: Week labels ──────────────────────────────────────────────── */
 
 .weekRow {
+  /* Same rationale as .monthRow — chameleon gradient is painted on the
+     row, not the sticky-clipped .header. */
   background: transparent;
 }
 
