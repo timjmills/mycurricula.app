@@ -16,7 +16,7 @@
 // `@/components/schedule`.
 
 import { useAppState } from "@/lib/app-state";
-import { WEEK_DAYS_SHORT } from "@/lib/mock";
+import { WEEK_DAYS, WEEK_DAYS_SHORT } from "@/lib/mock";
 import { dateNumberForWeekDay } from "@/lib/mock/calendar";
 import { todayDayIndex } from "@/lib/schedule-data";
 import { ScheduleDayPane } from "@/components/schedule";
@@ -36,7 +36,12 @@ export default function SchedulePage() {
     <div className={styles.root}>
       <header className={styles.pageHeader}>
         <span className={styles.eyebrow}>SCHEDULE</span>
-        <h1 className={styles.title}>Week {week} schedule</h1>
+        {/* The h1 carries the active day + week so a screen reader hops
+            into a page heading that reflects what's on screen, mirroring
+            the /weekly + /daily idiom. */}
+        <h1 className={styles.title}>
+          Schedule — {WEEK_DAYS[focusedDay] ?? "Day"}, Week {week}
+        </h1>
       </header>
 
       <nav className={styles.dayStrip} aria-label="Choose a day to view">

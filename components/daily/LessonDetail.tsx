@@ -76,7 +76,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { ReactNode, SyntheticEvent } from "react";
 import type { Lesson } from "@/lib/types";
-import { SUBJECT_BY_ID, describeStandard, lessonTime } from "@/lib/mock";
+import { SUBJECT_BY_ID, lessonTime } from "@/lib/mock";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
 import { usePlanner } from "@/lib/planner-store";
@@ -647,31 +647,12 @@ export function LessonDetail({
             />
           </div>
 
-          {/* ── Standards — inline code-chip rows on white ──────────────
-              The standards a lesson covers; only rendered when the
-              lesson carries any. */}
-          {lesson.standards.length > 0 && (
-            <section className={detailStyles.section}>
-              <h3 className={detailStyles.sectionHead}>
-                Standards
-                <span className={detailStyles.sectionCount}>
-                  {lesson.standards.length}
-                </span>
-              </h3>
-              <div className={detailStyles.standardsList}>
-                {lesson.standards.map((code) => (
-                  <div key={code} className={detailStyles.standardItem}>
-                    <span className={`${detailStyles.standardCode} cp-mono`}>
-                      {code}
-                    </span>
-                    <span className={detailStyles.standardDesc}>
-                      {describeStandard(code)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          {/* Standards row deliberately omitted here — <LessonFlow> already
+              renders a "Standards" canonical row (index 1) via
+              `helperOverride`, so a duplicate section in this body would (a)
+              show the same data twice and (b) produce a "Standards{count}"
+              screen-reader concatenation when the count chip lived inside
+              the heading. The LessonFlow row is the canonical surface. */}
 
           {/* ── My notes — always-visible editable rich text ────────────
               Always rendered (not gated on lesson.notes) so teachers can

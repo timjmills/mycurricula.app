@@ -23,7 +23,12 @@
 //   click does not bubble to the row's onClick (navigate to daily view).
 //
 // ── Accessibility ──────────────────────────────────────────────────────
-//   • The row is a <button> so it is keyboard reachable (Enter / Space).
+//   • The row is a <div role="button" tabIndex={0}> rather than a native
+//     <button>. The checkbox is a nested native <button role="checkbox">,
+//     and HTML forbids interactive content (a button) inside a button —
+//     so the row uses the ARIA-button idiom (Enter/Space handled in
+//     handleRowKeyDown) to keep the markup valid while staying keyboard
+//     reachable.
 //   • min-height: 44px (via CSS module) meets the touch-target floor.
 //   • The checkbox is a nested <button> with an aria-label.
 
@@ -206,18 +211,14 @@ export function ListRow({
     [lesson.title],
   );
 
-  // Toggle completion without bubbling to the row's onClick.
+  // Toggle completion without bubbling to the row's onClick. The native
+  // <button> below gives Enter+Space + focus management for free, so the
+  // bespoke key handler that the previous <span role="checkbox"> needed is
+  // gone — only the click stopPropagation remains so the row's onClick
+  // (navigate to daily) doesn't also fire when the checkbox is toggled.
   function handleCheckboxClick(e: React.MouseEvent): void {
     e.stopPropagation();
     setLessonStatus(lesson.id, isDone ? "not_done" : "done");
-  }
-
-  function handleCheckboxKeyDown(e: React.KeyboardEvent): void {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      e.stopPropagation();
-      setLessonStatus(lesson.id, isDone ? "not_done" : "done");
-    }
   }
 
   function handleRowKeyDown(e: React.KeyboardEvent): void {
@@ -228,8 +229,13 @@ export function ListRow({
   }
 
   return (
-    <button
-      type="button"
+    // The row is a div+role="button"+tabIndex rather than a native <button>
+    // because the completion control inside it is a real <button>, and HTML
+    // forbids nested interactive content. handleRowKeyDown supplies the
+    // Enter/Space activation a native button would have given for free.
+    <div
+      role="button"
+      tabIndex={0}
       className={rowClasses}
       onClick={onClick}
       onKeyDown={handleRowKeyDown}
@@ -287,18 +293,21 @@ export function ListRow({
         </span>
       )}
 
-      {/* Completion checkbox — separate interactive target */}
-      <span
+      {/* Completion checkbox — separate interactive target. A native
+          <button type="button" role="checkbox"> gives Enter+Space + focus
+          for free; the negative-margin hit-area trick lives in the CSS
+          module so the visible chip stays small while the tap target meets
+          the touch floor. */}
+      <button
+        type="button"
         role="checkbox"
         aria-checked={isDone}
         aria-label={isDone ? "Mark not done" : "Mark done"}
-        tabIndex={0}
         className={`${styles.checkbox}${isDone ? ` ${styles.checked}` : ""}`}
         onClick={handleCheckboxClick}
-        onKeyDown={handleCheckboxKeyDown}
       >
         {isDone && <CheckIcon />}
-      </span>
-    </button>
+      </button>
+    </div>
   );
 }

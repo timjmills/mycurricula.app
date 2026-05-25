@@ -1743,6 +1743,19 @@ export function DailyView(): ReactNode {
 
   return (
     <div className={styles.page}>
+      {/* ── Page-level h1 (sr-only) ─────────────────────────────────────
+          WCAG 2.4.6 + H42/H69: every route needs a programmatically
+          discoverable page heading. The visible day-name h2 inside
+          TodayDashboard reads as a section, not the page title — so the
+          h1 lives here as a visually-hidden label that mirrors the
+          /weekly idiom ("Week N"). Skipped in list mode because
+          DailyList renders its own visible h1 with the same day. */}
+      {viewMode !== "list" && (
+        <h1 className={styles.srOnly}>
+          Daily plan — {WEEK_DAYS[selectedDay] ?? "Day"}, Week {week}
+        </h1>
+      )}
+
       {/* ── Breadcrumb: Week N / Day / Subject (BIG-7) ───────────────────
           Renders above the body row so it sits flush with the page top,
           spanning the full width including the icon rail. Each segment is
