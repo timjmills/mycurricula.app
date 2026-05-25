@@ -56,7 +56,7 @@ export function StatusGlyph({
           height: size,
           borderRadius: "50%",
           background: "var(--done)",
-          color: "#fff",
+          color: "var(--paper)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",

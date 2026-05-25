@@ -91,3 +91,16 @@
     transition: none;
   }
 }
+
+/* Touch-target inflation for phone + tablet (CLAUDE.md §4 ≥44px rule).
+   Desktop keeps the denser 36px chip height — these chips read better at
+   the compact size on a mouse-driven viewport. */
+@media (max-width: 900px) {
+  .pill {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .clearBtn {
+    min-height: 44px;
+  }
+}

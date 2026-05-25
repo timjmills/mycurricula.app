@@ -124,3 +124,12 @@
   color: var(--fyi);
   font-weight: 700;
 }
+
+/* Touch-target inflation for phone + tablet (CLAUDE.md §4 ≥44px rule).
+   Desktop keeps the denser 36px row height — a 12-month menu is
+   more scannable when rows are compact on mouse-driven viewports. */
+@media (max-width: 900px) {
+  .item {
+    min-height: 44px;
+  }
+}
