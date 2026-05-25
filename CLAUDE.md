@@ -163,6 +163,31 @@ The visual system has two independent axes, both set as `<html>` data attributes
   sideways. Work is only "done" once it has been verified at all three tiers
   (DevTools device emulation is fine; document in the PR/commit message which
   widths were checked).
+- **Every interactive control and every named panel must have an onboarding
+  explanation.** The intent is first-time-teacher discoverability — a new
+  teacher should be able to learn the app by hovering or long-pressing things.
+  - **Surface:** desktop = tooltip on hover **and** keyboard focus; touch
+    (phone/tablet) = long-press OR a native `title=` attribute the platform
+    surfaces on touch-hold OR a visible `?` affordance for ambiguous controls.
+  - **Scope:** every `<Button>`, every switch / toggle / radio, every named
+    panel (sticky rails, drawers, modals), every icon-only control, every
+    disabled control (the tooltip explains _why_ it's disabled), every
+    settings input. Plain text buttons whose label IS the explanation
+    ("Save", "Cancel") still get a tooltip — but the tooltip _expands_
+    on the verb to teach the action ("Save your edits to this lesson",
+    not just "Save").
+  - **Voice:** tell a first-time teacher what the control _accomplishes_, in
+    the surrounding context. Not "Toggle X" but "Switch to editing the
+    team's curriculum (changes affect everyone)".
+  - **Implementation:** the `components/ui/Button` primitive carries a
+    `tooltip?: string` prop that wraps the rendered button in `<Tooltip>` AND
+    mirrors to native `title=` for the disabled-button browser quirk. Other
+    interactive primitives (ToggleGroup, etc.) accept a similar prop or wrap
+    each option in a Tooltip. Panels carry a `title` attribute on their root
+    so touch users get an explanation by holding the header.
+  - **Reduced-motion + accessibility:** tooltip fade respects
+    `prefers-reduced-motion`; tooltip text is linked to the trigger via
+    `aria-describedby` so screen-reader users hear it.
 
 ---
 
