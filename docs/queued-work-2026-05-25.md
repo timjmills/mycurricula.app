@@ -119,3 +119,51 @@ generic gateway).
 - The `useSchoolMonths()` hook exists and `allYearMonths()` returns
   12 entries, but no consumer reads the filter yet — `/year` still
   shows the same 9-month range as before Lane T lands.
+
+---
+
+## Late-session addition 2 — Schedule as side panel (not a top tab)
+
+User direction (after Wave 1A dispatch):
+> "the schedule view/pane, I want to take out from one of the main buttons at the top and I want to instead have it as one of the side panes. The side pane buttons panels can be combined and moved whereever they would like them."
+
+**Scope (Wave 1.5, queued for after Lane W lands):**
+
+1. **Drop Schedule from the top-bar tab strip.** Currently: Daily / Weekly /
+   Yearly / Curriculum / Schedule. New: Daily / Weekly / Yearly / Curriculum.
+   The `/schedule` route may stay as a deep-link surface or be deleted —
+   the user can decide.
+
+2. **Schedule lives as a side panel.** Accessible from:
+   - The Daily IconRail (currently has a "Schedule" coming-soon button —
+     wire it as the trigger).
+   - Or the right rail / panel manifest if we treat it as one of N
+     toggleable side panels.
+
+3. **Side panels are user-arranged.** The user can combine and reposition
+   side panels — currently the right rail has Resources / To-dos / Comments,
+   and the left has the filter panel. Add panel-management chrome that lets
+   the user pick which panels appear in which rail, and persist the layout
+   (USER-scoped — per the team/user scoping doctrine, since panel arrangement
+   is a personal preference).
+
+**Coordination with currently in-flight work:**
+- Lane W touches `components/shell/top-bar.tsx` (unify gear/avatar destination).
+  Removing the Schedule tab also touches `top-bar.tsx`. Must dispatch AFTER
+  Lane W merges.
+- Lane W also touches `components/daily/IconRail.tsx` (gear destination).
+  Wiring the Schedule trigger there is touch-adjacent. Must dispatch AFTER
+  Lane W merges.
+
+**Lane breakdown (rough):**
+- **Lane BA** — remove Schedule tab from top-bar; redirect `/schedule` route
+  to its panel form OR keep as deep-link.
+- **Lane BB** — Schedule side-panel component (consume existing
+  `components/schedule/*` content; render in a rail slot).
+- **Lane BC** — panel-arrangement system: which-panel-in-which-rail UI,
+  persistence as `mycurricula:user:panel-layout`.
+- **Lane BD** — entry points: wire Schedule trigger in IconRail / right rail
+  toggle.
+
+This is a substantial wave — probably 3-4 hr parallelized. Defer to after
+Wave 1A (W + X) and Wave 1B (Y + Y-hol) settle.
