@@ -42,18 +42,13 @@
   text-overflow: ellipsis;
 }
 
-.meta {
-  font-size: var(--t-13);
-  font-weight: 500;
-  color: var(--ink-500);
-  line-height: 1.2;
-}
-
-/* Right-side header controls — chip + minimize toggle */
+/* Right-side header controls — chip + minimize toggle.
+   Gap is wide enough that the toggleBtn's ::before hit-area (inset -10px)
+   does not overlap the chip's hit region. */
 .headerControls {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -75,13 +70,12 @@
 }
 
 .toggleBtn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 24px;
   height: 24px;
-  /* Padding-trick keeps the visual size compact while the hit target is ≥44px
-     on phone/tablet via the surrounding header padding. */
   border-radius: var(--r-6);
   background: transparent;
   border: 0;
@@ -91,6 +85,16 @@
   transition:
     background 120ms ease,
     color 120ms ease;
+}
+
+/* Touch-target inflation — the visible chevron stays 24×24, but a transparent
+   pseudo-element extends the hit area by 10px on every side, giving a final
+   44×44 tap target (24 + 10 + 10). Matches the pattern at
+   components/schedule/ScheduleDayPane.module.css `.iconMenu::before`. */
+.toggleBtn::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
 }
 
 .toggleBtn:hover {

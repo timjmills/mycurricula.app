@@ -61,8 +61,6 @@ const IconRestore = (p: React.SVGProps<SVGSVGElement>) => (
 interface LaneCardProps {
   name: string;
   subjectId: SubjectId;
-  /** Student count displayed under the name. */
-  students?: number;
   /** Completion percentage, 0–100. */
   completePct: number;
   /** Card height stretches to fill the lane row. */
@@ -80,7 +78,6 @@ interface LaneCardProps {
 export function LaneCard({
   name,
   subjectId,
-  students = 24,
   completePct,
   fullHeight = false,
   pacing,
@@ -121,7 +118,6 @@ export function LaneCard({
     <div className={styles.headerInner}>
       <div className={styles.headerText}>
         <div className={styles.name}>{name}</div>
-        <div className={styles.meta}>{students} students</div>
       </div>
 
       <div className={styles.headerControls}>
