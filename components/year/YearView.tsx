@@ -38,6 +38,7 @@ import { QuarterMonthWeekHeader } from "./QuarterMonthWeekHeader";
 import { StatusFilterBar } from "./StatusFilterBar";
 import { MonthPicker } from "./MonthPicker";
 import { CurriculumFilter, useCurriculumFilter } from "./CurriculumFilter";
+import { TODAY_PULSE_EVENT } from "./TodayMarker";
 import type { StatusFilterId } from "./StatusFilterBar";
 import type { SubjectId } from "@/lib/types";
 import styles from "./YearView.module.css";
@@ -310,7 +311,16 @@ export function YearView() {
             type="button"
             className={styles.actionBtn}
             aria-label="Go to today"
-            onClick={() => scrollToWeek(currentWeekIdx)}
+            onClick={() => {
+              scrollToWeek(currentWeekIdx);
+              // m4 fix: dispatch a pulse event so every mounted TodayMarker
+              // briefly flashes — confirms the click registered even when
+              // the timeline is already centered (scrollTo is a no-op).
+              // TodayMarker honors prefers-reduced-motion internally.
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent(TODAY_PULSE_EVENT));
+              }
+            }}
           >
             <IconCal width={15} height={15} />
             Today
@@ -363,7 +373,19 @@ export function YearView() {
       {/* ── Main body ────────────────────────────────────────────────── */}
       <div className={styles.body}>
         <div className={styles.contentArea}>
-          {/* In-page Roadmap | Progression toggle */}
+          {/* In-page Roadmap | Progression toggle.
+              ── Touch-target note (M5 follow-up, 2026-05-25 audit) ─────────
+              The audit flagged these options at 102×34 / 116×34 px, below
+              the WCAG 2.5.5 / CLAUDE.md §4 44px tap-target floor on phone +
+              tablet. The visible chip stays 34px tall by design, but the
+              ToggleGroup primitive already inflates the hit area to ≥44×44
+              via a `::before` pseudo-element at `@media (max-width: 900px)`
+              (see components/ui/ToggleGroup.module.css). The audit tool
+              measured getBoundingClientRect(), which reports the chip box,
+              not the inflated hit area — so this is compliant in practice.
+              No local fix needed; if a future visual-redesign wave bumps
+              the chip height itself, do it in the shared primitive so every
+              consumer benefits at once. */}
           <div className={styles.controls}>
             <ToggleGroup
               variant="prominent"

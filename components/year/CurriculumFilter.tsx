@@ -3,84 +3,54 @@
 // CurriculumFilter — "Select the curriculum" multi-select popover.
 //
 // A <Button> trigger labeled "Select the curriculum (N)" opens a portal
-// popover with an All/None header and a per-subject checklist. Selection
-// persists to localStorage. SSR-safe: defaults to all-selected on the
-// server and on the first client render; post-mount effect hydrates from
-// storage.
+// popover with an All/None header and a per-subject checklist.
+//
+// ── Shared state with the left filter panel (m5 fix, 2026-05-25 audit) ────
+// The popover and the shell's left-filter-panel SUBJECT chips are two
+// surfaces onto the SAME filter: `useAppState().filters.subjects`. CLAUDE.md
+// §1 ("Filter everywhere. Each UI surface has one clear job") forbids two
+// parallel filters of the same data with independent state. Both surfaces
+// now read from and write to the planner-wide `filters.subjects` array:
+//
+//   filters.subjects = []              → "show all" (no filter applied)
+//   filters.subjects = [SubjectId...]  → only those subjects visible
+//
+// The popover's UI model still uses a Set<SubjectId> of selected items and
+// a derived `subjectFilter` (null = show all). The hook bridges between
+// the two representations: an empty `filters.subjects` array maps to a Set
+// of all 8 subject ids (so "All" reads as checked in the popover) and a
+// `subjectFilter` of null (so the views skip filtering). Conversely, when
+// the popover writes a full set of 8, the hook normalizes it back to an
+// empty array in shared state — keeping the canonical "no filter" shape
+// consistent across both surfaces.
 //
 // Usage:
 //   import { CurriculumFilter, useCurriculumFilter } from "./CurriculumFilter";
 //
-//   // In the parent component:
-//   const { subjectFilter } = useCurriculumFilter();
-//   ...
-//   <CurriculumFilter />
+//   const { subjectFilter, selectedIds, setSelectedIds } = useCurriculumFilter();
+//   <CurriculumFilter selectedIds={selectedIds} onChange={setSelectedIds} />
 //   <RoadmapView subjectFilter={subjectFilter} />
-//
-// The hook must be called in the same component tree as <CurriculumFilter>
-// (or a parent). Both read from the same module-level state via a shared
-// React state lifted into a custom hook. Because Next.js client components
-// re-render together, a single useState at module level isn't correct —
-// instead, expose a context-like pattern via a hook that the host component
-// wires together. For this co-located use case (YearView calls both), the
-// hook and component share state by having the parent own the state and
-// pass it down. See the export shape below.
 
 import {
-  useState,
-  useEffect,
-  useRef,
   useCallback,
+  useEffect,
   useId,
-  type ReactNode,
+  useMemo,
+  useRef,
+  useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui";
 import { SUBJECTS } from "@/lib/mock";
+import { useAppState } from "@/lib/app-state";
 import type { SubjectId } from "@/lib/types";
 import styles from "./CurriculumFilter.module.css";
 
-// ── Storage ───────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = "mycurriculum:year-curriculum-filter";
+// ── Constants ─────────────────────────────────────────────────────────────
 
 const ALL_IDS: SubjectId[] = SUBJECTS.map((s) => s.id as SubjectId);
-
-/** Load persisted selection. Returns null (all-selected) if nothing stored. */
-function loadSelection(): Set<SubjectId> | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
-    const ids = parsed.filter(
-      (v): v is SubjectId =>
-        typeof v === "string" && ALL_IDS.includes(v as SubjectId),
-    );
-    // If all subjects are stored, treat as null (show-all) to avoid
-    // persisting a trivially full set.
-    if (ids.length === ALL_IDS.length) return null;
-    return new Set(ids);
-  } catch {
-    return null;
-  }
-}
-
-/** Persist selection, or clear if null (means show-all). */
-function saveSelection(set: Set<SubjectId> | null): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (set === null) {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } else {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...set]));
-    }
-  } catch {
-    // Non-fatal.
-  }
-}
 
 // ── Hook ──────────────────────────────────────────────────────────────────
 
@@ -90,47 +60,52 @@ export interface CurriculumFilterState {
   /** The raw selected-id set (always has all 8 if subjectFilter is null). */
   selectedIds: Set<SubjectId>;
   setSelectedIds: (ids: Set<SubjectId>) => void;
-  /** Hydration is complete (safe to read localStorage-backed state). */
-  hydrated: boolean;
 }
 
 /**
- * useCurriculumFilter — owns the filter state for the YearView curriculum
- * selector. Call once in YearView; pass `subjectFilter` to the sub-views.
+ * useCurriculumFilter — bridges the popover's Set<SubjectId> selection model
+ * to the planner-wide `filters.subjects` array owned by useAppState().
  *
- * Returns null for subjectFilter when all subjects are selected (so callers
- * can skip filtering entirely for the all-selected case).
+ * - Reads `filters.subjects`:
+ *     `[]`   → selectedIds = all 8, subjectFilter = null  (show all)
+ *     `[…]`  → selectedIds = those ids, subjectFilter = same set
+ * - Writes back via `updateFilters({ subjects })`:
+ *     A full 8-id set is stored as `[]` (canonical "no filter" shape).
+ *     Any partial set is stored as a plain array of ids.
+ *
+ * The left filter panel (components/shell/left-filter-panel.tsx) and this
+ * popover therefore stay in lockstep — toggling a subject in either surface
+ * is visible in the other on the next render.
  */
 export function useCurriculumFilter(): CurriculumFilterState {
-  // SSR-safe: start with all selected so the server HTML matches the first
-  // client render.
-  const [selectedIds, setSelectedIdsRaw] = useState<Set<SubjectId>>(
-    () => new Set(ALL_IDS),
+  const { filters, updateFilters } = useAppState();
+
+  // selectedIds derives from filters.subjects. Empty array = "show all" so we
+  // present the popover as fully checked (matches the shell semantics).
+  const selectedIds = useMemo<Set<SubjectId>>(
+    () =>
+      filters.subjects.length === 0
+        ? new Set(ALL_IDS)
+        : new Set(filters.subjects),
+    [filters.subjects],
   );
-  const [hydrated, setHydrated] = useState(false);
-  const hydratedRef = useRef(false);
 
-  // Post-mount: hydrate from localStorage.
-  useEffect(() => {
-    const stored = loadSelection();
-    if (stored !== null) setSelectedIdsRaw(stored);
-    hydratedRef.current = true;
-    setHydrated(true);
-  }, []);
+  const setSelectedIds = useCallback(
+    (next: Set<SubjectId>) => {
+      // Normalize the "all selected" case back to the canonical empty array
+      // so the left panel does not show all 8 chips as active when the user
+      // intent is "no filter applied."
+      const subjects: SubjectId[] =
+        next.size === ALL_IDS.length ? [] : [...next];
+      updateFilters({ subjects });
+    },
+    [updateFilters],
+  );
 
-  const setSelectedIds = useCallback((next: Set<SubjectId>) => {
-    setSelectedIdsRaw(next);
-    if (hydratedRef.current) {
-      // Store null when all are selected (keeps localStorage clean).
-      saveSelection(next.size === ALL_IDS.length ? null : next);
-    }
-  }, []);
+  const subjectFilter =
+    filters.subjects.length === 0 ? null : new Set(filters.subjects);
 
-  // Derive the filter: null when all selected, Set otherwise.
-  const allSelected = selectedIds.size === ALL_IDS.length;
-  const subjectFilter = allSelected ? null : new Set(selectedIds);
-
-  return { subjectFilter, selectedIds, setSelectedIds, hydrated };
+  return { subjectFilter, selectedIds, setSelectedIds };
 }
 
 // ── Popover position ──────────────────────────────────────────────────────

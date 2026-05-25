@@ -20,13 +20,13 @@
 /* "TODAY" pill — sits at the top, just above the lane rows */
 .pill {
   background: var(--fyi);
-  color: #fff;
+  color: var(--paper);
   font-size: var(--t-10);
   font-weight: 800;
   letter-spacing: 0.05em;
   padding: 2px 7px;
   border-radius: var(--r-pill);
-  box-shadow: 0 1px 4px rgba(31, 111, 184, 0.35);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--fyi) 35%, transparent);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -37,4 +37,47 @@
   width: 1.5px;
   background: var(--fyi);
   opacity: 0.45;
+}
+
+/* ── "Today" button pulse (m4 fix, 2026-05-25 audit) ─────────────────────
+   Toggled by TodayMarker.tsx via the mycurriculum:year-today-pulse window
+   event. The pill brightens and the line gains opacity for ~250ms — short
+   enough to read as confirmation (matches the ≤200ms card-expand window
+   from CLAUDE.md §4 plus easing tail) without feeling like a glitch. The
+   component itself skips the class entirely under prefers-reduced-motion,
+   so this animation never runs for users with the OS preference set. */
+
+@keyframes todayMarkerPulse {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  35% {
+    transform: scale(1.12);
+    filter: brightness(1.25);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes todayMarkerLinePulse {
+  0% {
+    opacity: 0.45;
+  }
+  35% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+
+.pulsing .pill {
+  animation: todayMarkerPulse 250ms ease-out;
+}
+
+.pulsing .line {
+  animation: todayMarkerLinePulse 250ms ease-out;
 }
