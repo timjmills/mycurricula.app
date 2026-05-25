@@ -80,7 +80,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Button, Tooltip } from "@/components/ui";
+import { Button, PageHeader, Tooltip } from "@/components/ui";
 import {
   DndContext,
   DragOverlay,
@@ -919,6 +919,19 @@ export function WeeklyShell(): ReactNode {
       >
         {columnAnnouncement}
       </div>
+
+      {/* ── Page header (title + onboarding subtitle) ──────────────────
+          Matches the YearView page-header recipe (BUILD_STANDARD.md §5
+          page-level type: --t-24 weight 800, --t-13 subtitle). The
+          single h1 satisfies WCAG 2.4.6; the subtitle tells a first-time
+          teacher what this surface is FOR per CLAUDE.md §4 onboarding
+          voice. PageHeader is the canonical primitive (components/ui)
+          so the rest of the routes use the same recipe. */}
+      <PageHeader
+        title="Weekly View"
+        subtitle="Your week at a glance — every lesson laid out by subject and day. Switch between Grid and List, drag to re-plan, edit in place."
+        className={styles.weeklyPageHeader}
+      />
 
       {/* ── Layer-2 catch-up bar (planning-doc §1262) ──────────────────
           The bar self-gates on enabled + per-week count + per-week dismissal,

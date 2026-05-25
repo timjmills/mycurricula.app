@@ -7,3 +7,4 @@ export { MasterBanner } from "./master-banner";
 export { LeftFilterPanel } from "./left-filter-panel";
 export { RightPanel } from "./right-panel";
 export { GlobalShortcuts } from "./global-shortcuts";
+export { Clock } from "./Clock";

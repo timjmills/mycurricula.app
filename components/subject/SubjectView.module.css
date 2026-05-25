@@ -149,6 +149,17 @@
   font-size: var(--t-13);
   color: var(--ink-500);
   margin: 0;
+  line-height: 1.4;
+  max-width: 64ch;
+}
+
+/* Grade + active-unit metadata — sits below the onboarding subtitle as
+   a quieter trailing line. Small, ink-400, single line. */
+.headerMeta {
+  margin: 8px 0 0;
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  font-weight: 500;
 }
 
 /* ── Scrollable content area ────────────────────────────────────────── */

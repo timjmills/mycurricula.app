@@ -1,0 +1,110 @@
+/* Clock.module.css — ambient day/date/time chip pinned bottom-right.
+ *
+ * Tokens only — no hex, no raw rgb/hsl, no magic font sizes. Spacing
+ * follows the 4-8-12 scale (BUILD_STANDARD.md §6).
+ */
+
+.chip {
+  /* Fixed so the chip survives internal scrolling on long surfaces
+     (Year timeline, Catchup list). Bottom-right is the canonical
+     ambient-metadata position; offset by 16px so it doesn't kiss the
+     viewport edge. */
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+
+  /* High enough to sit above planner content but below modal overlays
+     (which use 9999 in this codebase). The skip-to-content link is
+     also 9999; this 60 leaves headroom for both. */
+  z-index: 60;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  /* 4-8-12 scale: 6 isn't on the scale but the visible chip looks
+     squat at 8/16 — tighten vertically using the 4/12 pairing. */
+  padding: 8px 12px;
+
+  background: var(--paper);
+  color: var(--ink-700);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-card);
+
+  font-size: var(--t-12);
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  /* Tabular-nums keeps the time numerals the same width so the chip
+     doesn't visibly twitch each minute when "1:09 PM" becomes
+     "1:10 PM". */
+  font-variant-numeric: tabular-nums;
+
+  /* Don't catch pointer events away from anything underneath. The chip
+     is informational only — no interactions besides the tooltip's
+     hover/focus reveal. */
+  user-select: none;
+
+  /* Subtle entrance softening — if the chip animates in from the
+     bottom on some future onboarding flow, this is the hook. Skip
+     under reduced motion. */
+  transition: box-shadow 120ms ease;
+}
+
+.chip:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.date {
+  color: var(--ink-900);
+  font-weight: 700;
+}
+
+.sep {
+  color: var(--ink-500);
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.time {
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────
+ *
+ * The chip should remain visible at every viewport tier (CLAUDE.md §4
+ * three-tier responsive contract) without crowding content. On phone
+ * (≤480px) we tighten paddings + bump the offset down so the chip
+ * doesn't overlap the bottom-screen keyboard launcher when the
+ * teacher taps a card to edit. */
+
+@media (max-width: 900px) {
+  .chip {
+    /* Tablet — same chip, slightly tighter padding so it doesn't
+       compete with the bottom-pinned RightRail toggle. */
+    padding: 6px 10px;
+    gap: 6px;
+    font-size: var(--t-11);
+  }
+}
+
+@media (max-width: 480px) {
+  .chip {
+    /* Phone — keep it visible but shrink to a single-line micro-chip.
+       16px from each edge so a thumb tap doesn't accidentally hit it. */
+    bottom: 12px;
+    right: 12px;
+    padding: 6px 10px;
+    gap: 6px;
+    font-size: var(--t-11);
+  }
+}
+
+/* Defensive: nothing animates here at the moment, but if a future
+ * version adds an entrance fade, drop it under reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
+  }
+}

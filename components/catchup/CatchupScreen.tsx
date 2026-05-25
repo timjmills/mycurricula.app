@@ -44,11 +44,35 @@ import styles from "./CatchupScreen.module.css";
 
 // ── Local config ─────────────────────────────────────────────────────────
 
-const SCOPE_CHIPS: ReadonlyArray<{ id: CatchupScope; label: string }> = [
-  { id: "lastWeek", label: "Last week" },
-  { id: "last4", label: "Last 4 weeks" },
-  { id: "term", label: "This term" },
-  { id: "year", label: "All year" },
+const SCOPE_CHIPS: ReadonlyArray<{
+  id: CatchupScope;
+  label: string;
+  tooltip: string;
+}> = [
+  {
+    id: "lastWeek",
+    label: "Last week",
+    tooltip:
+      "Only show lessons that fell behind in the most recent school week — fastest way to triage what's right behind you",
+  },
+  {
+    id: "last4",
+    label: "Last 4 weeks",
+    tooltip:
+      "Show lessons that fell behind over the past month — the default scope, good balance of recent + actionable",
+  },
+  {
+    id: "term",
+    label: "This term",
+    tooltip:
+      "Show every uncovered lesson since the start of the current term — useful when planning a make-up week",
+  },
+  {
+    id: "year",
+    label: "All year",
+    tooltip:
+      "Show every uncovered lesson from the start of the school year — the full backlog, no time filter",
+  },
 ];
 
 const STATUS_CHIPS: ReadonlyArray<CatchupItem["status"]> = [
@@ -230,7 +254,17 @@ export function CatchupScreen() {
               Catch-up
             </div>
             <h1 className={styles.title}>What I haven&rsquo;t covered yet</h1>
-            <div className={styles.subtitle}>
+            {/* Onboarding-voice subtitle (CLAUDE.md §4) — tells a first-
+                time teacher what this surface is FOR, not just what it's
+                called. The grade + school-year + teacher metadata moved
+                to a sibling .metaRow below so the subtitle can carry a
+                single clear job-statement. */}
+            <p className={styles.subtitle}>
+              Lessons your team — or just you — fell behind on, ready to triage.
+              Carry them forward, mark them skipped, or jot a note so nothing
+              slips through the year.
+            </p>
+            <div className={styles.metaRow}>
               Grade 5 &middot; 2025&ndash;26 school year &middot;{" "}
               {currentUser.name}
             </div>
@@ -286,6 +320,7 @@ export function CatchupScreen() {
                   aria-pressed={active}
                   onClick={() => setScope(c.id)}
                   data-active={active || undefined}
+                  title={c.tooltip}
                 >
                   {c.label}
                 </button>
@@ -310,6 +345,7 @@ export function CatchupScreen() {
                   aria-pressed={active}
                   onClick={() => toggleStatus(s)}
                   data-active={active || undefined}
+                  title={`Toggle the ${CATCHUP_STATUS_LABEL[s].toLowerCase()} status — when off, lessons in that state are hidden from this list`}
                   style={
                     active
                       ? ({
@@ -341,6 +377,7 @@ export function CatchupScreen() {
             value={groupBy}
             onChange={(e) => setGroupBy(e.target.value as CatchupGroupBy)}
             aria-label="Group rows by"
+            title="Choose how to organize the catch-up list — by subject, by week, by standard, or by unit"
           >
             {GROUP_OPTIONS.map((o) => (
               <option key={o.id} value={o.id}>

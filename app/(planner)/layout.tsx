@@ -4,6 +4,7 @@ import { CatchupProvider } from "@/lib/catchup-state";
 import { PlannerProvider } from "@/lib/planner-store";
 import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
+  Clock,
   GlobalShortcuts,
   LeftFilterPanel,
   MasterBanner,
@@ -77,6 +78,12 @@ export default function PlannerLayout({
                 </main>
                 <RightPanel />
               </div>
+              {/* Ambient live clock — fixed-positioned bottom-right chip,
+                  visible on every planner route. Sits outside the body
+                  row so internal scroll containers (Year timeline, Catchup
+                  list) don't clip it. See components/shell/Clock.tsx for
+                  the full placement rationale. */}
+              <Clock />
             </div>
           </CatchupProvider>
         </UnitNotesProvider>

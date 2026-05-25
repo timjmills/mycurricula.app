@@ -22,6 +22,16 @@
   background: var(--ink-50);
 }
 
+/* ── Page header (title + subtitle) ──────────────────────────────────────
+   Wrapper class for the canonical <PageHeader> primitive — paints the
+   paper background and bottom hairline so the header reads as a top
+   chrome band like Year's. Padding/typography are owned by PageHeader. */
+.dailyPageHeader {
+  background: var(--paper);
+  border-bottom: 1px solid var(--ink-150);
+  flex-shrink: 0;
+}
+
 /* ── Breadcrumb: Week N / Day / Subject (BIG-7) ─────────────────────────
    A slim single-line strip across the top of the Daily view.  Each segment
    is a clickable link; chevron separators are presentational (aria-hidden).

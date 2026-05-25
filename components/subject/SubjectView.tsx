@@ -200,6 +200,7 @@ function LessonRowItem({
           .join(" ")}
         onClick={onToggle}
         aria-expanded={isExpanded}
+        title={`Expand "${lesson.title}" to see its directions, standards, and a quick preview of the lesson content`}
       >
         <span
           className={[
@@ -219,6 +220,7 @@ function LessonRowItem({
             onToggleStatus();
           }}
           aria-label={`Toggle completion for ${lesson.title}`}
+          title={`Mark "${lesson.title}" done or not done — completion is personal and never forks the team's Master copy`}
         >
           <CheckIcon status={lesson.status} />
         </button>
@@ -355,6 +357,7 @@ function GroupBlock({
           .join(" ")}
         onClick={onToggleOpen}
         aria-expanded={isOpen}
+        title={`Expand or collapse the ${group.name} group — see all lessons in this unit, their completion progress, and a "Now" pill on the unit you're currently teaching`}
       >
         <span
           className={[
@@ -377,7 +380,15 @@ function GroupBlock({
         </span>
 
         {isOpen && (
-          <button className={styles.groupExpandBtn} onClick={handleExpandAll}>
+          <button
+            className={styles.groupExpandBtn}
+            onClick={handleExpandAll}
+            title={
+              allExpanded
+                ? "Collapse every lesson in this group back to its title row"
+                : "Open every lesson in this group to see their directions and standards"
+            }
+          >
             {allExpanded ? "Close all" : "Expand all"}
           </button>
         )}
@@ -426,6 +437,7 @@ function SubjectBtn({
     <button
       className={`${styles.subjectBtn} ${isActive ? styles.subjectBtnActive : ""} cp-subj ${subjectId}`}
       onClick={onClick}
+      title={`Switch the Subject view to ${subject.name} — see all ${subject.name} units, your progress, and the team's pace`}
     >
       <span
         className={styles.subjectBtnStripe}
@@ -789,7 +801,16 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
           Subject
         </div>
         <h1 className={styles.headerTitle}>{subject.name}</h1>
-        <p className={styles.headerSub}>Grade 5 · {activeUnit.weeks}</p>
+        {/* Onboarding-voice subtitle (CLAUDE.md §4) — tells a first-time
+            teacher what the Subject (Curriculum) tab is FOR. The grade +
+            current-unit metadata moved to the .headerMeta line below so
+            the subtitle slot carries a clear job statement. */}
+        <p className={styles.headerSub}>
+          The full year of units and lessons for {subject.name}, with the
+          standards each one covers — pick a unit to drill in, or scan the
+          health cards to see where you&rsquo;re ahead and behind.
+        </p>
+        <p className={styles.headerMeta}>Grade 5 · {activeUnit.weeks}</p>
       </header>
 
       {/* ── Stat strip ──────────────────────────────────────────────────── */}
@@ -841,6 +862,7 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
               className={`${styles.chip} ${period === p ? styles.chipActive : ""}`}
               onClick={() => setPeriod(p)}
               aria-pressed={period === p}
+              title={`Narrow the lesson list to the ${p.toLowerCase()} time window`}
             >
               {p}
             </button>

@@ -135,7 +135,7 @@ import { RightRail } from "./RightRail";
 import { PaneSplitter } from "./PaneSplitter";
 import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
-import { Button } from "@/components/ui";
+import { Button, PageHeader } from "@/components/ui";
 import { DailyList } from "@/components/list/DailyList";
 import { ScheduleDayPane } from "@/components/schedule";
 import { DailySchedulePill } from "./daily-schedule-pill";
@@ -1743,18 +1743,20 @@ export function DailyView(): ReactNode {
 
   return (
     <div className={styles.page}>
-      {/* ── Page-level h1 (sr-only) ─────────────────────────────────────
-          WCAG 2.4.6 + H42/H69: every route needs a programmatically
-          discoverable page heading. The visible day-name h2 inside
-          TodayDashboard reads as a section, not the page title — so the
-          h1 lives here as a visually-hidden label that mirrors the
-          /weekly idiom ("Week N"). Skipped in list mode because
-          DailyList renders its own visible h1 with the same day. */}
-      {viewMode !== "list" && (
-        <h1 className={styles.srOnly}>
-          Daily plan — {WEEK_DAYS[selectedDay] ?? "Day"}, Week {week}
-        </h1>
-      )}
+      {/* ── Page header (title + onboarding subtitle) ─────────────────────
+          Visible page-level h1 + subtitle, matching the YearView recipe
+          via the canonical <PageHeader> primitive. Replaces the prior
+          sr-only h1 with a visible heading that doubles as onboarding
+          (CLAUDE.md §4 — tell a first-time teacher what this page is
+          FOR). Renders on BOTH grid and list modes so the page has
+          exactly one h1 in the a11y tree at all times. DailyList's
+          inner day title is demoted to an h2 (see DailyList.tsx) to
+          keep the single-h1-per-page invariant. */}
+      <PageHeader
+        title="Daily View"
+        subtitle="Today's lessons in detail, side-by-side with the day's schedule and notes."
+        className={styles.dailyPageHeader}
+      />
 
       {/* ── Breadcrumb: Week N / Day / Subject (BIG-7) ───────────────────
           Renders above the body row so it sits flush with the page top,
