@@ -31,6 +31,7 @@ import { useAppState, type CurrentUser } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip, ToggleGroup } from "@/components/ui";
 import { CatchupFlameButton } from "./catchup-flame-button";
+import { TopBarMoreMenu } from "./top-bar-more-menu";
 import styles from "./top-bar.module.css";
 
 // ── View definitions ─────────────────────────────────────────────────────
@@ -49,13 +50,20 @@ interface ViewDef {
 // canonical URL — "subject" is the data-model entity; "Curriculum" is just the
 // chrome label that teachers see).
 // The "Unit" SOON tab was retired — units live inside the Curriculum tab.
-const VIEWS: ViewDef[] = [
+//
+// Exported so the More menu (top-bar-more-menu.tsx) can render the same list
+// as menu items at ≤768px where the inline tab strip is hidden — see the
+// Navigation section in TopBarMoreMenu and the `.viewSwitcher` media-hide in
+// top-bar.module.css. Single source of truth: changing the tab order or copy
+// here updates both the desktop strip and the phone/tablet menu.
+export const VIEWS: ViewDef[] = [
   { label: "Daily", href: "/daily" },
   { label: "Weekly", href: "/weekly" },
   { label: "Yearly", href: "/year" },
   { label: "Curriculum", href: "/subject" },
   { label: "Schedule", href: "/schedule" },
 ];
+export type { ViewDef };
 
 // ── TopBar ───────────────────────────────────────────────────────────────
 
@@ -199,9 +207,27 @@ export function TopBar(): ReactNode {
         </Button>
       </Tooltip>
 
-      <div className={styles.divider} aria-hidden="true" />
+      {/* This divider sits between the left-panel-collapse toggle and the
+          view switcher. At ≤768px the switcher collapses into the More
+          menu's Navigation section, so the divider that "frames" it must
+          hide alongside the strip — otherwise we'd render a lone hairline
+          between two unrelated chunks of chrome. */}
+      <div
+        className={styles.divider}
+        data-tabs-divider="true"
+        aria-hidden="true"
+      />
 
       {/* ── View switcher ─────────────────────────────────────────── */}
+      {/* RES-CRIT-002 / Round 2: at ≤768px (tablet/phone) the five inline
+          tabs (Daily / Weekly / Yearly / Curriculum / Schedule) cannot
+          fit alongside the Logo, Personal/Master toggle, More trigger,
+          and Profile avatar within the viewport. They collapse into the
+          More menu's Navigation section (rendered by TopBarMoreMenu)
+          via `display: none` in the module CSS — see the
+          `@media (max-width: 768px)` rule. The data-narrow-hide rules at
+          ≤480px still apply when the strip IS visible (>768), so they
+          remain on the Yearly/Curriculum tabs. */}
       <nav className={styles.viewSwitcher} aria-label="View">
         {VIEWS.map((v) => {
           if (v.soon) {
@@ -231,8 +257,7 @@ export function TopBar(): ReactNode {
           // Curriculum tabs. The data-narrow attribute drives the CSS
           // media-query hide below. Daily / Weekly / Schedule are the
           // three primary tabs and stay visible at every width.
-          const narrowOnly =
-            v.label === "Yearly" || v.label === "Curriculum";
+          const narrowOnly = v.label === "Yearly" || v.label === "Curriculum";
           return (
             <Link
               key={v.label}
@@ -247,7 +272,13 @@ export function TopBar(): ReactNode {
         })}
       </nav>
 
-      <div className={styles.divider} aria-hidden="true" />
+      {/* Paired with the divider above the switcher — same data attribute
+          so the hide rule at ≤768px collapses the tabbed group cleanly. */}
+      <div
+        className={styles.divider}
+        data-tabs-divider="true"
+        aria-hidden="true"
+      />
 
       {/* ── Week label — static heading (POLISH-011) ─────────────────
           The top bar previously duplicated the in-grid week-navigation
@@ -394,95 +425,131 @@ export function TopBar(): ReactNode {
       {/* Push remaining controls to the right */}
       <div className={styles.spacer} aria-hidden="true" />
 
-      {/* ── Search — collapsible (TOPBAR-001) ────────────────────────
-          At rest: a 36px icon button (same size as the other icon buttons)
-          so the bar fits without horizontal scroll at 1024px. Clicking the
-          icon or pressing Enter/Space on it opens the full text input and
-          moves focus into it. The input collapses back on blur (when the
-          query is empty) or on Escape (always). A non-empty query keeps the
-          field open after blur so search results stay visible. This pattern
-          keeps every control reachable without a "More" overflow menu. */}
-      {searchOpen ? (
-        <div className={styles.searchWrap}>
-          <span className={styles.searchIcon} aria-hidden="true">
-            <SearchIcon />
-          </span>
-          <input
-            ref={searchInputRef}
-            type="search"
-            className={styles.searchInput}
-            placeholder="Search lessons…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search lessons"
-            data-search-input
-            // Collapse on blur when the query is empty; keep open otherwise
-            // so results stay visible after the teacher types something.
-            onBlur={() => {
-              if (!search) setSearchOpen(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                setSearch("");
-                setSearchOpen(false);
-              }
-            }}
-          />
-        </div>
-      ) : (
-        <Tooltip content="Search lessons" side="bottom">
-          <Button
-            variant="icon"
-            iconAriaLabel="Search lessons"
-            data-search-trigger
-            onClick={() => {
-              setSearchOpen(true);
-              // Focus the input on the next frame after it mounts.
-              requestAnimationFrame(() => searchInputRef.current?.focus());
-            }}
-          >
-            <SearchIcon />
-          </Button>
-        </Tooltip>
-      )}
+      {/* ── Full right cluster (visible >1280px) ─────────────────────────
+          The five right-side controls — Search / Catch-up / To-do /
+          Comments — rendered inline as before. At ≤1280 this wrapper is
+          hidden via CSS (`.rightClusterFull` rule in top-bar.module.css)
+          and the same controls are reachable from the ⋯ More menu rendered
+          below. The Profile avatar is intentionally a sibling, not a
+          member of this wrapper — it stays visible at every width because
+          it is the only Settings entry point. */}
+      <div className={styles.rightClusterFull}>
+        {/* ── Search — collapsible (TOPBAR-001) ────────────────────────
+            At rest: a 36px icon button (same size as the other icon
+            buttons) so the bar fits without horizontal scroll at 1024px.
+            Clicking the icon or pressing Enter/Space on it opens the full
+            text input and moves focus into it. The input collapses back on
+            blur (when the query is empty) or on Escape (always). A
+            non-empty query keeps the field open after blur so search
+            results stay visible. At ≤1280 the search lives inside the
+            ⋯ More menu (TopBarMoreMenu) as an inline input — that path
+            keeps every control reachable. */}
+        {searchOpen ? (
+          <div className={styles.searchWrap}>
+            <span className={styles.searchIcon} aria-hidden="true">
+              <SearchIcon />
+            </span>
+            <input
+              ref={searchInputRef}
+              type="search"
+              className={styles.searchInput}
+              placeholder="Search lessons…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search lessons"
+              data-search-input
+              // Collapse on blur when the query is empty; keep open otherwise
+              // so results stay visible after the teacher types something.
+              onBlur={() => {
+                if (!search) setSearchOpen(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setSearch("");
+                  setSearchOpen(false);
+                }
+              }}
+            />
+          </div>
+        ) : (
+          <Tooltip content="Search lessons" side="bottom">
+            <Button
+              variant="icon"
+              iconAriaLabel="Search lessons"
+              data-search-trigger
+              onClick={() => {
+                setSearchOpen(true);
+                // Focus the input on the next frame after it mounts.
+                requestAnimationFrame(() => searchInputRef.current?.focus());
+              }}
+            >
+              <SearchIcon />
+            </Button>
+          </Tooltip>
+        )}
 
-      {/* ── Layer-3 Catch-up flame badge (planning-doc §1262) ────────
-          Self-gates on enabled + total uncovered count > 0. Renders the
-          same .badgeWrap/.badge geometry as the comments unread chip but
-          tints the chip with var(--catchup). Click navigates to /catch-up. */}
-      <CatchupFlameButton />
+        {/* ── Layer-3 Catch-up flame badge (planning-doc §1262) ────────
+            Self-gates on enabled + total uncovered count > 0. Renders the
+            same .badgeWrap/.badge geometry as the comments unread chip but
+            tints the chip with var(--catchup). Click navigates to
+            /catch-up. */}
+        <CatchupFlameButton />
 
-      {/* ── To-do panel toggle ────────────────────────────────────── */}
-      <Button
-        variant="icon"
-        iconAriaLabel={todoPanelOpen ? "Close to-do panel" : "Open to-do panel"}
-        onClick={toggleTodoPanel}
-        aria-expanded={todoPanelOpen}
-        className={todoPanelOpen ? styles.iconActive : undefined}
-      >
-        <TodoIcon />
-      </Button>
-
-      {/* ── Comments panel toggle with unread badge ───────────────── */}
-      <div className={styles.badgeWrap}>
+        {/* ── To-do panel toggle ────────────────────────────────────── */}
         <Button
           variant="icon"
           iconAriaLabel={
-            commentsPanelOpen
-              ? "Close comments panel"
-              : `Open comments panel${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`
+            todoPanelOpen ? "Close to-do panel" : "Open to-do panel"
           }
-          onClick={toggleCommentsPanel}
-          aria-expanded={commentsPanelOpen}
-          className={commentsPanelOpen ? styles.iconActive : undefined}
+          onClick={toggleTodoPanel}
+          aria-expanded={todoPanelOpen}
+          className={todoPanelOpen ? styles.iconActive : undefined}
         >
-          <CommentsIcon />
+          <TodoIcon />
         </Button>
-        {unreadCount > 0 && (
-          <span className={styles.badge} aria-hidden="true">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
-        )}
+
+        {/* ── Comments panel toggle with unread badge ───────────────── */}
+        <div className={styles.badgeWrap}>
+          <Button
+            variant="icon"
+            iconAriaLabel={
+              commentsPanelOpen
+                ? "Close comments panel"
+                : `Open comments panel${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`
+            }
+            onClick={toggleCommentsPanel}
+            aria-expanded={commentsPanelOpen}
+            className={commentsPanelOpen ? styles.iconActive : undefined}
+          >
+            <CommentsIcon />
+          </Button>
+          {unreadCount > 0 && (
+            <span className={styles.badge} aria-hidden="true">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Collapsed right cluster — ⋯ More menu (visible ≤1280px) ──────
+          At desktop widths ≤1280px the inline right cluster above does not
+          fit between the Personal/Master toggle and the viewport edge. The
+          More menu absorbs Search / Catch-up / To-do / Comments / Sign Out
+          into a single dropdown so every control stays reachable. The menu
+          shares state with the desktop controls (no duplicated stores) via
+          the props below. Hidden via CSS at >1280. */}
+      <div className={styles.rightClusterCollapsed}>
+        <TopBarMoreMenu
+          search={search}
+          setSearch={setSearch}
+          todoPanelOpen={todoPanelOpen}
+          toggleTodoPanel={toggleTodoPanel}
+          commentsPanelOpen={commentsPanelOpen}
+          toggleCommentsPanel={toggleCommentsPanel}
+          unreadCount={unreadCount}
+          tabs={VIEWS}
+          activePath={pathname}
+        />
       </div>
 
       {/* ── Profile avatar → settings ─────────────────────────────── */}

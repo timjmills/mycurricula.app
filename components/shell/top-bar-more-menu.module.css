@@ -1,0 +1,323 @@
+/* top-bar-more-menu.module.css — overflow menu chrome for the top bar.
+ *
+ * Owns the ⋯ trigger button, the floating panel surface, the menu rows
+ * (icon · label · optional badge), and the embedded search input. All
+ * color / type / radius / shadow values come from tokens.css (zero hex).
+ * Layout-only Tailwind would have worked here but the surrounding shell
+ * components (top-bar.module.css, note-popover.module.css,
+ * catchup-flame-button.module.css) all use CSS Modules so we keep the
+ * idiom for consistency and easier review against the audit file ranges.
+ */
+
+/* ── Root — wraps trigger + panel ──────────────────────────────────────────
+   position:relative so the absolutely-positioned panel anchors to this
+   element. flex:0 0 auto keeps the slot the trigger occupies in the top bar
+   from growing/shrinking against neighboring controls. */
+.root {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+/* ── Trigger — the ⋯ More button ───────────────────────────────────────────
+   Visual recipe matches the surrounding top-bar icon buttons (catchup
+   flame, sign-out): 44×44 hit area, transparent at rest, ink-100 on hover,
+   focus ring via outline. The 44×44 satisfies the ≥44px touch-target rule
+   on every viewport tier (BUILD_STANDARD §8). */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--r-8);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.trigger:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.trigger:active {
+  background: var(--ink-150);
+}
+
+/* When the panel is open, paint the trigger like an open panel toggle so the
+   user sees which control is producing the dropdown. aria-expanded="true"
+   drives the rule — no class needed. */
+.trigger[aria-expanded="true"] {
+  background: var(--ink-100);
+  border-color: var(--ink-200);
+  color: var(--ink-900);
+}
+
+/* ── Floating panel ────────────────────────────────────────────────────────
+   Anchored below the trigger, right-aligned so it stays inside the viewport
+   on narrow widths (the trigger sits near the bar's right edge). z-index
+   lifts the panel above the sticky bar's own stacking context. The bar
+   sets z-index:30; the panel needs to clear that as well as any sibling
+   sticky chrome inside the planner views — 40 gives plenty of headroom. */
+.panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: 248px;
+  max-width: calc(100vw - 16px);
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-8);
+  box-shadow: var(--shadow-popover);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: moreMenuIn 0.12s ease-out;
+}
+
+@keyframes moreMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Divider between groups inside the panel ─────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--ink-150);
+  margin: 4px 4px;
+}
+
+/* ── Navigation section — primary view tabs (≤768px) ───────────────────────
+   At ≤768px the desktop tab strip in top-bar.tsx is hidden (the inline
+   five-tab row + Logo + Personal/Master toggle + More + Profile cannot fit a
+   768px viewport). The same VIEWS array is rendered here as menuitem rows
+   so every primary view stays reachable from the More menu on tablet/phone.
+   Visual recipe inherits `.row` (44px hit area, left-aligned label) so the
+   rows read consistently with To-do / Comments / Sign out below the divider. */
+.navSection {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Active route inside the nav section — paint the row with the same dark
+   ink-900/paper recipe used by the desktop `.viewTabActive` tab so the
+   "current page" signal reads consistently across breakpoints. Scoped
+   inside `.navSection` so the lighter `.rowActive` treatment used by the
+   To-do / Comments rows (panel-open indicator) is untouched. */
+.navSection .rowActive {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+.navSection .rowActive:hover {
+  background: var(--ink-700);
+  color: var(--paper);
+}
+
+/* ── Generic menu row — to-do, comments, sign-out ──────────────────────────
+   Each row is a left-aligned button with: icon slot + label + optional
+   right-edge badge. Height 44px satisfies the touch-target rule everywhere.
+   Hover/focus styles mirror the desktop's iconActive treatment so the
+   active panel state reads consistently with the rest of the bar. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 44px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--r-6);
+  background: transparent;
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.row:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+/* Active state — the underlying panel is open. Matches the desktop bar's
+   .iconActive treatment for the same control. */
+.rowActive {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.rowIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--ink-500);
+  flex: 0 0 auto;
+}
+
+.row:hover .rowIcon,
+.row:focus-visible .rowIcon,
+.rowActive .rowIcon {
+  color: var(--ink-900);
+}
+
+.rowLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Inline unread chip — same color/recipe as the desktop .badge but rendered
+   as a sibling at the row's right edge rather than overlaid on the icon. */
+.rowBadge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--urgent);
+  color: var(--paper);
+  font-size: var(--t-10);
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+/* ── Search row ────────────────────────────────────────────────────────────
+   Inline input with a left-aligned search icon. Distinct from the desktop's
+   collapsible search-trigger pattern because the More menu has the room to
+   show the input directly — and forcing a teacher to click ⋯ then a magnifier
+   is friction we'd rather skip. data-search-input is preserved so the global
+   `\` keyboard shortcut (lib/use-keyboard-shortcuts.ts) still hits this
+   field when it is mounted. */
+.searchRow {
+  position: relative;
+  padding: 4px 4px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-400);
+  pointer-events: none;
+  display: inline-flex;
+}
+
+.searchInput {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px 0 32px;
+  border-radius: var(--r-6);
+  border: 1px solid var(--ink-200);
+  background: var(--ink-50);
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  outline: none;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.searchInput::placeholder {
+  color: var(--ink-400);
+}
+
+.searchInput:focus {
+  border-color: var(--ink-400);
+  background: var(--paper);
+}
+
+/* ── Catch-up flame row ────────────────────────────────────────────────────
+   The CatchupFlameButton self-gates: when there is nothing uncovered it
+   renders nothing (returns null), and the row collapses to a 0-height
+   empty container — `.flameRow:empty` hides it so the panel does not show
+   a phantom gap when the flame is absent.
+
+   At ≤540px the catchup-flame-button module CSS hides `.flameBtn` so it
+   does not occupy a slot in the top bar's right cluster on phone. Inside
+   the More menu the flame SHOULD remain reachable (the entire point of
+   the menu is to absorb the cluster's controls at narrow widths). The
+   `:global` override below targets the button when it is mounted inside
+   `.flameRow` and restores it to its default flex display. The override
+   is scoped to this row only, so the desktop-bar hide at ≤540 remains
+   intact. */
+.flameRow {
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+}
+
+.flameRow:empty {
+  display: none;
+}
+
+@media (max-width: 540px) {
+  .flameRow :global([class*="catchup-flame-button_flameBtn"]),
+  .flameRow :global([class*="catchup-flame-button_catchupBadge"]) {
+    display: inline-flex;
+  }
+}
+
+/* ── Sign-out submit form ──────────────────────────────────────────────────
+   The form is only a POST wrapper — it must not add a box that disrupts the
+   panel's flex column. The submit button inside uses the same .row recipe. */
+.signOutRow {
+  display: flex;
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.signOutRow .row {
+  width: 100%;
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────────
+   Suppress the open fade/slide; the panel appears instantly (CLAUDE.md §4). */
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+  .trigger,
+  .row,
+  .rowIcon,
+  .searchInput {
+    transition-duration: 0.001ms !important;
+  }
+}

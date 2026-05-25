@@ -434,6 +434,52 @@
   min-width: 4px;
 }
 
+/* ── Right-cluster overflow gating (audit fix — top-bar overflow menu) ───
+   Above 1280px the bar has room for the full right-side cluster (Search,
+   Catch-up flame, To-do, Comments) plus Profile + Sign Out. At ≤1280px
+   those four controls do not fit between the Personal/Master toggle and
+   the viewport edge — with `overflow-x: clip` on `.bar` they were
+   silently hidden past the right edge (audit blocker:
+   docs/ui-ux-audit-2026-05-24.md L73-81). The collapse:
+     • `.rightClusterFull`        — the inline controls. Visible >1280;
+                                    hidden ≤1280.
+     • `.rightClusterCollapsed`   — the ⋯ More menu trigger that opens a
+                                    dropdown containing the same four
+                                    controls + Sign Out. Hidden >1280;
+                                    visible ≤1280.
+     • `.signOutForm`             — the desktop Sign Out form. Hidden
+                                    ≤1280; the More menu contains its own
+                                    submit form for narrower widths.
+   Profile avatar stays a sibling of both wrappers and is visible at every
+   width — it is the only Settings entry point. */
+.rightClusterFull {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.rightClusterCollapsed {
+  display: none;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1280px) {
+  .rightClusterFull {
+    display: none;
+  }
+  .rightClusterCollapsed {
+    display: flex;
+    align-items: center;
+  }
+  /* At ≤1280 the More menu inside .rightClusterCollapsed contains its own
+     Sign Out submit form. Hide the desktop one so we do not render two. */
+  .signOutForm {
+    display: none;
+  }
+}
+
 /* ── Responsive: progressive top-bar collapse ───────────────────────────
    Desktop (≥1280px) is the shipping target — base rules above are
    byte-for-byte unchanged. Each breakpoint below only ADDS hide/narrow
@@ -466,6 +512,25 @@
      and from the edit menu that will land in Phase 1B; hide the group
      to reclaim ~80px for the primary tab row. */
   .undoRedoGroup {
+    display: none;
+  }
+  /* Round-2 fix (RES-CRIT-002 follow-up): at tablet (≤768px) the inline
+     five-tab strip (Daily / Weekly / Yearly / Curriculum / Schedule —
+     ~340px) plus Logo + grade chip + Personal/Master toggle + More +
+     Profile already exceeds the 768px viewport (probe measured
+     bar.scrollWidth=854 before this rule). The strip collapses into a
+     Navigation section at the top of the More menu (rendered by
+     TopBarMoreMenu, see the `tabs` prop in top-bar.tsx). The two
+     dividers that frame the strip on desktop (data-tabs-divider="true")
+     also hide so the bar's hairline rhythm stays clean. Compressing
+     tab labels was considered and rejected: collapsing into the menu
+     is the smaller visual change AND zeroes the strip's contribution
+     to bar width, which is what closes the 86px (tablet) and 150px
+     (phone) overflow at one stroke. */
+  .viewSwitcher {
+    display: none;
+  }
+  .divider[data-tabs-divider="true"] {
     display: none;
   }
 }
@@ -534,31 +599,15 @@
   }
 }
 
-@media (max-width: 540px) {
-  /* Hide non-essential right-cluster buttons. Use descendant selectors
-     (no `>`) because the to-do button is a direct child of the bar but
-     the comments button is wrapped in `.badgeWrap`. The flame button
-     hides itself via its own module CSS at ≤540 — listed here too as
-     a belt-and-braces. */
-  .bar :global(button[data-search-trigger]),
-  .bar :global(button[aria-label*="to-do panel" i]),
-  .bar :global(button[aria-label*="comments panel" i]) {
-    display: none;
-  }
-  /* When the comments button is hidden, also hide its wrapper so the
-     bar's flex layout doesn't reserve any space. */
-  .bar
-    :global(div.top-bar_badgeWrap__6Z4pm):has(
-      button[aria-label*="comments panel" i]
-    ) {
-    display: none;
-  }
-  /* Avatar stays visible — once Yearly + Curriculum tabs are hidden at
-     ≤480 (the rule further down + the data-narrow-hide attribute on
-     the Link), the bar fits within the viewport with master toggle +
-     avatar both showing. Avatar links to settings; signout is one tap
-     deeper inside settings. */
-}
+/* The previous ≤540 rules that hid `[data-search-trigger]`,
+   `aria-label*="to-do panel"`, and `aria-label*="comments panel"` buttons
+   inside `.bar` are now redundant — the audit-fix overflow menu hides the
+   entire `.rightClusterFull` wrapper at ≤1280 (which covers ≤540 too).
+   Keeping them here would actively MIS-target the descendant More menu's
+   own row buttons (which carry the same aria-labels), so they were
+   removed. The flame button still self-hides at ≤540 via its own module
+   CSS; that rule is intentionally left in catchup-flame-button.module.css
+   so the flame stays out of the More menu trigger's slot on phone. */
 
 @media (max-width: 480px) {
   /* RES-CRIT-002: drop Yearly + Curriculum tabs at ≤480 to reclaim
