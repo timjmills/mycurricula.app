@@ -42,6 +42,8 @@ interface ViewDef {
   label: string;
   href?: string;
   soon?: boolean;
+  /** Onboarding tooltip — explains what this view is FOR. CLAUDE.md §4. */
+  tooltip?: string;
 }
 
 // Top-bar tab order, left → right: Daily · Weekly · Yearly · Curriculum · Schedule.
@@ -57,11 +59,36 @@ interface ViewDef {
 // top-bar.module.css. Single source of truth: changing the tab order or copy
 // here updates both the desktop strip and the phone/tablet menu.
 export const VIEWS: ViewDef[] = [
-  { label: "Daily", href: "/daily" },
-  { label: "Weekly", href: "/weekly" },
-  { label: "Yearly", href: "/year" },
-  { label: "Curriculum", href: "/subject" },
-  { label: "Schedule", href: "/schedule" },
+  {
+    label: "Daily",
+    href: "/daily",
+    tooltip:
+      "Today's lessons in detail — schedule, lesson cards, and the day's notes",
+  },
+  {
+    label: "Weekly",
+    href: "/weekly",
+    tooltip:
+      "Your full week of lessons across every subject — Grid or List, edit in place",
+  },
+  {
+    label: "Yearly",
+    href: "/year",
+    tooltip:
+      "High-level roadmap of units across the year — see the whole arc at a glance",
+  },
+  {
+    label: "Curriculum",
+    href: "/subject",
+    tooltip:
+      "The full year of units and lessons per subject, with the standards each covers",
+  },
+  {
+    label: "Schedule",
+    href: "/schedule",
+    tooltip:
+      "Daily timetable — the time blocks when each subject meets each day",
+  },
 ];
 export type { ViewDef };
 
@@ -281,6 +308,7 @@ export function TopBar(): ReactNode {
               className={`${styles.viewTab} ${isActive ? styles.viewTabActive : ""}`}
               data-narrow-hide={narrowOnly ? "true" : undefined}
               aria-current={isActive ? "page" : undefined}
+              title={v.tooltip}
             >
               {v.label}
             </Link>
@@ -405,11 +433,15 @@ export function TopBar(): ReactNode {
               value: "personal",
               label: "Personal",
               ariaLabel: "Personal mode",
+              title:
+                "Edit YOUR copy of the curriculum — changes only affect your view",
             },
             {
               value: "master",
               label: "Master",
               ariaLabel: "Master mode — changes affect the whole team",
+              title:
+                "Edit the team's MASTER curriculum — changes affect every teacher on your grade-level team",
             },
           ]}
           value={editMode}

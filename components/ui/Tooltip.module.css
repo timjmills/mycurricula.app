@@ -42,22 +42,29 @@
   position: fixed;
   z-index: 9000;
   pointer-events: none;
-  /* Visual */
-  background: var(--ink-900);
-  color: var(--paper);
+  /* Visual — stylish near-black popup with light text. User direction
+     2026-05-25: "the popups should be stylish black background light
+     text". Translucent + backdrop blur gives the popup a modern
+     popover-app feel that reads above any background. */
+  background: var(--tooltip-bg);
+  color: var(--tooltip-fg);
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
   font-size: var(--t-12);
   font-weight: 500;
-  line-height: 1.4;
-  padding: 6px 10px;
+  letter-spacing: 0.01em;
+  line-height: 1.45;
+  padding: 8px 12px;
   border-radius: var(--r-6);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--tooltip-shadow);
+  /* Subtle hairline outline reads as a crisp edge against light backgrounds */
+  border: 1px solid rgba(255, 255, 255, 0.06);
   /* Prevent the tooltip from wrapping mid-word on short labels */
-  white-space: nowrap;
-  max-width: 260px;
   white-space: normal;
+  max-width: 280px;
   /* Fade in/out — respects reduced-motion via the .instant modifier */
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity 140ms ease;
 }
 
 .tooltip.visible {
@@ -97,7 +104,7 @@
   transform: translateX(-50%);
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
-  border-top: 5px solid var(--ink-900);
+  border-top: 5px solid var(--tooltip-bg);
 }
 
 /* Arrow for side="bottom": points upward, sits at the top */
@@ -107,7 +114,7 @@
   transform: translateX(-50%);
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
-  border-bottom: 5px solid var(--ink-900);
+  border-bottom: 5px solid var(--tooltip-bg);
 }
 
 /* Arrow for side="left": points rightward, sits on the right edge */
@@ -117,7 +124,7 @@
   transform: translateY(-50%);
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
-  border-left: 5px solid var(--ink-900);
+  border-left: 5px solid var(--tooltip-bg);
 }
 
 /* Arrow for side="right": points leftward, sits on the left edge */
@@ -127,5 +134,5 @@
   transform: translateY(-50%);
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
-  border-right: 5px solid var(--ink-900);
+  border-right: 5px solid var(--tooltip-bg);
 }

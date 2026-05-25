@@ -40,6 +40,12 @@ export interface ToggleOption<T extends string = string> {
   icon?: ReactNode;
   /** Full accessible name for icon-only or abbreviated labels on phone. */
   ariaLabel?: string;
+  /**
+   * Onboarding tooltip — explains what the option DOES for a first-time
+   * teacher (CLAUDE.md §4). Rendered as a native `title=` attribute so
+   * the explanation shows on hover (desktop) AND long-press (touch).
+   */
+  title?: string;
 }
 
 export interface ToggleGroupProps<T extends string = string> {
@@ -126,6 +132,7 @@ export function ToggleGroup<T extends string = string>({
             role="radio"
             aria-checked={isActive}
             aria-label={option.ariaLabel ?? option.label}
+            title={option.title}
             tabIndex={isActive ? 0 : -1}
             className={btnClasses}
             onClick={() => onChange(option.value)}

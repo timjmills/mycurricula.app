@@ -46,6 +46,15 @@
   --ink-50: #f6f7f9;
   --paper: #ffffff;
 
+  /* Tooltip surface — richer-than-ink-900 near-black + light text. The
+     Tooltip primitive uses these instead of --ink-900 / --paper so we
+     can tune the popup look (translucency, shadow weight) independently
+     of body text color. CLAUDE.md §4 onboarding tooltips. */
+  --tooltip-bg: rgba(10, 10, 12, 0.94);
+  --tooltip-fg: #f5f5f7;
+  --tooltip-shadow:
+    0 12px 32px -8px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.28);
+
   /* ── Subject palette (team-wide, fixed) ───────────────────────────── */
   /* Each subject gets three shade levels for unit cycling. The base
      (medium) is the canonical color. */
