@@ -39,6 +39,7 @@
 // screen-readers don't announce them as interactive toggles.
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { Button, Tooltip } from "@/components/ui";
@@ -278,17 +279,21 @@ export function IconRail(): ReactNode {
       {/* ── Bottom-pinned settings gear (RAIL-002) ────────────────────
             position:sticky + bottom:0 so the gear is always reachable
             without scrolling, even when the nav is taller than the
-            viewport. */}
+            viewport.
+            Renders as a Next.js <Link> (not a Button) so it is a real
+            navigable anchor — middle-click / cmd-click / "open in new
+            tab" all work the way teachers expect from a primary nav
+            target. The .button class supplies the same ≥44×44 hit
+            target + ink-token chrome as the buttons above. */}
       <div className={styles.bottom}>
         <Tooltip content="Settings" side="right">
-          <Button
-            variant="icon"
-            iconAriaLabel="Settings"
+          <Link
+            href="/settings/appearance"
+            aria-label="Settings"
             className={styles.button}
-            onClick={() => router.push("/settings/appearance")}
           >
             <SettingsIcon />
-          </Button>
+          </Link>
         </Tooltip>
       </div>
     </nav>
