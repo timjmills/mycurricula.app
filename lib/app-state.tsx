@@ -75,16 +75,32 @@ export interface CurrentUser {
   initials: string;
   /** Google profile photo URL, when the provider supplies one. */
   avatarUrl: string | null;
+  /**
+   * Free-text curriculum label shown next to the wordmark in the top bar
+   * (e.g. "Grade 5", "K-12 Math", "Year 7 Science"). Per CLAUDE.md §1 the
+   * app is multi-grade by design — this label is NOT a grade enum, it is
+   * whatever the teacher (or school) types in Settings. Optional so the
+   * wordmark suffix simply disappears when no label is configured.
+   *
+   * No DB column exists yet — real Supabase users currently resolve as
+   * `undefined`; the FALLBACK_USER seeds "Grade 5" so the prototype's
+   * wordmark still reads "MyCurricula Grade 5" until Lane S lands the
+   * Settings UI + Supabase column.
+   */
+  curriculumLabel?: string;
 }
 
 // Pre-session placeholder — the mock lead teacher. Keeps the avatar populated
-// during the first paint and in backend-less prototype runs.
+// during the first paint and in backend-less prototype runs. The hard-coded
+// "Grade 5" here is SAMPLE DATA matching the beta school's teacher — not a
+// product assumption; see the curriculumLabel docstring above.
 const FALLBACK_USER: CurrentUser = {
   id: null,
   name: ME.name,
   email: "",
   initials: ME.initials,
   avatarUrl: null,
+  curriculumLabel: "Grade 5",
 };
 
 /** Derive a two-letter monogram from a display name, falling back to email. */

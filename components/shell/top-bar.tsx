@@ -171,6 +171,14 @@ export function TopBar(): ReactNode {
           without crowding the chrome — the full pair lives on the
           login screen; here we keep just the manifesto as a quiet
           tooltip on the home link. */}
+      {/* Task #27 / audit m3: the wordmark suffix is FREE TEXT, not a
+          grade enum. CLAUDE.md §1 mandates multi-grade by design; teachers
+          might type "Grade 5", "K-12 Math", "Lower Elementary Reading",
+          "Year 7 Science", etc. The label comes from
+          currentUser.curriculumLabel (Lane S is building the Settings UI
+          that edits it). When the label is absent (real Supabase users
+          until the DB column lands), the suffix simply disappears — the
+          wordmark reads "MyCurricula" alone. */}
       <Link
         href="/weekly"
         className={styles.wordmark}
@@ -178,7 +186,11 @@ export function TopBar(): ReactNode {
         title="Built for teachers, by teachers."
       >
         <span className={styles.wordmarkApp}>MyCurricula</span>
-        <span className={styles.wordmarkGrade}>Grade 5</span>
+        {currentUser.curriculumLabel && (
+          <span className={styles.wordmarkGrade}>
+            {currentUser.curriculumLabel}
+          </span>
+        )}
       </Link>
 
       <div className={styles.divider} aria-hidden="true" />

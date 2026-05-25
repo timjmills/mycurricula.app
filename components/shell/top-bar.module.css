@@ -633,11 +633,16 @@
 }
 
 @media (max-width: 480px) {
-  /* At 480px the wordmark grade suffix ("Grade 5") is redundant — the
-     app name alone identifies the product. Hiding it recovers ~52px. */
-  .wordmarkGrade {
-    display: none;
-  }
+  /* Task #27 / audit m3: the previous rule hid `.wordmarkGrade` at ≤480
+     to recover ~52px on phone. The grade chip is no longer a hard-coded
+     "Grade 5" — it is the teacher's free-text curriculumLabel (CLAUDE.md
+     §1 mandates multi-grade by design). Hiding it on phone meant the
+     teacher's chosen label vanished at the viewport tier where they most
+     need to confirm "yes, this is my curriculum". Keeping the label
+     visible across all three tiers is the consistent contract; the ~52px
+     budget cost is absorbed by the existing tab-padding compression and
+     right-cluster collapse rules above. */
+
   /* Tighten bar padding to the minimum so the remaining controls fit. */
   .bar {
     padding: 0 8px;
