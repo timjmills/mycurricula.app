@@ -190,3 +190,49 @@ Clarified via 3 AskUserQuestion answers:
 **Coordination notes:**
 - The chameleon gradient + sticky-left + sticky-top fixes from Lane M are reused — SubjectCalendar's header is a `<QuarterMonthWeekHeader subjectId={s} />` mount; the existing CSS already paints the chameleon when `subjectId` is set.
 - Default neutral state stays untouched.
+
+---
+
+## Late-session addition 4 — Academic year start/end dates (Lane Y-cal, Wave 1B)
+
+User direction:
+> "in the settings there needs to be when the calendar starts and ends so that roadmap and progression can start and end at the same exactly"
+
+The Roadmap and Progression views currently derive their week range from
+`lib/year-calendar.ts`'s hard-coded `DEFAULT_TERM_START = 2025-11-02` plus
+`WEEKS_IN_YEAR = 36`. The user wants this to be user-configurable so the
+two views align exactly with their school's calendar.
+
+**Lane Y-cal scope (dispatches in Wave 1B alongside Lane Y + Lane Y-hol):**
+
+- New file: `lib/use-academic-year.ts` — hook exposing
+  `{ start: Date, end: Date, setStart, setEnd }`. SSR-safe pattern matching
+  `lib/use-school-months.ts`. localStorage keys
+  `mycurricula:team:academic-year-start` + `mycurricula:team:academic-year-end`
+  (TEAM-scoped per the curriculum doctrine).
+- MODIFY: `lib/year-calendar.ts` — replace the hard-coded `DEFAULT_TERM_START`
+  and `WEEKS_IN_YEAR` literals with helpers that accept the configured
+  start/end. Keep the constants as documented defaults / fallbacks. Update
+  `allYearWeeks`, `allYearMonths`, `monthIndexForWeek` to derive from a
+  given range.
+- MODIFY: `app/settings/curriculum/page.tsx` — fill the
+  `// LANE-Y-CAL-MOUNT` placeholder Lane W carved out. Two `<input
+  type="date">` (or richer pickers if `components/ui` has one) — start +
+  end. Validate start < end and span sensible (~30-52 weeks).
+- MODIFY: `components/year/YearView.tsx`, `RoadmapView.tsx`,
+  `ProgressionView.tsx`, `app/(planner)/year/print/page.tsx` — consume the
+  hook so both view modes (Roadmap + Progression) start and end at the
+  configured dates.
+
+**Defaults if user has set nothing:** start = first Sunday in this calendar
+year's August (or whatever is sensible for a North-American academic year),
+end = last Friday of next calendar year's June. Document the heuristic in
+the code; the user can override anytime.
+
+**Coordination:**
+- Same Wave 1B grouping: Lane Y (school week), Lane Y-hol (holidays), Lane
+  Y-cal (academic year dates).
+- Lane Y-cal touches `lib/year-calendar.ts` AND `components/year/*` —
+  collides with Lane BG (subject chameleon calendar). Order: Lane Y-cal
+  ships first; Lane BG dispatches afterward and reads the same hook.
+- Tooltip rule (CLAUDE.md §4) applies to every date input and save button.
