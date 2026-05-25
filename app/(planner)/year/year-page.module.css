@@ -1,0 +1,40 @@
+/* year-page.module.css — viewport-driven mount switch for /year.
+ *
+ * The /year route mounts BOTH <YearView> (desktop/tablet) and <YearMobile>
+ * (phone) so that lane-minimization state in MinimizedSubjectsProvider
+ * survives a viewport resize. Visibility is owned by these two classes:
+ *
+ *   .desktopOnly — visible on tablet/desktop, hidden on phone
+ *   .phoneOnly   — visible on phone, hidden on tablet/desktop
+ *
+ * `display: contents` lets each wrapper become layout-transparent so the
+ * child component owns its own box (matching the previous inline-style
+ * behaviour). Switching visibility in CSS — not in React state — keeps the
+ * server render and first client paint identical at every viewport, which
+ * is what kills the desktop→phone CLS flash the audit (M3) flagged.
+ *
+ * The a11y tree still tracks the real viewport via the JS-driven
+ * `aria-hidden` on the wrappers (see page.tsx); CSS alone cannot drive an
+ * `aria-hidden` attribute, so the two channels intentionally stay
+ * separate: CSS owns paint, JS owns the AT semantics.
+ *
+ * The 480px breakpoint matches the rest of the responsive contract
+ * (CLAUDE.md §4 phone tier = 360–480px).
+ */
+
+.desktopOnly {
+  display: contents;
+}
+
+.phoneOnly {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .desktopOnly {
+    display: none;
+  }
+  .phoneOnly {
+    display: contents;
+  }
+}
