@@ -324,51 +324,191 @@ export function allYearWeeks(): { idx: number; label: string }[] {
   }));
 }
 
+// ── School-months configuration ────────────────────────────────────────────
+//
+// Different schools run on different academic-year shapes (US Aug–May, Qatar
+// Sep–May, Southern-hemisphere Feb–Nov, year-round, summer-only, etc.). To
+// support that without hard-coding a single calendar, /year always renders
+// all 12 calendar months by default; a settings surface lets the teacher
+// choose which months belong to their school year. Selections are stored as
+// 0-based calendar month indices.
+
+/** All 12 calendar months. Index 0 = January, 11 = December. */
+export const ALL_SCHOOL_MONTHS: readonly number[] = [
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+] as const;
+
 /**
- * Group the 36 academic weeks by calendar month, anchored at
- * `DEFAULT_TERM_START`. Each band records its label, the number of week
- * columns inside the band, and the 0-based week index where the band starts —
- * the MonthPicker uses `startWeekIdx` to scroll the timeline directly.
+ * Named presets the settings page surfaces as quick-pick options. Each value
+ * is an array of 0-based calendar month indices (0 = January, 11 = December).
+ *
+ * - `allYear`  — every calendar month (default).
+ * - `us`       — US K-12 standard: Aug–May.
+ * - `qatar`    — Qatar / GCC standard: Sep–May.
+ * - `southern` — Southern-hemisphere standard: Feb–Nov.
+ * - `summer`   — Summer-program / camp: Jun–Aug.
+ */
+export const SCHOOL_MONTH_PRESETS = {
+  allYear: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  us: [7, 8, 9, 10, 11, 0, 1, 2, 3, 4], // Aug–May
+  qatar: [8, 9, 10, 11, 0, 1, 2, 3, 4], // Sep–May
+  southern: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], // Feb–Nov
+  summer: [5, 6, 7], // Jun–Aug
+} as const;
+
+/** Shape of one calendar-month band returned by `allYearMonths()`. */
+export interface YearMonthBand {
+  /** Display name of the month, e.g. "January". */
+  label: string;
+  /**
+   * How many of the 36 academic weeks fall inside this calendar month.
+   * Months with no overlap report `weeks: 0` (and `hasData: false`).
+   */
+  weeks: number;
+  /**
+   * 0-based academic-week index where this band starts. For months with
+   * `weeks === 0` this is the *first* academic-week index that would land
+   * in or after the month — clamped to `WEEKS_IN_YEAR - 1` if the month
+   * sits entirely after the academic year ends, and `0` if it sits entirely
+   * before. Consumers should gate scroll/jump actions on `hasData`.
+   */
+  startWeekIdx: number;
+  /** 0-based calendar month index (0 = January, 11 = December). */
+  monthIndex: number;
+  /**
+   * Whether any of the 36 mock-data academic weeks overlap this month.
+   * Consumers (Year view, print page) use this to decide whether to render
+   * unit data or an "out-of-session" placeholder.
+   */
+  hasData: boolean;
+}
+
+/**
+ * Return one entry per calendar month (12 total), anchored at
+ * `DEFAULT_TERM_START`. Each entry records:
+ *
+ *   - `label`        — month display name ("January", "February", …).
+ *   - `weeks`        — how many of the 36 academic weeks land in that month.
+ *   - `startWeekIdx` — 0-based academic-week index where the band starts.
+ *   - `monthIndex`   — 0-based calendar month index (0 = Jan).
+ *   - `hasData`      — whether any academic weeks fall in this month.
+ *
+ * The MonthPicker uses `startWeekIdx` to scroll the timeline directly; the
+ * Year view and settings page use `monthIndex` + `hasData` to filter and to
+ * render out-of-session months as placeholders.
+ *
+ * IMPORTANT: this returns 12 entries — one per calendar month — regardless
+ * of how many months actually contain academic weeks. The previous version
+ * of this function returned only months with `weeks > 0`; existing fields
+ * (`label`, `weeks`, `startWeekIdx`) are preserved so older consumers keep
+ * working, but they will now see additional bands with `weeks: 0`.
  */
 export function allYearMonths(
   year: number = DEFAULT_TERM_START.getFullYear(),
-): { label: string; weeks: number; startWeekIdx: number }[] {
+): YearMonthBand[] {
   const termStart = new Date(
     year,
     DEFAULT_TERM_START.getMonth(),
     DEFAULT_TERM_START.getDate(),
   );
 
-  const bands: { label: string; weeks: number; startWeekIdx: number }[] = [];
+  // First pass: count how many of the 36 academic weeks land in each
+  // calendar month, and remember the earliest academic-week index for each.
+  // Both maps are keyed by 0-based calendar month index (0..11).
+  const weekCounts = new Map<number, number>();
+  const firstWeekFor = new Map<number, number>();
   for (let w = 0; w < WEEKS_IN_YEAR; w++) {
     const d = new Date(
       termStart.getFullYear(),
       termStart.getMonth(),
       termStart.getDate() + w * 7,
     );
-    const label = d.toLocaleString("en-US", { month: "long" });
-    const last = bands[bands.length - 1];
-    if (!last || last.label !== label) {
-      bands.push({ label, weeks: 1, startWeekIdx: w });
-    } else {
-      last.weeks += 1;
-    }
+    const m = d.getMonth();
+    weekCounts.set(m, (weekCounts.get(m) ?? 0) + 1);
+    if (!firstWeekFor.has(m)) firstWeekFor.set(m, w);
   }
-  return bands;
+
+  // Second pass: emit exactly 12 bands, in calendar order (Jan..Dec). For
+  // months with no overlap, clamp `startWeekIdx` to the nearest academic
+  // week — months before the year start clamp to 0, months after the year
+  // ends clamp to WEEKS_IN_YEAR - 1. Consumers gate on `hasData`.
+  const termStartMonth = termStart.getMonth();
+  return ALL_SCHOOL_MONTHS.map((m) => {
+    const weeks = weekCounts.get(m) ?? 0;
+    const hasData = weeks > 0;
+
+    let startWeekIdx: number;
+    if (hasData) {
+      // Safe: firstWeekFor has an entry whenever weekCounts > 0.
+      startWeekIdx = firstWeekFor.get(m) ?? 0;
+    } else {
+      // Position out-of-session months on the timeline edges. Months that
+      // sit *before* the term-start month clamp to 0; months that sit
+      // *after* the last academic week clamp to the final week index.
+      // `m` and `termStartMonth` are both 0-based calendar indices, so a
+      // direct comparison works for the within-same-calendar-year case;
+      // when the academic year crosses a year boundary, months on the
+      // "previous-year" side (m >= termStartMonth) still clamp to 0 which
+      // is the correct behaviour for scroll-to-month.
+      startWeekIdx = m < termStartMonth ? WEEKS_IN_YEAR - 1 : 0;
+    }
+
+    return {
+      label: MONTH_LABELS[m],
+      weeks,
+      startWeekIdx,
+      monthIndex: m,
+      hasData,
+    };
+  });
 }
 
+/** Long-form month labels used by `allYearMonths()` (index 0 = January). */
+const MONTH_LABELS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 /**
- * Return the 0-based week index for the band containing `weekIdx`. Useful for
- * highlighting the active month in the MonthPicker as the user scrolls.
+ * Return the index into `allYearMonths()` for the band containing `weekIdx`.
+ *
+ * Because `allYearMonths()` now always returns 12 entries (one per calendar
+ * month) — including months with `weeks: 0` — we can't just count cumulative
+ * `weeks` to find the active band: an empty month would contribute zero and
+ * be skipped over. Instead, we walk the bands and accept the first one
+ * whose `startWeekIdx + weeks` is past `weekIdx`. The default `months`
+ * parameter is preserved for backwards compatibility.
  */
 export function monthIndexForWeek(
   weekIdx: number,
-  months: { weeks: number }[] = allYearMonths(),
+  months: {
+    weeks: number;
+    startWeekIdx: number;
+    hasData?: boolean;
+  }[] = allYearMonths(),
 ): number {
-  let cursor = 0;
+  // Walk bands in order, returning the first band that contains the week.
+  // Bands with `weeks: 0` (no data) are skipped — they have no academic
+  // weeks to contain. The fallback (last band) preserves prior semantics
+  // for out-of-range `weekIdx` values.
+  let lastDataIdx = -1;
   for (let i = 0; i < months.length; i++) {
-    cursor += months[i].weeks;
-    if (weekIdx < cursor) return i;
+    const band = months[i];
+    if (band.weeks === 0) continue;
+    lastDataIdx = i;
+    if (weekIdx < band.startWeekIdx + band.weeks) return i;
   }
-  return months.length - 1;
+  // weekIdx is past the end of the academic year — return the last band
+  // that actually had data, or 0 if there is none.
+  return lastDataIdx === -1 ? 0 : lastDataIdx;
 }
