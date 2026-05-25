@@ -286,9 +286,16 @@ export function IconRail(): ReactNode {
             target. The .button class supplies the same ≥44×44 hit
             target + ink-token chrome as the buttons above. */}
       <div className={styles.bottom}>
-        <Tooltip content="Settings" side="right">
+        {/* Settings entry → /settings landing. The landing route
+            redirects to whichever sub-page the teacher last visited
+            (default /settings/curriculum). Unified with the top-bar
+            avatar so there is one canonical Settings affordance. */}
+        <Tooltip
+          content="Settings — your team's curriculum and your personal preferences"
+          side="right"
+        >
           <Link
-            href="/settings/appearance"
+            href="/settings"
             aria-label="Settings"
             className={styles.button}
           >

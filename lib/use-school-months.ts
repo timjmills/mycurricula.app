@@ -28,8 +28,19 @@ import { ALL_SCHOOL_MONTHS } from "./year-calendar";
 
 // ── Storage ────────────────────────────────────────────────────────────────
 
-/** localStorage key. Versioned under `mycurricula:` to avoid origin collisions. */
-const STORAGE_KEY = "mycurricula:school-months";
+/**
+ * localStorage key. School months are TEAM-scoped — every teacher in the
+ * grade-level team follows the same academic calendar. Per the
+ * 2026-05-25 scoping clarification (see lib/app-state.tsx
+ * `CURRICULUM_LABEL_KEY` comment for the full mental model), team
+ * settings live under `mycurricula:team:*` and migrate to a
+ * `team_settings` row when Supabase lands.
+ *
+ * The legacy v1 key (`mycurricula:school-months`) is read as a one-
+ * release fallback so existing teachers don't lose their selection.
+ */
+const STORAGE_KEY = "mycurricula:team:school-months";
+const STORAGE_KEY_LEGACY = "mycurricula:school-months";
 
 /**
  * Normalize a list of calendar month indices: keep only integers in 0..11,
@@ -49,14 +60,26 @@ function normalize(input: unknown): number[] {
   return Array.from(seen).sort((a, b) => a - b);
 }
 
-/** Read + parse the stored value, or return null if unset / invalid. */
+/**
+ * Read + parse the stored value. Prefers the team-scoped key; falls back
+ * to the legacy unscoped key for one release so existing teachers don't
+ * lose their selection across the rename. Returns null when both are
+ * unset or both fail to parse.
+ */
 function readFromStorage(): number[] | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw == null) return null;
-    const parsed: unknown = JSON.parse(raw);
-    return normalize(parsed);
+    if (raw != null) {
+      const parsed: unknown = JSON.parse(raw);
+      return normalize(parsed);
+    }
+    const legacy = window.localStorage.getItem(STORAGE_KEY_LEGACY);
+    if (legacy != null) {
+      const parsed: unknown = JSON.parse(legacy);
+      return normalize(parsed);
+    }
+    return null;
   } catch {
     // Malformed JSON or storage disabled (private mode) — fall through.
     return null;

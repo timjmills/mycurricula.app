@@ -200,24 +200,28 @@ export function TopBar(): ReactNode {
           leftPanelOpen boolean. The panel itself is rendered by another agent
           (WeeklyShell / planner layout) — this button is solely responsible
           for toggling the state that controls it. */}
-      <Tooltip
-        content={
+      {/* Lane X verification sample — uses the new Button.tooltip prop
+          instead of the manual <Tooltip> wrapper. The tooltip copy follows
+          CLAUDE.md §4 onboarding voice: it teaches the first-time teacher
+          what the control accomplishes ("Hide the subject/unit/standards
+          filters…"), not just what it's named ("Collapse panel"). */}
+      <Button
+        variant="icon"
+        iconAriaLabel={
           leftPanelOpen ? "Collapse filter panel" : "Expand filter panel"
         }
-        side="bottom"
+        tooltip={
+          leftPanelOpen
+            ? "Hide the subject, unit, and standards filters to give the planner more room"
+            : "Show the filter panel — narrow the planner to a subject, unit, or set of standards"
+        }
+        tooltipSide="bottom"
+        onClick={toggleLeftPanel}
+        aria-expanded={leftPanelOpen}
+        className={leftPanelOpen ? styles.iconActive : undefined}
       >
-        <Button
-          variant="icon"
-          iconAriaLabel={
-            leftPanelOpen ? "Collapse filter panel" : "Expand filter panel"
-          }
-          onClick={toggleLeftPanel}
-          aria-expanded={leftPanelOpen}
-          className={leftPanelOpen ? styles.iconActive : undefined}
-        >
-          <PanelLeftIcon />
-        </Button>
-      </Tooltip>
+        <PanelLeftIcon />
+      </Button>
 
       {/* This divider sits between the left-panel-collapse toggle and the
           view switcher. At ≤768px the switcher collapses into the More
@@ -340,19 +344,28 @@ export function TopBar(): ReactNode {
         role="group"
         aria-label="Undo and redo"
       >
-        <Tooltip
-          content={canUndo ? `Undo: ${undoLabel}` : "Nothing to undo"}
-          side="bottom"
+        {/* Lane X verification sample — disabled-button tooltip path. Uses
+            the new Button.tooltip prop so the styled Tooltip works via the
+            wrapper-span (Tooltip.tsx detects the disabled child and binds
+            listeners to a <span> wrapper) AND the native title= attribute
+            mirrors the value as a belt-and-suspenders fallback for any
+            engine that still drops events. Tooltip copy follows CLAUDE.md
+            §4 onboarding voice — the disabled-state text explains _why_
+            it's disabled, not just that it is. */}
+        <Button
+          variant="icon"
+          iconAriaLabel="Undo"
+          onClick={undo}
+          disabled={!canUndo}
+          tooltip={
+            canUndo
+              ? `Undo your last change (${undoLabel}) — restores the previous state of the planner`
+              : "Nothing to undo yet — make a change first and you'll be able to step back"
+          }
+          tooltipSide="bottom"
         >
-          <Button
-            variant="icon"
-            iconAriaLabel="Undo"
-            onClick={undo}
-            disabled={!canUndo}
-          >
-            <UndoIcon />
-          </Button>
-        </Tooltip>
+          <UndoIcon />
+        </Button>
         <Tooltip
           content={canRedo ? `Redo: ${redoLabel}` : "Nothing to redo"}
           side="bottom"
@@ -604,10 +617,15 @@ function ProfileAvatar({ user }: { user: CurrentUser }): ReactNode {
   const showPhoto = Boolean(user.avatarUrl) && !photoFailed;
 
   return (
+    // Unified Settings entry — both the avatar and the IconRail gear
+    // (components/daily/IconRail.tsx) point to /settings, which then
+    // redirects to the teacher's last-visited sub-page (default
+    // /settings/curriculum). One canonical Settings affordance.
     <Link
-      href="/settings/appearance"
+      href="/settings"
       className={styles.avatar}
       aria-label={`Profile settings (${user.name})`}
+      title={`Open Settings — your team's curriculum and your personal preferences (${user.name})`}
     >
       {showPhoto ? (
         <Image

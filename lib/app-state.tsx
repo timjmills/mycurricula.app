@@ -62,6 +62,51 @@ const EMPTY_FILTERS: PlannerFilters = {
 };
 
 /**
+ * localStorage key for the team's curriculum label.
+ *
+ * SCOPE NOTE (2026-05-25 clarification): the curriculum label is
+ * TEAM-scoped — it appears in the top-bar wordmark for every member of
+ * the grade-level team (e.g. "Grade 5" is the team's grade, not one
+ * teacher's preference). Per CLAUDE.md §2 the Master/Personal forking
+ * model already separates team-shared content from per-teacher overrides;
+ * Settings extends that distinction to configuration:
+ *
+ *   • TEAM   (mycurricula:team:*) — curriculumLabel, school-months,
+ *            school-week, holidays.
+ *   • USER   (mycurricula:user:*) — theme, palette, view mode, schedules.
+ *
+ * Today there is no backend, so the team-scoped keys still live in
+ * localStorage. When Supabase lands the team keys MIGRATE to a
+ * `team_settings` row keyed on the team's grade+school; this storage key
+ * names the eventual destination so the migration is grep-able.
+ *
+ * The legacy v1 key (`mycurricula:curriculum-label`) is read as a
+ * fallback for one release so existing teachers don't lose their label.
+ */
+const CURRICULUM_LABEL_KEY = "mycurricula:team:curriculum-label";
+const CURRICULUM_LABEL_KEY_LEGACY = "mycurricula:curriculum-label";
+
+/**
+ * Read the stored curriculum label. Prefers the new team-scoped key and
+ * falls back to the legacy unscoped key so existing teachers don't lose
+ * their label across the rename.
+ */
+function readCurriculumLabel(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CURRICULUM_LABEL_KEY);
+    if (raw != null) return raw;
+    // Legacy fallback — read once; the next write under the new key
+    // supersedes this, and the legacy entry is harmless if it lingers.
+    const legacy = window.localStorage.getItem(CURRICULUM_LABEL_KEY_LEGACY);
+    if (legacy != null) return legacy;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The signed-in teacher, derived from the Supabase Auth session. Until the
  * session resolves — and whenever the prototype runs without a backend — this
  * falls back to the mock `ME` so the shell still renders a populated avatar.
@@ -79,13 +124,17 @@ export interface CurrentUser {
    * Free-text curriculum label shown next to the wordmark in the top bar
    * (e.g. "Grade 5", "K-12 Math", "Year 7 Science"). Per CLAUDE.md §1 the
    * app is multi-grade by design — this label is NOT a grade enum, it is
-   * whatever the teacher (or school) types in Settings. Optional so the
-   * wordmark suffix simply disappears when no label is configured.
+   * whatever the team types in Settings. Optional so the wordmark suffix
+   * simply disappears when no label is configured.
    *
-   * No DB column exists yet — real Supabase users currently resolve as
-   * `undefined`; the FALLBACK_USER seeds "Grade 5" so the prototype's
-   * wordmark still reads "MyCurricula Grade 5" until Lane S lands the
-   * Settings UI + Supabase column.
+   * SCOPE (2026-05-25): TEAM-shared, not user-private. Every teacher on
+   * the same grade-level team sees the same wordmark suffix. The field
+   * lives on CurrentUser today for read-side convenience, but when
+   * Supabase lands it MIGRATES to a `team_settings.curriculum_label`
+   * row — see the localStorage comment near `CURRICULUM_LABEL_KEY` for
+   * the migration plan. Until then the value is persisted under
+   * `mycurricula:team:curriculum-label` (with a one-release legacy
+   * fallback for the unscoped v1 key).
    */
   curriculumLabel?: string;
 }
@@ -190,6 +239,15 @@ export interface AppStateValue {
 
   /** The signed-in teacher, derived from the Supabase Auth session. */
   currentUser: CurrentUser;
+
+  /**
+   * Update the teacher's curriculum label (the wordmark suffix). Persists to
+   * localStorage under `mycurricula:curriculum-label` so the value survives
+   * reloads in the prototype; the real Supabase column will pick this up
+   * when the backend lands. Passing the empty string clears the label so
+   * the wordmark falls back to just "MyCurricula".
+   */
+  updateCurriculumLabel: (label: string) => void;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -227,12 +285,32 @@ export function AppStateProvider({
   // in sync via onAuthStateChange (sign-in, sign-out, token refresh).
   const [currentUser, setCurrentUser] = useState<CurrentUser>(FALLBACK_USER);
 
+  // Post-mount: overlay any teacher-edited curriculum label from
+  // localStorage so the wordmark reflects what the teacher last typed in
+  // Settings → Curriculum. Done in a layout-effect-equivalent post-mount
+  // pass to avoid an SSR/CSR hydration mismatch on the wordmark suffix.
+  useEffect(() => {
+    const stored = readCurriculumLabel();
+    if (stored == null) return;
+    setCurrentUser((prev) => ({ ...prev, curriculumLabel: stored }));
+  }, []);
+
   useEffect(() => {
     const supabase = createClient();
     let active = true;
 
     const apply = (user: User | null): void => {
-      if (active) setCurrentUser(user ? toCurrentUser(user) : FALLBACK_USER);
+      if (active) {
+        const next = user ? toCurrentUser(user) : FALLBACK_USER;
+        // Preserve any teacher-edited curriculum label from localStorage
+        // when the Supabase session resolves — the auth user shape does
+        // not carry a curriculumLabel yet (no DB column), so without this
+        // overlay the wordmark would lose the teacher's edit on every
+        // auth event (initial read, refresh, sign-in).
+        const stored = readCurriculumLabel();
+        if (stored != null) next.curriculumLabel = stored;
+        setCurrentUser(next);
+      }
     };
 
     // Initial read, then subscribe to subsequent auth changes.
@@ -245,6 +323,40 @@ export function AppStateProvider({
       active = false;
       data.subscription.unsubscribe();
     };
+  }, []);
+
+  // Cross-tab sync — when another tab writes a new curriculum label, pick
+  // it up here so the top-bar wordmark stays consistent.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: StorageEvent): void => {
+      if (e.key !== CURRICULUM_LABEL_KEY) return;
+      const next = e.newValue == null ? undefined : e.newValue;
+      setCurrentUser((prev) => ({ ...prev, curriculumLabel: next }));
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  // Setter exposed via the context. Writes through to localStorage and
+  // updates the in-memory user so consumers (the top-bar wordmark, future
+  // export footers, etc.) reflect the change immediately.
+  const updateCurriculumLabel = useCallback((label: string): void => {
+    const trimmed = label.trim();
+    setCurrentUser((prev) => ({
+      ...prev,
+      curriculumLabel: trimmed === "" ? undefined : trimmed,
+    }));
+    if (typeof window === "undefined") return;
+    try {
+      if (trimmed === "") {
+        window.localStorage.removeItem(CURRICULUM_LABEL_KEY);
+      } else {
+        window.localStorage.setItem(CURRICULUM_LABEL_KEY, trimmed);
+      }
+    } catch {
+      // Storage disabled / quota exceeded — state still updates in memory.
+    }
   }, []);
 
   const updateFilters = useCallback((patch: Partial<PlannerFilters>) => {
@@ -289,6 +401,7 @@ export function AppStateProvider({
       search,
       setSearch,
       currentUser,
+      updateCurriculumLabel,
     }),
     [
       viewMode,
@@ -308,6 +421,7 @@ export function AppStateProvider({
       selectedLessonId,
       search,
       currentUser,
+      updateCurriculumLabel,
     ],
   );
 

@@ -1,0 +1,251 @@
+/* Settings → Curriculum page styles.
+ *
+ * Mirrors the centered max-width-1100 column the Appearance + Catch-up
+ * pages use so the settings tree reads as one coherent surface. All
+ * values via var(--token) — no hex.
+ */
+
+.page {
+  padding: 24px;
+}
+
+.inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Form row (curriculum label) ────────────────────────────────────── */
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.fieldLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--ink-500);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.fieldHint {
+  margin: 4px 0 0;
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  line-height: 1.55;
+  text-wrap: pretty;
+  max-width: 64ch;
+}
+
+.textInput {
+  min-height: 44px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-8);
+  outline: none;
+  transition: border-color 120ms ease;
+  max-width: 480px;
+}
+
+.textInput:hover {
+  border-color: var(--ink-300);
+}
+
+.textInput:focus-visible {
+  border-color: var(--ink-900);
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* ── Preset dropdown ────────────────────────────────────────────────── */
+
+.presetRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.select {
+  min-height: 44px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-8);
+  outline: none;
+  cursor: pointer;
+  max-width: 320px;
+}
+
+.select:hover {
+  border-color: var(--ink-300);
+}
+
+.select:focus-visible {
+  border-color: var(--ink-900);
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* ── Months fieldset ───────────────────────────────────────────────── */
+
+.monthsFieldset {
+  border: 0;
+  padding: 0;
+  margin: 16px 0 0;
+}
+
+.monthsLegend {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--ink-500);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.monthsGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .monthsGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 360px) {
+  .monthsGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ── Individual month chip ─────────────────────────────────────────── */
+
+.monthChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: var(--r-8);
+  font-family: inherit;
+  font-size: var(--t-13);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+
+.monthChip:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.monthChip:active {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .monthChip {
+    transition: none;
+  }
+  .monthChip:active {
+    transform: none;
+  }
+}
+
+.monthChipOn {
+  background: var(--ink-900);
+  color: var(--paper);
+  border: 1px solid var(--ink-900);
+}
+
+.monthChipOn:hover {
+  background: color-mix(in srgb, var(--ink-900) 88%, var(--paper));
+}
+
+.monthChipOff {
+  background: var(--paper);
+  color: var(--ink-700);
+  border: 1px solid var(--ink-200);
+}
+
+.monthChipOff:hover {
+  border-color: var(--ink-400);
+  background: var(--ink-50);
+}
+
+/* ── Placeholder body (Wave 1B reserved sections) ─────────────────── */
+
+.placeholderBody {
+  margin: 8px 0 0;
+  font-size: var(--t-13);
+  color: var(--ink-500);
+  line-height: 1.55;
+  text-wrap: pretty;
+  max-width: 64ch;
+  font-style: italic;
+}
+
+/* ── "Shared with your team" chip ──────────────────────────────────── */
+
+.teamChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-700);
+  background: var(--ink-50);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-pill);
+  letter-spacing: 0.2px;
+  cursor: help;
+  white-space: nowrap;
+}
+
+/* Phone — shrink chip text so it doesn't get clipped by the card's
+   overflow:hidden when the header competes with a long title. */
+@media (max-width: 540px) {
+  .teamChip {
+    padding: 3px 8px;
+    font-size: var(--t-10);
+  }
+}
+
+.teamChipDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ink-400);
+}
+
+/* ── Phone tighten — match Catch-up + Appearance pages ───────────── */
+
+@media (max-width: 540px) {
+  .page {
+    padding: 16px;
+  }
+}

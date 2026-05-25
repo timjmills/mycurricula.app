@@ -732,6 +732,7 @@ export function ResourceComposer({
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
+        title="Add a resource dialog — capture links, files, videos, and docs, then pick which lesson and section to attach them to"
         className={`${styles.panel} cp-subj ${subjectId}`}
         onKeyDown={handleKeyDown}
         onPaste={onDialogPaste}
@@ -743,6 +744,7 @@ export function ResourceComposer({
             iconAriaLabel="Close add-resource dialog"
             className={styles.closeBtn}
             onClick={onClose}
+            tooltip="Close the resource composer without attaching anything"
           >
             <CloseIcon />
           </Button>
@@ -753,6 +755,7 @@ export function ResourceComposer({
             variant="primary"
             size="sm"
             className={styles.addBtn}
+            tooltip="Attach every captured resource to the chosen lesson section — the resources appear in the lesson flow"
             onClick={handleAdd}
             disabled={!canAdd}
           >
@@ -856,6 +859,7 @@ export function ResourceComposer({
               className={styles.allToolsBtn}
               onClick={() => setAllToolsOpen(true)}
               aria-label="Show all tools"
+              tooltip="Browse every resource type the composer supports — files, links, video, slides, photos, and more"
               leadingIcon={<MoreDotsIcon />}
             >
               All tools
@@ -905,6 +909,7 @@ export function ResourceComposer({
                   className={styles.inlineAddBtn}
                   onClick={onLinkConfirm}
                   disabled={!linkValue.trim()}
+                  tooltip="Capture this URL into the resource list — you'll still need to click Add to attach everything to the lesson"
                 >
                   Add link
                 </Button>
@@ -961,15 +966,15 @@ export function ResourceComposer({
                             className={styles.capturedChipBody}
                             onClick={() => toggleNote(item.id)}
                             aria-expanded={noteOpen}
+                            title={
+                              hasNote
+                                ? `Edit the note attached to ${item.label}`
+                                : `Add a short note to ${item.label} so the team knows how to use it`
+                            }
                             aria-label={
                               hasNote
                                 ? `Edit note for ${item.label}`
                                 : `Add note for ${item.label}`
-                            }
-                            title={
-                              hasNote
-                                ? "Edit note"
-                                : "Add a note for this resource"
                             }
                           >
                             <span
@@ -997,7 +1002,7 @@ export function ResourceComposer({
                             className={styles.capturedChipRemove}
                             onClick={() => removeItem(item.id)}
                             aria-label={`Remove ${item.label}`}
-                            title="Remove"
+                            title={`Remove ${item.label} from the captured list — it won't be attached to the lesson`}
                           >
                             <SmallXIcon />
                           </button>
@@ -1219,6 +1224,7 @@ function ToolTile({
       className={`${styles.toolTile} ${active ? styles.toolTileActive : ""}`}
       onClick={onClick}
       aria-pressed={active}
+      title={`${label} — ${description}`}
       style={tileStyle}
     >
       <span className={styles.toolTileIcon} aria-hidden="true">
@@ -1301,6 +1307,7 @@ function PickerPill({
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={disabled}
+        title="Pick where to attach this resource — choose the subject, unit, lesson, and section in this order"
       >
         {swatchClass && (
           <span
@@ -1329,6 +1336,7 @@ function PickerPill({
                   opt.id === selectedId ? styles.pickerOptionActive : ""
                 }`}
                 onClick={() => onPick(opt.id)}
+                title={`Pick ${opt.label}`}
               >
                 {opt.label}
               </button>

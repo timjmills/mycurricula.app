@@ -1,0 +1,153 @@
+/* Settings layout — sidebar + content shell.
+ *
+ * Desktop: sidebar pinned left, content fills the remainder.
+ * Tablet:  sidebar narrows; content keeps its centered max-width.
+ * Phone:   sidebar collapses to a horizontal pill strip above content.
+ *
+ * All values via var(--token) — no hex. Mirrors the visual feel of the
+ * existing settings pages so the sub-page bodies don't have to change.
+ */
+
+/* ── Outer surface (replaces the prior <main> styles) ─────────────────── */
+
+.main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--ink-50);
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 0;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: 100%;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+
+.sidebar {
+  border-right: var(--line);
+  background: var(--paper);
+  padding: 24px 12px 24px 24px;
+}
+
+.tabList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 24px;
+}
+
+.tabItem {
+  margin: 0;
+}
+
+.tabLink {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-8);
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-700);
+  text-decoration: none;
+  letter-spacing: -0.1px;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.tabLink:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+.tabLink:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.tabLinkActive,
+.tabLinkActive:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabLink {
+    transition: none;
+  }
+}
+
+/* ── Content column ──────────────────────────────────────────────────── */
+
+.content {
+  min-width: 0;
+}
+
+/* ── Tablet ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 180px 1fr;
+  }
+
+  .sidebar {
+    padding: 16px 10px 16px 16px;
+  }
+}
+
+/* ── Phone: collapse sidebar to a horizontal strip ───────────────────── */
+
+@media (max-width: 600px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border-right: none;
+    border-bottom: var(--line);
+    padding: 8px 12px;
+  }
+
+  .tabList {
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: static;
+    /* Hide the horizontal scrollbar visually but keep panning working */
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tabItem {
+    flex: 0 0 auto;
+  }
+
+  .tabLink {
+    min-height: 44px;
+    padding: 0 14px;
+    white-space: nowrap;
+    border: 1px solid var(--ink-150);
+  }
+
+  .tabLinkActive,
+  .tabLinkActive:hover {
+    background: var(--ink-900);
+    color: var(--paper);
+    border-color: var(--ink-900);
+  }
+}

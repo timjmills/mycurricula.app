@@ -1,0 +1,176 @@
+[
+  {
+    "tier": "phone",
+    "route": "settings-landing",
+    "requestedUrl": "/settings",
+    "finalUrl": "http://localhost:3003/settings/curriculum",
+    "viewport": "360x800",
+    "dims": {
+      "docScrollWidth": 360,
+      "docClientWidth": 360,
+      "bodyScrollWidth": 360,
+      "bodyClientWidth": 360
+    },
+    "overflowsViewport": false,
+    "consoleCount": 1,
+    "hydrationWarningCount": 0,
+    "hydrationWarnings": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-w-settings\\settings-landing__phone-360x800.png"
+  },
+  {
+    "tier": "phone",
+    "route": "settings-curriculum",
+    "requestedUrl": "/settings/curriculum",
+    "finalUrl": "http://localhost:3003/settings/curriculum",
+    "viewport": "360x800",
+    "dims": {
+      "docScrollWidth": 360,
+      "docClientWidth": 360,
+      "bodyScrollWidth": 360,
+      "bodyClientWidth": 360
+    },
+    "overflowsViewport": false,
+    "consoleCount": 1,
+    "hydrationWarningCount": 0,
+    "hydrationWarnings": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-w-settings\\settings-curriculum__phone-360x800.png"
+  },
+  {
+    "tier": "phone",
+    "route": "settings-appearance",
+    "requestedUrl": "/settings/appearance",
+    "finalUrl": "http://localhost:3003/settings/appearance",
+    "viewport": "360x800",
+    "dims": {
+      "docScrollWidth": 360,
+      "docClientWidth": 360,
+      "bodyScrollWidth": 360,
+      "bodyClientWidth": 360
+    },
+    "overflowsViewport": false,
+    "consoleCount": 1,
+    "hydrationWarningCount": 0,
+    "hydrationWarnings": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-w-settings\\settings-appearance__phone-360x800.png"
+  },
+  {
+    "tier": "tablet",
+    "route": "settings-landing",
+    "requestedUrl": "/settings",
+    "finalUrl": "http://localhost:3003/settings/appearance",
+    "viewport": "768x1024",
+    "dims": {
+      "docScrollWidth": 768,
+      "docClientWidth": 768,
+      "bodyScrollWidth": 768,
+      "bodyClientWidth": 768
+    },
+    "overflowsViewport": false,
+    "consoleCount": 1,
+    "hydrationWarningCount": 0,
+    "hydrationWarnings": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-w-settings\\settings-landing__tablet-768x1024.png"
+  },
+  {
+    "tier": "tablet",
+    "route": "settings-curriculum",
+    "requestedUrl": "/settings/curriculum",
+    "finalUrl": "http://localhost:3003/settings/curriculum",
+    "viewport": "768x1024",
+    "dims": {
+      "docScrollWidth": 768,
+      "docClientWidth": 768,
+      "bodyScrollWidth": 768,
+      "bodyClientWidth": 768
+    },
+    "overflowsViewport": false,
+    "consoleCount": 1,
+    "hydrationWarningCount": 0,
+    "hydrationWarnings": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-w-settings\\settings-curriculum__tablet-768x1024.png"
+  },
+  {
+    "tier": "tablet",
+    "route": "settings-appearance",
+    "requestedUrl": "/settings/appearance",
+    "finalUrl": "http://localhost:3003/settings/appearance",
+    "viewport": "768x1024",
+    "dims": {
+      "docScrollWidth": 768,
+      "docClientWidth": 768,
+      "bodyScrollWidth": 768,
+      "bodyClientWidth": 768
+    },
+    "overflowsViewport": false,
+    "consoleCount": 1,
+    "hydrationWarningCount": 0,
+    "hydrationWarnings": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-w-settings\\settings-appearance__tablet-768x1024.png"
+  },
+  {
+    "tier": "desktop",
+    "route": "settings-landing",
+    "requestedUrl": "/settings",
+    "finalUrl": "http://localhost:3003/settings/appearance",
+    "viewport": "1280x900",
+    "dims": {
+      "docScrollWidth": 1280,
+      "docClientWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "bodyClientWidth": 1280
+    },
+    "overflowsViewport": false,
+    "consoleCount": 1,
+    "hydrationWarningCount": 0,
+    "hydrationWarnings": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-w-settings\\settings-landing__desktop-1280x900.png"
+  },
+  {
+    "tier": "desktop",
+    "route": "settings-curriculum",
+    "requestedUrl": "/settings/curriculum",
+    "finalUrl": "http://localhost:3003/settings/curriculum",
+    "viewport": "1280x900",
+    "dims": {
+      "docScrollWidth": 1280,
+      "docClientWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "bodyClientWidth": 1280
+    },
+    "overflowsViewport": false,
+    "consoleCount": 1,
+    "hydrationWarningCount": 0,
+    "hydrationWarnings": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-w-settings\\settings-curriculum__desktop-1280x900.png"
+  },
+  {
+    "tier": "desktop",
+    "route": "settings-appearance",
+    "requestedUrl": "/settings/appearance",
+    "finalUrl": "http://localhost:3003/settings/appearance",
+    "viewport": "1280x900",
+    "dims": {
+      "docScrollWidth": 1280,
+      "docClientWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "bodyClientWidth": 1280
+    },
+    "overflowsViewport": false,
+    "consoleCount": 1,
+    "hydrationWarningCount": 0,
+    "hydrationWarnings": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-w-settings\\settings-appearance__desktop-1280x900.png"
+  },
+  {
+    "integration": "curriculum-label-persists",
+    "sentinel": "ProbeLabel-1779733750560",
+    "persisted": "ProbeLabel-1779733750560",
+    "wordmark": "MyCurriculaProbeLabel-1779733750560",
+    "wordmarkShowsSentinel": true
+  },
+  {
+    "integration": "last-visited-sub-page",
+    "after": "http://localhost:3003/settings/appearance",
+    "landsOnAppearance": true
+  }
+]
