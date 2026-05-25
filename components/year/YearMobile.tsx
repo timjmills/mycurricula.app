@@ -50,7 +50,6 @@ function weekIdxToDateLabel(weekIdx: number): string {
 interface SubjectSummary {
   subjectId: SubjectId;
   name: string;
-  students: number;
   completePct: number;
   pacingText: string;
   currentUnit: {
@@ -115,7 +114,6 @@ export function YearMobile() {
       return {
         subjectId,
         name: subject.name,
-        students: 24,
         completePct,
         pacingText: pacingLabel(pacing),
         currentUnit: chosen
@@ -144,9 +142,6 @@ export function YearMobile() {
             <div className={styles.cardHeader}>
               <div className={styles.cardHeaderText}>
                 <span className={styles.cardName}>{s.name}</span>
-                <span className={styles.cardStudents}>
-                  {s.students} students
-                </span>
               </div>
               <div className={styles.cardChip} aria-hidden="true">
                 {monogram}

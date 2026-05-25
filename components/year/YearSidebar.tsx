@@ -82,21 +82,6 @@ const IconBarChart = (p: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-const IconUsers = (p: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    {...p}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.7"
-    aria-hidden="true"
-  >
-    <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
-    <circle cx="10" cy="7" r="4" />
-    <path d="M21 21v-2a4 4 0 0 0-3-3.9M15 3.1a4 4 0 0 1 0 7.8" />
-  </svg>
-);
-
 const IconSettings = (p: React.SVGProps<SVGSVGElement>) => (
   <svg
     {...p}
@@ -139,7 +124,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: "lessons", label: "Lessons", icon: IconBook },
   { id: "checkpoints", label: "Checkpoints", icon: IconFlag },
   { id: "reports", label: "Reports", icon: IconBarChart },
-  { id: "students", label: "Students", icon: IconUsers },
   { id: "settings", label: "Settings", icon: IconSettings },
   { id: "help", label: "Help", icon: IconHelp },
 ];

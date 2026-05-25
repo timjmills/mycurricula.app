@@ -63,12 +63,6 @@
   line-height: 1.2;
 }
 
-.cardStudents {
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-500);
-}
-
 .cardChip {
   flex-shrink: 0;
   width: 28px;
