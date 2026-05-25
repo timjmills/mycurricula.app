@@ -88,17 +88,54 @@ interface ExtractedToken {
   source: TokenSource;
 }
 
+/** Read a query-string value while preserving literal `+` bytes.
+ *  WHATWG `URLSearchParams` decodes `+` to space (form-urlencoded
+ *  semantics inherited from HTML form posts). Our bypass token is
+ *  base64 and can legitimately contain `+`, so the default decode
+ *  corrupts the bytes (`a+b` → `a b`) and the constant-time compare
+ *  then fails. Reading the raw query and decoding only `%xx` escapes
+ *  — leaving `+` alone — round-trips the token correctly regardless
+ *  of whether the caller URL-encoded `+` as `%2B` or sent it raw.
+ *
+ *  Returns null when the key is absent. */
+function readRawQueryParam(rawQuery: string, key: string): string | null {
+  // Strip leading `?` if present, then split on `&`.
+  const q = rawQuery.startsWith("?") ? rawQuery.slice(1) : rawQuery;
+  if (!q) return null;
+  for (const pair of q.split("&")) {
+    const eq = pair.indexOf("=");
+    const k = eq === -1 ? pair : pair.slice(0, eq);
+    if (k !== key) continue;
+    const v = eq === -1 ? "" : pair.slice(eq + 1);
+    // decodeURIComponent handles `%xx` but leaves `+` as-is — exactly
+    // what we want for a base64 value. Fall back to the raw string if
+    // the value happens to contain a malformed escape so the bypass
+    // can still report an "invalid_token" reason instead of throwing.
+    try {
+      return decodeURIComponent(v);
+    } catch {
+      return v;
+    }
+  }
+  return null;
+}
+
 /** Pull the token from a NextRequest. Looks at `?claude=<token>` first
  *  (the middleware-bypass convention used on any URL), then `?token=`
  *  (the explicit /auth/claude-login route-handler convention), then
  *  `Authorization: Bearer <token>` for command-line clients that prefer
  *  headers. Accepting all three keeps every Claude surface working
- *  without per-surface translation. */
+ *  without per-surface translation.
+ *
+ *  URL params are read off the raw query string via `readRawQueryParam`
+ *  rather than `searchParams.get()` — see that helper for why (`+` in
+ *  a base64 token gets corrupted to space under form-urlencoded rules,
+ *  and we want both `?claude=a+b` and `?claude=a%2Bb` to work). */
 function extractToken(request: NextRequest): ExtractedToken | null {
-  const url = request.nextUrl;
-  const fromClaude = url.searchParams.get(BYPASS_PARAM);
+  const rawQuery = request.nextUrl.search;
+  const fromClaude = readRawQueryParam(rawQuery, BYPASS_PARAM);
   if (fromClaude) return { token: fromClaude, source: "url" };
-  const fromToken = url.searchParams.get("token");
+  const fromToken = readRawQueryParam(rawQuery, "token");
   if (fromToken) return { token: fromToken, source: "url" };
   const auth = request.headers.get("authorization");
   if (auth?.startsWith("Bearer ")) {
