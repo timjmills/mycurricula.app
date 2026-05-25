@@ -42,8 +42,11 @@ import type { UnitBarStatus } from "./UnitBar";
 
 // ── Layout constants ───────────────────────────────────────────────────────
 
-/** Width in px of each week column — must match the YearView header. */
-const WEEK_COL_PX = 120;
+/** Width in px of each week column — must match the YearView header.
+ *  Tightened 2026-05-25: 120 → 96 (~20% reduction) so the default 100% zoom
+ *  shows ~25% more weeks per screen. Keep in sync with COLUMN_WIDTH_PX in
+ *  YearView.tsx. */
+const WEEK_COL_PX = 96;
 
 /** Horizontal gap in px subtracted from each unit bar's computed width. */
 const BAR_GAP_PX = 8;
@@ -265,80 +268,126 @@ export function RoadmapView({
       : orderedLanes.filter((l) => subjectFilter.has(l.subjectId));
 
   return (
-    <div className={styles.root}>
+    // .root carries `overflow: clip` in RoadmapView.module.css (Lane I's
+    // CSS) to keep the card chrome's rounded corners tidy. That clip
+    // hides our sticky-left LaneCards once they're positioned outside
+    // .root's narrow box (which scrolls with the timeline), reintroducing
+    // the cutoff the sticky was meant to fix. Override to `visible` so
+    // the sticky cards remain visible at every scroll position
+    // (Lane K scroll fix, 2026-05-25). The rounded chrome on the
+    // outer card border still reads correctly because the LaneCards
+    // sit on top of the same `var(--paper)` background.
+    <div className={styles.root} style={{ overflow: "visible" }}>
       {/* Lane rows */}
       <div className={styles.lanes}>
-        {visibleLanes.map(
-          ({ subject, subjectId, completePct, units, pacing }, li) => {
-            const minimized = isMinimized(subjectId);
-            return (
+        {visibleLanes.map(({ subject, subjectId, units }, li) => {
+          const minimized = isMinimized(subjectId);
+          return (
+            <div
+              key={subject.id}
+              data-lane-subject={subject.id}
+              ref={(el) => {
+                if (el) laneRefs.current.set(subject.id, el);
+                else laneRefs.current.delete(subject.id);
+              }}
+              className={`${styles.laneRow} ${minimized ? styles.laneRowMinimized : ""} ${subjectClassName(subjectId)}`}
+              style={{
+                borderTop: li > 0 ? "1px solid var(--ink-150)" : "none",
+                // Override .laneRow's `overflow: hidden` and `1fr` second
+                // column (set in RoadmapView.module.css, owned by Lane I) so
+                // the sticky-left LaneCard inside isn't clipped or stranded
+                // by the row's narrow box. Without these overrides the row
+                // sizes to .timelineScroll's clientWidth (~992px) even
+                // though the inner timeline child extends to ~3500px — so
+                // a sticky element bumps into the row's right-edge bound
+                // long before reaching the rightmost weeks, exposing the
+                // empty grid the user reported (Lane K scroll fix,
+                // 2026-05-25). Explicitly sizing the second track to the
+                // timeline width makes the row's containing block as wide
+                // as the scrollable content, giving sticky room to pin
+                // through the full pan range.
+                gridTemplateColumns: !minimized
+                  ? `200px ${timelineWidthPx}px`
+                  : undefined,
+                width: !minimized ? `${200 + timelineWidthPx}px` : undefined,
+                overflow: "visible",
+              }}
+            >
+              {/* Sticky-left wrapper keeps the LaneCard glued to the left
+                  edge of YearView's horizontally scrolling .timelineScroll
+                  container. Without this, the mount-time auto-center on
+                  today (or any rightward pan) pushes the LaneCards off-
+                  screen left and the grid reads as empty cells with no
+                  subject context — exactly the bug reported (Lane K scroll
+                  fix, 2026-05-25). The wrapper sticks against the nearest
+                  horizontally scrolling ancestor (.timelineScroll); the
+                  parent .laneRow is itself wider than the viewport because
+                  the timeline child carries an explicit pixel width
+                  (3456px), so sticky has room to pin.
+
+                  z-index 2 sits above unit-bars/glyphs (z:0–1) but below
+                  the sticky-top QuarterMonthWeekHeader (z:10) so the
+                  header stays on top at the corner. */}
               <div
-                key={subject.id}
-                data-lane-subject={subject.id}
-                ref={(el) => {
-                  if (el) laneRefs.current.set(subject.id, el);
-                  else laneRefs.current.delete(subject.id);
-                }}
-                className={`${styles.laneRow} ${minimized ? styles.laneRowMinimized : ""} ${subjectClassName(subjectId)}`}
                 style={{
-                  borderTop: li > 0 ? "1px solid var(--ink-150)" : "none",
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 2,
+                  background: "var(--paper)",
                 }}
               >
                 <LaneCard
                   name={subject.name}
                   subjectId={subjectId}
-                  completePct={completePct}
-                  pacing={pacing}
-                  fullHeight={!minimized}
                   minimized={minimized}
                   onToggleMinimize={() => toggle(subjectId)}
                 />
+              </div>
 
-                {/* The timeline column is only rendered when expanded. */}
-                {!minimized && (
+              {/* The timeline column is only rendered when expanded. */}
+              {!minimized && (
+                <div
+                  className={styles.timeline}
+                  style={{
+                    width: timelineWidthPx,
+                    height: LANE_HEIGHT_PX,
+                    containerType: "inline-size",
+                  }}
+                >
                   <div
-                    className={styles.timeline}
+                    className={styles.bgGrid}
                     style={{
-                      width: timelineWidthPx,
-                      height: LANE_HEIGHT_PX,
-                      containerType: "inline-size",
+                      gridTemplateColumns: `repeat(${weekLabels.length}, ${WEEK_COL_PX}px)`,
                     }}
                   >
-                    <div
-                      className={styles.bgGrid}
-                      style={{
-                        gridTemplateColumns: `repeat(${weekLabels.length}, ${WEEK_COL_PX}px)`,
-                      }}
-                    >
-                      {weekLabels.map((_, i) => (
-                        <div
-                          key={i}
-                          className={`${styles.bgLine} ${i > 0 ? styles.weekBorder : ""} ${i === currentWeekIdx ? styles.bgLineToday : ""}`}
-                        />
-                      ))}
-                    </div>
-
-                    {units.map((unit) => (
-                      <UnitBar
-                        key={unit.id}
-                        unit={unit}
-                        columnWidthPx={WEEK_COL_PX}
-                        gapPx={BAR_GAP_PX}
-                        onClick={undefined}
+                    {weekLabels.map((_, i) => (
+                      <div
+                        key={i}
+                        className={`${styles.bgLine} ${i > 0 ? styles.weekBorder : ""} ${i === currentWeekIdx ? styles.bgLineToday : ""}`}
                       />
                     ))}
-
-                    <TodayMarker
-                      todayWeekIdx={currentWeekIdx}
-                      columnWidthPx={WEEK_COL_PX}
-                      leftRailWidthPx={0}
-                    />
                   </div>
-                )}
-              </div>
-            );
-          },
-        )}
+
+                  {units.map((unit) => (
+                    <UnitBar
+                      key={unit.id}
+                      unit={unit}
+                      columnWidthPx={WEEK_COL_PX}
+                      gapPx={BAR_GAP_PX}
+                      onClick={undefined}
+                    />
+                  ))}
+
+                  <TodayMarker
+                    todayWeekIdx={currentWeekIdx}
+                    columnWidthPx={WEEK_COL_PX}
+                    leftRailWidthPx={0}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* ── Legend + summary strip ──────────────────────────────────────── */}

@@ -187,104 +187,128 @@ export function ProgressionView({
       : orderedLanes.filter((l) => subjectFilter.has(l.subjectId));
 
   return (
-    <div className={styles.root}>
+    // .root carries `overflow: clip` in ProgressionView.module.css
+    // (Lane I's CSS) to clean the card chrome's rounded corners. That
+    // clip hides our sticky-left LaneCards once they're positioned
+    // outside .root's narrow box (which scrolls with the timeline),
+    // reintroducing the cutoff the sticky was meant to fix. Override
+    // to `visible` so the sticky cards remain visible at every scroll
+    // position (Lane K scroll fix, 2026-05-25). Mirrors the
+    // RoadmapView.tsx fix.
+    <div className={styles.root} style={{ overflow: "visible" }}>
       {/* Lane rows */}
       <div className={styles.lanes}>
-        {visibleLanes.map(
-          (
-            { subject, subjectId, glyphMap, completePct, unitBars, pacing },
-            li,
-          ) => {
-            const minimized = isMinimized(subjectId);
-            return (
+        {visibleLanes.map(({ subject, subjectId, glyphMap, unitBars }, li) => {
+          const minimized = isMinimized(subjectId);
+          return (
+            <div
+              key={subject.id}
+              data-lane-subject={subject.id}
+              ref={(el) => {
+                if (el) laneRefs.current.set(subject.id, el);
+                else laneRefs.current.delete(subject.id);
+              }}
+              className={`${styles.laneRow} ${minimized ? styles.laneRowMinimized : ""} ${subjectClassName(subjectId)}`}
+              style={{
+                borderTop: li > 0 ? "1px solid var(--ink-150)" : "none",
+                // Pin the row's width to the full scrollable content
+                // (LaneCard rail + per-day grid). Without this the row's
+                // box sizes to .timelineScroll's viewport (~992px) — which
+                // means the sticky-left LaneCard inside cannot escape the
+                // row's right-edge bound once the user pans horizontally,
+                // and slides off-screen left. Mirrors the fix in
+                // RoadmapView.tsx (Lane K scroll fix, 2026-05-25).
+                width: !minimized ? `${200 + totalCols * COL}px` : undefined,
+                overflow: "visible",
+              }}
+            >
+              {/* Sticky-left wrapper keeps the LaneCard glued to the left
+                  edge of YearView's horizontally scrolling .timelineScroll
+                  container. Without this, the mount-time auto-center on
+                  today (or any rightward pan) pushes the LaneCards off-
+                  screen left and the grid reads as empty cells with no
+                  subject context (Lane K scroll fix, 2026-05-25). */}
               <div
-                key={subject.id}
-                data-lane-subject={subject.id}
-                ref={(el) => {
-                  if (el) laneRefs.current.set(subject.id, el);
-                  else laneRefs.current.delete(subject.id);
-                }}
-                className={`${styles.laneRow} ${minimized ? styles.laneRowMinimized : ""} ${subjectClassName(subjectId)}`}
                 style={{
-                  borderTop: li > 0 ? "1px solid var(--ink-150)" : "none",
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 2,
+                  background: "var(--paper)",
                 }}
               >
                 <LaneCard
                   name={subject.name}
                   subjectId={subjectId}
-                  completePct={completePct}
-                  pacing={pacing}
-                  fullHeight={!minimized}
                   minimized={minimized}
                   onToggleMinimize={() => toggle(subjectId)}
                 />
+              </div>
 
-                {!minimized && (
-                  <div
-                    className={styles.laneGrid}
-                    style={{ width: totalCols * COL }}
-                  >
-                    {/* TODAY column highlight */}
-                    {todayFlatIdx >= 0 && todayFlatIdx < totalCols && (
-                      <div
-                        className={styles.todayHighlight}
-                        style={{ left: todayFlatIdx * COL, width: COL }}
-                        aria-hidden="true"
-                      />
-                    )}
+              {!minimized && (
+                <div
+                  className={styles.laneGrid}
+                  style={{ width: totalCols * COL }}
+                >
+                  {/* TODAY column highlight */}
+                  {todayFlatIdx >= 0 && todayFlatIdx < totalCols && (
+                    <div
+                      className={styles.todayHighlight}
+                      style={{ left: todayFlatIdx * COL, width: COL }}
+                      aria-hidden="true"
+                    />
+                  )}
 
-                    {/* LESSONS row — per-day StatusGlyph cells */}
-                    <div className={styles.glyphRow}>
-                      {schoolDays.map((d, i) => {
-                        const state = glyphMap.get(i) ?? "upcoming";
-                        return (
-                          <div
-                            key={i}
-                            className={`${styles.glyphCell} ${d.firstOfMonth && i > 0 ? styles.monthBoundary : ""}`}
-                            style={{ width: COL }}
-                          >
-                            <StatusGlyph state={state} size={13} />
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* UNITS row — unit bars colored by var(--c) from the row */}
-                    <div className={styles.unitRow}>
-                      {schoolDays.map((d, i) => (
+                  {/* LESSONS row — per-day StatusGlyph cells */}
+                  <div className={styles.glyphRow}>
+                    {schoolDays.map((d, i) => {
+                      const state = glyphMap.get(i) ?? "upcoming";
+                      return (
                         <div
                           key={i}
-                          className={`${styles.unitGridLine} ${d.firstOfMonth && i > 0 ? styles.monthBoundary : ""}`}
+                          className={`${styles.glyphCell} ${d.firstOfMonth && i > 0 ? styles.monthBoundary : ""}`}
                           style={{ width: COL }}
-                        />
-                      ))}
-
-                      {unitBars.map((u, ui) => {
-                        const left = u.minIdx * COL + 4;
-                        const width = (u.maxIdx - u.minIdx + 1) * COL - 8;
-                        if (width <= 0) return null;
-                        return (
-                          <div
-                            key={u.unitId}
-                            className={styles.unitBar}
-                            style={{ left, width }}
-                            title={`${u.lessonCount} lessons`}
-                          >
-                            <span className={styles.unitTile}>U{ui + 1}</span>
-                            <div className={styles.unitMeta}>
-                              <IconBook width={10} height={10} />
-                              <span>{u.lessonCount} lessons</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                        >
+                          <StatusGlyph state={state} size={13} />
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
-            );
-          },
-        )}
+
+                  {/* UNITS row — unit bars colored by var(--c) from the row */}
+                  <div className={styles.unitRow}>
+                    {schoolDays.map((d, i) => (
+                      <div
+                        key={i}
+                        className={`${styles.unitGridLine} ${d.firstOfMonth && i > 0 ? styles.monthBoundary : ""}`}
+                        style={{ width: COL }}
+                      />
+                    ))}
+
+                    {unitBars.map((u, ui) => {
+                      const left = u.minIdx * COL + 4;
+                      const width = (u.maxIdx - u.minIdx + 1) * COL - 8;
+                      if (width <= 0) return null;
+                      return (
+                        <div
+                          key={u.unitId}
+                          className={styles.unitBar}
+                          style={{ left, width }}
+                          title={`${u.lessonCount} lessons`}
+                        >
+                          <span className={styles.unitTile}>U{ui + 1}</span>
+                          <div className={styles.unitMeta}>
+                            <IconBook width={10} height={10} />
+                            <span>{u.lessonCount} lessons</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Bottom legend */}

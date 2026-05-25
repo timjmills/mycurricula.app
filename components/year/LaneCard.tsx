@@ -1,32 +1,28 @@
 "use client";
 
-// LaneCard — left-edge lane summary card.
+// LaneCard — left-edge lane label.
+//
+// Visual recipe is COPIED VERBATIM from /weekly's grid subject row label
+// (`.subjectHead` + `.subjectTile` + `.subjectName` in
+// components/grid/WeeklyGrid.module.css, lines 251–288) — the canonical
+// "subject button" used to identify a subject row throughout the app.
+// Per CLAUDE.md / BUILD_STANDARD §2, every subject identity treatment
+// in the product must read as the same recipe. The Year lane is no
+// exception: it is a subject row label, so it consumes the same markup
+// and CSS class names the Weekly grid uses.
 //
 // Two display modes:
-//   • full    — subject name, student count, completion %, progress bar, pacing.
-//   • minimized — single-row pill (monogram + name + completion % + restore).
+//   • full       — the subject tile + subject name; one short horizontal row.
+//   • minimized  — identical visual, but expandable via the restore chevron.
 //
-// Both modes consume the canonical <Card subjectId={…}> primitive from
-// components/ui so the lane chrome matches Weekly's card recipe exactly —
-// subject-tinted header gradient, 4px deep left border, soft shadow.
+// Subject color flows through the `.cp-subj.<subjectId>` cascade — the same
+// `var(--c)` / `var(--cl)` / `var(--cd)` tokens the Weekly grid uses.
 
-import { Card, Tooltip } from "@/components/ui";
+import { Tooltip } from "@/components/ui";
+import { useSubjectColor } from "@/lib/palette";
+import { SUBJECT_BY_ID } from "@/lib/mock";
 import type { SubjectId } from "@/lib/types";
-import type { PacingStatus } from "@/lib/year-pacing";
-import { pacingLabel } from "@/lib/year-pacing";
 import styles from "./LaneCard.module.css";
-
-// Two-letter monogram for the subject identity chip.
-const CHIP_MONOGRAM: Record<SubjectId, string> = {
-  math: "Ma",
-  reading: "Re",
-  writing: "Wr",
-  grammar: "Gr",
-  spelling: "Sp",
-  ufli: "Uf",
-  explorers: "Ex",
-  sel: "Se",
-};
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
@@ -61,13 +57,7 @@ const IconRestore = (p: React.SVGProps<SVGSVGElement>) => (
 interface LaneCardProps {
   name: string;
   subjectId: SubjectId;
-  /** Completion percentage, 0–100. */
-  completePct: number;
-  /** Card height stretches to fill the lane row. */
-  fullHeight?: boolean;
-  /** Pacing status — when provided, renders a dot + sentence below the bar. */
-  pacing?: PacingStatus;
-  /** Minimized state — collapses the card to a single-row pill. */
+  /** Minimized state — visual stays the same; only the toggle icon flips. */
   minimized?: boolean;
   /** Click handler for the minimize / restore chevron. */
   onToggleMinimize?: () => void;
@@ -78,102 +68,51 @@ interface LaneCardProps {
 export function LaneCard({
   name,
   subjectId,
-  completePct,
-  fullHeight = false,
-  pacing,
   minimized = false,
   onToggleMinimize,
 }: LaneCardProps) {
-  const monogram = CHIP_MONOGRAM[subjectId] ?? name.slice(0, 2);
+  // Same color resolver used by the Weekly grid subject row label
+  // (components/grid/WeeklyGrid.tsx line 860). The tile gets the highlight
+  // fill; the name + chevron text use the deep tone.
+  const color = useSubjectColor(subjectId);
+  const subject = SUBJECT_BY_ID[subjectId];
+  const monogram = subject?.icon ?? name.slice(0, 2);
 
-  // ── Minimized pill mode ─────────────────────────────────────────────
-  if (minimized) {
-    return (
-      <Card subjectId={subjectId} density="compact" className={styles.pill}>
-        <div className={styles.pillRow}>
-          <span className={styles.pillChip} aria-hidden="true">
-            {monogram}
-          </span>
-          <span className={styles.pillName}>{name}</span>
-          <span className={styles.pillPct}>{completePct}%</span>
-          {onToggleMinimize && (
-            <Tooltip content={`Restore ${name}`} side="top">
-              <button
-                type="button"
-                className={styles.toggleBtn}
-                onClick={onToggleMinimize}
-                aria-label={`Restore ${name}`}
-              >
-                <IconRestore width={14} height={14} />
-              </button>
-            </Tooltip>
-          )}
-        </div>
-      </Card>
-    );
-  }
-
-  // ── Full card mode ──────────────────────────────────────────────────
-  const header = (
-    <div className={styles.headerInner}>
-      <div className={styles.headerText}>
-        <div className={styles.name}>{name}</div>
-      </div>
-
-      <div className={styles.headerControls}>
-        <div className={styles.chip} aria-hidden="true">
-          {monogram}
-        </div>
-        {onToggleMinimize && (
-          <Tooltip content={`Minimize ${name}`} side="top">
-            <button
-              type="button"
-              className={styles.toggleBtn}
-              onClick={onToggleMinimize}
-              aria-label={`Minimize ${name}`}
-            >
-              <IconMinimize width={14} height={14} />
-            </button>
-          </Tooltip>
-        )}
-      </div>
-    </div>
-  );
-
+  // The `cp-subj <subjectId>` cascade is set on the wrapping <div> so any
+  // descendants that reference var(--c) / var(--cd) resolve correctly —
+  // identical to the Weekly grid's `subjectHead` recipe.
   return (
-    <Card
-      subjectId={subjectId}
-      header={header}
-      density="compact"
-      className={`${styles.card} ${fullHeight ? styles.fullHeight : ""}`}
-    >
-      <div className={styles.body}>
-        <div className={styles.progressLabel}>{completePct}% Complete</div>
-        <div
-          className={styles.progressTrack}
-          role="progressbar"
-          aria-valuenow={completePct}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={`${name} ${completePct}% complete`}
+    <div className={`${styles.subjectHead} cp-subj ${subjectId}`}>
+      <span
+        className={styles.subjectTile}
+        style={{ background: color.tile, color: color.deep }}
+        aria-hidden="true"
+      >
+        {monogram}
+      </span>
+      <span className={styles.subjectName} style={{ color: color.deep }}>
+        {name}
+      </span>
+      {onToggleMinimize && (
+        <Tooltip
+          content={minimized ? `Restore ${name}` : `Minimize ${name}`}
+          side="top"
         >
-          <div
-            className={styles.progressFill}
-            style={{ width: `${completePct}%` }}
-          />
-        </div>
-
-        {pacing !== undefined && (
-          <div className={styles.pacingRow}>
-            <span
-              className={styles.pacingDot}
-              data-pacing={pacing.kind}
-              aria-hidden="true"
-            />
-            <span className={styles.pacingLabel}>{pacingLabel(pacing)}</span>
-          </div>
-        )}
-      </div>
-    </Card>
+          <button
+            type="button"
+            className={styles.toggleBtn}
+            onClick={onToggleMinimize}
+            aria-label={minimized ? `Restore ${name}` : `Minimize ${name}`}
+            style={{ color: color.deep }}
+          >
+            {minimized ? (
+              <IconRestore width={14} height={14} />
+            ) : (
+              <IconMinimize width={14} height={14} />
+            )}
+          </button>
+        </Tooltip>
+      )}
+    </div>
   );
 }

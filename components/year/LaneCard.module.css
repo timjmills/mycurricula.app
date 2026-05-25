@@ -1,73 +1,59 @@
-/* LaneCard — left-edge lane summary; consumes the canonical Card primitive.
-   Styles here scope to the slots Card renders (.header / .body) and to the
-   minimized pill mode. All subject color flows from the cp-subj cascade
-   Card injects via its `subjectId` prop. */
+/* LaneCard — left-edge subject row label.
+   COPIED VERBATIM from /weekly's grid subject row label (.subjectHead +
+   .subjectTile + .subjectName at components/grid/WeeklyGrid.module.css
+   lines 251–288). Per BUILD_STANDARD §2 the subject identity treatment
+   must be identical across surfaces; this file is the literal lift so
+   /year reads as the same product family as the Weekly grid. */
 
-/* The Card primitive owns shell + shadow + border. We just size it. */
-.card {
-  width: 200px;
-  flex: 0 0 200px;
-}
-
-.fullHeight {
-  height: 100%;
-}
-
-/* ── Header inner ─────────────────────────────────────────────────────── */
-
-.headerInner {
+/* ── Subject row header (lifted from WeeklyGrid.module.css L251–L267) ───── */
+.subjectHead {
   display: flex;
+  /* Top-align the label: in a tall subject row, centering would float
+     the subject name in the middle of the row. flex-start keeps it at the top,
+     aligned with the cards in that row. */
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 6px;
-  width: 100%;
+  gap: 8px;
+  padding: 10px 6px 10px 4px;
+  /* The Year lane column is fixed-width (RoadmapView/ProgressionView render
+     it inside a 200px grid track) — match the Weekly grid's sticky-column
+     paper background so the row reads as the same chrome. */
+  background: var(--ink-50);
+  /* Hairline right border reads as a clean edge against the row content. */
+  border-right: var(--line);
 }
 
-.headerText {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  flex: 1;
-}
-
-.name {
-  font-size: var(--t-16);
-  font-weight: 700;
-  letter-spacing: -0.2px;
-  line-height: 1.2;
-  color: var(--c-deep);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Right-side header controls — chip + minimize toggle.
-   Gap is wide enough that the toggleBtn's ::before hit-area (inset -10px)
-   does not overlap the chip's hit region. */
-.headerControls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.chip {
-  flex-shrink: 0;
+/* Lifted from WeeklyGrid.module.css L269–L281. */
+.subjectTile {
   width: 28px;
-  height: 32px;
-  border-radius: var(--r-6);
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
+  height: 28px;
+  border-radius: 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: var(--t-11);
   font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--c-deep);
+  line-height: 1;
+  flex: 0 0 auto;
+  letter-spacing: -0.3px;
 }
+
+/* Lifted from WeeklyGrid.module.css L283–L288. */
+.subjectName {
+  font-size: var(--t-13);
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  min-width: 0;
+  /* The Weekly grid's sticky column is narrow; truncate if the name overflows
+     so the chevron stays on the same row. */
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Minimize/restore chevron ─────────────────────────────────────────────
+   Preserves the Lane E ::before hit-area pattern so the tap target stays
+   ≥44×44 even though the visible chevron is 24×24. */
 
 .toggleBtn {
   position: relative;
@@ -79,9 +65,9 @@
   border-radius: var(--r-6);
   background: transparent;
   border: 0;
-  color: var(--c-deep);
   cursor: pointer;
   padding: 0;
+  flex-shrink: 0;
   transition:
     background 120ms ease,
     color 120ms ease;
@@ -112,161 +98,15 @@
   }
 }
 
-/* ── Body ─────────────────────────────────────────────────────────────── */
-
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.progressLabel {
-  font-size: var(--t-13);
-  font-weight: 700;
-  color: var(--ink-900);
-  line-height: 1.2;
-}
-
-.progressTrack {
-  height: 6px;
-  background: var(--c-progress-track);
-  border-radius: var(--r-pill);
-  overflow: hidden;
-}
-
-.progressFill {
-  height: 100%;
-  border-radius: var(--r-pill);
-  background: var(--c-progress-fill);
-  transition: width 180ms ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .progressFill {
-    transition: none;
-  }
-}
-
-/* ── Pacing row ───────────────────────────────────────────────────────── */
-
-.pacingRow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.pacingDot {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ink-500);
-}
-
-.pacingDot[data-pacing="on_pace"],
-.pacingDot[data-pacing="in_progress"],
-.pacingDot[data-pacing="completed"] {
-  background: var(--done);
-}
-
-.pacingDot[data-pacing="behind"] {
-  background: var(--catchup);
-}
-
-.pacingDot[data-pacing="ahead"] {
-  background: var(--fyi);
-}
-
-.pacingDot[data-pacing="starts_next_week"],
-.pacingDot[data-pacing="starts_in_days"] {
-  background: var(--ink-500);
-}
-
-.pacingDot[data-pacing="not_started"] {
-  background: var(--ink-400);
-}
-
-.pacingLabel {
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-700);
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ── Minimized pill mode ───────────────────────────────────────────────── */
-
-/* The pill is a Card render with density=compact and just a body slot.
-   We override width so it grows beyond the 200px default for a one-row layout. */
-.pill {
-  width: auto;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.pillRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 36px;
-}
-
-.pillChip {
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-6);
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--t-11);
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--c-deep);
-}
-
-.pillName {
-  flex: 1;
-  font-size: var(--t-13);
-  font-weight: 700;
-  color: var(--c-deep);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pillPct {
-  font-size: var(--t-12);
-  font-weight: 600;
-  color: var(--ink-700);
-  flex-shrink: 0;
-}
-
-/* ── Responsive ─────────────────────────────────────────────────────────── */
-
-@media (max-width: 900px) {
-  .name {
-    font-size: var(--t-14);
-  }
-}
+/* ── Responsive (mirrors Weekly grid behavior at narrow widths) ──────────── */
 
 @media (max-width: 480px) {
-  .card {
-    width: 160px;
-    flex: 0 0 160px;
+  .subjectName {
+    font-size: var(--t-12);
   }
-  .name {
-    font-size: var(--t-13);
-  }
-  .chip {
+  .subjectTile {
     width: 24px;
-    height: 28px;
+    height: 24px;
     font-size: var(--t-10);
   }
 }

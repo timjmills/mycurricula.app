@@ -184,8 +184,11 @@ function StatItem({
 
 // ── Layout constants ──────────────────────────────────────────────────────
 
-/** Width in px of each week column. Must match RoadmapView's WEEK_COL_PX. */
-const COLUMN_WIDTH_PX = 120;
+/** Width in px of each week column. Must match RoadmapView's WEEK_COL_PX.
+ *  Tightened 2026-05-25: 120 → 96 (~20% reduction) so the default 100% zoom
+ *  shows ~25% more weeks per screen — matches what users reported feeling
+ *  right at 80% browser zoom. */
+const COLUMN_WIDTH_PX = 96;
 /** Width in px of the left lane-card rail. Must match RoadmapView's grid. */
 const LEFT_RAIL_WIDTH_PX = 200;
 
