@@ -72,15 +72,29 @@ export function QuarterMonthWeekHeader({
           <span className={styles.eyebrowLine2}>CURRICULUM LANES</span>
         </div>
 
-        {months.map((m, mi) => (
-          <div
-            key={`${m.label}-${mi}`}
-            className={`${styles.monthCell} ${mi > 0 ? styles.monthBorder : ""}`}
-            style={{ gridColumn: `span ${m.weeks}` }}
-          >
-            {m.label}
-          </div>
-        ))}
+        {/* Lane R changed `allYearMonths()` to always return 12 calendar
+            months — including months that contain ZERO of the 36 mock-data
+            academic weeks (default mock: Aug/Sep/Oct). Their `weeks` field is
+            0, but CSS Grid spec defines `span 0` as invalid and clamps to
+            `span 1` — which inserts extra cells in this row that the lane
+            body below doesn't have. Result: month labels drift left by the
+            number of empty months (3 cells of misalignment in the default
+            mock anchor). Filtering empty months out keeps the header aligned
+            with the lane body until Lane Y-cal (academic year date pickers,
+            queued) restructures the data so all 12 calendar months can
+            render with empty week cells underneath. Audit ref:
+            docs/audit-roadmap-progression-days-2026-05-25.md F1. */}
+        {months
+          .filter((m) => m.weeks > 0)
+          .map((m, mi) => (
+            <div
+              key={`${m.label}-${mi}`}
+              className={`${styles.monthCell} ${mi > 0 ? styles.monthBorder : ""}`}
+              style={{ gridColumn: `span ${m.weeks}` }}
+            >
+              {m.label}
+            </div>
+          ))}
       </div>
 
       {/* ── Row 2: Week labels ────────────────────────────────────────── */}
