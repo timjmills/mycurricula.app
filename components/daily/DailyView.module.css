@@ -363,6 +363,29 @@
   overflow: hidden;
 }
 
+/* The right rail (second child, a <RightRail> <aside>) holds a fixed width
+   that mirrors the grid-mode rail track (320px). Without this rule, the
+   rail's own `.rail` CSS sets width: 100% + flex-shrink: 0 which makes it
+   take the full listModeBody width and collapse DailyList to zero, causing
+   the rail content to overlap / cover the rest of the page. The fixed-px
+   sibling layout matches the grid-mode 5-track grid (where the rail is the
+   last 320px track). On narrow viewports the rail's own narrow-mode CSS
+   (max-width: 720px in RightRail.module.css) drops the border-left and
+   relies on the wrapping flex column below to stack rail beneath list. */
+.listModeBody > :nth-child(2) {
+  flex: 0 0 320px;
+  min-width: 0;
+}
+
+/* At ≤960px (the same fold the grid mode uses), drop the rail to keep
+   DailyList readable. Mirrors the .body media query below that collapses
+   the right rail's grid track to 0. */
+@media (max-width: 960px) {
+  .listModeBody > :nth-child(2) {
+    display: none;
+  }
+}
+
 /* ── Schedule rail track ────────────────────────────────────────────────── */
 /* When the Daily Schedule pill is ON, the bodyRow grows by one track on
    the right that hosts a <ScheduleDayPane variant="rail" />. The track is
