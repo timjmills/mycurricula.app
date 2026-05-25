@@ -104,6 +104,7 @@ export function ResourceTile({
           className={styles.collapseBtn}
           onClick={onCollapse}
           iconAriaLabel={`Minimize resources to a link list (from ${label})`}
+          tooltip="Collapse this section's resources to a compact link list — useful when the lesson body needs more room"
         >
           <CollapseIcon />
         </Button>
@@ -115,6 +116,7 @@ export function ResourceTile({
           className={styles.removeBtn}
           onClick={onRemove}
           iconAriaLabel={`Remove resource: ${label}`}
+          tooltip={`Detach "${label}" from this section — the underlying file or link is not deleted, only unlinked here`}
         >
           <RemoveIcon />
         </Button>

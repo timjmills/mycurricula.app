@@ -95,7 +95,11 @@ export function LaneCard({
       </span>
       {onToggleMinimize && (
         <Tooltip
-          content={minimized ? `Restore ${name}` : `Minimize ${name}`}
+          content={
+            minimized
+              ? `Expand the ${name} row back to full height so you can see its unit bars again`
+              : `Collapse the ${name} row to a thin strip — useful when you want to focus on other subjects without losing context`
+          }
           side="top"
         >
           <button
@@ -103,6 +107,11 @@ export function LaneCard({
             className={styles.toggleBtn}
             onClick={onToggleMinimize}
             aria-label={minimized ? `Restore ${name}` : `Minimize ${name}`}
+            title={
+              minimized
+                ? `Expand the ${name} row back to full height`
+                : `Collapse the ${name} row to a thin strip`
+            }
             style={{ color: color.deep }}
           >
             {minimized ? (

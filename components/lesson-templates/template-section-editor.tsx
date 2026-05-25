@@ -135,7 +135,10 @@ export function TemplateSectionEditor({
               role="group"
               aria-label={`Controls for section ${index + 1}`}
             >
-              <Tooltip content="Move up" side="top">
+              <Tooltip
+                content="Move this section one slot earlier in the template's flow"
+                side="top"
+              >
                 <Button
                   variant="icon"
                   size="sm"
@@ -143,11 +146,15 @@ export function TemplateSectionEditor({
                   onClick={() => moveUp(index)}
                   disabled={index === 0}
                   iconAriaLabel={`Move section ${index + 1} up`}
+                  tooltip="Move this section one slot earlier"
                 >
                   <ArrowUpIcon />
                 </Button>
               </Tooltip>
-              <Tooltip content="Move down" side="top">
+              <Tooltip
+                content="Move this section one slot later in the template's flow"
+                side="top"
+              >
                 <Button
                   variant="icon"
                   size="sm"
@@ -155,11 +162,15 @@ export function TemplateSectionEditor({
                   onClick={() => moveDown(index)}
                   disabled={index === sections.length - 1}
                   iconAriaLabel={`Move section ${index + 1} down`}
+                  tooltip="Move this section one slot later"
                 >
                   <ArrowDownIcon />
                 </Button>
               </Tooltip>
-              <Tooltip content="Remove section" side="top">
+              <Tooltip
+                content="Remove this section from the template — existing lessons using the template keep the section unless edited"
+                side="top"
+              >
                 <Button
                   variant="icon"
                   size="sm"
@@ -167,6 +178,7 @@ export function TemplateSectionEditor({
                   onClick={() => removeSection(index)}
                   disabled={sections.length <= 1}
                   iconAriaLabel={`Remove section ${index + 1}`}
+                  tooltip="Remove this section from the template"
                 >
                   <RemoveIcon />
                 </Button>
@@ -183,6 +195,7 @@ export function TemplateSectionEditor({
         className={styles.addBtn}
         onClick={addSection}
         leadingIcon={<AddIcon />}
+        tooltip="Append a new section to this template — set its heading, default body, and color"
       >
         Add section
       </Button>

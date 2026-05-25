@@ -301,7 +301,10 @@ export function LessonCard({
           {/* ⋯ menu button — <Button variant="icon"> with <Tooltip>. The
               styles.affordance className overrides Button's own styles to
               preserve the hover-reveal behaviour defined in lesson-card.module.css. */}
-          <Tooltip content="More actions" side="top">
+          <Tooltip
+            content="Open the lesson menu — mark status, move this lesson to another day or week, edit details, or save changes to the team's Master copy"
+            side="top"
+          >
             <Button
               variant="icon"
               size="sm"
@@ -309,6 +312,7 @@ export function LessonCard({
               onClick={handleAffordance}
               iconAriaLabel="More actions"
               aria-haspopup="menu"
+              tooltip="Open the lesson menu — mark status, move the lesson, edit, or push changes to Master"
             >
               <span className={styles.affordanceVisual}>
                 <Icon name="dots" size={12} />
@@ -394,6 +398,11 @@ export function LessonCard({
           onClick={toggleExpand}
           aria-expanded={expanded}
           aria-label={expanded ? "Collapse lesson" : "Expand lesson"}
+          title={
+            expanded
+              ? "Collapse this lesson back to the preview card"
+              : "Expand this lesson to see full directions, resources, standards, and any sub-tasks"
+          }
         >
           <span
             aria-hidden
@@ -504,6 +513,11 @@ export function LessonCard({
                 }}
                 aria-expanded={notesOpen}
                 leadingIcon={<Icon name="eye" size={12} />}
+                tooltip={
+                  notesOpen
+                    ? "Hide the team's private teacher notes for this lesson"
+                    : "Reveal the team's private teacher notes — context that only fellow teachers see, never students"
+                }
               >
                 {notesOpen ? "Hide teacher notes" : "Show teacher notes"}
               </Button>

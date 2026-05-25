@@ -144,7 +144,9 @@ export function WeeklyList(): ReactNode {
         <div>
           <div className={styles.kicker}>WEEKLY PLAN · LIST VIEW</div>
           <div className={styles.headingRow}>
-            <h1 className={styles.heading}>Week {week}</h1>
+            {/* h2 (not h1) — the page-level h1 lives in WeeklyShell's
+                PageHeader. This in-list week heading is a section. */}
+            <h2 className={styles.heading}>Week {week}</h2>
             <span className={styles.hint}>
               Same data as the grid view, listed by day.
             </span>

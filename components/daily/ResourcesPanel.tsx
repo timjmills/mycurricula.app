@@ -589,6 +589,7 @@ function TileWithOverflow({
           variant="icon"
           iconAriaLabel={`More actions for ${resource.label || resource.type}`}
           className={styles.tileMenuBtn}
+          tooltip={`Open menu for "${resource.label || resource.type}" — rename, replace, or detach this resource`}
           onClick={(e) => {
             // The stub click is contained — don't bubble into a future
             // tile-click handler when one lands.
@@ -940,6 +941,7 @@ export function ResourcesPanel({
             ? `Resources for ${lesson.title}`
             : "Lesson resources"
       }
+      title="Resources panel — every link, file, video, and doc attached to the current lesson (or the whole week when no lesson is selected); drag files in to attach"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -976,6 +978,7 @@ export function ResourcesPanel({
             className={styles.backBtn}
             onClick={onClearLesson}
             aria-label="Back to week resources"
+            tooltip="Return to the week-wide resources view (un-pins the current lesson scope)"
             leadingIcon={<BackIcon />}
           />
         )}
@@ -1018,6 +1021,7 @@ export function ResourcesPanel({
             onClick={openComposer}
             aria-haspopup="dialog"
             aria-expanded={composerOpen}
+            tooltip="Attach a new link, file, video, or doc to this lesson — opens the resource composer"
           >
             <PlusIcon />
           </Button>
@@ -1041,6 +1045,7 @@ export function ResourcesPanel({
                 viewMode === "list" ? styles.modeBtnActive : ""
               }`}
               onClick={() => setViewMode("list")}
+              tooltip="Show resources as a compact list — best for scanning many items quickly"
             >
               <ListIcon />
             </Button>
@@ -1052,6 +1057,7 @@ export function ResourcesPanel({
                 viewMode === "grid" ? styles.modeBtnActive : ""
               }`}
               onClick={() => setViewMode("grid")}
+              tooltip="Show resources as visual tiles — best when you want previews of videos and documents"
             >
               <GridIcon />
             </Button>
@@ -1069,6 +1075,11 @@ export function ResourcesPanel({
             className={styles.collapseBtn}
             onClick={onToggleCollapsed}
             aria-expanded={!collapsed}
+            tooltip={
+              collapsed
+                ? "Expand the Resources panel to see this lesson's materials"
+                : "Collapse the Resources panel — frees up vertical space in the rail"
+            }
           >
             <ChevronToggleIcon collapsed={collapsed} />
           </Button>

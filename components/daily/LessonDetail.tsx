@@ -410,6 +410,7 @@ export function LessonDetail({
               iconAriaLabel="More options"
               className={detailStyles.bandIconBtn}
               aria-haspopup="menu"
+              tooltip="Open the lesson menu — mark status, relocate, save as template, print, archive, or fork to Master"
             >
               {/* Vertical three-dots — kebab overflow per spec §1.2(C). */}
               <svg
@@ -428,6 +429,7 @@ export function LessonDetail({
               variant="icon"
               iconAriaLabel="Expand to full screen"
               className={detailStyles.bandIconBtn}
+              tooltip="Expand this lesson detail to full screen — fewer distractions while you read or edit"
             >
               {/* Expand / full-screen — diagonal arrows pointing outward. */}
               <svg
@@ -553,6 +555,11 @@ export function LessonDetail({
                 aria-label={
                   lesson.status === "done" ? "Mark as not done" : "Mark as done"
                 }
+                tooltip={
+                  lesson.status === "done"
+                    ? "Click to cycle to partial credit, then to not-done — useful when something needs to be re-taught"
+                    : "Mark this lesson done — completion is personal, it never forks the team's Master copy"
+                }
                 leadingIcon={
                   <StatusCheckbox status={lesson.status} size={16} />
                 }
@@ -567,6 +574,7 @@ export function LessonDetail({
                 className={detailStyles.actionBtn}
                 aria-label="Add status"
                 aria-haspopup="menu"
+                tooltip="Tag this lesson with a status (urgent, important, FYI, catch-up) — the tag colors the card so the team can see priorities at a glance"
                 leadingIcon={
                   <svg
                     width="14"
@@ -600,6 +608,7 @@ export function LessonDetail({
                 className={detailStyles.notesLink}
                 onClick={scrollToNotes}
                 aria-label="Jump to lesson notes"
+                tooltip="Scroll down to the My-notes editor and focus the textarea — fastest way to jot a private reminder for yourself"
                 leadingIcon={
                   <svg
                     width="14"

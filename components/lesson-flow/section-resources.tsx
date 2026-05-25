@@ -212,6 +212,7 @@ export const SectionResources = memo(function SectionResources({
           onClick={onAdd}
           disabled={!onAdd}
           aria-label="Add a quick resource to this section"
+          tooltip="Attach a quick link, file, or video to this section — students see it on the published lesson"
           leadingIcon={<PlusGlyph />}
         >
           Add quick resource
@@ -258,6 +259,7 @@ export const SectionResources = memo(function SectionResources({
         onClick={onAdd}
         disabled={!onAdd}
         aria-label="Add a resource to this section"
+        tooltip="Attach a link, file, video, or doc to this section — opens the resource picker"
         leadingIcon={<PlusGlyph />}
       >
         Add resource
@@ -280,6 +282,7 @@ export const SectionResources = memo(function SectionResources({
             size="sm"
             className={styles.showMoreBtn}
             aria-label="Show more resources"
+            tooltip="Reveal the rest of the resources attached to this section"
             trailingIcon={<ShowMoreChevron />}
           >
             Show more
@@ -418,6 +421,11 @@ function ToggleButton({
       className={styles.toggleBtn}
       onClick={onClick}
       iconAriaLabel={minimized ? "Expand resources" : "Minimize resources"}
+      tooltip={
+        minimized
+          ? "Switch to the full 2x2 resource grid for this section"
+          : "Switch to the compact quick-access list — useful when the lesson body is the focus"
+      }
       // Spec §4.1: aria-pressed reflects the minimized state — pressed=true
       // when minimized; the label and glyph convey the transition direction.
       aria-pressed={minimized}

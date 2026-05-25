@@ -97,6 +97,8 @@ interface MenuRow {
   danger?: boolean;
   /** When true the row is omitted entirely — not greyed, not rendered. */
   hidden?: boolean;
+  /** Onboarding-voice explanation for this menu item. */
+  tip?: string;
   onSelect?: () => void;
 }
 
@@ -172,6 +174,7 @@ export function LessonContextMenu({
       // ── Group 1: navigation & movement ──────────────────────────────────
       {
         label: "Open in Daily",
+        tip: "Switch to Daily view with this lesson opened in the detail pane",
         onSelect: () => {
           router.push(`/daily?lesson=${lesson.id}`);
           onClose();
@@ -179,19 +182,23 @@ export function LessonContextMenu({
       },
       {
         label: "Relocate…",
+        tip: "Pick a new day or week for this lesson — pops a picker so you can drop it precisely",
         onSelect: () => fire("relocate"),
       },
       {
         label: "Bump",
+        tip: "Push this lesson forward one slot — useful when today's class ran short and you need to slide everything by a day",
         onSelect: () => fire("bump"),
       },
       {
         label: "Duplicate",
         kbd: "⌘D",
+        tip: "Create a copy of this lesson on the next available slot — handy when you want to teach the same thing twice",
         onSelect: () => fire("duplicate"),
       },
       {
         label: "Save as template",
+        tip: "Save this lesson's structure as a reusable template so you can stamp out similar lessons later",
         onSelect: () => fire("save-template"),
       },
 
@@ -201,22 +208,27 @@ export function LessonContextMenu({
       {
         label: "Mark status…",
         chevron: true,
+        tip: "Choose a specific status — done, partial, skipped, carried, or not started",
         onSelect: () => setSub("status"),
       },
       {
         label: "Skip (quick)",
+        tip: "Mark this lesson skipped in one click — it'll show on the catch-up list until you decide what to do with it",
         onSelect: () => fire("skip-quick"),
       },
       {
         label: "Add resource…",
+        tip: "Attach a link, file, or note to this lesson so the whole team has the material when they teach it",
         onSelect: () => fire("add-resource"),
       },
       {
         label: "Add to to-do list",
+        tip: "Pin this lesson to today's to-do list as a reminder to prep it",
         onSelect: () => fire("add-to-todo"),
       },
       {
         label: "See standards",
+        tip: "Open the standards drawer to see which CCSS / curriculum standards this lesson hits",
         onSelect: () => fire("see-standards"),
       },
 
@@ -229,16 +241,19 @@ export function LessonContextMenu({
       {
         label: "Restore from Master",
         hidden: !lesson.modified,
+        tip: "Discard your personal edits and revert to the team's Master version of this lesson",
         onSelect: () => fire("restore-master"),
       },
       {
         label: "Compare to Master",
         hidden: !lesson.modified,
+        tip: "Side-by-side view of your version next to the team's Master — so you can see exactly what you changed",
         onSelect: () => fire("compare-master"),
       },
       {
         label: "Copy to my personal",
         hidden: lesson.modified,
+        tip: "Fork the team's Master lesson into your personal copy so you can edit it without affecting anyone else",
         onSelect: () => fire("copy-to-personal"),
       },
 
@@ -248,10 +263,12 @@ export function LessonContextMenu({
       {
         label: "Print this lesson",
         kbd: "⌘P",
+        tip: "Open a paper-friendly single-lesson print view (good for handouts and substitute folders)",
         onSelect: () => fire("print"),
       },
       {
         label: "Archive",
+        tip: "Move this lesson out of the active planner — it stays in your archive so you can revive it next year",
         onSelect: () => fire("archive"),
       },
 
@@ -262,6 +279,7 @@ export function LessonContextMenu({
             {
               label: "Delete from Core",
               danger: true,
+              tip: "Permanently remove this lesson from the team's Master curriculum — affects every teacher's plan",
               onSelect: () => fire("delete"),
             },
           ] as MenuRow[])
@@ -316,6 +334,7 @@ export function LessonContextMenu({
           variant="ghost"
           size="sm"
           onClick={() => setSub(null)}
+          tooltip="Return to the main lesson menu"
           leadingIcon={
             <span
               style={{ transform: "rotate(180deg)", display: "inline-flex" }}
@@ -379,6 +398,8 @@ export function LessonContextMenu({
             role="menuitem"
             onClick={row.onSelect}
             className="cp-card-menuitem"
+            tooltip={row.tip}
+            tooltipSide="right"
             trailingIcon={
               row.chevron ? (
                 <Icon name="chevron" size={10} />

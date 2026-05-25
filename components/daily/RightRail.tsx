@@ -665,6 +665,7 @@ export function RightRail({
                   tabIndex={isActive ? 0 : -1}
                   className={`${styles.tab} ${isActive ? styles.tabActive : ""}`}
                   onClick={() => selectTab(id)}
+                  title={`Switch the right rail to the ${TAB_LABEL[id]} panel`}
                 >
                   {TAB_LABEL[id]}
                 </button>

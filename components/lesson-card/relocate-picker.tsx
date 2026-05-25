@@ -160,6 +160,7 @@ export function RelocatePicker({
         role="dialog"
         aria-modal="true"
         aria-label="Relocate lesson"
+        title="Relocate lesson dialog — pick a new day, week, and subject; optionally keep the original lesson where it is"
         onKeyDown={handleKeyDown}
         style={{
           background: "var(--paper)",
@@ -209,6 +210,7 @@ export function RelocatePicker({
                   type="button"
                   aria-pressed={day === i}
                   onClick={() => setDay(i)}
+                  title={`Move this lesson to ${label} of the target week`}
                   style={{
                     flex: 1,
                     minHeight: 44,
@@ -251,6 +253,7 @@ export function RelocatePicker({
               <button
                 type="button"
                 aria-label="Previous week"
+                title="Step back one school week"
                 disabled={week <= MIN_WEEK}
                 onClick={() => setWeek((w) => Math.max(MIN_WEEK, w - 1))}
                 style={{
@@ -298,6 +301,7 @@ export function RelocatePicker({
               <button
                 type="button"
                 aria-label="Next week"
+                title="Step forward one school week"
                 disabled={week >= MAX_WEEK}
                 onClick={() => setWeek((w) => Math.min(MAX_WEEK, w + 1))}
                 style={{
@@ -410,10 +414,25 @@ export function RelocatePicker({
               marginTop: 2,
             }}
           >
-            <Button variant="secondary" size="md" type="button" onClick={close}>
+            <Button
+              variant="secondary"
+              size="md"
+              type="button"
+              onClick={close}
+              tooltip="Close this picker without relocating the lesson"
+            >
               Cancel
             </Button>
-            <Button variant="primary" size="md" type="submit">
+            <Button
+              variant="primary"
+              size="md"
+              type="submit"
+              tooltip={
+                keepOriginal
+                  ? "Create a copy of this lesson at the chosen day and week — the original stays where it is"
+                  : "Move this lesson to the chosen day and week — it disappears from its current slot"
+              }
+            >
               {keepOriginal ? "Duplicate to here" : "Move here"}
             </Button>
           </div>

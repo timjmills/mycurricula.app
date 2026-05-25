@@ -29,27 +29,53 @@ export function BulkActionBar({
   onClear,
 }: BulkActionBarProps) {
   return (
-    <div className={styles.bar} role="region" aria-label="Bulk actions">
+    <div
+      className={styles.bar}
+      role="region"
+      aria-label="Bulk actions"
+      title="Bulk action bar — apply the same action to every catch-up row you've selected, then the selection clears"
+    >
       <span className={styles.count}>{count} selected</span>
       <span className={styles.divider} aria-hidden="true" />
-      <button type="button" className={styles.btn} onClick={onMarkAllDone}>
+      <button
+        type="button"
+        className={styles.btn}
+        onClick={onMarkAllDone}
+        title="Mark every selected lesson done — they leave the catch-up list and show as complete on the planner"
+      >
         Mark all done
       </button>
-      <button type="button" className={styles.btn} onClick={onMarkAllSkipped}>
+      <button
+        type="button"
+        className={styles.btn}
+        onClick={onMarkAllSkipped}
+        title="Mark every selected lesson skipped — they stay flagged so you can decide later whether to make them up"
+      >
         Mark all skipped
       </button>
       <button
         type="button"
         className={`${styles.btn} ${styles.btnPrimary}`}
         onClick={onCarryAll}
+        title="Move every selected lesson to a future day — pick the target week and day, then they re-appear there"
       >
         Carry over all to…
       </button>
-      <button type="button" className={styles.btn} onClick={onAddAllToTodo}>
+      <button
+        type="button"
+        className={styles.btn}
+        onClick={onAddAllToTodo}
+        title="Add every selected lesson to your daily to-do list as a reminder to revisit them"
+      >
         Add all to to-do
       </button>
       <span className={styles.spacer} aria-hidden="true" />
-      <button type="button" className={styles.btnGhost} onClick={onClear}>
+      <button
+        type="button"
+        className={styles.btnGhost}
+        onClick={onClear}
+        title="Deselect every catch-up row and hide this action bar"
+      >
         Clear
       </button>
     </div>

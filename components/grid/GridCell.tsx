@@ -419,13 +419,17 @@ export function GridCell({
         {isEmpty ? (
           <div className={styles.emptyCell}>
             <p className={styles.emptyHint}>Drag a lesson here or click +</p>
-            <Tooltip content="Add a lesson" side="top">
+            <Tooltip
+              content="Add a lesson to this day-subject slot — opens the new-lesson form pre-filled with the subject and day"
+              side="top"
+            >
               <Button
                 variant="icon"
                 size="sm"
                 iconAriaLabel="Add a lesson to this day"
                 className={styles.cellAdd}
                 onClick={() => onAdd(subjectId, day)}
+                tooltip="Add a lesson to this day-subject slot"
               >
                 <PlusIcon />
               </Button>
@@ -435,7 +439,11 @@ export function GridCell({
           <>
             {hasMultiple && (
               <Tooltip
-                content={maximized ? "Collapse cards" : "Expand all cards"}
+                content={
+                  maximized
+                    ? "Collapse this cell's lessons back into a stacked pager — saves vertical space across the whole grid row"
+                    : "Expand every lesson stacked in this cell so you can see them all at once"
+                }
                 side="top"
               >
                 <Button
@@ -445,6 +453,11 @@ export function GridCell({
                     maximized ? "Collapse cards" : "Expand all cards"
                   }
                   className={styles.collapseBtn}
+                  tooltip={
+                    maximized
+                      ? "Collapse this cell back to the stacked pager view"
+                      : "Show every lesson in this cell at full height"
+                  }
                   onClick={(e) => {
                     e.stopPropagation();
                     onToggleMaximize(subjectId, day);
@@ -468,12 +481,16 @@ export function GridCell({
             {/* Compact "+" affordance — absolutely positioned bottom-right,
                 revealed on cell hover/focus. Takes ZERO flow space so the
                 lesson card fills 100% of the cell. */}
-            <Tooltip content="Add another lesson" side="top">
+            <Tooltip
+              content="Stack another lesson into this same day-subject cell — useful for a warm-up + main lesson pairing"
+              side="top"
+            >
               <Button
                 variant="icon"
                 size="sm"
                 iconAriaLabel="Add another lesson to this day"
                 className={styles.cellAddInline}
+                tooltip="Stack another lesson into this same cell"
                 onClick={(e) => {
                   e.stopPropagation();
                   onAdd(subjectId, day);

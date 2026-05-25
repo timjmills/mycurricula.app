@@ -70,6 +70,7 @@ export function MonthPicker({ activeMonthIdx, onPickMonth }: MonthPickerProps) {
       <summary
         className={styles.summary}
         aria-label={`Jump to month, currently ${activeLabel}`}
+        title="Jump the year roadmap to any month — click to pick a month and the timeline scrolls to its first week"
       >
         <span className={styles.label}>{activeLabel}</span>
         <IconChev width={13} height={13} className={styles.chev} />
@@ -87,6 +88,7 @@ export function MonthPicker({ activeMonthIdx, onPickMonth }: MonthPickerProps) {
                   className={`${styles.item} ${isActive ? styles.itemActive : ""}`}
                   aria-current={isActive ? "true" : undefined}
                   onClick={() => handlePick(i)}
+                  title={`Scroll the roadmap to ${m.label}`}
                 >
                   {m.label}
                 </button>

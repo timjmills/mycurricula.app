@@ -321,6 +321,7 @@ export function Shoutbox({
             iconAriaLabel="Add emoji"
             className={styles.iconBtn}
             onClick={(e) => e.preventDefault()}
+            tooltip="Insert an emoji into your shoutbox message (coming in a later phase)"
           >
             <EmojiIcon />
           </Button>
@@ -330,6 +331,7 @@ export function Shoutbox({
             iconAriaLabel="Attach file"
             className={styles.iconBtn}
             onClick={(e) => e.preventDefault()}
+            tooltip="Attach a file — file hosting arrives in a later phase"
           >
             <AttachIcon />
           </Button>
@@ -340,6 +342,7 @@ export function Shoutbox({
             iconAriaLabel="Post message"
             className={`${styles.iconBtn} ${styles.sendBtn}`}
             disabled={draft.trim().length === 0}
+            tooltip="Post this message to today's shoutbox — every teacher on the team sees it on their Daily view"
           >
             <SendIcon />
           </Button>
@@ -349,7 +352,11 @@ export function Shoutbox({
   );
 
   return (
-    <section className={styles.panel} aria-label="Day shoutbox">
+    <section
+      className={styles.panel}
+      aria-label="Day shoutbox"
+      title="Day Shoutbox panel — a team-wide chat scoped to today; share quick updates, ask for cover, or flag something the whole grade should know"
+    >
       {/* ── Head: optional grip + title + Team-chat tag + unread + chevron ── */}
       <header className={styles.head}>
         {/* Drag grip — only rendered when the rail wires the bundle. */}
@@ -388,6 +395,11 @@ export function Shoutbox({
             className={styles.collapseBtn}
             onClick={onToggleCollapsed}
             aria-expanded={!collapsed}
+            tooltip={
+              collapsed
+                ? "Expand the Day Shoutbox to see today's team chat"
+                : "Collapse the Day Shoutbox — unread count stays visible in the header"
+            }
           >
             <ChevronToggleIcon collapsed={collapsed} />
           </Button>

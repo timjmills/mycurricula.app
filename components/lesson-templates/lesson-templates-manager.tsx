@@ -59,6 +59,7 @@ function BuiltinCard({ template, onDuplicate }: BuiltinCardProps): ReactNode {
           size="sm"
           onClick={() => onDuplicate(template)}
           aria-label={`Duplicate and edit ${template.name}`}
+          tooltip={`Create an editable copy of the ${template.name} template — the built-in template stays untouched`}
           leadingIcon={
             <svg
               aria-hidden
@@ -132,6 +133,7 @@ function CustomRow({
           onClick={onEdit}
           iconAriaLabel={`Edit ${template.name}`}
           aria-pressed={isEditing}
+          tooltip={`Open ${template.name} for editing — rename it, add or remove sections, change section colors`}
         >
           {/* Pencil icon */}
           <svg
@@ -154,6 +156,7 @@ function CustomRow({
           size="sm"
           onClick={onDelete}
           iconAriaLabel={`Delete ${template.name}`}
+          tooltip={`Delete the ${template.name} template — any lessons still using it stay intact but lose the link to this template`}
           leadingIcon={
             <svg
               aria-hidden
@@ -211,6 +214,7 @@ function EditorPanel({
           size="sm"
           onClick={onDone}
           aria-label="Done editing template"
+          tooltip="Stop editing this template and return to the list view"
         >
           Done
         </Button>
@@ -380,6 +384,7 @@ export function LessonTemplatesManager(): ReactNode {
               size="sm"
               onClick={handleCreateNew}
               aria-label="Create a new lesson template"
+              tooltip="Create a fresh lesson template from scratch — define your own section flow for reuse across lessons"
               leadingIcon={
                 <svg
                   aria-hidden

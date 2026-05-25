@@ -137,12 +137,16 @@ export function NotePopover({ reason }: NotePopoverProps) {
           Raw <button> retained here because Tooltip.cloneElement injects ref
           and the Button primitive does not forward ref. The trigger also needs
           aria-haspopup="dialog" + aria-controls which are dialog-specific. */}
-      <Tooltip content="Why this lesson did not go as planned" side="top">
+      <Tooltip
+        content="Open the catch-up note — see why this lesson didn't go as planned and any context the team left for next time"
+        side="top"
+      >
         <button
           ref={triggerRef}
           type="button"
           className={styles.trigger}
           aria-label="Why this lesson did not go as planned"
+          title="Open the catch-up note explaining why this lesson didn't finish"
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
@@ -165,6 +169,7 @@ export function NotePopover({ reason }: NotePopoverProps) {
           id={panelId}
           role="dialog"
           aria-label="Lesson note"
+          title="Catch-up note dialog — explains why this lesson fell behind and what to do about it next"
           className={styles.panel}
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
@@ -179,6 +184,7 @@ export function NotePopover({ reason }: NotePopoverProps) {
               variant="icon"
               size="sm"
               iconAriaLabel="Close note"
+              tooltip="Close this catch-up note popover"
               className={styles.panelClose}
               onClick={(e) => {
                 e.stopPropagation();

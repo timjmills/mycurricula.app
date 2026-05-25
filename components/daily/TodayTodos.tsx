@@ -317,6 +317,7 @@ export function TodayTodos({
           className={styles.addLink}
           onClick={() => setComposerOpen(true)}
           leadingIcon={<PlusIcon />}
+          tooltip="Open a quick-add input to capture a new to-do for today — full to-do management lives in the side panel"
         >
           Add a to-do
         </Button>
@@ -349,6 +350,7 @@ export function TodayTodos({
             type="submit"
             className={styles.composerAdd}
             disabled={draft.trim().length === 0}
+            tooltip="Add this item to your to-do list — it'll appear in the open count badge above"
           >
             Add
           </Button>
@@ -358,7 +360,11 @@ export function TodayTodos({
   );
 
   return (
-    <section className={styles.panel} aria-label="Today's to-dos">
+    <section
+      className={styles.panel}
+      aria-label="Today's to-dos"
+      title="To-do List panel — your personal task list for today; tick items off as you go, or click + Add a to-do to capture a quick reminder"
+    >
       {/* ── Head: optional grip + title + green count badge + chevron ─── */}
       <header className={styles.head}>
         {/* Drag grip — only rendered when the rail wires the bundle.
@@ -395,6 +401,11 @@ export function TodayTodos({
             className={styles.collapseBtn}
             onClick={onToggleCollapsed}
             aria-expanded={!collapsed}
+            tooltip={
+              collapsed
+                ? "Expand the to-do panel to see your full task list"
+                : "Collapse the to-do panel — the open-count badge stays visible in the header"
+            }
           >
             <ChevronToggleIcon collapsed={collapsed} />
           </Button>

@@ -44,13 +44,20 @@ interface FilterDef {
   activeTextVar: string; // var(--…) for the active pill text color
 }
 
-const FILTERS: FilterDef[] = [
+interface FilterDefWithCopy extends FilterDef {
+  /** Onboarding-voice tooltip text explaining what the filter shows. */
+  tooltip: string;
+}
+
+const FILTERS: FilterDefWithCopy[] = [
   {
     id: "all",
     label: "All",
     dotVar: "var(--ink-300)",
     activeVar: "var(--ink-100)",
     activeTextVar: "var(--ink-700)",
+    tooltip:
+      "Show every lesson on the roadmap regardless of status — clears the other status filters",
   },
   {
     id: "completed",
@@ -58,6 +65,8 @@ const FILTERS: FilterDef[] = [
     dotVar: "var(--done)",
     activeVar: "color-mix(in srgb, var(--done) 15%, white)",
     activeTextVar: "var(--reading-deep)",
+    tooltip:
+      "Highlight only lessons that have been marked done — useful for reviewing coverage you've already taught",
   },
   {
     id: "in_progress",
@@ -65,6 +74,8 @@ const FILTERS: FilterDef[] = [
     dotVar: "var(--fyi)",
     activeVar: "var(--fyi-bg)",
     activeTextVar: "var(--fyi)",
+    tooltip:
+      "Show units the team is currently teaching — at least one lesson started, but not yet all complete",
   },
   {
     id: "modified",
@@ -72,6 +83,8 @@ const FILTERS: FilterDef[] = [
     dotVar: "var(--important)",
     activeVar: "var(--important-bg)",
     activeTextVar: "var(--important)",
+    tooltip:
+      "Show units where you've personally edited lessons — these differ from the team's Master copy",
   },
   {
     id: "skipped",
@@ -79,6 +92,8 @@ const FILTERS: FilterDef[] = [
     dotVar: "var(--catchup)",
     activeVar: "color-mix(in srgb, var(--catchup) 12%, white)",
     activeTextVar: "var(--catchup)",
+    tooltip:
+      "Show lessons you marked skipped — they need a make-up day or to be moved into a future week",
   },
   {
     id: "not_started",
@@ -86,6 +101,8 @@ const FILTERS: FilterDef[] = [
     dotVar: "var(--ink-400)",
     activeVar: "var(--ink-100)",
     activeTextVar: "var(--ink-500)",
+    tooltip:
+      "Show units the team hasn't begun yet — useful for previewing what's coming up next",
   },
   {
     id: "needs_attention",
@@ -93,6 +110,8 @@ const FILTERS: FilterDef[] = [
     dotVar: "var(--catchup)",
     activeVar: "var(--catchup-bg)",
     activeTextVar: "var(--catchup)",
+    tooltip:
+      "Show units flagged as falling behind pace or needing review — catch-up candidates",
   },
 ];
 
@@ -136,6 +155,7 @@ export function StatusFilterBar({
             className={styles.pill}
             aria-pressed={isActive}
             onClick={() => onToggle(f.id)}
+            title={f.tooltip}
             style={
               isActive
                 ? ({
@@ -162,6 +182,7 @@ export function StatusFilterBar({
         className={styles.clearBtn}
         onClick={onClear}
         aria-label="Clear all status filters"
+        title="Remove every active status filter — the roadmap shows all lessons again"
         // Dim when there's nothing to clear so it reads as inactive.
         style={{ opacity: hasActiveFilters ? 1 : 0.45 }}
       >

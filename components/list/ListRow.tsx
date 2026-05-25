@@ -241,6 +241,7 @@ export function ListRow({
       onKeyDown={handleRowKeyDown}
       data-planner-item={`lesson:${lesson.id}`}
       aria-label={`${subjectLabelFor(lesson.subject)} — ${lesson.title}${isDone ? " (done)" : ""}`}
+      title={`Open "${lesson.title}" in the Daily view — see the full lesson plan, notes, and attached resources`}
     >
       {/* Subject monogram tile — background color from .cp-subj cascade */}
       <span className={styles.tile} aria-hidden="true">
@@ -303,6 +304,11 @@ export function ListRow({
         role="checkbox"
         aria-checked={isDone}
         aria-label={isDone ? "Mark not done" : "Mark done"}
+        title={
+          isDone
+            ? "Mark this lesson not done — useful if you completed it by mistake or need to re-teach"
+            : "Mark this lesson done — completion is personal and never forks the team's Master copy"
+        }
         className={`${styles.checkbox}${isDone ? ` ${styles.checked}` : ""}`}
         onClick={handleCheckboxClick}
       >

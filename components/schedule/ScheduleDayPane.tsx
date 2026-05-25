@@ -110,6 +110,7 @@ export function ScheduleDayPane({
         .filter(Boolean)
         .join(" ")}
       aria-label={`Schedule pane for ${dateLabel}`}
+      title={`Schedule pane for ${dateLabel} — see what classes meet today, switch between the bell schedule, your lesson plan, and any events`}
     >
       {/* ── Title strip ───────────────────────────────────────────────── */}
       <div className={styles.titleStrip}>
@@ -120,7 +121,7 @@ export function ScheduleDayPane({
           aria-label="Schedule pane options"
           disabled
           aria-disabled="true"
-          title="Pane options — coming soon"
+          title="Pane options menu — rename, hide, or rearrange this pane (coming in a later phase)"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
             <circle cx="3" cy="8" r="1.4" fill="currentColor" />
@@ -147,7 +148,7 @@ export function ScheduleDayPane({
           aria-label="Pick a different day"
           disabled
           aria-disabled="true"
-          title="Day picker — coming soon"
+          title="Jump this pane to a different day of the school week (coming in a later phase)"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
             <rect
@@ -232,7 +233,7 @@ export function ScheduleDayPane({
           // pane reads as the same shape it will have post-wire.
           disabled
           aria-disabled="true"
-          title="Adding time blocks — coming soon"
+          title="Add a new time block to this day's schedule — a class period, prep, lunch, or non-academic block (coming in a later phase)"
         >
           <span aria-hidden="true">+</span> Add time block
         </button>

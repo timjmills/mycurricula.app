@@ -147,6 +147,7 @@ export function YearSidebar() {
               aria-label={item.label}
               aria-disabled="true"
               disabled
+              title={`${item.label} — coming in a later phase`}
             >
               <Icon className={styles.navIcon} width={20} height={20} />
             </button>

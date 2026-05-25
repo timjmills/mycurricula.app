@@ -597,6 +597,7 @@ export function WeeklyGrid(): ReactNode {
             size="sm"
             onClick={expandAll}
             aria-label="Expand all lesson cards"
+            tooltip="Open every lesson card on this week's grid — useful for a full read-through before planning"
           >
             Expand all
           </Button>
@@ -605,6 +606,7 @@ export function WeeklyGrid(): ReactNode {
             size="sm"
             onClick={collapseAll}
             aria-label="Minimize all lesson cards"
+            tooltip="Collapse every lesson card back to its preview — gives you a fast overview of the whole week"
           >
             Minimize all
           </Button>
@@ -612,7 +614,7 @@ export function WeeklyGrid(): ReactNode {
 
         {/* BIG-2: Duplicate this week into the next week. */}
         <Tooltip
-          content={`Copy all lessons from week ${week} into week ${week + 1}`}
+          content={`Copy every lesson from week ${week} into week ${week + 1} — fast way to repeat a successful week or seed a similar plan`}
           side="top"
         >
           <Button
@@ -622,6 +624,7 @@ export function WeeklyGrid(): ReactNode {
             className={styles.dupeWeekBtn}
             onClick={handleDuplicateWeek}
             aria-label={`Duplicate week ${week} into week ${week + 1}`}
+            tooltip={`Copy every lesson in week ${week} forward into week ${week + 1}`}
           >
             Duplicate week
           </Button>
@@ -773,6 +776,7 @@ export function WeeklyGrid(): ReactNode {
                 className={styles.bulkDayBtn}
                 onClick={() => handleBulkMove(dayIdx)}
                 aria-label={`Move selected lessons to ${dayName}`}
+                tooltip={`Move every selected lesson to ${dayName} of this week`}
               >
                 {WEEK_DAYS_SHORT[dayIdx] ?? dayName}
               </Button>
@@ -786,6 +790,7 @@ export function WeeklyGrid(): ReactNode {
             className={styles.bulkClearBtn}
             onClick={clearBulkSelection}
             aria-label="Clear selection"
+            tooltip="Deselect every lesson card and hide this bulk action bar"
           >
             Clear
           </Button>

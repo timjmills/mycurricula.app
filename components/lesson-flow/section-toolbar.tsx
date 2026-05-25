@@ -113,25 +113,27 @@ export function SectionToolbar({
           so this popup never carries a drag grip. */}
       <div className={styles.manageRow}>
         <ManageButton
-          label="Move up"
+          label="Move this section one slot earlier in the lesson flow"
           onClick={onMoveUp}
           icon={<ChevronUpIcon />}
           disabled={!canMoveUp}
         />
         <ManageButton
-          label="Move down"
+          label="Move this section one slot later in the lesson flow"
           onClick={onMoveDown}
           icon={<ChevronDownIcon />}
           disabled={!canMoveDown}
         />
         <ManageButton
-          label="Duplicate section"
+          label="Create a copy of this section right below it — handy when two parts of a lesson share structure"
           onClick={onDuplicate}
           icon={<CopyIcon />}
         />
         <ManageButton
           label={
-            websiteVisible ? "Hide from class website" : "Show on class website"
+            websiteVisible
+              ? "Stop publishing this section to your class website — keeps it private to the team"
+              : "Publish this section to your class website so students can see it"
           }
           onClick={onToggleWebsite}
           icon={<GlobeIcon />}
@@ -139,7 +141,7 @@ export function SectionToolbar({
           active={websiteVisible}
         />
         <ManageButton
-          label="Delete section"
+          label="Delete this section from the lesson — disabled if this is the only section left"
           onClick={onDelete}
           icon={<TrashIcon />}
           danger
@@ -192,6 +194,7 @@ function ManageButton({
         className={className}
         onClick={onClick}
         disabled={disabled}
+        title={label}
         // aria-pressed only on toggle buttons — carried through Button's {...rest}.
         aria-pressed={toggle ? active : undefined}
       >

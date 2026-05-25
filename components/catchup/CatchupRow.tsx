@@ -164,6 +164,7 @@ export function CatchupRow({
         checked={selected}
         onChange={onToggleSelect}
         aria-label={`Select ${item.title}`}
+        title={`Check to add this lesson to the bulk-action set — selected rows can be marked done, skipped, or carried over together`}
       />
 
       <div className={styles.body}>
@@ -215,6 +216,7 @@ export function CatchupRow({
             className={styles.noteChip}
             onClick={handleEditNote}
             aria-label="Edit note"
+            title="Edit the note attached to this catch-up item — explain why it slipped or what you plan to do about it"
           >
             <span className={styles.noteLabel}>Note</span>
             <span className={styles.noteBody}>{visibleNote}</span>
@@ -224,6 +226,7 @@ export function CatchupRow({
             type="button"
             className={styles.addNote}
             onClick={handleEditNote}
+            title="Add a short note to this catch-up item — context for your future self or teammates"
           >
             <IconPencil />
             Add a note
@@ -257,6 +260,7 @@ export function CatchupRow({
             type="button"
             className={styles.actionBtn}
             onClick={onMarkDone}
+            title="Mark this lesson done retroactively — it leaves the catch-up list and shows complete on the planner"
           >
             Mark done
           </button>
@@ -264,6 +268,7 @@ export function CatchupRow({
             type="button"
             className={`${styles.actionBtn} ${styles.actionBtnMuted}`}
             onClick={onSkip}
+            title="Mark this lesson skipped — keeps it visible in catch-up so you can decide later whether to make it up"
           >
             Skipped
           </button>
@@ -271,6 +276,7 @@ export function CatchupRow({
             type="button"
             className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
             onClick={onCarryOver}
+            title="Move this lesson to a future day — pick the target week and day, then it re-appears there"
           >
             Carry over to…
           </button>
@@ -278,6 +284,7 @@ export function CatchupRow({
             type="button"
             className={styles.actionLink}
             onClick={onJumpToLesson}
+            title="Open this lesson in the Weekly grid so you can edit it in context"
           >
             Jump to lesson
           </button>

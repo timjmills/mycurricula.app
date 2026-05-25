@@ -424,12 +424,16 @@ const SortableSection = memo(function SortableSection({
                 DOM ref, and Button does not expose forwardRef yet. Tooltip
                 wraps it to replace the bespoke title="" attribute. */}
             {storeSection && (
-              <Tooltip content="Drag to reorder section" side="top">
+              <Tooltip
+                content="Drag this section up or down to reorder the lesson flow — useful when you want the Debrief earlier, or to put guided practice before independent practice"
+                side="top"
+              >
                 <button
                   type="button"
                   ref={setActivatorNodeRef}
                   className={styles.dragGrip}
                   aria-label={`Drag to reorder section ${canonical.index}: ${canonical.title}`}
+                  title="Drag up or down to reorder this lesson section"
                   // Stop click bubbling so dragging the grip doesn't toggle
                   // collapse.
                   onClick={(e) => e.stopPropagation()}
@@ -469,6 +473,11 @@ const SortableSection = memo(function SortableSection({
                   ? `Expand section ${canonical.index}: ${canonical.title}`
                   : `Collapse section ${canonical.index}: ${canonical.title}`
               }
+              tooltip={
+                isCollapsed
+                  ? `Expand ${canonical.title} to see its body and attached resources`
+                  : `Collapse ${canonical.title} to heading-only so you can scan the whole lesson at a glance`
+              }
             >
               <ChevronRightIcon collapsed={isCollapsed} />
             </Button>
@@ -503,6 +512,7 @@ const SortableSection = memo(function SortableSection({
                       ? `Close actions for ${canonical.title}`
                       : `Actions for ${canonical.title}`
                   }
+                  title={`Section actions for ${canonical.title} — move, duplicate, toggle on website, or delete`}
                 >
                   <OverflowIcon />
                 </button>
@@ -1007,6 +1017,7 @@ export function LessonFlow({
             className={styles.globalToggleBtn}
             onClick={expandAll}
             disabled={noneCollapsed}
+            tooltip="Open every section of this lesson at once — useful when reviewing the full plan before teaching"
           >
             Expand all
           </Button>
@@ -1016,6 +1027,7 @@ export function LessonFlow({
             className={styles.globalToggleBtn}
             onClick={collapseAll}
             disabled={allCollapsed}
+            tooltip="Collapse every section to heading-only — useful when reordering or scanning the lesson outline"
           >
             Collapse all
           </Button>
@@ -1113,6 +1125,7 @@ export function LessonFlow({
           className={styles.addSectionBtn}
           onClick={addSection}
           leadingIcon={<AddIcon />}
+          tooltip="Append a blank section to this lesson — useful when the standard Gradual Release flow doesn't quite fit"
         >
           Add section
         </Button>
@@ -1121,6 +1134,7 @@ export function LessonFlow({
           size="sm"
           className={styles.templateBtn}
           aria-label="Edit lesson flow template (coming soon)"
+          tooltip="Edit the underlying lesson-flow template that controls the default section list — coming in a later phase"
         >
           Edit lesson flow / template
         </Button>

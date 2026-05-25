@@ -151,6 +151,11 @@ function TemplateCard({
         aria-expanded={previewOpen}
         aria-controls={previewId}
         leadingIcon={<ChevronIcon open={previewOpen} />}
+        tooltip={
+          previewOpen
+            ? "Collapse the section list back to a one-line summary"
+            : "Show the full list of sections this lesson template includes — see if it fits your teaching style"
+        }
       >
         {previewOpen ? "Hide sections" : "Preview sections"}
       </Button>

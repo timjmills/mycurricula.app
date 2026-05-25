@@ -104,6 +104,14 @@ export function ScheduleBlock({ block }: ScheduleBlockProps): ReactNode {
     block.endMin,
   )} — ${ariaTitle}${secondaryText ? `, ${secondaryText}` : ""}`;
 
+  // Onboarding tooltip: tell the teacher what clicking the block does, not just
+  // restate the time. Click → opens the linked lesson in Daily view.
+  const tooltip = isAcademic
+    ? linkedLesson
+      ? `Open this ${subject?.name ?? "subject"} lesson in Daily view — ${formatBlockTime(block.startMin)}–${formatBlockTime(block.endMin)}`
+      : `${subject?.name ?? "Class"} block, ${formatBlockTime(block.startMin)}–${formatBlockTime(block.endMin)} — no lesson linked yet`
+    : `${block.label ?? "Non-academic block"} — ${formatBlockTime(block.startMin)}–${formatBlockTime(block.endMin)} (configured in Schedule settings)`;
+
   return (
     <button
       type="button"
@@ -111,6 +119,7 @@ export function ScheduleBlock({ block }: ScheduleBlockProps): ReactNode {
       style={{ top, height }}
       onClick={handleClick}
       aria-label={ariaLabel}
+      title={tooltip}
       // Non-academic + no-linked-lesson blocks aren't really interactive yet;
       // making them buttons keeps the keyboard story consistent (every block
       // is focusable) but tabIndex=-1 keeps them out of the tab sequence

@@ -448,6 +448,7 @@ export function AllToolsMenu({
           className={styles.backBtn}
           onClick={onBack}
           aria-label="Back to add resource"
+          title="Return to the resource composer without picking a tool"
         >
           <BackIcon />
           <span>Back</span>
@@ -544,6 +545,7 @@ export function AllToolsMenu({
               className={styles.inlineAddBtn}
               onClick={onYouTubeConfirm}
               disabled={!ytValue.trim() || !URL_REGEX.test(ytValue.trim())}
+              tooltip="Capture this YouTube URL into the resource list — Add it to the lesson with the green Add button at the top"
             >
               Add video
             </Button>
@@ -609,6 +611,11 @@ function Tile({
       className={`${styles.tile} ${tile.works ? "" : styles.tileStub}`}
       onClick={tile.onClick}
       aria-label={ariaLabel}
+      title={
+        tile.works
+          ? `Pick the ${tile.label} tool to capture a ${tile.label.toLowerCase()} resource`
+          : `${tile.label} — coming in a later phase`
+      }
       // The three custom props feed --tileBg / --tileIconBg / --stagger in
       // AllToolsMenu.module.css. Color tokens reference --hlp-* / --hl-*
       // from tokens.css so no hex sneaks in via the inline style. The

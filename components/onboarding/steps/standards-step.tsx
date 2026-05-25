@@ -116,6 +116,7 @@ export function StandardsStep(): ReactNode {
                 aria-checked={selected}
                 onClick={() => toggle(fw.id)}
                 className={`${styles.row} ${selected ? styles.rowSelected : ""} cp-focusable`}
+                title={`Toggle the ${fw.label} standards framework — lessons can be tagged with codes from any framework you enable here`}
               >
                 {/* Custom checkbox indicator. */}
                 <span

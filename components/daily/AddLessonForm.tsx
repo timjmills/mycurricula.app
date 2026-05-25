@@ -148,6 +148,7 @@ export function AddLessonForm({
         role="dialog"
         aria-label="Add a lesson"
         aria-modal="true"
+        title="Add a lesson dialog — drops a new lesson on the chosen day, in your personal copy by default"
         className={styles.dialog}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
@@ -160,6 +161,7 @@ export function AddLessonForm({
             iconAriaLabel="Close add-lesson form"
             className={styles.closeBtn}
             onClick={onClose}
+            tooltip="Close the add-lesson form without saving"
           >
             {/* × close icon */}
             <svg
@@ -244,6 +246,7 @@ export function AddLessonForm({
               size="sm"
               className={styles.btnCancel}
               onClick={onClose}
+              tooltip="Discard this draft and close the form — nothing is saved"
             >
               Cancel
             </Button>
@@ -253,6 +256,7 @@ export function AddLessonForm({
               type="submit"
               className={styles.btnSave}
               disabled={!title.trim()}
+              tooltip="Add the lesson to the selected day in your personal copy — you can move it to Master later"
             >
               Add lesson
             </Button>

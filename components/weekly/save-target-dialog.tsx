@@ -161,6 +161,7 @@ export function SaveTargetDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
+        title="Save destination dialog — choose whether this lesson edit lands in your personal copy or the team's shared curriculum"
         className={styles.panel}
         onKeyDown={handleKeyDown}
       >
@@ -191,6 +192,7 @@ export function SaveTargetDialog({
             className={`${styles.choiceBtn} ${styles.choiceBtnPersonal}`}
             onClick={choosePersonal}
             aria-label="Save to Personalized Curriculum — keeps this change in your own copy. Only you see it."
+            title="Save into your personal copy only — nobody else's planner is affected"
           >
             {/* Icon — person silhouette outline */}
             <span className={styles.choiceIcon} aria-hidden="true">
@@ -216,6 +218,7 @@ export function SaveTargetDialog({
             className={`${styles.choiceBtn} ${styles.choiceBtnCore}`}
             onClick={chooseCore}
             aria-label="Save to Core Curriculum — updates the shared plan for the whole team."
+            title="Save into the team's Master / Core curriculum — every teacher in your grade sees this change on their planner"
           >
             {/* Icon — stacked-pages / team plan symbol */}
             <span className={styles.choiceIcon} aria-hidden="true">
@@ -244,6 +247,7 @@ export function SaveTargetDialog({
             className={styles.cancelBtn}
             onClick={onClose}
             aria-label="Cancel — dismiss without saving"
+            tooltip="Close this dialog without saving — your edits stay in the editor so you can come back to them"
           >
             Cancel
           </Button>

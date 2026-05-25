@@ -330,6 +330,7 @@ export function YearView() {
             type="button"
             className={styles.actionBtn}
             aria-label="Go to today"
+            title="Scroll the year roadmap back to the current week — the today marker pulses to confirm"
             onClick={() => {
               scrollToWeek(currentWeekIdx);
               // m4 fix: dispatch a pulse event so every mounted TodayMarker
@@ -359,11 +360,15 @@ export function YearView() {
               as a vertical month-stack (audit M4, recommended Option 2 in
               docs/research-deferred-year-items-2026-05-25.md). Uses <Link>
               so it works without JS and remains keyboard-accessible. */}
-          <Tooltip content="Print this year" side="bottom">
+          <Tooltip
+            content="Open a paper-friendly print layout — the year roadmap re-flows as a vertical month-stack for clean printouts and PDFs"
+            side="bottom"
+          >
             <Link
               href="/year/print"
               className={styles.actionBtn}
               aria-label="Print this year"
+              title="Open a paper-friendly print layout of the year roadmap"
             >
               <IconPrint width={14} height={14} />
               Print

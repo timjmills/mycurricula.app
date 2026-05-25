@@ -347,6 +347,11 @@ export function WeeklyBoard(): ReactNode {
               ? "Exit Move mode (expand cards)"
               : "Enter Move mode (compact view)"
           }
+          tooltip={
+            compactManual
+              ? "Exit Move mode — expand cards back to full height so you can read the lesson previews"
+              : "Compact every card to one-line chips so the whole week fits on screen — useful for shuffling lessons around"
+          }
         >
           {compactManual ? "Exit Move mode" : "Move mode"}
         </Button>
@@ -616,6 +621,7 @@ function DayColumn({
         leadingIcon={<PlusIcon />}
         className={styles.addLesson}
         aria-label={`Add lesson on ${dayName}`}
+        tooltip={`Add a new lesson on ${dayName} — opens the new-lesson form pre-filled with this day (coming in a later phase)`}
         // Click handler intentionally omitted — stub affordance only.
         onClick={() => {
           /* lesson creation is a future increment */

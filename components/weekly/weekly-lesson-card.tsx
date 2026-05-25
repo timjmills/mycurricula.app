@@ -811,7 +811,10 @@ export function WeeklyLessonCard({
                         </span>
                       </span>
                     )}
-                    <Tooltip content="More actions" side="top">
+                    <Tooltip
+                      content="Open the lesson menu — mark status, relocate, duplicate, save as template, save to Master, or archive"
+                      side="top"
+                    >
                       <Button
                         variant="icon"
                         size="sm"
@@ -819,6 +822,7 @@ export function WeeklyLessonCard({
                         className={styles.affordance}
                         onClick={handleAffordance}
                         aria-haspopup="menu"
+                        tooltip="Open the lesson actions menu"
                       >
                         <span className={styles.affordanceVisual}>
                           <Icon name="dots" size={11} />
@@ -1142,6 +1146,11 @@ export function WeeklyLessonCard({
                               setNotesOpen((v) => !v);
                             }}
                             aria-expanded={notesOpen}
+                            tooltip={
+                              notesOpen
+                                ? "Hide the team's private notes for this lesson"
+                                : "Reveal the team's private teaching notes — context only fellow teachers see"
+                            }
                           >
                             {notesOpen
                               ? "Hide teacher notes"
@@ -1257,6 +1266,7 @@ export function WeeklyLessonCard({
                         e.stopPropagation();
                         onContextAction?.("add-to-todo", lesson.id);
                       }}
+                      tooltip="Add a new section to this lesson's flow — useful when your standard template needs an extra step for this topic"
                     >
                       Add section
                     </Button>
@@ -1279,6 +1289,7 @@ export function WeeklyLessonCard({
                         );
                       }}
                       aria-label="Add resource to this lesson"
+                      tooltip="Attach a link, file, or video to this lesson — drops into the first section"
                     >
                       Add resource
                     </Button>
@@ -1290,6 +1301,7 @@ export function WeeklyLessonCard({
                         e.stopPropagation();
                         onContextAction?.("print", lesson.id);
                       }}
+                      tooltip="Edit the underlying lesson template — sections, default headers, and section colors"
                     >
                       Edit Template
                     </Button>
@@ -1387,6 +1399,7 @@ export function WeeklyLessonCard({
               e.stopPropagation();
               deck.onPrev();
             }}
+            tooltip="Flip back to the previous lesson stacked in this cell"
           >
             <span aria-hidden>‹</span>
           </Button>
@@ -1403,6 +1416,7 @@ export function WeeklyLessonCard({
               e.stopPropagation();
               deck.onNext();
             }}
+            tooltip="Flip to the next lesson stacked in this cell"
           >
             <span aria-hidden>›</span>
           </Button>
@@ -1780,6 +1794,7 @@ function ReorderableSectionRow({
               className={styles.sectionMoveBtn}
               onClick={() => moveKeyboard("up")}
               disabled={isFirst}
+              tooltip={`Move the ${label} section one slot earlier in the lesson flow`}
             >
               <ChevronUpIcon />
             </Button>
@@ -1792,6 +1807,7 @@ function ReorderableSectionRow({
               className={styles.sectionMoveBtn}
               onClick={() => moveKeyboard("down")}
               disabled={isLast}
+              tooltip={`Move the ${label} section one slot later in the lesson flow`}
             >
               <ChevronDownIcon />
             </Button>

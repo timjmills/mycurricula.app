@@ -157,6 +157,7 @@ export function ArchiveToast({
         variant="ghost"
         size="md"
         onClick={handleUndo}
+        tooltip="Restore this lesson to the planner — undoes the archive while this toast is visible"
         style={{
           border: "1px solid rgba(255,255,255,0.22)",
           color: "var(--paper)",
@@ -173,6 +174,7 @@ export function ArchiveToast({
         size="md"
         iconAriaLabel="Dismiss notification"
         onClick={handleDismiss}
+        tooltip="Dismiss this notification now (the archive will still complete)"
         style={{ color: "var(--ink-400)", flexShrink: 0 }}
       >
         ×

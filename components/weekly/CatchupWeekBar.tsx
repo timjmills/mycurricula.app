@@ -70,6 +70,7 @@ export function CatchupWeekBar(): ReactNode {
         className={styles.dismiss}
         onClick={() => dismissWeek(week)}
         aria-label="Dismiss catch-up bar for this week"
+        title="Hide the catch-up summary for this week — it'll come back when new lessons fall behind"
       >
         <CloseIcon />
       </button>

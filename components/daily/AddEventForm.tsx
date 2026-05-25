@@ -167,6 +167,7 @@ export function AddEventForm({
         role="dialog"
         aria-label="Add an event"
         aria-modal="true"
+        title="Add a non-academic event (assembly, field trip, specialist) to this day's timeline"
         className={styles.dialog}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
@@ -179,6 +180,7 @@ export function AddEventForm({
             iconAriaLabel="Close add-event form"
             className={styles.closeBtn}
             onClick={onClose}
+            tooltip="Close the add-event form without saving"
           >
             <svg
               width="16"
@@ -269,6 +271,7 @@ export function AddEventForm({
               size="sm"
               className={styles.btnCancel}
               onClick={onClose}
+              tooltip="Discard this draft event and close the form"
             >
               Cancel
             </Button>
@@ -278,6 +281,7 @@ export function AddEventForm({
               type="submit"
               className={styles.btnSave}
               disabled={!label.trim() || !!timeError}
+              tooltip="Add this event to the day's schedule between the start and end times"
             >
               Add event
             </Button>

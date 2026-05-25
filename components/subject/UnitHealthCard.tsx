@@ -199,7 +199,10 @@ export function UnitHealthCard({ unit }: { unit: UnitHealthData }): ReactNode {
           <span className={styles.calloutLabel}>DON&apos;T MISS</span>
           <span className={styles.calloutEditor}>{unit.editorName}</span>
           {unit.canEdit && !editing && (
-            <Tooltip content="Edit don't-miss callout" side="top">
+            <Tooltip
+              content="Edit the unit's don't-miss callout — the one move the team agrees nobody should skip teaching this unit"
+              side="top"
+            >
               <Button
                 variant="ghost"
                 size="sm"
@@ -209,6 +212,7 @@ export function UnitHealthCard({ unit }: { unit: UnitHealthData }): ReactNode {
                   setEditing(true);
                 }}
                 aria-label="Edit don't-miss callout"
+                tooltip="Edit the don't-miss callout for this unit"
               >
                 <PencilIcon />
               </Button>
@@ -235,6 +239,7 @@ export function UnitHealthCard({ unit }: { unit: UnitHealthData }): ReactNode {
                 className={styles.saveBtn}
                 onClick={handleSave}
                 aria-label="Save callout"
+                tooltip="Save this don't-miss callout — the whole team sees the new text on their Subject view"
               >
                 Save
               </Button>
@@ -244,6 +249,7 @@ export function UnitHealthCard({ unit }: { unit: UnitHealthData }): ReactNode {
                 className={styles.cancelBtn}
                 onClick={handleCancel}
                 aria-label="Cancel edit"
+                tooltip="Discard your edits and revert to the previous callout text"
               >
                 Cancel
               </Button>

@@ -202,6 +202,7 @@ export function CompareToMaster({
         role="dialog"
         aria-modal="true"
         aria-label="Compare to Master"
+        title="Compare to Master dialog — see your personal edits side-by-side with the team's curriculum version of this lesson"
         onKeyDown={handleKeyDown}
         style={{
           background: "var(--paper)",
@@ -248,6 +249,7 @@ export function CompareToMaster({
             size="sm"
             iconAriaLabel="Close comparison"
             onClick={close}
+            tooltip="Close the comparison without changing anything"
             style={{ flexShrink: 0 }}
           >
             ×
@@ -409,6 +411,7 @@ export function CompareToMaster({
                 variant="secondary"
                 size="md"
                 onClick={() => setConfirmRestore(false)}
+                tooltip="Cancel the restore — your personal edits stay intact"
               >
                 Cancel
               </Button>
@@ -419,6 +422,7 @@ export function CompareToMaster({
                   onRestore();
                   close();
                 }}
+                tooltip="Confirm: replace your personal copy with the team's Master version (your edits will be lost)"
               >
                 Restore from Master
               </Button>
@@ -429,10 +433,16 @@ export function CompareToMaster({
                 variant="secondary"
                 size="md"
                 onClick={() => setConfirmRestore(true)}
+                tooltip="Discard your personal edits and revert to the team's Master version — you'll be asked to confirm"
               >
                 Restore from Master
               </Button>
-              <Button variant="primary" size="md" onClick={close}>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={close}
+                tooltip="Close this comparison without making any changes"
+              >
                 Close
               </Button>
             </>

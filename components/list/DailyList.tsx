@@ -195,7 +195,10 @@ export function DailyList({ onOpenAddLesson }: DailyListProps): ReactNode {
       <div className={styles.header}>
         <div className={styles.eyebrow}>DAILY PLAN · LIST VIEW</div>
         <div className={styles.titleRow}>
-          <h1 className={styles.title}>{dayTitle}</h1>
+          {/* h2 (not h1) — the page-level h1 lives in DailyView's
+              PageHeader so the page has exactly one h1 in the a11y
+              tree. This day title is a section heading underneath it. */}
+          <h2 className={styles.title}>{dayTitle}</h2>
           {totalCount > 0 && (
             <span className={styles.stat}>
               {totalCount} {totalCount === 1 ? "lesson" : "lessons"} planned
@@ -235,6 +238,7 @@ export function DailyList({ onOpenAddLesson }: DailyListProps): ReactNode {
             className={styles.addLessonCta}
             onClick={onOpenAddLesson}
             aria-label="Add a lesson for today"
+            title="Drop a new lesson onto today's schedule — opens the add-lesson form pre-filled with today's date"
           >
             <svg
               width="12"

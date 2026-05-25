@@ -40,14 +40,21 @@ export function WeekNavigator({
     <header className={styles.navbar}>
       <div className={styles.navTitleWrap}>
         <div className={styles.navEyebrow}>Weekly plan</div>
-        <h1 className={styles.navTitle}>
+        {/* h2 (not h1) — the page-level h1 lives in WeeklyShell's
+            PageHeader ("Weekly View") so the page has exactly one h1 in
+            the a11y tree. This week-navigator title is a section
+            heading underneath it. */}
+        <h2 className={styles.navTitle}>
           Week {week}
           {isCurrent && <span className={styles.currentTag}>This week</span>}
-        </h1>
+        </h2>
       </div>
 
       <div className={styles.navControls}>
-        <Tooltip content="Previous week" side="bottom">
+        <Tooltip
+          content="Jump back one school week — useful when you need to check what was taught last week before today's class"
+          side="bottom"
+        >
           <Button
             variant="icon"
             size="sm"
@@ -55,6 +62,7 @@ export function WeekNavigator({
             className={styles.navArrow}
             onClick={() => onChange(week - 1)}
             disabled={atStart}
+            tooltip="Step back one school week"
           >
             <ChevronLeft />
           </Button>
@@ -66,11 +74,15 @@ export function WeekNavigator({
           className={styles.navToday}
           onClick={() => onChange(currentWeek)}
           disabled={isCurrent}
+          tooltip="Jump the planner back to the current school week"
         >
           Today
         </Button>
 
-        <Tooltip content="Next week" side="bottom">
+        <Tooltip
+          content="Jump forward one school week — preview upcoming lessons or prep ahead of time"
+          side="bottom"
+        >
           <Button
             variant="icon"
             size="sm"
@@ -78,6 +90,7 @@ export function WeekNavigator({
             className={styles.navArrow}
             onClick={() => onChange(week + 1)}
             disabled={atEnd}
+            tooltip="Step forward one school week"
           >
             <ChevronRight />
           </Button>

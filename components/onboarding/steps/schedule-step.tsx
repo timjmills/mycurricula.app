@@ -78,6 +78,7 @@ export function ScheduleStep(): ReactNode {
                     disabled={idx === 0}
                     className={`${styles.moveBtn} cp-focusable`}
                     aria-label={`Move ${subj.name} up`}
+                    title={`Move ${subj.name} earlier in the daily schedule`}
                   >
                     ↑
                   </button>
@@ -87,6 +88,7 @@ export function ScheduleStep(): ReactNode {
                     disabled={idx === academic.length - 1}
                     className={`${styles.moveBtn} cp-focusable`}
                     aria-label={`Move ${subj.name} down`}
+                    title={`Move ${subj.name} later in the daily schedule`}
                   >
                     ↓
                   </button>

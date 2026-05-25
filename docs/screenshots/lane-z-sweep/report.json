@@ -1,0 +1,118 @@
+[
+  {
+    "route": "year",
+    "total": 61,
+    "withTitle": 32,
+    "withAriaDescribedBy": 0,
+    "coverage": 52,
+    "samples": [
+      {
+        "label": "Go to today",
+        "title": "Scroll the year roadmap back to the current week — the today marker pulses to confirm"
+      },
+      {
+        "label": "January",
+        "title": "Scroll the roadmap to January"
+      },
+      {
+        "label": "February",
+        "title": "Scroll the roadmap to February"
+      },
+      {
+        "label": "March",
+        "title": "Scroll the roadmap to March"
+      },
+      {
+        "label": "April",
+        "title": "Scroll the roadmap to April"
+      }
+    ]
+  },
+  {
+    "route": "weekly",
+    "total": 268,
+    "withTitle": 225,
+    "withAriaDescribedBy": 2,
+    "coverage": 84,
+    "samples": [
+      {
+        "label": "Dismiss catch-up bar for this week",
+        "title": "Hide the catch-up summary for this week — it'll come back when new lessons fall behind"
+      },
+      {
+        "label": "Drag to reorder weekly grid panel",
+        "title": "Drag to reorder weekly grid panel"
+      },
+      {
+        "label": "Previous week",
+        "title": "Step back one school week"
+      },
+      {
+        "label": "Today",
+        "title": "Jump the planner back to the current school week"
+      },
+      {
+        "label": "Next week",
+        "title": "Step forward one school week"
+      }
+    ]
+  },
+  {
+    "route": "daily",
+    "total": 132,
+    "withTitle": 96,
+    "withAriaDescribedBy": 9,
+    "coverage": 73,
+    "samples": [
+      {
+        "label": "Drag to reorder lesson list column",
+        "title": "Drag to reorder lesson list column"
+      },
+      {
+        "label": "Drag to reorder Equivalent fractions warm-up",
+        "title": "Drag to reorder"
+      },
+      {
+        "label": "Drag to reorder Wonder, chs 14–17 — point of view",
+        "title": "Drag to reorder"
+      },
+      {
+        "label": "Drag to reorder Lead sentences — three rewrites",
+        "title": "Drag to reorder"
+      },
+      {
+        "label": "Drag to reorder Past, present, future review",
+        "title": "Drag to reorder"
+      }
+    ]
+  },
+  {
+    "route": "catch-up",
+    "total": 40,
+    "withTitle": 13,
+    "withAriaDescribedBy": 0,
+    "coverage": 33,
+    "samples": [
+      {
+        "label": "Last week",
+        "title": "Only show lessons that fell behind in the most recent school week — fastest way to triage what's rig"
+      },
+      {
+        "label": "Last 4 weeks",
+        "title": "Show lessons that fell behind over the past month — the default scope, good balance of recent + acti"
+      },
+      {
+        "label": "This term",
+        "title": "Show every uncovered lesson since the start of the current term — useful when planning a make-up wee"
+      },
+      {
+        "label": "All year",
+        "title": "Show every uncovered lesson from the start of the school year — the full backlog, no time filter"
+      },
+      {
+        "label": "Not done",
+        "title": "Toggle the not done status — when off, lessons in that state are hidden from this list"
+      }
+    ]
+  }
+]

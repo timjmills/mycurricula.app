@@ -95,6 +95,7 @@ function SwatchPicker({ value, onChange }: SwatchPickerProps): ReactNode {
             aria-label={`${token} color${value === token ? " (selected)" : ""}`}
             aria-pressed={value === token}
             onClick={() => onChange(token)}
+            title={`Use the ${token} color for this subject — every card, stripe, and chip for this subject picks up this hue`}
           >
             {value === token && (
               <span className={styles.swatchCheck}>
@@ -233,6 +234,7 @@ function SubjectRow({
           onClick={() => onMoveUp(index)}
           disabled={index === 0}
           iconAriaLabel={`Move ${subject.name || "subject"} up`}
+          tooltip={`Move ${subject.name || "this subject"} earlier in the list — affects the order subjects appear in your planner grid`}
         >
           <ArrowUpIcon />
         </Button>
@@ -242,6 +244,7 @@ function SubjectRow({
           onClick={() => onMoveDown(index)}
           disabled={index === total - 1}
           iconAriaLabel={`Move ${subject.name || "subject"} down`}
+          tooltip={`Move ${subject.name || "this subject"} later in the list — affects the order subjects appear in your planner grid`}
         >
           <ArrowDownIcon />
         </Button>
@@ -279,6 +282,7 @@ function SubjectRow({
           onClick={() => onRemove(subject.id)}
           disabled={total <= 1}
           iconAriaLabel={`Remove ${subject.name || "subject"}`}
+          tooltip={`Remove ${subject.name || "this subject"} from your curriculum — you can add it back any time`}
         >
           <RemoveIcon />
         </Button>
@@ -374,6 +378,7 @@ export function SubjectsStep(): ReactNode {
         onClick={handleAdd}
         className={styles.addBtn}
         leadingIcon={<span aria-hidden>+</span>}
+        tooltip="Add a new subject to your curriculum — pick a name and a color; each subject becomes a row on your planner grid"
       >
         Add subject
       </Button>

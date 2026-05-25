@@ -119,6 +119,7 @@ export function OnboardingWizard(): ReactNode {
             size="md"
             onClick={back}
             aria-label="Go to previous step"
+            tooltip="Go back one step in the setup wizard — your answers on the current step stay saved"
             leadingIcon={<span aria-hidden="true">←</span>}
           >
             Back
@@ -126,11 +127,21 @@ export function OnboardingWizard(): ReactNode {
         )}
         <div className={styles.spacer} />
         {SKIPPABLE.has(stepId) && (
-          <Button variant="ghost" size="md" onClick={next}>
+          <Button
+            variant="ghost"
+            size="md"
+            onClick={next}
+            tooltip="Skip this optional setup step — you can complete it later from Settings"
+          >
             Skip for now
           </Button>
         )}
-        <Button variant="primary" size="lg" onClick={handleContinue}>
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={handleContinue}
+          tooltip="Save the current step and continue to the next part of setup"
+        >
           {continueLabel}
         </Button>
       </div>

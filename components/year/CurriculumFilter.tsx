@@ -239,6 +239,7 @@ export function CurriculumFilter({
       ref={panelRef}
       role="dialog"
       aria-label="Select curriculum subjects"
+      title="Curriculum picker — check a subject to include it on the year roadmap, uncheck to hide that subject's row"
       className={[styles.panel, open && pos ? styles.panelVisible : ""]
         .filter(Boolean)
         .join(" ")}
@@ -253,6 +254,7 @@ export function CurriculumFilter({
             size="sm"
             onClick={selectAll}
             aria-label="Select all subjects"
+            tooltip="Show every subject on the year roadmap (resets any curriculum filter you've applied)"
           >
             All
           </Button>
@@ -261,6 +263,7 @@ export function CurriculumFilter({
             size="sm"
             onClick={selectNone}
             aria-label="Clear subject selection"
+            tooltip="Narrow the roadmap to a single subject — pick from the list below to focus on one curriculum lane at a time"
           >
             None
           </Button>
@@ -319,6 +322,7 @@ export function CurriculumFilter({
           aria-expanded={open}
           aria-controls={panelId}
           onClick={() => setOpen((v) => !v)}
+          tooltip="Choose which subjects appear on the year roadmap — uncheck a subject to hide its unit bar across the whole year view"
         >
           {label}
         </Button>
