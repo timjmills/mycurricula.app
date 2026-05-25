@@ -2,7 +2,8 @@
 
 // YearView — the full Year tab composition (desktop / tablet).
 //
-// Layout: [YearSidebar] [main column].
+// Layout: [main column] (the YearSidebar rail was unmounted — every
+// item was an inert "coming soon" affordance; see import block below).
 // The main column contains a page header, an in-page Roadmap | Progression
 // toggle wired to viewMode, a status filter pill bar, and a single shared
 // horizontally scrolling container holding the sticky QuarterMonthWeekHeader
@@ -26,8 +27,11 @@ import {
   allYearMonths,
   monthIndexForWeek,
 } from "@/lib/year-calendar";
-import { ToggleGroup } from "@/components/ui";
-import { YearSidebar } from "./YearSidebar";
+import { ToggleGroup, Tooltip } from "@/components/ui";
+// YearSidebar is intentionally not mounted — every rail item is a
+// disabled "coming soon" affordance, and "Students" violates the
+// teacher-only product scope (CLAUDE.md §1). The component file is
+// retained so individual icons can be wired in a later wave.
 import { RoadmapView } from "./RoadmapView";
 import { ProgressionView } from "./ProgressionView";
 import { QuarterMonthWeekHeader } from "./QuarterMonthWeekHeader";
@@ -322,29 +326,42 @@ export function YearView() {
             onChange={setCurriculumSelectedIds}
           />
 
-          <button
-            type="button"
-            className={styles.actionBtn}
-            aria-label="Open filters"
-          >
-            <IconFilter width={14} height={14} />
-            Filters
-          </button>
-          <button
-            type="button"
-            className={styles.actionBtn}
-            aria-label="Export data"
-          >
-            <IconExport width={14} height={14} />
-            Export
-          </button>
+          {/* Filters + Export are decorative placeholders until Phase 1B
+              wires them to the left filter panel and a CSV/PDF export. The
+              `disabled` + `aria-disabled` + Tooltip pattern matches
+              YearSidebar's "coming soon" affordances so the precedent is
+              consistent across the Year route. */}
+          <Tooltip content="Filters — coming soon" side="bottom">
+            <button
+              type="button"
+              className={styles.actionBtn}
+              aria-label="Filters — coming soon"
+              aria-disabled="true"
+              disabled
+              title="Coming soon"
+            >
+              <IconFilter width={14} height={14} />
+              Filters
+            </button>
+          </Tooltip>
+          <Tooltip content="Export — coming soon" side="bottom">
+            <button
+              type="button"
+              className={styles.actionBtn}
+              aria-label="Export — coming soon"
+              aria-disabled="true"
+              disabled
+              title="Coming soon"
+            >
+              <IconExport width={14} height={14} />
+              Export
+            </button>
+          </Tooltip>
         </div>
       </div>
 
-      {/* ── Main body: sidebar + content ─────────────────────────────── */}
+      {/* ── Main body ────────────────────────────────────────────────── */}
       <div className={styles.body}>
-        <YearSidebar />
-
         <div className={styles.contentArea}>
           {/* In-page Roadmap | Progression toggle */}
           <div className={styles.controls}>

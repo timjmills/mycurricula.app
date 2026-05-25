@@ -76,6 +76,21 @@
   outline-offset: 2px;
 }
 
+/* Disabled "coming soon" affordances (Filters/Export). The Tooltip still
+   carries the explanation; the button just needs to read as inert. */
+.actionBtn:disabled,
+.actionBtn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.actionBtn:disabled:hover,
+.actionBtn[aria-disabled="true"]:hover {
+  background: var(--paper);
+  box-shadow: none;
+}
+
 /* ── Main body layout ────────────────────────────────────────────────── */
 
 .body {

@@ -7,6 +7,13 @@
 // width; both stay mounted to avoid flash on resize. The shared
 // <MinimizedSubjectsProvider> means a lane minimized on desktop stays
 // minimized after the viewport resizes into phone width.
+//
+// The off-screen variant is marked `aria-hidden="true"` so assistive tech
+// only ever encounters one `<h1>Yearly View</h1>` and one set of landmarks
+// at a time (audit fragment docs/audit-fragments/other-routes.md lines
+// 78–85). The CLS / bundle-size concerns from that audit item are
+// deferred — they want a true conditional render which would require a
+// hook the codebase does not yet have.
 
 import { useEffect, useState } from "react";
 import { YearView, YearMobile } from "@/components/year";
@@ -38,10 +45,16 @@ export default function YearPage() {
 
   return (
     <MinimizedSubjectsProvider>
-      <div style={{ display: isPhone ? "none" : "contents" }}>
+      <div
+        style={{ display: isPhone ? "none" : "contents" }}
+        aria-hidden={isPhone ? "true" : undefined}
+      >
         <YearView />
       </div>
-      <div style={{ display: isPhone ? "contents" : "none" }}>
+      <div
+        style={{ display: isPhone ? "contents" : "none" }}
+        aria-hidden={isPhone ? undefined : "true"}
+      >
         <YearMobile />
       </div>
     </MinimizedSubjectsProvider>
