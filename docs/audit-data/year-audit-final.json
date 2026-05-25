@@ -1,0 +1,82 @@
+{
+  "desktop_initial": {
+    "lanes": 8,
+    "h1Count": 2,
+    "h1VisibleCount": 1,
+    "bodyHeight": 1601,
+    "docScroll": 1280,
+    "docClient": 1280,
+    "timelineScrollWidth": 4520,
+    "timelineClientWidth": 992
+  },
+  "desktop_layout": {
+    "bodyLeft": 240,
+    "bodyWidth": 1040,
+    "contentLeft": 240,
+    "contentWidth": 1040,
+    "gapLeft": 0,
+    "bodyChildren": 1
+  },
+  "desktop_print": {
+    "tlScrollWidth": 4522,
+    "tlClientWidth": 4522,
+    "tlOverflowX": "auto",
+    "printStyleSheets": 5
+  },
+  "desktop_master_banner": [
+    {
+      "tag": "HTML",
+      "cls": "__variable_245d8d __variable_97c177 h-full antialiased",
+      "textPreview": "MyCurricula — Grade 5 Curriculum Planner@font-face{font-family:'__nextjs-Geist';",
+      "visible": true
+    },
+    {
+      "tag": "BODY",
+      "cls": "cp-root flex min-h-full flex-col",
+      "textPreview": ".cp-subj.math { --c: #7FB6FF; --cl: #7FB6FF; --cd: #0C2870; }\n.cp-subj.reading {",
+      "visible": true
+    },
+    {
+      "tag": "DIV",
+      "cls": "cp-root",
+      "textPreview": "Heads up — changes here affect the whole team.MyCurriculaGrade 5DailyWeeklyYearl",
+      "visible": true
+    },
+    {
+      "tag": "DIV",
+      "cls": "master-banner_banner___DIzY master-banner_headsUp__k66Nf",
+      "textPreview": "Heads up — changes here affect the whole team.",
+      "visible": true
+    },
+    {
+      "tag": "SPAN",
+      "cls": "",
+      "textPreview": "Heads up — changes here affect the whole team.",
+      "visible": true
+    }
+  ],
+  "desktop_today": {
+    "before": 0,
+    "after": 964,
+    "moved": true
+  },
+  "desktop_console": [],
+  "desktop_pageErrs": [],
+  "phone_state": {
+    "h1s": [
+      {
+        "text": "Yearly View",
+        "inAriaHidden": true,
+        "visible": false
+      },
+      {
+        "text": "Yearly View",
+        "inAriaHidden": false,
+        "visible": true
+      }
+    ],
+    "mobileMounted": true,
+    "desktopMounted": true,
+    "bothWrappers": 124
+  }
+}

@@ -1,0 +1,1966 @@
+{
+  "tiers": {
+    "phone": {
+      "tier": "phone",
+      "width": 400,
+      "height": 800,
+      "nav": {
+        "seedStatus": 200,
+        "status": 200
+      },
+      "audit": {
+        "docScrollWidth": 400,
+        "docClientWidth": 400,
+        "hasHorizontalScroll": false,
+        "bodyScrollHeight": 1497,
+        "h1Count": 2,
+        "h1s": [
+          {
+            "text": "Yearly View",
+            "ariaHidden": "true",
+            "visible": false
+          },
+          {
+            "text": "Yearly View",
+            "ariaHidden": null,
+            "visible": true
+          }
+        ],
+        "headings": [
+          {
+            "level": 1,
+            "text": "Yearly View",
+            "hidden": true
+          },
+          {
+            "level": 1,
+            "text": "Yearly View",
+            "hidden": false
+          }
+        ],
+        "buttons": [
+          {
+            "tag": "A",
+            "role": null,
+            "label": "Skip to content",
+            "w": 136,
+            "h": 38,
+            "disabled": false
+          },
+          {
+            "tag": "A",
+            "role": null,
+            "label": "MyCurricula home",
+            "w": 91,
+            "h": 22,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "Personal mode",
+            "w": 66,
+            "h": 26,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "Master mode — changes affect the whole team",
+            "w": 56,
+            "h": 26,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Open more controls menu",
+            "w": 44,
+            "h": 44,
+            "disabled": false
+          },
+          {
+            "tag": "A",
+            "role": null,
+            "label": "Profile settings (Tim)",
+            "w": 32,
+            "h": 32,
+            "disabled": false
+          }
+        ],
+        "stickyChromeHeight": 44
+      },
+      "smallButtons": [
+        {
+          "label": "Skip to content",
+          "w": 136,
+          "h": 38,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "MyCurricula home",
+          "w": 91,
+          "h": 22,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "Personal mode",
+          "w": 66,
+          "h": 26,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Master mode — changes affect the whole team",
+          "w": 56,
+          "h": 26,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Profile settings (Tim)",
+          "w": 32,
+          "h": 32,
+          "role": null,
+          "tag": "A"
+        }
+      ],
+      "hScroll": false,
+      "h1s": [
+        {
+          "text": "Yearly View",
+          "ariaHidden": "true",
+          "visible": false
+        },
+        {
+          "text": "Yearly View",
+          "ariaHidden": null,
+          "visible": true
+        }
+      ],
+      "stickyOverflowPctPhone": 6,
+      "consoleErrors": [
+        "WARN: [Fast Refresh] performing full reload\n\nFast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.\nYou might have a file which exports "
+      ],
+      "pageErrors": [],
+      "interactions": {
+        "filtersClick": {
+          "exists": true,
+          "disabled": true,
+          "ariaDisabled": "true",
+          "domChanged": false
+        },
+        "exportClick": {
+          "exists": true,
+          "disabled": true,
+          "ariaDisabled": "true"
+        },
+        "filtersTooltip": {
+          "error": "elementHandle.hover: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - attempting hover action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying hover action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying hover action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    56 × waiting for element to be visible and stable\u001b[22m\n\u001b[2m       - element is not visible\u001b[22m\n\u001b[2m     - retrying hover action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible and stable\u001b[22m\n"
+        },
+        "todayBtn": {
+          "error": "elementHandle.click: Element is not attached to the DOM\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is not visible\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for\" http://localhost:3000/year\" navigation to finish...\u001b[22m\n\u001b[2m    - navigated to \"http://localhost:3000/year\"\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n"
+        },
+        "progressionToggle": {
+          "exists": false
+        },
+        "minimizeBtns": {
+          "count": 0
+        },
+        "stickyHeader": {
+          "exists": false
+        },
+        "scrolledEnd": true
+      },
+      "timelineWidth": {
+        "clientWidth": 0,
+        "scrollWidth": 0,
+        "hasInternalHScroll": false
+      },
+      "hexLeakage": []
+    },
+    "tablet": {
+      "tier": "tablet",
+      "width": 768,
+      "height": 1024,
+      "nav": {
+        "seedStatus": 200,
+        "status": 200
+      },
+      "audit": {
+        "docScrollWidth": 768,
+        "docClientWidth": 768,
+        "hasHorizontalScroll": false,
+        "bodyScrollHeight": 1686,
+        "h1Count": 2,
+        "h1s": [
+          {
+            "text": "Yearly View",
+            "ariaHidden": null,
+            "visible": true
+          },
+          {
+            "text": "Yearly View",
+            "ariaHidden": "true",
+            "visible": false
+          }
+        ],
+        "headings": [
+          {
+            "level": 1,
+            "text": "Yearly View",
+            "hidden": false
+          },
+          {
+            "level": 1,
+            "text": "Yearly View",
+            "hidden": true
+          }
+        ],
+        "buttons": [
+          {
+            "tag": "A",
+            "role": null,
+            "label": "Skip to content",
+            "w": 136,
+            "h": 38,
+            "disabled": false
+          },
+          {
+            "tag": "A",
+            "role": null,
+            "label": "MyCurricula home",
+            "w": 142,
+            "h": 22,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "Personal mode",
+            "w": 66,
+            "h": 26,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "Master mode — changes affect the whole team",
+            "w": 56,
+            "h": 26,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Open more controls menu",
+            "w": 44,
+            "h": 44,
+            "disabled": false
+          },
+          {
+            "tag": "A",
+            "role": null,
+            "label": "Profile settings (Tim)",
+            "w": 32,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Go to today",
+            "w": 58,
+            "h": 44,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "November",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "December",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "January",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "February",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "March",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "April",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "May",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "June",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "July",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Select the curriculum",
+            "w": 131,
+            "h": 40,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Filters — coming soon",
+            "w": 59,
+            "h": 44,
+            "disabled": true
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Export — coming soon",
+            "w": 62,
+            "h": 44,
+            "disabled": true
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "Roadmap",
+            "w": 102,
+            "h": 34,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "Progression",
+            "w": 116,
+            "h": 34,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "All",
+            "w": 31,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Completed",
+            "w": 82,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "In Progress",
+            "w": 84,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Modified",
+            "w": 68,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Skipped",
+            "w": 65,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Not Started",
+            "w": 87,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Needs Attention",
+            "w": 114,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Clear all status filters",
+            "w": 89,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Math",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Reading",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Writing",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Grammar",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Spelling",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize UFLI",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Explorers",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize SEL",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          }
+        ],
+        "stickyChromeHeight": 52
+      },
+      "smallButtons": [
+        {
+          "label": "Skip to content",
+          "w": 136,
+          "h": 38,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "MyCurricula home",
+          "w": 142,
+          "h": 22,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "Personal mode",
+          "w": 66,
+          "h": 26,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Master mode — changes affect the whole team",
+          "w": 56,
+          "h": 26,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Profile settings (Tim)",
+          "w": 32,
+          "h": 32,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "November",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "December",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "January",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "February",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "March",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "April",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "May",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "June",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "July",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Select the curriculum",
+          "w": 131,
+          "h": 40,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Roadmap",
+          "w": 102,
+          "h": 34,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Progression",
+          "w": 116,
+          "h": 34,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "All",
+          "w": 31,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Completed",
+          "w": 82,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "In Progress",
+          "w": 84,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Modified",
+          "w": 68,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Skipped",
+          "w": 65,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Not Started",
+          "w": 87,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Needs Attention",
+          "w": 114,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Clear all status filters",
+          "w": 89,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Math",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Reading",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Writing",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Grammar",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Spelling",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize UFLI",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Explorers",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize SEL",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        }
+      ],
+      "hScroll": false,
+      "h1s": [
+        {
+          "text": "Yearly View",
+          "ariaHidden": null,
+          "visible": true
+        },
+        {
+          "text": "Yearly View",
+          "ariaHidden": "true",
+          "visible": false
+        }
+      ],
+      "stickyOverflowPctPhone": null,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "interactions": {
+        "filtersClick": {
+          "exists": true,
+          "disabled": true,
+          "ariaDisabled": "true",
+          "domChanged": false
+        },
+        "exportClick": {
+          "exists": true,
+          "disabled": true,
+          "ariaDisabled": "true"
+        },
+        "filtersTooltip": [],
+        "todayBtn": {
+          "before": 1220,
+          "after": 1220,
+          "moved": false
+        },
+        "progressionToggle": {
+          "before": false,
+          "after": true,
+          "switched": true
+        },
+        "statusFilter": {
+          "clickedCompleted": true
+        },
+        "minimizeBtns": {
+          "count": 8,
+          "afterMinimizeRestores": 1
+        },
+        "monthPicker": {
+          "opened": true,
+          "itemCount": 19
+        },
+        "curriculumFilter": {
+          "opened": true,
+          "checkboxCount": 8
+        },
+        "stickyHeader": {
+          "exists": true,
+          "top": 302,
+          "parentTop": 302,
+          "sticky": true
+        },
+        "scrolledEnd": true
+      },
+      "timelineWidth": {
+        "clientWidth": 720,
+        "scrollWidth": 4520,
+        "hasInternalHScroll": true
+      },
+      "hexLeakage": []
+    },
+    "desktop": {
+      "tier": "desktop",
+      "width": 1280,
+      "height": 900,
+      "nav": {
+        "seedStatus": 200,
+        "status": 200
+      },
+      "audit": {
+        "docScrollWidth": 1280,
+        "docClientWidth": 1280,
+        "hasHorizontalScroll": false,
+        "bodyScrollHeight": 1601,
+        "h1Count": 2,
+        "h1s": [
+          {
+            "text": "Yearly View",
+            "ariaHidden": null,
+            "visible": true
+          },
+          {
+            "text": "Yearly View",
+            "ariaHidden": "true",
+            "visible": false
+          }
+        ],
+        "headings": [
+          {
+            "level": 1,
+            "text": "Yearly View",
+            "hidden": false
+          },
+          {
+            "level": 1,
+            "text": "Yearly View",
+            "hidden": true
+          }
+        ],
+        "buttons": [
+          {
+            "tag": "A",
+            "role": null,
+            "label": "Skip to content",
+            "w": 136,
+            "h": 38,
+            "disabled": false
+          },
+          {
+            "tag": "A",
+            "role": null,
+            "label": "MyCurricula home",
+            "w": 142,
+            "h": 22,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Collapse filter panel",
+            "w": 40,
+            "h": 40,
+            "disabled": false
+          },
+          {
+            "tag": "A",
+            "role": null,
+            "label": "Daily",
+            "w": 50,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "A",
+            "role": null,
+            "label": "Weekly",
+            "w": 65,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "A",
+            "role": null,
+            "label": "Yearly",
+            "w": 57,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "A",
+            "role": null,
+            "label": "Curriculum",
+            "w": 87,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "A",
+            "role": null,
+            "label": "Schedule",
+            "w": 77,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Undo",
+            "w": 40,
+            "h": 40,
+            "disabled": true
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Redo",
+            "w": 40,
+            "h": 40,
+            "disabled": true
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "Personal mode",
+            "w": 66,
+            "h": 26,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "Master mode — changes affect the whole team",
+            "w": 56,
+            "h": 26,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "Grid",
+            "w": 40,
+            "h": 26,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "List",
+            "w": 36,
+            "h": 26,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Open more controls menu",
+            "w": 44,
+            "h": 44,
+            "disabled": false
+          },
+          {
+            "tag": "A",
+            "role": null,
+            "label": "Profile settings (Tim)",
+            "w": 32,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Math",
+            "w": 43,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Reading",
+            "w": 62,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Writing",
+            "w": 56,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Grammar",
+            "w": 68,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Spelling",
+            "w": 62,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "UFLI",
+            "w": 39,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Explorers",
+            "w": 69,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "SEL",
+            "w": 36,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Unit 3 · Fractions on a Number LineWk 9–",
+            "w": 211,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Unit 2 · Realistic FictionWk 7–12",
+            "w": 211,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Unit 3 · Personal NarrativeWk 10–15",
+            "w": 211,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Unit 2 · Verb Tense & AgreementWk 8–13",
+            "w": 211,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "List 12 · Greek RootsWk 12",
+            "w": 211,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Lessons 84–92 · Multisyllabic WordsWk 9–",
+            "w": 211,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Unit 2 · Ancient EgyptWk 8–14",
+            "w": 211,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Unit 2 · Conflict & ResolutionWk 9–12",
+            "w": 211,
+            "h": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Not done",
+            "w": 56,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Done",
+            "w": 32,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Partial",
+            "w": 39,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Carried over",
+            "w": 74,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "Skipped",
+            "w": 50,
+            "h": 28,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "5.NF.B.3Interpret a fraction as division",
+            "w": 211,
+            "h": 59,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "5.NF.B.4Apply and extend previous unders",
+            "w": 211,
+            "h": 59,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "RL.5.3Compare and contrast two or more c",
+            "w": 211,
+            "h": 45,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "RL.5.6Describe how a narrator's or speak",
+            "w": 211,
+            "h": 45,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "W.5.3Write narratives to develop real or",
+            "w": 211,
+            "h": 45,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "checkbox",
+            "label": "L.5.1.CUse verb tense to convey various ",
+            "w": 211,
+            "h": 45,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Go to today",
+            "w": 58,
+            "h": 44,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "November",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "December",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "January",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "February",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "March",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "April",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "May",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "June",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "menuitem",
+            "label": "July",
+            "w": 166,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Select the curriculum",
+            "w": 131,
+            "h": 40,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Filters — coming soon",
+            "w": 59,
+            "h": 44,
+            "disabled": true
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Export — coming soon",
+            "w": 62,
+            "h": 44,
+            "disabled": true
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "Roadmap",
+            "w": 102,
+            "h": 34,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": "radio",
+            "label": "Progression",
+            "w": 116,
+            "h": 34,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "All",
+            "w": 31,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Completed",
+            "w": 82,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "In Progress",
+            "w": 84,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Modified",
+            "w": 68,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Skipped",
+            "w": 65,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Not Started",
+            "w": 87,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Needs Attention",
+            "w": 114,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Clear all status filters",
+            "w": 89,
+            "h": 36,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Math",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Reading",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Writing",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Grammar",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Spelling",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize UFLI",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize Explorers",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "role": null,
+            "label": "Minimize SEL",
+            "w": 24,
+            "h": 24,
+            "disabled": false
+          }
+        ],
+        "stickyChromeHeight": 52
+      },
+      "smallButtons": [
+        {
+          "label": "Skip to content",
+          "w": 136,
+          "h": 38,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "MyCurricula home",
+          "w": 142,
+          "h": 22,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "Collapse filter panel",
+          "w": 40,
+          "h": 40,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Daily",
+          "w": 50,
+          "h": 32,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "Weekly",
+          "w": 65,
+          "h": 32,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "Yearly",
+          "w": 57,
+          "h": 32,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "Curriculum",
+          "w": 87,
+          "h": 32,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "Schedule",
+          "w": 77,
+          "h": 32,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "Personal mode",
+          "w": 66,
+          "h": 26,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Master mode — changes affect the whole team",
+          "w": 56,
+          "h": 26,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Grid",
+          "w": 40,
+          "h": 26,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "List",
+          "w": 36,
+          "h": 26,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Profile settings (Tim)",
+          "w": 32,
+          "h": 32,
+          "role": null,
+          "tag": "A"
+        },
+        {
+          "label": "Math",
+          "w": 43,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Reading",
+          "w": 62,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Writing",
+          "w": 56,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Grammar",
+          "w": 68,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Spelling",
+          "w": 62,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "UFLI",
+          "w": 39,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Explorers",
+          "w": 69,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "SEL",
+          "w": 36,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Unit 3 · Fractions on a Number LineWk 9–",
+          "w": 211,
+          "h": 32,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Unit 2 · Realistic FictionWk 7–12",
+          "w": 211,
+          "h": 32,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Unit 3 · Personal NarrativeWk 10–15",
+          "w": 211,
+          "h": 32,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Unit 2 · Verb Tense & AgreementWk 8–13",
+          "w": 211,
+          "h": 32,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "List 12 · Greek RootsWk 12",
+          "w": 211,
+          "h": 32,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Lessons 84–92 · Multisyllabic WordsWk 9–",
+          "w": 211,
+          "h": 32,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Unit 2 · Ancient EgyptWk 8–14",
+          "w": 211,
+          "h": 32,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Unit 2 · Conflict & ResolutionWk 9–12",
+          "w": 211,
+          "h": 32,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Not done",
+          "w": 56,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Done",
+          "w": 32,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Partial",
+          "w": 39,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Carried over",
+          "w": 74,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Skipped",
+          "w": 50,
+          "h": 28,
+          "role": "checkbox",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "November",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "December",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "January",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "February",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "March",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "April",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "May",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "June",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "July",
+          "w": 166,
+          "h": 36,
+          "role": "menuitem",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Select the curriculum",
+          "w": 131,
+          "h": 40,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Roadmap",
+          "w": 102,
+          "h": 34,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Progression",
+          "w": 116,
+          "h": 34,
+          "role": "radio",
+          "tag": "BUTTON"
+        },
+        {
+          "label": "All",
+          "w": 31,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Completed",
+          "w": 82,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "In Progress",
+          "w": 84,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Modified",
+          "w": 68,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Skipped",
+          "w": 65,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Not Started",
+          "w": 87,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Needs Attention",
+          "w": 114,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Clear all status filters",
+          "w": 89,
+          "h": 36,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Math",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Reading",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Writing",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Grammar",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Spelling",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize UFLI",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize Explorers",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        },
+        {
+          "label": "Minimize SEL",
+          "w": 24,
+          "h": 24,
+          "role": null,
+          "tag": "BUTTON"
+        }
+      ],
+      "hScroll": false,
+      "h1s": [
+        {
+          "text": "Yearly View",
+          "ariaHidden": null,
+          "visible": true
+        },
+        {
+          "text": "Yearly View",
+          "ariaHidden": "true",
+          "visible": false
+        }
+      ],
+      "stickyOverflowPctPhone": null,
+      "consoleErrors": [
+        "WARN: [Fast Refresh] performing full reload\n\nFast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.\nYou might have a file which exports ",
+        "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:\n\n- A server/client bran"
+      ],
+      "pageErrors": [],
+      "interactions": {
+        "filtersClick": {
+          "exists": true,
+          "disabled": true,
+          "ariaDisabled": "true",
+          "domChanged": false
+        },
+        "exportClick": {
+          "exists": true,
+          "disabled": true,
+          "ariaDisabled": "true"
+        },
+        "filtersTooltip": [],
+        "todayBtn": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        },
+        "progressionToggle": {
+          "before": false,
+          "after": false,
+          "switched": false
+        },
+        "statusFilter": {
+          "clickedCompleted": true
+        },
+        "minimizeBtns": {
+          "count": 8,
+          "afterMinimizeRestores": 1
+        },
+        "monthPicker": {
+          "opened": true,
+          "itemCount": 19
+        },
+        "curriculumFilter": {
+          "opened": true,
+          "checkboxCount": 8
+        },
+        "stickyHeader": {
+          "exists": true,
+          "top": 284,
+          "parentTop": 284,
+          "sticky": true
+        },
+        "scrolledEnd": true
+      },
+      "timelineWidth": {
+        "clientWidth": 992,
+        "scrollWidth": 4520,
+        "hasInternalHScroll": true
+      },
+      "hexLeakage": []
+    }
+  },
+  "errors": []
+}
