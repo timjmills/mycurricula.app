@@ -20,6 +20,22 @@
   position: relative;
 }
 
+/* Disabled-trigger wrapper — only used when the child is disabled or
+   aria-disabled. The span captures hover/focus events the disabled button
+   suppresses (Chromium drops pointer events on disabled <button>). Visual
+   layout inherits from the surrounding context so the button's hit area
+   and metrics are preserved exactly; the span is purely an event surface.
+
+   `display: inline-flex` keeps the wrapper sized to the button geometry
+   without forcing block flow. `cursor: not-allowed` mirrors the disabled
+   button's own cursor so hovering the wrapper area still shows the right
+   affordance. */
+.disabledWrapper {
+  display: inline-flex;
+  align-items: center;
+  cursor: not-allowed;
+}
+
 /* ── Tooltip bubble ──────────────────────────────────────────────────────── */
 
 .tooltip {

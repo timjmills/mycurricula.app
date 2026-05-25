@@ -21,6 +21,19 @@
 // Motion:
 //   120ms fade by default. Under prefers-reduced-motion the transition is
 //   removed so show/hide is instant.
+//
+// Disabled-button quirk (Lane Q m7):
+//   Chromium suppresses pointer events on disabled <button> elements, so
+//   mouseenter/mouseleave never fire on the disabled child and the styled
+//   tooltip never paints. Firefox + WebKit have the same quirk to varying
+//   degrees. Fix: when the trigger child is detected as disabled (the
+//   `disabled` prop is truthy, or `aria-disabled` is "true"), wrap the
+//   child in a transparent inline <span> and bind the hover/focus
+//   listeners to the SPAN. Pointer events reach the span normally because
+//   spans are not subject to the disabled-button suppression. The
+//   underlying button is still rendered as-is (still disabled, still has
+//   its native title= fallback), so screen readers and keyboard semantics
+//   are unchanged.
 
 import {
   useState,
@@ -210,20 +223,40 @@ export function Tooltip({
     hide();
   };
 
-  // Clone the trigger to inject ref + aria-describedby + event handlers.
-  // The cast to JSX.IntrinsicElements["button"] satisfies the stricter
-  // cloneElement overloads in React 19 while keeping the API open to any
-  // ReactElement trigger. Ref forwarding requires the child to accept a ref
-  // (all DOM elements and forwardRef components do).
+  // ── Disabled-button quirk detection ──────────────────────────────────────
+  // Inspect the child element's props for `disabled` (boolean) or
+  // `aria-disabled` ("true" / true). When detected, we cannot rely on
+  // listeners attached to the disabled element — Chromium drops pointer
+  // events on disabled buttons. Fall through to the wrapper-span path.
+  const childProps = (children as ReactElement<Record<string, unknown>>).props;
+  const childDisabled =
+    childProps?.disabled === true ||
+    childProps?.["aria-disabled"] === true ||
+    childProps?.["aria-disabled"] === "true";
+
+  // Clone the trigger to inject ref + aria-describedby (always) and the
+  // hover/focus listeners (only on the enabled path). When the child is
+  // disabled, the listeners move to the wrapper span below.
+  const triggerHandlers = childDisabled
+    ? {}
+    : {
+        onMouseEnter: handleMouseEnter,
+        onMouseLeave: handleMouseLeave,
+        onFocus: handleFocus,
+        onBlur: handleBlur,
+      };
+
+  // For the enabled path the ref lives on the trigger itself; for the
+  // disabled path the ref lives on the wrapper span so getBoundingClientRect()
+  // measures the right element.
   const trigger = cloneElement(
     children as ReactElement<JSX.IntrinsicElements["button"]>,
     {
-      ref: triggerRef as React.Ref<HTMLButtonElement>,
+      ...(childDisabled
+        ? {}
+        : { ref: triggerRef as React.Ref<HTMLButtonElement> }),
       "aria-describedby": open ? tooltipId : undefined,
-      onMouseEnter: handleMouseEnter,
-      onMouseLeave: handleMouseLeave,
-      onFocus: handleFocus,
-      onBlur: handleBlur,
+      ...triggerHandlers,
     },
   );
 
@@ -255,9 +288,29 @@ export function Tooltip({
     </div>
   );
 
+  // Render the trigger directly when the child is interactive; wrap it in
+  // an inline-flex span that catches the pointer events when the child is
+  // disabled. The span uses `display: contents` semantics via class so it
+  // does not disturb surrounding flex/grid layouts — see Tooltip.module.css
+  // .disabledWrapper.
+  const triggerNode = childDisabled ? (
+    <span
+      ref={triggerRef as React.Ref<HTMLSpanElement>}
+      className={styles.disabledWrapper}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+    >
+      {trigger}
+    </span>
+  ) : (
+    trigger
+  );
+
   return (
     <>
-      {trigger}
+      {triggerNode}
       {open && typeof document !== "undefined"
         ? createPortal(tooltipEl, document.body)
         : null}

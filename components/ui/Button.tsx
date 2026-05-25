@@ -20,9 +20,19 @@
 //
 // The `loading` prop shows a spinner in place of leadingIcon and disables
 // interaction with aria-busy.
+//
+// The `tooltip` prop wraps the rendered <button> in the canonical <Tooltip>
+// primitive AND mirrors the value to the native `title=` attribute. The
+// title attribute is the cross-browser fallback for the disabled-button
+// quirk (Chromium suppresses pointer events on disabled <button>, so the
+// styled tooltip's hover listeners never fire) — having both means a
+// disabled button always surfaces some textual hint. The Tooltip primitive
+// itself (Tooltip.tsx) handles the wrapper-span dance for disabled triggers
+// so the styled tooltip ALSO works when achievable.
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import styles from "./Button.module.css";
+import { Tooltip } from "./Tooltip";
 
 // ── Spinner glyph ─────────────────────────────────────────────────────────────
 // Inline SVG so it inherits currentColor and needs no external dep.
@@ -63,6 +73,35 @@ export interface ButtonProps extends Omit<
   iconAriaLabel?: string;
   /** Shows a small inline spinner in place of leadingIcon; disables interaction. */
   loading?: boolean;
+  /**
+   * Onboarding tooltip. CLAUDE.md §4 mandates an explanation on every
+   * interactive control so first-time teachers can discover the app by
+   * hovering / long-pressing.
+   *
+   * **Voice:** tell a first-time teacher what the control _accomplishes_ in
+   * context — not just what it's named.
+   *
+   * Good examples:
+   *   tooltip="Save your edits to this lesson"
+   *   tooltip="Switch to editing the team's curriculum (changes affect everyone)"
+   *   tooltip="Mark this lesson done — it'll grey out on the grid"
+   *
+   * Bad examples (restate the label, don't teach):
+   *   tooltip="Save"
+   *   tooltip="Toggle"
+   *   tooltip="Open panel"
+   *
+   * When set, the button is wrapped in the canonical <Tooltip> primitive AND
+   * the value is mirrored to the native `title=` attribute. The native title
+   * is the disabled-button fallback (Chromium suppresses pointer events on
+   * disabled <button>, so the styled tooltip alone may never fire — `title=`
+   * always works regardless of disabled state or engine). The Tooltip
+   * primitive itself further wraps disabled triggers in a <span> so the
+   * styled tooltip ALSO fires for those.
+   */
+  tooltip?: string;
+  /** Optional side override for the wrapping <Tooltip>. Default "top". */
+  tooltipSide?: "top" | "right" | "bottom" | "left";
 }
 
 // ── Button ────────────────────────────────────────────────────────────────────
@@ -77,6 +116,9 @@ export function Button({
   disabled,
   className,
   children,
+  tooltip,
+  tooltipSide,
+  title,
   ...rest
 }: ButtonProps): ReactNode {
   // icon variant: accessible name comes from iconAriaLabel, not children.
@@ -95,10 +137,15 @@ export function Button({
     .filter(Boolean)
     .join(" ");
 
-  return (
+  // Mirror the tooltip value to the native title= attribute when provided.
+  // A caller's explicit `title=` wins (allows opt-out / override).
+  const effectiveTitle = title ?? tooltip;
+
+  const buttonEl = (
     <button
       type="button"
       {...rest}
+      title={effectiveTitle}
       aria-label={ariaLabel}
       aria-busy={loading || undefined}
       disabled={disabled || loading}
@@ -128,5 +175,15 @@ export function Button({
         </span>
       )}
     </button>
+  );
+
+  // No tooltip prop → identical render path to pre-prop callsites (regression
+  // guard).
+  if (!tooltip) return buttonEl;
+
+  return (
+    <Tooltip content={tooltip} side={tooltipSide ?? "top"}>
+      {buttonEl}
+    </Tooltip>
   );
 }
