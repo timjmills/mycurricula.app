@@ -1,20 +1,19 @@
 
 ──── PHONE (400x800) ─────────────────
   [OK]        weekly                               status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
   [OK]        weekly-schedule                      status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-  [OK]        weekly-schedule-lessons-only         status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-  [OK]        daily                                status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-  [OK]        daily-schedule-rail                  status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
         console.error: TypeError: Failed to fetch
-    at eval (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/mo
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [OK]        weekly-schedule-lessons-only         status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [OK]        daily                                status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+  [OK]        daily-schedule-rail                  status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
   [OK]        schedule-tab                         status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
   [OK]        catch-up                             status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
   [OK]        year                                 status=200 doc= 400/ 400 title="MyCurricula — Grade 5 Curriculum Planner"
@@ -23,20 +22,19 @@
 
 ──── TABLET (768x1024) ─────────────────
   [OK]        weekly                               status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
   [OK]        weekly-schedule                      status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-  [OK]        weekly-schedule-lessons-only         status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-  [OK]        daily                                status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-  [OK]        daily-schedule-rail                  status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
         console.error: TypeError: Failed to fetch
-    at eval (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/mo
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [OK]        weekly-schedule-lessons-only         status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
+  [OK]        daily                                status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+  [OK]        daily-schedule-rail                  status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
   [OK]        schedule-tab                         status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
   [OK]        catch-up                             status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
   [OK]        year                                 status=200 doc= 768/ 768 title="MyCurricula — Grade 5 Curriculum Planner"
@@ -45,18 +43,19 @@
 
 ──── DESKTOP (1280x900) ─────────────────
   [OK]        weekly                               status=200 doc=1280/1280 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
   [OK]        weekly-schedule                      status=200 doc=1280/1280 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
   [OK]        weekly-schedule-lessons-only         status=200 doc=1280/1280 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
   [OK]        daily                                status=200 doc=1280/1280 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
   [OK]        daily-schedule-rail                  status=200 doc=1280/1280 title="MyCurricula — Grade 5 Curriculum Planner"
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
-        console.error: A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patche
+        console.error: TypeError: Failed to fetch
+    at https://mycurricula.app/_next/static/chunks/1613-0a41020c39722ea8.js:59:3554
+    at u 
   [OK]        schedule-tab                         status=200 doc=1280/1280 title="MyCurricula — Grade 5 Curriculum Planner"
   [OK]        catch-up                             status=200 doc=1280/1280 title="MyCurricula — Grade 5 Curriculum Planner"
   [OK]        year                                 status=200 doc=1280/1280 title="MyCurricula — Grade 5 Curriculum Planner"
