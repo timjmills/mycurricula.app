@@ -295,8 +295,9 @@
      curve on the bottom-left corner where the pointer originates. */
   border-radius: 6px 6px 8px 6px;
   background: var(--pin-color, var(--ink-400));
-  color: #ffffff; /* Spec says white numeral; not a token because it's pure
-                     white on every badge regardless of subject. */
+  /* Spec §3.1: pure white numeral on every badge regardless of pin hue.
+     `--paper` is the semantic "white surface" token. */
+  color: var(--paper);
   font-size: 13px; /* Spec §3.1: 13px numeral. */
   font-weight: 700;
   line-height: 1;

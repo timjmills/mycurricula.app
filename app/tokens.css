@@ -111,6 +111,34 @@
   --tag-pink: #e54b94;
   --tag-gray: #8b909e;
 
+  /* ── Tag-pill chrome (bg + fg pairs) ──────────────────────────────── */
+  /* Soft pastel fill + deep contrast text, for resource-type pills,
+     mini-row icon squares, and other badge/chip surfaces. These are
+     distinct from the `--tag-*` mid-tones above (which are saturated
+     dots): the pill pairs are the chrome a chip wears, not the chip
+     identity color. Approx Tailwind 100/800 pairs, picked for WCAG AA
+     contrast in their bg/fg combinations. */
+  --tag-pink-bg: #fce7f3;
+  --tag-pink-fg: #9d174d;
+  --tag-blue-bg: #dbeafe;
+  --tag-blue-fg: #1e40af;
+  --tag-red-bg: #fee2e2;
+  --tag-red-fg: #991b1b;
+  --tag-gray-bg: #f3f4f6;
+  --tag-gray-fg: #374151;
+  --tag-amber-bg: #fef3c7;
+  --tag-amber-fg: #92400e;
+  --tag-green-bg: #dcfce7;
+  --tag-green-fg: #166534;
+
+  /* YouTube brand-adjacent red — for the resource-type tint on YouTube
+     rows in the lesson card. Sits alongside `--urgent` / `--fyi` / etc.
+     as a semantic, not a subject color. The deep variant is the text
+     fill; the mid is consumed via `color-mix(... 18%, white)` to make a
+     soft pink-red wash for the row background. */
+  --youtube: #e53935;
+  --youtube-deep: #b71c1c;
+
   /* ── Highlighter pens ─────────────────────────────────────────────── */
   /* Bright marker colors + softer pastel tints for the rich-text
      highlight picker. */

@@ -100,7 +100,7 @@ export function CompletionCheck({
           borderRadius: 3,
           background,
           border,
-          color: done || partial ? "#fff" : "var(--ink-700)",
+          color: done || partial ? "var(--paper)" : "var(--ink-700)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
@@ -175,7 +175,10 @@ const RES_TINT: Record<LessonResource["type"], { bg: string; fg: string }> = {
     bg: "color-mix(in oklch, var(--urgent) 16%, white)",
     fg: "var(--urgent)",
   },
-  youtube: { bg: "color-mix(in oklch, #e53935 18%, white)", fg: "#b71c1c" },
+  youtube: {
+    bg: "color-mix(in oklch, var(--youtube) 18%, white)",
+    fg: "var(--youtube-deep)",
+  },
   slides: {
     bg: "color-mix(in oklch, var(--important) 22%, white)",
     fg: "var(--important)",

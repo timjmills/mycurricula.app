@@ -1,9 +1,11 @@
 /* resource-type-pill.module.css — small uppercase pill tag for resource types.
  *
- * Spec exception: §4.4 of the Plugin Directions explicitly lists HEX pairs
- * for each type. They are the published resource-type colorway and are NOT
- * part of the subject-color cascade. All other color in this folder still
- * flows through var(--token).
+ * Spec §4.4 lists HEX pairs for each resource type — the published
+ * resource-type colorway, distinct from the subject-color cascade. The
+ * actual values now live in `app/tokens.css` as `--tag-<hue>-bg` /
+ * `--tag-<hue>-fg` pairs (Tailwind-100/800-style soft pastel + deep
+ * contrast text) so the spec mapping is `data-kind="video"` → pink,
+ * etc., but the values stay in the token system per CLAUDE.md §4.
  *
  * Layout: 2px 8px padding, 999px radius (true pill), 10px text, weight 600,
  * uppercase, letter-spacing 0.4.
@@ -31,36 +33,37 @@
   line-height: 1;
 }
 
-/* ── EXACT HEX VALUES per spec §4.4 ─────────────────────────────────────
-   These are the only hex literals in this stylesheet. Do not refactor them
-   to tokens — they are the spec's color language for resource types. */
+/* ── Per-kind colorway, spec §4.4 ───────────────────────────────────────
+   Each data-kind picks one of the `--tag-<hue>-bg/-fg` pairs from
+   `app/tokens.css`. The spec hex values live there; this file just maps
+   resource kinds to the appropriate hue. */
 
 .pill[data-kind="video"] {
-  background: #fce7f3;
-  color: #9d174d;
+  background: var(--tag-pink-bg);
+  color: var(--tag-pink-fg);
 }
 
 .pill[data-kind="docx"] {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--tag-blue-bg);
+  color: var(--tag-blue-fg);
 }
 
 .pill[data-kind="pdf"] {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--tag-red-bg);
+  color: var(--tag-red-fg);
 }
 
 .pill[data-kind="link"] {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--tag-gray-bg);
+  color: var(--tag-gray-fg);
 }
 
 .pill[data-kind="slides"] {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--tag-amber-bg);
+  color: var(--tag-amber-fg);
 }
 
 .pill[data-kind="image"] {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--tag-green-bg);
+  color: var(--tag-green-fg);
 }

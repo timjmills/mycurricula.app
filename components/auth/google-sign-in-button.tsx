@@ -309,6 +309,7 @@ export function GoogleSignInButton({
 // are deliberately exempt from the token rule (see file header).
 
 function GoogleGlyph(): ReactNode {
+  // Google brand colors — locked by Google's identity guidelines, not theme tokens.
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
       <path
