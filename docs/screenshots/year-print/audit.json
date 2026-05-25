@@ -1,0 +1,86 @@
+{
+  "screen": {
+    "hasPrintRoot": true,
+    "sectionCount": 13,
+    "monthTitles": [
+      "?",
+      "?",
+      "?",
+      "?",
+      "November",
+      "December",
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July"
+    ],
+    "tables": [
+      null,
+      null,
+      null,
+      null,
+      {
+        "cols": 6,
+        "rows": 8,
+        "cells": 40
+      },
+      {
+        "cols": 5,
+        "rows": 8,
+        "cells": 32
+      },
+      {
+        "cols": 5,
+        "rows": 8,
+        "cells": 32
+      },
+      {
+        "cols": 5,
+        "rows": 8,
+        "cells": 32
+      },
+      {
+        "cols": 6,
+        "rows": 8,
+        "cells": 40
+      },
+      {
+        "cols": 5,
+        "rows": 8,
+        "cells": 32
+      },
+      {
+        "cols": 6,
+        "rows": 8,
+        "cells": 40
+      },
+      {
+        "cols": 5,
+        "rows": 8,
+        "cells": 32
+      },
+      {
+        "cols": 2,
+        "rows": 8,
+        "cells": 8
+      }
+    ],
+    "shellChromeVisible": {
+      "header": false,
+      "aside": false
+    },
+    "docScrollWidth": 1280,
+    "docClientWidth": 1280
+  },
+  "print": {
+    "sections": 9,
+    "actionsHidden": true,
+    "firstSectionBreakBefore": "auto",
+    "secondSectionBreakBefore": "page"
+  },
+  "consoleErrs": [],
+  "pageErrs": []
+}

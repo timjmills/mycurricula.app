@@ -19,6 +19,7 @@
 // QuarterMonthWeekHeader.
 
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import Link from "next/link";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
@@ -82,6 +83,21 @@ const IconExport = (p: React.SVGProps<SVGSVGElement>) => (
     aria-hidden="true"
   >
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+  </svg>
+);
+
+const IconPrint = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    {...p}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    aria-hidden="true"
+  >
+    <path d="M6 9V3h12v6" />
+    <rect x="4" y="9" width="16" height="9" rx="1.5" />
+    <path d="M6 14h12v6H6z" />
   </svg>
 );
 
@@ -338,6 +354,21 @@ export function YearView() {
             selectedIds={curriculumSelectedIds}
             onChange={setCurriculumSelectedIds}
           />
+
+          {/* Print → dedicated /year/print route that re-flows the timeline
+              as a vertical month-stack (audit M4, recommended Option 2 in
+              docs/research-deferred-year-items-2026-05-25.md). Uses <Link>
+              so it works without JS and remains keyboard-accessible. */}
+          <Tooltip content="Print this year" side="bottom">
+            <Link
+              href="/year/print"
+              className={styles.actionBtn}
+              aria-label="Print this year"
+            >
+              <IconPrint width={14} height={14} />
+              Print
+            </Link>
+          </Tooltip>
 
           {/* Filters + Export are decorative placeholders until Phase 1B
               wires them to the left filter panel and a CSV/PDF export. The

@@ -1,0 +1,347 @@
+/* print.module.css — /year/print styles.
+   Purpose-built for paper: vertical month-stack, one section per calendar
+   month, sized to landscape Letter / A4. All color/type/spacing come from
+   tokens.css via var(--…) — no hex in this file (per BUILD_STANDARD.md §3).
+
+   Shell-chrome suppression rules live in app/globals.css (scoped by
+   [data-print-view]); they cannot live here because CSS Modules require at
+   least one local class per selector. This file owns only print-page-local
+   styles. */
+
+/* ── Outer wrapper ───────────────────────────────────────────────────────
+   Fills the planner main column (which is itself the full viewport on the
+   print route, because the shell chrome is hidden by globals.css). */
+
+.page {
+  min-height: 100vh;
+  background: var(--ink-50);
+  padding: 24px 24px 40px;
+  /* Allow natural scroll on screen so a multi-month stack doesn't clip. */
+  overflow: auto;
+}
+
+/* ── Screen-only action bar ─────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  max-width: 1040px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media print {
+  .actions {
+    display: none;
+  }
+}
+
+.backLink {
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-500);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.backLink:hover {
+  color: var(--ink-900);
+}
+
+.printBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: var(--r-6);
+  border: 1px solid var(--ink-300);
+  background: var(--paper);
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-900);
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.printBtn:hover {
+  background: var(--ink-50);
+  border-color: var(--ink-400);
+}
+
+.printBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Print sheet ─────────────────────────────────────────────────────────
+   White card on screen; a sequence of physical pages in @media print. */
+
+.sheet {
+  background: var(--paper);
+  border-radius: var(--r-8);
+  box-shadow:
+    0 2px 8px color-mix(in oklch, var(--ink-900) 8%, transparent),
+    0 0 0 1px var(--ink-150);
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 28px 32px;
+}
+
+@media print {
+  .sheet {
+    box-shadow: none;
+    border-radius: 0;
+    max-width: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* Landscape per audit M4 recommendation — gives 4-5 week columns room
+     to breathe at ≥10pt typography. */
+  @page {
+    size: landscape;
+    margin: 0.5in;
+  }
+}
+
+/* ── Cover header ───────────────────────────────────────────────────────── */
+
+.sheetHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--ink-150);
+  padding-bottom: 12px;
+}
+
+.sheetTitle {
+  font-size: var(--t-22);
+  font-weight: 800;
+  color: var(--ink-900);
+  letter-spacing: -0.4px;
+  margin: 0;
+}
+
+.sheetMeta {
+  font-size: var(--t-12);
+  color: var(--ink-400);
+}
+
+@media print {
+  .sheetTitle {
+    font-size: 18pt;
+  }
+  .sheetMeta {
+    font-size: 9pt;
+  }
+}
+
+/* ── Month section ──────────────────────────────────────────────────────
+   One <section> per calendar month. Page breaks before each section except
+   the first; page-break-inside: avoid keeps the table on one page when it
+   fits, which it should at landscape with 4-5 columns. */
+
+.monthSection {
+  margin-top: 24px;
+}
+
+.monthSection:first-of-type,
+.monthSection[data-first="true"] {
+  margin-top: 8px;
+}
+
+@media print {
+  .monthSection {
+    page-break-before: always;
+    break-before: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-top: 0;
+  }
+
+  /* The first month rides under the cover header on page 1 — no break. */
+  .monthSection[data-first="true"] {
+    page-break-before: auto;
+    break-before: auto;
+    margin-top: 12px;
+  }
+}
+
+.monthTitle {
+  font-size: var(--t-16);
+  font-weight: 700;
+  color: var(--ink-900);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--ink-150);
+}
+
+@media print {
+  .monthTitle {
+    font-size: 14pt;
+  }
+}
+
+/* ── Grid (subject × week matrix) ──────────────────────────────────────── */
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--t-12);
+}
+
+.grid th {
+  padding: 6px 8px;
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  text-align: left;
+  border-bottom: 2px solid var(--ink-150);
+}
+
+/* Subject-stub column — narrower than week columns. */
+.grid th:first-child {
+  width: 100px;
+  color: var(--ink-300);
+}
+
+@media print {
+  .grid {
+    font-size: 10pt;
+  }
+  .grid th {
+    font-size: 9pt;
+  }
+}
+
+/* Subject stub cells — the row label. Inline color comes from the resolved
+   subject color (cd token) for paper-safe rendering even when cp-subj is
+   suppressed. */
+.subjectCell {
+  padding: 8px 8px 8px 0;
+  font-size: var(--t-12);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  vertical-align: top;
+  border-bottom: 1px solid var(--ink-100);
+  position: relative;
+}
+
+/* 3px stripe stuck to the leading edge of the subject row — the same
+   stripe metaphor used on Weekly cards and lane rows. */
+.subjectStripe {
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  border-radius: 999px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+@media print {
+  .subjectCell {
+    font-size: 10pt;
+  }
+}
+
+/* ── Week cells ──────────────────────────────────────────────────────── */
+
+.weekCell {
+  padding: 6px 7px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--ink-100);
+  border-left: 1px solid var(--ink-100);
+}
+
+/* Unit block inside a cell. Multiple blocks stack vertically — rare in
+   practice (most subjects have one unit per week) but the layout handles it. */
+.unitBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.unitBlock:last-child {
+  margin-bottom: 0;
+}
+
+.unitStripe {
+  flex-shrink: 0;
+  width: 3px;
+  border-radius: 999px;
+  align-self: stretch;
+  min-height: 18px;
+  /* background set inline (solid or dashed via repeating-linear-gradient) */
+}
+
+.unitText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.unitName {
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-900);
+  line-height: 1.25;
+  /* Clamp very long unit names to 2 lines in print. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.unitCount {
+  font-size: var(--t-10);
+  font-weight: 500;
+  color: var(--ink-400);
+  white-space: nowrap;
+}
+
+@media print {
+  .unitName {
+    font-size: 9pt;
+    -webkit-line-clamp: 3;
+  }
+  .unitCount {
+    font-size: 7.5pt;
+  }
+  /* Keep each subject row together so a row never splits across pages. */
+  .grid tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
+
+/* Empty cell placeholder. */
+.emptyCell {
+  color: var(--ink-200);
+  font-size: var(--t-11);
+  font-style: italic;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .printBtn,
+  .backLink {
+    transition: none;
+  }
+}
