@@ -1,0 +1,256 @@
+/* SchedulePanel.module.css — right-side drawer that wraps the existing
+   ScheduleDayPane content as a slide-out over any planner surface.
+
+   Anatomy:
+     .scrim     — full-viewport ink wash overlay; click-to-dismiss.
+     .panel     — right-aligned column. 400px desktop, 360px tablet,
+                  full-viewport phone. Slides in from the right via
+                  transform; respects prefers-reduced-motion.
+     .header    — eyebrow + title + × close button.
+     .dayStrip  — Sun…Thu chip selector (mirrors the /schedule route's
+                  vocabulary so the two surfaces read as one family).
+     .paneSlot  — fills the remaining height with <ScheduleDayPane />.
+
+   Tokens-only — no hex, no raw rgb/hsl. Spacing on the 4-8-12-16-24-32
+   scale. Touch targets ≥44×44 on phone/tablet (the day chips use
+   min-height + the close button is the icon Button primitive's ≥44px
+   hit target).
+
+   z-index: 500 lifts the drawer above the planner shell (sticky top-bar,
+   icon rail, right rail). Mirrors the ResourceComposer + command-palette
+   + shortcuts-overlay scrim, so all top-level overlays share one stacking
+   tier. */
+
+/* ── Scrim ──────────────────────────────────────────────────────────────── */
+/* The backdrop overlay. ~25% ink-900 wash so the drawer reads as the
+   focused surface but the planner remains a visible ghost behind it. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  background: color-mix(in srgb, var(--ink-900) 25%, transparent);
+  /* Soft fade-in on the scrim so the drawer doesn't slam in. */
+  animation: scrimIn 160ms ease forwards;
+}
+
+@keyframes scrimIn {
+  from {
+    background: color-mix(in srgb, var(--ink-900) 0%, transparent);
+  }
+  to {
+    background: color-mix(in srgb, var(--ink-900) 25%, transparent);
+  }
+}
+
+/* ── Panel ──────────────────────────────────────────────────────────────── */
+/* The drawer itself — anchored to the right edge, full viewport height,
+   400px wide on desktop. */
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 400px;
+  max-width: 100vw;
+  height: 100vh;
+  background: var(--paper);
+  border-left: 1px solid var(--ink-150);
+  box-shadow: var(--shadow-popover);
+  padding: 20px 20px 24px;
+  gap: 16px;
+  overflow-y: auto;
+  outline: none;
+  /* Slide in from the right edge. Reduced-motion zeros this out below. */
+  animation: panelIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: right center;
+}
+
+@keyframes panelIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0.4;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.eyebrow {
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.title {
+  font-size: var(--t-16);
+  font-weight: 800;
+  letter-spacing: -0.1px;
+  color: var(--ink-900);
+  margin: 0;
+  /* Long week labels (e.g. "Wednesday") should ellipsize rather than
+     wrap the header onto a second line. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.closeBtn {
+  flex-shrink: 0;
+}
+
+/* ── Day-strip selector ─────────────────────────────────────────────────── */
+/* Matches the /schedule route's chip vocabulary so the surfaces feel
+   paired. The chips are local to the drawer (not imported from the route)
+   because sharing CSS modules across an `app/` route and a `components/`
+   surface couples two unrelated lifecycles. */
+
+.dayStrip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dayChip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* min-width/height inflate the touch target to ≥44 × 44px without
+     bloating the visual on phone/tablet. */
+  min-width: 56px;
+  min-height: 44px;
+  padding: 4px 12px;
+  background: var(--paper);
+  color: var(--ink-700);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-8);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background 120ms ease-out,
+    border-color 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.dayChip:hover {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+.dayChip:focus-visible {
+  outline: 2px solid var(--fyi);
+  outline-offset: 2px;
+}
+
+.dayChipActive {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+  color: var(--paper);
+}
+
+.dayChipActive:hover {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+}
+
+/* Today gets a subtle catchup ring even when not the active selection
+   so a teacher always sees where "today" lives. */
+.dayChipToday:not(.dayChipActive) {
+  border-color: var(--catchup);
+  color: var(--catchup);
+}
+
+.chipDay {
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chipDate {
+  font-size: var(--t-13);
+  font-weight: 600;
+}
+
+/* ── Pane slot ──────────────────────────────────────────────────────────── */
+/* Fills remaining vertical space. The pane itself supplies its own
+   chrome (border, shadow, padding) so the slot is just a flex shell. */
+
+.paneSlot {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+/* Tablet — narrower drawer so a comfortable column shows alongside
+   whatever surface launched it. */
+@media (max-width: 900px) {
+  .panel {
+    width: 360px;
+    padding: 16px 16px 20px;
+    gap: 12px;
+  }
+}
+
+/* Phone — full-viewport sheet. No "behind the panel" affordance is
+   reachable at this width anyway, so a full sheet keeps the design
+   coherent rather than offering a sliver of dimmed background that
+   can't be tapped. */
+@media (max-width: 600px) {
+  .panel {
+    width: 100vw;
+    border-left: none;
+    padding: 16px 16px 20px;
+  }
+
+  .title {
+    font-size: var(--t-15);
+  }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+/* Drop the slide-in transform + the scrim fade so the drawer appears
+   instantly. Day-chip transitions also stripped to match the rest of
+   the app's reduced-motion contract. */
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim {
+    animation: none;
+  }
+
+  .panel {
+    animation: none;
+  }
+
+  .dayChip {
+    transition: none;
+  }
+}

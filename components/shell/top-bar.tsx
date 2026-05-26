@@ -46,12 +46,16 @@ interface ViewDef {
   tooltip?: string;
 }
 
-// Top-bar tab order, left → right: Daily · Weekly · Yearly · Curriculum · Schedule.
+// Top-bar tab order, left → right: Daily · Weekly · Yearly · Curriculum.
 // Yearly is a label rename of the Year route (/year stays the canonical URL).
 // Curriculum is a label rename of the Subject route (/subject/[slug] stays the
 // canonical URL — "subject" is the data-model entity; "Curriculum" is just the
 // chrome label that teachers see).
 // The "Unit" SOON tab was retired — units live inside the Curriculum tab.
+// Schedule was dropped from primary navigation on 2026-05-25 — the daily
+// timetable now lives as a side-pane trigger on the Daily IconRail. The
+// `/schedule` route is preserved as a deep link target for shared URLs, but
+// it is no longer surfaced in the tab strip or the More menu.
 //
 // Exported so the More menu (top-bar-more-menu.tsx) can render the same list
 // as menu items at ≤768px where the inline tab strip is hidden — see the
@@ -82,12 +86,6 @@ export const VIEWS: ViewDef[] = [
     href: "/subject",
     tooltip:
       "The full year of units and lessons per subject, with the standards each covers",
-  },
-  {
-    label: "Schedule",
-    href: "/schedule",
-    tooltip:
-      "Daily timetable — the time blocks when each subject meets each day",
   },
 ];
 export type { ViewDef };
@@ -262,12 +260,12 @@ export function TopBar(): ReactNode {
       />
 
       {/* ── View switcher ─────────────────────────────────────────── */}
-      {/* RES-CRIT-002 / Round 2: at ≤768px (tablet/phone) the five inline
-          tabs (Daily / Weekly / Yearly / Curriculum / Schedule) cannot
-          fit alongside the Logo, Personal/Master toggle, More trigger,
-          and Profile avatar within the viewport. They collapse into the
-          More menu's Navigation section (rendered by TopBarMoreMenu)
-          via `display: none` in the module CSS — see the
+      {/* RES-CRIT-002 / Round 2: at ≤768px (tablet/phone) the four inline
+          tabs (Daily / Weekly / Yearly / Curriculum) cannot fit alongside
+          the Logo, Personal/Master toggle, More trigger, and Profile
+          avatar within the viewport. They collapse into the More menu's
+          Navigation section (rendered by TopBarMoreMenu) via
+          `display: none` in the module CSS — see the
           `@media (max-width: 768px)` rule. The data-narrow-hide rules at
           ≤480px still apply when the strip IS visible (>768), so they
           remain on the Yearly/Curriculum tabs. */}
@@ -298,8 +296,8 @@ export function TopBar(): ReactNode {
           // remain visible per CLAUDE.md §4. To keep the bar within the
           // viewport budget at ≤480px we hide the less-used Yearly +
           // Curriculum tabs. The data-narrow attribute drives the CSS
-          // media-query hide below. Daily / Weekly / Schedule are the
-          // three primary tabs and stay visible at every width.
+          // media-query hide below. Daily / Weekly are the two primary
+          // tabs and stay visible at every width.
           const narrowOnly = v.label === "Yearly" || v.label === "Curriculum";
           return (
             <Link

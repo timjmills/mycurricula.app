@@ -20,6 +20,20 @@
 // POLISH-014: Every button already carried a `title` attribute in the
 //   original; confirmed present and correct — no gap to fill.
 //
+// ── Lane BD (schedule-and-auth-5.24): Schedule trigger ────────────────────
+// The Schedule icon is now a real toggle that opens Lane BB's
+// <SchedulePanel /> — a side-drawer over the Daily view showing the day's
+// timetable while the teacher works in any sub-surface. Local boolean
+// state (`scheduleOpen`) drives both aria-pressed and the panel's `open`
+// prop; the panel handles its own positioning/portal so we render it
+// inline at the bottom of the rail's <nav>.
+//
+// Scope limit: the Daily IconRail is mounted on /daily ONLY. So this
+// trigger only exposes the Schedule side-panel from /daily for now. A
+// later wave will surface the trigger globally (e.g. via the
+// LeftFilterPanel or a top-level rail) so teachers can pop the schedule
+// open from Weekly, Subject, Unit, etc.
+//
 // ── Add-lesson / Add-event forms ───────────────────────────────────────────
 // The "+ Add a lesson" and "+ Add an event" buttons are in DailyView.tsx.
 // DailyView owns their open-state and renders AddLessonForm / AddEventForm at
@@ -38,11 +52,15 @@
 // Coming-soon buttons carry aria-disabled="true" and no aria-pressed so
 // screen-readers don't announce them as interactive toggles.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { Button, Tooltip } from "@/components/ui";
+// SchedulePanel — Lane BB's right-side drawer. The drawer handles
+// its own portal + positioning, so we mount it inline at the bottom
+// of the rail and pass it our local toggle state.
+import { SchedulePanel } from "@/components/schedule";
 import styles from "./IconRail.module.css";
 
 // ── Icon set ─────────────────────────────────────────────────────────────
@@ -190,6 +208,10 @@ function SettingsIcon(): ReactNode {
 export function IconRail(): ReactNode {
   const { todoPanelOpen, toggleTodoPanel } = useAppState();
   const router = useRouter();
+  // Lane BD: local state for the Schedule side-panel toggle. Kept local
+  // (not in useAppState) because the trigger lives on /daily only — see
+  // file header. Promote to global state when the trigger goes global.
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   return (
     <nav className={styles.rail} aria-label="Daily view navigation">
@@ -210,22 +232,26 @@ export function IconRail(): ReactNode {
           </Tooltip>
         </li>
 
-        {/* Schedule — coming soon; inert affordance.
-              A plain <span> has no interactive role — screen readers ignore it.
-              pointer-events:none in CSS keeps it outside the keyboard tab order.
-              Sighted users see the title tooltip on hover. */}
+        {/* Schedule — wired (Lane BD) to toggle Lane BB's SchedulePanel
+              side-drawer. aria-pressed reflects the live open state so
+              screen readers announce the toggle correctly. */}
         <li className={styles.item}>
-          <span
-            className={`${styles.button} ${styles.buttonSoon}`}
-            title="Schedule — coming soon"
+          <Tooltip
+            content="Open the schedule side panel — see your day's timetable while you work in any view"
+            side="right"
           >
-            <span className={styles.iconSlot} aria-hidden="true">
+            <Button
+              variant="icon"
+              iconAriaLabel={
+                scheduleOpen ? "Close schedule panel" : "Open schedule panel"
+              }
+              aria-pressed={scheduleOpen}
+              className={`${styles.button} ${scheduleOpen ? styles.buttonActive : ""}`}
+              onClick={() => setScheduleOpen((o) => !o)}
+            >
               <ScheduleIcon />
-            </span>
-            <span className={styles.soonChip} aria-hidden="true">
-              soon
-            </span>
-          </span>
+            </Button>
+          </Tooltip>
         </li>
 
         {/* To-dos — wired to the right-rail to-do panel toggle. */}
@@ -275,6 +301,16 @@ export function IconRail(): ReactNode {
           </span>
         </li>
       </ul>
+
+      {/* ── Schedule side-panel (Lane BD → Lane BB) ──────────────────
+            The panel handles its own positioning and portal, so we
+            mount it inline at the bottom of the rail. Local
+            `scheduleOpen` drives both aria-pressed on the trigger
+            above and `open` here so they never drift. */}
+      <SchedulePanel
+        open={scheduleOpen}
+        onClose={() => setScheduleOpen(false)}
+      />
 
       {/* ── Bottom-pinned settings gear (RAIL-002) ────────────────────
             position:sticky + bottom:0 so the gear is always reachable
