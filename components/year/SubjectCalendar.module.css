@@ -1,0 +1,89 @@
+/* SubjectCalendar — per-subject chameleon mini-roadmap section.
+   Lane BG (2026-05-26): renders ABOVE the main multi-subject roadmap when
+   the curriculum filter narrows to a subset of subjects. The chameleon
+   gradient lives on the QuarterMonthWeekHeader (var(--c) → var(--cl) via
+   the cp-subj cascade); this stylesheet supplies the section spacing and
+   a subtle subject-tinted background wash behind the single lane row. */
+
+.section {
+  /* Subtle subject-tinted card wash — cp-subj cascade resolves var(--cl)
+     to the subject's light tone. Mixing into paper keeps the chrome
+     readable in both Quiet and Vivid themes. */
+  background: color-mix(in srgb, var(--cl) 18%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--cd) 16%, var(--ink-150));
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 16px;
+  /* Clip the chrome's rounded corners cleanly. The inner scroll wrap
+     owns the horizontal pan; the section itself does not scroll. */
+  overflow: hidden;
+}
+
+/* Each calendar owns its own horizontal scroll axis — independent of the
+   main roadmap scroll below — so the chameleon header + unit row pan
+   together as one widget. */
+.scrollWrap {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: thin;
+}
+
+/* One lane row — mirrors RoadmapView's `.laneRow` so the LaneCard column
+   width + timeline width match the main roadmap exactly. */
+.laneRow {
+  display: grid;
+  align-items: stretch;
+}
+
+/* Sticky-left LaneCard wrapper — same pattern as the main roadmap so the
+   subject label stays glued to the left edge during horizontal pan.
+   z-index 2 sits below the sticky-top header (z:10) but above unit bars. */
+.stickyLane {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--paper);
+}
+
+/* Timeline column — holds the bg grid lines + absolute-positioned unit
+   bars. Width is set inline to (weeks × columnWidthPx). */
+.timeline {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Background grid — drawn behind the unit bars, one cell per week. */
+.bgGrid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bgLine {
+  height: 100%;
+  /* Translucent paper so the section's subject wash shows through faintly
+     in the empty gaps between unit bars — keeps the subject tint visible
+     even where there's no instruction scheduled. */
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  border-right: 1px solid var(--ink-150);
+}
+
+.weekBorder {
+  border-right: 1px solid var(--ink-200);
+}
+
+.bgLineToday {
+  background: var(--fyi-bg);
+}
+
+/* Responsive: tighten the section spacing on phone so the stack of
+   per-subject calendars doesn't crowd the main roadmap below. */
+@media (max-width: 480px) {
+  .section {
+    margin-bottom: 12px;
+    border-radius: 12px;
+  }
+}

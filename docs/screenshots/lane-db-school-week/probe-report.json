@@ -1,0 +1,22 @@
+[
+  {
+    "phase": "A_default_sun_thu",
+    "expected_first": "Su",
+    "weekday_labels_first_28": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-db-school-week\\year__sun-thu-default.png"
+  },
+  {
+    "phase": "B_mon_fri",
+    "expected_first": "Mo",
+    "expected_period_len": 5,
+    "weekday_labels_first_28": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-db-school-week\\year__mon-fri.png"
+  },
+  {
+    "phase": "C_mon_sat",
+    "expected_first": "Mo",
+    "expected_period_len": 6,
+    "weekday_labels_first_28": [],
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-db-school-week\\year__mon-sat.png"
+  }
+]

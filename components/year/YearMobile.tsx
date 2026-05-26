@@ -17,11 +17,8 @@ import { useMemo } from "react";
 import { Card } from "@/components/ui";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
-import {
-  subjectCompletePct,
-  lessonToFlatIndex,
-  DEFAULT_SCHOOL_WEEK,
-} from "@/lib/year-calendar";
+import { subjectCompletePct, lessonToFlatIndex } from "@/lib/year-calendar";
+import { useSchoolWeek } from "@/lib/use-school-week";
 import { pacingFor, pacingLabel } from "@/lib/year-pacing";
 import type { SubjectId } from "@/lib/types";
 import styles from "./YearMobile.module.css";
@@ -64,7 +61,11 @@ interface SubjectSummary {
 
 export function YearMobile() {
   const { lessons } = usePlanner();
-  const schoolWeekLen = DEFAULT_SCHOOL_WEEK.length;
+  // TEAM-scoped school week (CLAUDE.md §1 — configurable, never hard-coded).
+  // YearMobile only consumes the length for flat-index + pacing math; it
+  // doesn't render per-weekday columns.
+  const { days: schoolWeek } = useSchoolWeek();
+  const schoolWeekLen = schoolWeek.length;
   const currentWeekIdx = CURRENT_WEEK - 1;
   const todaySchoolDayIdx = lessonToFlatIndex(CURRENT_WEEK, 0, schoolWeekLen);
 

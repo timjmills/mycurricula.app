@@ -92,6 +92,18 @@ export function ScheduleRow({
     .filter(Boolean)
     .join(" ");
 
+  // Onboarding tooltip (CLAUDE.md §4). Tell the teacher what clicking does in
+  // context — open the linked lesson in Daily — not just restate the time.
+  // Non-interactive rows still get a tooltip so a hover reveals what the row
+  // represents (a bell-schedule block with no lesson tied to it yet).
+  const subjectName = subject?.name ?? "Block";
+  const timeRange = `${formatBlockTime(block.startMin)}–${formatBlockTime(block.endMin)}`;
+  const rowTooltip = isInteractive
+    ? `Open this ${subjectName.toLowerCase()} lesson in Daily view (${timeRange}) — see the plan, materials, and standards for the period`
+    : isAcademic
+      ? `${subjectName} block, ${timeRange} — no lesson linked yet. Once you add one to this slot it will appear here.`
+      : `${title || subjectName}, ${timeRange} — a non-academic block configured in Schedule settings`;
+
   return (
     <div
       className={rowClass}
@@ -113,6 +125,7 @@ export function ScheduleRow({
           ? `${formatBlockTime(block.startMin)} to ${formatBlockTime(block.endMin)} — ${title}`
           : undefined
       }
+      title={rowTooltip}
     >
       {/* Time column — fixed width so every row's title aligns. */}
       <div className={styles.time}>

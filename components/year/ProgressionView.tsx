@@ -26,9 +26,9 @@ import {
   subjectCompletePct,
   lessonToFlatIndex,
   allYearWeeksFor,
-  DEFAULT_SCHOOL_WEEK,
 } from "@/lib/year-calendar";
 import { useAcademicYear } from "@/lib/use-academic-year";
+import { useSchoolWeek, type Weekday } from "@/lib/use-school-week";
 import { pacingFor } from "@/lib/year-pacing";
 import { useMinimizedSubjects } from "@/lib/year-state";
 import { subjectClassName } from "./roadTones";
@@ -58,6 +58,23 @@ const IconBook = (p: React.SVGProps<SVGSVGElement>) => (
 /** Width in px of each day column. */
 const COL = 30;
 
+/**
+ * Map lowercase Weekday tokens from `useSchoolWeek()` ("sun","mon",…) to the
+ * 2-letter abbreviations year-calendar.ts expects ("Su","Mo",…). The two
+ * modules use different token shapes for historical reasons (use-school-week
+ * is the user-facing settings hook; year-calendar is the legacy calendar
+ * helper). We map locally rather than touching either library file.
+ */
+const WEEKDAY_TO_SHORT: Readonly<Record<Weekday, string>> = {
+  sun: "Su",
+  mon: "Mo",
+  tue: "Tu",
+  wed: "We",
+  thu: "Th",
+  fri: "Fr",
+  sat: "Sa",
+};
+
 // ── Props ─────────────────────────────────────────────────────────────────
 
 export interface ProgressionViewProps {
@@ -81,6 +98,14 @@ export function ProgressionView({
   // TEAM-scoped academic year. Drives the day-column count + the
   // term-start date the buildSchoolDays helper anchors against.
   const { start: yearStart, end: yearEnd } = useAcademicYear();
+  // TEAM-scoped school week (CLAUDE.md §1 — configurable, never hard-coded).
+  // The hook hands back lowercase tokens; we translate to the 2-letter
+  // shape buildSchoolDays expects via WEEKDAY_TO_SHORT.
+  const { days: schoolWeek } = useSchoolWeek();
+  const schoolWeekShort = useMemo(
+    () => schoolWeek.map((d) => WEEKDAY_TO_SHORT[d]),
+    [schoolWeek],
+  );
 
   // ── Chameleon: notify parent which lane is topmost ───────────────────
   const laneRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -110,19 +135,20 @@ export function ProgressionView({
 
   // ── Calendar data ─────────────────────────────────────────────────────
 
-  const schoolWeekLen = DEFAULT_SCHOOL_WEEK.length;
+  const schoolWeekLen = schoolWeek.length;
   const totalYearWeeks = useMemo(
     () => allYearWeeksFor(yearStart, yearEnd).length,
     [yearStart, yearEnd],
   );
 
   // Build the flat school-day array for the full school year — anchored
-  // to the configured academic-year start. Audit F3 (year-calendar.ts):
-  // when yearStart's JS weekday doesn't match DEFAULT_SCHOOL_WEEK[0],
-  // the per-day labels desync. Lane Y owns the auto-align fix.
+  // to the configured academic-year start AND the configured school
+  // week. Audit F3 (year-calendar.ts): when yearStart's JS weekday
+  // doesn't match schoolWeek[0], buildSchoolDays auto-advances to the
+  // next matching weekday so per-day labels and Dates stay in lockstep.
   const schoolDays = useMemo(
-    () => buildSchoolDays(yearStart, totalYearWeeks, DEFAULT_SCHOOL_WEEK),
-    [yearStart, totalYearWeeks],
+    () => buildSchoolDays(yearStart, totalYearWeeks, schoolWeekShort),
+    [yearStart, totalYearWeeks, schoolWeekShort],
   );
   // monthGroups is kept for potential future use but is no longer rendered
   // here — the QuarterMonthWeekHeader carries the month bands now.

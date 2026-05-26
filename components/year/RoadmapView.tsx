@@ -28,9 +28,9 @@ import {
   subjectCompletePct,
   lessonToFlatIndex,
   allYearWeeksFor,
-  DEFAULT_SCHOOL_WEEK,
 } from "@/lib/year-calendar";
 import { useAcademicYear } from "@/lib/use-academic-year";
+import { useSchoolWeek } from "@/lib/use-school-week";
 import { pacingFor } from "@/lib/year-pacing";
 import { useMinimizedSubjects } from "@/lib/year-state";
 import { subjectClassName } from "./roadTones";
@@ -137,7 +137,12 @@ export function RoadmapView({
   subjectFilter,
 }: RoadmapViewProps = {}) {
   const { lessons } = usePlanner();
-  const schoolWeekLen = DEFAULT_SCHOOL_WEEK.length;
+  // TEAM-scoped school week (CLAUDE.md §1 — configurable, never hard-coded).
+  // We only need the length here for flat-index math + unit-bar date labels;
+  // the per-weekday tokens drive ProgressionView's daily grid, not Roadmap's
+  // week-grain timeline.
+  const { days: schoolWeek } = useSchoolWeek();
+  const schoolWeekLen = schoolWeek.length;
   const { isMinimized, toggle } = useMinimizedSubjects();
   // TEAM-scoped academic year. Drives the week column count + the
   // start date the unit-bar labels are anchored to.

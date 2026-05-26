@@ -65,6 +65,80 @@
   color: var(--ink-500);
 }
 
+/* ── Header right-side action cluster ───────────────────────────────────
+ * Holds the Settings link (always present) and the "Clear all" button
+ * (conditional). Both are kept on a single row; the Settings link can
+ * collapse to icon-only at narrow widths via .settingsLabel below. */
+
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Settings link ──────────────────────────────────────────────────────
+ * A compact icon + label affordance that sits in the filter-panel
+ * header on every planner route the panel renders on (panel itself is
+ * hidden on /daily and at ≤900px viewports — see suppression rules
+ * elsewhere in this file). Visual chrome matches the .clearBtn
+ * vocabulary so the cluster reads as one row of small header actions.
+ *
+ * Hit target: the button measures ~24px tall visually but inflates its
+ * pointer-capture area to ≥44×44 via a transparent ::before overlay —
+ * same pattern the ToggleGroup primitive uses elsewhere (see
+ * components/shell/top-bar.tsx around line 426). This keeps the header
+ * dense while still satisfying CLAUDE.md §4's ≥44px touch-target rule.
+ * Note: at ≤900px the panel itself is display:none, so the ≥44px
+ * target only applies on tablet-landscape and desktop — but we keep it
+ * for consistency and for any future narrow-viewport variant. */
+
+.settingsLink {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: var(--r-4);
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-500);
+  text-decoration: none;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.settingsLink:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.settingsLink:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Hit-area inflation — the visible target is small to fit the dense
+ * header strip, but the pointer/touch surface extends to ≥44×44 so
+ * CLAUDE.md §4 compliance holds even on a tablet-landscape pointer. */
+.settingsLink::before {
+  content: "";
+  position: absolute;
+  inset: 50% 50%;
+  transform: translate(-50%, -50%);
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  /* Non-visual layer — pointer-events still hit the anchor itself. */
+}
+
+.settingsLabel {
+  /* Compact label that sits next to the gear. The 240px panel is
+   * plenty wide for "Settings" alongside the gear, so we keep the
+   * label visible by default. A future narrow-panel variant could
+   * collapse this to icon-only via a media query. */
+  white-space: nowrap;
+}
+
 .clearBtn {
   font-size: var(--t-11);
   font-weight: 500;

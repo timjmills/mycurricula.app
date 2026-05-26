@@ -1,0 +1,244 @@
+[
+  {
+    "route": "/weekly",
+    "tier": "phone",
+    "railProbe": {
+      "found": true,
+      "chatPresent": false,
+      "chatTag": null,
+      "chatAriaPressed": null,
+      "chatAriaLabel": null,
+      "chatTitle": null,
+      "resourcesPresent": false,
+      "resourcesTag": null,
+      "resourcesTitle": null
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\weekly__phone.png",
+    "baseline": true,
+    "toggleOk": true
+  },
+  {
+    "route": "/weekly",
+    "tier": "tablet",
+    "railProbe": {
+      "found": true,
+      "chatPresent": false,
+      "chatTag": null,
+      "chatAriaPressed": null,
+      "chatAriaLabel": null,
+      "chatTitle": null,
+      "resourcesPresent": false,
+      "resourcesTag": null,
+      "resourcesTitle": null
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\weekly__tablet.png",
+    "baseline": false,
+    "toggleOk": true
+  },
+  {
+    "route": "/weekly",
+    "tier": "desktop",
+    "railProbe": {
+      "found": true,
+      "chatPresent": false,
+      "chatTag": null,
+      "chatAriaPressed": null,
+      "chatAriaLabel": null,
+      "chatTitle": null,
+      "resourcesPresent": false,
+      "resourcesTag": null,
+      "resourcesTitle": null
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\weekly__desktop.png",
+    "baseline": false,
+    "toggleOk": true
+  },
+  {
+    "route": "/daily",
+    "tier": "phone",
+    "railProbe": {
+      "found": true,
+      "chatPresent": false,
+      "chatTag": null,
+      "chatAriaPressed": null,
+      "chatAriaLabel": null,
+      "chatTitle": null,
+      "resourcesPresent": false,
+      "resourcesTag": null,
+      "resourcesTitle": null
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\daily__phone.png",
+    "baseline": true,
+    "toggleOk": true
+  },
+  {
+    "route": "/daily",
+    "tier": "tablet",
+    "toggleBefore": null,
+    "toggleAfter": null,
+    "toggleOk": false
+  },
+  {
+    "route": "/daily",
+    "tier": "tablet",
+    "railProbe": {
+      "found": true,
+      "chatPresent": false,
+      "chatTag": null,
+      "chatAriaPressed": null,
+      "chatAriaLabel": null,
+      "chatTitle": null,
+      "resourcesPresent": false,
+      "resourcesTag": null,
+      "resourcesTitle": null
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\daily__tablet.png",
+    "baseline": false,
+    "toggleOk": false
+  },
+  {
+    "route": "/daily",
+    "tier": "desktop",
+    "toggleBefore": null,
+    "toggleAfter": null,
+    "toggleOk": false
+  },
+  {
+    "route": "/daily",
+    "tier": "desktop",
+    "railProbe": {
+      "found": true,
+      "chatPresent": false,
+      "chatTag": null,
+      "chatAriaPressed": null,
+      "chatAriaLabel": null,
+      "chatTitle": null,
+      "resourcesPresent": false,
+      "resourcesTag": null,
+      "resourcesTitle": null
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\daily__desktop.png",
+    "baseline": false,
+    "toggleOk": false
+  },
+  {
+    "route": "/year",
+    "tier": "phone",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\year__phone.png",
+    "baseline": true,
+    "toggleOk": true
+  },
+  {
+    "route": "/year",
+    "tier": "tablet",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\year__tablet.png",
+    "baseline": false,
+    "toggleOk": true
+  },
+  {
+    "route": "/year",
+    "tier": "desktop",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\year__desktop.png",
+    "baseline": false,
+    "toggleOk": true
+  },
+  {
+    "route": "/catch-up",
+    "tier": "phone",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\catch-up__phone.png",
+    "baseline": true,
+    "toggleOk": true
+  },
+  {
+    "route": "/catch-up",
+    "tier": "tablet",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\catch-up__tablet.png",
+    "baseline": false,
+    "toggleOk": true
+  },
+  {
+    "route": "/catch-up",
+    "tier": "desktop",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\catch-up__desktop.png",
+    "baseline": false,
+    "toggleOk": true
+  },
+  {
+    "route": "/schedule",
+    "tier": "phone",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\schedule__phone.png",
+    "baseline": true,
+    "toggleOk": true
+  },
+  {
+    "route": "/schedule",
+    "tier": "tablet",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\schedule__tablet.png",
+    "baseline": false,
+    "toggleOk": true
+  },
+  {
+    "route": "/schedule",
+    "tier": "desktop",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\schedule__desktop.png",
+    "baseline": false,
+    "toggleOk": true
+  },
+  {
+    "route": "/subject/math",
+    "tier": "phone",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\subject-math__phone.png",
+    "baseline": true,
+    "toggleOk": true
+  },
+  {
+    "route": "/subject/math",
+    "tier": "tablet",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\subject-math__tablet.png",
+    "baseline": false,
+    "toggleOk": true
+  },
+  {
+    "route": "/subject/math",
+    "tier": "desktop",
+    "railProbe": {
+      "found": false
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cf-chat-resources\\subject-math__desktop.png",
+    "baseline": false,
+    "toggleOk": true
+  }
+]

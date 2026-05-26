@@ -26,12 +26,40 @@
 
 import { useMemo } from "react";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECTS, UNITS, describeStandard } from "@/lib/mock";
 import type { SubjectId, LessonStatus } from "@/lib/types";
+import { Tooltip } from "@/components/ui/Tooltip";
 import styles from "./left-filter-panel.module.css";
+
+// ── Settings gear icon ───────────────────────────────────────────────────────
+// Matches the visual vocabulary of the IconRail SettingsIcon
+// (components/daily/IconRail.tsx) and the GlobalRail SettingsIcon
+// (components/shell/GlobalRail.tsx) so the affordance reads the same across
+// every surface. Sized smaller (16×16) for the dense filter-panel header;
+// stroke inherits via `currentColor` so the button hover state drives the tint.
+
+function SettingsGearIcon(): ReactNode {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.27.652.875 1.106 1.59 1.18H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
 
 // ── Completion status labels ─────────────────────────────────────────────────
 // Maps the five LessonStatus values to human-readable filter chip labels.
@@ -171,19 +199,49 @@ export function LeftFilterPanel(): ReactNode {
 
   return (
     <aside className={`cp-root ${panelClass}`} aria-label="Filters">
-      {/* ── Header ───────────────────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────────────
+          Holds the section title plus two right-aligned affordances:
+          a Settings gear (always present) and a conditional "Clear all"
+          button shown only when filters are active.
+
+          The Settings entry is intentionally redundant with the
+          GlobalRail bottom-pinned gear (components/shell/GlobalRail.tsx),
+          the top-bar avatar (components/shell/top-bar.tsx), and the
+          /daily IconRail gear (components/daily/IconRail.tsx) — Lane CB
+          "belt-and-braces" rationale. Putting Settings here means a
+          teacher whose hand is already on the filter panel never has to
+          reach across the layout to find it.
+
+          The link is a real <Link> so middle-click / cmd-click / "open
+          in new tab" all behave as a teacher expects from a primary
+          navigation target. */}
       <div className={styles.header}>
         <span className={styles.headerTitle}>Filters</span>
-        {hasActiveFilters && (
-          <button
-            type="button"
-            className={styles.clearBtn}
-            onClick={resetFilters}
-            aria-label="Clear all filters"
+        <div className={styles.headerActions}>
+          <Tooltip
+            content="Open your settings — curriculum label, school year, school week, holidays, theme, and more."
+            side="bottom"
           >
-            Clear all
-          </button>
-        )}
+            <Link
+              href="/settings"
+              className={styles.settingsLink}
+              aria-label="Settings"
+            >
+              <SettingsGearIcon />
+              <span className={styles.settingsLabel}>Settings</span>
+            </Link>
+          </Tooltip>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className={styles.clearBtn}
+              onClick={resetFilters}
+              aria-label="Clear all filters"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Scrollable body ──────────────────────────────────────────────── */}

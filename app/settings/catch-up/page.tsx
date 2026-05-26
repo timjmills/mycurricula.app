@@ -57,8 +57,18 @@ function CatchupSettingsInner(): ReactNode {
           <div className={styles.toggleRow}>
             <ToggleGroup
               options={[
-                { value: "on", label: "On" },
-                { value: "off", label: "Off" },
+                {
+                  value: "on",
+                  label: "On",
+                  title:
+                    "Turn catch-up cues on — the Weekly grid shows a slim count of uncovered lessons each week, and the top bar grows a flame badge so you can spot weeks that need triage",
+                },
+                {
+                  value: "off",
+                  label: "Off",
+                  title:
+                    "Turn catch-up cues off — no in-grid bar or top-bar flame badge will appear in the planner. You can still open the dedicated Catch-up screen from the link below at any time.",
+                },
               ]}
               value={enabled ? "on" : "off"}
               onChange={(v) => setEnabled(v === "on")}
@@ -90,7 +100,11 @@ function CatchupSettingsInner(): ReactNode {
         >
           <div className={styles.openRow}>
             <Link href="/catch-up" className={styles.openLink}>
-              <Button variant="primary" size="md">
+              <Button
+                variant="primary"
+                size="md"
+                tooltip="Open the full Catch-up triage screen — see every uncovered lesson across the year, filter by subject or week, and decide what to reschedule, mark done, or skip"
+              >
                 Open Catch-up screen →
               </Button>
             </Link>

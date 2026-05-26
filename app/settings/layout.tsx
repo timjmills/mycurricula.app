@@ -24,6 +24,7 @@ import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppStateProvider } from "@/lib/app-state";
+import { Clock } from "@/components/shell/Clock";
 import styles from "./layout.module.css";
 
 // ── Sub-page registry ──────────────────────────────────────────────────────
@@ -124,6 +125,17 @@ export default function SettingsLayout({
           {/* ── Active sub-page ────────────────────────────────────── */}
           <div className={styles.content}>{children}</div>
         </div>
+
+        {/* Live Clock — Audit major F#5: the user asked for a live
+            day/date/time chip on EVERY page, including /settings/*.
+            The planner top-bar is not mounted on /settings/* (this
+            layout has its own chrome), so we mount the Clock here. It
+            renders as a fixed-position bottom-right chip (see
+            Clock.module.css `.chip`) so DOM placement is irrelevant —
+            it floats above the content without interfering with the
+            sidebar or sub-page body. The Tooltip on the chip carries
+            the onboarding explanation per CLAUDE.md §4. */}
+        <Clock />
       </main>
     </AppStateProvider>
   );

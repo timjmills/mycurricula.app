@@ -1,0 +1,53 @@
+[
+  {
+    "phase": "default-no-filter",
+    "calendarCount": 0,
+    "ok": true
+  },
+  {
+    "phase": "math-only",
+    "calendarCount": 1,
+    "ok": true
+  },
+  {
+    "phase": "math-only-classes",
+    "classes": "SubjectCalendar_section__0G_w4 cp-subj math"
+  },
+  {
+    "phase": "math-only-tier",
+    "tier": "phone",
+    "dims": {
+      "docScrollWidth": 400,
+      "bodyScrollWidth": 400
+    },
+    "overflows": false
+  },
+  {
+    "phase": "math-only-tier",
+    "tier": "tablet",
+    "dims": {
+      "docScrollWidth": 768,
+      "bodyScrollWidth": 768
+    },
+    "overflows": false
+  },
+  {
+    "phase": "math-only-tier",
+    "tier": "desktop",
+    "dims": {
+      "docScrollWidth": 1280,
+      "bodyScrollWidth": 1280
+    },
+    "overflows": false
+  },
+  {
+    "phase": "math-reading",
+    "calendarCount": 2,
+    "ok": true
+  },
+  {
+    "phase": "all-8-back-to-default",
+    "calendarCount": 0,
+    "ok": true
+  }
+]

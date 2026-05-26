@@ -1,0 +1,275 @@
+[
+  {
+    "route": "/weekly",
+    "tier": "phone",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 0,
+      "height": 0,
+      "visible": false,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\weekly__phone.png"
+  },
+  {
+    "route": "/weekly",
+    "tier": "tablet",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 56,
+      "height": 2336.40625,
+      "visible": true,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\weekly__tablet.png"
+  },
+  {
+    "route": "/weekly",
+    "tier": "desktop",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 56,
+      "height": 2295.328125,
+      "visible": true,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\weekly__desktop.png"
+  },
+  {
+    "route": "/daily",
+    "tier": "phone",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Daily view navigation",
+      "width": 0,
+      "height": 0,
+      "visible": false,
+      "contextCounts": {
+        "daily": 2,
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\daily__phone.png"
+  },
+  {
+    "route": "/daily",
+    "tier": "tablet",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Daily view navigation",
+      "width": 56,
+      "height": 1291.78125,
+      "visible": true,
+      "contextCounts": {
+        "daily": 2,
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\daily__tablet.png"
+  },
+  {
+    "route": "/daily",
+    "tier": "desktop",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Daily view navigation",
+      "width": 56,
+      "height": 1263.5,
+      "visible": true,
+      "contextCounts": {
+        "daily": 2,
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\daily__desktop.png"
+  },
+  {
+    "route": "/year",
+    "tier": "phone",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 0,
+      "height": 0,
+      "visible": false,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\year__phone.png"
+  },
+  {
+    "route": "/year",
+    "tier": "tablet",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 56,
+      "height": 1566.96875,
+      "visible": true,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\year__tablet.png"
+  },
+  {
+    "route": "/year",
+    "tier": "desktop",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 56,
+      "height": 1333.421875,
+      "visible": true,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\year__desktop.png"
+  },
+  {
+    "route": "/catch-up",
+    "tier": "phone",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 0,
+      "height": 0,
+      "visible": false,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\catch-up__phone.png"
+  },
+  {
+    "route": "/catch-up",
+    "tier": "tablet",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 56,
+      "height": 972,
+      "visible": true,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\catch-up__tablet.png"
+  },
+  {
+    "route": "/catch-up",
+    "tier": "desktop",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 56,
+      "height": 848,
+      "visible": true,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\catch-up__desktop.png"
+  },
+  {
+    "route": "/schedule",
+    "tier": "phone",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 0,
+      "height": 0,
+      "visible": false,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\schedule__phone.png"
+  },
+  {
+    "route": "/schedule",
+    "tier": "tablet",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 56,
+      "height": 986.71875,
+      "visible": true,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\schedule__tablet.png"
+  },
+  {
+    "route": "/schedule",
+    "tier": "desktop",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 56,
+      "height": 986.71875,
+      "visible": true,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\schedule__desktop.png"
+  },
+  {
+    "route": "/subject/math",
+    "tier": "phone",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 0,
+      "height": 0,
+      "visible": false,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\subject-math__phone.png"
+  },
+  {
+    "route": "/subject/math",
+    "tier": "tablet",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 56,
+      "height": 1930.90625,
+      "visible": true,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\subject-math__tablet.png"
+  },
+  {
+    "route": "/subject/math",
+    "tier": "desktop",
+    "railVisible": {
+      "found": true,
+      "ariaLabel": "Planner navigation",
+      "width": 56,
+      "height": 1879.734375,
+      "visible": true,
+      "contextCounts": {
+        "global": 4
+      }
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-cc-global-rail\\subject-math__desktop.png"
+  }
+]

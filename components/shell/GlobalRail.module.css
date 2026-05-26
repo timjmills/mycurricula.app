@@ -1,0 +1,195 @@
+/* GlobalRail.module.css
+ *
+ * The slim vertical icon nav strip mounted by the planner shell on every
+ * planner route. Subject-neutral chrome — ink tokens only; no curriculum
+ * color carries into the rail (CLAUDE.md §4: color is information, never
+ * decoration). All sizing / radii / spacing comes from tokens.css.
+ *
+ * History: promoted out of `components/daily/IconRail.module.css` in the
+ * 5.24 schedule-and-auth wave so the rail appears on every planner page
+ * (Weekly, Daily, Year, Catch-up, Subject, Schedule), not just Daily.
+ * The CSS contract is unchanged so existing screenshots / pixel-tests
+ * still match.
+ */
+
+/* ── Rail container ───────────────────────────────────────────────────── */
+/* Fixed-width vertical strip. flex-column so the bottom-pinned settings
+   button can sit on a margin-top: auto spacer. */
+.rail {
+  flex-shrink: 0;
+  width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  background: var(--paper);
+  border-right: 1px solid var(--ink-150);
+  /* Quiet drop in case the rail sits over content with no shadow underlying
+     it — keeps the boundary present without screaming. */
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Top group ────────────────────────────────────────────────────────── */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  align-items: center;
+}
+
+.item {
+  display: flex;
+  justify-content: center;
+}
+
+/* Bottom-pinned slot — the gear. mt:auto pushes it to the bottom of the
+   rail without needing a flex-spacer element. */
+.bottom {
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* A short hairline above the gear so the visual separation between the
+     navigation buttons and the settings affordance is unambiguous. */
+  border-top: 1px solid var(--ink-100);
+  width: calc(100% - 12px);
+  align-self: center;
+}
+
+/* ── Button chrome ────────────────────────────────────────────────────── */
+/* Each button is a ≥44px tap target (WCAG AA). The visual chrome is a
+   rounded square inside the larger hit area. */
+
+.button {
+  /* Tap target: at least 44×44 (CLAUDE.md §4). */
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-6);
+  color: var(--ink-500);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+
+.button:hover {
+  background: var(--ink-50);
+  color: var(--ink-700);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.buttonActive {
+  background: var(--ink-100);
+  color: var(--ink-900);
+  border-color: var(--ink-150);
+}
+
+.buttonActive:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+/* The icon sits in a centered slot — the SVG inside picks up `color` via
+   `currentColor` so the button hover/active states drive the stroke tint. */
+.iconSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Unread-comments badge ─────────────────────────────────────────────── */
+/* The Chat button on /daily can carry an unread-comments count. The badge
+   anchors to the top-right of the 44×44 button via a relative wrapper —
+   same shape and recipe as the top-bar's chat-icon badge so the two
+   surfaces visually agree. Tokens only; the urgent token drives the dot
+   color and stays in lockstep with the rest of the alert palette. */
+.badgeWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--urgent);
+  color: var(--paper);
+  font-size: var(--t-10);
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+  /* Lift above the button border + hover bg so the count is always legible. */
+  z-index: 1;
+}
+
+/* ── Coming-soon affordances ───────────────────────────────────────────── */
+/* These slots render as <span> (not <button>) so they are not keyboard-
+   reachable as interactive controls. */
+
+.buttonSoon {
+  cursor: default;
+  opacity: 0.45;
+  position: relative;
+  pointer-events: none;
+}
+
+/* "soon" label — a small badge overlaid at the bottom-right of the icon. */
+.soonChip {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-400);
+  background: var(--ink-100);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-4);
+  padding: 1px 3px;
+  z-index: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+}
+
+/* ── Responsive: narrow viewports ─────────────────────────────────────── */
+/* On very narrow viewports (≤480px phones), the rail hides entirely so the
+   teacher gets full-width content. The To-dos toggle is still reachable via
+   the top-bar overflow menu, and Settings via the avatar menu. Above 480
+   the rail stays visible — it's only 56px wide so it doesn't compromise
+   tablet layouts. */
+@media (max-width: 480px) {
+  .rail {
+    display: none;
+  }
+}
