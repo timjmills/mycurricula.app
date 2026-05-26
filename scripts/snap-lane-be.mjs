@@ -29,7 +29,9 @@ const ROUTES = [
 ];
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const ctx = await browser.newContext({
+  viewport: { width: 1280, height: 900 },
+});
 
 // Seed bypass cookie
 const seed = await ctx.newPage();

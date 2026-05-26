@@ -92,6 +92,43 @@ export function buildSchoolDays(
   weeksInView: number,
   schoolWeek: readonly string[],
 ): SchoolDay[] {
+  // Audit F3 fix (Lane BJ, 2026-05-26): when termStart's JS weekday
+  // doesn't match schoolWeek[0], the per-day labels and the per-day
+  // Date calculations would silently desynchronize — days[0].wkd would
+  // say "Mo" while the calendar Date was actually a Sunday. The
+  // previous behaviour (Y-cal lane) was to log a dev-only warning and
+  // emit the drifted dates anyway, which is not a fix. We now
+  // auto-advance termStart forward to the next calendar date whose
+  // weekday matches schoolWeek[0], so the labels and dates stay in
+  // lockstep. The advance is at most 6 days, so a teacher who picks
+  // "first day of the school year = some weekday" still gets the
+  // intuitive behaviour ("week 1 begins on the first matching school
+  // day").
+  const WEEKDAY_TO_JS: Record<string, number> = {
+    Su: 0,
+    Mo: 1,
+    Tu: 2,
+    We: 3,
+    Th: 4,
+    Fr: 5,
+    Sa: 6,
+  };
+  let effectiveStart = termStart;
+  if (schoolWeek.length > 0) {
+    const required = WEEKDAY_TO_JS[schoolWeek[0]];
+    if (typeof required === "number") {
+      const current = termStart.getDay();
+      const advance = (required - current + 7) % 7;
+      if (advance > 0) {
+        effectiveStart = new Date(
+          termStart.getFullYear(),
+          termStart.getMonth(),
+          termStart.getDate() + advance,
+        );
+      }
+    }
+  }
+
   const days: SchoolDay[] = [];
   // Advance one calendar week at a time; for each week, emit one entry per
   // school day in schoolWeek order.
@@ -101,9 +138,9 @@ export function buildSchoolDays(
       // calendar days regardless of which days the school runs.
       const offsetDays = w * 7 + d;
       const date = new Date(
-        termStart.getFullYear(),
-        termStart.getMonth(),
-        termStart.getDate() + offsetDays,
+        effectiveStart.getFullYear(),
+        effectiveStart.getMonth(),
+        effectiveStart.getDate() + offsetDays,
       );
 
       days.push({
@@ -313,15 +350,153 @@ export function weeksInQuarter(
 // all of them at once and lets the user pan / jump within a single
 // horizontally scrolling timeline.
 
-/** Total weeks in one academic year. */
+/** Total weeks in one academic year — documented default / fallback. */
 export const WEEKS_IN_YEAR = WEEKS_PER_QUARTER * 4;
 
-/** Return every week of the academic year as `{ idx, label }`. */
+/** Return every week of the academic year as `{ idx, label }` — uses the
+ *  default 36-week span. Backwards-compat wrapper around `allYearWeeksFor`;
+ *  new code should prefer the parameterized variant that accepts the
+ *  configured start/end dates. */
 export function allYearWeeks(): { idx: number; label: string }[] {
   return Array.from({ length: WEEKS_IN_YEAR }, (_, i) => ({
     idx: i,
     label: `Wk ${i + 1}`,
   }));
+}
+
+// ── Parameterized full-year helpers (Lane Y-cal, 2026-05-25) ───────────────
+//
+// The hard-coded `DEFAULT_TERM_START` + 36-week span only fit the mock
+// fixture. Real schools configure their academic year via Settings →
+// Curriculum → Academic year dates (see lib/use-academic-year.ts). These
+// `*For` helpers take the configured (start, end) pair so the Roadmap /
+// Progression timelines align exactly with the school's calendar.
+//
+// All four helpers share the same week-count derivation: count how many
+// 7-day strides fit into (end - start), inclusive of the partial final
+// week if the span isn't a clean multiple of 7 days. We never round down
+// to a fractional week because the underlying lesson data is 1-based week-
+// indexed and a half-week would render as an empty trailing column.
+
+const MS_PER_WEEK_INTERNAL = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Count the number of academic weeks between `start` and `end` (inclusive).
+ * Always returns ≥ 1 so callers can render at least one column even if the
+ * pair degenerates to start === end.
+ *
+ * Defensive: silently swaps start/end if reversed. The Lane Y-cal hook
+ * normalizes before persisting, so this is belt-and-braces.
+ */
+export function weeksInRange(start: Date, end: Date): number {
+  const a = start.getTime();
+  const b = end.getTime();
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  const spanMs = hi - lo;
+  // Ceiling so a partial trailing week still gets a column. +1 because
+  // the range is inclusive of both endpoints (a 0-day span = 1 week column
+  // is a sensible degenerate case — better than rendering 0 columns).
+  return Math.max(1, Math.ceil(spanMs / MS_PER_WEEK_INTERNAL) + 1);
+}
+
+/**
+ * Return one `{ idx, label }` entry per week column in the configured
+ * academic-year range. Labels are 1-based ("Wk 1" .. "Wk N").
+ */
+export function allYearWeeksFor(
+  start: Date,
+  end: Date,
+): { idx: number; label: string }[] {
+  const total = weeksInRange(start, end);
+  return Array.from({ length: total }, (_, i) => ({
+    idx: i,
+    label: `Wk ${i + 1}`,
+  }));
+}
+
+/**
+ * Return one `YearMonthBand` per calendar month (12 total), with `weeks`
+ * counts derived from the configured academic-year range — same shape as
+ * `allYearMonths()` so consumers can swap in either without other changes.
+ *
+ * For each of the configured academic weeks (0..N-1), bump the count of
+ * the calendar month containing that week's Sunday anchor. Months with no
+ * overlap report `weeks: 0` and `hasData: false` — consumers should gate
+ * on `hasData` for scroll-to-month or out-of-session placeholders.
+ */
+export function allYearMonthsFor(start: Date, end: Date): YearMonthBand[] {
+  const totalWeeks = weeksInRange(start, end);
+  const anchor = new Date(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate(),
+  );
+
+  // First pass: count academic weeks per calendar-month, remember earliest
+  // academic-week index per month. Both maps keyed by 0-based month idx
+  // (0..11) — a 60-week range may span 3 calendar years; we collapse those
+  // into the 12 month buckets, which means a multi-year academic year
+  // accumulates weeks into the same Jan..Dec band regardless of which
+  // calendar year contributed them. That matches the contract of the
+  // legacy `allYearMonths()` and the MonthPicker UI.
+  const weekCounts = new Map<number, number>();
+  const firstWeekFor = new Map<number, number>();
+  for (let w = 0; w < totalWeeks; w++) {
+    const d = new Date(
+      anchor.getFullYear(),
+      anchor.getMonth(),
+      anchor.getDate() + w * 7,
+    );
+    const m = d.getMonth();
+    weekCounts.set(m, (weekCounts.get(m) ?? 0) + 1);
+    if (!firstWeekFor.has(m)) firstWeekFor.set(m, w);
+  }
+
+  const startMonth = anchor.getMonth();
+  return ALL_SCHOOL_MONTHS.map((m) => {
+    const weeks = weekCounts.get(m) ?? 0;
+    const hasData = weeks > 0;
+    let startWeekIdx: number;
+    if (hasData) {
+      startWeekIdx = firstWeekFor.get(m) ?? 0;
+    } else {
+      // Out-of-session months clamp to a timeline edge. Months strictly
+      // BEFORE the term-start month (within the calendar year) clamp to
+      // the final week; months AT or AFTER clamp to 0. Consumers gate on
+      // hasData so the exact clamp value only matters for MonthPicker.
+      startWeekIdx = m < startMonth ? totalWeeks - 1 : 0;
+    }
+    return {
+      label: MONTH_LABELS[m],
+      weeks,
+      startWeekIdx,
+      monthIndex: m,
+      hasData,
+    };
+  });
+}
+
+/**
+ * Like `monthIndexForWeek`, but with the months derived from a configured
+ * (start, end) pair. Walks the bands in calendar order, returning the
+ * first one whose `startWeekIdx + weeks` is past `weekIdx`. Skips bands
+ * with `weeks: 0` because they have no academic weeks to contain.
+ */
+export function monthIndexForWeekFor(
+  weekIdx: number,
+  start: Date,
+  end: Date,
+): number {
+  const months = allYearMonthsFor(start, end);
+  let lastDataIdx = -1;
+  for (let i = 0; i < months.length; i++) {
+    const band = months[i];
+    if (band.weeks === 0) continue;
+    lastDataIdx = i;
+    if (weekIdx < band.startWeekIdx + band.weeks) return i;
+  }
+  return lastDataIdx === -1 ? 0 : lastDataIdx;
 }
 
 // ── School-months configuration ────────────────────────────────────────────

@@ -32,7 +32,8 @@ import type { ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECTS, SUBJECT_BY_ID, UNIT_BY_ID } from "@/lib/mock";
-import { allYearMonths } from "@/lib/year-calendar";
+import { allYearMonthsFor } from "@/lib/year-calendar";
+import { useAcademicYear } from "@/lib/use-academic-year";
 import { resolveSubjectColor } from "@/lib/palette-data";
 import type { Lesson, SubjectId } from "@/lib/types";
 import styles from "./print.module.css";
@@ -126,8 +127,12 @@ export default function YearPrintPage(): ReactNode {
   // identical so a future "active scope" filter can be applied uniformly.
   useAppState();
   const { lessons } = usePlanner();
+  // TEAM-scoped academic year — same hook the screen Year view reads.
+  // Print + screen layouts stay in lockstep so the printed range mirrors
+  // exactly what the teacher sees in /year.
+  const { start: yearStart, end: yearEnd } = useAcademicYear();
 
-  const months = allYearMonths();
+  const months = allYearMonthsFor(yearStart, yearEnd);
   const today = new Date();
 
   return (
@@ -158,115 +163,120 @@ export default function YearPrintPage(): ReactNode {
           <span className={styles.sheetMeta}>Printed {formatDate(today)}</span>
         </div>
 
-        {/* One <section> per calendar month. CSS handles the page-break-
-            before rules; the first section opts out of the page break so the
-            first month sits flush under the cover header on page 1. */}
-        {months.map((band, mi) => {
-          // Generate the absolute 0-based week indices that fall inside
-          // this month band — used both for column headers and cell lookups.
-          const weekIndices = Array.from(
-            { length: band.weeks },
-            (_, i) => band.startWeekIdx + i,
-          );
+        {/* One <section> per calendar month that actually has academic
+            weeks. `allYearMonthsFor` returns 12 entries (one per calendar
+            month) — months with `weeks: 0` would render an empty table, so
+            we filter them out. CSS handles the page-break-before rules; the
+            first section opts out of the page break so the first month sits
+            flush under the cover header on page 1. */}
+        {months
+          .filter((band) => band.weeks > 0)
+          .map((band, mi) => {
+            // Generate the absolute 0-based week indices that fall inside
+            // this month band — used both for column headers and cell lookups.
+            const weekIndices = Array.from(
+              { length: band.weeks },
+              (_, i) => band.startWeekIdx + i,
+            );
 
-          return (
-            <section
-              key={`${band.label}-${band.startWeekIdx}`}
-              className={styles.monthSection}
-              data-first={mi === 0 ? "true" : undefined}
-              aria-label={`${band.label} schedule`}
-            >
-              <h2 className={styles.monthTitle}>{band.label}</h2>
-
-              <table
-                className={styles.grid}
-                aria-label={`${band.label} subject × week matrix`}
+            return (
+              <section
+                key={`${band.label}-${band.startWeekIdx}`}
+                className={styles.monthSection}
+                data-first={mi === 0 ? "true" : undefined}
+                aria-label={`${band.label} schedule`}
               >
-                <thead>
-                  <tr>
-                    {/* Subject stub column. */}
-                    <th scope="col" aria-label="Subject" />
-                    {weekIndices.map((wi) => (
-                      <th key={wi} scope="col">
-                        Wk {wi + 1}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {SUBJECTS.map((subj) => {
-                    const subjectId = subj.id as SubjectId;
-                    const color = resolveSubjectColor(subjectId, "normal");
-                    return (
-                      <tr
-                        key={subj.id}
-                        className={`cp-subj ${subj.cls}`}
-                        data-subject={subj.id}
-                      >
-                        {/* Subject stub — colored by the cp-subj cascade,
+                <h2 className={styles.monthTitle}>{band.label}</h2>
+
+                <table
+                  className={styles.grid}
+                  aria-label={`${band.label} subject × week matrix`}
+                >
+                  <thead>
+                    <tr>
+                      {/* Subject stub column. */}
+                      <th scope="col" aria-label="Subject" />
+                      {weekIndices.map((wi) => (
+                        <th key={wi} scope="col">
+                          Wk {wi + 1}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {SUBJECTS.map((subj) => {
+                      const subjectId = subj.id as SubjectId;
+                      const color = resolveSubjectColor(subjectId, "normal");
+                      return (
+                        <tr
+                          key={subj.id}
+                          className={`cp-subj ${subj.cls}`}
+                          data-subject={subj.id}
+                        >
+                          {/* Subject stub — colored by the cp-subj cascade,
                             falls back to the resolved hex so paper output
                             keeps color even if the cascade is suppressed. */}
-                        <th
-                          scope="row"
-                          className={styles.subjectCell}
-                          style={{ color: color.cd }}
-                        >
-                          <span
-                            className={styles.subjectStripe}
-                            aria-hidden="true"
-                            style={{ background: color.stripe }}
-                          />
-                          {SUBJECT_BY_ID[subjectId].name}
-                        </th>
+                          <th
+                            scope="row"
+                            className={styles.subjectCell}
+                            style={{ color: color.cd }}
+                          >
+                            <span
+                              className={styles.subjectStripe}
+                              aria-hidden="true"
+                              style={{ background: color.stripe }}
+                            />
+                            {SUBJECT_BY_ID[subjectId].name}
+                          </th>
 
-                        {weekIndices.map((wi) => {
-                          const blocks = unitsForCell(lessons, subjectId, wi);
-                          return (
-                            <td key={wi} className={styles.weekCell}>
-                              {blocks.length === 0 ? (
-                                <span className={styles.emptyCell}>—</span>
-                              ) : (
-                                blocks.map((b) => (
-                                  <div
-                                    key={b.unitId}
-                                    className={styles.unitBlock}
-                                  >
-                                    <span
-                                      className={styles.unitStripe}
-                                      aria-hidden="true"
-                                      style={
-                                        b.modified
-                                          ? {
-                                              backgroundImage: `repeating-linear-gradient(to bottom, ${color.stripe} 0 4px, transparent 4px 8px)`,
-                                            }
-                                          : { background: color.stripe }
-                                      }
-                                    />
-                                    <span className={styles.unitText}>
-                                      <span className={styles.unitName}>
-                                        {b.unitName}
+                          {weekIndices.map((wi) => {
+                            const blocks = unitsForCell(lessons, subjectId, wi);
+                            return (
+                              <td key={wi} className={styles.weekCell}>
+                                {blocks.length === 0 ? (
+                                  <span className={styles.emptyCell}>—</span>
+                                ) : (
+                                  blocks.map((b) => (
+                                    <div
+                                      key={b.unitId}
+                                      className={styles.unitBlock}
+                                    >
+                                      <span
+                                        className={styles.unitStripe}
+                                        aria-hidden="true"
+                                        style={
+                                          b.modified
+                                            ? {
+                                                backgroundImage: `repeating-linear-gradient(to bottom, ${color.stripe} 0 4px, transparent 4px 8px)`,
+                                              }
+                                            : { background: color.stripe }
+                                        }
+                                      />
+                                      <span className={styles.unitText}>
+                                        <span className={styles.unitName}>
+                                          {b.unitName}
+                                        </span>
+                                        <span className={styles.unitCount}>
+                                          {b.lessonCount}{" "}
+                                          {b.lessonCount === 1
+                                            ? "lesson"
+                                            : "lessons"}
+                                        </span>
                                       </span>
-                                      <span className={styles.unitCount}>
-                                        {b.lessonCount}{" "}
-                                        {b.lessonCount === 1
-                                          ? "lesson"
-                                          : "lessons"}
-                                      </span>
-                                    </span>
-                                  </div>
-                                ))
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </section>
-          );
-        })}
+                                    </div>
+                                  ))
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </section>
+            );
+          })}
       </div>
     </div>
   );

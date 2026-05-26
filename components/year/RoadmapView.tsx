@@ -27,9 +27,10 @@ import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
 import {
   subjectCompletePct,
   lessonToFlatIndex,
-  allYearWeeks,
+  allYearWeeksFor,
   DEFAULT_SCHOOL_WEEK,
 } from "@/lib/year-calendar";
+import { useAcademicYear } from "@/lib/use-academic-year";
 import { pacingFor } from "@/lib/year-pacing";
 import { useMinimizedSubjects } from "@/lib/year-state";
 import { subjectClassName } from "./roadTones";
@@ -82,15 +83,27 @@ function deriveUnitStatus(
 }
 
 /**
- * Format a 0-based week index as a short date label, e.g. "Nov 2".
- * Anchored to DEFAULT_TERM_START (2025-11-02) from year-calendar.ts.
+ * Format a 0-based week index plus an optional day-of-week offset as a
+ * short date label, e.g. "Nov 2", anchored to the configured
+ * academic-year start. Called per-unit-bar to render the "Nov 2–Dec 14"
+ * range under each unit.
+ *
+ * Lane BJ fix (2026-05-26) — Audit F2: the previous call passed
+ * `endWeekIdx + 1` to label the unit's end, which returned the Sunday
+ * at the start of the week AFTER the unit ended (off by 3 calendar
+ * days for a Sun-Thu school). Adding the `dayOffset` parameter lets
+ * the caller name the unit's actual last instructional day
+ * (schoolWeekLen - 1) so the printed range matches the data.
  */
-function weekIdxToDateLabel(weekIdx: number): string {
-  const termStart = new Date(2025, 10, 2); // 2025-11-02
+function weekIdxToDateLabel(
+  weekIdx: number,
+  termStart: Date,
+  dayOffset: number = 0,
+): string {
   const d = new Date(
     termStart.getFullYear(),
     termStart.getMonth(),
-    termStart.getDate() + weekIdx * 7,
+    termStart.getDate() + weekIdx * 7 + dayOffset,
   );
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
@@ -126,6 +139,9 @@ export function RoadmapView({
   const { lessons } = usePlanner();
   const schoolWeekLen = DEFAULT_SCHOOL_WEEK.length;
   const { isMinimized, toggle } = useMinimizedSubjects();
+  // TEAM-scoped academic year. Drives the week column count + the
+  // start date the unit-bar labels are anchored to.
+  const { start: yearStart, end: yearEnd } = useAcademicYear();
 
   // CURRENT_WEEK is 1-based in the fixture; convert to 0-based for index math.
   const currentWeekIdx = CURRENT_WEEK - 1;
@@ -158,7 +174,10 @@ export function RoadmapView({
 
   // ── Full-year week labels ─────────────────────────────────────────────
 
-  const weekLabels = useMemo(() => allYearWeeks(), []);
+  const weekLabels = useMemo(
+    () => allYearWeeksFor(yearStart, yearEnd),
+    [yearStart, yearEnd],
+  );
   const timelineWidthPx = weekLabels.length * WEEK_COL_PX;
 
   // 0-based flat school-day index for "today" — passed to pacingFor.
@@ -235,8 +254,12 @@ export function RoadmapView({
           unitNumber: ui + 1,
           startWeekIdx,
           endWeekIdx,
-          startDate: weekIdxToDateLabel(startWeekIdx),
-          endDate: weekIdxToDateLabel(endWeekIdx + 1),
+          // Lane BJ fix (2026-05-26) — Audit F2: end label is the unit's
+          // actual last instructional day (schoolWeekLen - 1 days past
+          // the final week's Sunday), not the Sunday of the FOLLOWING
+          // week (which the old `endWeekIdx + 1` produced).
+          startDate: weekIdxToDateLabel(startWeekIdx, yearStart, 0),
+          endDate: weekIdxToDateLabel(endWeekIdx, yearStart, schoolWeekLen - 1),
           lessons: u.lessons.length,
           schoolDays: spanWeeks * schoolWeekLen,
           completePct: completePctUnit,
@@ -252,7 +275,7 @@ export function RoadmapView({
 
       return { subject, subjectId, completePct, units, pacing };
     });
-  }, [lessons, schoolWeekLen, todaySchoolDayIdx, currentWeekIdx]);
+  }, [lessons, schoolWeekLen, todaySchoolDayIdx, currentWeekIdx, yearStart]);
 
   // Sort: expanded subjects first (in canonical order), minimized at the bottom.
   const orderedLanes = useMemo(() => {

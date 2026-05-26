@@ -88,7 +88,10 @@ for (const route of ROUTES) {
   });
   page.on("pageerror", (err) => {
     localErrors.push(`pageerror: ${err.message}`);
-    consoleErrors.push({ route: route.name, text: `pageerror: ${err.message}` });
+    consoleErrors.push({
+      route: route.name,
+      text: `pageerror: ${err.message}`,
+    });
   });
 
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -212,7 +215,9 @@ for (const route of ROUTES) {
       `expected h1 "${route.expectTitle}" missing — found ${JSON.stringify(headingInfo.h1Texts)}`,
     );
   if (headingInfo.h1Count > 1) {
-    issues.push(`multiple h1s detected: ${JSON.stringify(headingInfo.h1Texts)}`);
+    issues.push(
+      `multiple h1s detected: ${JSON.stringify(headingInfo.h1Texts)}`,
+    );
   }
   if (localErrors.length > 0) {
     issues.push(`console/page errors: ${JSON.stringify(localErrors)}`);
@@ -256,5 +261,7 @@ for (const r of report) {
   console.log(`  screenshot → ${r.screenshot}`);
 }
 
-console.log(`\n${failed === 0 ? "PASS" : "FAIL"} (${failed} route(s) with issues)`);
+console.log(
+  `\n${failed === 0 ? "PASS" : "FAIL"} (${failed} route(s) with issues)`,
+);
 process.exit(failed === 0 ? 0 : 1);

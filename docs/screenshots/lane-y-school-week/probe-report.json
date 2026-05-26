@@ -1,0 +1,134 @@
+[
+  {
+    "phase": "responsive",
+    "tier": "phone",
+    "viewport": "360x800",
+    "dims": {
+      "docScrollWidth": 360,
+      "bodyScrollWidth": 344
+    },
+    "overflows": false,
+    "hydrationWarnings": 0,
+    "chipCount": 7,
+    "undersizedChipCount": 7,
+    "smallestChip": {
+      "w": 31.546875,
+      "h": 21,
+      "label": "Friday — excluded from the school week"
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-y-school-week\\curriculum__phone-360x800.png"
+  },
+  {
+    "phase": "responsive",
+    "tier": "tablet",
+    "viewport": "768x1024",
+    "dims": {
+      "docScrollWidth": 768,
+      "bodyScrollWidth": 752
+    },
+    "overflows": false,
+    "hydrationWarnings": 0,
+    "chipCount": 7,
+    "undersizedChipCount": 7,
+    "smallestChip": {
+      "w": 31.546875,
+      "h": 21,
+      "label": "Friday — excluded from the school week"
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-y-school-week\\curriculum__tablet-768x1024.png"
+  },
+  {
+    "phase": "responsive",
+    "tier": "desktop",
+    "viewport": "1280x900",
+    "dims": {
+      "docScrollWidth": 1280,
+      "bodyScrollWidth": 1264
+    },
+    "overflows": false,
+    "hydrationWarnings": 0,
+    "chipCount": 7,
+    "undersizedChipCount": 7,
+    "smallestChip": {
+      "w": 31.546875,
+      "h": 21,
+      "label": "Friday — excluded from the school week"
+    },
+    "screenshot": "C:\\Users\\losey\\Projects\\mycurricula.app\\docs\\screenshots\\lane-y-school-week\\curriculum__desktop-1280x900.png"
+  },
+  {
+    "phase": "persistence",
+    "lsAfter": null,
+    "chipStates": [
+      {
+        "label": "Sunday — included in the school week",
+        "checked": true
+      },
+      {
+        "label": "Monday — included in the school week",
+        "checked": true
+      },
+      {
+        "label": "Tuesday — included in the school week",
+        "checked": true
+      },
+      {
+        "label": "Wednesday — included in the school week",
+        "checked": true
+      },
+      {
+        "label": "Thursday — included in the school week",
+        "checked": true
+      },
+      {
+        "label": "Friday — excluded from the school week",
+        "checked": false
+      },
+      {
+        "label": "Saturday — excluded from the school week",
+        "checked": false
+      }
+    ],
+    "presetAfter": "sunThu",
+    "persistedCorrectly": false
+  },
+  {
+    "phase": "preset-mon-sat",
+    "chips": [
+      {
+        "label": "Sunday — included in the school week",
+        "checked": true
+      },
+      {
+        "label": "Monday — included in the school week",
+        "checked": true
+      },
+      {
+        "label": "Tuesday — included in the school week",
+        "checked": true
+      },
+      {
+        "label": "Wednesday — included in the school week",
+        "checked": true
+      },
+      {
+        "label": "Thursday — included in the school week",
+        "checked": true
+      },
+      {
+        "label": "Friday — excluded from the school week",
+        "checked": false
+      },
+      {
+        "label": "Saturday — excluded from the school week",
+        "checked": false
+      }
+    ],
+    "monSatOk": false
+  },
+  {
+    "phase": "min-one-day-guard",
+    "lsStillOne": "[\"wed\"]",
+    "wedStillChecked": true
+  }
+]

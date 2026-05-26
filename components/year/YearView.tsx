@@ -24,10 +24,11 @@ import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
 import {
-  allYearWeeks,
-  allYearMonths,
-  monthIndexForWeek,
+  allYearWeeksFor,
+  allYearMonthsFor,
+  monthIndexForWeekFor,
 } from "@/lib/year-calendar";
+import { useAcademicYear } from "@/lib/use-academic-year";
 import { ToggleGroup, Tooltip } from "@/components/ui";
 // YearSidebar is intentionally not mounted — every rail item is a
 // disabled "coming soon" affordance, and "Students" violates the
@@ -249,9 +250,23 @@ export function YearView() {
   const handleFilterClear = () =>
     setActiveFilters(new Set(["all"] as StatusFilterId[]));
 
+  // ── Academic year range (TEAM-scoped via useAcademicYear) ─────────────
+  // The Roadmap + Progression timelines derive their column count + month
+  // bands from the configured (start, end) pair so the visible year mirrors
+  // the school's actual calendar. Defaults: first Sunday in August through
+  // last Friday in June (~46-47 weeks). Settings → Curriculum → Academic
+  // year dates lets the user override.
+  const { start: yearStart, end: yearEnd } = useAcademicYear();
+
   // ── Full-year calendar data ──────────────────────────────────────────
-  const months = useMemo(() => allYearMonths(), []);
-  const weeks = useMemo(() => allYearWeeks(), []);
+  const months = useMemo(
+    () => allYearMonthsFor(yearStart, yearEnd),
+    [yearStart, yearEnd],
+  );
+  const weeks = useMemo(
+    () => allYearWeeksFor(yearStart, yearEnd),
+    [yearStart, yearEnd],
+  );
 
   // ── Shared horizontal scroll + scrollToWeek ──────────────────────────
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -294,8 +309,8 @@ export function YearView() {
   // ── Active month for the MonthPicker ─────────────────────────────────
   // For now derived from today; a future wave can update this on scroll.
   const activeMonthIdx = useMemo(
-    () => monthIndexForWeek(currentWeekIdx, months),
-    [currentWeekIdx, months],
+    () => monthIndexForWeekFor(currentWeekIdx, yearStart, yearEnd),
+    [currentWeekIdx, yearStart, yearEnd],
   );
 
   const handlePickMonth = (monthIdx: number) => {

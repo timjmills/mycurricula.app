@@ -1,0 +1,103 @@
+[
+  {
+    "phase": "tier",
+    "tier": "phone",
+    "dims": {
+      "docScrollWidth": 400,
+      "bodyScrollWidth": 400
+    },
+    "overflows": false,
+    "hydrationWarnings": 0,
+    "controlsTotal": 31,
+    "controlsVisible": 31,
+    "undersizedCount": 1,
+    "undersizedSample": [
+      {
+        "tag": "BUTTON",
+        "type": "submit",
+        "aria": "Add this holiday — the Year view greys out the week it lands on for the whole team.",
+        "h": 40,
+        "w": 82,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "phase": "tier",
+    "tier": "tablet",
+    "dims": {
+      "docScrollWidth": 768,
+      "bodyScrollWidth": 768
+    },
+    "overflows": false,
+    "hydrationWarnings": 0,
+    "controlsTotal": 31,
+    "controlsVisible": 31,
+    "undersizedCount": 1,
+    "undersizedSample": [
+      {
+        "tag": "BUTTON",
+        "type": "submit",
+        "aria": "Add this holiday — the Year view greys out the week it lands on for the whole team.",
+        "h": 40,
+        "w": 82,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "phase": "tier",
+    "tier": "desktop",
+    "dims": {
+      "docScrollWidth": 1280,
+      "bodyScrollWidth": 1280
+    },
+    "overflows": false,
+    "hydrationWarnings": 0,
+    "controlsTotal": 31,
+    "controlsVisible": 31,
+    "undersizedCount": 1,
+    "undersizedSample": [
+      {
+        "tag": "BUTTON",
+        "type": "submit",
+        "aria": "Add this holiday — the Year view greys out the week it lands on for the whole team.",
+        "h": 40,
+        "w": 82,
+        "visible": true
+      }
+    ]
+  },
+  {
+    "phase": "school-week-persistence",
+    "lsAfterToggle": "[\"mon\",\"tue\",\"wed\",\"thu\",\"fri\"]",
+    "presetAfterReload": "monFri",
+    "ok": true
+  },
+  {
+    "phase": "academic-year",
+    "startBefore": "2025-08-03",
+    "endBefore": "2026-06-26",
+    "lsStart": "2026-08-02",
+    "lsEnd": "2027-04-10",
+    "weekText": "= 37 weeks of school year — your Roadmap and Progression timelines will use exactly this range."
+  },
+  {
+    "phase": "holiday-overlay",
+    "lsHolidays": "[{\"id\":\"hol_mpm2l36h_qq8p56\",\"date\":\"2026-01-19\",\"name\":\"Winter Break\"}]",
+    "overlayCount": 8,
+    "ok": true
+  },
+  {
+    "phase": "academic-year-affects-year-view",
+    "statStripBefore": "Total Units8Total Lessons41Weeks in View48 weeksFull school yearActive Curriculum Lanes8",
+    "statStripAfter": "Total Units8Total Lessons41Weeks in View32 weeksFull school yearActive Curriculum Lanes8",
+    "different": true
+  },
+  {
+    "phase": "cross-tab-sync",
+    "presetA": "monSat",
+    "presetB": "monSat",
+    "syncedAcrossTabs": true
+  }
+]

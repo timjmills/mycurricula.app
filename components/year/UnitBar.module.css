@@ -11,6 +11,61 @@
      --c-deep         tile text + title text
 */
 
+/* ── Holiday overlay ────────────────────────────────────────────────
+   One striped band per holiday-week within a unit's span. The band
+   sits absolutely-positioned inside the .bar (which is itself
+   absolutely-positioned within the timeline) and is sized to one
+   week column wide via the `width` inline style.
+
+   Visual recipe: subtle ink-tinted stripes laid over the subject
+   tint, mixed in with the bar's own ::before-style backdrop so the
+   subject color still reads through. We use ink (not the catchup or
+   semantic red) so the marker conveys "no school" not "bad" —
+   absence of instruction, not a warning. */
+
+.holiday {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+
+  /* Sits ABOVE the bar's own background (var(--cl)) so the stripes
+     read — but the opacity is low enough that the title / dots
+     painted on top of it stay legible. We intentionally don't go
+     behind the content (a child can't sit between its parent's
+     background and the parent's other children) — instead the
+     stripes paint OVER everything and let pointer events fall
+     through. The tooltip arrives via the `title=` attribute on the
+     overlay span itself. */
+
+  /* Subtle diagonal stripes — ink (not catchup / red) so the marker
+     conveys "no school" not "warning". Layered over a light
+     ink wash so the band reads even on the most saturated subject
+     tint. */
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ink-700) 18%, transparent) 0,
+      color-mix(in srgb, var(--ink-700) 18%, transparent) 4px,
+      transparent 4px,
+      transparent 8px
+    ),
+    color-mix(in srgb, var(--paper) 50%, transparent);
+
+  /* Cursor stays on `help` so the tooltip / title= reads as
+     informational rather than interactive. The overlay is purely
+     decorative; clicks fall through to the unit bar's onClick. */
+  pointer-events: auto;
+  cursor: help;
+
+  /* Hairline edges so the band reads as a discrete "no-school strip"
+     rather than blending into the subject color. */
+  border-left: 1px dashed color-mix(in srgb, var(--ink-700) 30%, transparent);
+  border-right: 1px dashed color-mix(in srgb, var(--ink-700) 30%, transparent);
+}
+
+/* Reduced motion intentionally has nothing to disable here — the
+   overlay is static. */
+
 /* ── Bar shell ──────────────────────────────────────────────────────────── */
 
 .bar {

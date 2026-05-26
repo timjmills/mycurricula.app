@@ -25,10 +25,10 @@ import {
   buildDayGlyphMap,
   subjectCompletePct,
   lessonToFlatIndex,
-  allYearWeeks,
+  allYearWeeksFor,
   DEFAULT_SCHOOL_WEEK,
-  DEFAULT_TERM_START,
 } from "@/lib/year-calendar";
+import { useAcademicYear } from "@/lib/use-academic-year";
 import { pacingFor } from "@/lib/year-pacing";
 import { useMinimizedSubjects } from "@/lib/year-state";
 import { subjectClassName } from "./roadTones";
@@ -78,6 +78,9 @@ export function ProgressionView({
 }: ProgressionViewProps = {}) {
   const { lessons } = usePlanner();
   const { isMinimized, toggle } = useMinimizedSubjects();
+  // TEAM-scoped academic year. Drives the day-column count + the
+  // term-start date the buildSchoolDays helper anchors against.
+  const { start: yearStart, end: yearEnd } = useAcademicYear();
 
   // ── Chameleon: notify parent which lane is topmost ───────────────────
   const laneRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -108,13 +111,18 @@ export function ProgressionView({
   // ── Calendar data ─────────────────────────────────────────────────────
 
   const schoolWeekLen = DEFAULT_SCHOOL_WEEK.length;
-  const totalYearWeeks = useMemo(() => allYearWeeks().length, []);
+  const totalYearWeeks = useMemo(
+    () => allYearWeeksFor(yearStart, yearEnd).length,
+    [yearStart, yearEnd],
+  );
 
-  // Build the flat school-day array for the full school year.
+  // Build the flat school-day array for the full school year — anchored
+  // to the configured academic-year start. Audit F3 (year-calendar.ts):
+  // when yearStart's JS weekday doesn't match DEFAULT_SCHOOL_WEEK[0],
+  // the per-day labels desync. Lane Y owns the auto-align fix.
   const schoolDays = useMemo(
-    () =>
-      buildSchoolDays(DEFAULT_TERM_START, totalYearWeeks, DEFAULT_SCHOOL_WEEK),
-    [totalYearWeeks],
+    () => buildSchoolDays(yearStart, totalYearWeeks, DEFAULT_SCHOOL_WEEK),
+    [yearStart, totalYearWeeks],
   );
   // monthGroups is kept for potential future use but is no longer rendered
   // here — the QuarterMonthWeekHeader carries the month bands now.
