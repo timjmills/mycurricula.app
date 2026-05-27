@@ -256,6 +256,17 @@ export function Tooltip({
         ? {}
         : { ref: triggerRef as React.Ref<HTMLButtonElement> }),
       "aria-describedby": open ? tooltipId : undefined,
+      // Strip any native `title=` attribute from the wrapped child so the
+      // browser-default OS tooltip never fires alongside our styled bubble.
+      // User direction 2026-05-27 ("It's still showing the old popups as
+      // well — take those ones off"). Lane Z + Lane DA + the EA/EB/EC sweep
+      // added belt-and-braces `title=` attrs as a cross-engine fallback;
+      // they're redundant now that every interactive element is wrapped
+      // in this primitive and the styled portal handles every interaction
+      // surface (hover + focus + the disabled-button wrapper-span case).
+      // Accessibility is preserved via aria-describedby above linking the
+      // trigger to the tooltip text on open.
+      title: undefined,
       ...triggerHandlers,
     },
   );
