@@ -177,6 +177,34 @@ const FOCUSABLE =
 // Stricter than the spec but good enough to recognise a pasted link.
 const URL_REGEX = /^https?:\/\/\S+$/;
 
+// ── Resource caps ────────────────────────────────────────────────────────
+// Mirror the API allowlist in app/api/resources/upload/route.ts so the
+// composer rejects out-of-spec uploads with a clear inline message
+// before the file ever hits the network.
+
+const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_FILES_PER_LESSON = 10;
+const MAX_IMAGES_PER_LESSON = 10;
+
+const ALLOWED_MIMES: ReadonlySet<string> = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/rtf",
+  "text/rtf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
+
+function formatBytes(n: number): string {
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n >= 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${n} B`;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /** Tiny unique id (chip keys + nothing else). */
@@ -291,6 +319,11 @@ export function ResourceComposer({
   /** Inline status copy — "Pasted image" / "Pasted link" — appears under
    *  the captured-items strip so a teacher knows their paste registered. */
   const [pastedStatus, setPastedStatus] = useState<string | null>(null);
+  /** Inline rejection copy — "Skipped photo.png — image must be ≤ 5 MB"
+   *  — appears in red under the captured-items strip when an upload is
+   *  refused at capture time (size cap, mime allowlist, or the per-
+   *  lesson count cap). Auto-clears after 6 s. */
+  const [rejectionStatus, setRejectionStatus] = useState<string | null>(null);
 
   // Routing pills — initialize from the launching lesson + (optional) section.
   // The Section pill carries the special value "" to mean "Whole lesson".
@@ -321,6 +354,7 @@ export function ResourceComposer({
     setNoteOpenId(null);
     setItems(initialItems ?? []);
     setPastedStatus(null);
+    setRejectionStatus(null);
     setSubjectId(lesson.subject);
     setUnitId(lesson.unit);
     setLessonId(lesson.id);
@@ -375,6 +409,16 @@ export function ResourceComposer({
     const t = setTimeout(() => setPastedStatus(null), 2000);
     return () => clearTimeout(t);
   }, [pastedStatus]);
+
+  // ── Rejection status auto-clear (~6s) ────────────────────────────────
+  // Rejections need a longer dwell than the pasted status because the
+  // copy is longer (filename + cap + actual size) and the teacher needs
+  // time to read it before deciding what to do.
+  useEffect(() => {
+    if (!rejectionStatus) return;
+    const t = setTimeout(() => setRejectionStatus(null), 6000);
+    return () => clearTimeout(t);
+  }, [rejectionStatus]);
 
   // ── Derived: available units / lessons for the pickers ───────────────
   // Units come from the SUBJECT_BY_ID → UNITS map; we walk the planner
@@ -454,30 +498,79 @@ export function ResourceComposer({
     setItems((prev) => [...prev, { ...partial, id: uid("cap") }]);
   }, []);
 
-  /** Add many at once — used by the file pickers' onChange. Enforces
-   *  the per-lesson caps (≤10 files + ≤10 images) at capture time so the
-   *  teacher can't accidentally queue an 11th item. Counts ONLY the
-   *  current strip; a Phase 1B+ improvement is to include the section's
-   *  already-attached items in the count. */
+  /** Add many at once — used by the file pickers' onChange. Validates
+   *  every incoming item against the spec caps (mime allowlist, size cap,
+   *  per-lesson count cap) and collects each rejection's reason. Accepted
+   *  items merge into the strip; rejection reasons become an inline
+   *  message the teacher sees ("Skipped photo.png — image must be
+   *  ≤ 5 MB (yours: 6.2 MB).").
+   *
+   *  Counts are local to the current strip — a Phase 1B+ improvement is
+   *  to include the section's already-attached items in the count so the
+   *  composer can refuse the 11th item across BOTH the strip and the
+   *  lesson's prior resources. Today the DB trigger backstops that case
+   *  on the API side. */
   const addItems = useCallback((next: CapturedItem[]) => {
     if (next.length === 0) return;
+    const reasons: string[] = [];
     setItems((prev) => {
       const merged: CapturedItem[] = [...prev];
       for (const item of next) {
+        // Validate file metadata (mime + size) before the count check so
+        // a teacher sees the actual reason — "wrong type" beats "limit
+        // reached" when both could apply.
+        if (item.isFile) {
+          if (item.mimeType && !ALLOWED_MIMES.has(item.mimeType)) {
+            reasons.push(
+              `Skipped "${item.label}" — ${item.mimeType || "this file type"} isn't supported. ` +
+                `Use PDF, DOCX, RTF, or PNG/JPG/WebP/GIF.`,
+            );
+            continue;
+          }
+          const sizeCap =
+            item.provider === "image" ? MAX_IMAGE_BYTES : MAX_FILE_BYTES;
+          const sizeLabel = item.provider === "image" ? "5 MB" : "25 MB";
+          if (typeof item.sizeBytes === "number" && item.sizeBytes > sizeCap) {
+            reasons.push(
+              `Skipped "${item.label}" — ${item.provider === "image" ? "images" : "files"} must be ≤ ${sizeLabel} ` +
+                `(yours: ${formatBytes(item.sizeBytes)}).`,
+            );
+            continue;
+          }
+        }
+
+        // Per-lesson count cap — re-compute against the running merge so
+        // the message reflects the exact threshold the user hit.
         const fileCount = merged.filter(
           (c) => c.isFile && c.provider !== "image",
         ).length;
         const imageCount = merged.filter(
           (c) => c.isFile && c.provider === "image",
         ).length;
-        if (item.isFile && item.provider === "image" && imageCount >= 10)
-          continue;
-        if (item.isFile && item.provider !== "image" && fileCount >= 10)
-          continue;
+        if (item.isFile && item.provider === "image") {
+          if (imageCount >= MAX_IMAGES_PER_LESSON) {
+            reasons.push(
+              `Skipped "${item.label}" — limit reached (${MAX_IMAGES_PER_LESSON} images per lesson).`,
+            );
+            continue;
+          }
+        } else if (item.isFile) {
+          if (fileCount >= MAX_FILES_PER_LESSON) {
+            reasons.push(
+              `Skipped "${item.label}" — limit reached (${MAX_FILES_PER_LESSON} files per lesson).`,
+            );
+            continue;
+          }
+        }
         merged.push(item);
       }
       return merged;
     });
+    if (reasons.length > 0) {
+      // Join with " · " when there are multiple — keeps the message a
+      // single line and lets the teacher scan all reasons at once.
+      setRejectionStatus(reasons.join(" · "));
+    }
   }, []);
 
   const removeItem = useCallback((id: string) => {
@@ -1161,7 +1254,7 @@ export function ResourceComposer({
             resource (Padlet's "post caption" affordance). Clicking the
             same chip again closes the note editor. The note saves on
             blur to keep keystrokes off the items-array. */}
-            {(items.length > 0 || pastedStatus) && (
+            {(items.length > 0 || pastedStatus || rejectionStatus) && (
               <div className={styles.capturedWrap}>
                 {items.length > 0 && (
                   <ul
@@ -1362,6 +1455,15 @@ export function ResourceComposer({
                     aria-live="polite"
                   >
                     {pastedStatus}
+                  </p>
+                )}
+                {rejectionStatus && (
+                  <p
+                    className={styles.rejectionStatus}
+                    role="alert"
+                    aria-live="assertive"
+                  >
+                    {rejectionStatus}
                   </p>
                 )}
               </div>

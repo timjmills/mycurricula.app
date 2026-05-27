@@ -716,6 +716,21 @@
   font-style: italic;
 }
 
+/* Rejection status — same surface as .pastedStatus but rendered in the
+   catchup-red token + not italic, so a teacher reads it as a negative
+   action rather than a confirmation. role="alert" + aria-live="assertive"
+   on the element itself (set in JSX) so screen readers interrupt for it. */
+.rejectionStatus {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: var(--t-11);
+  color: var(--catchup);
+  background: color-mix(in srgb, var(--catchup) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--catchup) 22%, transparent);
+  border-radius: var(--r-4);
+  font-weight: 500;
+}
+
 /* ── Per-resource note editor ──────────────────────────────────────────── */
 /* Lives INSIDE the .capturedWrap zone — separated from the chip strip by
    a hairline divider rather than its own bordered box. Visually, the
