@@ -20,6 +20,7 @@
 import type { ReactNode, MouseEvent } from "react";
 import { useState } from "react";
 import type { LessonResource } from "@/lib/types";
+import { parseResourceUrl } from "@/lib/resource-embed";
 import { ImageLightbox } from "./ImageLightbox";
 import styles from "./ResourceEmbed.module.css";
 
@@ -92,10 +93,19 @@ function IframeEmbed({
   // allow-top-navigation or allow-forms — there's no use-case here for
   // those, and disallowing them limits the blast radius if a provider's
   // embed ever turned hostile.
+  //
+  // Always run resource.url through parseResourceUrl() so providers that
+  // ship a non-embeddable canonical URL (YouTube watch page, Vimeo
+  // /<id>, Google Slides /edit, Drive /view, Google Doc/Sheet /edit) get
+  // rewritten to their /embed or /preview form. Without this the iframe
+  // src points at the watch page which sets X-Frame-Options: sameorigin
+  // and refuses to load.
+  const parsed = resource.url ? parseResourceUrl(resource.url) : null;
+  const src = parsed?.embedUrl ?? resource.url ?? "";
   return (
     <div className={[styles.aspect, styles[`v_${variant}`]].join(" ")}>
       <iframe
-        src={resource.url}
+        src={src}
         title={resource.label}
         loading="lazy"
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"

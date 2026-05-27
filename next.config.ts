@@ -21,7 +21,10 @@ const csp = [
   "default-src 'self'",
   // Next.js requires unsafe-inline (runtime + Next/font), and unsafe-eval
   // is needed for the dev/runtime React fast-refresh path.
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  // static.cloudflareinsights.com is the Cloudflare Web Analytics beacon
+  // the Worker host injects automatically when observability is on; CSP
+  // must allow it or every page console-errors on script load.
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   `img-src 'self' data: blob: https://${r2Host} https://img.youtube.com https://i.vimeocdn.com https://*.googleusercontent.com https://*.ggpht.com https://upload.wikimedia.org`,
