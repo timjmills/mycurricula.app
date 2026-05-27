@@ -45,6 +45,7 @@ import type { ReactNode } from "react";
 import { memo, useCallback, useEffect, useId, useState } from "react";
 import type { SectionResource } from "@/lib/lesson-flow";
 import { Button, FutureControl } from "@/components/ui";
+import { ResourceEmbed } from "@/components/resources";
 import { ResourceTypePill } from "./resource-type-pill";
 import styles from "./section-resources.module.css";
 
@@ -299,6 +300,20 @@ function PrimaryCard({
   resource: SectionResource;
   fill: string;
 }): ReactNode {
+  // When a real URL is attached, the embed primitive owns the card interior —
+  // the colored card chrome (the §4.2 fill) still wraps it so the slot color
+  // stays load-bearing. Otherwise we fall back to the synthetic glyph render.
+  if (resource.url) {
+    return (
+      <article
+        className={styles.primaryCard}
+        style={{ background: fill }}
+        role="listitem"
+      >
+        <ResourceEmbed resource={resource} variant="tile" />
+      </article>
+    );
+  }
   return (
     <article
       className={styles.primaryCard}
@@ -322,9 +337,15 @@ function PrimaryCard({
 function MoreRow({ resource }: { resource: SectionResource }): ReactNode {
   return (
     <li className={styles.moreRow}>
-      <span className={styles.moreRowIcon} aria-hidden="true">
-        <MoreRowIcon type={resource.type} />
-      </span>
+      {resource.url ? (
+        <span className={styles.moreRowIcon}>
+          <ResourceEmbed resource={resource} variant="row" />
+        </span>
+      ) : (
+        <span className={styles.moreRowIcon} aria-hidden="true">
+          <MoreRowIcon type={resource.type} />
+        </span>
+      )}
       <span className={styles.moreRowTitle}>{resource.label}</span>
       <ResourceTypePill type={resource.type} />
     </li>
@@ -336,17 +357,26 @@ function MoreRow({ resource }: { resource: SectionResource }): ReactNode {
 function MinimizedRow({ resource }: { resource: SectionResource }): ReactNode {
   return (
     <li className={styles.miniRow}>
-      <span
-        className={styles.miniRowIconSquare}
-        data-kind={miniKindFor(resource.type)}
-        aria-hidden="true"
-      >
-        <MiniRowIcon type={resource.type} />
-      </span>
+      {resource.url ? (
+        <span
+          className={styles.miniRowIconSquare}
+          data-kind={miniKindFor(resource.type)}
+        >
+          <ResourceEmbed resource={resource} variant="row" />
+        </span>
+      ) : (
+        <span
+          className={styles.miniRowIconSquare}
+          data-kind={miniKindFor(resource.type)}
+          aria-hidden="true"
+        >
+          <MiniRowIcon type={resource.type} />
+        </span>
+      )}
       <span className={styles.miniRowStack}>
         <span className={styles.miniRowTitle}>{resource.label}</span>
         <span className={styles.miniRowSubtitle}>
-          {urlPreviewFor(resource)}
+          {resource.url ? realHostname(resource.url) : urlPreviewFor(resource)}
         </span>
       </span>
       <ResourceTypePill type={resource.type} />
@@ -397,6 +427,17 @@ function urlPreviewFor(res: SectionResource): string {
     case "link":
     default:
       return "linked resource";
+  }
+}
+
+/** Extract the bare hostname from a real URL for the minimized row's subtitle.
+ *  Strips a leading `www.` so the line reads cleanly. Falls back to the
+ *  synthetic link-preview string if the URL fails to parse. */
+function realHostname(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return urlPreviewFor({ type: "link" } as SectionResource);
   }
 }
 

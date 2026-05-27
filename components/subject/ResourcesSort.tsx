@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import { useState, useMemo } from "react";
 import type { LessonResource } from "@/lib/types";
 import { Chip } from "@/components/ui";
+import { ResourceEmbed } from "@/components/resources";
 import styles from "./ResourcesSort.module.css";
 
 // ── Type metadata ─────────────────────────────────────────────────────────
@@ -51,9 +52,7 @@ const MAX_DISPLAY = 20;
 
 // ── Resource row entry ─────────────────────────────────────────────────────
 
-export interface ResourceEntry {
-  type: LessonResource["type"];
-  label: string;
+export interface ResourceEntry extends LessonResource {
   /** Title of the lesson this resource is attached to. */
   lessonTitle: string;
   /** Unit name for context. */
@@ -169,18 +168,26 @@ export function ResourcesSort({
                 .filter(Boolean)
                 .join(" ")}
             >
-              {/* Resource type icon */}
-              <span className={styles.typeIcon} aria-hidden="true">
-                <FileIcon />
-              </span>
+              {r.url ? (
+                <span className={styles.typeIcon}>
+                  <ResourceEmbed resource={r} variant="row" />
+                </span>
+              ) : (
+                <>
+                  {/* Resource type icon */}
+                  <span className={styles.typeIcon} aria-hidden="true">
+                    <FileIcon />
+                  </span>
 
-              {/* Type badge */}
-              <span
-                className={`${styles.typeBadge} cp-mono`}
-                aria-hidden="true"
-              >
-                {meta.glyph} {meta.label}
-              </span>
+                  {/* Type badge */}
+                  <span
+                    className={`${styles.typeBadge} cp-mono`}
+                    aria-hidden="true"
+                  >
+                    {meta.glyph} {meta.label}
+                  </span>
+                </>
+              )}
 
               {/* Resource label */}
               <span className={styles.resourceLabel}>{r.label}</span>

@@ -88,7 +88,14 @@ export const LESSONS: Lesson[] = [
     objective: "I can generate equivalent fractions with area models.",
     preview:
       "Fold-and-shade activity building equivalent fractions, then a gallery walk comparing strategies.",
-    resources: [{ type: "slides", label: "Area model deck" }],
+    resources: [
+      {
+        type: "slides",
+        label: "Area model deck",
+        url: "https://docs.google.com/presentation/d/1eu3J4tLkTpW2gC2DLrNgVH71Hjt7sHM9Ie4yWNL2u0Y/edit",
+        provider: "gslides",
+      },
+    ],
     standards: ["5.NF.A.1"],
     status: "done",
   }),
@@ -114,7 +121,14 @@ export const LESSONS: Lesson[] = [
     objective: "I can plan a personal narrative on a story-arc map.",
     preview:
       "Students map their chosen memory onto a five-point arc before drafting next week.",
-    resources: [{ type: "pdf", label: "Story arc map" }],
+    resources: [
+      {
+        type: "pdf",
+        label: "Story arc map",
+        url: "https://drive.google.com/file/d/1n-jB_yJ8sZ4uV4dVL9z6KZpL_2H8KdH8X/view",
+        provider: "gdrive",
+      },
+    ],
     standards: ["W.5.3"],
     status: "carried",
     reasonNotDone:
@@ -161,7 +175,13 @@ export const LESSONS: Lesson[] = [
     // 2×2 thumbnail grid in Section 1 (Standards); the remaining three flow
     // into the "More resources" sub-list. Exact labels per the spec.
     resources: [
-      { type: "youtube", label: "Fraction Basics" }, // Card 1 — play icon
+      {
+        type: "youtube",
+        label: "Fraction Basics",
+        url: "https://www.youtube.com/watch?v=8E5K2dnyFOY",
+        provider: "youtube",
+        thumbnailUrl: "https://img.youtube.com/vi/8E5K2dnyFOY/hqdefault.jpg",
+      }, // Card 1 — play icon
       { type: "link", label: "What is a Fraction?" }, // Card 2 — paperclip
       { type: "doc", label: "Fractions Overview" }, // Card 3 — document
       { type: "link", label: "Khan Academy" }, // Card 4 — paperclip
@@ -188,7 +208,12 @@ export const LESSONS: Lesson[] = [
     resources: [
       { type: "slides", label: "Lesson 23 deck" },
       { type: "doc", label: "Exit ticket" },
-      { type: "youtube", label: "Bar models (4min)" },
+      {
+        type: "youtube",
+        label: "Bar models (4min)",
+        url: "https://vimeo.com/76979871",
+        provider: "vimeo",
+      },
     ],
     standards: ["5.NF.B.3"],
   }),
@@ -287,7 +312,12 @@ export const LESSONS: Lesson[] = [
       "First-person narrator shift from August to Via. Students annotate three places the same event is reframed.",
     notes: "Lara was absent for ch 13 — have her partner with Sofia.",
     resources: [
-      { type: "doc", label: "Annotation sheet" },
+      {
+        type: "doc",
+        label: "Annotation sheet",
+        url: "https://docs.google.com/document/d/1mGJ_yJ8sZ4uV4dVL9z6KZpL_2H8KdH8XzNgN6Hpx0fM/edit",
+        provider: "gdocs",
+      },
       { type: "website", label: "Lit-circle prompts" },
     ],
     standards: ["RL.5.6", "RL.5.3"],
@@ -590,7 +620,14 @@ export const LESSONS: Lesson[] = [
     preview:
       "Maps activity: students annotate four features of the Nile valley that made it attractive for civilization. Compare with Tigris/Euphrates next week.",
     resources: [
-      { type: "image", label: "Nile satellite" },
+      {
+        type: "image",
+        label: "Nile satellite",
+        url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Story_arc.svg/640px-Story_arc.svg.png",
+        provider: "image",
+        thumbnailUrl:
+          "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Story_arc.svg/640px-Story_arc.svg.png",
+      },
       { type: "pdf", label: "Annotation map" },
     ],
     standards: [],

@@ -30,6 +30,7 @@ import type { ReactNode } from "react";
 import { useId, useState } from "react";
 import type { SectionResource } from "@/lib/lesson-flow";
 import { Button } from "@/components/ui";
+import { ResourceEmbed } from "@/components/resources";
 import styles from "./resource-tile.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -88,13 +89,19 @@ export function ResourceTile({
           The frame's appearance is keyed by data-frame so the CSS module
           owns the per-kind styling. Inside sits the synthetic artwork. */}
       <div className={styles.frame}>
-        {/* Type-specific synthetic artwork. */}
-        <FrameArtwork kind={kind} />
+        {resource.url ? (
+          <ResourceEmbed resource={resource} variant="tile" />
+        ) : (
+          <>
+            {/* Type-specific synthetic artwork. */}
+            <FrameArtwork kind={kind} />
 
-        {/* Large centered type icon — the primary at-a-glance signal. */}
-        <span className={styles.bigIcon} aria-hidden="true">
-          <BigResourceIcon type={resource.type} />
-        </span>
+            {/* Large centered type icon — the primary at-a-glance signal. */}
+            <span className={styles.bigIcon} aria-hidden="true">
+              <BigResourceIcon type={resource.type} />
+            </span>
+          </>
+        )}
 
         {/* Minimize-to-links control, pinned to the tile's top-right.
             Button variant="icon" carries the 44px touch target + focus ring. */}
@@ -194,10 +201,16 @@ export function ResourceLinkPreview({
           aria-hidden="true"
         >
           <span className={styles.previewFrame} data-frame={kind}>
-            <FrameArtwork kind={kind} />
-            <span className={styles.previewBigIcon}>
-              <BigResourceIcon type={resource.type} />
-            </span>
+            {resource.url ? (
+              <ResourceEmbed resource={resource} variant="tile" />
+            ) : (
+              <>
+                <FrameArtwork kind={kind} />
+                <span className={styles.previewBigIcon}>
+                  <BigResourceIcon type={resource.type} />
+                </span>
+              </>
+            )}
           </span>
         </span>
       )}
