@@ -1,5 +1,11 @@
 # Research: 5 deferred /year audit items — options + trade-offs
 
+> **⚠ Snapshot disclaimer** — this is a dated audit/research artifact (2026-05-25).
+> Findings and recommendations may have shipped, regressed, or been superseded by
+> later work. Verify against current code (`git log -- <file>`) before treating any
+> finding as open or any recommendation as binding. The canonical project guide is
+> `CLAUDE.md`.
+
 2026-05-25
 
 For each finding: 2–3 concrete implementation options with effort + blast-radius

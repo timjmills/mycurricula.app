@@ -1,5 +1,11 @@
 # /weekly + /daily — Phase 1 (Defects) + Phase 2 (Improvements)
 
+> **⚠ Snapshot disclaimer** — this is a dated audit/research artifact (2026-05-25).
+> Findings and recommendations may have shipped, regressed, or been superseded by
+> later work. Verify against current code (`git log -- <file>`) before treating any
+> finding as open or any recommendation as binding. The canonical project guide is
+> `CLAUDE.md`.
+
 Audit performed 2026-05-25 against the live deployment at `https://mycurricula.app/weekly` and `https://mycurricula.app/daily`, cross-referenced with source under `app/(planner)/weekly/`, `app/(planner)/daily/`, `components/weekly/`, `components/daily/`, `components/grid/`, `components/lesson-card/`, and `components/shell/`. Three viewport tiers were probed via Playwright (400/768/1280). Several findings affect both routes; they are listed under whichever route surfaces the worst case and noted as "Route(s)" cross-references where relevant.
 
 ---
@@ -10,7 +16,7 @@ Audit performed 2026-05-25 against the live deployment at `https://mycurricula.a
 
 #### Blockers
 
-##### [Blocker] Top-bar Sign Out + Profile clipped past viewport at every desktop width below 1281px
+##### [Blocker] Top-bar Sign Out + Profile clipped past viewport at every desktop width below 1281px **[FIXED in commit b4071d6]**
 **Route:** /weekly (also affects /daily and every planner route)
 **File:** `components/shell/top-bar.module.css:41` (`overflow-x: clip` on `.bar`), `components/shell/top-bar.tsx:491–512` (Profile + Sign Out at the right end of the bar)
 **What I saw:** The top bar's `overflow-x: clip` rule (introduced as the fix for document-level horizontal scroll, comment at `top-bar.module.css:28-44`) silently cuts off whatever flex children exceed the viewport. At 1280×900 the rendered top bar has `scrollWidth = 1346`, so the rightmost 66px is hidden. Concretely (measured via Playwright on the live site):
@@ -26,7 +32,7 @@ Audit performed 2026-05-25 against the live deployment at `https://mycurricula.a
 **Proposed fix:** Drop the unconditional `overflow-x: clip` and instead introduce an overflow menu / hamburger affordance that absorbs everything past a budget at each breakpoint. Minimum viable fix: at ≤1280 collapse the right cluster (`Search / Catch-up / Todo / Comments / Sign out`) into a `⋯ More` button that opens a small menu containing every clipped control plus the Profile link. Keep Profile as a visible avatar at ≥768. Document the visible-right-edge contract in `BUILD_STANDARD.md`.
 **Verified against live site:** yes — measured rect positions via Playwright + the `inspect-topbar.mjs` script.
 
-##### [Blocker] /daily renders no `<h1>` — heading hierarchy starts at h2
+##### [Blocker] /daily renders no `<h1>` — heading hierarchy starts at h2 **[FIXED in commit 0867ce1]**
 **Route:** /daily
 **File:** `components/daily/DailyView.tsx:1744-1783` (page tree — no h1 anywhere); `components/daily/TodayDashboard.tsx:55` (renders `<h2>{dayLabel}</h2>` as the top-of-page heading)
 **What I saw:** Probing `/daily` at every viewport, `document.querySelectorAll('h1')` returns 0. The first heading is "Sunday" (h2) from `TodayDashboard.tsx:55`. The next is the lesson title (h2) from `LessonDetail.tsx` (`detailStyles.titleH2`). The breadcrumb above (`DailyView.tsx:1750-1782`) is rendered as a `<nav>` with `<ol>`/`<Link>` only — no heading element. Compare `/weekly` which has `<h1>Week 12</h1>` rendered by `WeekNavigator.tsx:43-46`.
@@ -35,7 +41,7 @@ Audit performed 2026-05-25 against the live deployment at `https://mycurricula.a
 **Proposed fix:** Add an h1 inside `DailyView.tsx` above the breadcrumb that mirrors the /weekly idiom — e.g. `<h1 className={styles.srOnly}>Daily plan — {WEEK_DAYS[selectedDay]}, Week {week}</h1>`. The visual day-name h2 inside `TodayDashboard` can remain, but should drop to h2/h3 once h1 exists. Aim for one h1 per route, consistently positioned.
 **Verified against live site:** yes.
 
-##### [Blocker] /daily duplicates Standards content in two adjacent sections — second h3 reads as "Standards2"
+##### [Blocker] /daily duplicates Standards content in two adjacent sections — second h3 reads as "Standards2" **[FIXED in commit 0867ce1]**
 **Route:** /daily
 **File:** `components/lesson-flow/lesson-flow.tsx:146-150` (virtual Standards canonical row in LessonFlow) AND `components/daily/LessonDetail.tsx:650-674` (separate Standards section in the lesson detail body)
 **What I saw:** A selected lesson on /daily renders **two** `Standards` blocks in the right pane:

@@ -1,4 +1,4 @@
-# mycurriculum.app — Project Guide
+# mycurricula.app — Project Guide
 
 This file is the source of truth for **what this project is, how we build it, and the
 rules every contributor (human or agent) must follow**. Read it before touching code.
@@ -14,12 +14,37 @@ rules every contributor (human or agent) must follow**. Read it before touching 
 
 ## 1. What this app is
 
-**`mycurriculum.app`** is a Learning Management System (LMS) for school teaching teams.
+**`mycurricula.app`** is a Learning Management System (LMS) for school teaching teams.
 Its first deployment is a Grade 5 team (4–6 teachers) at a school in Qatar, but the
 product is built for any school. It consolidates five fragmented planning surfaces —
 Padlet resource boards, a week-by-week lesson doc, a weekly-focus doc, a CCSS standards
 doc, and per-teacher personal copies — into **one filterable, editable curriculum
 operating system**.
+
+### Current build status (2026-05-27)
+
+Phase 1A is **shipped to a live beta-ready prototype** at the Cloudflare custom domain
+`mycurricula.app`. Every primary view renders against `lib/mock/` fixtures; the
+Supabase backend is the Phase 1B wave. The honest map:
+
+| Route / feature | Status |
+| --- | --- |
+| `/weekly` (Grid + List) | Shipped Phase 1A |
+| `/daily` (Day pane + lesson detail + IconRail) | Shipped Phase 1A |
+| `/year` (Roadmap + Progression + Print) | Shipped Phase 1A |
+| `/subject` (Curriculum view, per-subject unit pages) | Shipped Phase 1A |
+| `/schedule` (timetable) | Shipped as deep-link + side-panel via GlobalRail (Phase 1A complete; rotation cycles deferred to Phase 1B) |
+| `/catch-up` (lessons-not-covered triage) | Shipped Phase 1A |
+| `/settings/*` (unified hub: curriculum, school week, school months, academic year, holidays, appearance, lesson templates, catch-up rules) | Shipped Phase 1A |
+| Master/Personal forking model | Visual + state shipped; persistence to Supabase is Phase 1B |
+| Onboarding wizard | Shipped Phase 1A (`Documents/Claude Design/.../onboarding_wizard` is the spec) |
+| Cloudflare deploy (custom domain `mycurricula.app`) | Live |
+| Claude auth bypass (Bearer + URL + cookie) | Live — all three flows working |
+| Supabase backend (auth + DB rows + realtime) | **Not yet wired** — Phase 1B gate. Mock data in `lib/mock/` drives every view today. |
+
+Phase 1B is the **Supabase + multi-school config wave**: wiring the backend so the
+forking model persists, holidays render on weekly/daily, schedule rotation cycles work
+end-to-end, and unit-import lands. Phase 2+ brings annotation, admin, and AI.
 
 - **Users:** teachers only. No student, parent, or admin-facing product in scope.
 - **Core job:** "What are we teaching this week, and where am I in the plan?"
@@ -94,10 +119,10 @@ nearly every feature — respect it everywhere.
 | PDF / Excel   | `@react-pdf/renderer` / SheetJS, client-side                       |
 | Hosting       | Cloudflare Pages                                                   |
 
-**Current state of the repo:** a **frontend-only prototype**. There is no backend yet —
-every view reads from `lib/mock/`. The Weekly view, lesson card, design-token system,
-and Appearance settings are built. Daily, Subject, Schedule, Unit, Year views, the app
-shell (top bar / side panels), and the Supabase backend are **not yet built**.
+**Current state of the repo:** a **frontend-complete Phase 1A prototype** deployed to
+Cloudflare at `mycurricula.app`. See §1's status table for what is shipped vs.
+mock-driven. Every view today reads from `lib/mock/`; the Supabase backend lands in
+Phase 1B.
 
 ### Folder conventions
 
@@ -255,7 +280,7 @@ All under `Documents/` (reference only — never imported by the app):
   §5 screen-by-screen, §6 design system, §7 tech architecture, §8 phased roadmap,
   §9 acceptance criteria, §10 open questions.
 - `Project Files/5.16.26 conversation_record.md` — the decision history behind the spec.
-- `Project Files/5.16.26 mycurriculum.app_Business_Plan_Addendum.md` — positioning, pricing.
+- `Project Files/5.16.26 MyCurricula_Business_Plan_Addendum.md` — positioning, pricing.
 - `Project Files/5.16.26 *Competetor Anaylisis*` + `5.12.26 *Planbook*` — competitive
   context; selectively absorbed features.
 - `Claude Design/5.16.26 Build A Curriculum-handoff/` — the design handoff bundle.
@@ -277,3 +302,58 @@ Master/Personal toggle, Simple/Task/Advanced view modes, standards tagging, dail
 basic print/export). Phase 1B fills in the rest of Phase 1. Phase 2 brings Vivid +
 full forking + Schedule + Year rollover. Phase 3+ brings annotation, admin, and AI.
 When in doubt about whether to build something, check the roadmap and ask.
+
+---
+
+## 8. Canonical names, route map, and audit-doc disclaimer
+
+This section disambiguates the doc landscape so a new agent or contributor doesn't
+chase contradictions.
+
+### Authoritative MDs (the only docs that bind current behavior)
+
+- **`CLAUDE.md`** — policy, phasing, product principles, and the rules every
+  contributor must follow. This file.
+- **`BUILD_STANDARD.md`** — the visual, structural, and responsive contract. The
+  only authoritative visual contract. The older
+  `Documents/Project Files/5.24.26 website_build_standard_claude_codex.md` was
+  removed in this consolidation as it overlapped with `BUILD_STANDARD.md`.
+- **`Documents/Project Files/5.16.26 planning_document.md`** — the master spec
+  (data model, screen-by-screen, roadmap, acceptance criteria).
+
+Everything else under `Documents/` and `docs/` is historical reference or
+dated audit-snapshot. See "Audit-doc disclaimer" below.
+
+### App name — canonical spelling
+
+**`mycurricula.app`** (plural). The GitHub repo is `timjmills/mycurricula.app`
+and the deployed Cloudflare custom domain is the same. Older docs that use the
+singular `mycurriculum.app` predate the canonical name; treat those as
+historical.
+
+### Route aliases (planning-doc names vs. current routes)
+
+The planning doc and some older artifacts name routes that have since been
+renamed in the codebase. These have not changed in 2 months; older docs that
+say `/curriculum` or `/yearly` refer to the same surfaces.
+
+| Planning-doc name | Current route | Top-bar tab label |
+| --- | --- | --- |
+| `/curriculum` | `/subject` (→ `/subject/<id>`) | "Curriculum" |
+| `/yearly` | `/year` | "Yearly" |
+
+### Audit-doc disclaimer
+
+Every `docs/*audit*.md` and `docs/research-*.md` is a **dated snapshot**.
+Findings, recommendations, and "open questions" recorded in those docs may
+already be fixed, deferred, regressed, or superseded by later work. Each
+audit doc carries a snapshot-disclaimer header noting its date. **Verify
+against current code before treating any finding as open or any
+recommendation as binding.** A quick check:
+
+```
+git log --oneline -- <relevant-file-path>
+```
+
+The canonical project guide for what's true today is **this file
+(`CLAUDE.md`)** plus `BUILD_STANDARD.md`.

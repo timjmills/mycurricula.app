@@ -1,5 +1,11 @@
 # Full-session audit — 2026-05-25 evening → 2026-05-26
 
+> **⚠ Snapshot disclaimer** — this is a dated audit/research artifact (2026-05-26).
+> Findings and recommendations may have shipped, regressed, or been superseded by
+> later work. Verify against current code (`git log -- <file>`) before treating any
+> finding as open or any recommendation as binding. The canonical project guide is
+> `CLAUDE.md`.
+
 **Lane:** BK (full-session audit, read-only)
 **Scope:** every commit on `schedule-and-auth-5.24` in the range
 `cfa3f82..HEAD` — i.e. the 32 commits landed in the late-night Wave 1A,
@@ -32,12 +38,12 @@ the new `GlobalRail`/`SubjectCalendar` modules) deliberately ignored.
    `components/schedule/ScheduleDayPane.tsx`, `ScheduleBlock.tsx`,
    `SchedulePanel.tsx` — only 8 tooltip/title attrs total across 3 files.
    CLAUDE.md §4's onboarding-tooltip mandate is violated for the
-   most-touched non-grid route.
+   most-touched non-grid route. **[FIXED in commit 5b1bfd2]**
 2. **BLOCKER — `/settings/catch-up` 0% tooltip coverage (3 buttons).**
    `app/settings/catch-up/page.tsx:58-94` — On/Off toggle + "Open
    Catch-up screen →" button carry no tooltip. Lane Z missed this page
    entirely (it touched the planner `/catch-up` route but not
-   `/settings/catch-up`).
+   `/settings/catch-up`). **[FIXED in commit 5b1bfd2]**
 3. **BLOCKER — RoadmapView / ProgressionView / YearMobile still read
    `DEFAULT_SCHOOL_WEEK` constant, not `useSchoolWeek()`.** Wave 1B
    plumbed the configurable school week into Settings and persisted it
@@ -48,6 +54,7 @@ the new `GlobalRail`/`SubjectCalendar` modules) deliberately ignored.
    because CLAUDE.md §1 ("Never hard-code the weekday set — every
    calendar surface derives its days from this configuration") is the
    one rule the planning doc highlights with bold.
+   **[FIXED in commit 5b1bfd2]**
 4. **MAJOR — `/year/print` 10% tooltip coverage on 41 buttons.** Print
    surface may have fewer interactive controls per-spec, but 90% of
    buttons missing onboarding text on a teacher-facing surface still
@@ -59,7 +66,7 @@ the new `GlobalRail`/`SubjectCalendar` modules) deliberately ignored.
    `app/settings/layout.tsx` does not. Settings is reached from every
    route's avatar / IconRail gear; "all pages" arguably includes it.
    Either mount Clock in the settings layout too, or document the
-   intentional exclusion.
+   intentional exclusion. **[FIXED in commit 5b1bfd2]**
 
 ---
 
@@ -337,7 +344,7 @@ issue). Findings reproducible from `docs/screenshots/lane-bk-audit/*`.
   tooltips.
 - **Proposed fix:** sweep the remaining 10 buttons.
 
-### F#8 — MAJOR — Schedule unreachable except from /daily
+### F#8 — MAJOR — Schedule unreachable except from /daily **[FIXED in commit 1c54590]**
 
 - **Where:** `components/daily/IconRail.tsx` carries the Schedule-panel
   trigger; the IconRail mounts only on the Daily route. The Schedule

@@ -1,5 +1,13 @@
 # UI/UX Audit Fragment — /schedule + /catch-up
 
+> **⚠ Snapshot disclaimer** — this is a dated audit/research artifact (2026-05-25).
+> Findings and recommendations may have shipped, regressed, or been superseded by
+> later work. Verify against current code (`git log -- <file>`) before treating any
+> finding as open or any recommendation as binding. The canonical project guide is
+> `CLAUDE.md`. **Note:** Schedule was substantially rebuilt as a side-panel surface
+> (`977bd57`, `5b1bfd2`, `1c54590`); many findings in this doc target the old
+> top-tab implementation and may no longer apply verbatim.
+
 **Auditor:** Claude Code agent
 **Date:** 2026-05-25
 **Scope:** Routes 3 (`/schedule`) and 4 (`/catch-up`) per `docs/5.24.26 ui-ux-audit-prompt-for-claude-code.md`. Also covers the Weekly/Daily inline schedule-pill entry points (`components/weekly/weekly-schedule-pills.tsx`, `components/daily/daily-schedule-pill.tsx`) since those are how teachers reach Schedule from the primary views.
@@ -23,7 +31,7 @@
 
 ### Majors
 
-### [Major] Weekly Schedule timeline is unreachable on tablet and phone — the pill itself disappears
+### [Major] Weekly Schedule timeline is unreachable on tablet and phone — the pill itself disappears **[SUPERSEDED by Schedule-as-side-panel reorg in 977bd57 / 1c54590; verify against current code]**
 **Route:** /weekly (Schedule mode entry point)
 **File:** components/weekly/WeeklyShell.tsx:819-829; components/weekly/WeeklyShell.tsx:474 (`isNarrow`)
 **What I saw:** At ≤900px viewports, `WeeklyShell.tsx:819` sets `showList = isNarrow || viewMode === "list"` and **line 829 hides `<WeeklySchedulePills />` entirely** (`{!isNarrow && <WeeklySchedulePills />}`). Even if the teacher had Schedule mode persisted in localStorage, they can neither toggle nor see they're in it at tablet/phone — `showSchedule = !isNarrow && scheduleMode` (line 820) silently forces List view. Verified in `docs/screenshots/weekly-schedule__phone-400x800.png` and `weekly-schedule__tablet-768x1024.png`: both render the Weekly List, not the timeline, even with the localStorage seed set.
@@ -32,7 +40,7 @@
 **Proposed fix:** Keep `<WeeklySchedulePills />` mounted at all widths. When `isNarrow && scheduleMode`, render a small "Schedule view requires more room — open in /schedule" link in place of the timeline, with a button to navigate. Do not silently swap view modes.
 **Verified against live site:** yes (responsive-check.mjs, three tiers).
 
-### [Major] Daily Schedule rail is silently hidden ≤1280px while its pill still shows "Schedule" active
+### [Major] Daily Schedule rail is silently hidden ≤1280px while its pill still shows "Schedule" active **[SUPERSEDED by Schedule-as-side-panel reorg in 977bd57 / 1c54590; verify against current code]**
 **Route:** /daily (Schedule mode entry point)
 **File:** components/daily/DailyView.module.css:380-387; components/daily/daily-schedule-pill.tsx:35-53
 **What I saw:** The Daily Schedule rail uses `@media (max-width: 1280px) { .scheduleRail { display: none; } }`. The pill itself, however, stays visible and toggleable at every width — `DailySchedulePill` has no media-query guard. At tablet (768) and phone (400) the teacher can click "Schedule", the pill's active segment moves, the localStorage key updates, but **the rail never appears and there is zero feedback** that the mode is a no-op at this width. Confirmed in `docs/screenshots/daily-schedule-rail__tablet-768x1024.png` and `daily-schedule-rail__phone-400x800.png` (no rail visible despite pill ON).
@@ -41,7 +49,7 @@
 **Proposed fix:** Either (a) below 1280, replace the pill with a `<Link href="/schedule">` button so the action goes somewhere; or (b) render the schedule rail inline above/below the lesson list instead of as a 4th track when there is no room for one; or (c) at minimum, add a small inline notice "Schedule view opens on /schedule at this width" when the pill is flipped on at narrow widths.
 **Verified against live site:** yes (responsive screenshots).
 
-### [Major] /schedule lands on Sunday for every teacher's first visit even when "today" is Monday
+### [Major] /schedule lands on Sunday for every teacher's first visit even when "today" is Monday **[OPEN — verify against current code]**
 **Route:** /schedule
 **File:** app/(planner)/schedule/page.tsx:30-33; lib/app-state.tsx:201
 **What I saw:** `SchedulePage` reads `selectedDay` from `useAppState()`. `selectedDay` is initialized to `0` (Sunday) in `lib/app-state.tsx:201` and is **not persisted** anywhere — there's no localStorage write. The Schedule page comment claims "the user's last-chosen day persists across sessions" (page.tsx:33-34), which is false. On the live render the day-strip shows `Mon 19 (today)` (via `todayDayIndex() === 1`) but the pane below it captions "Sunday, January 18" because `focusedDay = selectedDay = 0`. Verified in `/tmp/audit-schedule.html` (`aria-label="Schedule pane for Sunday, January 18"` + `aria-label="Mon 19 (today)"` on the chip).

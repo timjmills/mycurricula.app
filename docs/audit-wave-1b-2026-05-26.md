@@ -1,5 +1,11 @@
 # Wave 1B verification + fix pass
 
+> **⚠ Snapshot disclaimer** — this is a dated audit/research artifact (2026-05-26).
+> Findings and recommendations may have shipped, regressed, or been superseded by
+> later work. Verify against current code (`git log -- <file>`) before treating any
+> finding as open or any recommendation as binding. The canonical project guide is
+> `CLAUDE.md`.
+
 2026-05-26 (Lane BJ — verification + fix)
 
 **Branch:** `schedule-and-auth-5.24`
@@ -25,19 +31,19 @@
 
 ## Per-finding detail
 
-### BLOCKER — Holiday overlays never render on /year (`components/year/UnitBar.tsx:46-56,160-171`)
+### BLOCKER — Holiday overlays never render on /year (`components/year/UnitBar.tsx:46-56,160-171`) **[FIXED in commit 1ac8d67]**
 
 **What I found:** `holidayDateToWeekIdx()` anchored the holiday→weekIdx conversion to the legacy hardcoded `DEFAULT_TERM_START = 2025-11-02` instead of the user-configured academic-year start from `useAcademicYear()`. The unit bars on /year derive their week columns from the configured start, but the holiday overlay anchored to a different start — so the overlay's `weekIdx` lived in a different coordinate space than `unit.startWeekIdx`/`unit.endWeekIdx`. Result: any teacher whose academic year doesn't begin exactly on 2025-11-02 would never see their holidays. For the mock fixture's seeded year this happens to line up, but every other configuration silently fails.
 
 **Fix applied (UnitBar.tsx):** Made `holidayDateToWeekIdx(iso, termStart)` accept the start as a parameter. UnitBar now calls `useAcademicYear()` and passes `yearStart` into the conversion. Probe confirms 8/8 unit bars show the overlay when `holiday-date` lands inside their week ranges (was 0/8 before).
 
-### BLOCKER — F2 end-date label off by 3 days (`components/year/RoadmapView.tsx:90-97,238-252`)
+### BLOCKER — F2 end-date label off by 3 days (`components/year/RoadmapView.tsx:90-97,238-252`) **[FIXED in commit 1ac8d67]**
 
 **What I found:** Per the prior audit doc, `endDate: weekIdxToDateLabel(endWeekIdx + 1, yearStart)` returned the Sunday at the START of the week AFTER the unit ends — not the unit's actual last instructional day. For the seeded Math unit (Wk9-14), the card said "Dec 28–Feb 8" but the unit really ends Feb 5 (Thursday).
 
 **Fix applied (RoadmapView.tsx):** Extended `weekIdxToDateLabel` to accept an optional `dayOffset` parameter; the unit-bar end-date call now passes `(endWeekIdx, yearStart, schoolWeekLen - 1)` to land on the actual last school day. Verified live: Math Unit 1 aria-label now reads "Jan 11–Jan 29" (was "Jan 11–Feb 1" before), where Jan 29 is the configured year's Wk13 Thursday.
 
-### BLOCKER — F3 `buildSchoolDays` only warned, didn't fix (`lib/year-calendar.ts:90-130`)
+### BLOCKER — F3 `buildSchoolDays` only warned, didn't fix (`lib/year-calendar.ts:90-130`) **[FIXED in commit 1ac8d67]**
 
 **What I found:** Audit said Y-cal lane left a dev-only `console.warn` when `termStart`'s weekday ≠ `schoolWeek[0]`. That's a warning, not a fix — the function still emitted dates that disagreed with their labels (day labeled "Mo" while the actual JS Date was a Sunday). This would silently corrupt the entire Progression view for any teacher who set their academic year to a date that doesn't fall on `schoolWeek[0]`'s weekday.
 

@@ -1,5 +1,11 @@
 # Cross-Cutting Phase 2 Findings
 
+> **⚠ Snapshot disclaimer** — this is a dated audit/research artifact (2026-05-24).
+> Findings and recommendations may have shipped, regressed, or been superseded by
+> later work. Verify against current code (`git log -- <file>`) before treating any
+> finding as open or any recommendation as binding. The canonical project guide is
+> `CLAUDE.md`.
+
 **Scope:** Improvements spanning the entire product, informed by shell components, design system (`lib/theme.tsx`, `lib/palette.tsx`, `app/tokens.css`), and CLAUDE.md §4.
 
 ---

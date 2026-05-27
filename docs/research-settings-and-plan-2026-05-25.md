@@ -1,4 +1,11 @@
 # Settings landscape, queued-work integration, master plan
+
+> **⚠ Snapshot disclaimer** — this is a dated audit/research artifact (2026-05-25).
+> Findings and recommendations may have shipped, regressed, or been superseded by
+> later work. Verify against current code (`git log -- <file>`) before treating any
+> finding as open or any recommendation as binding. The canonical project guide is
+> `CLAUDE.md`.
+
 2026-05-25 (research lane — no code changes)
 
 **Author:** research agent (Opus 4.7, 1M context). Read-only pass.

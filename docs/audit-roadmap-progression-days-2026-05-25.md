@@ -1,5 +1,11 @@
 # Audit — Roadmap & Progression day/week accuracy (2026-05-25)
 
+> **⚠ Snapshot disclaimer** — this is a dated audit/research artifact (2026-05-25).
+> Findings and recommendations may have shipped, regressed, or been superseded by
+> later work. Verify against current code (`git log -- <file>`) before treating any
+> finding as open or any recommendation as binding. The canonical project guide is
+> `CLAUDE.md`.
+
 **Lane:** lane-bh-calendar-audit (Task #40)
 **Branch:** `schedule-and-auth-5.24`
 **Scope:** calendar-math only. NOT visual redesign of UnitBar / lanes
@@ -27,9 +33,9 @@ Exit code is non-zero on any FAIL; commit as a regression check.
 
 | #   | Severity      | File                                | One-line                                                                          |
 | --- | ------------- | ----------------------------------- | --------------------------------------------------------------------------------- |
-| F1  | **MAJOR**     | `components/year/QuarterMonthWeekHeader.tsx:79` | `gridColumn: span 0` is invalid CSS; out-of-session months take 1 cell, drifting the header 3 cells right of the lane body. |
-| F2  | **MINOR**     | `components/year/RoadmapView.tsx:239`           | UnitBar `endDate` label points at the Sunday AFTER the unit's last instructional week, not the actual last lesson day. Off by 3 calendar days. |
-| F3  | **MINOR**     | `lib/year-calendar.ts:90`                       | `buildSchoolDays()` silently mislabels days when `termStart`'s weekday ≠ `schoolWeek[0]`. Latent for the Sun-Thu mock; will burn future Mon-Fri schools. |
+| F1  | **MAJOR**     | `components/year/QuarterMonthWeekHeader.tsx:79` | `gridColumn: span 0` is invalid CSS; out-of-session months take 1 cell, drifting the header 3 cells right of the lane body. **[FIXED in commit e0cb380]** |
+| F2  | **MINOR**     | `components/year/RoadmapView.tsx:239`           | UnitBar `endDate` label points at the Sunday AFTER the unit's last instructional week, not the actual last lesson day. Off by 3 calendar days. **[FIXED in commit 1ac8d67]** |
+| F3  | **MINOR**     | `lib/year-calendar.ts:90`                       | `buildSchoolDays()` silently mislabels days when `termStart`'s weekday ≠ `schoolWeek[0]`. Latent for the Sun-Thu mock; will burn future Mon-Fri schools. **[FIXED in commit 1ac8d67]** |
 | F4  | **NON-ISSUE** | `lib/mock/calendar.ts:48`                       | Anchor 2025-11-02 is a Sunday — confirmed. Wk1 day0..day4 align to JS weekdays 0..4 exactly. |
 | F5  | **NON-ISSUE** | `lib/year-calendar.ts:243`                      | `quarterForWeek` / `monthsForQuarter(1)` / `weeksInQuarter(1)` all sum to expected counts (9 weeks/quarter, 36 weeks total). Cross-checked against an independent re-derivation. |
 | F6  | **NON-ISSUE** | `components/year/UnitBar.tsx:116-117`           | `left` and `width` are correct for the inclusive Wk9-14 case. spanWeeks = 6; left = 768px; width = 568px; bar right-edge (1336) sits below wk15's left-edge (1344) — no bleed. |

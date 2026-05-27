@@ -1,5 +1,11 @@
 # /year audit — 2026-05-25
 
+> **⚠ Snapshot disclaimer** — this is a dated audit/research artifact (2026-05-25).
+> Findings and recommendations may have shipped, regressed, or been superseded by
+> later work. Verify against current code (`git log -- <file>`) before treating any
+> finding as open or any recommendation as binding. The canonical project guide is
+> `CLAUDE.md`.
+
 **Auditor:** Claude Code agent (Opus 4.7, 1M context)
 **Route:** `/year` (file path `app/(planner)/year/page.tsx`)
 **Method:** Source review + Playwright interactive probes against the
@@ -16,13 +22,18 @@ desktop 1280×900), with the Claude bypass cookie seed.
   1. **LaneCard minimize/restore buttons measure 24×24px** at every tier
      (`components/year/LaneCard.module.css` `.toggleBtn`) — fails CLAUDE.md §4
      ≥44px rule and WCAG 2.5.5 AA for primary controls on phone/tablet.
+     **[FIXED in commit b47c9d7]**
   2. **Hardcoded hex `#fff` + `rgba(31, 111, 184, 0.35)` in /year components**
      (`components/year/StatusGlyph.tsx:60`, `components/year/TodayMarker.module.css:23,29`)
      — direct CLAUDE.md §4 violation ("Zero hex anywhere in components").
+     **[FIXED in commit da4bcc2]**
   3. **Both YearView and YearMobile trees still ship in every bundle and SSR**
      (`app/(planner)/year/page.tsx:46-61`) — Lane D's `aria-hidden` correctly
      fixes the duplicate-h1 a11y concern, but the CLS-on-resize and double-bundle
      issues from the prior audit remain. Lane D's commit message acknowledged this.
+     **[FIXED in commit e873089]** (CSS-only dual-mount switch — hydration warning
+     gone). Related fixes: F1 month-header span:0 in `e0cb380`; chameleon gradient
+     width in `09890a3`.
 - **Overall posture:** **needs-work.** No blockers; the page renders correctly at
   every tier and the primary interactions (Today, MonthPicker, Roadmap/Progression
   toggle, CurriculumFilter, StatusFilterBar, LaneCard minimize) all work. Touch

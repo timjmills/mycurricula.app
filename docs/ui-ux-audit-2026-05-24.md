@@ -1,22 +1,28 @@
 # UI/UX Audit — mycurricula.app — 2026-05-24
 
+> **⚠ Snapshot disclaimer** — this is a dated audit/research artifact (2026-05-24).
+> Findings and recommendations may have shipped, regressed, or been superseded by
+> later work. Verify against current code (`git log -- <file>`) before treating any
+> finding as open or any recommendation as binding. The canonical project guide is
+> `CLAUDE.md`.
+
 ## Executive Summary
 
 ### Top 5 Phase 1 Findings (Blockers + Majors)
 
-1. 🟥 **PRODUCTION BUG — Claude bypass URL-param + cookie flows return 401/307** (Task #85)
+1. 🟥 **PRODUCTION BUG — Claude bypass URL-param + cookie flows return 401/307** (Task #85) **[FIXED in commit 85f4383]**
    - `/auth/claude-login?token=…` returns 401 Unauthorized
    - `/weekly?claude=…` redirects 307 → /login (token rejected)
    - **Only Bearer header auth works.** Affects WebFetch, Co-work agents, automated testing.
    - **Fix required before next audit wave.** Token likely mis-synced to Cloudflare secret vs `.env.local`.
 
-2. 🟥 **Top-bar Sign Out + Profile clipped past viewport at every desktop width ≤1280px** (Task #80 related)
+2. 🟥 **Top-bar Sign Out + Profile clipped past viewport at every desktop width ≤1280px** (Task #80 related) **[FIXED in commit b4071d6]**
    - Controls render at `right=1346` on 1280-wide viewport but viewport is 1280. Silently cut off.
    - Sign Out is **only logout affordance** in chrome; Profile is **only Settings entry point.**
    - Reachable only by Tab key or accidental off-screen tap.
    - **Not Phase 1A acceptable.** Requires overflow menu fix.
 
-3. 🟥 **ListRow checkbox is `<span role="checkbox">` instead of `<button>`** — breaks keyboard on all list views (Weekly, Daily, Catch-up)
+3. 🟥 **ListRow checkbox is `<span role="checkbox">` instead of `<button>`** — breaks keyboard on all list views (Weekly, Daily, Catch-up) **[FIXED in commit 0867ce1]**
    - Span doesn't receive focus by default; `tabIndex={0}` is a workaround.
    - Affects completion toggle — primary CTA on every list surface.
 

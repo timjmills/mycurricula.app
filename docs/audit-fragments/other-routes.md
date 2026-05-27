@@ -1,5 +1,11 @@
 # UI/UX audit fragment — /curriculum, /yearly, /auth/claude-login, /, /login
 
+> **⚠ Snapshot disclaimer** — this is a dated audit/research artifact (2026-05-25).
+> Findings and recommendations may have shipped, regressed, or been superseded by
+> later work. Verify against current code (`git log -- <file>`) before treating any
+> finding as open or any recommendation as binding. The canonical project guide is
+> `CLAUDE.md`.
+
 **Auditor:** sub-agent (priorities 5–8)
 **Spec:** `docs/5.24.26 ui-ux-audit-prompt-for-claude-code.md`
 **Method:** source review + live curl against `https://mycurricula.app` with Bearer auth at desktop (default UA) and iPhone UA (`Mozilla/5.0 (iPhone; …)`). Source citations are `file:line`. Live behaviour checked 2026-05-25.
@@ -25,7 +31,7 @@ None.
 
 #### Majors
 
-##### [Major] Subject + Year views are unreachable on phone via the top-bar
+##### [Major] Subject + Year views are unreachable on phone via the top-bar **[FIXED in commit b4071d6]** (top-bar overflow menu — collapse right cluster + tabs)
 **Route:** /subject, /year
 **File:** components/shell/top-bar.module.css:563-573, components/shell/top-bar.tsx:230-235
 **What I saw:** At `≤480px` the Yearly + Curriculum tabs are hidden (`data-narrow-hide="true"` → `display:none`). The code comment claims phone teachers can still reach the routes "via `3` keyboard nav, a deep link, or by widening the viewport" — none of those are usable on a phone in a Tuesday-morning classroom.
@@ -34,7 +40,7 @@ None.
 **Proposed fix:** Tracked by existing pending task #82 (hamburger menu / profile reachability at phone). Either a hamburger drawer with all five tabs, or a horizontal-scroll tab strip. Don't ship Phase 1A without one of those.
 **Verified against live site:** yes (compared desktop UA vs iPhone UA HTML; the data-narrow-hide attribute is identical in both, so the hide is purely CSS-driven on viewport).
 
-##### [Major] "Filters" and "Export" buttons on /year do nothing
+##### [Major] "Filters" and "Export" buttons on /year do nothing **[FIXED in commit be87ec7]** (dead Filters/Export removed)
 **Route:** /year
 **File:** components/year/YearView.tsx:326-340
 **What I saw:** Two `<button>`s in the page-header action row — "Filters" and "Export" — render with the action chrome, focus ring, and 44px hit target, but neither has an `onClick`. The Filters button has `aria-label="Open filters"`; Export has `aria-label="Export data"`. Clicking either is a no-op with no visible feedback.
@@ -43,7 +49,7 @@ None.
 **Proposed fix:** Either remove the buttons until Phase 1B, or wire them to the existing left filter panel (`leftPanelOpen` in app-state) and a basic CSV/PDF print stub. If they must stay decorative, add `aria-disabled="true" disabled` and a "Coming soon" tooltip like the YearSidebar already does — the precedent exists in `components/year/YearSidebar.tsx:160-168`.
 **Verified against live site:** yes.
 
-##### [Major] /year has no print stylesheet — Roadmap clips to viewport width on paper
+##### [Major] /year has no print stylesheet — Roadmap clips to viewport width on paper **[FIXED in commit c77ca07]** (dedicated /year/print route — vertical month-stack layout)
 **Route:** /year
 **File:** components/year/YearView.module.css:113-120, app/globals.css:51-68
 **What I saw:** The Roadmap view's timeline lives in `.timelineScroll { overflow-x: auto }`. At 120px per week × ~36 weeks the inner content is ~4320px wide. The global `@media print` rule (`app/globals.css:51`) only hides shell chrome; it does not adjust `.timelineScroll`. When a teacher prints `/year`, the browser renders only the slice currently scrolled into view inside the overflow container — the rest is clipped because `overflow-x:auto` keeps its scroll offset on paper.
