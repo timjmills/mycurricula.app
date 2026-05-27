@@ -13,9 +13,10 @@
 // The subject switcher sidebar (col 1) is unchanged from the previous build.
 //
 // Filter panel behavior:
-//   The left filter panel is driven by `leftPanelOpen` in app-state. On the
-//   Subject view the panel starts CLOSED (set once on mount). The top-bar
-//   filter toggle still opens/closes it. No double-rendering with S1's chrome.
+//   The left filter panel is OPEN by default on the Subject view per Unified
+//   Audit Decision #11 — the unit/subject planner benefits from filters being
+//   visible. We let the global default (`leftPanelOpen=true` in app-state)
+//   carry; the top-bar filter toggle still opens/closes it from there.
 //
 // Don't-miss persistence:
 //   useUnitNote(unitId) / useSetUnitNote() — localStorage via UnitNotesProvider.
@@ -23,7 +24,7 @@
 //   sourced from the mock unit definitions.
 
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SubjectId, LessonResource, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { useSubjectColor } from "@/lib/palette";
@@ -775,14 +776,18 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
   }, [groupMode, lessonRows, allLessons, activeUnit]);
 
   // All resources for the ResourcesSort section.
+  // Spread every LessonResource field so the optional url / provider /
+  // thumbnailUrl / previewTitle propagate through to ResourcesSort — they
+  // drive the actionable-row branch (URL → open in new tab vs lesson-jump
+  // → /daily?lesson=<id>) added in W3-C4.
   const allResources = useMemo((): ResourceEntry[] => {
     return allLessons.flatMap((l) => {
       const unitMeta = UNIT_BY_ID[l.unit] ?? activeUnit;
       return l.resources.map((r) => ({
-        type: r.type,
-        label: r.label,
+        ...r,
         lessonTitle: l.title,
         unitName: unitMeta.name,
+        lessonId: l.id,
       }));
     });
   }, [allLessons, activeUnit]);
@@ -1037,22 +1042,8 @@ export interface SubjectViewProps {
 }
 
 export function SubjectView({ initialSubject }: SubjectViewProps): ReactNode {
-  const { subjectView, setSubjectView, week, toggleLeftPanel, leftPanelOpen } =
-    useAppState();
+  const { subjectView, setSubjectView, week } = useAppState();
   const router = useRouter();
-
-  // On the Subject view the left filter panel starts closed.
-  // We only close it once on mount; the top-bar toggle still works after that.
-  const hasClosedPanelRef = useRef(false);
-  useEffect(() => {
-    if (!hasClosedPanelRef.current && leftPanelOpen) {
-      toggleLeftPanel();
-      hasClosedPanelRef.current = true;
-    }
-    // We don't re-run when leftPanelOpen changes — only want to close once on
-    // first mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Sync app-state when a slug param is passed in (from the dynamic route).
   useEffect(() => {
@@ -1085,7 +1076,11 @@ export function SubjectView({ initialSubject }: SubjectViewProps): ReactNode {
   return (
     <div className={styles.page}>
       <div className={styles.body}>
-        {/* Subject switcher sidebar */}
+        {/* Subject switcher — two surfaces driving the same handler:
+            • tab strip (>480px) — visual sidebar / horizontal-scroll bar
+            • native <select> dropdown (≤480px) — full names visible without
+              horizontal scroll, addresses W3-C6.
+            CSS swaps which is visible at the 480px breakpoint. */}
         <nav className={styles.sidebar} aria-label="Subject switcher">
           <div className={styles.sidebarLabel} aria-hidden="true">
             Subjects
@@ -1101,6 +1096,45 @@ export function SubjectView({ initialSubject }: SubjectViewProps): ReactNode {
             />
           ))}
         </nav>
+
+        <div className={styles.mobilePicker}>
+          <Tooltip
+            content="Switch the Subject view to a different subject — see all of that subject's units, your progress, and the team's pace."
+            side="bottom"
+            tooltipId="subject-mobile-picker"
+          >
+            <label className={styles.mobilePickerLabel}>
+              <span className={styles.mobilePickerLabelText}>Subject</span>
+              <span className={styles.mobilePickerSelectWrap}>
+                <select
+                  className={styles.mobilePickerSelect}
+                  value={subjectView}
+                  onChange={(e) =>
+                    handleSubjectSelect(e.target.value as SubjectId)
+                  }
+                  aria-label="Switch subject"
+                >
+                  {SUBJECTS.map((s) => {
+                    const c = subjectCounts[s.id];
+                    const done = c?.done ?? 0;
+                    const total = c?.total ?? 0;
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({done}/{total})
+                      </option>
+                    );
+                  })}
+                </select>
+                <span
+                  className={styles.mobilePickerChevron}
+                  aria-hidden="true"
+                >
+                  <ChevronIcon size={12} />
+                </span>
+              </span>
+            </label>
+          </Tooltip>
+        </div>
 
         {/* Main pane — re-mounts on subject change to reset local filter state */}
         <SubjectPane key={subjectView} subjectId={subjectView} week={week} />

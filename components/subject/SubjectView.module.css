@@ -101,6 +101,87 @@
   flex: 0 0 auto;
 }
 
+/* ── Mobile subject picker (≤480px replacement for the tab strip) ───
+ *
+ * W3-C6: at ≤480px the horizontal tab strip is replaced by a native
+ * <select> dropdown so full subject names are visible without horizontal
+ * scroll. Hidden at >480px; the tab-strip sidebar takes over there.
+ * `appearance: none` + a CSS-rendered chevron keeps the chrome consistent
+ * with the rest of the planner — no third-party picker.
+ */
+.mobilePicker {
+  display: none;
+}
+
+.mobilePickerLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.mobilePickerLabelText {
+  font-size: var(--t-10);
+  color: var(--ink-400);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.mobilePickerSelectWrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.mobilePickerSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 32px 0 12px;
+  font: inherit;
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--ink-900);
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-6);
+  cursor: pointer;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  transition:
+    border-color 0.1s ease,
+    background 0.1s ease;
+}
+
+.mobilePickerSelect:hover {
+  border-color: var(--ink-300);
+  background: var(--ink-50);
+}
+
+.mobilePickerSelect:focus-visible {
+  outline: 2px solid var(--c);
+  outline-offset: 2px;
+  border-color: var(--ink-300);
+}
+
+.mobilePickerChevron {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--ink-400);
+  display: inline-flex;
+  /* Rotate the shared ChevronIcon (which points right) so it points down. */
+  rotate: 90deg;
+}
+
 /* ── Main content column ────────────────────────────────────────────── */
 .main {
   overflow-y: auto;
@@ -673,23 +754,18 @@
 }
 
 @media (max-width: 480px) {
-  .sidebarLabel {
+  /* W3-C6: hide the horizontal-scroll tab strip at phone widths and show
+     the native <select> dropdown picker instead so full subject names are
+     visible without horizontal overflow. */
+  .sidebar {
     display: none;
   }
 
-  /* At ≤480px the horizontal subject row holds 8 buttons; each needs less
-     horizontal padding and a lower min-width so all 8 fit (or scroll
-     smoothly) without crowding. min-width: 64px keeps the label legible
-     and meets the ≥44px touch-target requirement via the 44px min-height
-     already on .subjectBtn. Labels truncate with ellipsis at this width;
-     the full name is in the title attribute for tooltip access. */
-  .subjectBtn {
-    padding: 6px 8px;
-    min-width: 64px;
-  }
-
-  .subjectBtnName {
-    font-size: var(--t-11);
+  .mobilePicker {
+    display: block;
+    padding: 10px 12px;
+    background: var(--ink-50);
+    border-bottom: 1px solid var(--ink-150);
   }
 
   .groupBody {
