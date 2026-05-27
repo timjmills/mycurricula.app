@@ -1,0 +1,69 @@
+name: Deploy to Cloudflare
+
+# Auto-deploys every push to schedule-and-auth-5.24 (the active dev branch)
+# and master. Also exposes a manual trigger so a teacher / Tim can
+# redeploy without pushing (Actions tab → "Deploy to Cloudflare" → Run
+# workflow).
+#
+# Secrets required (set at https://github.com/timjmills/mycurricula.app/settings/secrets/actions):
+#   • CLOUDFLARE_API_TOKEN          — User API Token with Workers Scripts:Edit,
+#                                     Account:Read, Workers R2 Storage:Edit
+#   • CLOUDFLARE_ACCOUNT_ID         — 009d3815b362e176031f124202abbcf9
+#   • NEXT_PUBLIC_SUPABASE_URL      — https://xuukfpvonsbvvbspsrsl.supabase.co
+#   • NEXT_PUBLIC_SUPABASE_ANON_KEY — Public anon key from Supabase dashboard
+#
+# Worker runtime secrets (R2_*, SUPABASE_SERVICE_ROLE_KEY, CLAUDE_BYPASS_TOKEN)
+# are already set on the Worker via `wrangler secret put` and the deploy
+# does NOT re-set them — they live in the Worker's runtime environment.
+
+on:
+  push:
+    branches:
+      - schedule-and-auth-5.24
+      - master
+  workflow_dispatch:
+
+# Cancel an in-flight deploy when a newer push arrives on the same ref.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `deploy:cf` runs `opennextjs-cloudflare build && opennextjs-cloudflare
+      # deploy` so this single step covers both the build + deploy.
+      - name: Build + deploy to Cloudflare
+        run: npm run deploy:cf
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Deploy ${{ job.status }}"
+            echo ""
+            echo "- Branch: \`${{ github.ref_name }}\`"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Live: https://mycurricula.app"
+          } >> "$GITHUB_STEP_SUMMARY"
