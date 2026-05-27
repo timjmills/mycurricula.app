@@ -39,7 +39,7 @@ import { dateForWeekDay } from "@/lib/mock/calendar";
 import { useRouter } from "next/navigation";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { useUnitNote } from "@/lib/unit-notes";
-import { ToggleGroup, Tooltip } from "@/components/ui";
+import { IntroSubtitle, ToggleGroup, Tooltip } from "@/components/ui";
 import { ListRow } from "@/components/list";
 import { StatStrip } from "./StatStrip";
 import { UnitHealthCard } from "./UnitHealthCard";
@@ -874,6 +874,16 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
             : activeUnit.weeks}
         </p>
       </header>
+
+      {/* ── W3-C10 once-per-view onboarding subtitle ──────────────────
+          Tells a first-time teacher what the Curriculum surface is FOR.
+          Distinct from the header's job-statement subtitle above: this
+          row is dismissible and disappears once the teacher clicks
+          "Got it". Persisted under `mycurricula:user:subject-intro-seen`. */}
+      <IntroSubtitle viewKey="subject">
+        One subject&rsquo;s units, standards covered, and your team&rsquo;s
+        don&rsquo;t-miss callouts.
+      </IntroSubtitle>
 
       {/* ── Stat strip ──────────────────────────────────────────────────── */}
       <div className={styles.content}>
