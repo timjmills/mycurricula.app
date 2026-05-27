@@ -22,6 +22,10 @@ interface SettingsCardProps {
   hint?: string;
   /** Optional element pinned to the top-right of the header. */
   action?: ReactNode;
+  /** W2-B7 scope chip — paints "Team" (changes shared with every teacher
+   *  on the team) or "Personal" (this teacher only) next to the eyebrow.
+   *  Vocabulary follows Unified Audit Decision #2. */
+  scope?: "personal" | "team";
   children: ReactNode;
 }
 
@@ -32,12 +36,37 @@ export function SettingsCard({
   title,
   hint,
   action,
+  scope,
   children,
 }: SettingsCardProps): ReactNode {
   const header = (
     <div className={styles.header}>
       <div className={styles.headerText}>
-        <span className={styles.eyebrow}>{eyebrow}</span>
+        <div className={styles.eyebrowRow}>
+          <span className={styles.eyebrow}>{eyebrow}</span>
+          {scope && (
+            <span
+              className={[
+                styles.scopeChip,
+                scope === "team"
+                  ? styles.scopeChipTeam
+                  : styles.scopeChipPersonal,
+              ].join(" ")}
+              title={
+                scope === "team"
+                  ? "Team Curriculum — changes affect every teacher on your team"
+                  : "Personal — changes only affect your view"
+              }
+              aria-label={
+                scope === "team"
+                  ? "Team Curriculum scope"
+                  : "Personal scope"
+              }
+            >
+              {scope === "team" ? "Team" : "Personal"}
+            </span>
+          )}
+        </div>
         {title && <h2 className={styles.title}>{title}</h2>}
         {hint && <p className={styles.hint}>{hint}</p>}
       </div>

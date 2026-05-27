@@ -16,6 +16,8 @@
 // "DATE / CURRICULUM LANES" eyebrow label.
 
 import type { SubjectId } from "@/lib/types";
+import { SUBJECT_BY_ID } from "@/lib/mock";
+import { Tooltip } from "@/components/ui";
 import { subjectClassName } from "./roadTones";
 import styles from "./QuarterMonthWeekHeader.module.css";
 
@@ -55,11 +57,27 @@ export function QuarterMonthWeekHeader({
     ? `${styles.chameleon} ${subjectClassName(subjectId)}`
     : "";
 
+  // W2-B4: name the chameleon signal so a first-time teacher knows the
+  // tint shift is meaningful, not decoration. The aria-label includes the
+  // active subject when one is set so screen-reader users get the same
+  // context sighted users see via the gradient.
+  const activeSubjectName = subjectId
+    ? (SUBJECT_BY_ID[subjectId]?.name ?? null)
+    : null;
+  const ariaLabel = activeSubjectName
+    ? `Year timeline header — currently viewing ${activeSubjectName}`
+    : "Year timeline header";
+
   return (
+    <Tooltip
+      content="Header color tracks the subject lane you're viewing — it shifts as you scroll between subjects."
+      side="bottom"
+      tooltipId="year-chameleon-header"
+    >
     <div
       className={`${styles.header} ${chameleonClass}`}
       style={{ "--left-rail": `${leftRailWidthPx}px` } as React.CSSProperties}
-      aria-label="Year timeline header"
+      aria-label={ariaLabel}
     >
       {/* ── Row 1: Month bands ────────────────────────────────────────── */}
       <div
@@ -118,5 +136,6 @@ export function QuarterMonthWeekHeader({
         ))}
       </div>
     </div>
+    </Tooltip>
   );
 }

@@ -24,6 +24,7 @@ import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppStateProvider } from "@/lib/app-state";
+import { ConsequenceToastProvider } from "@/lib/consequence-toast";
 import { Clock } from "@/components/shell/Clock";
 import styles from "./layout.module.css";
 
@@ -35,16 +36,39 @@ interface SettingsTab {
   slug: string;
   label: string;
   href: string;
+  /** W2-B7: scope chip rendered next to the label. "team" → settings
+   *  whose changes are shared with every teacher on the team. "personal"
+   *  → settings that only affect this teacher's view. Vocabulary follows
+   *  Unified Audit Decision #2 ("Personal" / "Team Curriculum"), not
+   *  TEAM/YOU. Catch-up is "personal" per Decision #7 (the recent scope
+   *  clarification). */
+  scope: "personal" | "team";
 }
 
 const TABS: readonly SettingsTab[] = [
-  { slug: "curriculum", label: "Curriculum", href: "/settings/curriculum" },
-  { slug: "appearance", label: "Appearance", href: "/settings/appearance" },
-  { slug: "catch-up", label: "Catch-up", href: "/settings/catch-up" },
+  {
+    slug: "curriculum",
+    label: "Curriculum",
+    href: "/settings/curriculum",
+    scope: "team",
+  },
+  {
+    slug: "appearance",
+    label: "Appearance",
+    href: "/settings/appearance",
+    scope: "personal",
+  },
+  {
+    slug: "catch-up",
+    label: "Catch-up",
+    href: "/settings/catch-up",
+    scope: "personal",
+  },
   {
     slug: "lesson-templates",
     label: "Lesson templates",
     href: "/settings/lesson-templates",
+    scope: "personal",
   },
 ] as const;
 
@@ -95,6 +119,7 @@ export default function SettingsLayout({
     // independence from the planner shell while letting the Curriculum
     // sub-page read and write the team's curriculum label.
     <AppStateProvider>
+      <ConsequenceToastProvider>
       <main className={styles.main}>
         <div className={styles.shell}>
           {/* ── Sidebar / nav strip ───────────────────────────────── */}
@@ -113,8 +138,28 @@ export default function SettingsLayout({
                         .filter(Boolean)
                         .join(" ")}
                       aria-current={isActive ? "page" : undefined}
+                      title={
+                        tab.scope === "team"
+                          ? `${tab.label} — changes affect every teacher on your team`
+                          : `${tab.label} — changes only affect your view`
+                      }
                     >
-                      {tab.label}
+                      <span className={styles.tabLabel}>{tab.label}</span>
+                      <span
+                        className={[
+                          styles.scopeChip,
+                          tab.scope === "team"
+                            ? styles.scopeChipTeam
+                            : styles.scopeChipPersonal,
+                        ].join(" ")}
+                        aria-label={
+                          tab.scope === "team"
+                            ? "Team Curriculum scope"
+                            : "Personal scope"
+                        }
+                      >
+                        {tab.scope === "team" ? "Team" : "Personal"}
+                      </span>
                     </Link>
                   </li>
                 );
@@ -137,6 +182,7 @@ export default function SettingsLayout({
             the onboarding explanation per CLAUDE.md §4. */}
         <Clock />
       </main>
+      </ConsequenceToastProvider>
     </AppStateProvider>
   );
 }

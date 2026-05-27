@@ -46,9 +46,26 @@ export function CatchupFlameButton(): ReactNode {
   const label = `Open Catch-up screen (${uncovered} item${uncovered === 1 ? "" : "s"} not covered)`;
   const displayCount = uncovered > 99 ? "99+" : String(uncovered);
 
+  // W2-B5: the in-grid CatchupWeekBar already explains the concept for
+  // the current week; the flame is the rollup across every past-or-
+  // current week and was previously just labelled with the count. Lead
+  // with the concept so a first-time teacher knows WHAT Catch-up is,
+  // then the live count. Dismissible (not high-consequence).
+  const tooltipContent = (
+    <>
+      <strong>Catch-up</strong> — lessons that fell behind and need a make-up
+      plan. {uncovered} item{uncovered === 1 ? "" : "s"} pending. Click to
+      triage.
+    </>
+  );
+
   return (
     <div className={topBarStyles.badgeWrap}>
-      <Tooltip content={label} side="bottom">
+      <Tooltip
+        content={tooltipContent}
+        side="bottom"
+        tooltipId="catchup-flame-button"
+      >
         <button
           type="button"
           className={styles.flameBtn}

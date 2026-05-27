@@ -52,6 +52,7 @@
 .tabLink {
   display: flex;
   align-items: center;
+  gap: 8px;
   min-height: 44px;
   padding: 0 12px;
   border-radius: var(--r-8);
@@ -63,6 +64,40 @@
   transition:
     background 120ms ease,
     color 120ms ease;
+}
+
+.tabLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* W2-B7 scope chip — "Team" (shared) or "Personal" (this teacher only).
+   Vocabulary follows Unified Audit Decision #2. */
+.scopeChip {
+  flex: 0 0 auto;
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--r-4);
+  border: 1px solid transparent;
+  line-height: 1;
+}
+
+.scopeChipTeam {
+  background: color-mix(in srgb, var(--core-mode) 12%, white);
+  color: var(--core-mode);
+  border-color: color-mix(in srgb, var(--core-mode) 28%, transparent);
+}
+
+.scopeChipPersonal {
+  background: var(--ink-100);
+  color: var(--ink-500);
+  border-color: var(--ink-200);
 }
 
 .tabLink:hover {

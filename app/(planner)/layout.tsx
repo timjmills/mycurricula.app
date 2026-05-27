@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AppStateProvider } from "@/lib/app-state";
 import { CatchupProvider } from "@/lib/catchup-state";
+import { ConsequenceToastProvider } from "@/lib/consequence-toast";
 import { PlannerProvider } from "@/lib/planner-store";
 import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
@@ -41,7 +42,11 @@ export default function PlannerLayout({
             data; any saved notes come from localStorage post-mount.
             CatchupProvider hosts the three-layer Catch-up control state
             (planning-doc §1262) — the global on/off flag, per-week
-            dismissals, and per-item action overlays. */}
+            dismissals, and per-item action overlays.
+            ConsequenceToastProvider hosts the W2-B8 toast surface so
+            team-scoped settings can fire a transient confirmation
+            naming the team-wide effect. */}
+        <ConsequenceToastProvider>
         <UnitNotesProvider>
           <CatchupProvider>
             {/* Skip-to-content (A11Y-004) — must be the first focusable element
@@ -114,6 +119,7 @@ export default function PlannerLayout({
             </div>
           </CatchupProvider>
         </UnitNotesProvider>
+        </ConsequenceToastProvider>
       </PlannerProvider>
     </AppStateProvider>
   );

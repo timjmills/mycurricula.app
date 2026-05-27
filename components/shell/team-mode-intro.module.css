@@ -1,0 +1,65 @@
+/* team-mode-intro.module.css — W2-B1 one-time popover.
+
+   Anchored as a floating card under the top-bar Personal/Team toggle.
+   Position is fixed relative to viewport rather than the toggle so we
+   don't have to compute a measured anchor — the toggle sits at a known
+   approximate offset from the right edge, and the popover floats below
+   it within ~6px gap. */
+
+.popover {
+  position: fixed;
+  top: 60px;
+  right: 12px;
+  z-index: 50;
+  width: min(360px, calc(100vw - 24px));
+  padding: 14px 16px;
+  background: var(--paper);
+  color: var(--ink-900);
+  border: 1px solid var(--core-mode);
+  border-radius: var(--r-8);
+  box-shadow: var(--shadow-popover);
+  font-size: var(--t-13);
+  line-height: 1.45;
+  animation: team-mode-intro-fade 180ms ease forwards;
+}
+
+@keyframes team-mode-intro-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popover {
+    animation: none;
+  }
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--core-mode);
+  letter-spacing: -0.1px;
+}
+
+.body {
+  margin: 0 0 12px;
+  font-size: var(--t-13);
+  color: var(--ink-700);
+}
+
+.body strong {
+  color: var(--ink-900);
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}

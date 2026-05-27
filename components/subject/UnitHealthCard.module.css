@@ -72,6 +72,20 @@
   text-overflow: ellipsis;
 }
 
+/* W2-B6: one-line subtitle under the unit name — lesson count + standards
+   fraction at a glance. Stays scannable; mirrors .unitName overflow. */
+.unitSubtitle {
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-500);
+  letter-spacing: 0;
+  line-height: 1.2;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* NOW pill — amber, matches the artboard */
 .nowPill {
   font-size: var(--t-10);

@@ -32,6 +32,7 @@ import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip, ToggleGroup } from "@/components/ui";
 import { CatchupFlameButton } from "./catchup-flame-button";
 import { Clock } from "./Clock";
+import { TeamModeIntro } from "./team-mode-intro";
 import { TopBarMoreMenu } from "./top-bar-more-menu";
 import styles from "./top-bar.module.css";
 
@@ -507,6 +508,13 @@ export function TopBar(): ReactNode {
           tooltipRequired
         />
       </div>
+
+      {/* W2-B1: one-time teaching popover anchored under the toggle. Fires
+          the first time a teacher flips to Team Curriculum, then never
+          again (keyed by `mycurricula:user:team-mode-introduced`). The
+          existing MasterBanner pulse-then-persist runs alongside it; the
+          popover teaches the concept BEFORE the first edit. */}
+      <TeamModeIntro />
 
       <div className={styles.divider} aria-hidden="true" />
 

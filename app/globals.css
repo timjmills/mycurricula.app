@@ -66,3 +66,21 @@ body:has([data-print-view]) [role="complementary"] {
     flex: none !important;
   }
 }
+
+/* ── W2-B1 inline edit cue ─────────────────────────────────────────────
+   A subtle ring + faint tint applied to lesson-card editable surfaces
+   while editMode === "master", so a teacher sees that the field they're
+   about to edit is part of the team-shared curriculum (not their
+   personal copy). Applied via the `myc-team-mode-edit-cue` className
+   returned by `useTeamModeEditCue()` (lib/use-team-mode-edit-cue.ts).
+   Lives in globals.css (not a CSS module) because consumers span
+   multiple module boundaries — lesson-card, weekly-lesson-card,
+   LessonDetail — and the class needs to resolve identically across
+   all of them. */
+.myc-team-mode-edit-cue {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--core-mode) 50%, transparent) inset,
+    0 0 0 3px color-mix(in srgb, var(--core-mode) 18%, transparent);
+  background: color-mix(in srgb, var(--core-mode) 5%, transparent);
+  border-radius: var(--r-6);
+}

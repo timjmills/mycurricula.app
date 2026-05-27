@@ -136,6 +136,14 @@ export function UnitHealthCard({ unit }: { unit: UnitHealthData }): ReactNode {
         </span>
         <div className={styles.headerText}>
           <div className={styles.unitName}>{unit.name}</div>
+          {/* W2-B6 subtitle — a one-line context line under the unit name so
+              the card stays scannable but reveals lesson count + standards
+              coverage without forcing the reader to interpret the stat row
+              tiles. */}
+          <div className={styles.unitSubtitle}>
+            {unit.total} lesson{unit.total === 1 ? "" : "s"} ·{" "}
+            {unit.standardsCovered}/{unit.standardsTotal} standards
+          </div>
         </div>
         {unit.isCurrent && (
           <span className={styles.nowPill} aria-label="Current unit">
@@ -166,7 +174,13 @@ export function UnitHealthCard({ unit }: { unit: UnitHealthData }): ReactNode {
       {/* Stat row: Standards · Skipped · When */}
       <div className={styles.statRow}>
         <div className={styles.statItem}>
-          <div className={styles.statItemLabel}>STANDARDS</div>
+          <Tooltip
+            content="Fraction of distinct standards covered by completed lessons in this unit."
+            side="top"
+            tooltipId="unit-health-standards-stat"
+          >
+            <div className={styles.statItemLabel}>STANDARDS</div>
+          </Tooltip>
           <div className={styles.statItemValue}>
             {unit.standardsCovered}{" "}
             <span className={styles.statItemDenom}>

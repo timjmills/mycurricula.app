@@ -56,6 +56,7 @@ import {
   academicYearIsoToDate,
 } from "@/lib/use-academic-year";
 import { useAppState } from "@/lib/app-state";
+import { useConsequenceToast } from "@/lib/consequence-toast";
 import { Button, PageHeader, Tooltip } from "@/components/ui";
 import { SettingsCard } from "@/components/appearance/settings-card";
 import styles from "./page.module.css";
@@ -255,6 +256,7 @@ const SCHOOL_WEEK_PRESET_OPTIONS: readonly SchoolWeekPresetOption[] = [
 
 function CurriculumLabelSection(): ReactNode {
   const { currentUser, updateCurriculumLabel } = useAppState();
+  const { showConsequence } = useConsequenceToast();
 
   // Local draft — independent during typing; re-syncs whenever the
   // context value updates (cross-tab change, login, etc.).
@@ -271,15 +273,24 @@ function CurriculumLabelSection(): ReactNode {
   // one, so blurring without edits is a no-op.
   const onBlur = (): void => {
     const trimmed = draft.trim();
-    const current = currentUser.curriculumLabel ?? "";
-    if (trimmed !== current) {
-      updateCurriculumLabel(trimmed);
-    }
+    const previous = currentUser.curriculumLabel ?? "";
+    if (trimmed === previous) return;
+    updateCurriculumLabel(trimmed);
+    // W2-B8: name the team-wide effect. Curriculum label is team-scoped
+    // (every teacher sees the same suffix), so the toast leads with the
+    // blast radius and offers Undo while the toast is visible.
+    showConsequence({
+      message: trimmed
+        ? `Curriculum label set to "${trimmed}" — every teacher on your team now sees it.`
+        : "Curriculum label cleared — every teacher on your team now sees no suffix.",
+      onUndo: () => updateCurriculumLabel(previous),
+    });
   };
 
   return (
     <SettingsCard
       eyebrow="Identity"
+      scope="team"
       title={
         <Tooltip
           content="Your team's display name shown in the top bar — what shows after MyCurricula. Shared with everyone on your grade-level team."

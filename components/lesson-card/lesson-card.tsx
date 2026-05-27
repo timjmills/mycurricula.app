@@ -24,6 +24,7 @@ import type { CSSProperties, MouseEvent } from "react";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { SUBJECT_BY_ID } from "@/lib/mock";
 import { useSubjectColor } from "@/lib/palette";
+import { useTeamModeEditCue } from "@/lib/use-team-mode-edit-cue";
 import { useTheme } from "@/lib/theme";
 import { Icon } from "./icon";
 import { LessonContextMenu } from "./context-menu";
@@ -195,6 +196,11 @@ export function LessonCard({
     () => lesson.objective.replace(/^I can\s+/i, ""),
     [lesson.objective],
   );
+
+  // W2-B1: inline edit cue ring on the lesson title surface while
+  // editMode === "master". Empty string in Personal mode (no visual
+  // change). Class is defined in master-banner.module.css :global.
+  const teamModeCue = useTeamModeEditCue();
 
   return (
     <div
@@ -390,8 +396,10 @@ export function LessonCard({
             </div>
           )}
           <h3
+            className={teamModeCue}
             style={{
               margin: 0,
+              padding: teamModeCue ? "2px 6px" : 0,
               fontSize: 14,
               fontWeight: 500,
               color: "var(--ink-900)",
