@@ -467,8 +467,29 @@ export function WeeklyShell(): ReactNode {
   // <WeeklyGrid> already reads. We don't pin a local copy here; the
   // RightRail just needs the current value to scope its Resources +
   // Shoutbox panels.
-  const { week, selectedDay, selectedLessonId, setSelectedLessonId, viewMode } =
-    useAppState();
+  //
+  // ── W3-C3 drawer-open signal ─────────────────────────────────────────
+  // The narrow-viewport overlay drawer (<WeeklyRailDrawer>) consumes the
+  // EXISTING To-do + Shoutbox panel-open flags rather than introducing a
+  // new piece of app-state. The two flags are already mutually exclusive
+  // (toggleTodoPanel closes commentsPanelOpen and vice versa, see
+  // lib/app-state.tsx) so OR-ing them gives one clean drawer-open signal.
+  // Closing the drawer flips BOTH to false so the rail icons' aria-pressed
+  // state stays accurate. The Resources rail panel is mounted inside
+  // <RightRail> too — there's no dedicated "resources" icon yet (it's
+  // marked SOON in rail-icons.tsx); when it graduates this hook adds
+  // `resourcesPanelOpen` alongside the existing two.
+  const {
+    week,
+    selectedDay,
+    selectedLessonId,
+    setSelectedLessonId,
+    viewMode,
+    todoPanelOpen,
+    commentsPanelOpen,
+    toggleTodoPanel,
+    toggleCommentsPanel,
+  } = useAppState();
   const { lessons } = usePlanner();
 
   // Inline schedule-pill state (Subject↔Schedule + Lessons-only↔All). Lives
@@ -504,6 +525,28 @@ export function WeeklyShell(): ReactNode {
       return () => mq.removeEventListener("change", handler);
     } else {
       // Older Safari / Chrome (pre-2020) shipped addListener.
+      mq.addListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
+      return () => mq.removeListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
+    }
+  }, []);
+
+  // ── W3-C3 — drawer-mode state ────────────────────────────────────────
+  // Mirrors the isNarrow pattern above. `drawerMode` is true on viewports
+  // where the inline rail is `display: none` (≤1280px in
+  // WeeklyShell.module.css). When true, the overlay drawer replaces the
+  // inline rail render; when false, the inline rail behaves exactly as it
+  // does today.
+  const [drawerMode, setDrawerMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia(DRAWER_MQ);
+    setDrawerMode(mq.matches);
+    const handler = (e: MediaQueryListEvent): void => setDrawerMode(e.matches);
+    if (mq.addEventListener) {
+      mq.addEventListener("change", handler);
+      return () => mq.removeEventListener("change", handler);
+    } else {
       mq.addListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
       return () => mq.removeListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
     }
@@ -784,6 +827,33 @@ export function WeeklyShell(): ReactNode {
   // lesson's resources. The RightRail `mode` prop controls this.
   const railMode: "day" | "week" = selectedLesson !== null ? "day" : "week";
 
+  // ── W3-C3 — drawer open signal + close handler ────────────────────────
+  // The drawer is "open" when either of the existing rail-panel flags is
+  // true AND we're in drawer mode (≤1280px viewport). The two flags are
+  // mutually exclusive (toggleTodoPanel / toggleCommentsPanel each close
+  // the other — see lib/app-state.tsx) so this OR cleanly tracks "is any
+  // rail-panel toggle on?".
+  //
+  // The close handler flips BOTH back to false. We can't just call one
+  // toggle (it would only close the active one if it happens to be the
+  // open one, and flip the other on by accident). The two togglers each
+  // run their setState through a functional updater, so we read whichever
+  // is currently true and toggle that one (this leaves the other already-
+  // false flag untouched). Defensive: if both happened to be true
+  // (shouldn't happen given the mutual exclusion, but the contract isn't
+  // enforced by the type system), we toggle both.
+  const drawerOpen = drawerMode && (todoPanelOpen || commentsPanelOpen);
+
+  const handleDrawerClose = useCallback((): void => {
+    if (todoPanelOpen) toggleTodoPanel();
+    if (commentsPanelOpen) toggleCommentsPanel();
+  }, [
+    todoPanelOpen,
+    commentsPanelOpen,
+    toggleTodoPanel,
+    toggleCommentsPanel,
+  ]);
+
   // ── Dynamic grid template ─────────────────────────────────────────────
   // Walk the column order, emitting a track size per panel AND an `auto`
   // track between the two panels for the splitter. The grid is always 1fr;
@@ -1029,6 +1099,30 @@ export function WeeklyShell(): ReactNode {
           </DndContext>
         </div>
       </div>
+
+      {/* ── W3-C3 — narrow-viewport overlay drawer ──────────────────────
+          At ≤1280px the inline rail is `display: none` (see
+          WeeklyShell.module.css RES-CRIT-001) so the WeeklyGrid has
+          breathing room. The drawer brings the same <RightRail> content
+          back as a slide-in overlay triggered by the GlobalRail's
+          To-dos / Shoutbox icons. State is the existing
+          todoPanelOpen / commentsPanelOpen flags on useAppState —
+          no new app-state introduced (drawer close flips both off so
+          the icons' aria-pressed stays accurate). The inline rail
+          render above is untouched; the drawer is a parallel surface
+          that only mounts when `drawerMode` is true. */}
+      <WeeklyRailDrawer
+        open={drawerOpen}
+        onClose={handleDrawerClose}
+        selectedLesson={selectedLesson}
+        week={week}
+        selectedDay={selectedDay}
+        railMode={railMode}
+        weekLessons={weekLessons}
+        onClearLesson={
+          selectedLesson !== null ? () => setSelectedLessonId(null) : undefined
+        }
+      />
     </div>
   );
 }
