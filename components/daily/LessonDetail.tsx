@@ -161,6 +161,38 @@ function StatusCheckbox({
   );
 }
 
+// ── Pencil icon (W3-C5) ──────────────────────────────────────────────────
+// Single-stroke pencil glyph, currentColor, 14×14 viewBox — matches the
+// thin-stroked visual language of components/lesson-card/icon.tsx (1.4
+// stroke, round caps + joins). Used by the visible "edit" affordance on
+// the lesson title + objective rows; clicking the host <button> calls the
+// same `openEditor(...)` the dbl-click / Enter / F2 path uses, so this
+// is a discoverability layer over an existing handler, not a new path.
+
+function PencilIcon(): ReactNode {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {/* Pencil body — slanted barrel from upper-right to lower-left, with
+          the tip pointing down to the lower-left corner. A short stroke
+          across the barrel marks the metal ferrule that separates the
+          wood from the eraser, matching the simplified-pencil silhouette
+          used in icon sets at this size. */}
+      <path d="M9.5 1.5l3 3-7 7H2.5v-3l7-7z" />
+      <path d="M8 3l3 3" />
+    </svg>
+  );
+}
+
 // ── Props ────────────────────────────────────────────────────────────────
 
 interface LessonDetailProps {
@@ -469,87 +501,135 @@ export function LessonDetail({
               Double-click-to-edit (or Enter / F2 on the focused text).
               Commits on blur, cancels on Escape — the WeeklyLessonCard
               pattern. The header band carries the SUBJECT hero above;
-              this is the lesson NAME hero, sitting on the white body. */}
-          <h2 className={detailStyles.title}>
-            {editingField === "title" ? (
-              <RichEditorWrapper onCommit={commitEdit} onCancel={cancelEdit}>
-                <RichTextEditor
-                  value={draftValue}
-                  onChange={setDraftValue}
-                  autoFocus
-                  singleLine
-                  placeholder="Lesson title…"
-                  ariaLabel="Edit lesson title"
-                  dockTarget={cellRef}
-                />
-              </RichEditorWrapper>
-            ) : (
-              <Tooltip
-                content="Double-click or press Enter to edit the lesson title — saved into your personal copy."
-                side="top"
-              >
-                <span
-                  className={detailStyles.editableText}
-                  tabIndex={0}
-                  role="button"
-                  aria-label="Edit lesson title"
-                  onDoubleClick={(e) => openEditor("title", e)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === "F2")
-                      openEditor("title", e);
-                  }}
-                  title="Double-click or press Enter to edit"
+              this is the lesson NAME hero, sitting on the white body.
+
+              W3-C5: a visible PENCIL button sits adjacent to the title
+              (inside the flex row, OUTSIDE the title's `<h3>` ring so it
+              doesn't fall inside any W2-B1 team-mode-edit-cue outline).
+              On desktop the pencil is hover-/focus-within-revealed; on
+              phone (≤480px) it is always visible. Pencil click calls
+              the SAME `openEditor("title")` the dbl-click path uses. */}
+          <div className={detailStyles.titleRow}>
+            <h2 className={detailStyles.title}>
+              {editingField === "title" ? (
+                <RichEditorWrapper onCommit={commitEdit} onCancel={cancelEdit}>
+                  <RichTextEditor
+                    value={draftValue}
+                    onChange={setDraftValue}
+                    autoFocus
+                    singleLine
+                    placeholder="Lesson title…"
+                    ariaLabel="Edit lesson title"
+                    dockTarget={cellRef}
+                  />
+                </RichEditorWrapper>
+              ) : (
+                <Tooltip
+                  content="Double-click or press Enter to edit the lesson title — saved into your personal copy."
+                  side="top"
                 >
-                  {lesson.title}
-                </span>
+                  <span
+                    className={detailStyles.editableText}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Edit lesson title"
+                    onDoubleClick={(e) => openEditor("title", e)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === "F2")
+                        openEditor("title", e);
+                    }}
+                    title="Double-click or press Enter to edit"
+                  >
+                    {lesson.title}
+                  </span>
+                </Tooltip>
+              )}
+            </h2>
+            {editingField !== "title" && (
+              <Tooltip
+                content="Edit the lesson title — saved into your personal copy."
+                side="top"
+                tooltipId="lesson-detail-edit-title"
+              >
+                <button
+                  type="button"
+                  className={detailStyles.editPencil}
+                  aria-label="Edit lesson title"
+                  onClick={(e) => openEditor("title", e)}
+                >
+                  <PencilIcon />
+                </button>
               </Tooltip>
             )}
-          </h2>
+          </div>
 
           {/* ── "I Can" objective — quiet single line, no box ──────────
               Double-click-to-edit, like the title. The editor edits only
               the trailing objective text — the "I CAN" label supplies
               the prefix, which commitEdit re-attaches. Always rendered
               (even when empty) so a teacher can add an objective to a
-              lesson that lacks one. Kept per spec §5. */}
-          <p className={detailStyles.objective}>
-            <span className={detailStyles.objectiveLabel}>I can</span>
-            {editingField === "objective" ? (
-              <RichEditorWrapper onCommit={commitEdit} onCancel={cancelEdit}>
-                <RichTextEditor
-                  value={draftValue}
-                  onChange={setDraftValue}
-                  autoFocus
-                  singleLine
-                  placeholder="state the lesson objective…"
-                  ariaLabel="Edit lesson objective"
-                  dockTarget={cellRef}
-                />
-              </RichEditorWrapper>
-            ) : (
-              <Tooltip
-                content="Double-click or press Enter to edit the I-can objective — saved into your personal copy."
-                side="top"
-              >
-                <span
-                  className={`${detailStyles.objectiveText} ${detailStyles.editableText} ${
-                    objectiveBody ? "" : detailStyles.objectiveEmpty
-                  }`}
-                  tabIndex={0}
-                  role="button"
-                  aria-label="Edit lesson objective"
-                  onDoubleClick={(e) => openEditor("objective", e)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === "F2")
-                      openEditor("objective", e);
-                  }}
-                  title="Double-click or press Enter to edit"
+              lesson that lacks one. Kept per spec §5.
+
+              W3-C5: the pencil button sits OUTSIDE the `<p>` in the flex
+              row wrapper so its hover/focus-within reveal scopes to the
+              whole objective row, and so it never lives inside any future
+              W2-B1 ring on the objective text itself. */}
+          <div className={detailStyles.objectiveRow}>
+            <p className={detailStyles.objective}>
+              <span className={detailStyles.objectiveLabel}>I can</span>
+              {editingField === "objective" ? (
+                <RichEditorWrapper onCommit={commitEdit} onCancel={cancelEdit}>
+                  <RichTextEditor
+                    value={draftValue}
+                    onChange={setDraftValue}
+                    autoFocus
+                    singleLine
+                    placeholder="state the lesson objective…"
+                    ariaLabel="Edit lesson objective"
+                    dockTarget={cellRef}
+                  />
+                </RichEditorWrapper>
+              ) : (
+                <Tooltip
+                  content="Double-click or press Enter to edit the I-can objective — saved into your personal copy."
+                  side="top"
                 >
-                  {objectiveBody || "Add a lesson objective"}
-                </span>
+                  <span
+                    className={`${detailStyles.objectiveText} ${detailStyles.editableText} ${
+                      objectiveBody ? "" : detailStyles.objectiveEmpty
+                    }`}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Edit lesson objective"
+                    onDoubleClick={(e) => openEditor("objective", e)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === "F2")
+                        openEditor("objective", e);
+                    }}
+                    title="Double-click or press Enter to edit"
+                  >
+                    {objectiveBody || "Add a lesson objective"}
+                  </span>
+                </Tooltip>
+              )}
+            </p>
+            {editingField !== "objective" && (
+              <Tooltip
+                content="Edit the I-can objective — saved into your personal copy."
+                side="top"
+                tooltipId="lesson-detail-edit-objective"
+              >
+                <button
+                  type="button"
+                  className={detailStyles.editPencil}
+                  aria-label="Edit lesson objective"
+                  onClick={(e) => openEditor("objective", e)}
+                >
+                  <PencilIcon />
+                </button>
               </Tooltip>
             )}
-          </p>
+          </div>
 
           {/* ── Action row ────────────────────────────────────────────
               Compact icon+label buttons (spec §5). Left cluster groups

@@ -402,6 +402,123 @@
   flex-direction: column;
 }
 
+/* ── Title row + Objective row — edit-affordance flex containers ────────
+   W3-C5: each editable text (title + I-can objective) sits inside a
+   flex row that also carries a visible PENCIL button. The pencil is
+   OUTSIDE the editable element itself so its hover/focus reveal scopes
+   to the whole row, and so it never falls inside any W2-B1 team-mode
+   edit-cue ring drawn on the text element.
+
+   Reveal behavior (see `.editPencil` below):
+     • Desktop (>480px): pencil opacity 0 by default; opacity 1 when the
+       row receives `:hover` OR contains `:focus-within` (keyboard focus
+       into the editable text reveals the pencil too).
+     • Phone (≤480px): pencil is always opacity 1 — touch surfaces have
+       no hover, so the affordance must be permanent.
+
+   The row aligns the pencil to the editable text's baseline-ish center
+   via `align-items: center`; the title hero is large enough that the
+   pencil reads as a quiet trailing affordance rather than competing
+   with the title text. */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The title hero should absorb all the row's available width so the
+   pencil stays pinned to the right edge of the title text block (rather
+   than crowding mid-row). `min-width: 0` lets long titles wrap or
+   ellipsize inside the column's measure. */
+.titleRow > .title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.objectiveRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 10px;
+}
+
+/* Same flex behavior for the objective paragraph — it expands to fill
+   the row, leaving the pencil pinned to the trailing edge. */
+.objectiveRow > .objective {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The objective `<p>` carried its own `margin-top: 10px`; now that the
+   row supplies that spacing, neutralize the paragraph's top margin so
+   the row gap is the only vertical lift. */
+.objectiveRow .objective {
+  margin-top: 0;
+}
+
+/* ── Visible pencil edit affordance (W3-C5) ─────────────────────────────
+   A real `<button>` (not a div) so it gets keyboard focus + Enter/Space
+   activation for free. The button hosts a single-stroke PencilIcon SVG
+   that inherits currentColor; the color is the muted ink so it reads as
+   a quiet affordance, brightening on hover/focus.
+
+   Reveal — desktop default is opacity 0 with the pencil still in the
+   DOM (no width collapse, no layout shift on hover). The row reveals it
+   on `:hover` OR `:focus-within`. Below 480px the pencil is always
+   visible (opacity 1) — touch devices have no hover state.
+
+   The button itself remains keyboard-reachable even when opacity is 0
+   (the row's `:focus-within` rule lifts it to opacity 1 the instant the
+   button receives focus). A 28×28 hit target keeps it tappable on
+   touch; the visible glyph is 14px. */
+.editPencil {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-4);
+  color: var(--ink-500);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.12s,
+    background 0.12s,
+    color 0.12s;
+}
+
+.titleRow:hover .editPencil,
+.titleRow:focus-within .editPencil,
+.objectiveRow:hover .editPencil,
+.objectiveRow:focus-within .editPencil {
+  opacity: 1;
+}
+
+.editPencil:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+.editPencil:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* Phone — always visible. Touch surfaces have no hover; the pencil
+   must be permanent so the affordance is discoverable. */
+@media (max-width: 480px) {
+  .editPencil {
+    opacity: 1;
+  }
+}
+
 /* ── Title — hero ────────────────────────────────────────────────────────
    The lesson title is the largest text in the body — confident, dark on
    white. The header band has its own subject hero above; the body title
@@ -755,7 +872,8 @@
   .bandIconBtn,
   .markDone,
   .actionBtn,
-  .notesLink {
+  .notesLink,
+  .editPencil {
     transition: none;
   }
 }
