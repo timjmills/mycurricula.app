@@ -31,6 +31,7 @@ import { useAppState, type CurrentUser } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip, ToggleGroup } from "@/components/ui";
 import { CatchupFlameButton } from "./catchup-flame-button";
+import { Clock } from "./Clock";
 import { TopBarMoreMenu } from "./top-bar-more-menu";
 import styles from "./top-bar.module.css";
 
@@ -336,6 +337,13 @@ export function TopBar(): ReactNode {
       >
         Week {week}
       </span>
+
+      {/* Live Clock — user direction 2026-05-26: "the clock should be in
+          the top-bar next to Week 12". Inline variant carries no chip
+          background; renders flush with the weekLabel + saveIndicator
+          row. Hidden at ≤900px via Clock.module.css to keep the bar's
+          collapse budget intact at tablet/phone. */}
+      <Clock variant="inline" />
 
       <div className={styles.divider} aria-hidden="true" />
 

@@ -4,7 +4,7 @@ import { CatchupProvider } from "@/lib/catchup-state";
 import { PlannerProvider } from "@/lib/planner-store";
 import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
-  Clock,
+  GlobalRail,
   GlobalShortcuts,
   LeftFilterPanel,
   MasterBanner,
@@ -64,6 +64,16 @@ export default function PlannerLayout({
               <MasterBanner />
               <TopBar />
               <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+                {/* GlobalRail — the site-wide slim icon nav strip, mounted
+                    on every planner route. Lane CC promoted it from the
+                    Daily-only IconRail; Lane DD also wired the Schedule
+                    drawer trigger here so the Schedule side-panel is
+                    reachable from /weekly, /year, /catch-up, /subject (not
+                    just /daily) — audit F#8. GlobalRail itself mounts the
+                    <SchedulePanel> with state from useAppState so the
+                    drawer ships exactly once per page (no duplicate
+                    mounts) and the trigger + drawer share one toggle. */}
+                <GlobalRail />
                 <LeftFilterPanel />
                 <main
                   id="main-content"
@@ -78,12 +88,11 @@ export default function PlannerLayout({
                 </main>
                 <RightPanel />
               </div>
-              {/* Ambient live clock — fixed-positioned bottom-right chip,
-                  visible on every planner route. Sits outside the body
-                  row so internal scroll containers (Year timeline, Catchup
-                  list) don't clip it. See components/shell/Clock.tsx for
-                  the full placement rationale. */}
-              <Clock />
+              {/* Live Clock now lives inline in the top-bar next to
+                  Week N (user direction 2026-05-26). The floating
+                  bottom-right variant is still supported via
+                  <Clock variant="floating" />; it's just not mounted
+                  here by default. */}
             </div>
           </CatchupProvider>
         </UnitNotesProvider>

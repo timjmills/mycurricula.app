@@ -87,7 +87,19 @@ function formatTime(now: Date): string {
   });
 }
 
-export function Clock(): ReactNode {
+/**
+ * `variant`:
+ *  - `"inline"` (default): renders flush with surrounding text in the
+ *    top-bar — small typography, no chip background, no fixed position.
+ *  - `"floating"`: legacy bottom-right floating chip (kept for an
+ *    optional future setting; not the default per user direction
+ *    2026-05-26 — "the clock should be in the top-bar next to Week 12").
+ */
+export interface ClockProps {
+  variant?: "inline" | "floating";
+}
+
+export function Clock({ variant = "inline" }: ClockProps): ReactNode {
   // Start with stable placeholders so server-rendered HTML matches the
   // first client paint exactly (no hydration mismatch).
   const [dateLabel, setDateLabel] = useState<string>(PLACEHOLDER_DATE);
@@ -107,10 +119,14 @@ export function Clock(): ReactNode {
     return () => window.clearInterval(id);
   }, []);
 
+  // Inline variant — flush typography next to Week N in the top-bar.
+  // Tooltip carries the full date string per CLAUDE.md §4.
+  const wrapperClass = variant === "floating" ? styles.chip : styles.inline;
+
   return (
     <Tooltip
       content="Today's date and time — kept current in your local timezone"
-      side="left"
+      side={variant === "floating" ? "left" : "bottom"}
     >
       {/* The chip is a non-interactive ambient surface. Role "status" so
           screen-reader users can opt into hearing the value on focus;
@@ -118,7 +134,7 @@ export function Clock(): ReactNode {
           30 seconds. The tooltip carries the explanation per
           CLAUDE.md §4. */}
       <div
-        className={styles.chip}
+        className={wrapperClass}
         role="status"
         aria-live="off"
         // The fallback title= is what most browsers show when the

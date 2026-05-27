@@ -55,6 +55,32 @@
   box-shadow: var(--shadow-card-hover);
 }
 
+/* Inline variant — flush text in the top-bar next to Week N.
+   No chip background, no border, no fixed position. Same typography
+   family as .weekLabel + .saveIndicator so the row reads as one cluster.
+   User direction 2026-05-26: "the clock should be in the top-bar next
+   to Week 12". */
+.inline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--ink-500);
+  font-size: var(--t-12);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Hide the inline clock at narrow widths so the top-bar collapse
+   cascade (BUILD_STANDARD §8) still fits Master/Personal toggle.
+   The weekLabel hides at ≤768; this matches. */
+@media (max-width: 900px) {
+  .inline {
+    display: none;
+  }
+}
+
 .date {
   color: var(--ink-900);
   font-weight: 700;
