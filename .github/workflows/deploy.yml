@@ -41,7 +41,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Wrangler 4.x requires Node ≥ 22. Wrangler 3 ran on 20 but the
+          # `opennextjs-cloudflare` toolchain we use is tied to Wrangler 4.
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
