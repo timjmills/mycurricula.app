@@ -137,7 +137,13 @@ import { RightRail } from "./RightRail";
 import { PaneSplitter } from "./PaneSplitter";
 import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
-import { Button, PageHeader, Tooltip } from "@/components/ui";
+import {
+  Button,
+  EmptyState,
+  IntroSubtitle,
+  PageHeader,
+  Tooltip,
+} from "@/components/ui";
 import { DailyList } from "@/components/list/DailyList";
 import { ScheduleDayPane } from "@/components/schedule";
 import { DailySchedulePill } from "./daily-schedule-pill";
@@ -303,6 +309,36 @@ function writeRightPaneWidth(px: number): void {
     window.localStorage.setItem(RIGHT_PANE_WIDTH_KEY, String(px));
   } catch {
     // Storage full / unavailable — width simply won't persist; non-fatal.
+  }
+}
+
+// ── Reorder-teaching toast persistence (W3-C13) ──────────────────────────
+// One-time teaching that the daily reorder is local-only. The key flips
+// true the first time a teacher drops a reordered row, after which the
+// teaching toast never reappears for that teacher. Per-teacher, NOT
+// per-team — the audit explicitly says don't use consequence-toast (that
+// surface is team-scoped). SSR-guarded.
+
+const REORDER_TAUGHT_KEY = "mycurricula:user:daily-reorder-taught";
+
+/** Read whether the teacher has been taught the personal-reorder semantic. */
+function readReorderTaught(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(REORDER_TAUGHT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Mark the teacher as taught — fires on first drop. */
+function writeReorderTaught(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(REORDER_TAUGHT_KEY, "1");
+  } catch {
+    // Storage full / unavailable — non-fatal; the toast will simply show
+    // again on a future reorder.
   }
 }
 
@@ -669,9 +705,15 @@ function LessonRow({
         .filter(Boolean)
         .join(" ")}
     >
-      {/* Drag handle — dnd-kit activator; ≥44px touch target. */}
+      {/* Drag handle — dnd-kit activator; ≥44px touch target.
+          W3-C13 — the tooltip teaches reorder semantics: it's a personal
+          view, never a shared edit. Bound to the drag handle (NOT the whole
+          row — the audit explicitly calls out a row-wide tooltip as noise).
+          The tooltipId opts this bubble into the dismissibility system so
+          a teacher who's learned it can suppress it. */}
       <Tooltip
-        content="Drag this lesson up or down to reorder today's lineup — order is personal to your planner."
+        content="Reordering is your personal view — your teammates still see the team order"
+        tooltipId="daily-reorder-teaching"
         side="right"
       >
         <button
@@ -681,7 +723,7 @@ function LessonRow({
           {...listeners}
           {...attributes}
           aria-label={`Drag to reorder ${lesson.title}`}
-          title="Drag to reorder this lesson within today's lineup"
+          title="Reordering is your personal view — teammates still see the team order"
         >
           <GripVerticalIcon />
         </button>
@@ -1079,6 +1121,103 @@ function ColumnDragGhost({ id }: { id: ColumnId }): ReactNode {
   );
 }
 
+// ── Reorder-teaching toast (W3-C13) ──────────────────────────────────────
+// A transient bottom-of-screen status surface that teaches the teacher,
+// the first time they drop a reordered row in a session, that the change
+// is local to their view. Modeled on the ArchiveToast visual vocabulary
+// (ink-900 chip + paper text) but stripped to a one-line message — no
+// Undo button, no dismiss × — because the action being explained is
+// non-destructive. Auto-dismisses after REORDER_TOAST_MS and respects
+// prefers-reduced-motion (no slide; opacity-only fade).
+//
+// Hosted by the DailyView via a `reorderToastVisible` flag that flips on
+// first-drop, then the toast self-mounts; once the auto-dismiss fires it
+// calls onDismiss which clears the flag.
+
+const REORDER_TOAST_MS = 5000;
+
+function ReorderTeachingToast({
+  onDismiss,
+}: {
+  onDismiss: () => void;
+}): ReactNode {
+  const [visible, setVisible] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Detect prefers-reduced-motion.
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent): void =>
+      setReducedMotion(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // Slide in on mount; start auto-dismiss timer. RAF defers the
+  // visible=true flip one frame so the initial paint captures
+  // visible=false and the transition fires.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setVisible(true));
+    dismissTimerRef.current = setTimeout(() => {
+      setVisible(false);
+      // Match the visible→hidden transition window before unmounting.
+      const exitDuration = reducedMotion ? 150 : 260;
+      setTimeout(onDismiss, exitDuration);
+    }, REORDER_TOAST_MS);
+    return () => {
+      cancelAnimationFrame(frame);
+      if (dismissTimerRef.current !== null) {
+        clearTimeout(dismissTimerRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const slideTransform = reducedMotion
+    ? "none"
+    : visible
+      ? "translateY(0)"
+      : "translateY(20px)";
+  const opacity = visible ? 1 : 0;
+  const transition = reducedMotion
+    ? "opacity 150ms ease"
+    : "opacity 220ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1)";
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      style={{
+        position: "fixed",
+        bottom: 24,
+        left: "50%",
+        transform: `translateX(-50%) ${slideTransform}`,
+        zIndex: 1200,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "10px 16px",
+        minHeight: 48,
+        background: "var(--ink-900)",
+        color: "var(--paper)",
+        borderRadius: 10,
+        boxShadow: "var(--shadow-popover)",
+        fontSize: 13,
+        fontWeight: 400,
+        opacity,
+        transition,
+        pointerEvents: visible ? "auto" : "none",
+        maxWidth: "calc(100vw - 32px)",
+      }}
+    >
+      Reordering is your personal view — teammates still see the team order.
+    </div>
+  );
+}
+
 // ── DailyView ────────────────────────────────────────────────────────────
 
 export interface DailyViewProps {
@@ -1178,6 +1317,22 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
   // and pointer events on a column grip never reach inner rows.
   const sensors = useDndSensors();
   const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  // ── Reorder-teaching toast (W3-C13) ───────────────────────────────────
+  // One-time teaching toast that fires the first time the teacher drops a
+  // reordered row. Gated on a per-teacher localStorage flag so the lesson
+  // is taught exactly once across sessions. The ref tracks the post-mount
+  // "have we read storage yet?" state — initialised false so the SSR
+  // render and the first client render agree (same hydration discipline
+  // as the row-order / pane-width / column-order persistence above).
+  const [reorderToastVisible, setReorderToastVisible] = useState(false);
+  const reorderTaughtRef = useRef<boolean>(false);
+
+  // Post-mount read of the persisted "already taught" flag. Empty deps —
+  // the flag is per-teacher, not per week/day, so we only read it once.
+  useEffect(() => {
+    reorderTaughtRef.current = readReorderTaught();
+  }, []);
 
   // ── Resizable column widths (local + localStorage) ────────────────────
   // The persisted widths track the LIST and RAIL columns regardless of where
@@ -1364,6 +1519,15 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
     const to = ids.indexOf(String(over.id));
     if (from === -1 || to === -1) return;
     commitOrder(arrayMove(ids, from, to));
+
+    // W3-C13 — first successful drop in this teacher's history fires the
+    // one-time teaching toast. Mark the localStorage flag immediately so a
+    // second drag (or a page reload mid-toast) never re-triggers it.
+    if (!reorderTaughtRef.current) {
+      reorderTaughtRef.current = true;
+      writeReorderTaught();
+      setReorderToastVisible(true);
+    }
   }
 
   function handleRowDragCancel(): void {
@@ -1760,8 +1924,15 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
             </DndContext>
 
             {dayLessons.length === 0 && (
-              <div className={styles.emptyList} role="status">
-                No lessons planned for {WEEK_DAYS[selectedDay]}.
+              <div className={styles.emptyList}>
+                {/* W3-C11 — canonical EmptyState replaces the prior flat
+                    "No lessons planned for X." copy. Size=sm because this
+                    region sits inside an already-narrow scroll column. */}
+                <EmptyState
+                  size="sm"
+                  heading="No lessons for this day yet"
+                  body="Add a lesson with the + button above, or check a different day on the week strip."
+                />
               </div>
             )}
 
@@ -1833,10 +2004,15 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
               onToggleComplete={handleToggleComplete}
             />
           ) : (
-            <div className={styles.emptyDetail} role="status">
-              <p className={styles.emptyDetailText}>
-                Select a lesson to view its plan.
-              </p>
+            <div className={styles.emptyDetail}>
+              {/* W3-C11 — canonical EmptyState (md) replaces the bare
+                  "Select a lesson to view its plan." copy. The wrapper
+                  div keeps the existing flex-1 sizing rule from the
+                  module CSS so this column always fills its track. */}
+              <EmptyState
+                heading="Pick a lesson on the left"
+                body="Select any lesson row to see its sections, resources, and per-section notes."
+              />
             </div>
           )}
         </div>
@@ -1899,6 +2075,15 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
         subtitle="Today's lessons in detail, side-by-side with the day's schedule and notes."
         className={styles.dailyPageHeader}
       />
+
+      {/* ── W3-C10 once-per-view onboarding subtitle ──────────────────
+          Tells a first-time teacher what the Daily surface is FOR.
+          Dismissed via "Got it" and persisted to localStorage under
+          `mycurricula:user:daily-intro-seen`. */}
+      <IntroSubtitle viewKey="daily">
+        Today&rsquo;s lessons. The center panel follows whichever row you
+        select.
+      </IntroSubtitle>
 
       {/* ── Breadcrumb: Week N / Day / Subject (BIG-7) ───────────────────
           Renders above the body row so it sits flush with the page top,
@@ -2084,6 +2269,18 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
         onClose={() => setAddEventOpen(false)}
         day={selectedDay}
       />
+
+      {/* ── W3-C13: one-time reorder teaching toast ─────────────────────────
+          Mounted only when the teacher has just made their first-ever drop
+          (handleRowDragEnd flips the flag). The component self-dismisses
+          after REORDER_TOAST_MS and calls onDismiss, which clears the flag
+          and unmounts the toast. Position:fixed so it sits outside every
+          overflow:hidden ancestor and floats above all other chrome. */}
+      {reorderToastVisible && (
+        <ReorderTeachingToast
+          onDismiss={() => setReorderToastVisible(false)}
+        />
+      )}
     </div>
   );
 }
