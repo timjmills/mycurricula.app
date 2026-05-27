@@ -9,7 +9,7 @@
 // tabbable, never clickable. Each one is wrapped in a Tooltip carrying
 // the label so the rail stays comprehensible at icon-only width.
 
-import { Tooltip } from "@/components/ui";
+import { FutureControl } from "@/components/ui";
 import styles from "./YearSidebar.module.css";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -136,22 +136,15 @@ export function YearSidebar() {
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
         return (
-          <Tooltip
+          <FutureControl
             key={item.id}
-            content={`${item.label} — coming soon`}
-            side="right"
-          >
-            <button
-              type="button"
-              className={styles.navItem}
-              aria-label={item.label}
-              aria-disabled="true"
-              disabled
-              title={`${item.label} — coming in a later phase`}
-            >
+            variant="icon-only"
+            tooltip={`${item.label} — coming after beta. Will switch the Year view to a ${item.label.toLowerCase()} focus.`}
+            tooltipSide="right"
+            leadingIcon={
               <Icon className={styles.navIcon} width={20} height={20} />
-            </button>
-          </Tooltip>
+            }
+          />
         );
       })}
     </nav>

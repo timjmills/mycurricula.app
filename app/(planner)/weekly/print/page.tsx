@@ -58,7 +58,7 @@ function formatDate(d: Date): string {
 // ── component ─────────────────────────────────────────────────────────────
 
 export default function WeeklyPrintPage(): ReactNode {
-  const { week } = useAppState();
+  const { week, currentUser } = useAppState();
   const { lessons } = usePlanner();
 
   // Only lessons in the current week, in day order.
@@ -107,7 +107,9 @@ export default function WeeklyPrintPage(): ReactNode {
         {/* Sheet header */}
         <div className={styles.sheetHeader}>
           <h1 className={styles.sheetTitle}>
-            Week {week} — Grade 5 Curriculum
+            {currentUser.curriculumLabel
+              ? `Week ${week} — ${currentUser.curriculumLabel} Curriculum`
+              : `Week ${week}`}
           </h1>
           <span className={styles.sheetMeta}>Printed {formatDate(today)}</span>
         </div>

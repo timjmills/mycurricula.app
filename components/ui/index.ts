@@ -30,3 +30,6 @@ export type { ChipProps } from "./Chip";
 
 export { Tooltip } from "./Tooltip";
 export type { TooltipProps } from "./Tooltip";
+
+export { FutureControl } from "./FutureControl";
+export type { FutureControlProps } from "./FutureControl";

@@ -56,6 +56,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useAppState } from "@/lib/app-state";
+import { useSchoolWeek, WEEKDAY_INDEX } from "@/lib/use-school-week";
 import { WEEK_DAYS, WEEK_DAYS_SHORT } from "@/lib/mock";
 import { dateNumberForWeekDay } from "@/lib/mock/calendar";
 import { todayDayIndex } from "@/lib/schedule-data";
@@ -67,14 +68,9 @@ import styles from "./SchedulePanel.module.css";
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/**
- * The five school-week days the panel surfaces. Hard-coded for Sun–Thu
- * while the configured school week wires through (see CLAUDE.md §1 — the
- * school week is per-school configurable; today's mock fixtures use
- * Sun–Thu). This matches the /schedule page's strip exactly so a teacher
- * flipping between the route and the drawer sees the same chips.
- */
-const SCHOOL_WEEK_DAYS: readonly number[] = [0, 1, 2, 3, 4];
+// School-week days are derived from useSchoolWeek() inside the component
+// (CLAUDE.md §1). The /schedule route uses the same hook so the strip and
+// the drawer stay in lockstep.
 
 // ── Close (×) icon ──────────────────────────────────────────────────────────
 function CloseIcon(): ReactNode {
@@ -114,6 +110,8 @@ export function SchedulePanel({
 }: SchedulePanelProps): ReactNode {
   const { week, selectedDay, setSelectedDay } = useAppState();
   const focusedDay = selectedDay;
+  const { days: configuredDays } = useSchoolWeek();
+  const schoolWeekDays = configuredDays.map((d) => WEEKDAY_INDEX[d]);
 
   const headingId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -265,7 +263,7 @@ export function SchedulePanel({
 
         {/* ── Day-strip selector ───────────────────────────────────── */}
         <nav className={styles.dayStrip} aria-label="Choose a day to view">
-          {SCHOOL_WEEK_DAYS.map((d) => {
+          {schoolWeekDays.map((d) => {
             const isActive = d === focusedDay;
             const isToday = d === todayDayIndex();
             const chipDayLabel = WEEK_DAYS_SHORT[d] ?? "Day";

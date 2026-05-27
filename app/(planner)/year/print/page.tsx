@@ -122,10 +122,9 @@ function unitsForCell(
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function YearPrintPage(): ReactNode {
-  // useAppState() is read for parity with /weekly/print — even though we
-  // don't currently scope by week here, this keeps the consumption shape
-  // identical so a future "active scope" filter can be applied uniformly.
-  useAppState();
+  // useAppState() — read currentUser.curriculumLabel for the cover title
+  // (omitted entirely when the label is empty so the title still scans).
+  const { currentUser } = useAppState();
   const { lessons } = usePlanner();
   // TEAM-scoped academic year — same hook the screen Year view reads.
   // Print + screen layouts stay in lockstep so the printed range mirrors
@@ -163,7 +162,9 @@ export default function YearPrintPage(): ReactNode {
         {/* Cover header — prints once at the top of the first page. */}
         <div className={styles.sheetHeader}>
           <h1 className={styles.sheetTitle}>
-            Yearly Plan — Grade 5 Curriculum
+            {currentUser.curriculumLabel
+              ? `Yearly Plan — ${currentUser.curriculumLabel} Curriculum`
+              : "Yearly Plan"}
           </h1>
           <span className={styles.sheetMeta}>Printed {formatDate(today)}</span>
         </div>

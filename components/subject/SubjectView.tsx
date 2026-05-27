@@ -195,7 +195,9 @@ function LessonRowItem({
         content={`Expand "${lesson.title}" to see its directions, standards, and a quick preview of the lesson content.`}
         side="top"
       >
-        <button
+        <div
+          role="button"
+          tabIndex={0}
           className={[
             styles.lessonRow,
             lesson.isPersonal ? styles.lessonRowPersonal : "",
@@ -203,7 +205,17 @@ function LessonRowItem({
             .filter(Boolean)
             .join(" ")}
           onClick={onToggle}
+          onKeyDown={(e) => {
+            // Only fire on the row itself — Enter/Space on the nested
+            // checkBtn must reach the inner button's native onClick alone.
+            if (e.target !== e.currentTarget) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onToggle();
+            }
+          }}
           aria-expanded={isExpanded}
+          aria-label={`Toggle ${lesson.title}`}
           title={`Expand "${lesson.title}" to see its directions, standards, and a quick preview of the lesson content`}
         >
           <span
@@ -295,7 +307,7 @@ function LessonRowItem({
           )}
 
           {lesson.isCurrent && <span className={styles.currentDot}>•</span>}
-        </button>
+        </div>
       </Tooltip>
 
       {isExpanded && (
@@ -362,7 +374,9 @@ function GroupBlock({
         content={`Expand or collapse the ${group.name} group — see all lessons in this unit, their completion progress, and a "Now" pill on the unit you're currently teaching.`}
         side="top"
       >
-        <button
+        <div
+          role="button"
+          tabIndex={0}
           className={[
             styles.groupHeader,
             group.isCurrent ? styles.groupHeaderCurrent : "",
@@ -370,7 +384,17 @@ function GroupBlock({
             .filter(Boolean)
             .join(" ")}
           onClick={onToggleOpen}
+          onKeyDown={(e) => {
+            // Only fire on the header itself — Enter/Space on the nested
+            // groupExpandBtn must reach the inner button's native onClick alone.
+            if (e.target !== e.currentTarget) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onToggleOpen();
+            }
+          }}
           aria-expanded={isOpen}
+          aria-label={`Toggle ${group.name} group`}
           title={`Expand or collapse the ${group.name} group — see all lessons in this unit, their completion progress, and a "Now" pill on the unit you're currently teaching`}
         >
           <span
@@ -415,7 +439,7 @@ function GroupBlock({
               </button>
             </Tooltip>
           )}
-        </button>
+        </div>
       </Tooltip>
 
       {isOpen && (
@@ -839,7 +863,11 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
           standards each one covers — pick a unit to drill in, or scan the
           health cards to see where you&rsquo;re ahead and behind.
         </p>
-        <p className={styles.headerMeta}>Grade 5 · {activeUnit.weeks}</p>
+        <p className={styles.headerMeta}>
+          {currentUser.curriculumLabel
+            ? `${currentUser.curriculumLabel} · ${activeUnit.weeks}`
+            : activeUnit.weeks}
+        </p>
       </header>
 
       {/* ── Stat strip ──────────────────────────────────────────────────── */}

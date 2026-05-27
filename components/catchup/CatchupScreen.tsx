@@ -225,11 +225,10 @@ export function CatchupScreen() {
     () => bulkApply(handleCarryOver),
     [bulkApply, handleCarryOver],
   );
-  const handleBulkAddToTodo = useCallback(() => {
-    // TODO: wire planner-store bulk to-do add once that action lands;
-    // the to-do store is owned by another agent.
-    clearSelection();
-  }, [clearSelection]);
+  // W1-A2 (2026-05-27): the prior "Add all to to-do" handler was a silent
+  // clearSelection() no-op because no to-do bulk-add API exists yet. The
+  // BulkActionBar button is gone for beta; add it back here when the
+  // planner gains a real bulk-add action.
 
   return (
     <div className={`cp-root ${styles.root}`}>
@@ -266,8 +265,9 @@ export function CatchupScreen() {
               slips through the year.
             </p>
             <div className={styles.metaRow}>
-              Grade 5 &middot; 2025&ndash;26 school year &middot;{" "}
-              {currentUser.name}
+              {currentUser.curriculumLabel
+                ? `${currentUser.curriculumLabel} · 2025–26 school year · ${currentUser.name}`
+                : `2025–26 school year · ${currentUser.name}`}
             </div>
           </div>
 
@@ -458,7 +458,6 @@ export function CatchupScreen() {
           onMarkAllDone={handleBulkDone}
           onMarkAllSkipped={handleBulkSkip}
           onCarryAll={handleBulkCarry}
-          onAddAllToTodo={handleBulkAddToTodo}
           onClear={clearSelection}
         />
       )}

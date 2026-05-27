@@ -1,0 +1,106 @@
+/* FutureControl.module.css — the canonical "coming after beta" placeholder
+   treatment. Visually distinct from any live control so a first-time
+   teacher never mistakes a placeholder for a broken button. */
+
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px dashed var(--ink-300);
+  border-radius: var(--r-6);
+  background: transparent;
+  color: var(--ink-500);
+  font: inherit;
+  font-size: var(--t-12);
+  line-height: 1;
+  opacity: 0.7;
+  cursor: not-allowed;
+  user-select: none;
+  /* Disabled buttons normally drop pointer events in some browsers — the
+     Tooltip primitive's disabled-button quirk wraps the trigger in a span
+     so hover/focus still fire, so we don't need pointer-events tweaks here. */
+}
+
+.root:focus-visible {
+  outline: 2px solid var(--ink-400);
+  outline-offset: 2px;
+}
+
+/* ── Size variants ────────────────────────────────────────────────────── */
+
+.sm {
+  padding: 6px 10px;
+  font-size: var(--t-12);
+}
+
+.md {
+  padding: 8px 12px;
+  font-size: var(--t-14);
+}
+
+/* ── Visual variants ──────────────────────────────────────────────────── */
+
+.default {
+  /* outline-dashed neutral — used by toolbar buttons. */
+}
+
+.ghost {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--ink-100) 60%, transparent);
+}
+
+.iconOnly,
+.icon-only {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
+/* ── Sub-elements ─────────────────────────────────────────────────────── */
+
+.icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.label {
+  flex: 0 1 auto;
+  white-space: nowrap;
+}
+
+/* Inline SOON pill — sits next to the label. */
+.pillInline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--t-10);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 5px;
+  border-radius: var(--r-4);
+  background: color-mix(in srgb, var(--important) 18%, white);
+  color: var(--important);
+  border: 1px solid color-mix(in srgb, var(--important) 30%, transparent);
+  margin-left: 4px;
+}
+
+/* Corner SOON pill — used by icon-only variant. Positioned top-right. */
+.pillCorner {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: var(--t-10);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: var(--r-4);
+  background: color-mix(in srgb, var(--important) 18%, white);
+  color: var(--important);
+  border: 1px solid color-mix(in srgb, var(--important) 30%, transparent);
+  pointer-events: none;
+}

@@ -44,7 +44,7 @@
 import type { ReactNode } from "react";
 import { memo, useCallback, useEffect, useId, useState } from "react";
 import type { SectionResource } from "@/lib/lesson-flow";
-import { Button } from "@/components/ui";
+import { Button, FutureControl } from "@/components/ui";
 import { ResourceTypePill } from "./resource-type-pill";
 import styles from "./section-resources.module.css";
 
@@ -274,19 +274,16 @@ export const SectionResources = memo(function SectionResources({
               <MoreRow key={res.id} resource={res} />
             ))}
           </ul>
-          {/* "Show more" affordance — non-functional placeholder for Phase 1A
-              (the "more" list is already fully visible). Kept per spec so the
-              UI matches Reference A; the click is a no-op for now. */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className={styles.showMoreBtn}
-            aria-label="Show more resources"
-            tooltip="Reveal the rest of the resources attached to this section"
+          {/* "Show more" — placeholder for Phase 1A (the "more" list is
+              already fully visible). FutureControl gives it the canonical
+              "coming after beta" treatment so it never reads as a broken
+              live button. */}
+          <FutureControl
+            label="Show more"
             trailingIcon={<ShowMoreChevron />}
-          >
-            Show more
-          </Button>
+            tooltip="Show more — coming after beta. Will paginate the resource list when sections grow long."
+            className={styles.showMoreBtn}
+          />
         </div>
       )}
     </section>

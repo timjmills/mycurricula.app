@@ -1,13 +1,16 @@
 "use client";
 
 // BulkActionBar — the dark fixed-bottom action bar that slides in once
-// one or more Catch-up rows are checked. Mirrors the per-row actions
-// (Mark done / Mark skipped / Carry over all / Add to to-do) but applies
-// the chosen action to every id in the selection set before clearing it.
+// one or more Catch-up rows are checked. Applies the chosen action to
+// every id in the selection set before clearing it.
 //
-// The "Add all to to-do" action is wired as a no-op stub — the planner's
-// to-do store is the parent agent's territory; we leave a TODO so the
-// wire-up is a one-line follow-up when that store gains a bulk-add API.
+// W1-A2 (2026-05-27): "Add all to to-do" removed for beta — the to-do
+// store doesn't support a real bulk-add yet, so the old button was a
+// silent no-op. "Carry over all to…" is renamed "Mark all as needs
+// carry-over" because the bulk action flags items without picking a
+// target week/day (single-row carry-over keeps its existing per-row
+// target picker). When the backend lands, the target picker will land
+// here too and the label can go back to "Carry over all to…".
 
 import { Tooltip } from "@/components/ui";
 import styles from "./BulkActionBar.module.css";
@@ -17,7 +20,6 @@ interface BulkActionBarProps {
   onMarkAllDone: () => void;
   onMarkAllSkipped: () => void;
   onCarryAll: () => void;
-  onAddAllToTodo: () => void;
   onClear: () => void;
 }
 
@@ -26,7 +28,6 @@ export function BulkActionBar({
   onMarkAllDone,
   onMarkAllSkipped,
   onCarryAll,
-  onAddAllToTodo,
   onClear,
 }: BulkActionBarProps) {
   return (
@@ -72,29 +73,16 @@ export function BulkActionBar({
         </button>
       </Tooltip>
       <Tooltip
-        content="Move every selected lesson to a future day — pick the target week and day, then they re-appear there."
+        content="Flag every selected lesson as needs-carry-over so they stay visible until you assign each to a future week and day."
         side="top"
       >
         <button
           type="button"
           className={`${styles.btn} ${styles.btnPrimary}`}
           onClick={onCarryAll}
-          title="Move every selected lesson to a future day — pick the target week and day, then they re-appear there"
+          title="Flag every selected lesson as needs-carry-over so they stay visible until you assign each to a future week and day"
         >
-          Carry over all to…
-        </button>
-      </Tooltip>
-      <Tooltip
-        content="Add every selected lesson to your daily to-do list as a reminder to revisit them."
-        side="top"
-      >
-        <button
-          type="button"
-          className={styles.btn}
-          onClick={onAddAllToTodo}
-          title="Add every selected lesson to your daily to-do list as a reminder to revisit them"
-        >
-          Add all to to-do
+          Mark all as needs carry-over
         </button>
       </Tooltip>
       <span className={styles.spacer} aria-hidden="true" />

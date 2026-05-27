@@ -29,7 +29,7 @@ import {
   monthIndexForWeekFor,
 } from "@/lib/year-calendar";
 import { useAcademicYear } from "@/lib/use-academic-year";
-import { ToggleGroup, Tooltip } from "@/components/ui";
+import { FutureControl, ToggleGroup, Tooltip } from "@/components/ui";
 // YearSidebar is intentionally not mounted — every rail item is a
 // disabled "coming soon" affordance, and "Students" violates the
 // teacher-only product scope (CLAUDE.md §1). The component file is
@@ -435,37 +435,20 @@ export function YearView() {
             </Link>
           </Tooltip>
 
-          {/* Filters + Export are decorative placeholders until Phase 1B
-              wires them to the left filter panel and a CSV/PDF export. The
-              `disabled` + `aria-disabled` + Tooltip pattern matches
-              YearSidebar's "coming soon" affordances so the precedent is
-              consistent across the Year route. */}
-          <Tooltip content="Filters — coming soon" side="bottom">
-            <button
-              type="button"
-              className={styles.actionBtn}
-              aria-label="Filters — coming soon"
-              aria-disabled="true"
-              disabled
-              title="Coming soon"
-            >
-              <IconFilter width={14} height={14} />
-              Filters
-            </button>
-          </Tooltip>
-          <Tooltip content="Export — coming soon" side="bottom">
-            <button
-              type="button"
-              className={styles.actionBtn}
-              aria-label="Export — coming soon"
-              aria-disabled="true"
-              disabled
-              title="Coming soon"
-            >
-              <IconExport width={14} height={14} />
-              Export
-            </button>
-          </Tooltip>
+          {/* Filters + Export are placeholders until Phase 1B wires them to
+              the left filter panel and a CSV/PDF export. The FutureControl
+              primitive gives them the canonical "coming after beta"
+              treatment so they never read as broken live buttons. */}
+          <FutureControl
+            label="Filters"
+            leadingIcon={<IconFilter width={14} height={14} />}
+            tooltip="Filters — coming after beta. Will narrow the Year view by subject, unit, or completion."
+          />
+          <FutureControl
+            label="Export"
+            leadingIcon={<IconExport width={14} height={14} />}
+            tooltip="Export — coming after beta. Will save the Year view as CSV or PDF."
+          />
         </div>
       </div>
 

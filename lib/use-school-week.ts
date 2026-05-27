@@ -46,7 +46,7 @@ export const WEEKDAY_ORDER: readonly Weekday[] = [
  * user's selection deterministically without depending on Array index
  * lookups in hot paths.
  */
-const WEEKDAY_INDEX: Readonly<Record<Weekday, number>> = {
+export const WEEKDAY_INDEX: Readonly<Record<Weekday, number>> = {
   sun: 0,
   mon: 1,
   tue: 2,

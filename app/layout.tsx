@@ -9,8 +9,11 @@ import { LabelsProvider } from "@/lib/labels";
 // which globals.css and the ported tokens.css reference for --font-sans/mono.
 
 export const metadata: Metadata = {
-  title: "MyCurricula — Grade 5 Curriculum Planner",
-  description: "Weekly curriculum planning tool for Grade 5 teachers.",
+  // Root metadata is rendered server-side and cannot read per-team
+  // curriculumLabel state. Keep it generic; surface the team's label inside
+  // the app chrome instead (top bar + per-page headers).
+  title: "MyCurricula — Curriculum Planner",
+  description: "Curriculum planning tool for teaching teams.",
 };
 
 export default function RootLayout({

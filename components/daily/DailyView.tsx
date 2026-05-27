@@ -129,6 +129,7 @@ import { useDayHoliday, useHolidaysByDay } from "@/lib/use-day-holiday";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { LessonDetail } from "./LessonDetail";
 import { TodayDashboard } from "./TodayDashboard";
 import { IconRail } from "./IconRail";
@@ -174,11 +175,19 @@ import styles from "./DailyView.module.css";
 
 const PANE_WIDTH_KEY = "mycurricula:daily-left-width";
 
-/** Absolute minimum pane width, in px. Below this a pane is unreadable and
- *  its inner content starts to overlap its own padding. Acts as both the
- *  hard lower clamp AND the reservation kept for the OTHER side pane and
- *  for the center detail. */
+/** Absolute floor for the side-pane width reservation math, in px. The
+ *  splitter never lets a content pane settle at this width — that's what
+ *  PANE_VISIBLE_MIN is for. This is the smallest amount of space the layout
+ *  guarantees for the OTHER side and the center detail when computing the
+ *  upper bound for THIS pane. */
 const PANE_FLOOR = 40;
+
+/** Visible minimum for a content pane, in px. Below this the lesson list /
+ *  resources / shoutbox surfaces are unreadable and overlap their own
+ *  padding. The splitter clamps to this lower bound so a teacher cannot
+ *  create a broken layout by dragging the divider in. (W1-A3 — audit
+ *  blocker; teachers reported creating 40px slivers.) */
+const PANE_VISIBLE_MIN = 280;
 
 /** Default left-pane width — only used on first paint before localStorage
  *  is read and before bodyRef has resolved a live container width. */
@@ -203,13 +212,13 @@ function clampPaneWidth(
 ): number {
   const rounded = Math.round(px);
   if (!Number.isFinite(bodyWidth) || bodyWidth <= 0) {
-    return Math.max(PANE_FLOOR, rounded);
+    return Math.max(PANE_VISIBLE_MIN, rounded);
   }
-  // Reserve PANE_FLOOR for the other side pane AND PANE_FLOOR for the
-  // center detail — by accepting `otherWidth` (which is already ≥
-  // PANE_FLOOR) we automatically include the side-pane share.
-  const max = Math.max(PANE_FLOOR, bodyWidth - otherWidth - PANE_FLOOR);
-  return Math.min(max, Math.max(PANE_FLOOR, rounded));
+  // Reserve PANE_FLOOR for the center detail's minimum breathing room.
+  // The OTHER side pane's own min is already enforced when it was set,
+  // so we only need to leave PANE_FLOOR for the center column here.
+  const max = Math.max(PANE_VISIBLE_MIN, bodyWidth - otherWidth - PANE_FLOOR);
+  return Math.min(max, Math.max(PANE_VISIBLE_MIN, rounded));
 }
 
 /** Compute the live (min, max) bounds for a pane given the container width
@@ -222,10 +231,10 @@ function paneBounds(
   otherWidth: number,
 ): { min: number; max: number } {
   if (!Number.isFinite(bodyWidth) || bodyWidth <= 0) {
-    return { min: PANE_FLOOR, max: Number.MAX_SAFE_INTEGER };
+    return { min: PANE_VISIBLE_MIN, max: Number.MAX_SAFE_INTEGER };
   }
-  const max = Math.max(PANE_FLOOR, bodyWidth - otherWidth - PANE_FLOOR);
-  return { min: PANE_FLOOR, max };
+  const max = Math.max(PANE_VISIBLE_MIN, bodyWidth - otherWidth - PANE_FLOOR);
+  return { min: PANE_VISIBLE_MIN, max };
 }
 
 /** Read the saved left-pane width, or the default if none / unavailable.
@@ -1070,10 +1079,21 @@ function ColumnDragGhost({ id }: { id: ColumnId }): ReactNode {
 
 // ── DailyView ────────────────────────────────────────────────────────────
 
-export function DailyView(): ReactNode {
+export interface DailyViewProps {
+  /** Seed the initial selection from a `/daily?lesson=<id>` deep-link.
+   *  When set + the id resolves to a lesson, the view jumps to that
+   *  lesson's week + day on mount and clears the query string so day
+   *  navigation thereafter is normal. (W1-V5 — closes Subject→Daily
+   *  cross-route trust gap.) */
+  initialLessonId?: string;
+}
+
+export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
+  const router = useRouter();
   // selectedDay is shared planner state — the top bar may also change it.
   // viewMode drives the list vs. grid rendering choice.
-  const { viewMode, week, selectedDay, setSelectedDay } = useAppState();
+  const { viewMode, week, selectedDay, setSelectedDay, setWeek } =
+    useAppState();
 
   // Lessons come from the planner store so completions, edits, and undo/redo
   // are immediately reflected in the left pane list and right pane detail.
@@ -1105,12 +1125,32 @@ export function DailyView(): ReactNode {
 
   // Daily view manages its own selected-lesson state (per task brief).
   // Default: first not-yet-done lesson for the active day; null → empty.
+  // If a `?lesson=<id>` deep-link was provided AND the id resolves, seed
+  // selectedId with it instead (the matching week+day are also synced post-
+  // mount below so the lesson is actually visible).
   const [selectedId, setSelectedId] = useState<string | null>(() => {
+    if (initialLessonId) {
+      const target = lessons.find((l) => l.id === initialLessonId);
+      if (target) return target.id;
+    }
     const first = lessons.find(
       (l) => l.week === week && l.day === selectedDay && l.status !== "done",
     );
     return first?.id ?? null;
   });
+
+  // Once-only sync of week + selectedDay to the deep-linked lesson's
+  // location, then drop the query string so subsequent day changes don't
+  // re-seed. Runs only when initialLessonId is set on first mount.
+  useEffect(() => {
+    if (!initialLessonId) return;
+    const target = lessons.find((l) => l.id === initialLessonId);
+    if (!target) return;
+    if (target.week !== week) setWeek(target.week);
+    if (target.day !== selectedDay) setSelectedDay(target.day);
+    router.replace("/daily", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLessonId]);
 
   // Collapse-all toggle — default expanded. UI-only, never persisted.
   const [collapsedAll, setCollapsedAll] = useState(false);

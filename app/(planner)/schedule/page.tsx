@@ -20,14 +20,16 @@ import { WEEK_DAYS, WEEK_DAYS_SHORT } from "@/lib/mock";
 import { dateNumberForWeekDay } from "@/lib/mock/calendar";
 import { todayDayIndex } from "@/lib/schedule-data";
 import { ScheduleDayPane } from "@/components/schedule";
+import { useSchoolWeek, WEEKDAY_INDEX } from "@/lib/use-school-week";
 import styles from "./page.module.css";
-
-/** The five school-week days the page surfaces. Hard-coded for Sun–Thu
- *  while the configured school week wires through. */
-const SCHOOL_WEEK_DAYS: readonly number[] = [0, 1, 2, 3, 4];
 
 export default function SchedulePage() {
   const { week, selectedDay, setSelectedDay } = useAppState();
+  // School-week days come from the team's configured selection
+  // (CLAUDE.md §1). Map Weekday tokens → numeric indexes the day-strip
+  // expects. The configured Weekday[] is already sorted Sun-first.
+  const { days: configuredDays } = useSchoolWeek();
+  const schoolWeekDays = configuredDays.map((d) => WEEKDAY_INDEX[d]);
   // app-state.selectedDay is plain `number` (default 0). We don't replace
   // it with today; the user's last-chosen day persists across sessions.
   const focusedDay = selectedDay;
@@ -45,7 +47,7 @@ export default function SchedulePage() {
       </header>
 
       <nav className={styles.dayStrip} aria-label="Choose a day to view">
-        {SCHOOL_WEEK_DAYS.map((d) => {
+        {schoolWeekDays.map((d) => {
           const isActive = d === focusedDay;
           const isToday = d === todayDayIndex();
           const dayLabel = WEEK_DAYS_SHORT[d] ?? "Day";
