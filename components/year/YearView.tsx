@@ -29,7 +29,12 @@ import {
   monthIndexForWeekFor,
 } from "@/lib/year-calendar";
 import { useAcademicYear } from "@/lib/use-academic-year";
-import { FutureControl, ToggleGroup, Tooltip } from "@/components/ui";
+import {
+  FutureControl,
+  IntroSubtitle,
+  ToggleGroup,
+  Tooltip,
+} from "@/components/ui";
 // YearSidebar is intentionally not mounted — every rail item is a
 // disabled "coming soon" affordance, and "Students" violates the
 // teacher-only product scope (CLAUDE.md §1). The component file is
@@ -451,6 +456,17 @@ export function YearView() {
           />
         </div>
       </div>
+
+      {/* ── W3-C10 once-per-view onboarding subtitle ──────────────────
+          Tells a first-time teacher what the Yearly surface is FOR.
+          Dismissed via "Got it" and persisted to localStorage under
+          `mycurricula:user:year-intro-seen`. The same key is shared
+          with YearMobile so dismissing on either viewport silences
+          the subtitle everywhere. */}
+      <IntroSubtitle viewKey="year">
+        Your subjects&rsquo; road across the school year. The header tints to
+        whichever subject you&rsquo;re scrolling through.
+      </IntroSubtitle>
 
       {/* ── Main body ────────────────────────────────────────────────── */}
       <div className={styles.body}>

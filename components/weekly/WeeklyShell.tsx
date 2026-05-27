@@ -80,7 +80,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Button, PageHeader, Tooltip } from "@/components/ui";
+import { Button, IntroSubtitle, PageHeader, Tooltip } from "@/components/ui";
 import {
   DndContext,
   DragOverlay,
@@ -101,6 +101,7 @@ import { WeeklyList } from "@/components/list";
 import { ScheduleTimeline } from "@/components/schedule";
 import { CatchupWeekBar } from "./CatchupWeekBar";
 import { WeeklySchedulePills } from "./weekly-schedule-pills";
+import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
 import { useAppState } from "@/lib/app-state";
 import { useWeeklyScheduleMode } from "@/lib/weekly-schedule-state";
 import { useDndSensors } from "@/lib/collapse-on-drag";
@@ -448,6 +449,16 @@ function ColumnDragGhost({ id }: { id: PanelId }): ReactNode {
 // restores Grid automatically without any preference mutation.
 
 const NARROW_MQ = "(max-width: 900px)";
+
+// ── W3-C3 — drawer-mode breakpoint ───────────────────────────────────────
+// WeeklyShell.module.css already drops the inline rail to `display: none`
+// at ≤1280px (RES-CRIT-001 — the WeeklyGrid has a 1082px intrinsic
+// min-width so a rail next to it forces document-level horizontal scroll).
+// We mount the overlay drawer at the SAME breakpoint so the rail's content
+// is reachable at every viewport where the inline pane is hidden. The
+// audit's spec ("below ~960px") would leave a 961–1280 dead-zone — fixing
+// that by aligning to the existing CSS hide is the practical answer.
+const DRAWER_MQ = "(max-width: 1280px)";
 
 // ── WeeklyShell ──────────────────────────────────────────────────────────
 
@@ -937,6 +948,16 @@ export function WeeklyShell(): ReactNode {
         subtitle="Your week at a glance — every lesson laid out by subject and day. Switch between Grid and List, drag to re-plan, edit in place."
         className={styles.weeklyPageHeader}
       />
+
+      {/* ── W3-C10 once-per-view onboarding subtitle ──────────────────
+          Tells a first-time teacher what THIS surface is FOR, in the new
+          Personal/Team Curriculum vocabulary (no "Master"). Dismissed via
+          "Got it" and persisted to localStorage under
+          `mycurricula:user:weekly-intro-seen` so a returning teacher
+          never sees it again. */}
+      <IntroSubtitle viewKey="weekly">
+        The Team Curriculum grid — every subject, the whole school week.
+      </IntroSubtitle>
 
       {/* ── Layer-2 catch-up bar (planning-doc §1262) ──────────────────
           The bar self-gates on enabled + per-week count + per-week dismissal,

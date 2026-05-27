@@ -33,3 +33,6 @@ export type { TooltipProps } from "./Tooltip";
 
 export { FutureControl } from "./FutureControl";
 export type { FutureControlProps } from "./FutureControl";
+
+export { IntroSubtitle } from "./IntroSubtitle";
+export type { IntroSubtitleProps, IntroSubtitleViewKey } from "./IntroSubtitle";
