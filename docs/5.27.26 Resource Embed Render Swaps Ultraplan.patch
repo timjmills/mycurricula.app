@@ -1,0 +1,321 @@
+diff --git a/components/lesson-flow/resource-tile.tsx b/components/lesson-flow/resource-tile.tsx
+index f5bf4ed..9630e2d 100644
+--- a/components/lesson-flow/resource-tile.tsx
++++ b/components/lesson-flow/resource-tile.tsx
+@@ -30,6 +30,7 @@ import type { ReactNode } from "react";
+ import { useId, useState } from "react";
+ import type { SectionResource } from "@/lib/lesson-flow";
+ import { Button } from "@/components/ui";
++import { ResourceEmbed } from "@/components/resources";
+ import styles from "./resource-tile.module.css";
+ 
+ // ── Props ────────────────────────────────────────────────────────────────
+@@ -88,13 +89,19 @@ export function ResourceTile({
+           The frame's appearance is keyed by data-frame so the CSS module
+           owns the per-kind styling. Inside sits the synthetic artwork. */}
+       <div className={styles.frame}>
+-        {/* Type-specific synthetic artwork. */}
+-        <FrameArtwork kind={kind} />
++        {resource.url ? (
++          <ResourceEmbed resource={resource} variant="tile" />
++        ) : (
++          <>
++            {/* Type-specific synthetic artwork. */}
++            <FrameArtwork kind={kind} />
+ 
+-        {/* Large centered type icon — the primary at-a-glance signal. */}
+-        <span className={styles.bigIcon} aria-hidden="true">
+-          <BigResourceIcon type={resource.type} />
+-        </span>
++            {/* Large centered type icon — the primary at-a-glance signal. */}
++            <span className={styles.bigIcon} aria-hidden="true">
++              <BigResourceIcon type={resource.type} />
++            </span>
++          </>
++        )}
+ 
+         {/* Minimize-to-links control, pinned to the tile's top-right.
+             Button variant="icon" carries the 44px touch target + focus ring. */}
+@@ -194,10 +201,16 @@ export function ResourceLinkPreview({
+           aria-hidden="true"
+         >
+           <span className={styles.previewFrame} data-frame={kind}>
+-            <FrameArtwork kind={kind} />
+-            <span className={styles.previewBigIcon}>
+-              <BigResourceIcon type={resource.type} />
+-            </span>
++            {resource.url ? (
++              <ResourceEmbed resource={resource} variant="tile" />
++            ) : (
++              <>
++                <FrameArtwork kind={kind} />
++                <span className={styles.previewBigIcon}>
++                  <BigResourceIcon type={resource.type} />
++                </span>
++              </>
++            )}
+           </span>
+         </span>
+       )}
+diff --git a/components/lesson-flow/section-resources.tsx b/components/lesson-flow/section-resources.tsx
+index 01f8c20..3a55fa6 100644
+--- a/components/lesson-flow/section-resources.tsx
++++ b/components/lesson-flow/section-resources.tsx
+@@ -45,6 +45,7 @@ import type { ReactNode } from "react";
+ import { memo, useCallback, useEffect, useId, useState } from "react";
+ import type { SectionResource } from "@/lib/lesson-flow";
+ import { Button } from "@/components/ui";
++import { ResourceEmbed } from "@/components/resources";
+ import { ResourceTypePill } from "./resource-type-pill";
+ import styles from "./section-resources.module.css";
+ 
+@@ -302,6 +303,20 @@ function PrimaryCard({
+   resource: SectionResource;
+   fill: string;
+ }): ReactNode {
++  // When a real URL is attached, the embed primitive owns the card interior —
++  // the colored card chrome (the §4.2 fill) still wraps it so the slot color
++  // stays load-bearing. Otherwise we fall back to the synthetic glyph render.
++  if (resource.url) {
++    return (
++      <article
++        className={styles.primaryCard}
++        style={{ background: fill }}
++        role="listitem"
++      >
++        <ResourceEmbed resource={resource} variant="tile" />
++      </article>
++    );
++  }
+   return (
+     <article
+       className={styles.primaryCard}
+@@ -325,9 +340,15 @@ function PrimaryCard({
+ function MoreRow({ resource }: { resource: SectionResource }): ReactNode {
+   return (
+     <li className={styles.moreRow}>
+-      <span className={styles.moreRowIcon} aria-hidden="true">
+-        <MoreRowIcon type={resource.type} />
+-      </span>
++      {resource.url ? (
++        <span className={styles.moreRowIcon}>
++          <ResourceEmbed resource={resource} variant="row" />
++        </span>
++      ) : (
++        <span className={styles.moreRowIcon} aria-hidden="true">
++          <MoreRowIcon type={resource.type} />
++        </span>
++      )}
+       <span className={styles.moreRowTitle}>{resource.label}</span>
+       <ResourceTypePill type={resource.type} />
+     </li>
+@@ -339,17 +360,26 @@ function MoreRow({ resource }: { resource: SectionResource }): ReactNode {
+ function MinimizedRow({ resource }: { resource: SectionResource }): ReactNode {
+   return (
+     <li className={styles.miniRow}>
+-      <span
+-        className={styles.miniRowIconSquare}
+-        data-kind={miniKindFor(resource.type)}
+-        aria-hidden="true"
+-      >
+-        <MiniRowIcon type={resource.type} />
+-      </span>
++      {resource.url ? (
++        <span
++          className={styles.miniRowIconSquare}
++          data-kind={miniKindFor(resource.type)}
++        >
++          <ResourceEmbed resource={resource} variant="row" />
++        </span>
++      ) : (
++        <span
++          className={styles.miniRowIconSquare}
++          data-kind={miniKindFor(resource.type)}
++          aria-hidden="true"
++        >
++          <MiniRowIcon type={resource.type} />
++        </span>
++      )}
+       <span className={styles.miniRowStack}>
+         <span className={styles.miniRowTitle}>{resource.label}</span>
+         <span className={styles.miniRowSubtitle}>
+-          {urlPreviewFor(resource)}
++          {resource.url ? realHostname(resource.url) : urlPreviewFor(resource)}
+         </span>
+       </span>
+       <ResourceTypePill type={resource.type} />
+@@ -403,6 +433,17 @@ function urlPreviewFor(res: SectionResource): string {
+   }
+ }
+ 
++/** Extract the bare hostname from a real URL for the minimized row's subtitle.
++ *  Strips a leading `www.` so the line reads cleanly. Falls back to the
++ *  synthetic link-preview string if the URL fails to parse. */
++function realHostname(url: string): string {
++  try {
++    return new URL(url).hostname.replace(/^www\./, "");
++  } catch {
++    return urlPreviewFor({ type: "link" } as SectionResource);
++  }
++}
++
+ // ── ToggleButton — the expanded/minimized swap control ──────────────────
+ // Button variant="icon" carries the touch target, focus ring, and disabled
+ // state. aria-pressed passes through {...rest} to the native <button>.
+diff --git a/components/subject/ResourcesSort.tsx b/components/subject/ResourcesSort.tsx
+index 9a4ce7b..95f7176 100644
+--- a/components/subject/ResourcesSort.tsx
++++ b/components/subject/ResourcesSort.tsx
+@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
+ import { useState, useMemo } from "react";
+ import type { LessonResource } from "@/lib/types";
+ import { Chip } from "@/components/ui";
++import { ResourceEmbed } from "@/components/resources";
+ import styles from "./ResourcesSort.module.css";
+ 
+ // ── Type metadata ─────────────────────────────────────────────────────────
+@@ -51,9 +52,7 @@ const MAX_DISPLAY = 20;
+ 
+ // ── Resource row entry ─────────────────────────────────────────────────────
+ 
+-export interface ResourceEntry {
+-  type: LessonResource["type"];
+-  label: string;
++export interface ResourceEntry extends LessonResource {
+   /** Title of the lesson this resource is attached to. */
+   lessonTitle: string;
+   /** Unit name for context. */
+@@ -169,18 +168,26 @@ export function ResourcesSort({
+                 .filter(Boolean)
+                 .join(" ")}
+             >
+-              {/* Resource type icon */}
+-              <span className={styles.typeIcon} aria-hidden="true">
+-                <FileIcon />
+-              </span>
+-
+-              {/* Type badge */}
+-              <span
+-                className={`${styles.typeBadge} cp-mono`}
+-                aria-hidden="true"
+-              >
+-                {meta.glyph} {meta.label}
+-              </span>
++              {r.url ? (
++                <span className={styles.typeIcon}>
++                  <ResourceEmbed resource={r} variant="row" />
++                </span>
++              ) : (
++                <>
++                  {/* Resource type icon */}
++                  <span className={styles.typeIcon} aria-hidden="true">
++                    <FileIcon />
++                  </span>
++
++                  {/* Type badge */}
++                  <span
++                    className={`${styles.typeBadge} cp-mono`}
++                    aria-hidden="true"
++                  >
++                    {meta.glyph} {meta.label}
++                  </span>
++                </>
++              )}
+ 
+               {/* Resource label */}
+               <span className={styles.resourceLabel}>{r.label}</span>
+diff --git a/lib/mock/lessons.ts b/lib/mock/lessons.ts
+index fe3957e..a74f2b1 100644
+--- a/lib/mock/lessons.ts
++++ b/lib/mock/lessons.ts
+@@ -88,7 +88,14 @@ export const LESSONS: Lesson[] = [
+     objective: "I can generate equivalent fractions with area models.",
+     preview:
+       "Fold-and-shade activity building equivalent fractions, then a gallery walk comparing strategies.",
+-    resources: [{ type: "slides", label: "Area model deck" }],
++    resources: [
++      {
++        type: "slides",
++        label: "Area model deck",
++        url: "https://docs.google.com/presentation/d/1eu3J4tLkTpW2gC2DLrNgVH71Hjt7sHM9Ie4yWNL2u0Y/edit",
++        provider: "gslides",
++      },
++    ],
+     standards: ["5.NF.A.1"],
+     status: "done",
+   }),
+@@ -114,7 +121,14 @@ export const LESSONS: Lesson[] = [
+     objective: "I can plan a personal narrative on a story-arc map.",
+     preview:
+       "Students map their chosen memory onto a five-point arc before drafting next week.",
+-    resources: [{ type: "pdf", label: "Story arc map" }],
++    resources: [
++      {
++        type: "pdf",
++        label: "Story arc map",
++        url: "https://drive.google.com/file/d/1n-jB_yJ8sZ4uV4dVL9z6KZpL_2H8KdH8X/view",
++        provider: "gdrive",
++      },
++    ],
+     standards: ["W.5.3"],
+     status: "carried",
+     reasonNotDone:
+@@ -161,7 +175,13 @@ export const LESSONS: Lesson[] = [
+     // 2×2 thumbnail grid in Section 1 (Standards); the remaining three flow
+     // into the "More resources" sub-list. Exact labels per the spec.
+     resources: [
+-      { type: "youtube", label: "Fraction Basics" }, // Card 1 — play icon
++      {
++        type: "youtube",
++        label: "Fraction Basics",
++        url: "https://www.youtube.com/watch?v=8E5K2dnyFOY",
++        provider: "youtube",
++        thumbnailUrl: "https://img.youtube.com/vi/8E5K2dnyFOY/hqdefault.jpg",
++      }, // Card 1 — play icon
+       { type: "link", label: "What is a Fraction?" }, // Card 2 — paperclip
+       { type: "doc", label: "Fractions Overview" }, // Card 3 — document
+       { type: "link", label: "Khan Academy" }, // Card 4 — paperclip
+@@ -188,7 +208,12 @@ export const LESSONS: Lesson[] = [
+     resources: [
+       { type: "slides", label: "Lesson 23 deck" },
+       { type: "doc", label: "Exit ticket" },
+-      { type: "youtube", label: "Bar models (4min)" },
++      {
++        type: "youtube",
++        label: "Bar models (4min)",
++        url: "https://vimeo.com/76979871",
++        provider: "vimeo",
++      },
+     ],
+     standards: ["5.NF.B.3"],
+   }),
+@@ -287,7 +312,12 @@ export const LESSONS: Lesson[] = [
+       "First-person narrator shift from August to Via. Students annotate three places the same event is reframed.",
+     notes: "Lara was absent for ch 13 — have her partner with Sofia.",
+     resources: [
+-      { type: "doc", label: "Annotation sheet" },
++      {
++        type: "doc",
++        label: "Annotation sheet",
++        url: "https://docs.google.com/document/d/1mGJ_yJ8sZ4uV4dVL9z6KZpL_2H8KdH8XzNgN6Hpx0fM/edit",
++        provider: "gdocs",
++      },
+       { type: "website", label: "Lit-circle prompts" },
+     ],
+     standards: ["RL.5.6", "RL.5.3"],
+@@ -590,7 +620,14 @@ export const LESSONS: Lesson[] = [
+     preview:
+       "Maps activity: students annotate four features of the Nile valley that made it attractive for civilization. Compare with Tigris/Euphrates next week.",
+     resources: [
+-      { type: "image", label: "Nile satellite" },
++      {
++        type: "image",
++        label: "Nile satellite",
++        url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Story_arc.svg/640px-Story_arc.svg.png",
++        provider: "image",
++        thumbnailUrl:
++          "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Story_arc.svg/640px-Story_arc.svg.png",
++      },
+       { type: "pdf", label: "Annotation map" },
+     ],
+     standards: [],

@@ -1,0 +1,2094 @@
+diff --git a/app/api/og-preview/route.ts b/app/api/og-preview/route.ts
+new file mode 100644
+index 0000000..5841142
+--- /dev/null
++++ b/app/api/og-preview/route.ts
+@@ -0,0 +1,95 @@
++// app/api/og-preview/route.ts
++//
++// GET /api/og-preview?url=<url>
++//
++// Server-side fetch (avoids browser CORS), light HTML scan for
++// <meta property="og:*"> + <title>, plus a check on whether the response
++// would refuse to load in a frame (`X-Frame-Options: deny|sameorigin` or
++// `Content-Security-Policy: frame-ancestors 'none'`).
++//
++// Response:
++//   { title?, description?, thumbnailUrl?, domain, canEmbed: boolean }
++
++import { NextResponse, type NextRequest } from "next/server";
++
++const FETCH_TIMEOUT_MS = 5_000;
++const READ_CAP_BYTES = 1_000_000;
++
++export async function GET(req: NextRequest) {
++  const target = req.nextUrl.searchParams.get("url");
++  if (!target || !/^https?:\/\//i.test(target)) {
++    return NextResponse.json({ error: "bad_url" }, { status: 400 });
++  }
++
++  try {
++    const ctrl = new AbortController();
++    const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
++
++    const res = await fetch(target, {
++      signal: ctrl.signal,
++      redirect: "follow",
++      headers: { "User-Agent": "mycurricula-og-fetcher/1.0" },
++    });
++    clearTimeout(t);
++
++    const xfo = res.headers.get("x-frame-options")?.toLowerCase() ?? null;
++    const csp = res.headers.get("content-security-policy") ?? "";
++    const blocksFrame =
++      xfo === "deny" ||
++      xfo === "sameorigin" ||
++      /frame-ancestors\s+'none'/i.test(csp);
++
++    // Read at most READ_CAP_BYTES — a giant page shouldn't stall the worker.
++    const text = (await res.text()).slice(0, READ_CAP_BYTES);
++
++    const metaProp = (prop: string): string | undefined => {
++      // Both attribute orders are valid; check property-then-content, then
++      // content-then-property.
++      const reA = new RegExp(
++        `<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']+)["']`,
++        "i",
++      );
++      const reB = new RegExp(
++        `<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${prop}["']`,
++        "i",
++      );
++      return text.match(reA)?.[1] ?? text.match(reB)?.[1];
++    };
++    const titleTag = text.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
++
++    const title = metaProp("og:title") ?? metaProp("twitter:title") ?? titleTag;
++    const description =
++      metaProp("og:description") ??
++      metaProp("twitter:description") ??
++      metaProp("description");
++    const thumbnailUrl = metaProp("og:image") ?? metaProp("twitter:image");
++
++    const domain = (() => {
++      try {
++        return new URL(target).hostname.replace(/^www\./, "");
++      } catch {
++        return null;
++      }
++    })();
++
++    return NextResponse.json(
++      {
++        title: title?.trim(),
++        description: description?.trim(),
++        thumbnailUrl,
++        domain,
++        canEmbed: !blocksFrame,
++      },
++      {
++        headers: {
++          "Cache-Control": "public, max-age=3600, s-maxage=3600",
++        },
++      },
++    );
++  } catch (e) {
++    return NextResponse.json(
++      { error: "fetch_failed", detail: (e as Error).message },
++      { status: 502 },
++    );
++  }
++}
+diff --git a/app/api/resources/[id]/route.ts b/app/api/resources/[id]/route.ts
+new file mode 100644
+index 0000000..f955fba
+--- /dev/null
++++ b/app/api/resources/[id]/route.ts
+@@ -0,0 +1,114 @@
++// app/api/resources/[id]/route.ts
++//
++// GET    /api/resources/[id]                 — link rows: 200 JSON.
++//                                              Hosted files: 302 to R2 signed
++//                                              inline URL (default ?inline=1).
++// DELETE /api/resources/[id]                 — drop the row. (R2 cleanup is
++//                                              best-effort, handled out-of-band.)
++// PATCH  /api/resources/[id]                 — update display_mode | link_text |
++//                                              position | display_label.
++
++import { NextResponse, type NextRequest } from "next/server";
++import { createClient } from "@/lib/supabase/server";
++import { presignGet } from "@/lib/r2";
++
++interface RouteContext {
++  params: Promise<{ id: string }>;
++}
++
++// ── GET ────────────────────────────────────────────────────────────────────
++export async function GET(req: NextRequest, { params }: RouteContext) {
++  const { id } = await params;
++  const supabase = await createClient();
++
++  const { data, error } = await supabase
++    .from("resources")
++    .select("*")
++    .eq("id", id)
++    .single();
++
++  if (error || !data) {
++    return NextResponse.json({ error: "not_found" }, { status: 404 });
++  }
++
++  // Hosted file → redirect to a short-lived R2 signed URL with inline
++  // disposition so the browser previews instead of downloading.
++  if (
++    data.kind === "hosted_file" &&
++    Array.isArray(data.r2_object_keys) &&
++    data.r2_object_keys.length > 0
++  ) {
++    const inline = req.nextUrl.searchParams.get("inline") !== "0";
++    const url = await presignGet(data.r2_object_keys[0] as string, {
++      inline,
++      filename: data.original_filename ?? undefined,
++      expiresSeconds: 3600,
++    });
++    return NextResponse.redirect(url, 302);
++  }
++
++  // Link rows return the row JSON.
++  return NextResponse.json({ resource: data });
++}
++
++// ── PATCH ──────────────────────────────────────────────────────────────────
++const PATCHABLE = new Set([
++  "display_mode",
++  "link_text",
++  "position",
++  "display_label",
++]);
++
++export async function PATCH(req: NextRequest, { params }: RouteContext) {
++  const { id } = await params;
++
++  let body: Record<string, unknown>;
++  try {
++    body = (await req.json()) as Record<string, unknown>;
++  } catch {
++    return NextResponse.json({ error: "bad_json" }, { status: 400 });
++  }
++
++  const patch: Record<string, unknown> = {};
++  for (const k of Object.keys(body)) {
++    if (PATCHABLE.has(k)) patch[k] = body[k];
++  }
++  if (Object.keys(patch).length === 0) {
++    return NextResponse.json({ error: "no_patchable_fields" }, { status: 400 });
++  }
++  if (
++    patch.display_mode !== undefined &&
++    !["literal", "hyperlink", "thumbnail"].includes(
++      patch.display_mode as string,
++    )
++  ) {
++    return NextResponse.json({ error: "bad_display_mode" }, { status: 400 });
++  }
++
++  const supabase = await createClient();
++  const { data, error } = await supabase
++    .from("resources")
++    .update(patch)
++    .eq("id", id)
++    .select()
++    .single();
++
++  if (error) {
++    return NextResponse.json({ error: error.message }, { status: 400 });
++  }
++  return NextResponse.json({ resource: data });
++}
++
++// ── DELETE ─────────────────────────────────────────────────────────────────
++export async function DELETE(_req: NextRequest, { params }: RouteContext) {
++  const { id } = await params;
++  const supabase = await createClient();
++  // R2 object deletion is intentionally NOT blocking — a nightly sweep
++  // removes orphan objects whose row no longer exists. Keeps DELETE fast
++  // and avoids leaving the row half-deleted on an R2 failure.
++  const { error } = await supabase.from("resources").delete().eq("id", id);
++  if (error) {
++    return NextResponse.json({ error: error.message }, { status: 400 });
++  }
++  return NextResponse.json({ ok: true });
++}
+diff --git a/app/api/resources/route.ts b/app/api/resources/route.ts
+new file mode 100644
+index 0000000..9a0845c
+--- /dev/null
++++ b/app/api/resources/route.ts
+@@ -0,0 +1,222 @@
++// app/api/resources/route.ts
++//
++// POST /api/resources         — create a row (link OR finalized hosted file)
++// GET  /api/resources?owner_event_type=...&owner_event_id=...
++//                             — list rows for one event, in display order
++//
++// Auth: every call requires a Supabase session. RLS does the team gate.
++
++import { NextResponse, type NextRequest } from "next/server";
++import { createClient } from "@/lib/supabase/server";
++
++const OWNER_TYPES = new Set([
++  "core_lesson_event",
++  "extra_lesson_event",
++  "day_event",
++  "unit",
++  "personal_subject",
++]);
++
++const PROVIDERS = new Set([
++  "youtube",
++  "vimeo",
++  "gslides",
++  "gdocs",
++  "gsheets",
++  "gdrive",
++  "pdf",
++  "image",
++  "video",
++  "audio",
++  "website",
++]);
++
++const KINDS = new Set([
++  "hosted_file",
++  "external_link",
++  "youtube_link",
++  "drive_link",
++]);
++
++const FILE_TYPES = new Set(["pdf", "docx", "rtf", "image", "image_stack"]);
++
++// ── GET ────────────────────────────────────────────────────────────────────
++export async function GET(req: NextRequest) {
++  const owner_event_type = req.nextUrl.searchParams.get("owner_event_type");
++  const owner_event_id = req.nextUrl.searchParams.get("owner_event_id");
++
++  if (
++    !owner_event_type ||
++    !owner_event_id ||
++    !OWNER_TYPES.has(owner_event_type)
++  ) {
++    return NextResponse.json({ error: "bad_owner" }, { status: 400 });
++  }
++
++  const supabase = await createClient();
++  const { data, error } = await supabase
++    .from("resources")
++    .select("*")
++    .eq("owner_event_type", owner_event_type)
++    .eq("owner_event_id", owner_event_id)
++    .order("position", { ascending: true })
++    .order("created_at", { ascending: true });
++
++  if (error) {
++    return NextResponse.json({ error: error.message }, { status: 500 });
++  }
++  return NextResponse.json({ resources: data });
++}
++
++// ── POST ───────────────────────────────────────────────────────────────────
++interface PostBody {
++  /** When finalizing a hosted_file, pass the resource_id minted by the
++   *  upload-presign route so the row consumes the same UUID. */
++  id?: string;
++  owner_event_type: string;
++  owner_event_id: string;
++  kind: "hosted_file" | "external_link" | "youtube_link" | "drive_link";
++  display_label: string;
++  position?: number;
++  // Hosted-file fields
++  file_type?: "pdf" | "docx" | "rtf" | "image" | "image_stack";
++  r2_object_keys?: string[];
++  file_size_bytes?: number;
++  original_filename?: string;
++  mime_type?: string;
++  width?: number;
++  height?: number;
++  // Link fields
++  url?: string;
++  preview_title?: string;
++  preview_description?: string;
++  preview_thumbnail_url?: string;
++  // Common
++  provider?: string;
++  display_mode?: "literal" | "hyperlink" | "thumbnail";
++  link_text?: string;
++}
++
++export async function POST(req: NextRequest) {
++  let body: PostBody;
++  try {
++    body = (await req.json()) as PostBody;
++  } catch {
++    return NextResponse.json({ error: "bad_json" }, { status: 400 });
++  }
++
++  if (!OWNER_TYPES.has(body.owner_event_type)) {
++    return NextResponse.json({ error: "bad_owner_type" }, { status: 400 });
++  }
++  if (!KINDS.has(body.kind)) {
++    return NextResponse.json({ error: "bad_kind" }, { status: 400 });
++  }
++  if (body.provider && !PROVIDERS.has(body.provider)) {
++    return NextResponse.json({ error: "bad_provider" }, { status: 400 });
++  }
++  if (body.kind === "hosted_file") {
++    if (!body.file_type || !FILE_TYPES.has(body.file_type)) {
++      return NextResponse.json({ error: "bad_file_type" }, { status: 400 });
++    }
++    if (!body.r2_object_keys || body.r2_object_keys.length === 0) {
++      return NextResponse.json({ error: "missing_r2_keys" }, { status: 400 });
++    }
++  } else {
++    if (!body.url) {
++      return NextResponse.json({ error: "missing_url" }, { status: 400 });
++    }
++  }
++
++  const supabase = await createClient();
++  const {
++    data: { user },
++  } = await supabase.auth.getUser();
++  if (!user) {
++    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
++  }
++
++  // OG-preview enrichment for new website / generic external links — only
++  // when caller didn't already populate the preview fields.
++  if (body.kind === "external_link" && body.url && !body.preview_title) {
++    try {
++      const og = await fetchOgPreview(body.url, req.nextUrl.origin);
++      if (og) {
++        body.preview_title = body.preview_title ?? og.title;
++        body.preview_description = body.preview_description ?? og.description;
++        body.preview_thumbnail_url =
++          body.preview_thumbnail_url ?? og.thumbnailUrl;
++      }
++    } catch {
++      // OG fetch is a best-effort enrichment. The row still saves; the
++      // renderer falls back to a domain-only card.
++    }
++  }
++
++  const row = {
++    ...(body.id ? { id: body.id } : {}),
++    owner_event_type: body.owner_event_type,
++    owner_event_id: body.owner_event_id,
++    kind: body.kind,
++    display_label: body.display_label,
++    position: body.position ?? 0,
++    file_type: body.file_type ?? null,
++    r2_object_keys: body.r2_object_keys ?? [],
++    file_size_bytes: body.file_size_bytes ?? null,
++    original_filename: body.original_filename ?? null,
++    mime_type: body.mime_type ?? null,
++    width: body.width ?? null,
++    height: body.height ?? null,
++    url: body.url ?? null,
++    preview_title: body.preview_title ?? null,
++    preview_description: body.preview_description ?? null,
++    preview_thumbnail_url: body.preview_thumbnail_url ?? null,
++    preview_fetched_at: body.preview_title ? new Date().toISOString() : null,
++    provider: body.provider ?? null,
++    display_mode: body.display_mode ?? "thumbnail",
++    link_text: body.link_text ?? null,
++    uploaded_by_id: user.id,
++  };
++
++  const { data, error } = await supabase
++    .from("resources")
++    .upsert(row, { onConflict: "id" })
++    .select()
++    .single();
++
++  if (error) {
++    // Surface the count-limit trigger message cleanly.
++    const code = error.message.includes("resource_limit_files")
++      ? "file_limit"
++      : error.message.includes("resource_limit_images")
++        ? "image_limit"
++        : "db_error";
++    return NextResponse.json(
++      { error: code, detail: error.message },
++      { status: 400 },
++    );
++  }
++
++  return NextResponse.json({ resource: data });
++}
++
++// ── Internal: dogfood the OG-preview route ────────────────────────────────
++async function fetchOgPreview(
++  url: string,
++  origin: string,
++): Promise<{
++  title?: string;
++  description?: string;
++  thumbnailUrl?: string;
++  domain?: string;
++} | null> {
++  const r = await fetch(
++    `${origin}/api/og-preview?url=${encodeURIComponent(url)}`,
++  );
++  if (!r.ok) return null;
++  return (await r.json()) as {
++    title?: string;
++    description?: string;
++    thumbnailUrl?: string;
++    domain?: string;
++  };
++}
+diff --git a/app/api/resources/upload/route.ts b/app/api/resources/upload/route.ts
+new file mode 100644
+index 0000000..77775df
+--- /dev/null
++++ b/app/api/resources/upload/route.ts
+@@ -0,0 +1,139 @@
++// app/api/resources/upload/route.ts
++//
++// POST /api/resources/upload — preflight that returns a presigned R2 PUT URL.
++//
++// Request body:
++//   { owner_event_type, owner_event_id, team_id, filename, content_type, size_bytes }
++//
++// Response: { resource_id, object_key, upload_url, file_type }
++//
++// The browser then PUTs the file to `upload_url`, and finalizes the row by
++// POSTing to /api/resources with `{ id: resource_id, kind: "hosted_file",
++// r2_object_keys: [object_key], ... }`.
++//
++// Limits enforced here:
++//   • mime allowlist (PDF / DOCX / RTF / images)
++//   • per-file size caps (25 MB files, 5 MB images)
++//   • per-event counts (≤10 files, ≤10 images) — pre-checked; the DB
++//     trigger backstops races.
++
++import { NextResponse, type NextRequest } from "next/server";
++import { createClient } from "@/lib/supabase/server";
++import { presignPut, r2Key } from "@/lib/r2";
++
++const MAX_FILE_BYTES = 25 * 1024 * 1024;
++const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
++
++const ALLOWED_MIMES: Record<string, "pdf" | "docx" | "rtf" | "image"> = {
++  "application/pdf": "pdf",
++  "application/msword": "docx",
++  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
++    "docx",
++  "application/rtf": "rtf",
++  "text/rtf": "rtf",
++  "image/png": "image",
++  "image/jpeg": "image",
++  "image/webp": "image",
++  "image/gif": "image",
++};
++
++const OWNER_TYPES = new Set([
++  "core_lesson_event",
++  "extra_lesson_event",
++  "day_event",
++  "unit",
++  "personal_subject",
++]);
++
++interface UploadBody {
++  owner_event_type: string;
++  owner_event_id: string;
++  team_id: string;
++  filename: string;
++  content_type: string;
++  size_bytes: number;
++}
++
++export async function POST(req: NextRequest) {
++  let body: UploadBody;
++  try {
++    body = (await req.json()) as UploadBody;
++  } catch {
++    return NextResponse.json({ error: "bad_json" }, { status: 400 });
++  }
++
++  if (!OWNER_TYPES.has(body.owner_event_type)) {
++    return NextResponse.json({ error: "bad_owner_type" }, { status: 400 });
++  }
++  if (!body.owner_event_id || !body.team_id || !body.filename) {
++    return NextResponse.json({ error: "missing_fields" }, { status: 400 });
++  }
++
++  const fileType = ALLOWED_MIMES[body.content_type];
++  if (!fileType) {
++    return NextResponse.json(
++      { error: "bad_mime", detail: body.content_type },
++      { status: 400 },
++    );
++  }
++
++  const cap = fileType === "image" ? MAX_IMAGE_BYTES : MAX_FILE_BYTES;
++  if (typeof body.size_bytes !== "number" || body.size_bytes <= 0) {
++    return NextResponse.json({ error: "bad_size" }, { status: 400 });
++  }
++  if (body.size_bytes > cap) {
++    return NextResponse.json({ error: "too_large", cap }, { status: 400 });
++  }
++
++  const supabase = await createClient();
++  const {
++    data: { user },
++  } = await supabase.auth.getUser();
++  if (!user) {
++    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
++  }
++
++  // Pre-count check. RLS filters this to rows the caller can see, which is
++  // exactly the set the trigger evaluates. The trigger backstops races.
++  const fileTypeFilter =
++    fileType === "image" ? ["image", "image_stack"] : ["pdf", "docx", "rtf"];
++
++  const { count, error: countErr } = await supabase
++    .from("resources")
++    .select("id", { count: "exact", head: true })
++    .eq("owner_event_type", body.owner_event_type)
++    .eq("owner_event_id", body.owner_event_id)
++    .eq("kind", "hosted_file")
++    .in("file_type", fileTypeFilter);
++
++  if (countErr) {
++    return NextResponse.json(
++      { error: "db_error", detail: countErr.message },
++      { status: 500 },
++    );
++  }
++  if ((count ?? 0) >= 10) {
++    return NextResponse.json(
++      { error: fileType === "image" ? "image_limit" : "file_limit" },
++      { status: 400 },
++    );
++  }
++
++  const resource_id = crypto.randomUUID();
++  const object_key = r2Key(
++    body.team_id,
++    body.owner_event_id,
++    resource_id,
++    body.filename,
++  );
++  const upload_url = await presignPut(object_key, body.content_type, {
++    expiresSeconds: 600,
++  });
++
++  return NextResponse.json({
++    resource_id,
++    object_key,
++    upload_url,
++    file_type: fileType,
++  });
++}
+diff --git a/components/resources/ImageLightbox.tsx b/components/resources/ImageLightbox.tsx
+new file mode 100644
+index 0000000..12ffd16
+--- /dev/null
++++ b/components/resources/ImageLightbox.tsx
+@@ -0,0 +1,70 @@
++"use client";
++
++// components/resources/ImageLightbox.tsx — minimal click-to-zoom modal.
++//
++// Opened from <ResourceEmbed> when an image resource is clicked. Closes
++// on Esc, on backdrop click, and restores focus to the trigger on close.
++
++import { useEffect, useRef, type ReactNode, type MouseEvent } from "react";
++
++export interface ImageLightboxProps {
++  src: string;
++  alt: string;
++  onClose: () => void;
++}
++
++export function ImageLightbox({
++  src,
++  alt,
++  onClose,
++}: ImageLightboxProps): ReactNode {
++  const dialogRef = useRef<HTMLDivElement>(null);
++
++  useEffect(() => {
++    const prev = document.activeElement as HTMLElement | null;
++    dialogRef.current?.focus();
++    const onKey = (e: KeyboardEvent) => {
++      if (e.key === "Escape") onClose();
++    };
++    document.addEventListener("keydown", onKey);
++    return () => {
++      document.removeEventListener("keydown", onKey);
++      if (prev && typeof prev.focus === "function") prev.focus();
++    };
++  }, [onClose]);
++
++  const swallow = (e: MouseEvent<HTMLImageElement>) => e.stopPropagation();
++
++  return (
++    <div
++      ref={dialogRef}
++      tabIndex={-1}
++      role="dialog"
++      aria-modal="true"
++      aria-label={alt}
++      onClick={onClose}
++      style={{
++        position: "fixed",
++        inset: 0,
++        zIndex: 9999,
++        display: "grid",
++        placeItems: "center",
++        background: "rgba(0,0,0,0.85)",
++        cursor: "zoom-out",
++      }}
++    >
++      {/* eslint-disable-next-line @next/next/no-img-element */}
++      <img
++        src={src}
++        alt={alt}
++        onClick={swallow}
++        style={{
++          maxWidth: "92vw",
++          maxHeight: "92vh",
++          objectFit: "contain",
++          cursor: "default",
++        }}
++      />
++    </div>
++  );
++}
+diff --git a/components/resources/ResourceEmbed.module.css b/components/resources/ResourceEmbed.module.css
+new file mode 100644
+index 0000000..9d51488
+--- /dev/null
++++ b/components/resources/ResourceEmbed.module.css
+@@ -0,0 +1,176 @@
++/* ResourceEmbed.module.css — the kind-switched embed renderer.
++ *
++ * Tokens (--paper, --ink-*, --accent, --radius-sm, --font-mono) come from
++ * styles/tokens.css. The component never invents a color — variant and
++ * subject color cascade from the calling card. */
++
++.aspect {
++  position: relative;
++  width: 100%;
++  aspect-ratio: 16 / 9;
++  border-radius: var(--radius-sm, 6px);
++  overflow: hidden;
++  background: var(--ink-50, #f4f4f5);
++}
++
++.iframe,
++.media {
++  position: absolute;
++  inset: 0;
++  width: 100%;
++  height: 100%;
++  border: 0;
++  display: block;
++}
++
++.audio {
++  width: 100%;
++}
++
++/* ── Image ─────────────────────────────────────────────────────────────── */
++
++.imageBtn {
++  display: block;
++  width: 100%;
++  padding: 0;
++  border: 0;
++  background: transparent;
++  cursor: zoom-in;
++  border-radius: var(--radius-sm, 6px);
++  overflow: hidden;
++}
++
++.imageBtn:focus-visible {
++  outline: 2px solid var(--accent, #2563eb);
++  outline-offset: 2px;
++}
++
++.image {
++  display: block;
++  width: 100%;
++  height: auto;
++  object-fit: cover;
++}
++
++/* ── OG link card ──────────────────────────────────────────────────────── */
++
++.ogCard {
++  display: grid;
++  grid-template-columns: 120px 1fr;
++  gap: 12px;
++  text-decoration: none;
++  color: inherit;
++  border: 1px solid var(--ink-100, #e4e4e7);
++  border-radius: var(--radius-sm, 6px);
++  overflow: hidden;
++  background: var(--paper, #fff);
++  transition: border-color 120ms ease;
++}
++
++.ogCard:hover {
++  border-color: var(--ink-200, #d4d4d8);
++}
++
++.ogCard:focus-visible {
++  outline: 2px solid var(--accent, #2563eb);
++  outline-offset: 2px;
++}
++
++.ogThumb {
++  width: 120px;
++  height: 100%;
++  object-fit: cover;
++}
++
++.ogThumbFallback {
++  background: var(--ink-50, #f4f4f5);
++}
++
++.ogBody {
++  display: flex;
++  flex-direction: column;
++  justify-content: center;
++  padding: 12px 14px 12px 0;
++  min-width: 0;
++}
++
++.ogTitle {
++  font-weight: 600;
++  font-size: 14px;
++  line-height: 1.3;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.ogDesc {
++  font-size: 13px;
++  line-height: 1.4;
++  color: var(--ink-600, #52525b);
++  margin-top: 4px;
++  display: -webkit-box;
++  -webkit-line-clamp: 2;
++  -webkit-box-orient: vertical;
++  overflow: hidden;
++}
++
++.ogDomain {
++  font-size: 12px;
++  color: var(--ink-500, #71717a);
++  margin-top: 6px;
++}
++
++/* ── Literal / hyperlink link modes ────────────────────────────────────── */
++
++.literal {
++  font-family: var(--font-mono, ui-monospace, monospace);
++  font-size: 13px;
++  word-break: break-all;
++  color: inherit;
++}
++
++.hyperlink {
++  color: var(--accent, #2563eb);
++  text-decoration: underline;
++}
++
++/* ── Variants ──────────────────────────────────────────────────────────── */
++
++.v_row {
++  aspect-ratio: auto;
++  height: 44px;
++}
++
++.v_row.ogCard {
++  grid-template-columns: 44px 1fr;
++  gap: 8px;
++  height: 44px;
++}
++
++.v_row .ogThumb,
++.v_row .ogThumbFallback {
++  width: 44px;
++  height: 44px;
++}
++
++.v_row .ogBody {
++  padding: 4px 10px 4px 0;
++}
++
++.v_card,
++.v_tile {
++  /* No overrides — default tile geometry. */
++}
++
++/* ── Reduced motion ────────────────────────────────────────────────────── */
++
++@media (prefers-reduced-motion: reduce) {
++  .ogCard {
++    transition: none;
++  }
++}
++
++/* ── Legacy fixture marker — invisible by default; flip on with a [data-debug] ancestor in dev. */
++.legacyMarker {
++  display: none;
++}
+diff --git a/components/resources/ResourceEmbed.tsx b/components/resources/ResourceEmbed.tsx
+new file mode 100644
+index 0000000..208ce80
+--- /dev/null
++++ b/components/resources/ResourceEmbed.tsx
+@@ -0,0 +1,258 @@
++"use client";
++
++// components/resources/ResourceEmbed.tsx
++//
++// The single kind-switched renderer for every resource. Used by:
++//   • components/lesson-flow/resource-tile.tsx       (section thumbnails)
++//   • components/lesson-flow/section-resources.tsx   (primary 2x2 + lists)
++//   • components/subject/ResourcesSort.tsx           (all-resources table)
++//   • components/daily/ResourceComposer.tsx          (capture-strip preview)
++//
++// The component does NOT call /api/og-preview itself — OG enrichment
++// happens once at link-creation time on the server (the POST /api/resources
++// route dogfoods the OG-preview route). The row arrives here with
++// preview_title/_description/_thumbnail_url already set.
++//
++// Caller contract: pass `resource.url`. When the URL is absent, this
++// component renders a hidden marker — that's how the section-resources /
++// resource-tile callers keep their legacy synthetic-glyph branches working.
++
++import type { ReactNode, MouseEvent } from "react";
++import { useState } from "react";
++import type { LessonResource } from "@/lib/types";
++import { ImageLightbox } from "./ImageLightbox";
++import styles from "./ResourceEmbed.module.css";
++
++export interface ResourceEmbedProps {
++  resource: LessonResource;
++  /** Visual variant.
++   *   tile  — 16:9 thumbnail (default; used in PrimaryCard + section grids).
++   *   row   — compact inline row (used in ResourcesSort).
++   *   card  — OG-style preview card (used for thumbnail-mode links). */
++  variant?: "tile" | "row" | "card";
++  /** Optional click handler that supersedes the default behavior
++   *  (e.g. the composer's "open in lightbox" preview overrides). */
++  onClick?: () => void;
++}
++
++export function ResourceEmbed({
++  resource,
++  variant = "tile",
++  onClick,
++}: ResourceEmbedProps): ReactNode {
++  const { url, provider, displayMode = "thumbnail" } = resource;
++
++  // Legacy fixture row — no URL. Caller decides what to render in this
++  // case; we surface a tiny invisible marker so a wrong call here is
++  // visible in dev (CSS toggles it on with a data attribute).
++  if (!url) {
++    return <span className={styles.legacyMarker} aria-hidden="true" />;
++  }
++
++  switch (provider) {
++    case "youtube":
++    case "vimeo":
++    case "gslides":
++    case "gdocs":
++    case "gsheets":
++    case "gdrive":
++    case "pdf":
++      return <IframeEmbed resource={resource} variant={variant} />;
++    case "image":
++      return (
++        <ImageEmbed resource={resource} variant={variant} onClick={onClick} />
++      );
++    case "video":
++      return <VideoEmbed resource={resource} />;
++    case "audio":
++      return <AudioEmbed resource={resource} />;
++    case "website":
++    default:
++      return (
++        <LinkEmbed
++          resource={resource}
++          displayMode={displayMode}
++          variant={variant}
++        />
++      );
++  }
++}
++
++// ── Iframe variants (YouTube / Vimeo / Google / hosted PDF) ───────────────
++
++function IframeEmbed({
++  resource,
++  variant,
++}: {
++  resource: LessonResource;
++  variant: "tile" | "row" | "card";
++}): ReactNode {
++  // The sandbox allowlist is the minimum each allowed provider needs to
++  // render a working player / preview. We intentionally do not allow
++  // allow-top-navigation or allow-forms — there's no use-case here for
++  // those, and disallowing them limits the blast radius if a provider's
++  // embed ever turned hostile.
++  return (
++    <div className={[styles.aspect, styles[`v_${variant}`]].join(" ")}>
++      <iframe
++        src={resource.url}
++        title={resource.label}
++        loading="lazy"
++        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
++        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation"
++        className={styles.iframe}
++      />
++    </div>
++  );
++}
++
++// ── Image (click → lightbox) ──────────────────────────────────────────────
++
++function ImageEmbed({
++  resource,
++  variant,
++  onClick,
++}: {
++  resource: LessonResource;
++  variant: "tile" | "row" | "card";
++  onClick?: () => void;
++}): ReactNode {
++  const [lightboxOpen, setLightboxOpen] = useState(false);
++  const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
++    if (onClick) {
++      onClick();
++      return;
++    }
++    e.preventDefault();
++    setLightboxOpen(true);
++  };
++  return (
++    <>
++      <button
++        type="button"
++        className={[styles.imageBtn, styles[`v_${variant}`]].join(" ")}
++        onClick={handleClick}
++        aria-label={`Open image: ${resource.label}`}
++      >
++        {/* eslint-disable-next-line @next/next/no-img-element */}
++        <img
++          src={resource.thumbnailUrl ?? resource.url}
++          alt={resource.label}
++          loading="lazy"
++          className={styles.image}
++        />
++      </button>
++      {lightboxOpen && resource.url && (
++        <ImageLightbox
++          src={resource.url}
++          alt={resource.label}
++          onClose={() => setLightboxOpen(false)}
++        />
++      )}
++    </>
++  );
++}
++
++// ── Native video / audio ──────────────────────────────────────────────────
++
++function VideoEmbed({ resource }: { resource: LessonResource }): ReactNode {
++  return (
++    <div className={styles.aspect}>
++      <video
++        src={resource.url}
++        controls
++        preload="metadata"
++        className={styles.media}
++        aria-label={resource.label}
++      />
++    </div>
++  );
++}
++
++function AudioEmbed({ resource }: { resource: LessonResource }): ReactNode {
++  return (
++    <audio
++      src={resource.url}
++      controls
++      preload="metadata"
++      className={styles.audio}
++      aria-label={resource.label}
++    />
++  );
++}
++
++// ── Link (three display modes + OG card) ──────────────────────────────────
++
++function LinkEmbed({
++  resource,
++  displayMode,
++  variant,
++}: {
++  resource: LessonResource;
++  displayMode: "literal" | "hyperlink" | "thumbnail";
++  variant: "tile" | "row" | "card";
++}): ReactNode {
++  if (displayMode === "literal") {
++    return (
++      <a
++        href={resource.url}
++        target="_blank"
++        rel="noopener noreferrer"
++        className={styles.literal}
++      >
++        {resource.url}
++      </a>
++    );
++  }
++  if (displayMode === "hyperlink") {
++    return (
++      <a
++        href={resource.url}
++        target="_blank"
++        rel="noopener noreferrer"
++        className={styles.hyperlink}
++      >
++        {resource.linkText || resource.label}
++      </a>
++    );
++  }
++  // thumbnail (OG card)
++  return (
++    <a
++      href={resource.url}
++      target="_blank"
++      rel="noopener noreferrer"
++      className={[styles.ogCard, styles[`v_${variant}`]].join(" ")}
++    >
++      {resource.thumbnailUrl ? (
++        // eslint-disable-next-line @next/next/no-img-element
++        <img
++          src={resource.thumbnailUrl}
++          alt=""
++          loading="lazy"
++          className={styles.ogThumb}
++        />
++      ) : (
++        <span className={styles.ogThumbFallback} aria-hidden="true" />
++      )}
++      <span className={styles.ogBody}>
++        <span className={styles.ogTitle}>
++          {resource.previewTitle || resource.label}
++        </span>
++        {resource.previewDescription ? (
++          <span className={styles.ogDesc}>{resource.previewDescription}</span>
++        ) : null}
++        <span className={styles.ogDomain}>{safeHost(resource.url)}</span>
++      </span>
++    </a>
++  );
++}
++
++function safeHost(url: string | undefined): string {
++  if (!url) return "";
++  try {
++    return new URL(url).hostname.replace(/^www\./, "");
++  } catch {
++    return "";
++  }
++}
+diff --git a/components/resources/index.ts b/components/resources/index.ts
+new file mode 100644
+index 0000000..7d33c08
+--- /dev/null
++++ b/components/resources/index.ts
+@@ -0,0 +1,5 @@
++// Barrel for the cross-view resource embed primitives.
++export { ResourceEmbed } from "./ResourceEmbed";
++export type { ResourceEmbedProps } from "./ResourceEmbed";
++export { ImageLightbox } from "./ImageLightbox";
++export type { ImageLightboxProps } from "./ImageLightbox";
+diff --git a/docs/5.24.26 claude-access.md b/docs/5.24.26 claude-access.md
+index f65d2a2..7806039 100644
+--- a/docs/5.24.26 claude-access.md	
++++ b/docs/5.24.26 claude-access.md	
+@@ -305,3 +305,99 @@ secret put` invocation that reads from stdin.
+ | **Claude Co-work** (browser sessions) | `/auth/claude-login?token=…&next=/weekly` once at session start                                               |
+ | **Claude Code Cloud**                 | `Bearer` header for scripted access                                                                           |
+ | **Anthropic Custom Connector**        | `?claude=` URL param in connector config (rotate the connector secret in lockstep with `CLAUDE_BYPASS_TOKEN`) |
++
++---
++
++## Resource embed / Cloudflare R2
++
++Phase 1B's resource-embed slice (`resource-embed-1b` branch) introduces the
++first production R2 wiring. Files (PDF / DOCX / RTF / images) attached to
++lesson events upload directly from the browser to R2 via presigned URLs,
++and serve back to the browser through a Next.js route handler that issues
++short-lived signed GETs with inline disposition. Links (YouTube / Vimeo /
++Google / arbitrary websites) carry only metadata — no R2 traffic.
++
++### Bucket + key shape
++
++- **Bucket name:** `lesson-resources`
++- **Object key:** `<team_id>/<owner_event_id>/<resource_id>/<filename>`
++
++The key shape makes objects auditable per team / event / resource without
++touching the DB. A future nightly sweep can drop orphans by matching keys
++against `resources.r2_object_keys`.
++
++### Env vars (Cloudflare Worker secrets + `.env.local`)
++
++| Name                   | Value                                         |
++| ---------------------- | --------------------------------------------- |
++| `R2_ACCOUNT_ID`        | Cloudflare account ID                         |
++| `R2_ACCESS_KEY_ID`     | R2 API token (S3-compat), Object Read + Write |
++| `R2_SECRET_ACCESS_KEY` | R2 API token (S3-compat) — secret             |
++| `R2_BUCKET`            | `lesson-resources`                            |
++| `R2_PUBLIC_HOST`       | `<accountid>.r2.cloudflarestorage.com`        |
++
++The Worker binding `LESSON_RESOURCES` (in `wrangler.jsonc`) is reserved
++for future server-side reads; current traffic uses the presigner.
++
++### Signed-URL TTLs
++
++- **PUT (upload):** 600s. The browser PUTs the file before the URL expires;
++  the upload route mints a fresh URL on retry.
++- **GET (inline preview):** 3600s. Long enough that a teacher can leave a
++  PDF open for an hour without the URL going stale; short enough that
++  forwarding the URL to a non-teammate is short-lived. RLS gates the row
++  read; the signed URL only fronts the object.
++
++### Polymorphic owner pointer
++
++Resources attach to one of five `owner_event_type` values (from the
++`resource_owner_type` enum):
++
++| Owner type           | Maps to                                      |
++| -------------------- | -------------------------------------------- |
++| `core_lesson_event`  | `master_core_lesson_events.id` (master plan) |
++| `extra_lesson_event` | `extra_lesson_events.id` (one-off lesson)    |
++| `day_event`          | `day_events.id` (non-academic block)         |
++| `unit`               | `units.id`                                   |
++| `personal_subject`   | `subjects.id` (personal-scoped subject)      |
++
++Note `personal_core_lesson_event_copies` (the per-teacher fork) does not
++have its own row type — personal-copy edits to a lesson's resources flow
++through the same `core_lesson_event` pointer; RLS resolves the team gate.
++This matches the §4.2 spec: forking does not duplicate resource attachments.
++
++### Count limits (Tim, 2026-05-27)
++
++- ≤10 hosted files (`pdf | docx | rtf`) per `(owner_event_type, owner_event_id)`
++- ≤10 hosted images (`image | image_stack`) per same
++- Links unlimited
++
++Enforced in two places:
++
++1. **`/api/resources/upload`** pre-checks the count before presigning, so a
++   teacher gets a clean error before the file uploads.
++2. **`enforce_resource_limits()` trigger** on `resources` raises a Postgres
++   exception (`resource_limit_files` / `resource_limit_images`) — backstops
++   races and direct DB inserts.
++
++### CSP — adding a new provider
++
++`next.config.ts` sets `Content-Security-Policy`. To allow a new embed
++provider:
++
++1. Add the host to **`frame-src`** if it serves an iframe (most cases).
++2. Add the thumbnail-CDN host to **`img-src`** if it serves OG images / posters.
++3. Extend `lib/resource-embed.ts` with a new regex branch + provider tag.
++
++### Files
++
++- `supabase/migrations/20260527120000_resources_embed_fields.sql` — column
++  - RLS + trigger changes layered onto the resources table.
++- `lib/r2.ts` — SigV4 presigner. Zero deps; uses Web Crypto.
++- `app/api/resources/route.ts` — list + create.
++- `app/api/resources/[id]/route.ts` — signed-redirect GET, PATCH, DELETE.
++- `app/api/resources/upload/route.ts` — preflight returning a presigned PUT.
++- `app/api/og-preview/route.ts` — server-side OG fetch for link cards.
++- `lib/resource-embed.ts` — pure URL → ParsedResource normalizer.
++- `components/resources/ResourceEmbed.tsx` — the kind-switched renderer.
++- `components/resources/ImageLightbox.tsx` — image click-to-zoom.
+diff --git a/lib/r2.ts b/lib/r2.ts
+new file mode 100644
+index 0000000..8d278f0
+--- /dev/null
++++ b/lib/r2.ts
+@@ -0,0 +1,241 @@
++// lib/r2.ts — AWS S3-compatible SigV4 presigner for Cloudflare R2.
++//
++// Two exports:
++//   • presignPut(key, contentType, opts) — URL the browser PUTs to.
++//   • presignGet(key, opts)               — URL the browser GETs from,
++//                                            optionally with inline disposition.
++//
++// Why presigned URLs and not the Workers R2 binding for browser traffic:
++// the binding only works server-side. To let the browser upload directly
++// to R2 (avoiding a hop through the Worker), we presign a PUT. For reads
++// we presign a GET so the Worker doesn't proxy every PDF/image stream.
++//
++// SigV4 reference: https://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html
++// R2 quirks:
++//   • region is fixed to "auto"
++//   • service is "s3"
++//   • only `host` is signed; payload is "UNSIGNED-PAYLOAD"
++
++const SERVICE = "s3";
++const REGION = "auto";
++
++interface PresignOpts {
++  /** TTL on the presigned URL in seconds. Defaults: PUT 600s, GET 3600s. */
++  expiresSeconds?: number;
++}
++
++export interface PresignGetOpts extends PresignOpts {
++  /** Set `Content-Disposition: inline; filename="..."` so PDFs render in-browser. */
++  inline?: boolean;
++  /** Filename presented to the browser for save-as. */
++  filename?: string;
++}
++
++function env(name: string): string {
++  const v = process.env[name];
++  if (!v) throw new Error(`Missing env var: ${name}`);
++  return v;
++}
++
++function r2Host(): string {
++  // e.g. <accountid>.r2.cloudflarestorage.com
++  return env("R2_PUBLIC_HOST");
++}
++
++function bucket(): string {
++  return env("R2_BUCKET");
++}
++
++// ── Web Crypto helpers ─────────────────────────────────────────────────────
++
++async function sha256Hex(s: string): Promise<string> {
++  const buf = new TextEncoder().encode(s);
++  const hash = await crypto.subtle.digest("SHA-256", buf);
++  return toHex(hash);
++}
++
++async function hmac(
++  key: ArrayBuffer | Uint8Array,
++  msg: string,
++): Promise<ArrayBuffer> {
++  const keyBuf: BufferSource =
++    key instanceof Uint8Array
++      ? (key.buffer.slice(
++          key.byteOffset,
++          key.byteOffset + key.byteLength,
++        ) as ArrayBuffer)
++      : key;
++  const cryptoKey = await crypto.subtle.importKey(
++    "raw",
++    keyBuf,
++    { name: "HMAC", hash: "SHA-256" },
++    false,
++    ["sign"],
++  );
++  return crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(msg));
++}
++
++function toHex(buf: ArrayBuffer | Uint8Array): string {
++  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
++  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
++}
++
++// ── Date formatting ────────────────────────────────────────────────────────
++
++function amzDates(now = new Date()): { amzDate: string; dateStamp: string } {
++  // 20240101T120000Z / 20240101
++  const iso = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
++  return {
++    amzDate: iso,
++    dateStamp: iso.slice(0, 8),
++  };
++}
++
++// ── Canonical URI helpers ──────────────────────────────────────────────────
++
++function uriEncode(s: string, encodeSlash = true): string {
++  // AWS-style: every byte except [A-Za-z0-9-_.~]; '/' optionally exempt.
++  let out = "";
++  for (const c of s) {
++    if (/^[A-Za-z0-9\-_.~]$/.test(c)) {
++      out += c;
++    } else if (c === "/" && !encodeSlash) {
++      out += c;
++    } else {
++      for (const byte of new TextEncoder().encode(c)) {
++        out += "%" + byte.toString(16).toUpperCase().padStart(2, "0");
++      }
++    }
++  }
++  return out;
++}
++
++// ── Core sign ──────────────────────────────────────────────────────────────
++
++async function deriveSigningKey(
++  secret: string,
++  dateStamp: string,
++): Promise<ArrayBuffer> {
++  const kDate = await hmac(
++    new TextEncoder().encode("AWS4" + secret),
++    dateStamp,
++  );
++  const kRegion = await hmac(kDate, REGION);
++  const kService = await hmac(kRegion, SERVICE);
++  const kSigning = await hmac(kService, "aws4_request");
++  return kSigning;
++}
++
++interface SignArgs {
++  method: "PUT" | "GET";
++  key: string;
++  query: Record<string, string>;
++  expiresSeconds: number;
++}
++
++async function presign(args: SignArgs): Promise<string> {
++  const { method, key, query, expiresSeconds } = args;
++  const accessKey = env("R2_ACCESS_KEY_ID");
++  const secretKey = env("R2_SECRET_ACCESS_KEY");
++  const host = r2Host();
++  const { amzDate, dateStamp } = amzDates();
++  const credentialScope = `${dateStamp}/${REGION}/${SERVICE}/aws4_request`;
++
++  // Canonical request
++  const canonicalUri = "/" + uriEncode(`${bucket()}/${key}`, false);
++  const signedHeaders = "host";
++  const params: Record<string, string> = {
++    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
++    "X-Amz-Credential": `${accessKey}/${credentialScope}`,
++    "X-Amz-Date": amzDate,
++    "X-Amz-Expires": String(expiresSeconds),
++    "X-Amz-SignedHeaders": signedHeaders,
++    ...query,
++  };
++  const canonicalQuery = Object.keys(params)
++    .sort()
++    .map((k) => `${uriEncode(k)}=${uriEncode(params[k])}`)
++    .join("&");
++  const canonicalHeaders = `host:${host}\n`;
++  const payloadHash = "UNSIGNED-PAYLOAD";
++
++  const canonicalRequest = [
++    method,
++    canonicalUri,
++    canonicalQuery,
++    canonicalHeaders,
++    signedHeaders,
++    payloadHash,
++  ].join("\n");
++
++  const stringToSign = [
++    "AWS4-HMAC-SHA256",
++    amzDate,
++    credentialScope,
++    await sha256Hex(canonicalRequest),
++  ].join("\n");
++
++  const signingKey = await deriveSigningKey(secretKey, dateStamp);
++  const signature = toHex(await hmac(signingKey, stringToSign));
++
++  return `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
++}
++
++// ── Public API ─────────────────────────────────────────────────────────────
++
++/** Presign a PUT URL the browser can upload directly to. The browser sends
++ *  the file with `Content-Type: <contentType>`; the type is not part of the
++ *  signed payload (we set X-Amz-Content-Sha256 = UNSIGNED-PAYLOAD), so any
++ *  Content-Type the browser sends is accepted by R2. */
++export async function presignPut(
++  key: string,
++  contentType: string,
++  opts: PresignOpts = {},
++): Promise<string> {
++  // contentType is accepted for API symmetry; R2 honors whatever the browser
++  // sends on the PUT. It's not signed.
++  void contentType;
++  return presign({
++    method: "PUT",
++    key,
++    query: {},
++    expiresSeconds: opts.expiresSeconds ?? 600,
++  });
++}
++
++/** Presign a GET URL. When `inline` is true, the URL carries a
++ *  `response-content-disposition=inline` override so PDFs / images render
++ *  in-browser instead of triggering a save dialog. */
++export async function presignGet(
++  key: string,
++  opts: PresignGetOpts = {},
++): Promise<string> {
++  const query: Record<string, string> = {};
++  if (opts.inline) {
++    const name = opts.filename
++      ? `; filename="${opts.filename.replace(/"/g, "")}"`
++      : "";
++    query["response-content-disposition"] = `inline${name}`;
++  }
++  return presign({
++    method: "GET",
++    key,
++    query,
++    expiresSeconds: opts.expiresSeconds ?? 3600,
++  });
++}
++
++/** Compose the canonical R2 object key. The team_id / event_id / resource_id
++ *  segments make the key auditable and let a future RLS-aware sweep know
++ *  which row each object belongs to. */
++export function r2Key(
++  teamId: string,
++  ownerEventId: string,
++  resourceId: string,
++  filename: string,
++): string {
++  // Strip path separators from filename so a crafted name can't escape its
++  // resource folder.
++  const safe = filename.replace(/[\\/]/g, "_");
++  return `${teamId}/${ownerEventId}/${resourceId}/${safe}`;
++}
+diff --git a/lib/resource-embed.ts b/lib/resource-embed.ts
+new file mode 100644
+index 0000000..946ae9d
+--- /dev/null
++++ b/lib/resource-embed.ts
+@@ -0,0 +1,277 @@
++// resource-embed.ts — URL → ParsedResource. Pure, no I/O.
++//
++// Maps a pasted/typed URL to the metadata the <ResourceEmbed> renderer
++// needs: which embed surface to use (iframe / img / video / link card),
++// the rewritten embed URL (e.g. youtube.com/watch?v=X → youtube-nocookie
++// /embed/X), and a thumbnail when one is cheaply derivable.
++//
++// The renderer reads `provider` + `embedUrl`; the composer also reads
++// `displayName` + `thumbnailUrl` to draw the capture-strip preview.
++//
++// Security: only http(s) URLs are accepted; everything else degrades to
++// the link fallback. The renderer never injects HTML — every URL flows
++// through React `src`/`href` props.
++
++import type { LessonResource, ResourceProvider } from "./types";
++
++export interface ParsedResource {
++  /** Coarse kind. Maps 1:1 to the renderer's branch. */
++  kind: "embed" | "image" | "video" | "audio" | "pdf" | "link";
++  provider: ResourceProvider;
++  /** The URL the renderer should point an <iframe>/<img>/<video> at.
++   *  Null for non-embeddable generic links. */
++  embedUrl: string | null;
++  /** OG image / YouTube poster / null. */
++  thumbnailUrl: string | null;
++  /** Human label suggestion — caller may override. */
++  displayName: string;
++  /** False when only a link/fallback card can be drawn. */
++  canEmbed: boolean;
++}
++
++// ── Provider regexes ──────────────────────────────────────────────────────
++// Capture group 1 is always the id we need.
++const RX = {
++  youtubeWatch:
++    /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:[^#&?]*&)*v=([A-Za-z0-9_-]{11})/i,
++  youtubeShort: /^https?:\/\/youtu\.be\/([A-Za-z0-9_-]{11})/i,
++  youtubeShorts:
++    /^https?:\/\/(?:www\.)?youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/i,
++  youtubeEmbed:
++    /^https?:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([A-Za-z0-9_-]{11})/i,
++  vimeo:
++    /^https?:\/\/(?:www\.|player\.)?vimeo\.com\/(?:video\/|channels\/[^/]+\/)?(\d+)/i,
++  gslides: /^https?:\/\/docs\.google\.com\/presentation\/d\/([A-Za-z0-9_-]+)/i,
++  gdocs: /^https?:\/\/docs\.google\.com\/document\/d\/([A-Za-z0-9_-]+)/i,
++  gsheets: /^https?:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]+)/i,
++  gdriveFile: /^https?:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]+)/i,
++  gdriveOpen: /^https?:\/\/drive\.google\.com\/open\?id=([A-Za-z0-9_-]+)/i,
++};
++
++const EXTS = {
++  image: /\.(jpe?g|png|gif|webp|avif|svg)(?:\?.*)?$/i,
++  video: /\.(mp4|webm|mov|m4v)(?:\?.*)?$/i,
++  audio: /\.(mp3|m4a|wav|ogg|aac)(?:\?.*)?$/i,
++  pdf: /\.pdf(?:\?.*)?$/i,
++};
++
++const SAFE_SCHEME = /^https?:\/\//i;
++
++// ── Main ──────────────────────────────────────────────────────────────────
++
++export function parseResourceUrl(raw: string): ParsedResource {
++  const trimmed = raw.trim();
++  if (!SAFE_SCHEME.test(trimmed)) {
++    return fallback(trimmed);
++  }
++
++  let m: RegExpMatchArray | null;
++
++  // YouTube — watch / short / shorts / already-embed forms all collapse
++  // to the privacy-enhanced /embed/ID URL.
++  if (
++    (m = trimmed.match(RX.youtubeWatch)) ||
++    (m = trimmed.match(RX.youtubeShort)) ||
++    (m = trimmed.match(RX.youtubeShorts)) ||
++    (m = trimmed.match(RX.youtubeEmbed))
++  ) {
++    const id = m[1];
++    return {
++      kind: "embed",
++      provider: "youtube",
++      embedUrl: `https://www.youtube-nocookie.com/embed/${id}`,
++      thumbnailUrl: `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
++      displayName: `YouTube · ${id}`,
++      canEmbed: true,
++    };
++  }
++
++  // Vimeo
++  if ((m = trimmed.match(RX.vimeo))) {
++    return {
++      kind: "embed",
++      provider: "vimeo",
++      embedUrl: `https://player.vimeo.com/video/${m[1]}`,
++      // Vimeo's thumbnail API needs an OAuth token; defer to OG fetch.
++      thumbnailUrl: null,
++      displayName: `Vimeo · ${m[1]}`,
++      canEmbed: true,
++    };
++  }
++
++  // Google Slides — /edit → /embed
++  if ((m = trimmed.match(RX.gslides))) {
++    return {
++      kind: "embed",
++      provider: "gslides",
++      embedUrl: `https://docs.google.com/presentation/d/${m[1]}/embed`,
++      thumbnailUrl: null,
++      displayName: "Google Slides",
++      canEmbed: true,
++    };
++  }
++
++  // Google Docs — /edit → /preview
++  if ((m = trimmed.match(RX.gdocs))) {
++    return {
++      kind: "embed",
++      provider: "gdocs",
++      embedUrl: `https://docs.google.com/document/d/${m[1]}/preview`,
++      thumbnailUrl: null,
++      displayName: "Google Doc",
++      canEmbed: true,
++    };
++  }
++
++  // Google Sheets — /edit → /preview
++  if ((m = trimmed.match(RX.gsheets))) {
++    return {
++      kind: "embed",
++      provider: "gsheets",
++      embedUrl: `https://docs.google.com/spreadsheets/d/${m[1]}/preview`,
++      thumbnailUrl: null,
++      displayName: "Google Sheet",
++      canEmbed: true,
++    };
++  }
++
++  // Google Drive — /view or /open?id= → /preview
++  if (
++    (m = trimmed.match(RX.gdriveFile)) ||
++    (m = trimmed.match(RX.gdriveOpen))
++  ) {
++    return {
++      kind: "embed",
++      provider: "gdrive",
++      embedUrl: `https://drive.google.com/file/d/${m[1]}/preview`,
++      thumbnailUrl: null,
++      displayName: "Google Drive",
++      canEmbed: true,
++    };
++  }
++
++  // Extension-based fallbacks (directly hosted media).
++  if (EXTS.image.test(trimmed)) {
++    return {
++      kind: "image",
++      provider: "image",
++      embedUrl: trimmed,
++      thumbnailUrl: trimmed,
++      displayName: basename(trimmed),
++      canEmbed: true,
++    };
++  }
++  if (EXTS.video.test(trimmed)) {
++    return {
++      kind: "video",
++      provider: "video",
++      embedUrl: trimmed,
++      thumbnailUrl: null,
++      displayName: basename(trimmed),
++      canEmbed: true,
++    };
++  }
++  if (EXTS.audio.test(trimmed)) {
++    return {
++      kind: "audio",
++      provider: "audio",
++      embedUrl: trimmed,
++      thumbnailUrl: null,
++      displayName: basename(trimmed),
++      canEmbed: true,
++    };
++  }
++  if (EXTS.pdf.test(trimmed)) {
++    return {
++      kind: "pdf",
++      provider: "pdf",
++      embedUrl: trimmed,
++      thumbnailUrl: null,
++      displayName: basename(trimmed),
++      canEmbed: true,
++    };
++  }
++
++  // Generic link — the renderer chooses literal/hyperlink/thumbnail
++  // based on the resource's displayMode.
++  return {
++    kind: "link",
++    provider: "website",
++    embedUrl: null,
++    thumbnailUrl: null,
++    displayName: safeHostname(trimmed) ?? trimmed,
++    canEmbed: false,
++  };
++}
++
++function basename(url: string): string {
++  try {
++    const p = new URL(url).pathname;
++    return decodeURIComponent(p.slice(p.lastIndexOf("/") + 1)) || url;
++  } catch {
++    return url;
++  }
++}
++
++function safeHostname(url: string): string | null {
++  try {
++    return new URL(url).hostname.replace(/^www\./, "");
++  } catch {
++    return null;
++  }
++}
++
++function fallback(raw: string): ParsedResource {
++  return {
++    kind: "link",
++    provider: "website",
++    embedUrl: null,
++    thumbnailUrl: null,
++    displayName: raw.slice(0, 80),
++    canEmbed: false,
++  };
++}
++
++/** Convenience: project a parsed result onto a LessonResource patch
++ *  so the composer can spread it into the planner-store mutation. */
++export function parsedToLessonResource(
++  parsed: ParsedResource,
++  url: string,
++): Partial<LessonResource> {
++  return {
++    url,
++    provider: parsed.provider,
++    thumbnailUrl: parsed.thumbnailUrl ?? undefined,
++    label: parsed.displayName,
++  };
++}
++
++/** Map a parsed result to the legacy `LessonResource["type"]` field so
++ *  the existing render sites (which still switch on `type` for the glyph)
++ *  keep producing a sensible icon. The renderer prefers `provider`. */
++export function parsedToLegacyType(
++  parsed: ParsedResource,
++): LessonResource["type"] {
++  switch (parsed.provider) {
++    case "youtube":
++    case "vimeo":
++    case "video":
++      return "youtube";
++    case "gslides":
++      return "slides";
++    case "gdocs":
++      return "doc";
++    case "gsheets":
++      return "doc";
++    case "gdrive":
++    case "pdf":
++      return "pdf";
++    case "image":
++      return "image";
++    case "audio":
++      return "link";
++    case "website":
++    default:
++      return "website";
++  }
++}
+diff --git a/lib/types.ts b/lib/types.ts
+index 5edf35f..b0a7b9e 100644
+--- a/lib/types.ts
++++ b/lib/types.ts
+@@ -43,12 +43,59 @@ export interface Unit {
+   shade: number;
+ }
+ 
+-/** A resource attached to a lesson or task. */
++/** A resource attached to a lesson or task.
++ *
++ *  Two shapes coexist in the document today: the legacy `{ type, label }`
++ *  fixture rows (synthesized labels, no real URL) and the post-Phase-1B
++ *  shape with `url` + provider metadata. Everything beyond `type`/`label`
++ *  is optional so the existing mock fixtures stay valid; views fall back
++ *  to the synthetic glyph render when `url` is absent. */
+ export interface LessonResource {
+   type: "slides" | "pdf" | "doc" | "image" | "youtube" | "website" | "link";
+   label: string;
++  /** Real URL — embed source, link target, or R2 signed-GET endpoint. When
++   *  absent, this is a legacy/placeholder fixture row. */
++  url?: string;
++  /** Fine-grained provider detected from the URL — drives the renderer's
++   *  embed switch. Computed by `parseResourceUrl` at link-creation time. */
++  provider?: ResourceProvider;
++  /** How a LINK resource (provider in {"website","link"}) is rendered in
++   *  the lesson body. Files always render as their native embed (image →
++   *  <img>, pdf → iframe, etc.); this is link-only. Default: thumbnail. */
++  displayMode?: "literal" | "hyperlink" | "thumbnail";
++  /** Visible anchor text when `displayMode === "hyperlink"`. */
++  linkText?: string;
++  /** Mime type for hosted files. */
++  mimeType?: string;
++  /** Hosted file size in bytes — informs the limits UI. */
++  sizeBytes?: number;
++  /** Intrinsic image/video dimensions, when known. */
++  width?: number;
++  height?: number;
++  /** Thumbnail URL — OG image, YouTube poster, generated WebP, etc. */
++  thumbnailUrl?: string;
++  /** OG-fetched title/description for `provider="website"` rows. */
++  previewTitle?: string;
++  previewDescription?: string;
++  /** Server-side row id — present after the row has been persisted. */
++  resourceId?: string;
+ }
+ 
++/** Provider tag computed from the resource URL — narrows the renderer's
++ *  embed strategy without touching the DB's coarse `resource_kind` enum. */
++export type ResourceProvider =
++  | "youtube"
++  | "vimeo"
++  | "gslides"
++  | "gdocs"
++  | "gsheets"
++  | "gdrive"
++  | "pdf"
++  | "image"
++  | "video"
++  | "audio"
++  | "website";
++
+ /** Per-lesson completion / catch-up state. */
+ export type LessonStatus =
+   | "not_done"
+diff --git a/next.config.ts b/next.config.ts
+index b7d72e1..30c501e 100644
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -1,6 +1,38 @@
+ import type { NextConfig } from "next";
+ import path from "node:path";
+ 
++// Derive the Supabase host (the project URL minus the scheme + trailing
++// slash) so the CSP's connect-src can name it explicitly. Falls back to
++// "*.supabase.co" when the env var isn't set (e.g. during a bare build).
++const supabaseHost =
++  (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "")
++    .replace(/^https?:\/\//, "")
++    .replace(/\/$/, "") || "*.supabase.co";
++
++// R2 public host — set per environment (e.g. <accountid>.r2.cloudflarestorage.com).
++// In a dev environment without an R2 binding configured, fall through to the
++// wildcard so the CSP still parses and embed surfaces work locally.
++const r2Host = process.env.R2_PUBLIC_HOST ?? "*.r2.cloudflarestorage.com";
++
++// ── Content-Security-Policy ─────────────────────────────────────────────────
++// Locks down where embeds + media may load from. New embed providers are
++// added by extending the relevant directive (usually `frame-src`).
++const csp = [
++  "default-src 'self'",
++  // Next.js requires unsafe-inline (runtime + Next/font), and unsafe-eval
++  // is needed for the dev/runtime React fast-refresh path.
++  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
++  "style-src 'self' 'unsafe-inline'",
++  "font-src 'self' data:",
++  `img-src 'self' data: blob: https://${r2Host} https://img.youtube.com https://i.vimeocdn.com https://*.googleusercontent.com https://*.ggpht.com`,
++  `media-src 'self' blob: https://${r2Host}`,
++  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://docs.google.com https://drive.google.com",
++  `connect-src 'self' https://${supabaseHost} https://${r2Host}`,
++  "object-src 'none'",
++  "base-uri 'self'",
++  "form-action 'self'",
++].join("; ");
++
+ const nextConfig: NextConfig = {
+   // Pin the workspace root to this project. A stray lockfile in the user's
+   // home directory otherwise makes Next infer the wrong tracing root.
+@@ -16,6 +48,19 @@ const nextConfig: NextConfig = {
+       },
+     ],
+   },
++
++  async headers() {
++    return [
++      {
++        source: "/(.*)",
++        headers: [
++          { key: "Content-Security-Policy", value: csp },
++          { key: "X-Content-Type-Options", value: "nosniff" },
++          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
++        ],
++      },
++    ];
++  },
+ };
+ 
+ export default nextConfig;
+diff --git a/supabase/migrations/20260527120000_resources_embed_fields.sql b/supabase/migrations/20260527120000_resources_embed_fields.sql
+new file mode 100644
+index 0000000..51fcbfc
+--- /dev/null
++++ b/supabase/migrations/20260527120000_resources_embed_fields.sql
+@@ -0,0 +1,180 @@
++-- Phase 1B — resources embed slice.
++-- Extends the dormant `resources` table (added in
++-- 20260518102823_initial_schema.sql:839-864) with the columns the embed
++-- renderer + composer need, tightens RLS to a proper team check, and
++-- enforces the per-event count limits Tim set in the 2026-05-27 brief:
++--   ≤10 hosted files (pdf/docx/rtf) per (owner_event_type, owner_event_id)
++--   ≤10 hosted images (image/image_stack) per (owner_event_type, owner_event_id)
++--   links unlimited
++
++-- ── 1. Columns ──────────────────────────────────────────────────────────────
++alter table resources
++  add column if not exists display_mode text
++    check (display_mode in ('literal', 'hyperlink', 'thumbnail'))
++    default 'thumbnail',
++  add column if not exists link_text text,
++  add column if not exists mime_type text,
++  add column if not exists width int,
++  add column if not exists height int,
++  add column if not exists position int not null default 0,
++  add column if not exists provider text;
++
++-- Sanity check on `provider` values — kept as a text column (not an enum)
++-- so adding a new provider later doesn't require a schema migration.
++do $$
++begin
++  if not exists (
++    select 1 from pg_constraint where conname = 'resources_provider_chk'
++  ) then
++    alter table resources
++      add constraint resources_provider_chk check (
++        provider is null or provider in (
++          'youtube', 'vimeo', 'gslides', 'gdocs', 'gsheets', 'gdrive',
++          'pdf', 'image', 'video', 'audio', 'website'
++        )
++      );
++  end if;
++end $$;
++
++-- Index for the in-event ordering used by the renderer.
++create index if not exists idx_resources_owner_position
++  on resources (owner_event_type, owner_event_id, position);
++
++
++-- ── 2. RLS helper — auth_can_access_event ───────────────────────────────────
++-- Resolve a polymorphic (owner_event_type, owner_event_id) pointer to whether
++-- the current auth.uid() can read/write resources attached to it. Used by
++-- the resources_read policy below. Mirrors the per-table baseline policies
++-- already established in 20260518102823_initial_schema.sql §11.
++create or replace function auth_can_access_event(
++  p_owner_event_type resource_owner_type,
++  p_owner_event_id   uuid
++)
++returns boolean
++language sql stable security definer
++set search_path = public
++as $$
++  select case p_owner_event_type
++    when 'core_lesson_event' then exists (
++      select 1
++        from master_core_lesson_events m
++        join units u on u.id = m.unit_id
++       where m.id = p_owner_event_id
++         and can_read_grade(u.grade_level_id)
++    )
++    when 'extra_lesson_event' then exists (
++      select 1
++        from extra_lesson_events e
++       where e.id = p_owner_event_id
++         and (e.author_id = auth.uid()
++              or e.teacher_id = auth.uid()
++              or (e.scope = 'team' and can_read_grade(e.grade_level_id)))
++    )
++    when 'day_event' then exists (
++      select 1
++        from day_events d
++       where d.id = p_owner_event_id
++         and can_read_grade(d.grade_level_id)
++         and (d.scope = 'team' or d.author_id = auth.uid())
++    )
++    when 'unit' then exists (
++      select 1
++        from units u
++       where u.id = p_owner_event_id
++         and can_read_grade(u.grade_level_id)
++    )
++    when 'personal_subject' then exists (
++      select 1
++        from subjects s
++       where s.id = p_owner_event_id
++         and s.owner_id = auth.uid()
++    )
++    else false
++  end;
++$$;
++
++
++-- ── 3. Tightened RLS policies ───────────────────────────────────────────────
++-- Old policies (read = any teacher in school, write = uploader-only) were
++-- baseline-only. Replace with the helper above for read, and split write
++-- into _insert / _update / _delete so the read-side gate is a team check
++-- while the write-side stays uploader-only.
++drop policy if exists resources_read   on resources;
++drop policy if exists resources_write  on resources;
++drop policy if exists resources_insert on resources;
++drop policy if exists resources_update on resources;
++drop policy if exists resources_delete on resources;
++
++create policy resources_read on resources for select using (
++  auth_can_access_event(owner_event_type, owner_event_id)
++);
++
++create policy resources_insert on resources for insert with check (
++  uploaded_by_id = auth.uid()
++  and auth_can_access_event(owner_event_type, owner_event_id)
++);
++
++create policy resources_update on resources for update using (
++  uploaded_by_id = auth.uid()
++) with check (
++  uploaded_by_id = auth.uid()
++);
++
++create policy resources_delete on resources for delete using (
++  uploaded_by_id = auth.uid()
++);
++
++
++-- ── 4. Count-enforcement trigger ────────────────────────────────────────────
++-- Per Tim's 2026-05-27 brief: ≤10 hosted_file rows of (pdf|docx|rtf) per
++-- owner event; ≤10 of (image|image_stack); links unlimited. The API route
++-- pre-checks counts before presigning, so this trigger only fires on race
++-- conditions or direct DB inserts.
++create or replace function enforce_resource_limits()
++returns trigger
++language plpgsql
++as $$
++declare
++  doc_count   int;
++  image_count int;
++begin
++  if new.kind <> 'hosted_file' then
++    return new;
++  end if;
++
++  if new.file_type in ('pdf', 'docx', 'rtf') then
++    select count(*) into doc_count
++      from resources
++     where owner_event_type = new.owner_event_type
++       and owner_event_id   = new.owner_event_id
++       and kind             = 'hosted_file'
++       and file_type        in ('pdf', 'docx', 'rtf')
++       and id <> new.id;
++    if doc_count >= 10 then
++      raise exception 'resource_limit_files'
++        using hint = 'Up to 10 files per lesson.';
++    end if;
++  end if;
++
++  if new.file_type in ('image', 'image_stack') then
++    select count(*) into image_count
++      from resources
++     where owner_event_type = new.owner_event_type
++       and owner_event_id   = new.owner_event_id
++       and kind             = 'hosted_file'
++       and file_type        in ('image', 'image_stack')
++       and id <> new.id;
++    if image_count >= 10 then
++      raise exception 'resource_limit_images'
++        using hint = 'Up to 10 images per lesson.';
++    end if;
++  end if;
++
++  return new;
++end;
++$$;
++
++drop trigger if exists trg_resources_enforce_limits on resources;
++create trigger trg_resources_enforce_limits
++  before insert on resources
++  for each row execute function enforce_resource_limits();
+diff --git a/wrangler.jsonc b/wrangler.jsonc
+index 987d2ac..97bdd46 100644
+--- a/wrangler.jsonc
++++ b/wrangler.jsonc
+@@ -14,4 +14,14 @@
+   // Serve the Worker on the production domain. `custom_domain` provisions the
+   // DNS record + TLS cert automatically, since the zone is in this account.
+   "routes": [{ "pattern": "mycurricula.app", "custom_domain": true }],
++
++  // R2 binding for lesson resources. The Worker uses it server-side (the
++  // browser uploads directly via presigned URLs from lib/r2.ts). Bucket
++  // must exist before deploy — see docs/claude-access.md §Resource embed.
++  "r2_buckets": [
++    {
++      "binding": "LESSON_RESOURCES",
++      "bucket_name": "lesson-resources",
++    },
++  ],
+ }

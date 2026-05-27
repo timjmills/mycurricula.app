@@ -1,0 +1,660 @@
+diff --git a/components/daily/ResourceComposer.tsx b/components/daily/ResourceComposer.tsx
+index 5aa149a..0b9524f 100644
+--- a/components/daily/ResourceComposer.tsx
++++ b/components/daily/ResourceComposer.tsx
+@@ -85,6 +85,8 @@ import { usePlanner } from "@/lib/planner-store";
+ import { SUBJECTS } from "@/lib/mock";
+ import { useLabels } from "@/lib/labels";
+ import { Button, Tooltip } from "@/components/ui";
++import { parseResourceUrl } from "@/lib/resource-embed";
++import { ResourceEmbed } from "@/components/resources";
+ import { AllToolsMenu } from "./AllToolsMenu";
+ import styles from "./ResourceComposer.module.css";
+ 
+@@ -110,6 +112,19 @@ export interface CapturedItem {
+    *  text"). When the store grows a richer LessonResource shape, lift the
+    *  note out of the label and into its own column. */
+   note?: string;
++  /** Real URL (embed source for links; `blob:` for in-session files). */
++  url?: string;
++  /** Fine-grained provider from parseResourceUrl or mime detection. */
++  provider?: import("@/lib/types").ResourceProvider;
++  /** Link display mode — only meaningful when provider is "website". */
++  displayMode?: "literal" | "hyperlink" | "thumbnail";
++  /** Anchor text when displayMode === "hyperlink". */
++  linkText?: string;
++  mimeType?: string;
++  sizeBytes?: number;
++  thumbnailUrl?: string;
++  /** Set true for file items so the limits banner can bucket them. */
++  isFile?: boolean;
+ }
+ 
+ /** Summary of what landed in the planner doc on Add — handed back to
+@@ -196,12 +211,34 @@ export function mimeToResourceType(file: File): LessonResource["type"] {
+   return "link";
+ }
+ 
+-/** Convert a File into a CapturedItem (synthetic — no upload). */
++/** Map a File's mime to the fine-grained `ResourceProvider` tag used by
++ *  the embed primitives. Mirrors `mimeToResourceType` but returns the
++ *  newer provider taxonomy (image / pdf / video / audio) so the
++ *  ResourceEmbed renderer can pick the right branch from a session-only
++ *  blob URL. Returns undefined for things we don't yet recognise. */
++function mimeToProvider(
++  file: File,
++): import("@/lib/types").ResourceProvider | undefined {
++  if (file.type.startsWith("image/")) return "image";
++  if (file.type === "application/pdf") return "pdf";
++  if (file.type.startsWith("video/")) return "video";
++  if (file.type.startsWith("audio/")) return "audio";
++  return undefined;
++}
++
++/** Convert a File into a CapturedItem. Mints a session-only `blob:` URL
++ *  so the captured strip + ResourceEmbed can preview the file in-place
++ *  before Add (real R2 upload lands in a later slice). */
+ export function fileToCapturedItem(file: File): CapturedItem {
+   return {
+     id: uid("cap"),
+     type: mimeToResourceType(file),
+     label: file.name || "File",
++    url: URL.createObjectURL(file),
++    provider: mimeToProvider(file),
++    mimeType: file.type,
++    sizeBytes: file.size,
++    isFile: true,
+   };
+ }
+ 
+@@ -300,6 +337,27 @@ export function ResourceComposer({
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [open]);
+ 
++  // ── Blob-URL leak guard ──────────────────────────────────────────────
++  // File picks mint `blob:` URLs via URL.createObjectURL so the embed
++  // preview can render the file in-session. Those handles need an
++  // explicit URL.revokeObjectURL when the composer closes (or the items
++  // are dropped) or the browser leaks them for the page's lifetime.
++  // We keep a ref to the latest items array so the cleanup effect can
++  // revoke without listing `items` in its deps (which would re-fire on
++  // every keystroke).
++  const itemsRef = useRef<CapturedItem[]>(items);
++  useEffect(() => {
++    itemsRef.current = items;
++  }, [items]);
++  useEffect(() => {
++    if (open) return;
++    // The dialog just closed — revoke every blob URL we created during
++    // this session so the browser frees the underlying File objects.
++    for (const item of itemsRef.current) {
++      if (item.url?.startsWith("blob:")) URL.revokeObjectURL(item.url);
++    }
++  }, [open]);
++
+   // ── On close: restore focus ──────────────────────────────────────────
+   useEffect(() => {
+     if (open) return;
+@@ -396,10 +454,30 @@ export function ResourceComposer({
+     setItems((prev) => [...prev, { ...partial, id: uid("cap") }]);
+   }, []);
+ 
+-  /** Add many at once — used by the file pickers' onChange. */
++  /** Add many at once — used by the file pickers' onChange. Enforces
++   *  the per-lesson caps (≤10 files + ≤10 images) at capture time so the
++   *  teacher can't accidentally queue an 11th item. Counts ONLY the
++   *  current strip; a Phase 1B+ improvement is to include the section's
++   *  already-attached items in the count. */
+   const addItems = useCallback((next: CapturedItem[]) => {
+     if (next.length === 0) return;
+-    setItems((prev) => [...prev, ...next]);
++    setItems((prev) => {
++      const merged: CapturedItem[] = [...prev];
++      for (const item of next) {
++        const fileCount = merged.filter(
++          (c) => c.isFile && c.provider !== "image",
++        ).length;
++        const imageCount = merged.filter(
++          (c) => c.isFile && c.provider === "image",
++        ).length;
++        if (item.isFile && item.provider === "image" && imageCount >= 10)
++          continue;
++        if (item.isFile && item.provider !== "image" && fileCount >= 10)
++          continue;
++        merged.push(item);
++      }
++      return merged;
++    });
+   }, []);
+ 
+   const removeItem = useCallback((id: string) => {
+@@ -445,10 +523,19 @@ export function ResourceComposer({
+         // Photo picker uses accept="image/*", but be defensive: only
+         // accept images here so the caller's intent is preserved.
+         if (!files[i].type.startsWith("image/")) continue;
++        // Photo picks get the same rich shape as the generic upload
++        // path — blob URL + provider + size + mime — so the embed
++        // preview and limits banner can read them.
++        const f = files[i];
+         captured.push({
+           id: uid("cap"),
+           type: "image",
+-          label: files[i].name || "Photo",
++          label: f.name || "Photo",
++          url: URL.createObjectURL(f),
++          provider: "image",
++          mimeType: f.type,
++          sizeBytes: f.size,
++          isFile: true,
+         });
+       }
+       addItems(captured);
+@@ -468,11 +555,36 @@ export function ResourceComposer({
+   }, []);
+   const onSearchClick = useCallback(() => setSearchOpen((v) => !v), []);
+ 
+-  /** Confirm the inline URL: append a link item, clear the field, keep open. */
++  /** Confirm the inline URL: parse it through `parseResourceUrl` so the
++   *  captured chip carries a real `provider`, `thumbnailUrl`, and
++   *  `displayName`, then append a link item and clear the field. */
+   const onLinkConfirm = useCallback(() => {
+     const raw = linkValue.trim();
+     if (!raw) return;
+-    addItem({ type: "link", label: raw });
++    const parsed = parseResourceUrl(raw);
++    addItem({
++      type:
++        parsed.provider === "youtube" ||
++        parsed.provider === "vimeo" ||
++        parsed.provider === "video"
++          ? "youtube"
++          : parsed.provider === "gslides"
++            ? "slides"
++            : parsed.provider === "gdocs" || parsed.provider === "gsheets"
++              ? "doc"
++              : parsed.provider === "gdrive" || parsed.provider === "pdf"
++                ? "pdf"
++                : parsed.provider === "image"
++                  ? "image"
++                  : "link",
++      label: parsed.displayName,
++      url: raw,
++      provider: parsed.provider,
++      thumbnailUrl: parsed.thumbnailUrl ?? undefined,
++      // Default to "thumbnail" for every link; the segmented control on
++      // the chip lets the teacher flip to literal/hyperlink.
++      displayMode: "thumbnail",
++    });
+     setLinkValue("");
+   }, [linkValue, addItem]);
+ 
+@@ -506,10 +618,18 @@ export function ResourceComposer({
+       }
+       if (imgFiles.length > 0) {
+         e.preventDefault();
++        // Enrich pasted images with the same blob-URL + provider + size
++        // shape that the file picker uses, so the embed preview and the
++        // limits banner can read them.
+         const captured: CapturedItem[] = imgFiles.map((f) => ({
+           id: uid("cap"),
+           type: "image",
+           label: f.name || "Pasted image",
++          url: URL.createObjectURL(f),
++          provider: "image",
++          mimeType: f.type,
++          sizeBytes: f.size,
++          isFile: true,
+         }));
+         addItems(captured);
+         setPastedStatus(
+@@ -520,13 +640,37 @@ export function ResourceComposer({
+         return;
+       }
+ 
+-      // 2) Otherwise read plain text. URL → link item, anything else → body.
++      // 2) Otherwise read plain text. URL → link item (parsed through
++      // parseResourceUrl so we capture provider + thumbnail), anything
++      // else → body.
+       const text = cd.getData("text");
+       if (!text) return;
+ 
+       if (URL_REGEX.test(text.trim())) {
+         e.preventDefault();
+-        addItem({ type: "link", label: text.trim() });
++        const raw = text.trim();
++        const parsed = parseResourceUrl(raw);
++        addItem({
++          type:
++            parsed.provider === "youtube" ||
++            parsed.provider === "vimeo" ||
++            parsed.provider === "video"
++              ? "youtube"
++              : parsed.provider === "gslides"
++                ? "slides"
++                : parsed.provider === "gdocs" || parsed.provider === "gsheets"
++                  ? "doc"
++                  : parsed.provider === "gdrive" || parsed.provider === "pdf"
++                    ? "pdf"
++                    : parsed.provider === "image"
++                      ? "image"
++                      : "link",
++          label: parsed.displayName,
++          url: raw,
++          provider: parsed.provider,
++          thumbnailUrl: parsed.thumbnailUrl ?? undefined,
++          displayMode: "thumbnail",
++        });
+         setPastedStatus("Pasted link");
+         return;
+       }
+@@ -582,13 +726,35 @@ export function ResourceComposer({
+       return `${label} — ${trimmed}`;
+     };
+ 
+-    const toCommit: { type: LessonResource["type"]; label: string }[] =
++    // The new commit shape carries the full LessonResource payload —
++    // url/provider/displayMode/etc. — so a captured embed survives the
++    // round-trip into the planner store. Fields are undefined for the
++    // "title-only stub" path, which the store + renderer tolerate.
++    type CommitShape = {
++      type: LessonResource["type"];
++      label: string;
++      url?: string;
++      provider?: import("@/lib/types").ResourceProvider;
++      displayMode?: "literal" | "hyperlink" | "thumbnail";
++      linkText?: string;
++      mimeType?: string;
++      sizeBytes?: number;
++      thumbnailUrl?: string;
++    };
++    const toCommit: CommitShape[] =
+       items.length > 0
+         ? items.map((it) => ({
+             type: it.type,
+             // Prefer the per-item label; the dialog's title only steers
+             // the first item so multi-item adds keep their per-file names.
+             label: labelWithNote(it.label, it.note),
++            url: it.url,
++            provider: it.provider,
++            displayMode: it.displayMode,
++            linkText: it.linkText,
++            mimeType: it.mimeType,
++            sizeBytes: it.sizeBytes,
++            thumbnailUrl: it.thumbnailUrl,
+           }))
+         : [{ type: "link", label: title.trim() || "New resource" }];
+ 
+@@ -605,15 +771,35 @@ export function ResourceComposer({
+     }
+ 
+     if (destSectionId) {
+-      // Section route — one addSectionResource per item.
++      // Section route — one addSectionResource per item. The new
++      // signature accepts a Partial<SectionResource> shape so url +
++      // provider + displayMode + the rest flow into the store.
+       for (const r of toCommit) {
+-        addSectionResource(destLessonId, destSectionId, r.type, r.label);
++        addSectionResource(destLessonId, destSectionId, {
++          type: r.type,
++          label: r.label,
++          url: r.url,
++          provider: r.provider,
++          displayMode: r.displayMode,
++          linkText: r.linkText,
++          mimeType: r.mimeType,
++          sizeBytes: r.sizeBytes,
++          thumbnailUrl: r.thumbnailUrl,
++        });
+       }
+     } else {
+       // Whole-lesson route — merge into lesson.resources via editLesson.
++      // Same full LessonResource shape as the section route.
+       const newResources: LessonResource[] = toCommit.map((r) => ({
+         type: r.type,
+         label: r.label,
++        url: r.url,
++        provider: r.provider,
++        displayMode: r.displayMode,
++        linkText: r.linkText,
++        mimeType: r.mimeType,
++        sizeBytes: r.sizeBytes,
++        thumbnailUrl: r.thumbnailUrl,
+       }));
+       editLesson(destLessonId, {
+         resources: [...destLesson.resources, ...newResources],
+@@ -938,6 +1124,37 @@ export function ResourceComposer({
+               rows={3}
+             />
+ 
++            {/* ── Limits banner ──────────────────────────────────────────── */}
++            {/* Per Tim's brief: ≤10 files (PDF/DOCX/RTF) + ≤10 images per
++            lesson; links unlimited. The banner counts ONLY the items in
++            the current capture strip — a Phase 1B+ improvement is to
++            include the section's already-attached items. The cap is
++            enforced in `addItems`, so this line is informational. */}
++            {items.length > 0 &&
++              (() => {
++                const fileCount = items.filter(
++                  (c) => c.isFile && c.provider !== "image",
++                ).length;
++                const imageCount = items.filter(
++                  (c) => c.isFile && c.provider === "image",
++                ).length;
++                const linkCount = items.filter((c) => !c.isFile).length;
++                return (
++                  <div
++                    style={{
++                      fontSize: 11,
++                      color: "var(--ink-500, #71717a)",
++                      margin: "4px 0",
++                    }}
++                    role="status"
++                    aria-live="polite"
++                  >
++                    {fileCount} / 10 files · {imageCount} / 10 images ·{" "}
++                    {linkCount} link{linkCount === 1 ? "" : "s"}
++                  </div>
++                );
++              })()}
++
+             {/* ── Captured items strip + paste status ────────────────────── */}
+             {/* Each chip is a button — tapping it opens a small textarea
+             below the strip where the teacher writes a note for THAT
+@@ -1020,6 +1237,78 @@ export function ResourceComposer({
+                               <SmallXIcon />
+                             </button>
+                           </Tooltip>
++                          {/* Inline embed preview — shows the teacher the
++                          actual thing before they Add. We pass the
++                          captured item as a LessonResource (the shape is
++                          compatible: type/label/url/provider/etc.); the
++                          renderer falls back to a legacy marker if no
++                          url is present, so legacy fixtures stay safe. */}
++                          {item.url && (
++                            <div
++                              style={{
++                                flexBasis: "100%",
++                                marginTop: 4,
++                              }}
++                            >
++                              <ResourceEmbed
++                                resource={item as LessonResource}
++                                variant="row"
++                              />
++                            </div>
++                          )}
++                          {/* 3-way display-mode toggle — only for true
++                          link/website rows. The teacher's choice flows
++                          through to LessonResource.displayMode on Add. */}
++                          {item.provider === "website" && (
++                            <div
++                              role="radiogroup"
++                              aria-label="Link display mode"
++                              style={{
++                                display: "flex",
++                                gap: 4,
++                                marginTop: 4,
++                                flexBasis: "100%",
++                              }}
++                            >
++                              {(
++                                ["literal", "hyperlink", "thumbnail"] as const
++                              ).map((mode) => (
++                                <button
++                                  key={mode}
++                                  type="button"
++                                  role="radio"
++                                  aria-checked={item.displayMode === mode}
++                                  onClick={() =>
++                                    setItems((prev) =>
++                                      prev.map((c) =>
++                                        c.id === item.id
++                                          ? { ...c, displayMode: mode }
++                                          : c,
++                                      ),
++                                    )
++                                  }
++                                  style={{
++                                    padding: "2px 8px",
++                                    fontSize: 11,
++                                    border:
++                                      "1px solid var(--ink-100, #e4e4e7)",
++                                    borderRadius: 4,
++                                    background:
++                                      item.displayMode === mode
++                                        ? "var(--accent, #2563eb)"
++                                        : "transparent",
++                                    color:
++                                      item.displayMode === mode
++                                        ? "white"
++                                        : "inherit",
++                                    cursor: "pointer",
++                                  }}
++                                >
++                                  {mode}
++                                </button>
++                              ))}
++                            </div>
++                          )}
+                         </li>
+                       );
+                     })}
+diff --git a/components/weekly/weekly-lesson-card.tsx b/components/weekly/weekly-lesson-card.tsx
+index 53378ad..2522cc3 100644
+--- a/components/weekly/weekly-lesson-card.tsx
++++ b/components/weekly/weekly-lesson-card.tsx
+@@ -1301,12 +1301,10 @@ export function WeeklyLessonCard({
+                         // If no sections exist yet the store creates a default section.
+                         const sections = getSections(lesson.id);
+                         const targetSectionId = sections[0]?.id ?? lesson.id;
+-                        addSectionResource(
+-                          lesson.id,
+-                          targetSectionId,
+-                          "link",
+-                          "New resource",
+-                        );
++                        addSectionResource(lesson.id, targetSectionId, {
++                          type: "link",
++                          label: "New resource",
++                        });
+                       }}
+                       aria-label="Add resource to this lesson"
+                       tooltip="Attach a link, file, or video to this lesson — drops into the first section"
+diff --git a/lib/planner-store.tsx b/lib/planner-store.tsx
+index f6efcc5..fba65c5 100644
+--- a/lib/planner-store.tsx
++++ b/lib/planner-store.tsx
+@@ -242,8 +242,22 @@ type AddSectionResourceAction = {
+   type: "addSectionResource";
+   lessonId: string;
+   sectionId: string;
+-  resourceType?: SectionResource["type"];
+-  label?: string;
++  /** Full or partial new resource. `type` + `label` are required; `id` is
++   *  minted if absent; every other field is optional and carries through. */
++  resource: Partial<SectionResource> & {
++    type: SectionResource["type"];
++    label: string;
++  };
++};
++
++type EditSectionResourceAction = {
++  type: "editSectionResource";
++  lessonId: string;
++  sectionId: string;
++  resourceId: string;
++  patch: Partial<SectionResource>;
++  coalesceKey?: string;
++  coalesceTs?: number;
+ };
+ 
+ type RemoveSectionResourceAction = {
+@@ -297,6 +311,7 @@ type PlannerAction =
+   | RemoveSectionAction
+   | DuplicateSectionAction
+   | AddSectionResourceAction
++  | EditSectionResourceAction
+   | RemoveSectionResourceAction
+   | MoveSectionResourceAction
+   | ToggleSectionWebsiteAction
+@@ -345,6 +360,8 @@ function labelFor(action: PlannerAction): string {
+       return "Duplicate section";
+     case "addSectionResource":
+       return "Add resource";
++    case "editSectionResource":
++      return "Edit resource";
+     case "removeSectionResource":
+       return "Remove resource";
+     case "moveSectionResource":
+@@ -793,10 +810,12 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
+ 
+     case "addSectionResource": {
+       const current = ensureSections(doc.sections, action.lessonId);
+-      const resource = newSectionResource(
+-        action.resourceType ?? "link",
+-        action.label ?? "New resource",
+-      );
++      const seed = newSectionResource(action.resource.type, action.resource.label);
++      const resource: SectionResource = {
++        ...seed,                       // gives us a fresh id
++        ...action.resource,            // caller's fields win — type, label, url, etc.
++        id: action.resource.id ?? seed.id,
++      };
+       return {
+         ...doc,
+         sections: {
+@@ -810,6 +829,26 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
+       };
+     }
+ 
++    case "editSectionResource": {
++      const current = ensureSections(doc.sections, action.lessonId);
++      return {
++        ...doc,
++        sections: {
++          ...doc.sections,
++          [action.lessonId]: current.map((s) =>
++            s.id === action.sectionId
++              ? {
++                  ...s,
++                  resources: s.resources.map((r) =>
++                    r.id === action.resourceId ? { ...r, ...action.patch } : r,
++                  ),
++                }
++              : s,
++          ),
++        },
++      };
++    }
++
+     case "removeSectionResource": {
+       const current = ensureSections(doc.sections, action.lessonId);
+       return {
+@@ -959,8 +998,13 @@ function historyReducer(
+   // key AND it fired within COALESCE_WINDOW_MS, update present in place
+   // without pushing a new past entry. This collapses a typing burst into
+   // a single undo step.
+-  const coalesceKey = "coalesceKey" in action ? action.coalesceKey : null;
+-  const coalesceTs = "coalesceTs" in action ? action.coalesceTs : Date.now();
++  // The new editSectionResource action makes both fields optional, so the
++  // `in` check returns true even when the property is `undefined` — coerce
++  // through the null/now() defaults to keep downstream types strict.
++  const coalesceKey =
++    "coalesceKey" in action ? (action.coalesceKey ?? null) : null;
++  const coalesceTs =
++    "coalesceTs" in action ? (action.coalesceTs ?? Date.now()) : Date.now();
+ 
+   const shouldCoalesce =
+     coalesceKey !== null &&
+@@ -1069,6 +1113,7 @@ function buildLastChange(action: PlannerAction): LastChange {
+       };
+ 
+     case "addSectionResource":
++    case "editSectionResource":
+     case "removeSectionResource":
+       return {
+         kind: action.type,
+@@ -1218,12 +1263,23 @@ export interface PlannerValue {
+   removeSection: (lessonId: string, sectionId: string) => void;
+   /** Duplicate a section, inserting the copy immediately after the original. */
+   duplicateSection: (lessonId: string, sectionId: string) => void;
+-  /** Add a resource chip to a section. */
++  /** Add a resource to a section. Pass `type` + `label` minimally; carry
++   *  through `url`, `provider`, `displayMode`, etc. for real embeds. */
+   addSectionResource: (
+     lessonId: string,
+     sectionId: string,
+-    resourceType?: SectionResource["type"],
+-    label?: string,
++    resource: Partial<SectionResource> & {
++      type: SectionResource["type"];
++      label: string;
++    },
++  ) => void;
++  /** Patch a section resource (e.g. flip a link's displayMode). Coalesced
++   *  under `editResource:<lessonId>:<sectionId>:<resourceId>`. */
++  editSectionResource: (
++    lessonId: string,
++    sectionId: string,
++    resourceId: string,
++    patch: Partial<SectionResource>,
+   ) => void;
+   /** Remove a resource chip from a section. */
+   removeSectionResource: (
+@@ -1460,15 +1516,36 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
+     (
+       lessonId: string,
+       sectionId: string,
+-      resourceType?: SectionResource["type"],
+-      label?: string,
++      resource: Partial<SectionResource> & {
++        type: SectionResource["type"];
++        label: string;
++      },
+     ) => {
+       dispatchRef.current({
+         type: "addSectionResource",
+         lessonId,
+         sectionId,
+-        resourceType,
+-        label,
++        resource,
++      });
++    },
++    [],
++  );
++
++  const editSectionResource = useCallback(
++    (
++      lessonId: string,
++      sectionId: string,
++      resourceId: string,
++      patch: Partial<SectionResource>,
++    ) => {
++      dispatchRef.current({
++        type: "editSectionResource",
++        lessonId,
++        sectionId,
++        resourceId,
++        patch,
++        coalesceKey: `editResource:${lessonId}:${sectionId}:${resourceId}`,
++        coalesceTs: Date.now(),
+       });
+     },
+     [],
+@@ -1554,6 +1631,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
+       removeSection,
+       duplicateSection,
+       addSectionResource,
++      editSectionResource,
+       removeSectionResource,
+       moveSectionResource,
+       toggleSectionWebsite,
+@@ -1589,6 +1667,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
+       removeSection,
+       duplicateSection,
+       addSectionResource,
++      editSectionResource,
+       removeSectionResource,
+       moveSectionResource,
+       toggleSectionWebsite,
