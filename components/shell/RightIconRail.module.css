@@ -1,0 +1,92 @@
+/* RightIconRail.module.css
+ *
+ * The right-side mirror of GlobalRail. Wave 1.5 Lane FA introduced
+ * teacher-arrangeable rails — every icon button can live on either side.
+ * This rail is the LANDING SURFACE for icons the teacher drags off the
+ * left rail. Subject-neutral chrome — ink tokens only; no curriculum
+ * color carries into the rail (CLAUDE.md §4: color is information, never
+ * decoration). All sizing / radii / spacing comes from tokens.css.
+ *
+ * Visual contract mirrors GlobalRail.module.css — same 56px width, same
+ * 44px button hit area, same hover/active treatment — only the border
+ * direction flips (border-LEFT instead of border-RIGHT) so the rail reads
+ * as a parallel surface.
+ */
+
+/* ── Rail container ───────────────────────────────────────────────────── */
+.rail {
+  flex-shrink: 0;
+  width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  background: var(--paper);
+  border-left: 1px solid var(--ink-150);
+  position: relative;
+  z-index: 1;
+}
+
+/* When the rail is empty, render a quiet "drop here" guide so teachers
+   know they can move icons over. The guide disappears the moment any icon
+   lands on the right side. */
+.empty {
+  width: 56px;
+  /* When empty, keep the rail thin and quiet — just a vertical hairline.
+     The DOM is still mounted so dnd-kit's collision detection has a drop
+     target on every planner route. */
+}
+
+.emptyHint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: var(--t-10);
+  line-height: 1.2;
+  color: var(--ink-300);
+  padding: 12px 4px;
+  /* Vertical text — rotated 90deg so the hint reads up the rail. Keeps
+     the empty rail at 56px wide without crowding the canvas. */
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  user-select: none;
+  pointer-events: none;
+  letter-spacing: 0.04em;
+}
+
+/* When the rail is the active drag target (someone is dragging an icon
+   from the left), tint the background to telegraph "drop here". The
+   data-attribute is set by the planner layout's DndContext via React
+   state so we can react to drag-over with pure CSS. */
+.rail[data-drop-active="true"] {
+  background: var(--ink-50);
+}
+
+/* ── Top group ────────────────────────────────────────────────────────── */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  align-items: center;
+  /* Stretch the list to fill the rail so a drop near the bottom of an
+     empty rail still hits the SortableContext. min-height keeps the drop
+     target generous even when the list is empty. */
+  flex: 1;
+  min-height: 120px;
+}
+
+/* ── Responsive: narrow viewports ─────────────────────────────────────── */
+/* Mirrors GlobalRail's responsive rule — at phone widths the rail hides
+   so the canvas gets the full viewport. The teacher's arrangement is
+   preserved in localStorage and reappears on tablet/desktop. */
+@media (max-width: 480px) {
+  .rail {
+    display: none;
+  }
+}

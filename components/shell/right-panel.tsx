@@ -3,25 +3,50 @@
 // right-panel.tsx — contextual right side panel for the planner shell.
 // One job at a time, in priority order:
 //   1. todoPanelOpen  → To-do slide-out (TODOS grouped by scope)
-//   2. commentsPanelOpen → Comments browser (lessons with commentCount > 0)
+//   2. commentsPanelOpen → Shoutbox panel (team chat + comment index)
 //   3. selectedLessonId set → Lesson detail
 //   4. else → null (panel closed)
+//
+// ── Shoutbox panel — user-direction 2026-05-27 ────────────────────────────
+// The previous "Comments" panel has been renamed and expanded into the
+// Shoutbox: a tabbed surface that subsumes BOTH team chat AND the per-
+// lesson/per-unit comment index. The four tabs are
+//   • Team chat       — quick messages between teachers (placeholder copy
+//                       until the realtime backend lands; the existing Day
+//                       Shoutbox on /daily is the day-scoped counterpart).
+//   • Lesson comments — the original list: lessons that have at least one
+//                       comment, with author/recent-line previews.
+//   • Unit comments   — comments scoped to a unit (placeholder — no unit
+//                       comments exist in the mock yet, but the surface is
+//                       wired so the model can drop in).
+//   • All comments    — the aggregation index: every comment grouped first
+//                       by Subject → Unit → Lesson, with a Jump-to link.
+//
+// Option (b) from the brief (tabs inside the Shoutbox) was chosen over a
+// new global-rail icon to keep the rail's icon count steady — adding a
+// fifth icon ("All comments") would have crowded the rail and forced an
+// awkward icon vocabulary. Tabs inside one drawer = one entry point, four
+// adjacent surfaces. The unread badge on the rail/top-bar trigger remains
+// a single number summing across surfaces.
 //
 // CSS Modules in right-panel.module.css.
 // All colors and sizing come from CSS custom properties (tokens.css).
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
+import { useRouter } from "next/navigation";
 import {
   TODOS,
   TAG_BY_ID,
   LESSONS,
   LESSON_BY_ID,
   SUBJECT_BY_ID,
+  UNIT_BY_ID,
   describeStandard,
 } from "@/lib/mock";
 import type { LessonStatus } from "@/lib/types";
+import { Tooltip } from "@/components/ui";
 import styles from "./right-panel.module.css";
 
 // ── Status display helpers ───────────────────────────────────────────────────
@@ -300,81 +325,478 @@ function TodoPanel(): ReactNode {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// COMMENTS PANEL
+// SHOUTBOX PANEL (formerly the Comments panel)
 // ════════════════════════════════════════════════════════════════════════════
 
-// Lists every lesson that has at least one comment. Shows title, subject name,
-// total comment count, and an unread badge when there are unread comments.
+// Tabbed surface — four tabs (Team chat / Lesson comments / Unit comments /
+// All comments). See file header for the option-(b) reasoning. The panel is
+// triggered by useAppState().commentsPanelOpen — the internal state name is
+// preserved per the rename brief; only USER-VISIBLE labels carry "Shoutbox".
+
+type ShoutboxTabId = "team" | "lesson" | "unit" | "all";
+
+const SHOUTBOX_TABS: ReadonlyArray<{
+  id: ShoutboxTabId;
+  label: string;
+  tooltip: string;
+}> = [
+  {
+    id: "team",
+    label: "Team chat",
+    tooltip:
+      "Team chat — quick messages between teachers covering the same lessons and units. The day-scoped Day Shoutbox on the Daily view is the per-day counterpart.",
+  },
+  {
+    id: "lesson",
+    label: "Lesson Comments",
+    tooltip:
+      "Lesson Comments — comments your teammates have left on specific lessons. Click a row to jump to that lesson.",
+  },
+  {
+    id: "unit",
+    label: "Unit Comments",
+    tooltip:
+      "Unit Comments — comments left on whole units (a chapter's worth of lessons). Use these for unit-wide observations like pacing or assessment notes.",
+  },
+  {
+    id: "all",
+    label: "All comments",
+    tooltip:
+      "Every comment across the curriculum, grouped by Subject → Unit → Lesson. Use this when you want to scan the whole conversation at once.",
+  },
+];
+
+// Internal record for an aggregated comment row. Built from the existing
+// commentCount/unreadComments scalars on each lesson — when the real
+// per-comment author/text model lands this is the shape that view rows
+// will consume directly. Keeping the synthesis inline (vs. inventing fake
+// authors/timestamps) makes the seam easy to spot at backend swap-in time.
+interface CommentRow {
+  lessonId: string;
+  lessonTitle: string;
+  subjectId: string;
+  unitId: string;
+  count: number;
+  unread: number;
+}
 
 function CommentsPanel(): ReactNode {
-  const { toggleCommentsPanel } = useAppState();
+  const { toggleCommentsPanel, setSelectedLessonId } = useAppState();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<ShoutboxTabId>("team");
 
-  const withComments = LESSONS.filter((l) => l.commentCount > 0);
+  // ── All lesson-scoped comments — flat aggregation ────────────────────
+  // `lib/planner-store.tsx` only exposes scalar counts (commentCount /
+  // unreadComments) per lesson today; the per-comment author/text shape
+  // arrives with the backend. The aggregation we can produce now is
+  // therefore one row per lesson-that-has-comments, not one row per
+  // individual comment. The "All comments" tab groups those rows by
+  // Subject → Unit → Lesson per the brief.
+  const lessonComments = useMemo<CommentRow[]>(
+    () =>
+      LESSONS.filter((l) => l.commentCount > 0).map((l) => ({
+        lessonId: l.id,
+        lessonTitle: l.title,
+        subjectId: l.subject,
+        unitId: l.unit,
+        count: l.commentCount,
+        unread: l.unreadComments,
+      })),
+    [],
+  );
+
+  // ── Group lesson rows for the "All comments" tab ─────────────────────
+  // Subject → Unit → list-of-lesson-rows. A Map preserves the natural
+  // first-encounter ordering of the LESSONS fixture, which is grouped
+  // sensibly enough for the index without a stable sort key.
+  const groupedAll = useMemo(() => {
+    const bySubject = new Map<string, Map<string, CommentRow[]>>();
+    for (const row of lessonComments) {
+      let byUnit = bySubject.get(row.subjectId);
+      if (!byUnit) {
+        byUnit = new Map();
+        bySubject.set(row.subjectId, byUnit);
+      }
+      const rows = byUnit.get(row.unitId) ?? [];
+      rows.push(row);
+      byUnit.set(row.unitId, rows);
+    }
+    return bySubject;
+  }, [lessonComments]);
+
+  // Click a comment row → open the lesson detail in the right panel. The
+  // panel itself flips from comments view to lesson-detail view because of
+  // the priority order at the bottom of this file: setting selectedLessonId
+  // while keeping commentsPanelOpen=true still resolves to LessonDetailPanel
+  // (LessonDetail wins over the comments tab when both are set), and the
+  // teacher can return via the Daily Resources panel or by reopening the
+  // Shoutbox icon. NOTE: routes are not changed — the lesson surfaces in
+  // the same right-rail drawer.
+  function jumpToLesson(lessonId: string): void {
+    setSelectedLessonId(lessonId);
+  }
+
+  function jumpToUnit(subjectId: string): void {
+    // Subject pages show the unit lanes; jumping there is the closest
+    // analogue to "open this unit" until the dedicated /unit route lands.
+    router.push(`/subject/${subjectId}`);
+    toggleCommentsPanel();
+  }
 
   return (
     <div
       className={`cp-root ${styles.panel}`}
       role="complementary"
-      aria-label="Comments"
+      aria-label="Shoutbox"
     >
       {/* Header */}
       <div className={styles.header}>
-        <h2 className={styles.headerTitle}>Comments</h2>
+        <Tooltip
+          content="The team Shoutbox — quick messages between teachers plus the index of every Lesson and Unit Comment across the curriculum."
+          side="bottom"
+        >
+          <h2 className={styles.headerTitle} tabIndex={0}>
+            Shoutbox
+          </h2>
+        </Tooltip>
         <button
           type="button"
           className={`cp-focusable ${styles.closeBtn}`}
           onClick={toggleCommentsPanel}
-          aria-label="Close comments panel"
+          aria-label="Close Shoutbox panel"
+          title="Close the Shoutbox panel"
         >
           <CloseIcon />
         </button>
       </div>
 
-      {/* List */}
-      <div className={styles.body}>
-        {withComments.length === 0 ? (
-          <p className={styles.emptyState}>No comments yet.</p>
-        ) : (
-          withComments.map((lesson) => {
-            const subj = SUBJECT_BY_ID[lesson.subject];
-            return (
-              <div key={lesson.id} className={styles.commentRow}>
-                {/* Subject color dot — scoped so --c resolves via cp-subj. */}
-                <span
-                  className={`cp-subj ${subj.cls}`}
-                  aria-hidden
-                  style={{ display: "contents" }}
-                >
-                  <span
-                    className={styles.commentSubjectDot}
-                    style={{ background: "var(--c)" }}
-                  />
-                </span>
+      {/* Tabs row — reuses the .todoTabs / .todoTab vocabulary so the visual
+          treatment matches the To-do panel above. */}
+      <div className={styles.todoTabs} role="tablist" aria-label="Shoutbox sections">
+        {SHOUTBOX_TABS.map((tab) => {
+          const isActive = tab.id === activeTab;
+          return (
+            <Tooltip key={tab.id} content={tab.tooltip} side="bottom">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                className={
+                  isActive
+                    ? `${styles.todoTab} ${styles.todoTabActive}`
+                    : styles.todoTab
+                }
+                onClick={() => setActiveTab(tab.id)}
+                title={tab.tooltip}
+              >
+                {tab.label}
+              </button>
+            </Tooltip>
+          );
+        })}
+      </div>
 
-                <div className={styles.commentContent}>
-                  <p className={styles.commentTitle}>{lesson.title}</p>
-                  <p className={styles.commentSubjectName}>{subj.name}</p>
-                  <div className={styles.commentCounts}>
-                    <span className={styles.commentTotal}>
-                      {lesson.commentCount}{" "}
-                      {lesson.commentCount === 1 ? "comment" : "comments"}
-                    </span>
-                    {lesson.unreadComments > 0 && (
-                      <span
-                        className={styles.commentUnreadBadge}
-                        aria-label={`${lesson.unreadComments} unread`}
-                      >
-                        {lesson.unreadComments} new
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })
+      {/* Body — one panel at a time, content shaped by activeTab. */}
+      <div className={styles.body}>
+        {activeTab === "team" && <TeamChatTab />}
+        {activeTab === "lesson" && (
+          <LessonCommentsTab
+            rows={lessonComments}
+            onJump={jumpToLesson}
+          />
+        )}
+        {activeTab === "unit" && <UnitCommentsTab />}
+        {activeTab === "all" && (
+          <AllCommentsTab
+            grouped={groupedAll}
+            onJumpLesson={jumpToLesson}
+            onJumpUnit={jumpToUnit}
+          />
         )}
       </div>
     </div>
+  );
+}
+
+// ── Team chat tab — placeholder for the realtime backend ─────────────────
+// The Day Shoutbox on /daily is the per-day counterpart. The global Team
+// Shoutbox is a Phase 1B feature — until the backend lands the tab carries
+// onboarding-voice copy explaining where teachers can chat today.
+
+function TeamChatTab(): ReactNode {
+  return (
+    <div style={{ padding: "20px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <p className={styles.emptyState} style={{ padding: 0, textAlign: "left" }}>
+        Team chat is the team-wide, always-on conversation. Use it for quick
+        messages between teachers covering the same lessons and units.
+      </p>
+      <p className={styles.emptyState} style={{ padding: 0, textAlign: "left" }}>
+        While the global team chat is still being built, head to the{" "}
+        <strong>Day Shoutbox</strong> on the Daily view — it&apos;s the
+        day-scoped version that&apos;s live today.
+      </p>
+    </div>
+  );
+}
+
+// ── Lesson Comments tab ──────────────────────────────────────────────────
+// The original Comments-panel list, relabelled. Each row shows the lesson
+// title, subject, total comment count, and unread chip. Clicking jumps to
+// the lesson detail view in the same right-panel drawer.
+
+function LessonCommentsTab({
+  rows,
+  onJump,
+}: {
+  rows: CommentRow[];
+  onJump: (lessonId: string) => void;
+}): ReactNode {
+  if (rows.length === 0) {
+    return (
+      <p className={styles.emptyState}>
+        No Lesson Comments yet — teachers&apos; lesson comments will appear
+        here.
+      </p>
+    );
+  }
+  return (
+    <>
+      {rows.map((row) => {
+        const subj = SUBJECT_BY_ID[row.subjectId as keyof typeof SUBJECT_BY_ID];
+        if (!subj) return null;
+        return (
+          <Tooltip
+            key={row.lessonId}
+            content={`Jump to "${row.lessonTitle}" — opens the lesson detail in this panel.`}
+            side="left"
+          >
+            <button
+              type="button"
+              className={styles.commentRow}
+              onClick={() => onJump(row.lessonId)}
+              aria-label={`Open ${row.lessonTitle} (${row.count} Lesson Comment${row.count === 1 ? "" : "s"})`}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                background: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              {/* Subject color dot */}
+              <span
+                className={`cp-subj ${subj.cls}`}
+                aria-hidden
+                style={{ display: "contents" }}
+              >
+                <span
+                  className={styles.commentSubjectDot}
+                  style={{ background: "var(--c)" }}
+                />
+              </span>
+
+              <div className={styles.commentContent}>
+                <p className={styles.commentTitle}>{row.lessonTitle}</p>
+                <p className={styles.commentSubjectName}>{subj.name}</p>
+                <div className={styles.commentCounts}>
+                  <span className={styles.commentTotal}>
+                    {row.count} Lesson Comment{row.count === 1 ? "" : "s"}
+                  </span>
+                  {row.unread > 0 && (
+                    <span
+                      className={styles.commentUnreadBadge}
+                      aria-label={`${row.unread} unread`}
+                    >
+                      {row.unread} new
+                    </span>
+                  )}
+                </div>
+              </div>
+            </button>
+          </Tooltip>
+        );
+      })}
+    </>
+  );
+}
+
+// ── Unit Comments tab — placeholder until the model lands ────────────────
+// Unit-scoped comments aren't in the fixture yet; the data shape will
+// arrive with the backend. The tab is still rendered so the surface and
+// the language are in place when the model becomes available.
+
+function UnitCommentsTab(): ReactNode {
+  return (
+    <p className={styles.emptyState}>
+      No Unit Comments yet — when teachers leave comments on a whole unit
+      (e.g. about pacing or assessment), they&apos;ll appear here grouped by
+      subject.
+    </p>
+  );
+}
+
+// ── All comments aggregation tab ─────────────────────────────────────────
+// Every comment row grouped by Subject → Unit → Lesson. Each lesson row
+// carries a Jump button; each unit header is itself a button that opens
+// the subject view (closest analogue to "see this unit" until /unit lands).
+
+function AllCommentsTab({
+  grouped,
+  onJumpLesson,
+  onJumpUnit,
+}: {
+  grouped: Map<string, Map<string, CommentRow[]>>;
+  onJumpLesson: (lessonId: string) => void;
+  onJumpUnit: (subjectId: string) => void;
+}): ReactNode {
+  if (grouped.size === 0) {
+    return (
+      <p className={styles.emptyState}>
+        No comments yet — teachers&apos; lesson + unit comments will appear
+        here.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      {Array.from(grouped.entries()).map(([subjectId, byUnit]) => {
+        const subj = SUBJECT_BY_ID[subjectId as keyof typeof SUBJECT_BY_ID];
+        if (!subj) return null;
+        return (
+          <section key={subjectId} aria-labelledby={`shoutbox-subj-${subjectId}`}>
+            {/* Subject header — reuses the sticky group header from
+                .todoGroup so visual rhythm matches the To-do panel above. */}
+            <div
+              className={styles.todoGroup}
+              id={`shoutbox-subj-${subjectId}`}
+              role="rowgroup"
+            >
+              <span
+                className={`cp-subj ${subj.cls}`}
+                aria-hidden
+                style={{ display: "contents" }}
+              >
+                <span
+                  className={styles.commentSubjectDot}
+                  style={{ background: "var(--c)" }}
+                />
+              </span>
+              <span>{subj.name}</span>
+            </div>
+
+            {Array.from(byUnit.entries()).map(([unitId, rows]) => {
+              const unit = UNIT_BY_ID[unitId];
+              const unitTotal = rows.reduce((n, r) => n + r.count, 0);
+              const unitUnread = rows.reduce((n, r) => n + r.unread, 0);
+              return (
+                <div key={unitId}>
+                  {/* Unit row — a sub-group header. Click jumps to the
+                      subject view (closest analogue). */}
+                  <Tooltip
+                    content={`Open ${subj.name} curriculum to see this unit in context.`}
+                    side="left"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onJumpUnit(subjectId)}
+                      aria-label={`Open ${unit?.name ?? unitId} (${unitTotal} comment${unitTotal === 1 ? "" : "s"} across ${rows.length} lesson${rows.length === 1 ? "" : "s"})`}
+                      title={`Open ${subj.name} curriculum to see this unit`}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        background: "transparent",
+                        cursor: "pointer",
+                        padding: "8px 16px 6px 28px",
+                        fontSize: "var(--t-11)",
+                        fontWeight: 600,
+                        color: "var(--ink-700)",
+                        borderBottom: "1px solid var(--ink-100)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <span>{unit?.name ?? unitId}</span>
+                      <span
+                        style={{
+                          marginLeft: "auto",
+                          color: "var(--ink-400)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {unitTotal} · {rows.length} lesson
+                        {rows.length === 1 ? "" : "s"}
+                        {unitUnread > 0 && (
+                          <span
+                            className={styles.commentUnreadBadge}
+                            style={{ marginLeft: 6 }}
+                            aria-label={`${unitUnread} unread`}
+                          >
+                            {unitUnread} new
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </Tooltip>
+
+                  {/* Lesson rows under this unit */}
+                  {rows.map((row) => (
+                    <Tooltip
+                      key={row.lessonId}
+                      content={`Jump to "${row.lessonTitle}" — opens the lesson detail in this panel.`}
+                      side="left"
+                    >
+                      <button
+                        type="button"
+                        className={styles.commentRow}
+                        onClick={() => onJumpLesson(row.lessonId)}
+                        aria-label={`Open ${row.lessonTitle} (${row.count} Lesson Comment${row.count === 1 ? "" : "s"})`}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          background: "transparent",
+                          cursor: "pointer",
+                          paddingLeft: 28,
+                        }}
+                      >
+                        <span
+                          className={`cp-subj ${subj.cls}`}
+                          aria-hidden
+                          style={{ display: "contents" }}
+                        >
+                          <span
+                            className={styles.commentSubjectDot}
+                            style={{ background: "var(--c)" }}
+                          />
+                        </span>
+                        <div className={styles.commentContent}>
+                          <p className={styles.commentTitle}>{row.lessonTitle}</p>
+                          <div className={styles.commentCounts}>
+                            <span className={styles.commentTotal}>
+                              {row.count} Lesson Comment
+                              {row.count === 1 ? "" : "s"}
+                            </span>
+                            {row.unread > 0 && (
+                              <span
+                                className={styles.commentUnreadBadge}
+                                aria-label={`${row.unread} unread`}
+                              >
+                                {row.unread} new
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    </Tooltip>
+                  ))}
+                </div>
+              );
+            })}
+          </section>
+        );
+      })}
+    </>
   );
 }
 

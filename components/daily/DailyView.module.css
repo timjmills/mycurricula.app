@@ -195,6 +195,92 @@
   border-radius: 999px;
 }
 
+/* ── Holiday treatment on the week strip ────────────────────────────────
+ * F#20 (Wave 1B extension to /daily) — surfaces configured holidays at
+ * the week-strip granularity so a teacher scanning the strip sees the
+ * no-school day before clicking it. Two pieces compose the marker:
+ *   .weekStripPillHoliday — paints the same diagonal-stripe wash recipe
+ *                           used by UnitBar.module.css `.holiday`, but
+ *                           dialled down to a near-watermark so the
+ *                           day number stays the primary read.
+ *   .weekStripHolidayDot  — a small ink dot in the pill's top-right
+ *                           corner. Ink (not subject, not warning red)
+ *                           — "no instruction", per CLAUDE.md §4.
+ * The full holiday name + onboarding copy lives in the wrapping Tooltip
+ * (DailyView.tsx) — the dot itself is the at-a-glance signal. */
+
+.weekStripPillHoliday {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ink-700) 10%, transparent) 0,
+    color-mix(in srgb, var(--ink-700) 10%, transparent) 3px,
+    transparent 3px,
+    transparent 7px
+  );
+  cursor: help;
+}
+
+.weekStripHolidayDot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ink-700);
+  /* A thin paper-colored ring lifts the dot off the striped wash so it
+     reads at any pill state. */
+  box-shadow: 0 0 0 1.5px var(--paper);
+}
+
+/* ── Holiday banner (above the day header) ──────────────────────────────
+ * Renders when the selected day is a configured holiday. Same diagonal-
+ * stripe wash recipe as UnitBar.module.css `.holiday` (2026-05-26 source
+ * of truth) so /year, /weekly, and /daily all read holidays as the same
+ * concept. Sits between the week strip and the day header — calmly tells
+ * the teacher "no school today" without alarming color. */
+
+.holidayBanner {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 4px 12px 4px;
+  padding: 8px 12px;
+  border-radius: var(--r-8);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ink-700) 18%, transparent) 0,
+      color-mix(in srgb, var(--ink-700) 18%, transparent) 4px,
+      transparent 4px,
+      transparent 8px
+    ),
+    color-mix(in srgb, var(--paper) 50%, transparent);
+  border-left: 1px dashed color-mix(in srgb, var(--ink-700) 30%, transparent);
+  border-right: 1px dashed color-mix(in srgb, var(--ink-700) 30%, transparent);
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.holidayBannerLabel {
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  flex-shrink: 0;
+}
+
+.holidayBannerName {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 /* ── Notes banner (inside the lesson list column) ────────────────────── */
 /* Sits between the in-column day header and the "Lessons" label row. The
    banner self-hides when the day has no personal notes. Kept neutral —

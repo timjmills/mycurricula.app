@@ -629,22 +629,27 @@ export function TopBar(): ReactNode {
           <TodoIcon />
         </Button>
 
-        {/* ── Comments panel toggle with unread badge ─────────────────
-            Same tooltip= pattern. The unread-count is appended to the
-            copy so a teacher hovering over the badge sees both the
-            count and what it means without parsing the chip alone. */}
+        {/* ── Shoutbox panel toggle with unread badge ─────────────────
+            User-visible label is "Shoutbox" — the same internal panel that
+            was the "Comments" panel now subsumes both team chat and the
+            per-lesson/per-unit comment index. State names
+            (commentsPanelOpen / toggleCommentsPanel) stay as-is for
+            internal stability per the rename brief. The unread-count is
+            appended to the tooltip so a teacher hovering over the badge
+            sees both the count and what it means without parsing the
+            chip alone. */}
         <div className={styles.badgeWrap}>
           <Button
             variant="icon"
             iconAriaLabel={
               commentsPanelOpen
-                ? "Close comments panel"
-                : `Open comments panel${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`
+                ? "Close Shoutbox panel"
+                : `Open Shoutbox panel${unreadCount > 0 ? ` (${unreadCount} unread Shoutbox messages)` : ""}`
             }
             tooltip={
               commentsPanelOpen
-                ? "Close the comments panel"
-                : `Team comments on lessons${unreadCount > 0 ? ` — ${unreadCount} unread` : " — see and reply to what teammates wrote"}`
+                ? "Close the Shoutbox panel"
+                : `Open the team Shoutbox — quick messages between teachers covering the same lessons and units${unreadCount > 0 ? ` — ${unreadCount} unread` : ""}`
             }
             tooltipSide="bottom"
             onClick={toggleCommentsPanel}
@@ -654,7 +659,10 @@ export function TopBar(): ReactNode {
             <CommentsIcon />
           </Button>
           {unreadCount > 0 && (
-            <span className={styles.badge} aria-hidden="true">
+            <span
+              className={styles.badge}
+              aria-label={`${unreadCount} unread Shoutbox messages`}
+            >
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}

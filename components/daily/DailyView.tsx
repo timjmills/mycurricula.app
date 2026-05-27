@@ -125,6 +125,7 @@ import {
   dateNumberForWeekDay,
   notesForDay,
 } from "@/lib/mock";
+import { useDayHoliday, useHolidaysByDay } from "@/lib/use-day-holiday";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import Link from "next/link";
@@ -765,6 +766,41 @@ function NotesBanner({ day }: NotesBannerProps): ReactNode {
   );
 }
 
+// ── Holiday banner ───────────────────────────────────────────────────────
+// Renders above the day-header / lesson list when the selected day matches a
+// configured holiday. Subtle, not alarming — same diagonal-stripe wash recipe
+// as UnitBar.module.css `.holiday` so /year, /weekly, and /daily all read
+// the holiday as the same concept. Self-hides on non-holiday days, so the
+// banner never crowds normal-instruction days.
+
+interface HolidayBannerProps {
+  /** The active week (drives the date lookup). */
+  week: number;
+  /** The active day index in the configured school week. */
+  day: number;
+}
+
+function HolidayBanner({ week, day }: HolidayBannerProps): ReactNode {
+  const holiday = useDayHoliday(week, day);
+  if (!holiday) return null;
+
+  return (
+    <Tooltip
+      content={`This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`}
+      side="bottom"
+    >
+      <div
+        className={styles.holidayBanner}
+        role="status"
+        aria-label={`Holiday: ${holiday.name} — no school today.`}
+      >
+        <span className={styles.holidayBannerLabel}>Holiday</span>
+        <span className={styles.holidayBannerName}>{holiday.name}</span>
+      </div>
+    </Tooltip>
+  );
+}
+
 // ── Week strip ───────────────────────────────────────────────────────────
 // A horizontal row of weekday pills inside the lesson list column. Each
 // pill is a real <button> that switches the active day. Layout per pill:
@@ -795,6 +831,12 @@ interface WeekStripProps {
 }
 
 function WeekStrip({ week, selectedDay, onSelect }: WeekStripProps): ReactNode {
+  // Holiday lookup keyed by day index — every pill below checks for a match
+  // so a holiday on any day in the visible week surfaces a small dot
+  // indicator + the holiday name in the pill's tooltip. F#20 (Wave 1B
+  // extension to /daily) — the visual idiom matches the WeeklyGrid day
+  // header treatment.
+  const holidaysByDay = useHolidaysByDay(week, WEEK_DAYS.length);
   return (
     <div
       className={styles.weekStrip}
@@ -806,10 +848,19 @@ function WeekStrip({ week, selectedDay, onSelect }: WeekStripProps): ReactNode {
         // notes banner in the same column).
         const dayNotes = notesForDay(i).filter((n) => n.scope === "personal");
         const topNote = dayNotes[0];
+        const holiday = holidaysByDay.get(i) ?? null;
         const isActive = i === selectedDay;
         const dateNumber = dateNumberForWeekDay(week, i);
         const shortLabel = WEEK_DAYS_SHORT[i];
-        return (
+
+        // Compose the pill label — keyboard-only users hear the holiday
+        // context too, since the tooltip is hover/focus-visible only.
+        const baseAriaLabel = `Select ${dayName} ${dateNumber} — Week ${week}`;
+        const ariaLabel = holiday
+          ? `${baseAriaLabel}. This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`
+          : baseAriaLabel;
+
+        const pillButton = (
           <button
             key={dayName}
             // Each pill gets an id so the lesson-pane body can reference it
@@ -819,10 +870,10 @@ function WeekStrip({ week, selectedDay, onSelect }: WeekStripProps): ReactNode {
             role="tab"
             aria-selected={isActive}
             aria-controls="daily-pane-body"
-            aria-label={`Select ${dayName} ${dateNumber} — Week ${week}`}
+            aria-label={ariaLabel}
             className={`${styles.weekStripPill} ${
               isActive ? styles.weekStripPillActive : ""
-            }`}
+            } ${holiday ? styles.weekStripPillHoliday : ""}`}
             onClick={() => onSelect(i)}
           >
             <span className={styles.weekStripDayName}>{shortLabel}</span>
@@ -843,7 +894,38 @@ function WeekStrip({ week, selectedDay, onSelect }: WeekStripProps): ReactNode {
                 aria-hidden="true"
               />
             )}
+            {/* Holiday dot — a small ink dot pinned to the top-right of
+                the pill. Subject-neutral (ink, not subject color and not
+                warning red) so it reads as "no instruction", matching the
+                UnitBar.module.css `.holiday` semantic. The note dot lives
+                bottom-center; the holiday dot lives top-right so the two
+                indicators never collide on the same pill. */}
+            {holiday && (
+              <span
+                className={styles.weekStripHolidayDot}
+                aria-hidden="true"
+                title={`Holiday: ${holiday.name}`}
+              />
+            )}
           </button>
+        );
+
+        // CLAUDE.md §4 tooltip primitive — only wraps the pill when the
+        // day is a holiday so the un-marked days keep their existing
+        // bare-button activation rhythm. Tooltip portals the bubble to
+        // document.body, so the wrapping does NOT inject an extra column
+        // into the grid (the pill button itself remains the direct grid
+        // item that grid-auto-columns: 1fr sizes).
+        return holiday ? (
+          <Tooltip
+            key={dayName}
+            content={`This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`}
+            side="bottom"
+          >
+            {pillButton}
+          </Tooltip>
+        ) : (
+          pillButton
         );
       })}
     </div>
@@ -1502,6 +1584,14 @@ export function DailyView(): ReactNode {
             selectedDay={selectedDay}
             onSelect={handleDayChange}
           />
+
+          {/* ── Holiday banner ──────────────────────────────────────────
+              Self-hides on non-holiday days. F#20 (Wave 1B extension to
+              /daily) — the visual idiom matches the UnitBar.module.css
+              `.holiday` recipe so /year, /weekly, /daily all read as the
+              same concept. Sits above the day header so a teacher sees
+              the no-school context before reading the daily lineup. */}
+          <HolidayBanner week={week} day={selectedDay} />
 
           {/* ── In-column day header (full day name + progress) ── */}
           <TodayDashboard

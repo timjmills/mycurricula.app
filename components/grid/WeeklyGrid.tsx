@@ -77,6 +77,7 @@ import {
   WEEK_DAYS_SHORT,
   SUBJECT_BY_ID,
 } from "@/lib/mock";
+import { useHolidaysByDay } from "@/lib/use-day-holiday";
 import type {
   ContextAction,
   ContextActionPayload,
@@ -180,6 +181,14 @@ export function WeeklyGrid(): ReactNode {
     () => weekBounds(lessons),
     [lessons],
   );
+
+  // ── Holiday lookup for the active week ────────────────────────────────────
+  // Map<dayIndex, Holiday>; days without a holiday are absent. The map is
+  // consumed by the day-header pill (top of each affected column) and the
+  // per-column striped overlay (.holidayColumn) that paints across every
+  // subject row of that day. Visual recipe matches UnitBar's `.holiday`
+  // overlay (year-roadmap source of truth) — see WeeklyGrid.module.css.
+  const holidaysByDay = useHolidaysByDay(week, DAY_COUNT);
 
   // ── Scroll preservation after any store mutation ───────────────────────────
   // When a lesson is moved (drag, context-menu, undo/redo) we scroll the
@@ -660,6 +669,7 @@ export function WeeklyGrid(): ReactNode {
             <div className={styles.cornerCell} role="presentation" />
             {WEEK_DAYS.map((dayName, dayIdx) => {
               const shortName = WEEK_DAYS_SHORT[dayIdx] ?? dayName;
+              const holiday = holidaysByDay.get(dayIdx) ?? null;
               return (
                 <div
                   key={dayName}
@@ -669,20 +679,68 @@ export function WeeklyGrid(): ReactNode {
                   // accessibility tree as "SundaySun". The label supplies a
                   // natural-language form; the spans are aria-hidden so the
                   // label is not double-announced.
-                  aria-label={`${dayName} (${shortName})`}
+                  aria-label={
+                    holiday
+                      ? `${dayName} (${shortName}) — holiday: ${holiday.name}`
+                      : `${dayName} (${shortName})`
+                  }
                   className={`${styles.dayHead} ${
                     week === CURRENT_WEEK && dayIdx === 0
                       ? styles.dayHeadToday
                       : ""
-                  }`}
+                  } ${holiday ? styles.dayHeadHoliday : ""}`}
                 >
                   <span aria-hidden="true">{dayName}</span>
                   <span aria-hidden="true" className={styles.dayHeadDate}>
                     {shortName}
                   </span>
+                  {/* Holiday pill — surfaces the holiday name at the very
+                      top of the affected column. CLAUDE.md §4 tooltip on
+                      the marker carries the explanatory copy that the
+                      pill itself only previews. */}
+                  {holiday && (
+                    <Tooltip
+                      content={`This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`}
+                      side="bottom"
+                    >
+                      <span
+                        className={styles.dayHeadHolidayPill}
+                        aria-label={`Holiday: ${holiday.name}`}
+                      >
+                        {holiday.name}
+                      </span>
+                    </Tooltip>
+                  )}
                 </div>
               );
             })}
+
+            {/* ── Holiday column overlays ─────────────────────────────────
+                One striped wash per holiday day, painted across every
+                subject row of that column. We use CSS Grid placement
+                (grid-row: 2 / -1 — skip the day-header row at row 1;
+                grid-column: dayIdx+2 — leading subject-label col is 1)
+                so the overlay tracks the exact column the day header
+                sits over, regardless of how many subject rows are in
+                the grid. pointer-events:none so drags and clicks fall
+                through to the underlying cell, matching UnitBar's
+                non-blocking holiday treatment. The visual recipe lives
+                in WeeklyGrid.module.css `.holidayColumn`, copied from
+                UnitBar.module.css with a citation comment. */}
+            {Array.from(holidaysByDay.entries()).map(([dayIdx, holiday]) => (
+              <div
+                key={`holiday-col-${dayIdx}`}
+                className={styles.holidayColumn}
+                style={{
+                  // dayIdx 0 → column 2 (subject col is 1, then day 1..5).
+                  gridColumn: dayIdx + 2,
+                  // Skip the day-header row (row 1); span all subject rows.
+                  gridRow: "2 / -1",
+                }}
+                aria-hidden="true"
+                title={`Holiday — no instruction on this day (${holiday.name})`}
+              />
+            ))}
 
             {/* ── Subject rows ── */}
             {!weekHasLessons && (

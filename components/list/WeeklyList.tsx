@@ -32,6 +32,9 @@ import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { WEEK_DAYS } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
+import { useHolidaysByDay } from "@/lib/use-day-holiday";
+import { Tooltip } from "@/components/ui";
+import type { Holiday } from "@/lib/use-holidays";
 import { ListRow } from "./ListRow";
 import styles from "./WeeklyList.module.css";
 
@@ -57,6 +60,11 @@ interface DaySectionProps {
   dayIndex: number;
   dayName: string;
   lessons: Lesson[];
+  /** When set, the day is a configured holiday; the section paints a
+   *  subtle grey-stripe wash and surfaces the holiday name in the
+   *  header. Lessons (if any) remain visible — teachers may want to see
+   *  what they had planned. */
+  holiday: Holiday | null;
   onRowClick: (lesson: Lesson) => void;
 }
 
@@ -64,12 +72,13 @@ function DaySection({
   dayIndex,
   dayName,
   lessons,
+  holiday,
   onRowClick,
 }: DaySectionProps): ReactNode {
   const count = lessons.length;
   return (
     <section
-      className={styles.daySection}
+      className={`${styles.daySection} ${holiday ? styles.daySectionHoliday : ""}`}
       aria-labelledby={`day-heading-${dayIndex}`}
     >
       <div className={styles.dayHeader}>
@@ -79,6 +88,22 @@ function DaySection({
         <span className={styles.lessonCount} aria-label={`${count} lessons`}>
           {count} {count === 1 ? "lesson" : "lessons"}
         </span>
+        {/* Holiday pill — same visual vocabulary as the Weekly grid's day
+            header pill (.dayHeadHolidayPill). The CLAUDE.md §4 tooltip on
+            the marker carries the explanatory copy. */}
+        {holiday && (
+          <Tooltip
+            content={`This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`}
+            side="bottom"
+          >
+            <span
+              className={styles.holidayPill}
+              aria-label={`Holiday: ${holiday.name}`}
+            >
+              {holiday.name}
+            </span>
+          </Tooltip>
+        )}
       </div>
 
       {count > 0 ? (
@@ -93,7 +118,9 @@ function DaySection({
           ))}
         </div>
       ) : (
-        <p className={styles.emptyDay}>No lessons planned</p>
+        <p className={styles.emptyDay}>
+          {holiday ? "Holiday — no lessons planned" : "No lessons planned"}
+        </p>
       )}
     </section>
   );
@@ -105,6 +132,11 @@ export function WeeklyList(): ReactNode {
   const router = useRouter();
   const { week, setSelectedDay, setSelectedLessonId } = useAppState();
   const { lessons } = usePlanner();
+  // Holiday lookup for this week — used to decorate each day section with
+  // a subtle grey wash + the holiday name. F#20 (audit-deferred holiday
+  // visualization) was originally scoped to /year only; this lights up the
+  // /weekly List mode with the same UnitBar.module.css `.holiday` recipe.
+  const holidaysByDay = useHolidaysByDay(week, WEEK_DAYS.length);
 
   // Filter to lessons in the active week, then group by day index.
   // The useMemo deps are [lessons, week] — the grouped object is rebuilt
@@ -161,6 +193,7 @@ export function WeeklyList(): ReactNode {
           dayIndex={dayIndex}
           dayName={dayName}
           lessons={grouped[dayIndex] ?? []}
+          holiday={holidaysByDay.get(dayIndex) ?? null}
           onRowClick={handleRowClick}
         />
       ))}

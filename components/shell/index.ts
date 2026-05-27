@@ -7,5 +7,7 @@ export { MasterBanner } from "./master-banner";
 export { LeftFilterPanel } from "./left-filter-panel";
 export { RightPanel } from "./right-panel";
 export { GlobalRail } from "./GlobalRail";
+export { RightIconRail } from "./RightIconRail";
+export { RailsDndProvider } from "./RailsDndProvider";
 export { GlobalShortcuts } from "./global-shortcuts";
 export { Clock } from "./Clock";

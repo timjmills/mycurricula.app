@@ -8,6 +8,8 @@ import {
   GlobalShortcuts,
   LeftFilterPanel,
   MasterBanner,
+  RailsDndProvider,
+  RightIconRail,
   RightPanel,
   TopBar,
 } from "@/components/shell";
@@ -63,31 +65,46 @@ export default function PlannerLayout({
                   the Master edit mode is active; pins above the top bar. */}
               <MasterBanner />
               <TopBar />
-              <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-                {/* GlobalRail — the site-wide slim icon nav strip, mounted
-                    on every planner route. Lane CC promoted it from the
-                    Daily-only IconRail; Lane DD also wired the Schedule
-                    drawer trigger here so the Schedule side-panel is
-                    reachable from /weekly, /year, /catch-up, /subject (not
-                    just /daily) — audit F#8. GlobalRail itself mounts the
-                    <SchedulePanel> with state from useAppState so the
-                    drawer ships exactly once per page (no duplicate
-                    mounts) and the trigger + drawer share one toggle. */}
-                <GlobalRail />
-                <LeftFilterPanel />
-                <main
-                  id="main-content"
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    minHeight: 0,
-                    overflow: "auto",
-                  }}
-                >
-                  {children}
-                </main>
-                <RightPanel />
-              </div>
+              {/* RailsDndProvider wraps the body row in a single dnd-kit
+                  DndContext so teachers can drag icon buttons BETWEEN the
+                  left rail (<GlobalRail>) and the right icon rail
+                  (<RightIconRail>). The provider owns the cross-rail
+                  drop-end handler and writes the new arrangement through
+                  useRailLayout; both rails register their own
+                  SortableContext inside it (Lane FA — Wave 1.5). */}
+              <RailsDndProvider>
+                <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+                  {/* GlobalRail — the site-wide slim icon nav strip, mounted
+                      on every planner route. Lane CC promoted it from the
+                      Daily-only IconRail; Lane DD also wired the Schedule
+                      drawer trigger here so the Schedule side-panel is
+                      reachable from /weekly, /year, /catch-up, /subject (not
+                      just /daily) — audit F#8. GlobalRail itself mounts the
+                      <SchedulePanel> with state from useAppState so the
+                      drawer ships exactly once per page (no duplicate
+                      mounts) and the trigger + drawer share one toggle. */}
+                  <GlobalRail />
+                  <LeftFilterPanel />
+                  <main
+                    id="main-content"
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      minHeight: 0,
+                      overflow: "auto",
+                    }}
+                  >
+                    {children}
+                  </main>
+                  <RightPanel />
+                  {/* RightIconRail — the right-side mirror of GlobalRail.
+                      Renders whichever icons the teacher has dragged from
+                      the left rail; starts empty by default. Mounted on
+                      every planner route so the arrangement is consistent
+                      across views (Lane FA — Wave 1.5). */}
+                  <RightIconRail />
+                </div>
+              </RailsDndProvider>
               {/* Live Clock now lives inline in the top-bar next to
                   Week N (user direction 2026-05-26). The floating
                   bottom-right variant is still supported via
