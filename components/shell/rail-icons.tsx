@@ -51,6 +51,7 @@ import {
   type RailIconId,
   type RailSide,
 } from "@/lib/use-rail-layout";
+import { useRailsDragIntro } from "@/lib/use-rails-drag-intro";
 import { RailContextMenu } from "./RailContextMenu";
 import styles from "./GlobalRail.module.css";
 
@@ -252,10 +253,24 @@ const LONG_PRESS_MOVE_THRESHOLD = 10;
 interface SortableWrapProps {
   id: RailIconId;
   side: RailSide;
+  /** True when this icon is the first on its rail AND eligible for the
+   *  W3-C7 first-session drag-intro pulse. Only the left rail's first
+   *  icon ever passes true (see GlobalRail.tsx). */
+  isFirstOnRail: boolean;
   children: ReactNode;
 }
 
-function SortableWrap({ id, side, children }: SortableWrapProps): ReactNode {
+// W3-C7 pulse duration — matches the .itemIntro keyframes (1s × 2 iters).
+// We mark-introduced after the pulse finishes so subsequent renders skip
+// the class and the localStorage gate stays consistent across reloads.
+const DRAG_INTRO_PULSE_MS = 2000;
+
+function SortableWrap({
+  id,
+  side,
+  isFirstOnRail,
+  children,
+}: SortableWrapProps): ReactNode {
   const {
     attributes,
     listeners,
@@ -265,6 +280,36 @@ function SortableWrap({ id, side, children }: SortableWrapProps): ReactNode {
     isDragging,
   } = useSortable({ id });
   const { moveIcon } = useRailLayout();
+
+  // W3-C7 — first-session drag-intro pulse. The hook is SSR-safe: `mounted`
+  // is false on the server and on the first client render, so we never
+  // paint the animation until a post-mount effect has read localStorage.
+  // `playIntro` becomes true only when this is the eligible icon AND the
+  // teacher has never been introduced — at which point we paint the
+  // .itemIntro class, schedule a 2s timeout to call markIntroduced(), and
+  // then strip the class so the icon settles back to normal.
+  const {
+    mounted: dragIntroMounted,
+    hasIntroduced,
+    markIntroduced,
+  } = useRailsDragIntro();
+  const [playIntro, setPlayIntro] = useState(false);
+
+  useEffect(() => {
+    if (!dragIntroMounted) return;
+    if (!isFirstOnRail) return;
+    if (hasIntroduced) return;
+    // Eligible: paint the pulse, then mark-introduced after the keyframes
+    // finish (2s total). Cleanup clears the timer if the icon unmounts
+    // mid-pulse (route change, layout swap) so we don't call setState on
+    // an unmounted instance.
+    setPlayIntro(true);
+    const t = setTimeout(() => {
+      markIntroduced();
+      setPlayIntro(false);
+    }, DRAG_INTRO_PULSE_MS);
+    return () => clearTimeout(t);
+  }, [dragIntroMounted, isFirstOnRail, hasIntroduced, markIntroduced]);
 
   // Context-menu open-point. Null when closed.
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -369,7 +414,7 @@ function SortableWrap({ id, side, children }: SortableWrapProps): ReactNode {
       <li
         ref={setNodeRef}
         style={style}
-        className={styles.item}
+        className={`${styles.item} ${playIntro ? styles.itemIntro : ""}`.trim()}
         data-rail-icon={id}
         data-dragging={isDragging ? "true" : "false"}
         onContextMenu={handleContextMenu}
@@ -416,9 +461,19 @@ interface RailIconProps {
    *  GlobalRail share the same context-gating without re-reading
    *  usePathname twice per icon. */
   pathname: string | null;
+  /** W3-C7: when true, this icon plays the first-session drag-intro pulse
+   *  once per teacher (gated by `mycurricula:user:rails-drag-introduced`).
+   *  Only the left rail's first icon ever passes true; the bottom-pinned
+   *  settings slot and every right-rail icon default to false. */
+  isFirstOnRail?: boolean;
 }
 
-export function RailIcon({ id, side, pathname }: RailIconProps): ReactNode {
+export function RailIcon({
+  id,
+  side,
+  pathname,
+  isFirstOnRail = false,
+}: RailIconProps): ReactNode {
   const {
     todoPanelOpen,
     toggleTodoPanel,
@@ -637,7 +692,7 @@ export function RailIcon({ id, side, pathname }: RailIconProps): ReactNode {
   }
 
   return (
-    <SortableWrap id={id} side={side}>
+    <SortableWrap id={id} side={side} isFirstOnRail={isFirstOnRail}>
       {body}
     </SortableWrap>
   );

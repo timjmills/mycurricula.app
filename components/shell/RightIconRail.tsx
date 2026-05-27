@@ -62,6 +62,11 @@ export function RightIconRail(): ReactNode {
               id={id}
               side="right"
               pathname={pathname ?? null}
+              /* W3-C7: the first-session drag-intro pulse fires ONLY on the
+                 left rail's first icon. The right rail never carries it,
+                 even when icons live here, because we don't want two
+                 simultaneous pulses competing for attention. */
+              isFirstOnRail={false}
             />
           ))}
           {/* Empty-state hint. The list is still focusable / drop-able so

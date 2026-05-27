@@ -48,6 +48,16 @@
   justify-content: center;
 }
 
+/* W3-C7: while @dnd-kit reports an active drag, swap the cursor on the
+   whole li (so the cursor stays `grabbing` even if the pointer drifts off
+   the inner button during the drag). The button's own `cursor: grab` is
+   shadowed by this rule because the li is the pointer-event owner during
+   drag. */
+.item[data-dragging="true"],
+.item[data-dragging="true"] .button {
+  cursor: grabbing;
+}
+
 /* Bottom-pinned slot — the gear. mt:auto pushes it to the bottom of the
    rail without needing a flex-spacer element. */
 .bottom {
@@ -79,7 +89,11 @@
   border: 1px solid transparent;
   border-radius: var(--r-6);
   color: var(--ink-500);
-  cursor: pointer;
+  /* W3-C7: draggable rail icons advertise the affordance with `grab`. The
+     wrapping <li data-dragging> flips this to `grabbing` while a drag is
+     in flight (see .item[data-dragging="true"] below). SOON icons override
+     to `not-allowed` so the visual contract matches their behavior. */
+  cursor: grab;
   transition:
     background 0.12s,
     color 0.12s,
@@ -147,32 +161,102 @@
 
 /* ── Coming-soon affordances ───────────────────────────────────────────── */
 /* These slots render as <span> (not <button>) so they are not keyboard-
-   reachable as interactive controls. */
+   reachable as interactive controls. W3-C7 (Decision #5) made these
+   visually distinct from live controls: outline-only icon at 70% opacity
+   + a SOON mini-pill in the catchup-red token. The teacher must never be
+   able to mistake a soon icon for a live control. */
 
 .buttonSoon {
-  cursor: default;
-  opacity: 0.45;
+  /* `not-allowed` advertises the inert state — distinct from the live
+     icons' `grab` cursor. */
+  cursor: not-allowed;
+  opacity: 0.7;
   position: relative;
-  pointer-events: none;
+  /* The wrapping <li> still receives pointer events for the long-press
+     context-menu + the surrounding tooltip; the inner button is inert.
+     Removing the prior `pointer-events: none` ensures hover-tooltips and
+     the long-press menu both still work for SOON icons. */
 }
 
-/* "soon" label — a small badge overlaid at the bottom-right of the icon. */
+.buttonSoon:hover {
+  /* Suppress the live-icon hover background — SOON icons never look
+     "armed". The cursor + opacity already communicate inertness. */
+  background: transparent;
+  color: var(--ink-500);
+}
+
+/* SOON mini-pill — a small catchup-red badge anchored to the top-right of
+   the icon. Decision #5: outline-only icon + an inline mini-pill in the
+   catchup-red token. The pill paints over the icon corner so even at a
+   glance the SOON state is unambiguous. ~10px text per the spec. */
 .soonChip {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
-  font-size: 8px;
+  top: 2px;
+  right: 2px;
+  font-size: 9px;
   line-height: 1;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--ink-400);
-  background: var(--ink-100);
-  border: 1px solid var(--ink-150);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: var(--catchup);
   border-radius: var(--r-4);
-  padding: 1px 3px;
+  padding: 2px 4px;
   z-index: 1;
   pointer-events: none;
   user-select: none;
+}
+
+/* ── W3-C7 first-session pulse ─────────────────────────────────────────
+   A 2-second subtle scale + glow on the FIRST rail icon, fired exactly
+   once per teacher (gated by lib/use-rails-drag-intro on the localStorage
+   key `mycurricula:user:rails-drag-introduced`). The pulse telegraphs
+   "these icons are draggable" — the affordance that Wave 1.5 Lane FA
+   shipped invisibly.
+
+   The animation runs on the <li> wrapper (.itemIntro) — not on the inner
+   .button — so the pulse glow paints in the gap between icons rather
+   than clipping at the button's border-radius. */
+@keyframes cp-rail-drag-intro {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ink-700) 40%, transparent);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--ink-700) 0%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ink-700) 0%, transparent);
+  }
+}
+
+.itemIntro {
+  animation: cp-rail-drag-intro 1s ease-in-out 2;
+  /* The animation is purely a hint; pointer events must keep flowing to
+     the inner button so a teacher who tries to click during the pulse
+     still gets normal behavior. */
+  border-radius: var(--r-6);
+}
+
+/* Reduced-motion fallback: no scale, no glow — just a brief opacity
+   shimmer so the affordance hint is still surfaced for teachers who opt
+   out of motion. The 2-iteration count matches the active animation so
+   the total duration is identical. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes cp-rail-drag-intro {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+  .itemIntro {
+    animation: cp-rail-drag-intro 1s ease-in-out 2;
+  }
 }
 
 /* ── Reduced motion ───────────────────────────────────────────────────── */

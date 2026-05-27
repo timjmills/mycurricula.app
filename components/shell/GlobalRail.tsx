@@ -85,12 +85,16 @@ export function GlobalRail(): ReactNode {
           (and vice versa). */}
       <SortableContext items={leftIds} strategy={verticalListSortingStrategy}>
         <ul className={styles.list} role="list" data-rail-side="left">
-          {mainIds.map((id) => (
+          {mainIds.map((id, idx) => (
             <RailIcon
               key={id}
               id={id}
               side="left"
               pathname={pathname ?? null}
+              /* W3-C7: only the FIRST icon on the left rail gets the
+                 first-session pulse — singular per the audit spec. The
+                 right rail starts empty so it never carries the intro. */
+              isFirstOnRail={idx === 0}
             />
           ))}
         </ul>
