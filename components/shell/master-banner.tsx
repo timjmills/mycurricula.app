@@ -22,6 +22,7 @@
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
+import { Tooltip } from "@/components/ui";
 import styles from "./master-banner.module.css";
 
 // Duration (ms) before the heads-up phase resolves to the persistent strip.
@@ -62,20 +63,30 @@ export function MasterBanner(): ReactNode {
 
   const isHeadsUp = phase === "headsup";
 
+  // Panel-header tooltip per CLAUDE.md §4 — teach a first-time teacher
+  // what Master mode IS (editing the team's shared curriculum) and how
+  // to leave it (toggle back to Personal). Wrapped in the styled
+  // <Tooltip> primitive so the explanation paints the black-backdrop
+  // bubble that matches the rest of the chrome.
+  const bannerCopy =
+    "You're editing the team's MASTER curriculum — every change here is shared with every teacher on your grade-level team. Flip the top-bar toggle back to Personal to keep edits private.";
   return (
-    <div
-      className={`${styles.banner} ${
-        isHeadsUp ? styles.headsUp : styles.persistent
-      }`}
-      role={isHeadsUp ? "alert" : "status"}
-      aria-live={isHeadsUp ? "assertive" : "polite"}
-      aria-atomic="true"
-    >
-      <span className={styles.icon} aria-hidden="true">
-        <WarningIcon size={isHeadsUp ? 18 : 14} />
-      </span>
-      <span>Heads up — changes here affect the whole team.</span>
-    </div>
+    <Tooltip content={bannerCopy} side="bottom">
+      <div
+        className={`${styles.banner} ${
+          isHeadsUp ? styles.headsUp : styles.persistent
+        }`}
+        role={isHeadsUp ? "alert" : "status"}
+        aria-live={isHeadsUp ? "assertive" : "polite"}
+        aria-atomic="true"
+        title={bannerCopy}
+      >
+        <span className={styles.icon} aria-hidden="true">
+          <WarningIcon size={isHeadsUp ? 18 : 14} />
+        </span>
+        <span>Heads up — changes here affect the whole team.</span>
+      </div>
+    </Tooltip>
   );
 }
 

@@ -19,7 +19,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { CatchupProvider, useCatchup } from "@/lib/catchup-state";
-import { Button, PageHeader, ToggleGroup } from "@/components/ui";
+import { Button, PageHeader, ToggleGroup, Tooltip } from "@/components/ui";
 import { SettingsCard } from "@/components/appearance/settings-card";
 import styles from "./page.module.css";
 
@@ -51,7 +51,14 @@ function CatchupSettingsInner(): ReactNode {
         {/* ── Toggle card ─────────────────────────────────────────── */}
         <SettingsCard
           eyebrow="Layer 1"
-          title="Show catch-up cues"
+          title={
+            <Tooltip
+              content="Master switch for the ambient catch-up surface. When ON, the planner shows a slim per-week count of uncovered lessons and a top-bar flame badge. When OFF, neither cue appears anywhere — but the dedicated Catch-up screen is still reachable from this page."
+              side="bottom"
+            >
+              <span>Show catch-up cues</span>
+            </Tooltip>
+          }
           hint="When on, the planner highlights weeks with uncovered lessons. When off, no in-grid bar or top-bar badge appears — but you can still open the Catch-up screen from this page."
         >
           <div className={styles.toggleRow}>
@@ -95,7 +102,14 @@ function CatchupSettingsInner(): ReactNode {
             reachable from Settings regardless of the feature flag. */}
         <SettingsCard
           eyebrow="Layer 3"
-          title="Open the triage screen"
+          title={
+            <Tooltip
+              content="Open the dedicated full-page Catch-up triage screen — list every uncovered lesson across the year, group by subject or week, and decide what to reschedule, mark done, or skip. Always reachable, even when catch-up cues are off."
+              side="bottom"
+            >
+              <span>Open the triage screen</span>
+            </Tooltip>
+          }
           hint="See every uncovered lesson across the year, filter by scope, group by subject or week, and decide what to do."
         >
           <div className={styles.openRow}>

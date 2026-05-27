@@ -9,6 +9,7 @@
 // to-do store is the parent agent's territory; we leave a TODO so the
 // wire-up is a one-line follow-up when that store gains a bulk-add API.
 
+import { Tooltip } from "@/components/ui";
 import styles from "./BulkActionBar.module.css";
 
 interface BulkActionBarProps {
@@ -35,49 +36,81 @@ export function BulkActionBar({
       aria-label="Bulk actions"
       title="Bulk action bar — apply the same action to every catch-up row you've selected, then the selection clears"
     >
-      <span className={styles.count}>{count} selected</span>
+      <Tooltip
+        content="Bulk action bar — apply the same action to every catch-up row you've selected, then the selection clears."
+        side="top"
+      >
+        <span className={styles.count} tabIndex={0}>
+          {count} selected
+        </span>
+      </Tooltip>
       <span className={styles.divider} aria-hidden="true" />
-      <button
-        type="button"
-        className={styles.btn}
-        onClick={onMarkAllDone}
-        title="Mark every selected lesson done — they leave the catch-up list and show as complete on the planner"
+      <Tooltip
+        content="Mark every selected lesson done — they leave the catch-up list and show as complete on the planner."
+        side="top"
       >
-        Mark all done
-      </button>
-      <button
-        type="button"
-        className={styles.btn}
-        onClick={onMarkAllSkipped}
-        title="Mark every selected lesson skipped — they stay flagged so you can decide later whether to make them up"
+        <button
+          type="button"
+          className={styles.btn}
+          onClick={onMarkAllDone}
+          title="Mark every selected lesson done — they leave the catch-up list and show as complete on the planner"
+        >
+          Mark all done
+        </button>
+      </Tooltip>
+      <Tooltip
+        content="Mark every selected lesson skipped — they stay flagged so you can decide later whether to make them up."
+        side="top"
       >
-        Mark all skipped
-      </button>
-      <button
-        type="button"
-        className={`${styles.btn} ${styles.btnPrimary}`}
-        onClick={onCarryAll}
-        title="Move every selected lesson to a future day — pick the target week and day, then they re-appear there"
+        <button
+          type="button"
+          className={styles.btn}
+          onClick={onMarkAllSkipped}
+          title="Mark every selected lesson skipped — they stay flagged so you can decide later whether to make them up"
+        >
+          Mark all skipped
+        </button>
+      </Tooltip>
+      <Tooltip
+        content="Move every selected lesson to a future day — pick the target week and day, then they re-appear there."
+        side="top"
       >
-        Carry over all to…
-      </button>
-      <button
-        type="button"
-        className={styles.btn}
-        onClick={onAddAllToTodo}
-        title="Add every selected lesson to your daily to-do list as a reminder to revisit them"
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnPrimary}`}
+          onClick={onCarryAll}
+          title="Move every selected lesson to a future day — pick the target week and day, then they re-appear there"
+        >
+          Carry over all to…
+        </button>
+      </Tooltip>
+      <Tooltip
+        content="Add every selected lesson to your daily to-do list as a reminder to revisit them."
+        side="top"
       >
-        Add all to to-do
-      </button>
+        <button
+          type="button"
+          className={styles.btn}
+          onClick={onAddAllToTodo}
+          title="Add every selected lesson to your daily to-do list as a reminder to revisit them"
+        >
+          Add all to to-do
+        </button>
+      </Tooltip>
       <span className={styles.spacer} aria-hidden="true" />
-      <button
-        type="button"
-        className={styles.btnGhost}
-        onClick={onClear}
-        title="Deselect every catch-up row and hide this action bar"
+      <Tooltip
+        content="Deselect every catch-up row and hide this action bar."
+        side="top"
       >
-        Clear
-      </button>
+        <button
+          type="button"
+          className={styles.btnGhost}
+          onClick={onClear}
+          title="Deselect every catch-up row and hide this action bar"
+        >
+          Clear
+        </button>
+      </Tooltip>
     </div>
   );
 }

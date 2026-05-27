@@ -179,7 +179,14 @@ export function NotePopover({ reason }: NotePopoverProps) {
             <span aria-hidden className={styles.panelIcon}>
               <AlertIcon size={12} />
             </span>
-            <span className={styles.panelTitle}>Note</span>
+            <Tooltip
+              content="Catch-up note — explains why this lesson fell behind and what the team plans to do about it next."
+              side="bottom"
+            >
+              <span className={styles.panelTitle} tabIndex={0}>
+                Note
+              </span>
+            </Tooltip>
             <Button
               variant="icon"
               size="sm"

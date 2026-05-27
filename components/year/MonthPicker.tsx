@@ -15,6 +15,7 @@
 
 import { useEffect, useRef } from "react";
 import { allYearMonths } from "@/lib/year-calendar";
+import { Tooltip } from "@/components/ui";
 import styles from "./MonthPicker.module.css";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -67,14 +68,19 @@ export function MonthPicker({ activeMonthIdx, onPickMonth }: MonthPickerProps) {
 
   return (
     <details ref={detailsRef} className={styles.root}>
-      <summary
-        className={styles.summary}
-        aria-label={`Jump to month, currently ${activeLabel}`}
-        title="Jump the year roadmap to any month — click to pick a month and the timeline scrolls to its first week"
+      <Tooltip
+        content="Jump the year roadmap to any month — click to pick a month and the timeline scrolls to its first week"
+        side="bottom"
       >
-        <span className={styles.label}>{activeLabel}</span>
-        <IconChev width={13} height={13} className={styles.chev} />
-      </summary>
+        <summary
+          className={styles.summary}
+          aria-label={`Jump to month, currently ${activeLabel}`}
+          title="Jump the year roadmap to any month — click to pick a month and the timeline scrolls to its first week"
+        >
+          <span className={styles.label}>{activeLabel}</span>
+          <IconChev width={13} height={13} className={styles.chev} />
+        </summary>
+      </Tooltip>
 
       <div className={styles.popover} role="menu">
         <ul className={styles.list}>
@@ -82,16 +88,21 @@ export function MonthPicker({ activeMonthIdx, onPickMonth }: MonthPickerProps) {
             const isActive = i === activeMonthIdx;
             return (
               <li key={`${m.label}-${i}`}>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`${styles.item} ${isActive ? styles.itemActive : ""}`}
-                  aria-current={isActive ? "true" : undefined}
-                  onClick={() => handlePick(i)}
-                  title={`Scroll the roadmap to ${m.label}`}
+                <Tooltip
+                  content={`Scroll the roadmap to ${m.label}`}
+                  side="right"
                 >
-                  {m.label}
-                </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`${styles.item} ${isActive ? styles.itemActive : ""}`}
+                    aria-current={isActive ? "true" : undefined}
+                    onClick={() => handlePick(i)}
+                    title={`Scroll the roadmap to ${m.label}`}
+                  >
+                    {m.label}
+                  </button>
+                </Tooltip>
               </li>
             );
           })}

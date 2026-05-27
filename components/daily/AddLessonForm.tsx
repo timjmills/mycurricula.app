@@ -33,7 +33,7 @@ import type { ReactNode, KeyboardEvent, FormEvent } from "react";
 import type { SubjectId } from "@/lib/types";
 import { SUBJECTS } from "@/lib/mock";
 import { WEEK_DAYS } from "@/lib/mock";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import styles from "./AddLessonForm.module.css";
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -154,7 +154,14 @@ export function AddLessonForm({
         onKeyDown={onKeyDown}
       >
         <header className={styles.header}>
-          <h2 className={styles.title}>Add a lesson</h2>
+          <Tooltip
+            content="Add a lesson dialog — drops a new lesson on the chosen day, in your personal copy by default"
+            side="bottom"
+          >
+            <h2 className={styles.title} tabIndex={0}>
+              Add a lesson
+            </h2>
+          </Tooltip>
           <span className={styles.dayBadge}>{dayLabel}</span>
           <Button
             variant="icon"

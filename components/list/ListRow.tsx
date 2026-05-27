@@ -36,6 +36,7 @@ import type { ReactNode } from "react";
 import { useMemo } from "react";
 import type { Lesson } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
+import { Tooltip } from "@/components/ui";
 import styles from "./ListRow.module.css";
 
 // ── Em-dash title split ───────────────────────────────────────────────────────
@@ -126,14 +127,20 @@ function MoveArrow({ moved }: { moved: Lesson["moved"] }): ReactNode {
   const label =
     moved === "across-weeks" ? "Moved across weeks" : "Moved within the week";
   return (
-    <span
-      className={styles.moveIcon}
-      aria-label={label}
-      title={label}
-      role="img"
+    <Tooltip
+      content={`${label} — your personal copy was relocated from the team's Master.`}
+      side="top"
     >
-      {symbol}
-    </span>
+      <span
+        className={styles.moveIcon}
+        aria-label={label}
+        title={label}
+        role="img"
+        tabIndex={0}
+      >
+        {symbol}
+      </span>
+    </Tooltip>
   );
 }
 
@@ -233,87 +240,101 @@ export function ListRow({
     // because the completion control inside it is a real <button>, and HTML
     // forbids nested interactive content. handleRowKeyDown supplies the
     // Enter/Space activation a native button would have given for free.
-    <div
-      role="button"
-      tabIndex={0}
-      className={rowClasses}
-      onClick={onClick}
-      onKeyDown={handleRowKeyDown}
-      data-planner-item={`lesson:${lesson.id}`}
-      aria-label={`${subjectLabelFor(lesson.subject)} — ${lesson.title}${isDone ? " (done)" : ""}`}
-      title={`Open "${lesson.title}" in the Daily view — see the full lesson plan, notes, and attached resources`}
+    <Tooltip
+      content={`Open "${lesson.title}" in the Daily view — see the full lesson plan, notes, and attached resources.`}
+      side="top"
     >
-      {/* Subject monogram tile — background color from .cp-subj cascade */}
-      <span className={styles.tile} aria-hidden="true">
-        {monogramFor(lesson.subject)}
-      </span>
-
-      {/* Time / weekday chip */}
-      <span className={styles.timeCol} aria-hidden="true">
-        <span className={styles.subjLabel}>
-          {subjectLabelFor(lesson.subject)}
+      <div
+        role="button"
+        tabIndex={0}
+        className={rowClasses}
+        onClick={onClick}
+        onKeyDown={handleRowKeyDown}
+        data-planner-item={`lesson:${lesson.id}`}
+        aria-label={`${subjectLabelFor(lesson.subject)} — ${lesson.title}${isDone ? " (done)" : ""}`}
+        title={`Open "${lesson.title}" in the Daily view — see the full lesson plan, notes, and attached resources`}
+      >
+        {/* Subject monogram tile — background color from .cp-subj cascade */}
+        <span className={styles.tile} aria-hidden="true">
+          {monogramFor(lesson.subject)}
         </span>
-        {chipLabel && <span className={styles.timeLabel}>{chipLabel}</span>}
-      </span>
 
-      {/* Title + optional subtitle + optional preview.
+        {/* Time / weekday chip */}
+        <span className={styles.timeCol} aria-hidden="true">
+          <span className={styles.subjLabel}>
+            {subjectLabelFor(lesson.subject)}
+          </span>
+          {chipLabel && <span className={styles.timeLabel}>{chipLabel}</span>}
+        </span>
+
+        {/* Title + optional subtitle + optional preview.
           titleMain is the dominant headline; titleSub is the em-dash
           qualifier rendered as a smaller muted line below the title.
           The move indicator sits on the title row so it scans alongside
           the primary text without visual competition. */}
-      <span className={styles.body}>
-        <span className={styles.titleRow}>
-          <span className={styles.title}>{titleMain}</span>
-          {/* Move indicator — only when lesson was relocated */}
-          <MoveArrow moved={lesson.moved} />
+        <span className={styles.body}>
+          <span className={styles.titleRow}>
+            <span className={styles.title}>{titleMain}</span>
+            {/* Move indicator — only when lesson was relocated */}
+            <MoveArrow moved={lesson.moved} />
+          </span>
+          {titleSub && <span className={styles.titleSub}>{titleSub}</span>}
+          {!dense && lesson.preview && (
+            <span className={styles.preview}>{lesson.preview}</span>
+          )}
         </span>
-        {titleSub && <span className={styles.titleSub}>{titleSub}</span>}
-        {!dense && lesson.preview && (
-          <span className={styles.preview}>{lesson.preview}</span>
+
+        {/* CCSS chip — count of standards attached */}
+        {lesson.standards.length > 0 && (
+          <span
+            className={`${styles.ccssChip} cp-mono`}
+            aria-label={`${lesson.standards.length} CCSS standard${lesson.standards.length === 1 ? "" : "s"}`}
+          >
+            CCSS·{lesson.standards.length}
+          </span>
         )}
-      </span>
 
-      {/* CCSS chip — count of standards attached */}
-      {lesson.standards.length > 0 && (
-        <span
-          className={`${styles.ccssChip} cp-mono`}
-          aria-label={`${lesson.standards.length} CCSS standard${lesson.standards.length === 1 ? "" : "s"}`}
-        >
-          CCSS·{lesson.standards.length}
-        </span>
-      )}
+        {/* Resource count */}
+        {lesson.resources.length > 0 && (
+          <span
+            className={styles.resourceCount}
+            aria-label={`${lesson.resources.length} resource${lesson.resources.length === 1 ? "" : "s"}`}
+          >
+            <LinkIcon />
+            {lesson.resources.length}
+          </span>
+        )}
 
-      {/* Resource count */}
-      {lesson.resources.length > 0 && (
-        <span
-          className={styles.resourceCount}
-          aria-label={`${lesson.resources.length} resource${lesson.resources.length === 1 ? "" : "s"}`}
-        >
-          <LinkIcon />
-          {lesson.resources.length}
-        </span>
-      )}
-
-      {/* Completion checkbox — separate interactive target. A native
+        {/* Completion checkbox — separate interactive target. A native
           <button type="button" role="checkbox"> gives Enter+Space + focus
           for free; the negative-margin hit-area trick lives in the CSS
           module so the visible chip stays small while the tap target meets
           the touch floor. */}
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={isDone}
-        aria-label={isDone ? "Mark not done" : "Mark done"}
-        title={
-          isDone
-            ? "Mark this lesson not done — useful if you completed it by mistake or need to re-teach"
-            : "Mark this lesson done — completion is personal and never forks the team's Master copy"
-        }
-        className={`${styles.checkbox}${isDone ? ` ${styles.checked}` : ""}`}
-        onClick={handleCheckboxClick}
-      >
-        {isDone && <CheckIcon />}
-      </button>
-    </div>
+        <Tooltip
+          content={
+            isDone
+              ? "Mark this lesson not done — useful if you completed it by mistake or need to re-teach."
+              : "Mark this lesson done — completion is personal and never forks the team's Master copy."
+          }
+          side="left"
+        >
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={isDone}
+            aria-label={isDone ? "Mark not done" : "Mark done"}
+            title={
+              isDone
+                ? "Mark this lesson not done — useful if you completed it by mistake or need to re-teach"
+                : "Mark this lesson done — completion is personal and never forks the team's Master copy"
+            }
+            className={`${styles.checkbox}${isDone ? ` ${styles.checked}` : ""}`}
+            onClick={handleCheckboxClick}
+          >
+            {isDone && <CheckIcon />}
+          </button>
+        </Tooltip>
+      </div>
+    </Tooltip>
   );
 }

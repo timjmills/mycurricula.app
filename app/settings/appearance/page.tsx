@@ -172,7 +172,14 @@ function HierarchyLabelsCard(): ReactNode {
   return (
     <SettingsCard
       eyebrow="Vocabulary"
-      title="Hierarchy labels"
+      title={
+        <Tooltip
+          content="Rename what your school calls each planning level (Subject, Unit, Lesson, Section). The captions update everywhere in the app immediately — behavior is unchanged."
+          side="bottom"
+        >
+          <span>Hierarchy labels</span>
+        </Tooltip>
+      }
       hint="Rename what your school calls each planning level. Captions update everywhere; behavior is unchanged."
       action={restoreAction}
     >
@@ -249,6 +256,7 @@ function LabelInput({
   onBlur,
 }: LabelInputProps): ReactNode {
   const id = `hierarchy-label-${name}`;
+  const tip = `Rename what your school calls a ${legend.toLowerCase()} — the caption updates everywhere in the app. Saves when you click out of the field; clear it to fall back to the default “${defaultLabel}”.`;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <label
@@ -263,29 +271,32 @@ function LabelInput({
       >
         {legend}
       </label>
-      <input
-        id={id}
-        name={name}
-        type="text"
-        value={value}
-        onChange={onChange}
-        onBlur={onBlur}
-        // Always show the factory caption as a placeholder so a teacher
-        // who blanks the field sees what it will fall back to.
-        placeholder={defaultLabel}
-        spellCheck={false}
-        autoComplete="off"
-        style={{
-          minHeight: 44,
-          padding: "0 12px",
-          fontSize: "var(--t-13)",
-          color: "var(--ink-900)",
-          background: "var(--paper)",
-          border: "1px solid var(--ink-200)",
-          borderRadius: "var(--r-8)",
-          outline: "none",
-        }}
-      />
+      <Tooltip content={tip} side="bottom">
+        <input
+          id={id}
+          name={name}
+          type="text"
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          // Always show the factory caption as a placeholder so a teacher
+          // who blanks the field sees what it will fall back to.
+          placeholder={defaultLabel}
+          spellCheck={false}
+          autoComplete="off"
+          title={tip}
+          style={{
+            minHeight: 44,
+            padding: "0 12px",
+            fontSize: "var(--t-13)",
+            color: "var(--ink-900)",
+            background: "var(--paper)",
+            border: "1px solid var(--ink-200)",
+            borderRadius: "var(--r-8)",
+            outline: "none",
+          }}
+        />
+      </Tooltip>
     </div>
   );
 }

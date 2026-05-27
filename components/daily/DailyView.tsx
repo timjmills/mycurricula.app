@@ -135,7 +135,7 @@ import { RightRail } from "./RightRail";
 import { PaneSplitter } from "./PaneSplitter";
 import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
-import { Button, PageHeader } from "@/components/ui";
+import { Button, PageHeader, Tooltip } from "@/components/ui";
 import { DailyList } from "@/components/list/DailyList";
 import { ScheduleDayPane } from "@/components/schedule";
 import { DailySchedulePill } from "./daily-schedule-pill";
@@ -660,17 +660,22 @@ function LessonRow({
         .join(" ")}
     >
       {/* Drag handle — dnd-kit activator; ≥44px touch target. */}
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        className={styles.lessonDragHandle}
-        {...listeners}
-        {...attributes}
-        aria-label={`Drag to reorder ${lesson.title}`}
-        title="Drag to reorder"
+      <Tooltip
+        content="Drag this lesson up or down to reorder today's lineup — order is personal to your planner."
+        side="right"
       >
-        <GripVerticalIcon />
-      </button>
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          className={styles.lessonDragHandle}
+          {...listeners}
+          {...attributes}
+          aria-label={`Drag to reorder ${lesson.title}`}
+          title="Drag to reorder this lesson within today's lineup"
+        >
+          <GripVerticalIcon />
+        </button>
+      </Tooltip>
 
       {/* 3px subject-color left stripe */}
       <span className={styles.lessonStripe} aria-hidden="true" />
@@ -878,22 +883,27 @@ function ColumnDragGrip({
   attributes,
 }: ColumnDragGripProps): ReactNode {
   return (
-    <button
-      type="button"
-      ref={activatorRef}
-      // Spread dnd-kit's pointer + keyboard listeners + a11y attributes.
-      // The listeners object is typed loosely here because dnd-kit's
-      // SyntheticListenerMap is a record of arbitrary event-handler keys.
-      {...(listeners ?? {})}
-      {...attributes}
-      className={styles.columnDragGrip}
-      aria-label={`Drag to reorder ${COLUMN_LABEL[id].toLowerCase()} column`}
-      title={`Drag to reorder ${COLUMN_LABEL[id].toLowerCase()} column`}
+    <Tooltip
+      content={`Drag this ${COLUMN_LABEL[id].toLowerCase()} column to rearrange the daily layout — your layout choice is remembered between sessions.`}
+      side="bottom"
     >
-      <span className={styles.columnDragGripIcon} aria-hidden="true">
-        <GripHorizontalIcon />
-      </span>
-    </button>
+      <button
+        type="button"
+        ref={activatorRef}
+        // Spread dnd-kit's pointer + keyboard listeners + a11y attributes.
+        // The listeners object is typed loosely here because dnd-kit's
+        // SyntheticListenerMap is a record of arbitrary event-handler keys.
+        {...(listeners ?? {})}
+        {...attributes}
+        className={styles.columnDragGrip}
+        aria-label={`Drag to reorder ${COLUMN_LABEL[id].toLowerCase()} column`}
+        title={`Drag to reorder the ${COLUMN_LABEL[id].toLowerCase()} column`}
+      >
+        <span className={styles.columnDragGripIcon} aria-hidden="true">
+          <GripHorizontalIcon />
+        </span>
+      </button>
+    </Tooltip>
   );
 }
 

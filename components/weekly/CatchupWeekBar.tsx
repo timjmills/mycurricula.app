@@ -23,6 +23,7 @@ import { useAppState } from "@/lib/app-state";
 import { useCatchup } from "@/lib/catchup-state";
 import { countForWeek } from "@/lib/catchup-data";
 import { usePlanner } from "@/lib/planner-store";
+import { Tooltip } from "@/components/ui";
 import styles from "./CatchupWeekBar.module.css";
 
 export function CatchupWeekBar(): ReactNode {
@@ -44,10 +45,15 @@ export function CatchupWeekBar(): ReactNode {
   return (
     <div className={styles.bar} role="region" aria-label="Catch-up summary">
       {/* Eyebrow + headline — flame icon + "N items not covered" copy. */}
-      <span className={styles.eyebrow}>
-        <FlameIcon />
-        Catch-up
-      </span>
+      <Tooltip
+        content="Lessons your team or you fell behind on this week, ready to triage. Click View all to mark them done, skipped, or carry them over."
+        side="bottom"
+      >
+        <span className={styles.eyebrow} tabIndex={0}>
+          <FlameIcon />
+          Catch-up
+        </span>
+      </Tooltip>
       <span className={styles.count}>
         {count === 1
           ? "1 item not covered this week"
@@ -65,15 +71,20 @@ export function CatchupWeekBar(): ReactNode {
       {/* Dismiss — marks THIS week as dismissed. The bar reappears on any
           other week with uncovered items; the rollup count still surfaces
           in the top-bar flame badge. */}
-      <button
-        type="button"
-        className={styles.dismiss}
-        onClick={() => dismissWeek(week)}
-        aria-label="Dismiss catch-up bar for this week"
-        title="Hide the catch-up summary for this week — it'll come back when new lessons fall behind"
+      <Tooltip
+        content="Hide the catch-up summary for this week — it'll come back when new lessons fall behind."
+        side="left"
       >
-        <CloseIcon />
-      </button>
+        <button
+          type="button"
+          className={styles.dismiss}
+          onClick={() => dismissWeek(week)}
+          aria-label="Dismiss catch-up bar for this week"
+          title="Hide the catch-up summary for this week — it'll come back when new lessons fall behind"
+        >
+          <CloseIcon />
+        </button>
+      </Tooltip>
     </div>
   );
 }

@@ -17,7 +17,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useOnboarding } from "@/lib/onboarding-state";
 import type { OnboardingSubject } from "@/lib/onboarding-state";
-import { Button, ToggleGroup } from "@/components/ui";
+import { Button, ToggleGroup, Tooltip } from "@/components/ui";
 import type { ToggleOption } from "@/components/ui";
 import styles from "./subjects-step.module.css";
 
@@ -86,24 +86,28 @@ function SwatchPicker({ value, onChange }: SwatchPickerProps): ReactNode {
         Color
       </span>
       <div className={styles.swatches} role="group" aria-label="Subject color">
-        {COLOR_TOKENS.map((token) => (
-          <button
-            key={token}
-            type="button"
-            className={styles.swatch}
-            style={{ background: `var(--${token})` } as CSSProperties}
-            aria-label={`${token} color${value === token ? " (selected)" : ""}`}
-            aria-pressed={value === token}
-            onClick={() => onChange(token)}
-            title={`Use the ${token} color for this subject — every card, stripe, and chip for this subject picks up this hue`}
-          >
-            {value === token && (
-              <span className={styles.swatchCheck}>
-                <CheckIcon />
-              </span>
-            )}
-          </button>
-        ))}
+        {COLOR_TOKENS.map((token) => {
+          const tip = `Use the ${token} color for this subject — every card, stripe, and chip for this subject picks up this hue`;
+          return (
+            <Tooltip key={token} content={tip} side="top">
+              <button
+                type="button"
+                className={styles.swatch}
+                style={{ background: `var(--${token})` } as CSSProperties}
+                aria-label={`${token} color${value === token ? " (selected)" : ""}`}
+                aria-pressed={value === token}
+                onClick={() => onChange(token)}
+                title={tip}
+              >
+                {value === token && (
+                  <span className={styles.swatchCheck}>
+                    <CheckIcon />
+                  </span>
+                )}
+              </button>
+            </Tooltip>
+          );
+        })}
       </div>
     </div>
   );

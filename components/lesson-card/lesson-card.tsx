@@ -233,32 +233,42 @@ export function LessonCard({
         }}
       >
         {lesson.moved && (
-          <span
-            title={
+          <Tooltip
+            content={
               lesson.moved === "across-weeks"
-                ? "Moved across weeks"
-                : "Moved within the week"
+                ? "This lesson was moved across weeks in your personal copy — the team's Master version still lives in the original slot."
+                : "This lesson was moved within the week in your personal copy — the team's Master version still lives in the original slot."
             }
-            aria-label={
-              lesson.moved === "across-weeks"
-                ? "Moved across weeks"
-                : "Moved within the week"
-            }
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 16,
-              height: 16,
-              borderRadius: 3,
-              background: color.cl,
-              color: color.cd,
-              fontSize: 10,
-              fontWeight: 700,
-            }}
+            side="top"
           >
-            {lesson.moved === "across-weeks" ? "⤴" : "↔"}
-          </span>
+            <span
+              title={
+                lesson.moved === "across-weeks"
+                  ? "Moved across weeks in your personal copy"
+                  : "Moved within the week in your personal copy"
+              }
+              aria-label={
+                lesson.moved === "across-weeks"
+                  ? "Moved across weeks"
+                  : "Moved within the week"
+              }
+              tabIndex={0}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 16,
+                height: 16,
+                borderRadius: 3,
+                background: color.cl,
+                color: color.cd,
+                fontSize: 10,
+                fontWeight: 700,
+              }}
+            >
+              {lesson.moved === "across-weeks" ? "⤴" : "↔"}
+            </span>
+          </Tooltip>
         )}
         {/* Modified pill — bespoke: subject-color background (color.deep), no
             Badge semantic match. The deep tone clears AA vs white text in all
@@ -284,19 +294,24 @@ export function LessonCard({
           {/* Drag handle — bespoke: dnd-kit spreads dragHandleProps here; cannot
               be a <Button> as it receives an external ref and event spread. */}
           {dragHandleProps && (
-            <span
-              {...dragHandleProps}
-              className={styles.affordance}
-              title="Drag to move"
-              aria-label="Drag handle"
-              role="button"
-              tabIndex={0}
-              style={{ cursor: "grab", ...dragHandleProps.style }}
+            <Tooltip
+              content="Drag to move this lesson — moves stay personal unless you save them to the team's Master."
+              side="top"
             >
-              <span aria-hidden className={styles.affordanceVisual}>
-                <Icon name="drag" size={12} />
+              <span
+                {...dragHandleProps}
+                className={styles.affordance}
+                title="Drag to move this lesson"
+                aria-label="Drag handle"
+                role="button"
+                tabIndex={0}
+                style={{ cursor: "grab", ...dragHandleProps.style }}
+              >
+                <span aria-hidden className={styles.affordanceVisual}>
+                  <Icon name="drag" size={12} />
+                </span>
               </span>
-            </span>
+            </Tooltip>
           )}
           {/* ⋯ menu button — <Button variant="icon"> with <Tooltip>. The
               styles.affordance className overrides Button's own styles to
@@ -392,27 +407,36 @@ export function LessonCard({
 
         {/* Expand caret — bespoke: structural, has styles.caretOpen rotation
             animation; keeping as native button per task spec. */}
-        <button
-          type="button"
-          className={styles.caret}
-          onClick={toggleExpand}
-          aria-expanded={expanded}
-          aria-label={expanded ? "Collapse lesson" : "Expand lesson"}
-          title={
+        <Tooltip
+          content={
             expanded
-              ? "Collapse this lesson back to the preview card"
-              : "Expand this lesson to see full directions, resources, standards, and any sub-tasks"
+              ? "Collapse this lesson back to the preview card."
+              : "Expand this lesson to see full directions, resources, standards, and any sub-tasks."
           }
+          side="top"
         >
-          <span
-            aria-hidden
-            className={`${styles.caretVisual} ${
-              expanded ? styles.caretOpen : ""
-            }`}
+          <button
+            type="button"
+            className={styles.caret}
+            onClick={toggleExpand}
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse lesson" : "Expand lesson"}
+            title={
+              expanded
+                ? "Collapse this lesson back to the preview card"
+                : "Expand this lesson to see full directions, resources, standards, and any sub-tasks"
+            }
           >
-            <Icon name="chevronD" size={12} />
-          </span>
-        </button>
+            <span
+              aria-hidden
+              className={`${styles.caretVisual} ${
+                expanded ? styles.caretOpen : ""
+              }`}
+            >
+              <Icon name="chevronD" size={12} />
+            </span>
+          </button>
+        </Tooltip>
       </div>
 
       {/* Objective + preview (collapsed) */}
@@ -596,56 +620,68 @@ export function LessonCard({
         )}
         <ResourceTypeRow resources={lesson.resources} dense={dense} />
         {hasTasks && (
-          <span
-            title={`${lesson.tasks.length} lesson tasks inside this lesson`}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
-              padding: "1px 6px 1px 4px",
-              borderRadius: 999,
-              background: color.cl,
-              color: color.cd,
-              fontSize: 9.5,
-              fontWeight: 700,
-              letterSpacing: 0.3,
-            }}
+          <Tooltip
+            content={`${lesson.tasks.length} lesson task${lesson.tasks.length === 1 ? "" : "s"} inside this lesson — expand the card to tick them off.`}
+            side="top"
           >
-            <Icon name="list" size={9} />
-            {lesson.tasks.length} tasks
-          </span>
+            <span
+              title={`${lesson.tasks.length} lesson tasks inside this lesson`}
+              tabIndex={0}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                padding: "1px 6px 1px 4px",
+                borderRadius: 999,
+                background: color.cl,
+                color: color.cd,
+                fontSize: 9.5,
+                fontWeight: 700,
+                letterSpacing: 0.3,
+              }}
+            >
+              <Icon name="list" size={9} />
+              {lesson.tasks.length} tasks
+            </span>
+          </Tooltip>
         )}
         {lesson.commentCount > 0 && (
-          <span
-            title={`${lesson.commentCount} comment${lesson.commentCount === 1 ? "" : "s"}`}
-            style={{
-              position: "relative",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
-              fontSize: 10,
-              color: isVivid ? color.deep : "var(--ink-500)",
-            }}
+          <Tooltip
+            content={`${lesson.commentCount} comment${lesson.commentCount === 1 ? "" : "s"} from your team — open the card to read them.`}
+            side="top"
           >
-            <span aria-hidden style={{ fontSize: 11 }}>
-              💬
+            <span
+              title={`${lesson.commentCount} comment${lesson.commentCount === 1 ? "" : "s"} from your team`}
+              tabIndex={0}
+              style={{
+                position: "relative",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                fontSize: 10,
+                color: isVivid ? color.deep : "var(--ink-500)",
+              }}
+            >
+              <span aria-hidden style={{ fontSize: 11 }}>
+                💬
+              </span>
+              {lesson.commentCount}
+              {lesson.unreadComments > 0 && (
+                <span
+                  aria-label={`${lesson.unreadComments} unread`}
+                  style={{
+                    position: "absolute",
+                    top: -2,
+                    right: -3,
+                    width: 5,
+                    height: 5,
+                    borderRadius: 999,
+                    background: "var(--urgent)",
+                  }}
+                />
+              )}
             </span>
-            {lesson.commentCount}
-            {lesson.unreadComments > 0 && (
-              <span
-                aria-label={`${lesson.unreadComments} unread`}
-                style={{
-                  position: "absolute",
-                  top: -2,
-                  right: -3,
-                  width: 5,
-                  height: 5,
-                  borderRadius: 999,
-                  background: "var(--urgent)",
-                }}
-              />
-            )}
-          </span>
+          </Tooltip>
         )}
         <div style={{ flex: 1 }} />
         {/* pendingMaster — <Badge variant="warn">: maps to --important token pair. */}

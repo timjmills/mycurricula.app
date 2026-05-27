@@ -59,7 +59,7 @@ import { useAppState } from "@/lib/app-state";
 import { WEEK_DAYS, WEEK_DAYS_SHORT } from "@/lib/mock";
 import { dateNumberForWeekDay } from "@/lib/mock/calendar";
 import { todayDayIndex } from "@/lib/schedule-data";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import { ScheduleDayPane } from "./ScheduleDayPane";
 import styles from "./SchedulePanel.module.css";
 
@@ -210,10 +210,7 @@ export function SchedulePanel({
   );
 
   // ── Accessible heading text ───────────────────────────────────────────────
-  const dayLabel = useMemo(
-    () => WEEK_DAYS[focusedDay] ?? "Day",
-    [focusedDay],
-  );
+  const dayLabel = useMemo(() => WEEK_DAYS[focusedDay] ?? "Day", [focusedDay]);
   const headingText = `Schedule — ${dayLabel}, Week ${week}`;
 
   if (!open) return null;
@@ -243,12 +240,17 @@ export function SchedulePanel({
       >
         {/* ── Header — close button on the right ────────────────────── */}
         <header className={styles.header}>
-          <div className={styles.headerText}>
-            <span className={styles.eyebrow}>SCHEDULE</span>
-            <h2 className={styles.title} id={headingId}>
-              {headingText}
-            </h2>
-          </div>
+          <Tooltip
+            content="Schedule drawer — see this day's timetable and switch days without leaving your current view. Click any day chip below to jump."
+            side="bottom"
+          >
+            <div className={styles.headerText} tabIndex={0}>
+              <span className={styles.eyebrow}>SCHEDULE</span>
+              <h2 className={styles.title} id={headingId}>
+                {headingText}
+              </h2>
+            </div>
+          </Tooltip>
           <Button
             variant="icon"
             iconAriaLabel="Close schedule panel"
@@ -269,26 +271,31 @@ export function SchedulePanel({
             const chipDayLabel = WEEK_DAYS_SHORT[d] ?? "Day";
             const dateNum = dateNumberForWeekDay(week, d);
             return (
-              <button
+              <Tooltip
                 key={d}
-                type="button"
-                className={[
-                  styles.dayChip,
-                  isActive ? styles.dayChipActive : "",
-                  isToday ? styles.dayChipToday : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => setSelectedDay(d)}
-                aria-pressed={isActive}
-                aria-label={`${chipDayLabel} ${dateNum}${isToday ? " (today)" : ""}`}
-                title={`Show the schedule for ${chipDayLabel} (date ${dateNum})${
-                  isToday ? " — today" : ""
-                }`}
+                content={`Show the schedule for ${chipDayLabel} (date ${dateNum})${isToday ? " — today" : ""}`}
+                side="bottom"
               >
-                <span className={styles.chipDay}>{chipDayLabel}</span>
-                <span className={styles.chipDate}>{dateNum}</span>
-              </button>
+                <button
+                  type="button"
+                  className={[
+                    styles.dayChip,
+                    isActive ? styles.dayChipActive : "",
+                    isToday ? styles.dayChipToday : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => setSelectedDay(d)}
+                  aria-pressed={isActive}
+                  aria-label={`${chipDayLabel} ${dateNum}${isToday ? " (today)" : ""}`}
+                  title={`Show the schedule for ${chipDayLabel} (date ${dateNum})${
+                    isToday ? " — today" : ""
+                  }`}
+                >
+                  <span className={styles.chipDay}>{chipDayLabel}</span>
+                  <span className={styles.chipDate}>{dateNum}</span>
+                </button>
+              </Tooltip>
             );
           })}
         </nav>

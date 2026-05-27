@@ -2,7 +2,7 @@
 
 // lesson-flow.tsx — the per-lesson section editor ("lesson flow").
 //
-// REVISED 2026-05-20 per Plugin Directions §3, §4, §5, §6:
+// REVISED 2026-05-20 per docs/historical/5.20.26 Plugin Directions §3, §4, §5, §6:
 // The lesson body is now a CANONICAL SIX-SECTION layout. Each section row
 // leads with a PIN badge (USER OVERRIDE — see CSS for the teardrop shape;
 // the spec's "circle" is REPLACED by a rounded-rect + right-pointing notch),
@@ -449,12 +449,21 @@ const SortableSection = memo(function SortableSection({
                 `helperOverride` is set by LessonFlow for the Standards row
                 to surface the active lesson's standards codes; all other rows
                 use the canonical static helper string (DAILY-STANDARDS-001). */}
-            <div className={styles.titleStack}>
-              <h3 className={styles.sectionTitle}>{canonical.title}</h3>
-              <p className={styles.sectionHelper}>
-                {resolved.helperOverride ?? canonical.helper}
-              </p>
-            </div>
+            <Tooltip
+              content={
+                canonical.title === "Standards"
+                  ? "The CCSS / curriculum standards this lesson covers — required for grade-level alignment."
+                  : `${canonical.title} — ${canonical.helper}`
+              }
+              side="top"
+            >
+              <div className={styles.titleStack} tabIndex={0}>
+                <h3 className={styles.sectionTitle}>{canonical.title}</h3>
+                <p className={styles.sectionHelper}>
+                  {resolved.helperOverride ?? canonical.helper}
+                </p>
+              </div>
+            </Tooltip>
 
             {/* Right-side chevron — `v` when expanded, `>` when collapsed
                 (spec §3.2). Button variant="icon" carries the hit target;
@@ -492,30 +501,35 @@ const SortableSection = memo(function SortableSection({
                 {/* Kept as raw <button>: triggerRef is required by the
                     click-outside handler in the parent effect, and Button does
                     not expose forwardRef yet. */}
-                <button
-                  type="button"
-                  ref={triggerRef}
-                  className={[
-                    styles.menuTrigger,
-                    isMenuOpen ? styles.menuTriggerOpen : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleMenu(rowId);
-                  }}
-                  aria-haspopup="true"
-                  aria-expanded={isMenuOpen}
-                  aria-label={
-                    isMenuOpen
-                      ? `Close actions for ${canonical.title}`
-                      : `Actions for ${canonical.title}`
-                  }
-                  title={`Section actions for ${canonical.title} — move, duplicate, toggle on website, or delete`}
+                <Tooltip
+                  content={`Section actions for ${canonical.title} — move, duplicate, toggle on website, or delete.`}
+                  side="left"
                 >
-                  <OverflowIcon />
-                </button>
+                  <button
+                    type="button"
+                    ref={triggerRef}
+                    className={[
+                      styles.menuTrigger,
+                      isMenuOpen ? styles.menuTriggerOpen : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleMenu(rowId);
+                    }}
+                    aria-haspopup="true"
+                    aria-expanded={isMenuOpen}
+                    aria-label={
+                      isMenuOpen
+                        ? `Close actions for ${canonical.title}`
+                        : `Actions for ${canonical.title}`
+                    }
+                    title={`Section actions for ${canonical.title} — move, duplicate, toggle on website, or delete`}
+                  >
+                    <OverflowIcon />
+                  </button>
+                </Tooltip>
 
                 <div className={styles.toolbarAnchor} ref={anchorRef}>
                   <SectionToolbar
@@ -588,7 +602,7 @@ const SortableSection = memo(function SortableSection({
                             if (e.key === "Enter" || e.key === "F2")
                               onOpenBodyEditor(rowId, e);
                           }}
-                          title="Double-click or press Enter to edit"
+                          title={`Double-click or press Enter to edit ${canonical.title}`}
                           // eslint-disable-next-line react/no-danger
                           dangerouslySetInnerHTML={{
                             __html: storeSection.body,
@@ -617,7 +631,7 @@ const SortableSection = memo(function SortableSection({
                           }}
                           title={
                             storeSection
-                              ? "Double-click or press Enter to edit"
+                              ? `Double-click or press Enter to edit ${canonical.title}`
                               : undefined
                           }
                         >

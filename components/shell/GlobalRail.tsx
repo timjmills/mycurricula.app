@@ -397,6 +397,9 @@ export function GlobalRail(): ReactNode {
           </li>
         ) : (
           <li className={styles.item} data-context="global">
+            {/* Coming-soon Chat slot — already wraps in <Tooltip> so the
+                styled black bubble appears. title= mirrors the same copy
+                for cross-engine fallback (touch long-press). */}
             <Tooltip
               content="Comments are scoped to lessons — coming as a global drawer in Phase 1B."
               side="right"
@@ -407,7 +410,7 @@ export function GlobalRail(): ReactNode {
                   pointer-events:none + opacity 0.45 to convey "inert". */}
               <span
                 className={`${styles.button} ${styles.buttonSoon}`}
-                title="Comments — coming soon"
+                title="Comments are scoped to lessons — coming as a global drawer in Phase 1B."
               >
                 <span className={styles.iconSlot} aria-hidden="true">
                   <ChatIcon />
@@ -446,7 +449,7 @@ export function GlobalRail(): ReactNode {
           >
             <span
               className={`${styles.button} ${styles.buttonSoon}`}
-              title="Resources — coming soon"
+              title="Open the lesson resources panel — links, slides, handouts, and videos attached to the lesson you're viewing."
             >
               <span className={styles.iconSlot} aria-hidden="true">
                 <ResourcesIcon />
@@ -459,34 +462,47 @@ export function GlobalRail(): ReactNode {
         </li>
 
         {/* Year / month overview — global coming-soon affordance.
-            Renders on every route as an inert visual reservation. */}
+            Renders on every route as an inert visual reservation.
+            Wrapped in <Tooltip> so hovering surfaces the styled black
+            bubble (not the OS-default native title). title= mirrors
+            for cross-engine fallback. */}
         <li className={styles.item} data-context="global">
-          <span
-            className={`${styles.button} ${styles.buttonSoon}`}
-            title="Year / month overview — coming soon"
+          <Tooltip
+            content="Year and month overview — zoom out to see the arc of your year at a glance (coming soon)"
+            side="right"
           >
-            <span className={styles.iconSlot} aria-hidden="true">
-              <YearIcon />
+            <span
+              className={`${styles.button} ${styles.buttonSoon}`}
+              title="Year and month overview — zoom out to see the arc of your year at a glance (coming soon)"
+            >
+              <span className={styles.iconSlot} aria-hidden="true">
+                <YearIcon />
+              </span>
+              <span className={styles.soonChip} aria-hidden="true">
+                soon
+              </span>
             </span>
-            <span className={styles.soonChip} aria-hidden="true">
-              soon
-            </span>
-          </span>
+          </Tooltip>
         </li>
 
         {/* Voice note — global coming-soon affordance. */}
         <li className={styles.item} data-context="global">
-          <span
-            className={`${styles.button} ${styles.buttonSoon}`}
-            title="Voice note — coming soon"
+          <Tooltip
+            content="Dictate a quick voice note about a lesson — transcribed automatically into the lesson's notes (coming soon)"
+            side="right"
           >
-            <span className={styles.iconSlot} aria-hidden="true">
-              <VoiceIcon />
+            <span
+              className={`${styles.button} ${styles.buttonSoon}`}
+              title="Dictate a quick voice note about a lesson — transcribed automatically into the lesson's notes (coming soon)"
+            >
+              <span className={styles.iconSlot} aria-hidden="true">
+                <VoiceIcon />
+              </span>
+              <span className={styles.soonChip} aria-hidden="true">
+                soon
+              </span>
             </span>
-            <span className={styles.soonChip} aria-hidden="true">
-              soon
-            </span>
-          </span>
+          </Tooltip>
         </li>
       </ul>
 

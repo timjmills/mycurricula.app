@@ -14,8 +14,10 @@ import styles from "./settings-card.module.css";
 interface SettingsCardProps {
   /** Small uppercase label above the title. */
   eyebrow: string;
-  /** Section title. */
-  title?: string;
+  /** Section title. Accepts a ReactNode so the title can be wrapped in a
+   *  styled <Tooltip> for the per-panel onboarding-voice tooltip (CLAUDE.md
+   *  §4 — every panel has a tooltip about its function). */
+  title?: ReactNode;
   /** Supporting one-liner under the title. */
   hint?: string;
   /** Optional element pinned to the top-right of the header. */

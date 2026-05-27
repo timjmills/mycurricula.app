@@ -381,25 +381,30 @@ export function YearView() {
             </button>
           </Tooltip>
 
-          <button
-            type="button"
-            className={styles.actionBtn}
-            aria-label="Go to today"
-            title="Scroll the year roadmap back to the current week — the today marker pulses to confirm"
-            onClick={() => {
-              scrollToWeek(currentWeekIdx);
-              // m4 fix: dispatch a pulse event so every mounted TodayMarker
-              // briefly flashes — confirms the click registered even when
-              // the timeline is already centered (scrollTo is a no-op).
-              // TodayMarker honors prefers-reduced-motion internally.
-              if (typeof window !== "undefined") {
-                window.dispatchEvent(new CustomEvent(TODAY_PULSE_EVENT));
-              }
-            }}
+          <Tooltip
+            content="Scroll the year roadmap back to the current week — the today marker pulses to confirm"
+            side="bottom"
           >
-            <IconCal width={15} height={15} />
-            Today
-          </button>
+            <button
+              type="button"
+              className={styles.actionBtn}
+              aria-label="Go to today"
+              title="Scroll the year roadmap back to the current week — the today marker pulses to confirm"
+              onClick={() => {
+                scrollToWeek(currentWeekIdx);
+                // m4 fix: dispatch a pulse event so every mounted TodayMarker
+                // briefly flashes — confirms the click registered even when
+                // the timeline is already centered (scrollTo is a no-op).
+                // TodayMarker honors prefers-reduced-motion internally.
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent(TODAY_PULSE_EVENT));
+                }
+              }}
+            >
+              <IconCal width={15} height={15} />
+              Today
+            </button>
+          </Tooltip>
 
           <MonthPicker
             activeMonthIdx={activeMonthIdx}

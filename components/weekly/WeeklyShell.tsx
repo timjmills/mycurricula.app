@@ -331,22 +331,27 @@ function ColumnDragGrip({
   attributes,
 }: ColumnDragGripProps): ReactNode {
   return (
-    <button
-      type="button"
-      ref={activatorRef}
-      // Spread dnd-kit's pointer + keyboard listeners + a11y attributes.
-      // The listeners object is typed loosely because dnd-kit's
-      // SyntheticListenerMap is a record of arbitrary event-handler keys.
-      {...(listeners ?? {})}
-      {...attributes}
-      className={styles.columnDragGrip}
-      aria-label={`Drag to reorder ${COLUMN_LABEL[id].toLowerCase()} panel`}
-      title={`Drag to reorder ${COLUMN_LABEL[id].toLowerCase()} panel`}
+    <Tooltip
+      content={`Drag the ${COLUMN_LABEL[id].toLowerCase()} panel to rearrange the weekly layout — your layout is remembered between sessions.`}
+      side="bottom"
     >
-      <span className={styles.columnDragGripIcon} aria-hidden="true">
-        <GripHorizontalIcon />
-      </span>
-    </button>
+      <button
+        type="button"
+        ref={activatorRef}
+        // Spread dnd-kit's pointer + keyboard listeners + a11y attributes.
+        // The listeners object is typed loosely because dnd-kit's
+        // SyntheticListenerMap is a record of arbitrary event-handler keys.
+        {...(listeners ?? {})}
+        {...attributes}
+        className={styles.columnDragGrip}
+        aria-label={`Drag to reorder ${COLUMN_LABEL[id].toLowerCase()} panel`}
+        title={`Drag the ${COLUMN_LABEL[id].toLowerCase()} panel to rearrange the weekly layout — your layout is remembered between sessions`}
+      >
+        <span className={styles.columnDragGripIcon} aria-hidden="true">
+          <GripHorizontalIcon />
+        </span>
+      </button>
+    </Tooltip>
   );
 }
 

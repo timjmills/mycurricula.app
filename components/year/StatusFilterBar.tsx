@@ -12,6 +12,7 @@
 //
 // Status colors use semantic tokens from app/tokens.css only — no hex.
 
+import { Tooltip } from "@/components/ui";
 import styles from "./StatusFilterBar.module.css";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -150,45 +151,51 @@ export function StatusFilterBar({
       {FILTERS.map((f) => {
         const isActive = active.has(f.id);
         return (
-          <button
-            key={f.id}
-            className={styles.pill}
-            aria-pressed={isActive}
-            onClick={() => onToggle(f.id)}
-            title={f.tooltip}
-            style={
-              isActive
-                ? ({
-                    "--pill-bg": f.activeVar,
-                    "--pill-color": f.activeTextVar,
-                    "--pill-border": "transparent",
-                  } as React.CSSProperties)
-                : undefined
-            }
-          >
-            {/* Colored status dot */}
-            <span
-              className={styles.dot}
-              style={{ background: f.dotVar }}
-              aria-hidden="true"
-            />
-            {f.label}
-          </button>
+          <Tooltip key={f.id} content={f.tooltip} side="bottom">
+            <button
+              className={styles.pill}
+              aria-pressed={isActive}
+              onClick={() => onToggle(f.id)}
+              title={f.tooltip}
+              style={
+                isActive
+                  ? ({
+                      "--pill-bg": f.activeVar,
+                      "--pill-color": f.activeTextVar,
+                      "--pill-border": "transparent",
+                    } as React.CSSProperties)
+                  : undefined
+              }
+            >
+              {/* Colored status dot */}
+              <span
+                className={styles.dot}
+                style={{ background: f.dotVar }}
+                aria-hidden="true"
+              />
+              {f.label}
+            </button>
+          </Tooltip>
         );
       })}
 
       {/* Clear button — plain text, right-aligned via flex margin */}
-      <button
-        className={styles.clearBtn}
-        onClick={onClear}
-        aria-label="Clear all status filters"
-        title="Remove every active status filter — the roadmap shows all lessons again"
-        // Dim when there's nothing to clear so it reads as inactive.
-        style={{ opacity: hasActiveFilters ? 1 : 0.45 }}
+      <Tooltip
+        content="Remove every active status filter — the roadmap shows all lessons again"
+        side="bottom"
       >
-        Clear filters
-        <IconX />
-      </button>
+        <button
+          className={styles.clearBtn}
+          onClick={onClear}
+          aria-label="Clear all status filters"
+          title="Remove every active status filter — the roadmap shows all lessons again"
+          // Dim when there's nothing to clear so it reads as inactive.
+          style={{ opacity: hasActiveFilters ? 1 : 0.45 }}
+        >
+          Clear filters
+          <IconX />
+        </button>
+      </Tooltip>
     </div>
   );
 }

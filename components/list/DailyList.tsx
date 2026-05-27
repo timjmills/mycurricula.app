@@ -35,6 +35,7 @@ import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { WEEK_DAYS, SCHEDULE, dateForWeekDay } from "@/lib/mock";
 import { ListRow } from "@/components/list/ListRow";
+import { Tooltip } from "@/components/ui";
 import styles from "./DailyList.module.css";
 
 // ── Time-sort helpers ────────────────────────────────────────────────────────
@@ -233,30 +234,35 @@ export function DailyList({ onOpenAddLesson }: DailyListProps): ReactNode {
         <div className={styles.empty} role="status">
           <EmptyDayIllustration />
           <p className={styles.emptyHeading}>No lessons planned for today</p>
-          <button
-            type="button"
-            className={styles.addLessonCta}
-            onClick={onOpenAddLesson}
-            aria-label="Add a lesson for today"
-            title="Drop a new lesson onto today's schedule — opens the add-lesson form pre-filled with today's date"
+          <Tooltip
+            content="Drop a new lesson onto today's schedule — opens the add-lesson form pre-filled with today's date."
+            side="top"
           >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
-              fill="none"
-              aria-hidden="true"
-              focusable="false"
+            <button
+              type="button"
+              className={styles.addLessonCta}
+              onClick={onOpenAddLesson}
+              aria-label="Add a lesson for today"
+              title="Drop a new lesson onto today's schedule — opens the add-lesson form pre-filled with today's date"
             >
-              <path
-                d="M6 1.5v9M1.5 6h9"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-            Add a lesson
-          </button>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M6 1.5v9M1.5 6h9"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+              Add a lesson
+            </button>
+          </Tooltip>
         </div>
       )}
     </div>

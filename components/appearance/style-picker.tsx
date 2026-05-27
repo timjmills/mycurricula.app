@@ -9,6 +9,7 @@
 import type { ReactNode } from "react";
 import { useTheme } from "@/lib/theme";
 import type { ThemeStyle } from "@/lib/theme";
+import { Tooltip } from "@/components/ui";
 import { SettingsCard, RadioDot } from "./settings-card";
 
 interface StyleOption {
@@ -52,7 +53,14 @@ export function StylePicker(): ReactNode {
   return (
     <SettingsCard
       eyebrow="Card style"
-      title="How your planner looks"
+      title={
+        <Tooltip
+          content="Pick the visual treatment for every lesson card in your planner. Personal preference — saved per teacher, not shared with the team."
+          side="bottom"
+        >
+          <span>How your planner looks</span>
+        </Tooltip>
+      }
       hint="Personal preference — your teammates can pick a different one."
     >
       <div
@@ -68,55 +76,56 @@ export function StylePicker(): ReactNode {
         {STYLE_OPTIONS.map((opt) => {
           const selected = style === opt.id;
           return (
-            <button
-              key={opt.id}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => setStyle(opt.id)}
-              title={opt.tooltip}
-              className="cp-focusable"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "11px 14px",
-                minHeight: 44,
-                borderRadius: 10,
-                background: selected ? "var(--ink-100)" : "var(--paper)",
-                border: selected
-                  ? "1.5px solid var(--ink-900)"
-                  : "1px solid var(--ink-150)",
-                textAlign: "left",
-                cursor: "pointer",
-              }}
-            >
-              <RadioDot selected={selected} />
-              <span style={{ flex: 1 }}>
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: 13.5,
-                    fontWeight: 600,
-                    color: "var(--ink-900)",
-                  }}
-                >
-                  {opt.label}
+            <Tooltip key={opt.id} content={opt.tooltip} side="right">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setStyle(opt.id)}
+                title={opt.tooltip}
+                className="cp-focusable"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "11px 14px",
+                  minHeight: 44,
+                  borderRadius: 10,
+                  background: selected ? "var(--ink-100)" : "var(--paper)",
+                  border: selected
+                    ? "1.5px solid var(--ink-900)"
+                    : "1px solid var(--ink-150)",
+                  textAlign: "left",
+                  cursor: "pointer",
+                }}
+              >
+                <RadioDot selected={selected} />
+                <span style={{ flex: 1 }}>
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      color: "var(--ink-900)",
+                    }}
+                  >
+                    {opt.label}
+                  </span>
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: 11.5,
+                      color: "var(--ink-500)",
+                      marginTop: 2,
+                      lineHeight: 1.45,
+                      textWrap: "pretty",
+                    }}
+                  >
+                    {opt.desc}
+                  </span>
                 </span>
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: 11.5,
-                    color: "var(--ink-500)",
-                    marginTop: 2,
-                    lineHeight: 1.45,
-                    textWrap: "pretty",
-                  }}
-                >
-                  {opt.desc}
-                </span>
-              </span>
-            </button>
+              </button>
+            </Tooltip>
           );
         })}
       </div>

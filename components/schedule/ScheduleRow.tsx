@@ -31,6 +31,7 @@ import { type TimelineBlock, formatBlockTime } from "@/lib/schedule-data";
 import { SUBJECT_BY_ID } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
+import { Tooltip } from "@/components/ui";
 import styles from "./ScheduleRow.module.css";
 
 export interface ScheduleRowProps {
@@ -105,76 +106,80 @@ export function ScheduleRow({
       : `${title || subjectName}, ${timeRange} — a non-academic block configured in Schedule settings`;
 
   return (
-    <div
-      className={rowClass}
-      role={isInteractive ? "button" : undefined}
-      tabIndex={isInteractive ? 0 : -1}
-      onClick={isInteractive ? handleClick : undefined}
-      onKeyDown={
-        isInteractive
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleClick(e as unknown as MouseEvent<HTMLDivElement>);
+    <Tooltip content={rowTooltip} side="right">
+      <div
+        className={rowClass}
+        role={isInteractive ? "button" : undefined}
+        tabIndex={isInteractive ? 0 : -1}
+        onClick={isInteractive ? handleClick : undefined}
+        onKeyDown={
+          isInteractive
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleClick(e as unknown as MouseEvent<HTMLDivElement>);
+                }
               }
-            }
-          : undefined
-      }
-      aria-label={
-        isInteractive
-          ? `${formatBlockTime(block.startMin)} to ${formatBlockTime(block.endMin)} — ${title}`
-          : undefined
-      }
-      title={rowTooltip}
-    >
-      {/* Time column — fixed width so every row's title aligns. */}
-      <div className={styles.time}>
-        <span className={styles.timeStart}>
-          {formatBlockTime(block.startMin)}
-        </span>
-        <span className={styles.timeDash} aria-hidden="true">
-          —
-        </span>
-        <span className={styles.timeEnd}>{formatBlockTime(block.endMin)}</span>
-      </div>
-
-      {/* Monogram chip — subject-tinted for academic, neutral for chores. */}
-      {subject ? (
-        <span className={styles.monogram} aria-hidden="true">
-          {subject.icon}
-        </span>
-      ) : (
-        <span
-          className={[styles.monogram, styles.monogramNeutral].join(" ")}
-          aria-hidden="true"
-        >
-          {/* A subtle dot keeps the column aligned without inventing an icon. */}
-          ·
-        </span>
-      )}
-
-      {/* Body — subject label (academic only) + title + optional "now" pill. */}
-      <div className={styles.body}>
-        <div className={styles.bodyHeader}>
-          {subject && (
-            <span className={styles.subjectLabel}>
-              {subject.name.toUpperCase()}
-            </span>
-          )}
-          {isNow && (
-            <span className={styles.nowPill} aria-label="Currently active">
-              <span aria-hidden="true">▶</span> now
-            </span>
-          )}
+            : undefined
+        }
+        aria-label={
+          isInteractive
+            ? `${formatBlockTime(block.startMin)} to ${formatBlockTime(block.endMin)} — ${title}`
+            : undefined
+        }
+        title={rowTooltip}
+      >
+        {/* Time column — fixed width so every row's title aligns. */}
+        <div className={styles.time}>
+          <span className={styles.timeStart}>
+            {formatBlockTime(block.startMin)}
+          </span>
+          <span className={styles.timeDash} aria-hidden="true">
+            —
+          </span>
+          <span className={styles.timeEnd}>
+            {formatBlockTime(block.endMin)}
+          </span>
         </div>
-        <div
-          className={[styles.title, faded ? styles.titleFaded : ""]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          {faded ? "No lesson scheduled" : title}
+
+        {/* Monogram chip — subject-tinted for academic, neutral for chores. */}
+        {subject ? (
+          <span className={styles.monogram} aria-hidden="true">
+            {subject.icon}
+          </span>
+        ) : (
+          <span
+            className={[styles.monogram, styles.monogramNeutral].join(" ")}
+            aria-hidden="true"
+          >
+            {/* A subtle dot keeps the column aligned without inventing an icon. */}
+            ·
+          </span>
+        )}
+
+        {/* Body — subject label (academic only) + title + optional "now" pill. */}
+        <div className={styles.body}>
+          <div className={styles.bodyHeader}>
+            {subject && (
+              <span className={styles.subjectLabel}>
+                {subject.name.toUpperCase()}
+              </span>
+            )}
+            {isNow && (
+              <span className={styles.nowPill} aria-label="Currently active">
+                <span aria-hidden="true">▶</span> now
+              </span>
+            )}
+          </div>
+          <div
+            className={[styles.title, faded ? styles.titleFaded : ""]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {faded ? "No lesson scheduled" : title}
+          </div>
         </div>
       </div>
-    </div>
+    </Tooltip>
   );
 }

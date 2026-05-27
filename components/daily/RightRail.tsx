@@ -34,7 +34,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { ToggleGroup } from "@/components/ui";
+import { ToggleGroup, Tooltip } from "@/components/ui";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
@@ -653,22 +653,27 @@ export function RightRail({
             {TAB_IDS.map((id) => {
               const isActive = id === activeTab;
               return (
-                <button
+                <Tooltip
                   key={id}
-                  type="button"
-                  role="tab"
-                  id={`rail-tab-${id}`}
-                  aria-selected={isActive}
-                  aria-controls={`rail-panel-${id}`}
-                  // Roving tabindex: only the active tab is keyboard-reachable
-                  // from outside the strip; within the strip, arrow keys navigate.
-                  tabIndex={isActive ? 0 : -1}
-                  className={`${styles.tab} ${isActive ? styles.tabActive : ""}`}
-                  onClick={() => selectTab(id)}
-                  title={`Switch the right rail to the ${TAB_LABEL[id]} panel`}
+                  content={`Switch the right rail to the ${TAB_LABEL[id]} panel`}
+                  side="bottom"
                 >
-                  {TAB_LABEL[id]}
-                </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    id={`rail-tab-${id}`}
+                    aria-selected={isActive}
+                    aria-controls={`rail-panel-${id}`}
+                    // Roving tabindex: only the active tab is keyboard-reachable
+                    // from outside the strip; within the strip, arrow keys navigate.
+                    tabIndex={isActive ? 0 : -1}
+                    className={`${styles.tab} ${isActive ? styles.tabActive : ""}`}
+                    onClick={() => selectTab(id)}
+                    title={`Switch the right rail to the ${TAB_LABEL[id]} panel`}
+                  >
+                    {TAB_LABEL[id]}
+                  </button>
+                </Tooltip>
               );
             })}
             {/* Mode toggle sits flush right inside the tab strip. */}

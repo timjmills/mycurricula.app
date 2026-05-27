@@ -22,7 +22,14 @@ import {
 } from "@/lib/lesson-templates";
 import { useCustomTemplates, isCustomTemplateId } from "@/lib/custom-templates";
 import { TemplateSectionEditor } from "./template-section-editor";
-import { Badge, Button, Chip, EmptyState, PageHeader } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Chip,
+  EmptyState,
+  PageHeader,
+  Tooltip,
+} from "@/components/ui";
 import styles from "./lesson-templates-manager.module.css";
 
 // ── Built-in card ───────────────────────────────────────────────────────────
@@ -205,9 +212,14 @@ function EditorPanel({
       <div className={styles.editorHeader}>
         <div className={styles.editorHeaderText}>
           <div className={styles.editorEyebrow}>Editing template</div>
-          <h2 className={styles.editorTitle}>
-            {template.name || "Untitled template"}
-          </h2>
+          <Tooltip
+            content="The custom lesson template currently open for editing. Rename it, edit its description, or add/remove/reorder sections below."
+            side="bottom"
+          >
+            <h2 className={styles.editorTitle} tabIndex={0}>
+              {template.name || "Untitled template"}
+            </h2>
+          </Tooltip>
         </div>
         <Button
           variant="primary"
@@ -345,9 +357,18 @@ export function LessonTemplatesManager(): ReactNode {
           <div className={styles.cardHeader}>
             <div className={styles.cardHeaderText}>
               <div className={styles.cardEyebrow}>Built-in library</div>
-              <h2 className={styles.cardTitle} id="builtin-heading">
-                Lesson templates
-              </h2>
+              <Tooltip
+                content="15 research-backed lesson structures available out of the box. Each is read-only — click Duplicate & edit on any card to make your own editable copy."
+                side="bottom"
+              >
+                <h2
+                  className={styles.cardTitle}
+                  id="builtin-heading"
+                  tabIndex={0}
+                >
+                  Lesson templates
+                </h2>
+              </Tooltip>
               <p className={styles.cardHint}>
                 15 research-backed lesson structures. They are read-only — use
                 &ldquo;Duplicate &amp; edit&rdquo; to create your own variation.
@@ -371,9 +392,18 @@ export function LessonTemplatesManager(): ReactNode {
           <div className={styles.cardHeader}>
             <div className={styles.cardHeaderText}>
               <div className={styles.cardEyebrow}>Your templates</div>
-              <h2 className={styles.cardTitle} id="custom-heading">
-                Custom templates
-              </h2>
+              <Tooltip
+                content="Your own lesson-flow templates — created from scratch or duplicated from a built-in. Edit names, sections, and prompts; one will be your account-wide default for new lessons."
+                side="bottom"
+              >
+                <h2
+                  className={styles.cardTitle}
+                  id="custom-heading"
+                  tabIndex={0}
+                >
+                  Custom templates
+                </h2>
+              </Tooltip>
               <p className={styles.cardHint}>
                 Templates you create or duplicate. Set one as your default and
                 every new lesson in an academic subject will start with it.

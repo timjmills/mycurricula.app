@@ -15,6 +15,7 @@ import { PaletteProvider } from "@/lib/palette";
 import type { SubjectMapping } from "@/lib/palette";
 import { LESSON_BY_ID } from "@/lib/mock/lessons";
 import { LessonCard } from "@/components/lesson-card";
+import { Tooltip } from "@/components/ui";
 import { SettingsCard } from "./settings-card";
 
 // A Math / Reading / Writing trio — same lessons artboard A2 previews.
@@ -38,6 +39,14 @@ export function LivePreview({ mapping }: LivePreviewProps): ReactNode {
   return (
     <SettingsCard
       eyebrow="Live preview"
+      title={
+        <Tooltip
+          content="Sample lesson cards rendered with your current style + palette choices. Re-themes the instant you change either picker above so you can preview before committing."
+          side="bottom"
+        >
+          <span>How your cards look right now</span>
+        </Tooltip>
+      }
       action={
         <div style={{ fontSize: 11, color: "var(--ink-500)" }}>
           Style:{" "}

@@ -176,14 +176,7 @@ export function SubjectCalendar({
         status: unitStatus,
       };
     });
-  }, [
-    lessons,
-    subjectId,
-    subject,
-    currentWeekIdx,
-    yearStart,
-    schoolWeekLen,
-  ]);
+  }, [lessons, subjectId, subject, currentWeekIdx, yearStart, schoolWeekLen]);
 
   // ── Shared horizontal scroll + auto-center on today ───────────────────
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -209,11 +202,12 @@ export function SubjectCalendar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const calendarTip = `Mini roadmap for ${subject?.name ?? subjectId} — the chameleon tint and unit bars track this subject only. Uncheck "${subject?.name ?? subjectId}" in the curriculum filter to remove this calendar.`;
   return (
     <section
       className={`${styles.section} ${subjectClassName(subjectId)}`}
       aria-label={`${subject?.name ?? subjectId} subject calendar`}
-      title={`Mini roadmap for ${subject?.name ?? subjectId} — the chameleon tint and unit bars track this subject only. Uncheck "${subject?.name ?? subjectId}" in the curriculum filter to remove this calendar.`}
+      title={calendarTip}
     >
       <div ref={scrollRef} className={styles.scrollWrap}>
         <QuarterMonthWeekHeader
@@ -236,10 +230,7 @@ export function SubjectCalendar({
           {/* Sticky-left LaneCard — same pattern as RoadmapView so the
               subject label stays glued to the left edge while the timeline
               scrolls underneath. */}
-          <div
-            className={styles.stickyLane}
-            style={{ width: leftRailWidthPx }}
-          >
+          <div className={styles.stickyLane} style={{ width: leftRailWidthPx }}>
             <LaneCard name={subject?.name ?? subjectId} subjectId={subjectId} />
           </div>
 

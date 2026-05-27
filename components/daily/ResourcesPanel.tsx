@@ -62,7 +62,7 @@ import { ResourceTile } from "@/components/lesson-flow";
 import { usePlanner } from "@/lib/planner-store";
 import { lessonResources } from "@/lib/lesson-resources";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import type { PanelDragHandleProps } from "./RightRail";
 import {
   ResourceComposer,
@@ -463,27 +463,29 @@ function ResourceListRow({
   };
 
   return (
-    <button
-      type="button"
-      className={`${styles.resourceRow} ${styles[tag.tagClass] ?? ""}`}
-      aria-label={`${tag.label}: ${label}`}
-      title={label}
-      onClick={handleClick}
-    >
-      {/* Left chip — 32×32 pastel SQUARE with the type glyph centered.
+    <Tooltip content={`${tag.label} — ${label}`} side="left">
+      <button
+        type="button"
+        className={`${styles.resourceRow} ${styles[tag.tagClass] ?? ""}`}
+        aria-label={`${tag.label}: ${label}`}
+        title={`${tag.label} — ${label}`}
+        onClick={handleClick}
+      >
+        {/* Left chip — 32×32 pastel SQUARE with the type glyph centered.
           The pastel pair comes from the .row<Type> class on this button. */}
-      <span className={styles.resourceRowChip} aria-hidden="true">
-        <ResourceTypeIcon type={resource.type} />
-      </span>
-      {/* Two-line text block: bold label on top, small URL preview below. */}
-      <span className={styles.resourceRowText}>
-        <span className={styles.resourceRowLabel}>{label}</span>
-        <span className={styles.resourceRowUrl}>{url}</span>
-      </span>
-      {/* Right pill — uppercase TYPE TAG (PPT / PDF / DOCX / IMG / VIDEO /
+        <span className={styles.resourceRowChip} aria-hidden="true">
+          <ResourceTypeIcon type={resource.type} />
+        </span>
+        {/* Two-line text block: bold label on top, small URL preview below. */}
+        <span className={styles.resourceRowText}>
+          <span className={styles.resourceRowLabel}>{label}</span>
+          <span className={styles.resourceRowUrl}>{url}</span>
+        </span>
+        {/* Right pill — uppercase TYPE TAG (PPT / PDF / DOCX / IMG / VIDEO /
           WEB / LINK). Same per-type pastel as the chip, slightly stronger. */}
-      <span className={styles.resourceRowTag}>{tag.label}</span>
-    </button>
+        <span className={styles.resourceRowTag}>{tag.label}</span>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -571,13 +573,19 @@ function TileWithOverflow({
       {/* Photo-stack count badge — small chip in the top-left corner
           indicating how many photos are bundled into the stack. */}
       {isStack && (
-        <span
-          className={styles.stackBadge}
-          aria-hidden="true"
-          title={`${stackCount} photos`}
+        <Tooltip
+          content={`${stackCount} photos bundled in this stack — click the tile to add more.`}
+          side="top"
         >
-          {stackCount}
-        </span>
+          <span
+            className={styles.stackBadge}
+            aria-hidden="true"
+            title={`${stackCount} photos in this stack`}
+            tabIndex={0}
+          >
+            {stackCount}
+          </span>
+        </Tooltip>
       )}
       {/* The "···" overflow button — visual stub for Phase 1A. Sits over
           the tile's top-right corner; positioning is tuned so it lands
@@ -953,17 +961,22 @@ export function ResourcesPanel({
             button alone, so the rest of the header (mode toggle, count
             chip) stays click-through. ≥44px touch target via padding. */}
         {dragHandleProps && (
-          <button
-            type="button"
-            ref={dragHandleProps.ref}
-            {...(dragHandleProps.attributes ?? {})}
-            {...(dragHandleProps.listeners ?? {})}
-            className={styles.gripBtn}
-            aria-label={dragHandleProps.label ?? "Drag to reorder Resources"}
-            title="Drag to reorder"
+          <Tooltip
+            content="Drag to reorder the Resources panel within the right rail."
+            side="bottom"
           >
-            <GripVerticalIcon />
-          </button>
+            <button
+              type="button"
+              ref={dragHandleProps.ref}
+              {...(dragHandleProps.attributes ?? {})}
+              {...(dragHandleProps.listeners ?? {})}
+              className={styles.gripBtn}
+              aria-label={dragHandleProps.label ?? "Drag to reorder Resources"}
+              title="Drag to reorder the Resources panel"
+            >
+              <GripVerticalIcon />
+            </button>
+          </Tooltip>
         )}
         {/* "Back to week" affordance — shown only when the panel is
             lesson-scoped on the Weekly view (i.e. `onClearLesson` is
@@ -987,16 +1000,26 @@ export function ResourcesPanel({
             • Day mode with a selected lesson: "Resources · <lesson title>"
               (truncated via CSS ellipsis so the head doesn't overflow).
             • Day mode with no selection: "Resources". */}
-        <h3
-          className={styles.title}
-          title={!isWeek && lesson !== null ? lesson.title : undefined}
+        <Tooltip
+          content="Open the lesson's attached resources — slides, handouts, videos, and links the team has attached to this lesson. Drag files in to attach."
+          side="bottom"
         >
-          {isWeek && typeof week === "number"
-            ? `Resources · Week ${week}`
-            : !isWeek && lesson !== null
-              ? `Resources · ${lesson.title}`
-              : "Resources"}
-        </h3>
+          <h3
+            className={styles.title}
+            title={
+              !isWeek && lesson !== null
+                ? `Resources for ${lesson.title}`
+                : "Resources panel — attached links, files, videos, and docs"
+            }
+            tabIndex={0}
+          >
+            {isWeek && typeof week === "number"
+              ? `Resources · Week ${week}`
+              : !isWeek && lesson !== null
+                ? `Resources · ${lesson.title}`
+                : "Resources"}
+          </h3>
+        </Tooltip>
         {/* Small neutral count chip on the right of the title — only
             shown once there's context (a selected lesson in day mode, or
             at least one lesson in the week in week mode), so an empty

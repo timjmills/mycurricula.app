@@ -71,7 +71,7 @@ import {
 } from "react";
 import type { CapturedItem } from "./ResourceComposer";
 import { fileToCapturedItem } from "./ResourceComposer";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import styles from "./AllToolsMenu.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -442,17 +442,22 @@ export function AllToolsMenu({
       <div className={styles.header}>
         {/* ref held for focus-management on mount — Button doesn't forward
             refs, so this stays as a raw button. All styling via .backBtn. */}
-        <button
-          ref={backRef}
-          type="button"
-          className={styles.backBtn}
-          onClick={onBack}
-          aria-label="Back to add resource"
-          title="Return to the resource composer without picking a tool"
+        <Tooltip
+          content="Return to the resource composer without picking a tool"
+          side="bottom"
         >
-          <BackIcon />
-          <span>Back</span>
-        </button>
+          <button
+            ref={backRef}
+            type="button"
+            className={styles.backBtn}
+            onClick={onBack}
+            aria-label="Back to add resource"
+            title="Return to the resource composer without picking a tool"
+          >
+            <BackIcon />
+            <span>Back</span>
+          </button>
+        </Tooltip>
         <h2 id={titleId} className={styles.title}>
           All tools
         </h2>
@@ -605,48 +610,49 @@ function Tile({
   const ariaLabel = tile.works
     ? `${tile.label}`
     : `${tile.label} (coming soon)`;
+  const tileTip = tile.works
+    ? `Pick the ${tile.label} tool to capture a ${tile.label.toLowerCase()} resource`
+    : `${tile.label} — coming in a later phase`;
   return (
-    <button
-      type="button"
-      className={`${styles.tile} ${tile.works ? "" : styles.tileStub}`}
-      onClick={tile.onClick}
-      aria-label={ariaLabel}
-      title={
-        tile.works
-          ? `Pick the ${tile.label} tool to capture a ${tile.label.toLowerCase()} resource`
-          : `${tile.label} — coming in a later phase`
-      }
-      // The three custom props feed --tileBg / --tileIconBg / --stagger in
-      // AllToolsMenu.module.css. Color tokens reference --hlp-* / --hl-*
-      // from tokens.css so no hex sneaks in via the inline style. The
-      // stagger custom property drives the staggered entrance animation
-      // delay so the grid cascades in rather than landing as a block.
-      style={
-        {
-          "--tileBg": `var(${tile.bgVar})`,
-          "--tileIconBg": `var(${tile.iconVar})`,
-          "--stagger": `${staggerIndex * 16}ms`,
-        } as React.CSSProperties
-      }
-    >
-      <span className={styles.tileIcon} aria-hidden="true">
-        {tile.icon}
-      </span>
-      <span className={styles.tileLabel}>{tile.label}</span>
-      {tile.works && tile.isNew && (
-        <span className={styles.badge} aria-hidden="true">
-          New
+    <Tooltip content={tileTip} side="top">
+      <button
+        type="button"
+        className={`${styles.tile} ${tile.works ? "" : styles.tileStub}`}
+        onClick={tile.onClick}
+        aria-label={ariaLabel}
+        title={tileTip}
+        // The three custom props feed --tileBg / --tileIconBg / --stagger in
+        // AllToolsMenu.module.css. Color tokens reference --hlp-* / --hl-*
+        // from tokens.css so no hex sneaks in via the inline style. The
+        // stagger custom property drives the staggered entrance animation
+        // delay so the grid cascades in rather than landing as a block.
+        style={
+          {
+            "--tileBg": `var(${tile.bgVar})`,
+            "--tileIconBg": `var(${tile.iconVar})`,
+            "--stagger": `${staggerIndex * 16}ms`,
+          } as React.CSSProperties
+        }
+      >
+        <span className={styles.tileIcon} aria-hidden="true">
+          {tile.icon}
         </span>
-      )}
-      {!tile.works && (
-        <span
-          className={`${styles.badge} ${styles.badgeSoon}`}
-          aria-hidden="true"
-        >
-          Soon
-        </span>
-      )}
-    </button>
+        <span className={styles.tileLabel}>{tile.label}</span>
+        {tile.works && tile.isNew && (
+          <span className={styles.badge} aria-hidden="true">
+            New
+          </span>
+        )}
+        {!tile.works && (
+          <span
+            className={`${styles.badge} ${styles.badgeSoon}`}
+            aria-hidden="true"
+          >
+            Soon
+          </span>
+        )}
+      </button>
+    </Tooltip>
   );
 }
 

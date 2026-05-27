@@ -84,7 +84,7 @@ import type { Lesson, LessonResource, SubjectId } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECTS } from "@/lib/mock";
 import { useLabels } from "@/lib/labels";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import { AllToolsMenu } from "./AllToolsMenu";
 import styles from "./ResourceComposer.module.css";
 
@@ -961,51 +961,65 @@ export function ResourceComposer({
                             noteOpen ? styles.capturedChipActive : ""
                           }`}
                         >
-                          <button
-                            type="button"
-                            className={styles.capturedChipBody}
-                            onClick={() => toggleNote(item.id)}
-                            aria-expanded={noteOpen}
-                            title={
+                          <Tooltip
+                            content={
                               hasNote
-                                ? `Edit the note attached to ${item.label}`
-                                : `Add a short note to ${item.label} so the team knows how to use it`
+                                ? `Edit the note attached to ${item.label} — the note shows up on the lesson card alongside the resource.`
+                                : `Add a short note to ${item.label} so the team knows how to use it.`
                             }
-                            aria-label={
-                              hasNote
-                                ? `Edit note for ${item.label}`
-                                : `Add note for ${item.label}`
-                            }
+                            side="top"
                           >
-                            <span
-                              className={styles.capturedChipIcon}
-                              aria-hidden="true"
+                            <button
+                              type="button"
+                              className={styles.capturedChipBody}
+                              onClick={() => toggleNote(item.id)}
+                              aria-expanded={noteOpen}
+                              title={
+                                hasNote
+                                  ? `Edit the note attached to ${item.label}`
+                                  : `Add a short note to ${item.label} so the team knows how to use it`
+                              }
+                              aria-label={
+                                hasNote
+                                  ? `Edit note for ${item.label}`
+                                  : `Add note for ${item.label}`
+                              }
                             >
-                              <CapturedTypeIcon type={item.type} />
-                            </span>
-                            <span
-                              className={styles.capturedChipLabel}
-                              title={item.label}
-                            >
-                              {item.label}
-                            </span>
-                            {hasNote && (
                               <span
-                                className={styles.capturedChipNoteDot}
-                                aria-label="Has note"
-                                title="Has note"
-                              />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.capturedChipRemove}
-                            onClick={() => removeItem(item.id)}
-                            aria-label={`Remove ${item.label}`}
-                            title={`Remove ${item.label} from the captured list — it won't be attached to the lesson`}
+                                className={styles.capturedChipIcon}
+                                aria-hidden="true"
+                              >
+                                <CapturedTypeIcon type={item.type} />
+                              </span>
+                              <span
+                                className={styles.capturedChipLabel}
+                                title={item.label}
+                              >
+                                {item.label}
+                              </span>
+                              {hasNote && (
+                                <span
+                                  className={styles.capturedChipNoteDot}
+                                  aria-label="Has note"
+                                  title="Has note"
+                                />
+                              )}
+                            </button>
+                          </Tooltip>
+                          <Tooltip
+                            content={`Remove ${item.label} from the captured list — it won't be attached to the lesson.`}
+                            side="top"
                           >
-                            <SmallXIcon />
-                          </button>
+                            <button
+                              type="button"
+                              className={styles.capturedChipRemove}
+                              onClick={() => removeItem(item.id)}
+                              aria-label={`Remove ${item.label}`}
+                              title={`Remove ${item.label} from the captured list — it won't be attached to the lesson`}
+                            >
+                              <SmallXIcon />
+                            </button>
+                          </Tooltip>
                         </li>
                       );
                     })}
@@ -1219,20 +1233,22 @@ function ToolTile({
   } as React.CSSProperties;
 
   return (
-    <button
-      type="button"
-      className={`${styles.toolTile} ${active ? styles.toolTileActive : ""}`}
-      onClick={onClick}
-      aria-pressed={active}
-      title={`${label} — ${description}`}
-      style={tileStyle}
-    >
-      <span className={styles.toolTileIcon} aria-hidden="true">
-        {icon}
-      </span>
-      <span className={styles.toolTileLabel}>{label}</span>
-      <span className={styles.toolTileDesc}>{description}</span>
-    </button>
+    <Tooltip content={`${label} — ${description}`} side="top">
+      <button
+        type="button"
+        className={`${styles.toolTile} ${active ? styles.toolTileActive : ""}`}
+        onClick={onClick}
+        aria-pressed={active}
+        title={`${label} — ${description}`}
+        style={tileStyle}
+      >
+        <span className={styles.toolTileIcon} aria-hidden="true">
+          {icon}
+        </span>
+        <span className={styles.toolTileLabel}>{label}</span>
+        <span className={styles.toolTileDesc}>{description}</span>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -1298,48 +1314,58 @@ function PickerPill({
 
   return (
     <div className={styles.pickerWrap}>
-      <button
-        type="button"
-        className={`${styles.pickerPill} ${
-          disabled ? styles.pickerPillDisabled : ""
-        }`}
-        onClick={onToggle}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        disabled={disabled}
-        title="Pick where to attach this resource — choose the subject, unit, lesson, and section in this order"
+      <Tooltip
+        content="Pick where to attach this resource — choose the subject, unit, lesson, and section in this order."
+        side="top"
       >
-        {swatchClass && (
-          <span
-            className={`${styles.pickerSwatch} cp-subj ${swatchClass}`}
-            aria-hidden="true"
-          />
-        )}
-        <span className={styles.pickerPillLabel}>{label}</span>
-        <span className={styles.pickerPillValue} title={value}>
-          {value || "—"}
-        </span>
-        <ChevronDownIcon />
-      </button>
+        <button
+          type="button"
+          className={`${styles.pickerPill} ${
+            disabled ? styles.pickerPillDisabled : ""
+          }`}
+          onClick={onToggle}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          disabled={disabled}
+          title="Pick where to attach this resource — choose the subject, unit, lesson, and section in this order"
+        >
+          {swatchClass && (
+            <span
+              className={`${styles.pickerSwatch} cp-subj ${swatchClass}`}
+              aria-hidden="true"
+            />
+          )}
+          <span className={styles.pickerPillLabel}>{label}</span>
+          <span className={styles.pickerPillValue} title={value}>
+            {value || "—"}
+          </span>
+          <ChevronDownIcon />
+        </button>
+      </Tooltip>
       {open && (
         <div ref={popoverRef} className={styles.pickerPopover} role="listbox">
           {options.length === 0 ? (
             <p className={styles.pickerEmpty}>No options.</p>
           ) : (
             options.map((opt) => (
-              <button
+              <Tooltip
                 key={opt.id || "__whole__"}
-                type="button"
-                role="option"
-                aria-selected={opt.id === selectedId}
-                className={`${styles.pickerOption} ${
-                  opt.id === selectedId ? styles.pickerOptionActive : ""
-                }`}
-                onClick={() => onPick(opt.id)}
-                title={`Pick ${opt.label}`}
+                content={`Pick ${opt.label}`}
+                side="right"
               >
-                {opt.label}
-              </button>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={opt.id === selectedId}
+                  className={`${styles.pickerOption} ${
+                    opt.id === selectedId ? styles.pickerOptionActive : ""
+                  }`}
+                  onClick={() => onPick(opt.id)}
+                  title={`Pick ${opt.label}`}
+                >
+                  {opt.label}
+                </button>
+              </Tooltip>
             ))
           )}
         </div>

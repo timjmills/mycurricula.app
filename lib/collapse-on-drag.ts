@@ -1,7 +1,7 @@
 "use client";
 
 // collapse-on-drag.ts — shared foundation for the collapse-on-drag
-// interaction pattern (Documents/Project Files/5.18.26
+// interaction pattern (docs/historical/5.18.26
 // collapse_on_drag_pattern.md). When the user picks up a card/section,
 // every peer collapses to a single-line chip; on drop they re-expand.
 //

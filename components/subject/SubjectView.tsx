@@ -191,102 +191,112 @@ function LessonRowItem({
     >
       {lesson.isPersonal && <span className={styles.personalStripe} />}
 
-      <button
-        className={[
-          styles.lessonRow,
-          lesson.isPersonal ? styles.lessonRowPersonal : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        onClick={onToggle}
-        aria-expanded={isExpanded}
-        title={`Expand "${lesson.title}" to see its directions, standards, and a quick preview of the lesson content`}
+      <Tooltip
+        content={`Expand "${lesson.title}" to see its directions, standards, and a quick preview of the lesson content.`}
+        side="top"
       >
-        <span
-          className={[
-            styles.lessonRowChevron,
-            isExpanded ? styles.lessonRowChevronOpen : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <ChevronIcon size={8} />
-        </span>
-
         <button
-          className={styles.checkBtn}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleStatus();
-          }}
-          aria-label={`Toggle completion for ${lesson.title}`}
-          title={`Mark "${lesson.title}" done or not done — completion is personal and never forks the team's Master copy`}
-        >
-          <CheckIcon status={lesson.status} />
-        </button>
-
-        <span
           className={[
-            styles.lessonTitle,
-            lesson.status === "done" || lesson.status === "skipped"
-              ? styles.lessonTitleDone
-              : "",
+            styles.lessonRow,
+            lesson.isPersonal ? styles.lessonRowPersonal : "",
           ]
             .filter(Boolean)
             .join(" ")}
+          onClick={onToggle}
+          aria-expanded={isExpanded}
+          title={`Expand "${lesson.title}" to see its directions, standards, and a quick preview of the lesson content`}
         >
-          {lesson.title}
-        </span>
+          <span
+            className={[
+              styles.lessonRowChevron,
+              isExpanded ? styles.lessonRowChevronOpen : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <ChevronIcon size={8} />
+          </span>
 
-        <span
-          style={{
-            fontSize: "var(--t-11)",
-            color: "var(--ink-400)",
-            fontVariantNumeric: "tabular-nums",
-            fontFamily: "var(--font-mono)",
-            flexShrink: 0,
-          }}
-        >
-          W{lesson.week} · {dayLabel.slice(0, 3)}
-        </span>
-
-        {lesson.isPersonal && (
-          <Tooltip content="Personalized lesson" side="top">
-            <span className={styles.personalPill}>Personal</span>
-          </Tooltip>
-        )}
-
-        {lesson.taskCount > 0 && (
           <Tooltip
-            content={`${lesson.taskCount} task${lesson.taskCount === 1 ? "" : "s"}`}
+            content={`Mark "${lesson.title}" done or not done — completion is personal and never forks the team's Master copy.`}
             side="top"
           >
-            <span className={styles.subEventsBadge}>
-              <span className={styles.subEventsBadgeDot} />+{lesson.taskCount}
-            </span>
+            <button
+              className={styles.checkBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleStatus();
+              }}
+              aria-label={`Toggle completion for ${lesson.title}`}
+              title={`Mark "${lesson.title}" done or not done — completion is personal and never forks the team's Master copy`}
+            >
+              <CheckIcon status={lesson.status} />
+            </button>
           </Tooltip>
-        )}
 
-        {lesson.standards.slice(0, 2).map((s, idx) => (
-          <span key={`${s}-${idx}`} className={styles.standardChip}>
-            {s}
+          <span
+            className={[
+              styles.lessonTitle,
+              lesson.status === "done" || lesson.status === "skipped"
+                ? styles.lessonTitleDone
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {lesson.title}
           </span>
-        ))}
 
-        {lesson.resources.length > 0 && (
           <span
             style={{
               fontSize: "var(--t-11)",
               color: "var(--ink-400)",
+              fontVariantNumeric: "tabular-nums",
+              fontFamily: "var(--font-mono)",
               flexShrink: 0,
             }}
           >
-            {lesson.resources.length} res
+            W{lesson.week} · {dayLabel.slice(0, 3)}
           </span>
-        )}
 
-        {lesson.isCurrent && <span className={styles.currentDot}>•</span>}
-      </button>
+          {lesson.isPersonal && (
+            <Tooltip content="Personalized lesson" side="top">
+              <span className={styles.personalPill}>Personal</span>
+            </Tooltip>
+          )}
+
+          {lesson.taskCount > 0 && (
+            <Tooltip
+              content={`${lesson.taskCount} task${lesson.taskCount === 1 ? "" : "s"}`}
+              side="top"
+            >
+              <span className={styles.subEventsBadge}>
+                <span className={styles.subEventsBadgeDot} />+{lesson.taskCount}
+              </span>
+            </Tooltip>
+          )}
+
+          {lesson.standards.slice(0, 2).map((s, idx) => (
+            <span key={`${s}-${idx}`} className={styles.standardChip}>
+              {s}
+            </span>
+          ))}
+
+          {lesson.resources.length > 0 && (
+            <span
+              style={{
+                fontSize: "var(--t-11)",
+                color: "var(--ink-400)",
+                flexShrink: 0,
+              }}
+            >
+              {lesson.resources.length} res
+            </span>
+          )}
+
+          {lesson.isCurrent && <span className={styles.currentDot}>•</span>}
+        </button>
+      </Tooltip>
 
       {isExpanded && (
         <div className={styles.lessonDetail}>
@@ -348,51 +358,65 @@ function GroupBlock({
 
   return (
     <div className={styles.group}>
-      <button
-        className={[
-          styles.groupHeader,
-          group.isCurrent ? styles.groupHeaderCurrent : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        onClick={onToggleOpen}
-        aria-expanded={isOpen}
-        title={`Expand or collapse the ${group.name} group — see all lessons in this unit, their completion progress, and a "Now" pill on the unit you're currently teaching`}
+      <Tooltip
+        content={`Expand or collapse the ${group.name} group — see all lessons in this unit, their completion progress, and a "Now" pill on the unit you're currently teaching.`}
+        side="top"
       >
-        <span
+        <button
           className={[
-            styles.groupHeaderChevron,
-            isOpen ? styles.groupHeaderChevronOpen : "",
+            styles.groupHeader,
+            group.isCurrent ? styles.groupHeaderCurrent : "",
           ]
             .filter(Boolean)
             .join(" ")}
+          onClick={onToggleOpen}
+          aria-expanded={isOpen}
+          title={`Expand or collapse the ${group.name} group — see all lessons in this unit, their completion progress, and a "Now" pill on the unit you're currently teaching`}
         >
-          <ChevronIcon size={11} />
-        </span>
-
-        <span className={styles.groupTag}>{group.tag}</span>
-        <span className={styles.groupName}>{group.name}</span>
-
-        {group.isCurrent && <span className={styles.nowPill}>Now</span>}
-
-        <span className={styles.groupProgress}>
-          {doneCount}/{group.lessons.length}
-        </span>
-
-        {isOpen && (
-          <button
-            className={styles.groupExpandBtn}
-            onClick={handleExpandAll}
-            title={
-              allExpanded
-                ? "Collapse every lesson in this group back to its title row"
-                : "Open every lesson in this group to see their directions and standards"
-            }
+          <span
+            className={[
+              styles.groupHeaderChevron,
+              isOpen ? styles.groupHeaderChevronOpen : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
-            {allExpanded ? "Close all" : "Expand all"}
-          </button>
-        )}
-      </button>
+            <ChevronIcon size={11} />
+          </span>
+
+          <span className={styles.groupTag}>{group.tag}</span>
+          <span className={styles.groupName}>{group.name}</span>
+
+          {group.isCurrent && <span className={styles.nowPill}>Now</span>}
+
+          <span className={styles.groupProgress}>
+            {doneCount}/{group.lessons.length}
+          </span>
+
+          {isOpen && (
+            <Tooltip
+              content={
+                allExpanded
+                  ? "Collapse every lesson in this group back to its title row."
+                  : "Open every lesson in this group to see their directions and standards."
+              }
+              side="top"
+            >
+              <button
+                className={styles.groupExpandBtn}
+                onClick={handleExpandAll}
+                title={
+                  allExpanded
+                    ? "Collapse every lesson in this group back to its title row"
+                    : "Open every lesson in this group to see their directions and standards"
+                }
+              >
+                {allExpanded ? "Close all" : "Expand all"}
+              </button>
+            </Tooltip>
+          )}
+        </button>
+      </Tooltip>
 
       {isOpen && (
         <div className={styles.groupBody}>
@@ -434,27 +458,32 @@ function SubjectBtn({
   const subject = SUBJECTS.find((s) => s.id === subjectId)!;
 
   return (
-    <button
-      className={`${styles.subjectBtn} ${isActive ? styles.subjectBtnActive : ""} cp-subj ${subjectId}`}
-      onClick={onClick}
-      title={`Switch the Subject view to ${subject.name} — see all ${subject.name} units, your progress, and the team's pace`}
+    <Tooltip
+      content={`Switch the Subject view to ${subject.name} — see all ${subject.name} units, your progress, and the team's pace.`}
+      side="bottom"
     >
-      <span
-        className={styles.subjectBtnStripe}
-        style={{ background: color.c }}
-        aria-hidden="true"
-      />
-      <span
-        className={`${styles.subjectBtnName} ${isActive ? styles.subjectBtnNameActive : ""}`}
+      <button
+        className={`${styles.subjectBtn} ${isActive ? styles.subjectBtnActive : ""} cp-subj ${subjectId}`}
+        onClick={onClick}
+        title={`Switch the Subject view to ${subject.name} — see all ${subject.name} units, your progress, and the team's pace`}
       >
-        {subject.name}
-      </span>
-      {isActive && (
-        <span className={styles.subjectBtnCount}>
-          {doneCount}/{totalCount}
+        <span
+          className={styles.subjectBtnStripe}
+          style={{ background: color.c }}
+          aria-hidden="true"
+        />
+        <span
+          className={`${styles.subjectBtnName} ${isActive ? styles.subjectBtnNameActive : ""}`}
+        >
+          {subject.name}
         </span>
-      )}
-    </button>
+        {isActive && (
+          <span className={styles.subjectBtnCount}>
+            {doneCount}/{totalCount}
+          </span>
+        )}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -857,15 +886,20 @@ function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
         >
           <span className={styles.filterLabel}>Period</span>
           {PERIOD_FILTERS.map((p) => (
-            <button
+            <Tooltip
               key={p}
-              className={`${styles.chip} ${period === p ? styles.chipActive : ""}`}
-              onClick={() => setPeriod(p)}
-              aria-pressed={period === p}
-              title={`Narrow the lesson list to the ${p.toLowerCase()} time window`}
+              content={`Narrow the lesson list to the ${p.toLowerCase()} time window.`}
+              side="bottom"
             >
-              {p}
-            </button>
+              <button
+                className={`${styles.chip} ${period === p ? styles.chipActive : ""}`}
+                onClick={() => setPeriod(p)}
+                aria-pressed={period === p}
+                title={`Narrow the lesson list to the ${p.toLowerCase()} time window`}
+              >
+                {p}
+              </button>
+            </Tooltip>
           ))}
 
           <span className={styles.filterSep} />

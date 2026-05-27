@@ -8,6 +8,7 @@
 
 import type { ReactNode } from "react";
 import { PALETTE_20 } from "@/lib/palette";
+import { Tooltip } from "@/components/ui";
 import { SettingsCard } from "./settings-card";
 
 /** Shared header-cell style for the reference table. */
@@ -58,7 +59,14 @@ export function PaletteReference(): ReactNode {
   return (
     <SettingsCard
       eyebrow="The 20-color paired palette"
-      title="Every swatch has a Normal and Highlight twin"
+      title={
+        <Tooltip
+          content="Read-only reference of the full 20-color palette. The Core Curriculum picks one swatch per subject; your Normal/Highlight palette preference decides which column you actually see in the planner."
+          side="bottom"
+        >
+          <span>Every swatch has a Normal and Highlight twin</span>
+        </Tooltip>
+      }
       hint="The Core Curriculum picks one swatch per subject. Each teacher's palette preference selects which column they see."
     >
       <div style={{ marginTop: 12, overflowX: "auto" }}>

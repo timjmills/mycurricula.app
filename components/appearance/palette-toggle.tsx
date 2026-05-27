@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import { useTheme } from "@/lib/theme";
 import type { ThemePalette } from "@/lib/theme";
 import { PALETTE_20 } from "@/lib/palette";
+import { Tooltip } from "@/components/ui";
 import { SettingsCard, RadioDot } from "./settings-card";
 
 interface PaletteOption {
@@ -51,7 +52,14 @@ export function PaletteToggle(): ReactNode {
   return (
     <SettingsCard
       eyebrow="Palette"
-      title="Color intensity"
+      title={
+        <Tooltip
+          content="Pick how saturated your subject colors look. The hue is locked team-wide so every teacher identifies the same subject by the same hue — only the saturation is yours to set."
+          side="bottom"
+        >
+          <span>Color intensity</span>
+        </Tooltip>
+      }
       hint="Personal preference — the hues are set team-wide; only saturation changes."
     >
       <div
@@ -67,66 +75,67 @@ export function PaletteToggle(): ReactNode {
         {PALETTE_OPTIONS.map((opt) => {
           const selected = palette === opt.id;
           return (
-            <button
-              key={opt.id}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => setPalette(opt.id)}
-              title={opt.tooltip}
-              className="cp-focusable"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-start",
-                gap: 8,
-                padding: "12px 14px",
-                minHeight: 44,
-                borderRadius: 10,
-                background: selected ? "var(--ink-100)" : "var(--paper)",
-                border: selected
-                  ? "1.5px solid var(--ink-900)"
-                  : "1px solid var(--ink-150)",
-                textAlign: "left",
-                cursor: "pointer",
-              }}
-            >
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <RadioDot selected={selected} />
-                <span
-                  style={{
-                    fontSize: 13.5,
-                    fontWeight: 600,
-                    color: "var(--ink-900)",
-                  }}
-                >
-                  {opt.label}
-                </span>
-              </span>
-              <span aria-hidden style={{ display: "flex", gap: 3 }}>
-                {opt.swatches.map((hex, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: 5,
-                      background: hex,
-                    }}
-                  />
-                ))}
-              </span>
-              <span
+            <Tooltip key={opt.id} content={opt.tooltip} side="top">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setPalette(opt.id)}
+                title={opt.tooltip}
+                className="cp-focusable"
                 style={{
-                  fontSize: 11.5,
-                  color: "var(--ink-500)",
-                  lineHeight: 1.45,
-                  textWrap: "pretty",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 8,
+                  padding: "12px 14px",
+                  minHeight: 44,
+                  borderRadius: 10,
+                  background: selected ? "var(--ink-100)" : "var(--paper)",
+                  border: selected
+                    ? "1.5px solid var(--ink-900)"
+                    : "1px solid var(--ink-150)",
+                  textAlign: "left",
+                  cursor: "pointer",
                 }}
               >
-                {opt.desc}
-              </span>
-            </button>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <RadioDot selected={selected} />
+                  <span
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      color: "var(--ink-900)",
+                    }}
+                  >
+                    {opt.label}
+                  </span>
+                </span>
+                <span aria-hidden style={{ display: "flex", gap: 3 }}>
+                  {opt.swatches.map((hex, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 5,
+                        background: hex,
+                      }}
+                    />
+                  ))}
+                </span>
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--ink-500)",
+                    lineHeight: 1.45,
+                    textWrap: "pretty",
+                  }}
+                >
+                  {opt.desc}
+                </span>
+              </button>
+            </Tooltip>
           );
         })}
       </div>

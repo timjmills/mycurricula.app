@@ -275,18 +275,31 @@ planning_document.md` has a screen-by-screen section (§5) and the data model (�
 
 ## 7. Reference documents
 
-All under `Documents/` (reference only — never imported by the app):
+Reference material (never imported by the app). The master spec lives under
+`Documents/Project Files/`; all other historical-reference docs live under
+`docs/historical/`. The `Documents/` folder otherwise holds only the design
+handoff bundle.
 
-- `Project Files/5.16.26 planning_document.md` — the master spec. §3 IA, §4 data model,
-  §5 screen-by-screen, §6 design system, §7 tech architecture, §8 phased roadmap,
-  §9 acceptance criteria, §10 open questions.
-- `Project Files/5.16.26 conversation_record.md` — the decision history behind the spec.
-- `Project Files/5.16.26 MyCurricula_Business_Plan_Addendum.md` — positioning, pricing.
-- `Project Files/5.16.26 *Competetor Anaylisis*` + `5.12.26 *Planbook*` — competitive
-  context; selectively absorbed features.
-- `Claude Design/5.16.26 Build A Curriculum-handoff/` — the design handoff bundle.
-  `project/*.jsx` are per-surface artboards; `project/tokens.css` is the token source;
-  `project/README.md` explains the handoff.
+- `Documents/Project Files/5.16.26 planning_document.md` — the master spec. §3 IA,
+  §4 data model, §5 screen-by-screen, §6 design system, §7 tech architecture, §8
+  phased roadmap, §9 acceptance criteria, §10 open questions.
+- `docs/historical/5.16.26 conversation_record.md` — the decision history behind
+  the spec.
+- `docs/historical/5.16.26 MyCurricula_Business_Plan_Addendum.md` — positioning,
+  pricing.
+- `docs/historical/5.16.26 *Competetor Anaylisis*` + `docs/historical/5.12.26
+  *Planbook*` — competitive context; selectively absorbed features.
+- `docs/historical/5.17.26 Onboarding & Lesson-Flow Template Plan.md` — cited by
+  `lib/lesson-templates.ts`.
+- `docs/historical/5.18.26 collapse_on_drag_pattern.md` — cited by
+  `lib/collapse-on-drag.ts` and `components/grid/WeeklyGrid.tsx`.
+- `docs/historical/5.20.26 Plugin Directions - Daily View Lesson Panel.md` — cited
+  by `components/daily/LessonDetail.tsx` and the three `components/lesson-flow/`
+  files.
+- `Documents/Claude Design/5.16.26 Build A Curriculum-handoff/` — the design
+  handoff bundle. `project/*.jsx` are per-surface artboards;
+  `project/tokens.css` is the token source; `project/README.md` explains the
+  handoff.
 
 **Operational docs** (under `docs/`, checked into the repo, not reference-only):
 
@@ -326,8 +339,9 @@ chase contradictions.
 - **`Documents/Project Files/5.16.26 planning_document.md`** — the master spec
   (data model, screen-by-screen, roadmap, acceptance criteria).
 
-Everything else under `Documents/` and `docs/` is historical reference or
-dated audit-snapshot. See "Audit-doc disclaimer" below.
+Everything else under `Documents/` (the design handoff bundle) and
+`docs/historical/` (historical reference) and `docs/*audit*.md` / `docs/research-*.md`
+(dated audit snapshots) is reference material. See "Audit-doc disclaimer" below.
 
 ### App name — canonical spelling
 

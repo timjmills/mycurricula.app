@@ -42,7 +42,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import { SUBJECTS } from "@/lib/mock";
 import { useAppState } from "@/lib/app-state";
 import type { SubjectId } from "@/lib/types";
@@ -247,7 +247,14 @@ export function CurriculumFilter({
     >
       {/* Header: quick actions */}
       <div className={styles.panelHeader}>
-        <span className={styles.panelTitle}>Curriculum</span>
+        <Tooltip
+          content="Curriculum picker — check a subject to include it on the year roadmap, uncheck to hide that subject's row"
+          side="bottom"
+        >
+          <span className={styles.panelTitle} tabIndex={0}>
+            Curriculum
+          </span>
+        </Tooltip>
         <div className={styles.quickActions}>
           <Button
             variant="ghost"

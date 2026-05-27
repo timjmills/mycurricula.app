@@ -23,7 +23,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { ReactNode, KeyboardEvent, FormEvent } from "react";
 import { WEEK_DAYS } from "@/lib/mock";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import styles from "./AddEventForm.module.css";
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -173,7 +173,14 @@ export function AddEventForm({
         onKeyDown={onKeyDown}
       >
         <header className={styles.header}>
-          <h2 className={styles.title}>Add an event</h2>
+          <Tooltip
+            content="Add a non-academic event (assembly, field trip, specialist) to this day's timeline. Events live alongside your lessons in the daily schedule."
+            side="bottom"
+          >
+            <h2 className={styles.title} tabIndex={0}>
+              Add an event
+            </h2>
+          </Tooltip>
           <span className={styles.dayBadge}>{dayLabel}</span>
           <Button
             variant="icon"

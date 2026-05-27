@@ -1,7 +1,7 @@
 "use client";
 
 // section-resources.tsx — per-section Resources area with EXPANDED ⇄ MINIMIZED
-// toggle (Plugin Directions §4).
+// toggle (docs/historical/5.20.26 Plugin Directions §4).
 //
 // Each section row gets its own resources card. The card has two states and
 // the teacher flips between them with a small icon button at its top-right:

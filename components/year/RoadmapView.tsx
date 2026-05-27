@@ -299,11 +299,7 @@ export function RoadmapView({
       for (const cu of customForSubject) {
         const startWeekIdx = customUnitWeekIdxForDate(cu.startDate, yearStart);
         const endWeekIdx = customUnitWeekIdxForDate(cu.endDate, yearStart);
-        if (
-          startWeekIdx < 0 ||
-          endWeekIdx < 0 ||
-          endWeekIdx < startWeekIdx
-        ) {
+        if (startWeekIdx < 0 || endWeekIdx < 0 || endWeekIdx < startWeekIdx) {
           continue;
         }
         const spanWeeks = endWeekIdx - startWeekIdx + 1;
@@ -328,9 +324,7 @@ export function RoadmapView({
           // Prepend the user's unit-type label so the bar reads
           // "Unit of Study — Fractions on a Number Line" without
           // requiring a separate prefix property on UnitBar.
-          name: cu.unitTypeLabel
-            ? `${cu.unitTypeLabel} — ${cu.name}`
-            : cu.name,
+          name: cu.unitTypeLabel ? `${cu.unitTypeLabel} — ${cu.name}` : cu.name,
           // Number it after the existing fixture units so labels stay
           // unique within the lane (cosmetic only — the U# tile shows
           // this number).
@@ -338,11 +332,7 @@ export function RoadmapView({
           startWeekIdx,
           endWeekIdx,
           startDate: weekIdxToDateLabel(startWeekIdx, yearStart, 0),
-          endDate: weekIdxToDateLabel(
-            endWeekIdx,
-            yearStart,
-            schoolWeekLen - 1,
-          ),
+          endDate: weekIdxToDateLabel(endWeekIdx, yearStart, schoolWeekLen - 1),
           lessons: lessonCount,
           schoolDays,
           completePct: completePctUnit,

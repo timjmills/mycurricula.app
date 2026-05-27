@@ -28,7 +28,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Lesson } from "@/lib/types";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import { STATUS_LABEL } from "./status";
 import { WEEK_DAYS } from "@/lib/mock";
 
@@ -228,16 +228,22 @@ export function CompareToMaster({
           }}
         >
           <div style={{ flex: 1 }}>
-            <div
-              style={{
-                fontSize: 15,
-                fontWeight: 600,
-                color: "var(--ink-900)",
-                marginBottom: 3,
-              }}
+            <Tooltip
+              content="Compare to Master dialog — see your personal edits side-by-side with the team's curriculum version of this lesson. Useful before deciding whether to push your changes to the team."
+              side="bottom"
             >
-              Compare to Master
-            </div>
+              <div
+                tabIndex={0}
+                style={{
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: "var(--ink-900)",
+                  marginBottom: 3,
+                }}
+              >
+                Compare to Master
+              </div>
+            </Tooltip>
             <div
               style={{ fontSize: 12, color: "var(--ink-500)", lineHeight: 1.4 }}
             >

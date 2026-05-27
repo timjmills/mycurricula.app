@@ -30,6 +30,7 @@
 
 import { useCallback, useRef } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
+import { Tooltip } from "./Tooltip";
 import styles from "./ToggleGroup.module.css";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -125,7 +126,15 @@ export function ToggleGroup<T extends string = string>({
           isActive ? styles.active : styles.inactive,
         ].join(" ");
 
-        return (
+        // Render the radio as a bespoke <button>. When the option carries
+        // a `title` (onboarding tooltip per CLAUDE.md §4) the button is
+        // wrapped in the styled <Tooltip> primitive so the bubble paints
+        // with the black backdrop + light text the user explicitly
+        // asked for everywhere — not the OS-default light native title.
+        // The native title= attribute stays on the inner element as a
+        // cross-engine fallback (touch long-press; engines that drop
+        // pointer events on disabled buttons).
+        const buttonEl = (
           <button
             key={option.value}
             type="button"
@@ -144,6 +153,14 @@ export function ToggleGroup<T extends string = string>({
             )}
             <span className={styles.optionLabel}>{option.label}</span>
           </button>
+        );
+
+        return option.title ? (
+          <Tooltip key={option.value} content={option.title} side="bottom">
+            {buttonEl}
+          </Tooltip>
+        ) : (
+          buttonEl
         );
       })}
     </div>

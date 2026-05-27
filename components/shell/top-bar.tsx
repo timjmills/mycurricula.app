@@ -193,10 +193,15 @@ export function TopBar(): ReactNode {
   return (
     <header className={styles.bar}>
       {/* ── Wordmark ──────────────────────────────────────────────────
-          The `title` carries the brand motto so it surfaces on hover
+          The tooltip carries the brand motto so it surfaces on hover
           without crowding the chrome — the full pair lives on the
           login screen; here we keep just the manifesto as a quiet
-          tooltip on the home link. */}
+          tooltip on the home link. Wrapped in the styled <Tooltip>
+          primitive (black backdrop / blur / light text) so it matches
+          the rest of the chrome instead of rendering as the OS-default
+          light-background native title bubble. The native title= is
+          kept on the inner element as a cross-engine fallback for
+          touch long-press. */}
       {/* Task #27 / audit m3: the wordmark suffix is FREE TEXT, not a
           grade enum. CLAUDE.md §1 mandates multi-grade by design; teachers
           might type "Grade 5", "K-12 Math", "Lower Elementary Reading",
@@ -205,19 +210,24 @@ export function TopBar(): ReactNode {
           that edits it). When the label is absent (real Supabase users
           until the DB column lands), the suffix simply disappears — the
           wordmark reads "MyCurricula" alone. */}
-      <Link
-        href="/weekly"
-        className={styles.wordmark}
-        aria-label="MyCurricula home"
-        title="Built for teachers, by teachers."
+      <Tooltip
+        content="Built for teachers, by teachers — click to return to your Weekly planner home"
+        side="bottom"
       >
-        <span className={styles.wordmarkApp}>MyCurricula</span>
-        {currentUser.curriculumLabel && (
-          <span className={styles.wordmarkGrade}>
-            {currentUser.curriculumLabel}
-          </span>
-        )}
-      </Link>
+        <Link
+          href="/weekly"
+          className={styles.wordmark}
+          aria-label="MyCurricula home"
+          title="Built for teachers, by teachers — click to return to your Weekly planner home"
+        >
+          <span className={styles.wordmarkApp}>MyCurricula</span>
+          {currentUser.curriculumLabel && (
+            <span className={styles.wordmarkGrade}>
+              {currentUser.curriculumLabel}
+            </span>
+          )}
+        </Link>
+      </Tooltip>
 
       <div className={styles.divider} aria-hidden="true" />
 
@@ -277,18 +287,20 @@ export function TopBar(): ReactNode {
             // with cursor:not-allowed and a descriptive tooltip. No hover
             // state. The SOON badge is uppercase for consistency. They are
             // hidden below 1280px via CSS (from Wave 2).
+            const soonCopy = `Coming soon — ${v.label} view`;
             return (
-              <span
-                key={v.label}
-                className={`${styles.viewTab} ${styles.viewTabSoon}`}
-                aria-disabled="true"
-                title={`Coming soon — ${v.label} view`}
-              >
-                {v.label}
-                <span className={styles.soonBadge} aria-hidden="true">
-                  SOON
+              <Tooltip key={v.label} content={soonCopy} side="bottom">
+                <span
+                  className={`${styles.viewTab} ${styles.viewTabSoon}`}
+                  aria-disabled="true"
+                  title={soonCopy}
+                >
+                  {v.label}
+                  <span className={styles.soonBadge} aria-hidden="true">
+                    SOON
+                  </span>
                 </span>
-              </span>
+              </Tooltip>
             );
           }
           const isActive =
@@ -300,17 +312,24 @@ export function TopBar(): ReactNode {
           // media-query hide below. Daily / Weekly are the two primary
           // tabs and stay visible at every width.
           const narrowOnly = v.label === "Yearly" || v.label === "Curriculum";
+          // Convert the native title= to the styled <Tooltip> primitive
+          // (black backdrop, blur, light text) so the four primary view
+          // tabs match the rest of the chrome instead of rendering the
+          // OS-default light bubble. The inner Link keeps the same
+          // string as title= for touch long-press fallback (Lane X
+          // pattern).
           return (
-            <Link
-              key={v.label}
-              href={v.href!}
-              className={`${styles.viewTab} ${isActive ? styles.viewTabActive : ""}`}
-              data-narrow-hide={narrowOnly ? "true" : undefined}
-              aria-current={isActive ? "page" : undefined}
-              title={v.tooltip}
-            >
-              {v.label}
-            </Link>
+            <Tooltip key={v.label} content={v.tooltip ?? ""} side="bottom">
+              <Link
+                href={v.href!}
+                className={`${styles.viewTab} ${isActive ? styles.viewTabActive : ""}`}
+                data-narrow-hide={narrowOnly ? "true" : undefined}
+                aria-current={isActive ? "page" : undefined}
+                title={v.tooltip}
+              >
+                {v.label}
+              </Link>
+            </Tooltip>
           );
         })}
       </nav>
@@ -328,15 +347,22 @@ export function TopBar(): ReactNode {
           trio (Prev / Today / Next). POLISH-011 removes that duplication:
           the top bar keeps only the "Week N" heading as a passive context
           label; the in-grid WeekNavigator (owned by another agent) remains
-          the working navigation control. */}
-      <span
-        className={styles.weekLabel}
-        aria-live="polite"
-        aria-atomic="true"
-        aria-label={`Current week: Week ${week}`}
+          the working navigation control. Tooltip explains what "Week N"
+          means in the school year per CLAUDE.md §4 onboarding voice. */}
+      <Tooltip
+        content={`Week ${week} of your school year — use the in-grid Prev/Today/Next controls to navigate`}
+        side="bottom"
       >
-        Week {week}
-      </span>
+        <span
+          className={styles.weekLabel}
+          aria-live="polite"
+          aria-atomic="true"
+          aria-label={`Current week: Week ${week}`}
+          title={`Week ${week} of your school year — use the in-grid Prev/Today/Next controls to navigate`}
+        >
+          Week {week}
+        </span>
+      </Tooltip>
 
       {/* Live Clock — user direction 2026-05-26: "the clock should be in
           the top-bar next to Week 12". Inline variant carries no chip
@@ -351,21 +377,33 @@ export function TopBar(): ReactNode {
           Shows "Saved HH:MM" after any mutation; "All changes saved" before
           the first edit. Subtle muted token color so it doesn't compete with
           the primary controls. aria-live="polite" announces changes to screen
-          readers without interrupting the teacher mid-action. */}
-      <span
-        className={styles.saveIndicator}
-        aria-live="polite"
-        aria-atomic="true"
-        title={
+          readers without interrupting the teacher mid-action.
+          Wrapped in <Tooltip> so the auto-save reassurance copy renders in
+          the styled black bubble instead of the native OS title; the inner
+          span keeps the same string as a title= fallback. */}
+      <Tooltip
+        content={
           savedAt
-            ? `Last saved at ${savedAt.toLocaleTimeString()}`
-            : "All changes saved"
+            ? `Your changes are saved automatically — last sync at ${savedAt.toLocaleTimeString()}`
+            : "Your changes save automatically as you edit — nothing to do, no Save button to find"
         }
+        side="bottom"
       >
-        {savedAt
-          ? `Saved ${savedAt.getHours().toString().padStart(2, "0")}:${savedAt.getMinutes().toString().padStart(2, "0")}`
-          : "All changes saved"}
-      </span>
+        <span
+          className={styles.saveIndicator}
+          aria-live="polite"
+          aria-atomic="true"
+          title={
+            savedAt
+              ? `Your changes are saved automatically — last sync at ${savedAt.toLocaleTimeString()}`
+              : "Your changes save automatically as you edit — nothing to do, no Save button to find"
+          }
+        >
+          {savedAt
+            ? `Saved ${savedAt.getHours().toString().padStart(2, "0")}:${savedAt.getMinutes().toString().padStart(2, "0")}`
+            : "All changes saved"}
+        </span>
+      </Tooltip>
 
       <div className={styles.divider} aria-hidden="true" />
 
@@ -474,8 +512,18 @@ export function TopBar(): ReactNode {
       <div className={styles.viewModePillWrap}>
         <ToggleGroup
           options={[
-            { value: "grid", label: "Grid" },
-            { value: "list", label: "List" },
+            {
+              value: "grid",
+              label: "Grid",
+              title:
+                "Grid layout — see every subject for the week side-by-side in columns",
+            },
+            {
+              value: "list",
+              label: "List",
+              title:
+                "List layout — a single scrollable stream of lessons grouped by day",
+            },
           ]}
           value={viewMode}
           onChange={setViewMode}
@@ -558,12 +606,22 @@ export function TopBar(): ReactNode {
             /catch-up. */}
         <CatchupFlameButton />
 
-        {/* ── To-do panel toggle ────────────────────────────────────── */}
+        {/* ── To-do panel toggle ──────────────────────────────────────
+            tooltip= prop wraps the button in the canonical <Tooltip>
+            primitive AND mirrors to title= for touch (Button primitive
+            handles both). Onboarding voice per CLAUDE.md §4 — explains
+            what the panel is for, not just that it opens. */}
         <Button
           variant="icon"
           iconAriaLabel={
             todoPanelOpen ? "Close to-do panel" : "Open to-do panel"
           }
+          tooltip={
+            todoPanelOpen
+              ? "Close the to-do panel"
+              : "Your planning to-dos — non-lesson tasks like print handouts or message a parent"
+          }
+          tooltipSide="bottom"
           onClick={toggleTodoPanel}
           aria-expanded={todoPanelOpen}
           className={todoPanelOpen ? styles.iconActive : undefined}
@@ -571,7 +629,10 @@ export function TopBar(): ReactNode {
           <TodoIcon />
         </Button>
 
-        {/* ── Comments panel toggle with unread badge ───────────────── */}
+        {/* ── Comments panel toggle with unread badge ─────────────────
+            Same tooltip= pattern. The unread-count is appended to the
+            copy so a teacher hovering over the badge sees both the
+            count and what it means without parsing the chip alone. */}
         <div className={styles.badgeWrap}>
           <Button
             variant="icon"
@@ -580,6 +641,12 @@ export function TopBar(): ReactNode {
                 ? "Close comments panel"
                 : `Open comments panel${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`
             }
+            tooltip={
+              commentsPanelOpen
+                ? "Close the comments panel"
+                : `Team comments on lessons${unreadCount > 0 ? ` — ${unreadCount} unread` : " — see and reply to what teammates wrote"}`
+            }
+            tooltipSide="bottom"
             onClick={toggleCommentsPanel}
             aria-expanded={commentsPanelOpen}
             className={commentsPanelOpen ? styles.iconActive : undefined}
@@ -654,30 +721,35 @@ function ProfileAvatar({ user }: { user: CurrentUser }): ReactNode {
   const [photoFailed, setPhotoFailed] = useState(false);
   const showPhoto = Boolean(user.avatarUrl) && !photoFailed;
 
+  const settingsTip = `Open Settings — your team's curriculum and your personal preferences (${user.name})`;
   return (
     // Unified Settings entry — both the avatar and the IconRail gear
     // (components/daily/IconRail.tsx) point to /settings, which then
     // redirects to the teacher's last-visited sub-page (default
     // /settings/curriculum). One canonical Settings affordance.
-    <Link
-      href="/settings"
-      className={styles.avatar}
-      aria-label={`Profile settings (${user.name})`}
-      title={`Open Settings — your team's curriculum and your personal preferences (${user.name})`}
-    >
-      {showPhoto ? (
-        <Image
-          src={user.avatarUrl!}
-          alt=""
-          width={32}
-          height={32}
-          className={styles.avatarImg}
-          onError={() => setPhotoFailed(true)}
-        />
-      ) : (
-        user.initials
-      )}
-    </Link>
+    // Wrapped in <Tooltip> so the styled black bubble appears on hover
+    // (matches the rest of the chrome); title= mirrors for touch.
+    <Tooltip content={settingsTip} side="bottom">
+      <Link
+        href="/settings"
+        className={styles.avatar}
+        aria-label={`Profile settings (${user.name})`}
+        title={settingsTip}
+      >
+        {showPhoto ? (
+          <Image
+            src={user.avatarUrl!}
+            alt=""
+            width={32}
+            height={32}
+            className={styles.avatarImg}
+            onError={() => setPhotoFailed(true)}
+          />
+        ) : (
+          user.initials
+        )}
+      </Link>
+    </Tooltip>
   );
 }
 

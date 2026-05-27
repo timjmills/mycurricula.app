@@ -37,6 +37,7 @@ import type {
 } from "@/lib/catchup-data";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECT_BY_ID } from "@/lib/mock";
+import { Tooltip } from "@/components/ui";
 import { BulkActionBar } from "./BulkActionBar";
 import { CatchupRow } from "./CatchupRow";
 import { EmptyState } from "./EmptyState";
@@ -313,17 +314,18 @@ export function CatchupScreen() {
             {SCOPE_CHIPS.map((c) => {
               const active = scope === c.id;
               return (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={styles.scopeChip}
-                  aria-pressed={active}
-                  onClick={() => setScope(c.id)}
-                  data-active={active || undefined}
-                  title={c.tooltip}
-                >
-                  {c.label}
-                </button>
+                <Tooltip key={c.id} content={c.tooltip} side="bottom">
+                  <button
+                    type="button"
+                    className={styles.scopeChip}
+                    aria-pressed={active}
+                    onClick={() => setScope(c.id)}
+                    data-active={active || undefined}
+                    title={c.tooltip}
+                  >
+                    {c.label}
+                  </button>
+                </Tooltip>
               );
             })}
           </div>
@@ -338,31 +340,36 @@ export function CatchupScreen() {
               const active = statusFilter.has(s);
               const dotVar = CATCHUP_STATUS_TOKEN[s];
               return (
-                <button
+                <Tooltip
                   key={s}
-                  type="button"
-                  className={styles.statusChip}
-                  aria-pressed={active}
-                  onClick={() => toggleStatus(s)}
-                  data-active={active || undefined}
-                  title={`Toggle the ${CATCHUP_STATUS_LABEL[s].toLowerCase()} status — when off, lessons in that state are hidden from this list`}
-                  style={
-                    active
-                      ? ({
-                          "--chip-bg": `color-mix(in srgb, var(${dotVar}) 14%, white)`,
-                          "--chip-border": `var(${dotVar})`,
-                          "--chip-color": "var(--ink-900)",
-                        } as React.CSSProperties)
-                      : undefined
-                  }
+                  content={`Toggle the ${CATCHUP_STATUS_LABEL[s].toLowerCase()} status — when off, lessons in that state are hidden from this list.`}
+                  side="bottom"
                 >
-                  <span
-                    className={styles.statusDot}
-                    style={{ background: `var(${dotVar})` }}
-                    aria-hidden="true"
-                  />
-                  {CATCHUP_STATUS_LABEL[s]}
-                </button>
+                  <button
+                    type="button"
+                    className={styles.statusChip}
+                    aria-pressed={active}
+                    onClick={() => toggleStatus(s)}
+                    data-active={active || undefined}
+                    title={`Toggle the ${CATCHUP_STATUS_LABEL[s].toLowerCase()} status — when off, lessons in that state are hidden from this list`}
+                    style={
+                      active
+                        ? ({
+                            "--chip-bg": `color-mix(in srgb, var(${dotVar}) 14%, white)`,
+                            "--chip-border": `var(${dotVar})`,
+                            "--chip-color": "var(--ink-900)",
+                          } as React.CSSProperties)
+                        : undefined
+                    }
+                  >
+                    <span
+                      className={styles.statusDot}
+                      style={{ background: `var(${dotVar})` }}
+                      aria-hidden="true"
+                    />
+                    {CATCHUP_STATUS_LABEL[s]}
+                  </button>
+                </Tooltip>
               );
             })}
           </div>
@@ -372,19 +379,24 @@ export function CatchupScreen() {
 
         <label className={styles.groupByLabel}>
           <span className={styles.groupByEyebrow}>Group by</span>
-          <select
-            className={styles.groupBySelect}
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value as CatchupGroupBy)}
-            aria-label="Group rows by"
-            title="Choose how to organize the catch-up list — by subject, by week, by standard, or by unit"
+          <Tooltip
+            content="Choose how to organize the catch-up list — by subject, by week, by standard, or by unit."
+            side="bottom"
           >
-            {GROUP_OPTIONS.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            <select
+              className={styles.groupBySelect}
+              value={groupBy}
+              onChange={(e) => setGroupBy(e.target.value as CatchupGroupBy)}
+              aria-label="Group rows by"
+              title="Choose how to organize the catch-up list — by subject, by week, by standard, or by unit"
+            >
+              {GROUP_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Tooltip>
         </label>
       </div>
 

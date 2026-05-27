@@ -9,6 +9,7 @@
 import type { CSSProperties } from "react";
 import type { LessonTask, SubjectId } from "@/lib/types";
 import { resolveSubjectColor, usePalette } from "@/lib/palette";
+import { Tooltip } from "@/components/ui";
 import { CompletionCheck, ResourceTypeRow } from "./parts";
 import { cycleStatus } from "./status";
 
@@ -63,22 +64,28 @@ export function TaskRow({ task, parentSubject, onCycle }: TaskRowProps) {
           {task.title}
         </div>
       </div>
-      <span
-        title="Lesson task inside the parent lesson"
-        style={{
-          fontSize: 8.5,
-          fontWeight: 700,
-          letterSpacing: 0.4,
-          textTransform: "uppercase",
-          padding: "1px 5px",
-          borderRadius: 2,
-          background: color.cl,
-          color: color.cd,
-          flex: "0 0 auto",
-        }}
+      <Tooltip
+        content="Lesson task inside the parent lesson — tick it off as you finish each step."
+        side="top"
       >
-        Task
-      </span>
+        <span
+          title="Lesson task inside the parent lesson"
+          tabIndex={0}
+          style={{
+            fontSize: 8.5,
+            fontWeight: 700,
+            letterSpacing: 0.4,
+            textTransform: "uppercase",
+            padding: "1px 5px",
+            borderRadius: 2,
+            background: color.cl,
+            color: color.cd,
+            flex: "0 0 auto",
+          }}
+        >
+          Task
+        </span>
+      </Tooltip>
       {task.isPersonal && (
         <span
           style={{

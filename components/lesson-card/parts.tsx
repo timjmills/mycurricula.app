@@ -13,6 +13,7 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { LessonResource, LessonStatus } from "@/lib/types";
 import { describeStandard } from "@/lib/mock";
+import { Tooltip } from "@/components/ui";
 import { Icon } from "./icon";
 import type { IconName } from "./icon";
 import { checkTitle } from "./status";
@@ -77,38 +78,40 @@ export function CompletionCheck({
   }
 
   return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onCycle?.();
-      }}
-      title={checkTitle(status)}
-      aria-label={label ?? `Completion: ${status}`}
-      className="cp-card-check"
-      style={
-        {
-          "--box": `${size}px`,
-        } as CSSProperties
-      }
-    >
-      <span
-        aria-hidden
-        style={{
-          width: size,
-          height: size,
-          borderRadius: 3,
-          background,
-          border,
-          color: done || partial ? "var(--paper)" : "var(--ink-700)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
+    <Tooltip content={checkTitle(status)} side="top">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onCycle?.();
         }}
+        title={checkTitle(status)}
+        aria-label={label ?? `Completion: ${status}`}
+        className="cp-card-check"
+        style={
+          {
+            "--box": `${size}px`,
+          } as CSSProperties
+        }
       >
-        {glyph}
-      </span>
-    </button>
+        <span
+          aria-hidden
+          style={{
+            width: size,
+            height: size,
+            borderRadius: 3,
+            background,
+            border,
+            color: done || partial ? "var(--paper)" : "var(--ink-700)",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {glyph}
+        </span>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -218,37 +221,45 @@ export function ResourceTypeRow({ resources, dense }: ResourceTypeRowProps) {
     counts.set(r.type, (counts.get(r.type) ?? 0) + 1);
   }
   return (
-    <span
-      style={{ display: "inline-flex", gap: 3, alignItems: "center" }}
-      title={`${resources.length} ${
+    <Tooltip
+      content={`${resources.length} ${
         resources.length === 1 ? "resource" : "resources"
-      }`}
+      } attached — open the Resources panel to see them.`}
+      side="top"
     >
-      {[...counts.entries()].map(([type, n]) => {
-        const tint = RES_TINT[type];
-        return (
-          <span
-            key={type}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 2,
-              padding: dense ? "0 4px 0 3px" : "1px 5px 1px 4px",
-              background: tint.bg,
-              color: tint.fg,
-              borderRadius: 3,
-              fontSize: dense ? 9.5 : 10,
-              fontWeight: 600,
-              lineHeight: 1.3,
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            <Icon name={RES_ICON[type]} size={dense ? 10 : 11} />
-            {n > 1 && <span>{n}</span>}
-          </span>
-        );
-      })}
-    </span>
+      <span
+        style={{ display: "inline-flex", gap: 3, alignItems: "center" }}
+        title={`${resources.length} ${
+          resources.length === 1 ? "resource" : "resources"
+        } attached`}
+        tabIndex={0}
+      >
+        {[...counts.entries()].map(([type, n]) => {
+          const tint = RES_TINT[type];
+          return (
+            <span
+              key={type}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 2,
+                padding: dense ? "0 4px 0 3px" : "1px 5px 1px 4px",
+                background: tint.bg,
+                color: tint.fg,
+                borderRadius: 3,
+                fontSize: dense ? 9.5 : 10,
+                fontWeight: 600,
+                lineHeight: 1.3,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              <Icon name={RES_ICON[type]} size={dense ? 10 : 11} />
+              {n > 1 && <span>{n}</span>}
+            </span>
+          );
+        })}
+      </span>
+    </Tooltip>
   );
 }
 
@@ -344,7 +355,7 @@ export function StandardsBadge({ codes }: { codes: string[] }) {
         letterSpacing: 0.2,
         cursor: "default",
       }}
-      title={`${codes.length} aligned standard${codes.length === 1 ? "" : "s"}`}
+      title={`The CCSS / curriculum standards this lesson covers — ${codes.length} aligned standard${codes.length === 1 ? "" : "s"}. Hover to see the codes.`}
     >
       <span className="cp-mono" style={{ fontSize: 10, fontWeight: 500 }}>
         CCSS

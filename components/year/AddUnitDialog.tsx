@@ -213,9 +213,7 @@ export function AddUnitDialog({
       if (e.key === "Tab" && dialogRef.current) {
         const els = Array.from(
           dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE),
-        ).filter(
-          (el) => !el.hasAttribute("aria-hidden") || el.tabIndex >= 0,
-        );
+        ).filter((el) => !el.hasAttribute("aria-hidden") || el.tabIndex >= 0);
         if (els.length === 0) return;
         const first = els[0];
         const last = els[els.length - 1];
@@ -249,9 +247,7 @@ export function AddUnitDialog({
       // Sort by canonical Sunday-first order on every change so consumers
       // see a stable ordering.
       const next = [...prev, d];
-      next.sort(
-        (a, b) => WEEKDAY_ORDER.indexOf(a) - WEEKDAY_ORDER.indexOf(b),
-      );
+      next.sort((a, b) => WEEKDAY_ORDER.indexOf(a) - WEEKDAY_ORDER.indexOf(b));
       return next;
     });
   };
@@ -571,44 +567,48 @@ export function AddUnitDialog({
               content="Which weekdays this unit meets. Grey chips are days your school doesn't run, so they're not selectable here. If a course only meets three days a week, pick three — the lesson count adjusts automatically."
               side="top"
             >
-              <div className={styles.dayChips} role="group" aria-label="Days of the week">
+              <div
+                className={styles.dayChips}
+                role="group"
+                aria-label="Days of the week"
+              >
                 {WEEKDAY_ORDER.map((d) => {
                   const isSchoolDay = schoolWeek.includes(d);
                   const isActive = daysOfWeek.includes(d);
+                  const dayTip = !isSchoolDay
+                    ? `${WEEKDAY_SHORT[d]} — not in your school week`
+                    : isActive
+                      ? `${WEEKDAY_SHORT[d]} — click to remove from this unit's meeting days`
+                      : `${WEEKDAY_SHORT[d]} — click to add as one of this unit's meeting days`;
                   return (
-                    <button
-                      key={d}
-                      type="button"
-                      className={`${styles.dayChip} ${
-                        isActive ? styles.dayChipActive : ""
-                      } ${!isSchoolDay ? styles.dayChipDisabled : ""}`}
-                      aria-pressed={isActive}
-                      aria-disabled={!isSchoolDay}
-                      disabled={!isSchoolDay}
-                      title={
-                        !isSchoolDay
-                          ? `${WEEKDAY_SHORT[d]} — not in your school week`
-                          : isActive
-                          ? `${WEEKDAY_SHORT[d]} — click to remove`
-                          : `${WEEKDAY_SHORT[d]} — click to add`
-                      }
-                      onClick={() => {
-                        if (!isSchoolDay) return;
-                        toggleDay(d);
-                        setLessonsOverride(null); // re-engage auto-compute
-                      }}
-                    >
-                      {WEEKDAY_SHORT[d]}
-                    </button>
+                    <Tooltip key={d} content={dayTip} side="bottom">
+                      <button
+                        type="button"
+                        className={`${styles.dayChip} ${
+                          isActive ? styles.dayChipActive : ""
+                        } ${!isSchoolDay ? styles.dayChipDisabled : ""}`}
+                        aria-pressed={isActive}
+                        aria-disabled={!isSchoolDay}
+                        disabled={!isSchoolDay}
+                        title={dayTip}
+                        onClick={() => {
+                          if (!isSchoolDay) return;
+                          toggleDay(d);
+                          setLessonsOverride(null); // re-engage auto-compute
+                        }}
+                      >
+                        {WEEKDAY_SHORT[d]}
+                      </button>
+                    </Tooltip>
                   );
                 })}
               </div>
             </Tooltip>
             <span className={styles.hint}>
-              {daysOfWeek.length} day{daysOfWeek.length === 1 ? "" : "s"} selected
+              {daysOfWeek.length} day{daysOfWeek.length === 1 ? "" : "s"}{" "}
+              selected
               {" · "}
-              School week:{" "}
-              {schoolWeek.map((d) => WEEKDAY_SHORT[d]).join(", ")}
+              School week: {schoolWeek.map((d) => WEEKDAY_SHORT[d]).join(", ")}
             </span>
           </div>
 

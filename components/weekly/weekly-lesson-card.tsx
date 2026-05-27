@@ -660,20 +660,25 @@ export function WeeklyLessonCard({
               Overflows the 28px chip vertically via negative margin so touch
               ergonomics meet the minimum even at reduced chip height. */}
           {dragHandleProps && (
-            <span
-              {...dragHandleProps}
-              data-drag-handle
-              className={`${styles.affordance} ${styles.dragHandle} ${styles.chipHandle}`}
-              title="Drag to move this lesson"
-              aria-label="Drag to move this lesson"
-              role="button"
-              tabIndex={0}
-              style={{ cursor: "grab", ...dragHandleProps.style }}
+            <Tooltip
+              content="Drag to move this lesson to a different day or column — moves are personal unless you explicitly save them to the team's Master."
+              side="top"
             >
-              <span aria-hidden className={styles.affordanceVisual}>
-                <Icon name="drag" size={13} />
+              <span
+                {...dragHandleProps}
+                data-drag-handle
+                className={`${styles.affordance} ${styles.dragHandle} ${styles.chipHandle}`}
+                title="Drag to move this lesson"
+                aria-label="Drag to move this lesson"
+                role="button"
+                tabIndex={0}
+                style={{ cursor: "grab", ...dragHandleProps.style }}
+              >
+                <span aria-hidden className={styles.affordanceVisual}>
+                  <Icon name="drag" size={13} />
+                </span>
               </span>
-            </span>
+            </Tooltip>
           )}
 
           {/* Title with 2-letter subject code prefix (spec §3.2 / §3.7).
@@ -844,25 +849,35 @@ export function WeeklyLessonCard({
                   onClick={(e) => e.stopPropagation()}
                 >
                   {lesson.moved && (
-                    <span
-                      className={styles.indicator}
-                      title={
+                    <Tooltip
+                      content={
                         lesson.moved === "across-weeks"
-                          ? "Moved across weeks"
-                          : "Moved within the week"
+                          ? "This lesson was moved across weeks in your personal copy — the team's Master version still lives in the original slot."
+                          : "This lesson was moved within the week in your personal copy — the team's Master version still lives in the original slot."
                       }
-                      aria-label={
-                        lesson.moved === "across-weeks"
-                          ? "Moved across weeks"
-                          : "Moved within the week"
-                      }
-                      style={{
-                        background: color.stripe,
-                        color: "var(--paper)",
-                      }}
+                      side="top"
                     >
-                      {lesson.moved === "across-weeks" ? "⤴" : "↔"}
-                    </span>
+                      <span
+                        className={styles.indicator}
+                        title={
+                          lesson.moved === "across-weeks"
+                            ? "Moved across weeks in your personal copy"
+                            : "Moved within the week in your personal copy"
+                        }
+                        aria-label={
+                          lesson.moved === "across-weeks"
+                            ? "Moved across weeks"
+                            : "Moved within the week"
+                        }
+                        tabIndex={0}
+                        style={{
+                          background: color.stripe,
+                          color: "var(--paper)",
+                        }}
+                      >
+                        {lesson.moved === "across-weeks" ? "⤴" : "↔"}
+                      </span>
+                    </Tooltip>
                   )}
                   {lesson.modified && (
                     // MED-7: richer tooltip describing what changed and who.
@@ -995,21 +1010,26 @@ export function WeeklyLessonCard({
                       />
                     </RichEditorWrapper>
                   ) : (
-                    <span
-                      className={styles.editableText}
-                      tabIndex={0}
-                      role="button"
-                      aria-label="Edit lesson preview"
-                      onClick={(e) => e.stopPropagation()}
-                      onDoubleClick={(e) => openEditor("preview", e)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === "F2")
-                          openEditor("preview", e);
-                      }}
-                      title="Double-click or press Enter to edit"
-                      // eslint-disable-next-line react/no-danger
-                      dangerouslySetInnerHTML={{ __html: lesson.preview }}
-                    />
+                    <Tooltip
+                      content="Double-click or press Enter to edit the lesson preview — saved into your personal copy."
+                      side="top"
+                    >
+                      <span
+                        className={styles.editableText}
+                        tabIndex={0}
+                        role="button"
+                        aria-label="Edit lesson preview"
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => openEditor("preview", e)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "F2")
+                            openEditor("preview", e);
+                        }}
+                        title="Double-click or press Enter to edit the lesson preview"
+                        // eslint-disable-next-line react/no-danger
+                        dangerouslySetInnerHTML={{ __html: lesson.preview }}
+                      />
+                    </Tooltip>
                   )}
                 </p>
               ) : (
@@ -1090,7 +1110,7 @@ export function WeeklyLessonCard({
                               if (e.key === "Enter" || e.key === "F2")
                                 openEditor("objective", e);
                             }}
-                            title="Double-click or press Enter to edit"
+                            title="Double-click or press Enter to edit the I-can objective"
                             // eslint-disable-next-line react/no-danger
                             dangerouslySetInnerHTML={{ __html: objectiveBody }}
                           />
@@ -1125,7 +1145,7 @@ export function WeeklyLessonCard({
                               if (e.key === "Enter" || e.key === "F2")
                                 openEditor("directions", e);
                             }}
-                            title="Double-click or press Enter to edit"
+                            title="Double-click or press Enter to edit the directions"
                             // eslint-disable-next-line react/no-danger
                             dangerouslySetInnerHTML={{
                               __html: lesson.directions,
@@ -1183,7 +1203,7 @@ export function WeeklyLessonCard({
                                   if (e.key === "Enter" || e.key === "F2")
                                     openEditor("notes", e);
                                 }}
-                                title="Double-click or press Enter to edit"
+                                title="Double-click or press Enter to edit the teacher notes"
                                 // eslint-disable-next-line react/no-danger
                                 dangerouslySetInnerHTML={{
                                   __html: lesson.notes ?? "",
@@ -1317,30 +1337,44 @@ export function WeeklyLessonCard({
                   )}
                   <ResourceTypeRow resources={lesson.resources} dense />
                   {hasTasks && (
-                    <span
-                      className={styles.tasksPill}
-                      title={`${lesson.tasks.length} lesson tasks`}
-                      style={{ background: color.cl, color: color.cd }}
+                    <Tooltip
+                      content={`${lesson.tasks.length} lesson task${lesson.tasks.length === 1 ? "" : "s"} inside this lesson — expand the card to tick them off.`}
+                      side="top"
                     >
-                      <Icon name="list" size={9} />
-                      {lesson.tasks.length} tasks
-                    </span>
+                      <span
+                        className={styles.tasksPill}
+                        title={`${lesson.tasks.length} lesson task${lesson.tasks.length === 1 ? "" : "s"} inside this lesson`}
+                        tabIndex={0}
+                        style={{ background: color.cl, color: color.cd }}
+                      >
+                        <Icon name="list" size={9} />
+                        {lesson.tasks.length} tasks
+                      </span>
+                    </Tooltip>
                   )}
                   {lesson.commentCount > 0 && (
-                    <span
-                      className={styles.commentBadge}
-                      title={`${lesson.commentCount} comment${lesson.commentCount === 1 ? "" : "s"}`}
-                      style={{ color: isVivid ? color.deep : "var(--ink-500)" }}
+                    <Tooltip
+                      content={`${lesson.commentCount} comment${lesson.commentCount === 1 ? "" : "s"} from your team — open the card to read them.`}
+                      side="top"
                     >
-                      <span aria-hidden>💬</span>
-                      {lesson.commentCount}
-                      {lesson.unreadComments > 0 && (
-                        <span
-                          aria-label={`${lesson.unreadComments} unread`}
-                          className={styles.unreadDot}
-                        />
-                      )}
-                    </span>
+                      <span
+                        className={styles.commentBadge}
+                        title={`${lesson.commentCount} comment${lesson.commentCount === 1 ? "" : "s"} from your team`}
+                        tabIndex={0}
+                        style={{
+                          color: isVivid ? color.deep : "var(--ink-500)",
+                        }}
+                      >
+                        <span aria-hidden>💬</span>
+                        {lesson.commentCount}
+                        {lesson.unreadComments > 0 && (
+                          <span
+                            aria-label={`${lesson.unreadComments} unread`}
+                            className={styles.unreadDot}
+                          />
+                        )}
+                      </span>
+                    </Tooltip>
                   )}
                   <div style={{ flex: 1 }} />
                   {lesson.pendingMaster && (

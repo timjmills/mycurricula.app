@@ -7,7 +7,7 @@
 //   rows 1..n  → one subject row each: subject-label cell + day cells
 //
 // Drag-and-drop uses @dnd-kit with the collapse-on-drag pattern (spec §3
-// of 5.18.26 collapse_on_drag_pattern.md). The moment any drag starts every
+// of docs/historical/5.18.26 collapse_on_drag_pattern.md). The moment any drag starts every
 // lesson card collapses to a 28px chip simultaneously; on drop they all
 // re-expand. This multiplies visible drop targets and removes mid-drag scroll.
 //

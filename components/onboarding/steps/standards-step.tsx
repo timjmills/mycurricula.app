@@ -12,7 +12,7 @@
 
 import type { ReactNode } from "react";
 import { useOnboarding } from "@/lib/onboarding-state";
-import { Badge } from "@/components/ui";
+import { Badge, Tooltip } from "@/components/ui";
 import styles from "./standards-step.module.css";
 
 /** A standards framework offered as a toggle option. */
@@ -108,27 +108,30 @@ export function StandardsStep(): ReactNode {
       >
         {FRAMEWORKS.map((fw) => {
           const selected = data.standards.includes(fw.id);
+          const tip = `Toggle the ${fw.label} standards framework — lessons can be tagged with codes from any framework you enable here`;
           return (
             <li key={fw.id} className={styles.item}>
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={selected}
-                onClick={() => toggle(fw.id)}
-                className={`${styles.row} ${selected ? styles.rowSelected : ""} cp-focusable`}
-                title={`Toggle the ${fw.label} standards framework — lessons can be tagged with codes from any framework you enable here`}
-              >
-                {/* Custom checkbox indicator. */}
-                <span
-                  className={styles.check}
-                  aria-hidden
-                  data-checked={selected}
-                />
-                <span className={styles.text}>
-                  <span className={styles.label}>{fw.label}</span>
-                  <span className={styles.detail}>{fw.detail}</span>
-                </span>
-              </button>
+              <Tooltip content={tip} side="top">
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={selected}
+                  onClick={() => toggle(fw.id)}
+                  className={`${styles.row} ${selected ? styles.rowSelected : ""} cp-focusable`}
+                  title={tip}
+                >
+                  {/* Custom checkbox indicator. */}
+                  <span
+                    className={styles.check}
+                    aria-hidden
+                    data-checked={selected}
+                  />
+                  <span className={styles.text}>
+                    <span className={styles.label}>{fw.label}</span>
+                    <span className={styles.detail}>{fw.detail}</span>
+                  </span>
+                </button>
+              </Tooltip>
             </li>
           );
         })}

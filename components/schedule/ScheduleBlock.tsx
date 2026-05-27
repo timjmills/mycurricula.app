@@ -30,6 +30,7 @@
 
 import type { MouseEvent, ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { Tooltip } from "@/components/ui";
 import {
   type TimelineBlock,
   formatBlockTime,
@@ -113,28 +114,32 @@ export function ScheduleBlock({ block }: ScheduleBlockProps): ReactNode {
     : `${block.label ?? "Non-academic block"} — ${formatBlockTime(block.startMin)}–${formatBlockTime(block.endMin)} (configured in Schedule settings)`;
 
   return (
-    <button
-      type="button"
-      className={rootClass}
-      style={{ top, height }}
-      onClick={handleClick}
-      aria-label={ariaLabel}
-      title={tooltip}
-      // Non-academic + no-linked-lesson blocks aren't really interactive yet;
-      // making them buttons keeps the keyboard story consistent (every block
-      // is focusable) but tabIndex=-1 keeps them out of the tab sequence
-      // until they have an action.
-      tabIndex={isAcademic && linkedLesson ? 0 : -1}
-    >
-      <div className={styles.eyebrow}>
-        {isAcademic && subject ? subject.name : block.label}
-      </div>
-      {showSecondary && <div className={styles.secondary}>{secondaryText}</div>}
-      {showTimeRange && (
-        <div className={styles.timeRange}>
-          {formatBlockTime(block.startMin)}–{formatBlockTime(block.endMin)}
+    <Tooltip content={tooltip} side="right">
+      <button
+        type="button"
+        className={rootClass}
+        style={{ top, height }}
+        onClick={handleClick}
+        aria-label={ariaLabel}
+        title={tooltip}
+        // Non-academic + no-linked-lesson blocks aren't really interactive yet;
+        // making them buttons keeps the keyboard story consistent (every block
+        // is focusable) but tabIndex=-1 keeps them out of the tab sequence
+        // until they have an action.
+        tabIndex={isAcademic && linkedLesson ? 0 : -1}
+      >
+        <div className={styles.eyebrow}>
+          {isAcademic && subject ? subject.name : block.label}
         </div>
-      )}
-    </button>
+        {showSecondary && (
+          <div className={styles.secondary}>{secondaryText}</div>
+        )}
+        {showTimeRange && (
+          <div className={styles.timeRange}>
+            {formatBlockTime(block.startMin)}–{formatBlockTime(block.endMin)}
+          </div>
+        )}
+      </button>
+    </Tooltip>
   );
 }

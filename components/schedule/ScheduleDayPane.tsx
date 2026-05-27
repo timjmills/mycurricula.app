@@ -42,7 +42,7 @@ import { dateForWeekDay } from "@/lib/mock/calendar";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { useNowTick } from "@/lib/use-now-tick";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, Tooltip } from "@/components/ui";
 import { ScheduleRow } from "./ScheduleRow";
 import { ScheduleTabs, type ScheduleTab } from "./ScheduleTabs";
 import styles from "./ScheduleDayPane.module.css";
@@ -114,21 +114,33 @@ export function ScheduleDayPane({
     >
       {/* ── Title strip ───────────────────────────────────────────────── */}
       <div className={styles.titleStrip}>
-        <span className={styles.eyebrow}>Schedule Pane</span>
-        <button
-          type="button"
-          className={styles.iconMenu}
-          aria-label="Schedule pane options"
-          disabled
-          aria-disabled="true"
-          title="Pane options menu — rename, hide, or rearrange this pane (coming in a later phase)"
+        <Tooltip
+          content={`Switch between days of the school week — your timetable for ${dateLabel}. See what classes meet today, the linked lesson plan, and any events.`}
+          side="bottom"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-            <circle cx="3" cy="8" r="1.4" fill="currentColor" />
-            <circle cx="8" cy="8" r="1.4" fill="currentColor" />
-            <circle cx="13" cy="8" r="1.4" fill="currentColor" />
-          </svg>
-        </button>
+          <span className={styles.eyebrow} tabIndex={0}>
+            Schedule Pane
+          </span>
+        </Tooltip>
+        <Tooltip
+          content="Pane options menu — rename, hide, or rearrange this pane (coming in a later phase)."
+          side="left"
+        >
+          <button
+            type="button"
+            className={styles.iconMenu}
+            aria-label="Schedule pane options"
+            disabled
+            aria-disabled="true"
+            title="Pane options menu — rename, hide, or rearrange this pane (coming in a later phase)"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="3" cy="8" r="1.4" fill="currentColor" />
+              <circle cx="8" cy="8" r="1.4" fill="currentColor" />
+              <circle cx="13" cy="8" r="1.4" fill="currentColor" />
+            </svg>
+          </button>
+        </Tooltip>
       </div>
 
       {/* ── Tabs row ──────────────────────────────────────────────────── */}
@@ -142,53 +154,58 @@ export function ScheduleDayPane({
           <span className={styles.dateLabel}>{dateLabel}</span>
           <span className={styles.weekLabel}>WEEK {week}</span>
         </div>
-        <button
-          type="button"
-          className={styles.iconMenu}
-          aria-label="Pick a different day"
-          disabled
-          aria-disabled="true"
-          title="Jump this pane to a different day of the school week (coming in a later phase)"
+        <Tooltip
+          content="Jump this pane to a different day of the school week (coming in a later phase)."
+          side="left"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-            <rect
-              x="2"
-              y="3"
-              width="12"
-              height="11"
-              rx="1.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.4"
-            />
-            <line
-              x1="2"
-              y1="6.5"
-              x2="14"
-              y2="6.5"
-              stroke="currentColor"
-              strokeWidth="1.4"
-            />
-            <line
-              x1="5"
-              y1="2"
-              x2="5"
-              y2="4.5"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-            />
-            <line
-              x1="11"
-              y1="2"
-              x2="11"
-              y2="4.5"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
+          <button
+            type="button"
+            className={styles.iconMenu}
+            aria-label="Pick a different day"
+            disabled
+            aria-disabled="true"
+            title="Jump this pane to a different day of the school week (coming in a later phase)"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <rect
+                x="2"
+                y="3"
+                width="12"
+                height="11"
+                rx="1.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              />
+              <line
+                x1="2"
+                y1="6.5"
+                x2="14"
+                y2="6.5"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              />
+              <line
+                x1="5"
+                y1="2"
+                x2="5"
+                y2="4.5"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+              <line
+                x1="11"
+                y1="2"
+                x2="11"
+                y2="4.5"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </Tooltip>
       </div>
 
       {/* ── Body — rows or empty state, per active tab ─────────────────── */}
@@ -225,18 +242,23 @@ export function ScheduleDayPane({
 
       {/* ── Add-block CTA (stub) ──────────────────────────────────────── */}
       <div className={styles.addRow}>
-        <button
-          type="button"
-          className={styles.addButton}
-          // TODO: when the Schedule settings UI lands, this opens the
-          // AddTimeBlock form. For now it's a visual placeholder so the
-          // pane reads as the same shape it will have post-wire.
-          disabled
-          aria-disabled="true"
-          title="Add a new time block to this day's schedule — a class period, prep, lunch, or non-academic block (coming in a later phase)"
+        <Tooltip
+          content="Add a new time block to this day's schedule — a class period, prep, lunch, or non-academic block (coming in a later phase)."
+          side="top"
         >
-          <span aria-hidden="true">+</span> Add time block
-        </button>
+          <button
+            type="button"
+            className={styles.addButton}
+            // TODO: when the Schedule settings UI lands, this opens the
+            // AddTimeBlock form. For now it's a visual placeholder so the
+            // pane reads as the same shape it will have post-wire.
+            disabled
+            aria-disabled="true"
+            title="Add a new time block to this day's schedule — a class period, prep, lunch, or non-academic block (coming in a later phase)"
+          >
+            <span aria-hidden="true">+</span> Add time block
+          </button>
+        </Tooltip>
       </div>
     </section>
   );

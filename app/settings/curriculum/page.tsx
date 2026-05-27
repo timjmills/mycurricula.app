@@ -56,7 +56,7 @@ import {
   academicYearIsoToDate,
 } from "@/lib/use-academic-year";
 import { useAppState } from "@/lib/app-state";
-import { Button, PageHeader } from "@/components/ui";
+import { Button, PageHeader, Tooltip } from "@/components/ui";
 import { SettingsCard } from "@/components/appearance/settings-card";
 import styles from "./page.module.css";
 
@@ -280,7 +280,14 @@ function CurriculumLabelSection(): ReactNode {
   return (
     <SettingsCard
       eyebrow="Identity"
-      title="Curriculum label"
+      title={
+        <Tooltip
+          content="Your team's display name shown in the top bar — what shows after MyCurricula. Shared with everyone on your grade-level team."
+          side="bottom"
+        >
+          <span>Curriculum label</span>
+        </Tooltip>
+      }
       hint="The suffix shown next to the wordmark in the top bar — e.g. “Grade 5”, “K-12 Math”, “Year 7 Science”."
       action={<TeamChip />}
     >
@@ -288,20 +295,25 @@ function CurriculumLabelSection(): ReactNode {
         <label htmlFor="curriculum-label" className={styles.fieldLabel}>
           Label
         </label>
-        <input
-          id="curriculum-label"
-          name="curriculumLabel"
-          type="text"
-          value={draft}
-          onChange={onChange}
-          onBlur={onBlur}
-          placeholder="e.g. Grade 5, K-12 Math, Year 7 Science"
-          autoComplete="off"
-          spellCheck={false}
-          maxLength={60}
-          title="Type what your team calls this curriculum — it appears next to the MyCurricula wordmark for every teacher on the team. Saves when you click out of the field."
-          className={styles.textInput}
-        />
+        <Tooltip
+          content="Type what your team calls this curriculum — it appears next to the MyCurricula wordmark for every teacher on the team. Saves when you click out of the field."
+          side="bottom"
+        >
+          <input
+            id="curriculum-label"
+            name="curriculumLabel"
+            type="text"
+            value={draft}
+            onChange={onChange}
+            onBlur={onBlur}
+            placeholder="e.g. Grade 5, K-12 Math, Year 7 Science"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={60}
+            title="Type what your team calls this curriculum — it appears next to the MyCurricula wordmark for every teacher on the team. Saves when you click out of the field."
+            className={styles.textInput}
+          />
+        </Tooltip>
         <p className={styles.fieldHint}>
           Saves when you click out of the field. Clear it to leave just
           “MyCurricula” in the top bar.
@@ -355,7 +367,14 @@ function SchoolMonthsSection(): ReactNode {
   return (
     <SettingsCard
       eyebrow="Calendar"
-      title="School months"
+      title={
+        <Tooltip
+          content="Which calendar months your school operates in — only these months show in /year. Shared with your team."
+          side="bottom"
+        >
+          <span>School months</span>
+        </Tooltip>
+      }
       hint="Which calendar months your team treats as the academic year. The Year view and any month-scoped filters use this."
       action={<TeamChip />}
     >
@@ -364,19 +383,24 @@ function SchoolMonthsSection(): ReactNode {
         <label htmlFor="school-months-preset" className={styles.fieldLabel}>
           Preset
         </label>
-        <select
-          id="school-months-preset"
-          value={activePreset}
-          onChange={onPresetChange}
-          title="Quick-pick a common school-year shape. Picking one updates the month toggles below for the whole team."
-          className={styles.select}
+        <Tooltip
+          content="Quick-pick a common school-year shape. Picking one updates the month toggles below for the whole team."
+          side="bottom"
         >
-          {PRESET_OPTIONS.map((opt) => (
-            <option key={opt.key} value={opt.key} title={opt.hint}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          <select
+            id="school-months-preset"
+            value={activePreset}
+            onChange={onPresetChange}
+            title="Quick-pick a common school-year shape. Picking one updates the month toggles below for the whole team."
+            className={styles.select}
+          >
+            {PRESET_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key} title={opt.hint}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </Tooltip>
       </div>
 
       {/* ── 12-month chip row ───────────────────────────────────────── */}
@@ -389,22 +413,24 @@ function SchoolMonthsSection(): ReactNode {
             const isOn = selected.has(monthIdx);
             const short = MONTH_NAMES_SHORT[monthIdx];
             const long = MONTH_NAMES_LONG[monthIdx];
+            const tip = `Include ${long} in this curriculum's school year. Every teacher on the team sees the change.`;
             return (
-              <button
-                key={monthIdx}
-                type="button"
-                role="switch"
-                aria-checked={isOn}
-                aria-label={`${long} — ${isOn ? "included in" : "excluded from"} the school year`}
-                onClick={() => onToggleMonth(monthIdx)}
-                title={`Include ${long} in this curriculum's school year. Every teacher on the team sees the change.`}
-                className={[
-                  styles.monthChip,
-                  isOn ? styles.monthChipOn : styles.monthChipOff,
-                ].join(" ")}
-              >
-                {short}
-              </button>
+              <Tooltip key={monthIdx} content={tip} side="top">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isOn}
+                  aria-label={`${long} — ${isOn ? "included in" : "excluded from"} the school year`}
+                  onClick={() => onToggleMonth(monthIdx)}
+                  title={tip}
+                  className={[
+                    styles.monthChip,
+                    isOn ? styles.monthChipOn : styles.monthChipOff,
+                  ].join(" ")}
+                >
+                  {short}
+                </button>
+              </Tooltip>
             );
           })}
         </div>
@@ -466,7 +492,14 @@ function AcademicYearSection(): ReactNode {
   return (
     <SettingsCard
       eyebrow="Calendar"
-      title="Academic year dates"
+      title={
+        <Tooltip
+          content="The exact dates your academic year starts and ends — Roadmap + Progression scale to this range. Shared with your team."
+          side="bottom"
+        >
+          <span>Academic year dates</span>
+        </Tooltip>
+      }
       hint="When your school year starts and ends. The Year view's Roadmap and Progression timelines line up exactly with these dates."
       action={<TeamChip />}
     >
@@ -476,15 +509,20 @@ function AcademicYearSection(): ReactNode {
           <label htmlFor="academic-year-start" className={styles.fieldLabel}>
             Start date
           </label>
-          <input
-            id="academic-year-start"
-            name="academicYearStart"
-            type="date"
-            value={startIso}
-            onChange={onStartChange}
-            title="The first day of your school year. The Year view's Roadmap and Progression timelines start exactly here, so units pinned to early weeks land on the same calendar dates a teacher would see in their school's calendar."
-            className={styles.textInput}
-          />
+          <Tooltip
+            content="The first day of your school year. The Year view's Roadmap and Progression timelines start exactly here, so units pinned to early weeks land on the same calendar dates a teacher would see in their school's calendar."
+            side="bottom"
+          >
+            <input
+              id="academic-year-start"
+              name="academicYearStart"
+              type="date"
+              value={startIso}
+              onChange={onStartChange}
+              title="The first day of your school year. The Year view's Roadmap and Progression timelines start exactly here, so units pinned to early weeks land on the same calendar dates a teacher would see in their school's calendar."
+              className={styles.textInput}
+            />
+          </Tooltip>
         </div>
 
         {/* End date */}
@@ -492,30 +530,41 @@ function AcademicYearSection(): ReactNode {
           <label htmlFor="academic-year-end" className={styles.fieldLabel}>
             End date
           </label>
-          <input
-            id="academic-year-end"
-            name="academicYearEnd"
-            type="date"
-            value={endIso}
-            onChange={onEndChange}
-            title="The last day of your school year. The Roadmap and Progression timelines end here — final-week units are anchored to this date, so a unit that ends two weeks before school finishes lands two weeks back from this date."
-            className={styles.textInput}
-          />
+          <Tooltip
+            content="The last day of your school year. The Roadmap and Progression timelines end here — final-week units are anchored to this date, so a unit that ends two weeks before school finishes lands two weeks back from this date."
+            side="bottom"
+          >
+            <input
+              id="academic-year-end"
+              name="academicYearEnd"
+              type="date"
+              value={endIso}
+              onChange={onEndChange}
+              title="The last day of your school year. The Roadmap and Progression timelines end here — final-week units are anchored to this date, so a unit that ends two weeks before school finishes lands two weeks back from this date."
+              className={styles.textInput}
+            />
+          </Tooltip>
         </div>
       </div>
 
       {/* Live span readout — keeps the math visible to the teacher as
           they edit either date. The number matches the column count the
           /year view will render. */}
-      <p
-        className={styles.fieldHint}
-        aria-live="polite"
-        title="Total number of school weeks between your start and end dates. The Year view renders this many week columns."
+      <Tooltip
+        content="Total number of school weeks between your start and end dates. The Year view renders this many week columns."
+        side="top"
       >
-        = <strong>{weeks}</strong> {weeks === 1 ? "week" : "weeks"} of school
-        year — your Roadmap and Progression timelines will use exactly this
-        range.
-      </p>
+        <p
+          className={styles.fieldHint}
+          aria-live="polite"
+          tabIndex={0}
+          title="Total number of school weeks between your start and end dates. The Year view renders this many week columns."
+        >
+          = <strong>{weeks}</strong> {weeks === 1 ? "week" : "weeks"} of school
+          year — your Roadmap and Progression timelines will use exactly this
+          range.
+        </p>
+      </Tooltip>
       <p className={styles.fieldHint}>
         Spans are clamped to a 30–60 week range. Pick a sensible school year and
         the Year view will follow.
@@ -574,7 +623,14 @@ function SchoolWeekSection(): ReactNode {
   return (
     <SettingsCard
       eyebrow="Calendar"
-      title="School week"
+      title={
+        <Tooltip
+          content="Which weekdays your school holds lessons — Sun-Thu for Qatar, Mon-Fri for US, etc. Shared with your team."
+          side="bottom"
+        >
+          <span>School week</span>
+        </Tooltip>
+      }
       hint="Which weekdays your school runs. The Weekly grid, Daily list, and Schedule all use this set as their day columns. Existing lessons map by index — day 0 stays day 0 (the first day of your school week)."
       action={<TeamChip />}
     >
@@ -583,19 +639,24 @@ function SchoolWeekSection(): ReactNode {
         <label htmlFor="school-week-preset" className={styles.fieldLabel}>
           Preset
         </label>
-        <select
-          id="school-week-preset"
-          value={activePreset}
-          onChange={onPresetChange}
-          title="Quick-pick a common school-week shape. Picking one updates the weekday toggles below for the whole team."
-          className={styles.select}
+        <Tooltip
+          content="Quick-pick a common school-week shape. Picking one updates the weekday toggles below for the whole team."
+          side="bottom"
         >
-          {SCHOOL_WEEK_PRESET_OPTIONS.map((opt) => (
-            <option key={opt.key} value={opt.key} title={opt.hint}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          <select
+            id="school-week-preset"
+            value={activePreset}
+            onChange={onPresetChange}
+            title="Quick-pick a common school-week shape. Picking one updates the weekday toggles below for the whole team."
+            className={styles.select}
+          >
+            {SCHOOL_WEEK_PRESET_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key} title={opt.hint}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </Tooltip>
       </div>
 
       {/* ── 7-weekday chip row ──────────────────────────────────────── */}
@@ -609,27 +670,27 @@ function SchoolWeekSection(): ReactNode {
             const short = WEEKDAY_NAMES_SHORT[day];
             const long = WEEKDAY_NAMES_LONG[day];
             const isOnlyOne = isOn && selected.size === 1;
+            const tip = isOnlyOne
+              ? `${long} is the only school day right now — pick another weekday first before removing it.`
+              : `Include ${long} in your school week. Every teacher on the team sees the change, and every calendar view updates its day columns.`;
             return (
-              <button
-                key={day}
-                type="button"
-                role="switch"
-                aria-checked={isOn}
-                aria-label={`${long} — ${isOn ? "included in" : "excluded from"} the school week`}
-                aria-disabled={isOnlyOne}
-                onClick={() => onToggleDay(day)}
-                title={
-                  isOnlyOne
-                    ? `${long} is the only school day right now — pick another weekday first before removing it.`
-                    : `Include ${long} in your school week. Every teacher on the team sees the change, and every calendar view updates its day columns.`
-                }
-                className={[
-                  styles.monthChip,
-                  isOn ? styles.monthChipOn : styles.monthChipOff,
-                ].join(" ")}
-              >
-                {short}
-              </button>
+              <Tooltip key={day} content={tip} side="top">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isOn}
+                  aria-label={`${long} — ${isOn ? "included in" : "excluded from"} the school week`}
+                  aria-disabled={isOnlyOne}
+                  onClick={() => onToggleDay(day)}
+                  title={tip}
+                  className={[
+                    styles.monthChip,
+                    isOn ? styles.monthChipOn : styles.monthChipOff,
+                  ].join(" ")}
+                >
+                  {short}
+                </button>
+              </Tooltip>
             );
           })}
         </div>
@@ -682,7 +743,14 @@ function HolidaysSection(): ReactNode {
   return (
     <SettingsCard
       eyebrow="Calendar"
-      title="Holidays"
+      title={
+        <Tooltip
+          content="Holidays + breaks during the school year — these days grey out on /year so you don't plan lessons on them. Shared with your team."
+          side="bottom"
+        >
+          <span>Holidays</span>
+        </Tooltip>
+      }
       hint="Non-instruction dates — Eid, Spring Break, in-service days, anything where lessons shouldn't run. The Year view greys out the matching week so the team can see at a glance where the school week is short."
       action={<TeamChip />}
     >
@@ -693,35 +761,45 @@ function HolidaysSection(): ReactNode {
             <label htmlFor="holiday-date" className={styles.fieldLabel}>
               Date
             </label>
-            <input
-              id="holiday-date"
-              name="holidayDate"
-              type="date"
-              required
-              value={draftDate}
-              onChange={(e) => setDraftDate(e.target.value)}
-              title="The calendar date this holiday falls on. Pick from the picker or type YYYY-MM-DD."
-              className={styles.textInput}
-            />
+            <Tooltip
+              content="The calendar date this holiday falls on. Pick from the picker or type YYYY-MM-DD."
+              side="bottom"
+            >
+              <input
+                id="holiday-date"
+                name="holidayDate"
+                type="date"
+                required
+                value={draftDate}
+                onChange={(e) => setDraftDate(e.target.value)}
+                title="The calendar date this holiday falls on. Pick from the picker or type YYYY-MM-DD."
+                className={styles.textInput}
+              />
+            </Tooltip>
           </div>
           <div className={styles.holidayFormField}>
             <label htmlFor="holiday-name" className={styles.fieldLabel}>
               Name
             </label>
-            <input
-              id="holiday-name"
-              name="holidayName"
-              type="text"
-              required
-              maxLength={60}
-              value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-              placeholder="e.g. Eid al-Fitr, Spring Break"
-              autoComplete="off"
-              spellCheck={false}
-              title="What this holiday is called — appears on the Year-view tooltip and in this list."
-              className={styles.textInput}
-            />
+            <Tooltip
+              content="What this holiday is called — appears on the Year-view tooltip and in this list."
+              side="bottom"
+            >
+              <input
+                id="holiday-name"
+                name="holidayName"
+                type="text"
+                required
+                maxLength={60}
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                placeholder="e.g. Eid al-Fitr, Spring Break"
+                autoComplete="off"
+                spellCheck={false}
+                title="What this holiday is called — appears on the Year-view tooltip and in this list."
+                className={styles.textInput}
+              />
+            </Tooltip>
           </div>
           <div className={styles.holidayFormAction}>
             <Button
@@ -834,13 +912,19 @@ function PlaceholderSection({
 
 function TeamChip(): ReactNode {
   return (
-    <span
-      className={styles.teamChip}
-      title="This setting affects every teacher on your grade-level team."
-      aria-label="Shared with your team"
+    <Tooltip
+      content="This setting affects every teacher on your grade-level team."
+      side="bottom"
     >
-      <span aria-hidden="true" className={styles.teamChipDot} />
-      Shared with your team
-    </span>
+      <span
+        className={styles.teamChip}
+        tabIndex={0}
+        title="This setting affects every teacher on your grade-level team."
+        aria-label="Shared with your team"
+      >
+        <span aria-hidden="true" className={styles.teamChipDot} />
+        Shared with your team
+      </span>
+    </Tooltip>
   );
 }

@@ -25,6 +25,7 @@
 import type { ReactNode } from "react";
 import type { Lesson } from "@/lib/types";
 import { SUBJECT_BY_ID } from "@/lib/mock";
+import { Tooltip } from "@/components/ui";
 import styles from "./DailyView.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -75,19 +76,27 @@ export function TodayDashboard({
         <div className={styles.dayHeaderBar} role="presentation">
           {total === 0 && <div className={styles.dayHeaderBarEmpty} />}
           {dayLessons.map((l) => (
-            <div
+            <Tooltip
               key={l.id}
-              className={`${styles.dayHeaderBarSegment} cp-subj ${l.subject}`}
-              style={{
-                background:
-                  l.status === "done"
-                    ? "var(--c)"
-                    : l.status === "partial"
-                      ? "var(--cl)"
-                      : "var(--ink-150)",
-              }}
-              title={`${SUBJECT_BY_ID[l.subject].name} — ${l.status}`}
-            />
+              content={`${SUBJECT_BY_ID[l.subject].name} — ${l.status === "done" ? "complete" : l.status === "partial" ? "partially complete" : "not yet started"}. Each segment in this bar represents one of today's lessons.`}
+              side="bottom"
+            >
+              <div
+                className={`${styles.dayHeaderBarSegment} cp-subj ${l.subject}`}
+                style={{
+                  background:
+                    l.status === "done"
+                      ? "var(--c)"
+                      : l.status === "partial"
+                        ? "var(--cl)"
+                        : "var(--ink-150)",
+                }}
+                title={`${SUBJECT_BY_ID[l.subject].name} — ${l.status}`}
+                tabIndex={0}
+                role="img"
+                aria-label={`${SUBJECT_BY_ID[l.subject].name} — ${l.status}`}
+              />
+            </Tooltip>
           ))}
         </div>
       </div>

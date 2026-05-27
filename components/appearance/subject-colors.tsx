@@ -118,7 +118,14 @@ export function SubjectColors({
   return (
     <SettingsCard
       eyebrow="Subject colors"
-      title="Which swatch represents each subject"
+      title={
+        <Tooltip
+          content="Pick which color swatch represents each subject. Team subjects are locked by the team lead; personal subjects (like Morning Meeting) you own and can recolor freely."
+          side="bottom"
+        >
+          <span>Which swatch represents each subject</span>
+        </Tooltip>
+      }
       hint="Team subjects are set in the Core Curriculum — only your team lead can change them. Personal subjects (Morning Meeting, Afternoon Circle) you own and edit."
       action={
         // Scope selector — true radiogroup (Team / Personal), migrated to ToggleGroup.

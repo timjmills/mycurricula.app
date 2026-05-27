@@ -30,7 +30,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { TEACHER_BY_ID, ME, shoutboxForDay } from "@/lib/mock";
 import type { ShoutboxMessage } from "@/lib/mock";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import type { PanelDragHandleProps } from "./RightRail";
 import styles from "./Shoutbox.module.css";
 
@@ -361,19 +361,33 @@ export function Shoutbox({
       <header className={styles.head}>
         {/* Drag grip — only rendered when the rail wires the bundle. */}
         {dragHandleProps && (
-          <button
-            type="button"
-            ref={dragHandleProps.ref}
-            {...(dragHandleProps.attributes ?? {})}
-            {...(dragHandleProps.listeners ?? {})}
-            className={styles.gripBtn}
-            aria-label={dragHandleProps.label ?? "Drag to reorder Day Shoutbox"}
-            title="Drag to reorder"
+          <Tooltip
+            content="Drag to reorder the Day Shoutbox panel within the right rail."
+            side="bottom"
           >
-            <GripVerticalIcon />
-          </button>
+            <button
+              type="button"
+              ref={dragHandleProps.ref}
+              {...(dragHandleProps.attributes ?? {})}
+              {...(dragHandleProps.listeners ?? {})}
+              className={styles.gripBtn}
+              aria-label={
+                dragHandleProps.label ?? "Drag to reorder Day Shoutbox"
+              }
+              title="Drag to reorder the Day Shoutbox panel"
+            >
+              <GripVerticalIcon />
+            </button>
+          </Tooltip>
         )}
-        <h3 className={styles.title}>Day Shoutbox</h3>
+        <Tooltip
+          content="Team chat scoped to today — quick notes between teachers covering the same day. Share quick updates, ask for cover, or flag something the whole grade should know."
+          side="bottom"
+        >
+          <h3 className={styles.title} tabIndex={0}>
+            Day Shoutbox
+          </h3>
+        </Tooltip>
         <span className={styles.tag}>Team chat</span>
         {unreadCount.current > 0 && (
           <span

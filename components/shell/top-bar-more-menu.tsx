@@ -297,51 +297,81 @@ export function TopBarMoreMenu({
           {/* ── To-do panel toggle ───────────────────────────────────────
               Mirrors the desktop button's behavior — toggleTodoPanel + the
               aria-expanded reflection. Closing the menu after the click
-              keeps the reveal of the to-do panel visible. */}
-          <button
-            type="button"
-            role="menuitem"
-            className={`${styles.row} ${todoPanelOpen ? styles.rowActive : ""}`}
-            onClick={runAndClose(toggleTodoPanel)}
-            aria-expanded={todoPanelOpen}
+              keeps the reveal of the to-do panel visible. Tooltip wrap
+              per CLAUDE.md §4 — teach first-time teachers what the
+              panel does, in the styled black bubble. */}
+          <Tooltip
+            content={
+              todoPanelOpen
+                ? "Close the to-do panel"
+                : "Your planning to-dos — non-lesson tasks like print handouts or message a parent"
+            }
+            side="left"
           >
-            <span className={styles.rowIcon} aria-hidden="true">
-              <TodoIcon />
-            </span>
-            <span className={styles.rowLabel}>
-              {todoPanelOpen ? "Close to-do panel" : "Open to-do panel"}
-            </span>
-          </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={`${styles.row} ${todoPanelOpen ? styles.rowActive : ""}`}
+              onClick={runAndClose(toggleTodoPanel)}
+              aria-expanded={todoPanelOpen}
+              title={
+                todoPanelOpen
+                  ? "Close the to-do panel"
+                  : "Your planning to-dos — non-lesson tasks like print handouts or message a parent"
+              }
+            >
+              <span className={styles.rowIcon} aria-hidden="true">
+                <TodoIcon />
+              </span>
+              <span className={styles.rowLabel}>
+                {todoPanelOpen ? "Close to-do panel" : "Open to-do panel"}
+              </span>
+            </button>
+          </Tooltip>
 
           {/* ── Comments panel toggle (with unread badge) ────────────────
               The unread count chip mirrors the desktop badge styling but
               renders inline on the row's right edge rather than absolutely
               over the icon — the menu row has more room to spell out the
               count and the chip stays a sibling, not a layered overlay. */}
-          <button
-            type="button"
-            role="menuitem"
-            className={`${styles.row} ${commentsPanelOpen ? styles.rowActive : ""}`}
-            onClick={runAndClose(toggleCommentsPanel)}
-            aria-expanded={commentsPanelOpen}
-            aria-label={
+          <Tooltip
+            content={
               commentsPanelOpen
-                ? "Close comments panel"
-                : `Open comments panel${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`
+                ? "Close the comments panel"
+                : `Team comments on lessons${unreadCount > 0 ? ` — ${unreadCount} unread` : " — see and reply to what teammates wrote"}`
             }
+            side="left"
           >
-            <span className={styles.rowIcon} aria-hidden="true">
-              <CommentsIcon />
-            </span>
-            <span className={styles.rowLabel}>
-              {commentsPanelOpen ? "Close comments panel" : "Comments"}
-            </span>
-            {unreadCount > 0 && (
-              <span className={styles.rowBadge} aria-hidden="true">
-                {unreadCount > 99 ? "99+" : unreadCount}
+            <button
+              type="button"
+              role="menuitem"
+              className={`${styles.row} ${commentsPanelOpen ? styles.rowActive : ""}`}
+              onClick={runAndClose(toggleCommentsPanel)}
+              aria-expanded={commentsPanelOpen}
+              aria-label={
+                commentsPanelOpen
+                  ? "Close comments panel"
+                  : `Open comments panel${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`
+              }
+              title={
+                commentsPanelOpen
+                  ? "Close the comments panel"
+                  : `Team comments on lessons${unreadCount > 0 ? ` — ${unreadCount} unread` : " — see and reply to what teammates wrote"}`
+              }
+            >
+              <span className={styles.rowIcon} aria-hidden="true">
+                <CommentsIcon />
               </span>
-            )}
-          </button>
+              <span className={styles.rowLabel}>
+                {commentsPanelOpen ? "Close comments panel" : "Comments"}
+              </span>
+              {unreadCount > 0 && (
+                <span className={styles.rowBadge} aria-hidden="true">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
+          </Tooltip>
 
           <div className={styles.divider} role="separator" aria-hidden="true" />
 
@@ -355,17 +385,23 @@ export function TopBarMoreMenu({
             method="post"
             className={styles.signOutRow}
           >
-            <button
-              type="submit"
-              role="menuitem"
-              className={styles.row}
-              aria-label="Sign out"
+            <Tooltip
+              content="Sign out of MyCurricula — you'll be returned to the login screen"
+              side="left"
             >
-              <span className={styles.rowIcon} aria-hidden="true">
-                <SignOutIcon />
-              </span>
-              <span className={styles.rowLabel}>Sign out</span>
-            </button>
+              <button
+                type="submit"
+                role="menuitem"
+                className={styles.row}
+                aria-label="Sign out"
+                title="Sign out of MyCurricula — you'll be returned to the login screen"
+              >
+                <span className={styles.rowIcon} aria-hidden="true">
+                  <SignOutIcon />
+                </span>
+                <span className={styles.rowLabel}>Sign out</span>
+              </button>
+            </Tooltip>
           </form>
         </div>
       )}

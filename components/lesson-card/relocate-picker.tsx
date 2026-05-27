@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Lesson, SubjectId } from "@/lib/types";
 import { SUBJECTS, WEEK_DAYS_SHORT } from "@/lib/mock";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 
 // ── Focus-trap selector (mirrors command-palette.tsx) ─────────────────────
 const FOCUSABLE =
@@ -173,16 +173,22 @@ export function RelocatePicker({
         }}
       >
         {/* Header */}
-        <div
-          style={{
-            fontSize: 15,
-            fontWeight: 600,
-            color: "var(--ink-900)",
-            marginBottom: 18,
-          }}
+        <Tooltip
+          content="Relocate lesson dialog — pick a new day, week, and subject; optionally keep the original lesson where it is. Moves are personal unless you explicitly save them to the team's Master."
+          side="bottom"
         >
-          Relocate lesson
-        </div>
+          <div
+            tabIndex={0}
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              color: "var(--ink-900)",
+              marginBottom: 18,
+            }}
+          >
+            Relocate lesson
+          </div>
+        </Tooltip>
 
         <form
           onSubmit={handleSubmit}
@@ -205,30 +211,35 @@ export function RelocatePicker({
             </legend>
             <div style={{ display: "flex", gap: 4 }}>
               {WEEK_DAYS_SHORT.map((label, i) => (
-                <button
+                <Tooltip
                   key={label}
-                  type="button"
-                  aria-pressed={day === i}
-                  onClick={() => setDay(i)}
-                  title={`Move this lesson to ${label} of the target week`}
-                  style={{
-                    flex: 1,
-                    minHeight: 44,
-                    borderRadius: 6,
-                    border:
-                      day === i
-                        ? "2px solid var(--ink-700)"
-                        : "1px solid var(--ink-200)",
-                    background: day === i ? "var(--ink-900)" : "var(--paper)",
-                    color: day === i ? "var(--paper)" : "var(--ink-700)",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "background 120ms, color 120ms, border 120ms",
-                  }}
+                  content={`Move this lesson to ${label} of the target week.`}
+                  side="bottom"
                 >
-                  {label}
-                </button>
+                  <button
+                    type="button"
+                    aria-pressed={day === i}
+                    onClick={() => setDay(i)}
+                    title={`Move this lesson to ${label} of the target week`}
+                    style={{
+                      flex: 1,
+                      minHeight: 44,
+                      borderRadius: 6,
+                      border:
+                        day === i
+                          ? "2px solid var(--ink-700)"
+                          : "1px solid var(--ink-200)",
+                      background: day === i ? "var(--ink-900)" : "var(--paper)",
+                      color: day === i ? "var(--paper)" : "var(--ink-700)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "background 120ms, color 120ms, border 120ms",
+                    }}
+                  >
+                    {label}
+                  </button>
+                </Tooltip>
               ))}
             </div>
           </fieldset>
@@ -250,30 +261,32 @@ export function RelocatePicker({
               Week
             </label>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <button
-                type="button"
-                aria-label="Previous week"
-                title="Step back one school week"
-                disabled={week <= MIN_WEEK}
-                onClick={() => setWeek((w) => Math.max(MIN_WEEK, w - 1))}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 6,
-                  border: "1px solid var(--ink-200)",
-                  background: "var(--paper)",
-                  color: "var(--ink-700)",
-                  fontSize: 16,
-                  cursor: week <= MIN_WEEK ? "not-allowed" : "pointer",
-                  opacity: week <= MIN_WEEK ? 0.38 : 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                −
-              </button>
+              <Tooltip content="Step back one school week." side="top">
+                <button
+                  type="button"
+                  aria-label="Previous week"
+                  title="Step back one school week"
+                  disabled={week <= MIN_WEEK}
+                  onClick={() => setWeek((w) => Math.max(MIN_WEEK, w - 1))}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 6,
+                    border: "1px solid var(--ink-200)",
+                    background: "var(--paper)",
+                    color: "var(--ink-700)",
+                    fontSize: 16,
+                    cursor: week <= MIN_WEEK ? "not-allowed" : "pointer",
+                    opacity: week <= MIN_WEEK ? 0.38 : 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  −
+                </button>
+              </Tooltip>
               <input
                 id="relocate-week"
                 type="number"
@@ -298,30 +311,32 @@ export function RelocatePicker({
                   MozAppearance: "textfield",
                 }}
               />
-              <button
-                type="button"
-                aria-label="Next week"
-                title="Step forward one school week"
-                disabled={week >= MAX_WEEK}
-                onClick={() => setWeek((w) => Math.min(MAX_WEEK, w + 1))}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 6,
-                  border: "1px solid var(--ink-200)",
-                  background: "var(--paper)",
-                  color: "var(--ink-700)",
-                  fontSize: 16,
-                  cursor: week >= MAX_WEEK ? "not-allowed" : "pointer",
-                  opacity: week >= MAX_WEEK ? 0.38 : 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                +
-              </button>
+              <Tooltip content="Step forward one school week." side="top">
+                <button
+                  type="button"
+                  aria-label="Next week"
+                  title="Step forward one school week"
+                  disabled={week >= MAX_WEEK}
+                  onClick={() => setWeek((w) => Math.min(MAX_WEEK, w + 1))}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 6,
+                    border: "1px solid var(--ink-200)",
+                    background: "var(--paper)",
+                    color: "var(--ink-700)",
+                    fontSize: 16,
+                    cursor: week >= MAX_WEEK ? "not-allowed" : "pointer",
+                    opacity: week >= MAX_WEEK ? 0.38 : 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  +
+                </button>
+              </Tooltip>
             </div>
           </div>
 

@@ -6,7 +6,7 @@
 // in a real lesson holds rich text plus its own attached resources.
 //
 // These 15 templates are the read-only built-ins offered during onboarding
-// (see Documents/Project Files/5.17.26 Onboarding & Lesson-Flow Template
+// (see docs/historical/5.17.26 Onboarding & Lesson-Flow Template
 // Plan.md). A teacher can duplicate one and edit it, or build a custom flow.
 // The empty-state placeholder a teacher sees inside a section is its
 // `prompt`.

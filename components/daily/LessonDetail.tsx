@@ -2,7 +2,7 @@
 
 // LessonDetail.tsx — Right pane: full lesson detail for a selected lesson.
 //
-// LAYOUT (REVISED 2026-05-20 per Plugin Directions §1 + §2) — the daily-view
+// LAYOUT (REVISED 2026-05-20 per docs/historical/5.20.26 Plugin Directions §1 + §2) — the daily-view
 // lesson detail panel is a single rounded WHITE card. Across the top sits
 // a FLAT, light subject-tinted HEADER BAND — the exact treatment used by
 // the weekly-grid lesson cards. The header is no longer a dark slab; it
@@ -80,7 +80,7 @@ import { SUBJECT_BY_ID, lessonTime } from "@/lib/mock";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
 import { usePlanner } from "@/lib/planner-store";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import detailStyles from "./lesson-detail.module.css";
 
 // ── Completion checkbox (status-aware) ───────────────────────────────────
@@ -391,9 +391,15 @@ export function LessonDetail({
             with ellipsis when squeezed (the first thing to give under
             narrow widths). The double-click-to-edit target lives below
             in the body's hero title; this is just the band tier. */}
-        <p className={detailStyles.bandTitle} title={lesson.title}>
-          {lesson.title}
-        </p>
+        <Tooltip content={lesson.title} side="bottom">
+          <p
+            className={detailStyles.bandTitle}
+            title={lesson.title}
+            tabIndex={0}
+          >
+            {lesson.title}
+          </p>
+        </Tooltip>
 
         {/* (C) RIGHT — Time + header icon buttons.
             The time is the visual hero of the right region: big tabular-
@@ -478,20 +484,25 @@ export function LessonDetail({
                 />
               </RichEditorWrapper>
             ) : (
-              <span
-                className={detailStyles.editableText}
-                tabIndex={0}
-                role="button"
-                aria-label="Edit lesson title"
-                onDoubleClick={(e) => openEditor("title", e)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === "F2")
-                    openEditor("title", e);
-                }}
-                title="Double-click or press Enter to edit"
+              <Tooltip
+                content="Double-click or press Enter to edit the lesson title — saved into your personal copy."
+                side="top"
               >
-                {lesson.title}
-              </span>
+                <span
+                  className={detailStyles.editableText}
+                  tabIndex={0}
+                  role="button"
+                  aria-label="Edit lesson title"
+                  onDoubleClick={(e) => openEditor("title", e)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "F2")
+                      openEditor("title", e);
+                  }}
+                  title="Double-click or press Enter to edit"
+                >
+                  {lesson.title}
+                </span>
+              </Tooltip>
             )}
           </h2>
 
@@ -516,22 +527,27 @@ export function LessonDetail({
                 />
               </RichEditorWrapper>
             ) : (
-              <span
-                className={`${detailStyles.objectiveText} ${detailStyles.editableText} ${
-                  objectiveBody ? "" : detailStyles.objectiveEmpty
-                }`}
-                tabIndex={0}
-                role="button"
-                aria-label="Edit lesson objective"
-                onDoubleClick={(e) => openEditor("objective", e)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === "F2")
-                    openEditor("objective", e);
-                }}
-                title="Double-click or press Enter to edit"
+              <Tooltip
+                content="Double-click or press Enter to edit the I-can objective — saved into your personal copy."
+                side="top"
               >
-                {objectiveBody || "Add a lesson objective"}
-              </span>
+                <span
+                  className={`${detailStyles.objectiveText} ${detailStyles.editableText} ${
+                    objectiveBody ? "" : detailStyles.objectiveEmpty
+                  }`}
+                  tabIndex={0}
+                  role="button"
+                  aria-label="Edit lesson objective"
+                  onDoubleClick={(e) => openEditor("objective", e)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "F2")
+                      openEditor("objective", e);
+                  }}
+                  title="Double-click or press Enter to edit"
+                >
+                  {objectiveBody || "Add a lesson objective"}
+                </span>
+              </Tooltip>
             )}
           </p>
 

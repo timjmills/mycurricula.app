@@ -14,6 +14,7 @@
 import { useState, type ReactNode } from "react";
 import { useOnboarding } from "@/lib/onboarding-state";
 import type { OnboardingSubject } from "@/lib/onboarding-state";
+import { Tooltip } from "@/components/ui";
 import styles from "./schedule-step.module.css";
 
 /** Step 8 — "a typical day" subject-order preview. */
@@ -72,26 +73,36 @@ export function ScheduleStep(): ReactNode {
                 />
                 <span className={styles.name}>{subj.name}</span>
                 <span className={styles.controls}>
-                  <button
-                    type="button"
-                    onClick={() => move(idx, "up")}
-                    disabled={idx === 0}
-                    className={`${styles.moveBtn} cp-focusable`}
-                    aria-label={`Move ${subj.name} up`}
-                    title={`Move ${subj.name} earlier in the daily schedule`}
+                  <Tooltip
+                    content={`Move ${subj.name} earlier in the daily schedule`}
+                    side="top"
                   >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => move(idx, "down")}
-                    disabled={idx === academic.length - 1}
-                    className={`${styles.moveBtn} cp-focusable`}
-                    aria-label={`Move ${subj.name} down`}
-                    title={`Move ${subj.name} later in the daily schedule`}
+                    <button
+                      type="button"
+                      onClick={() => move(idx, "up")}
+                      disabled={idx === 0}
+                      className={`${styles.moveBtn} cp-focusable`}
+                      aria-label={`Move ${subj.name} up`}
+                      title={`Move ${subj.name} earlier in the daily schedule`}
+                    >
+                      ↑
+                    </button>
+                  </Tooltip>
+                  <Tooltip
+                    content={`Move ${subj.name} later in the daily schedule`}
+                    side="top"
                   >
-                    ↓
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => move(idx, "down")}
+                      disabled={idx === academic.length - 1}
+                      className={`${styles.moveBtn} cp-focusable`}
+                      aria-label={`Move ${subj.name} down`}
+                      title={`Move ${subj.name} later in the daily schedule`}
+                    >
+                      ↓
+                    </button>
+                  </Tooltip>
                 </span>
               </li>
             ))}

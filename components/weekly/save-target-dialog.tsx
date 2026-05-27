@@ -27,7 +27,7 @@
 // Never hard-code hex or px values.
 
 import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import styles from "./save-target-dialog.module.css";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -167,9 +167,14 @@ export function SaveTargetDialog({
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className={styles.header}>
-          <h2 id={headingId} className={styles.heading}>
-            Save your changes
-          </h2>
+          <Tooltip
+            content="Save destination dialog — choose whether this lesson edit lands in your personal copy or the team's shared curriculum."
+            side="bottom"
+          >
+            <h2 id={headingId} className={styles.heading} tabIndex={0}>
+              Save your changes
+            </h2>
+          </Tooltip>
           <p className={styles.lessonLine}>
             <span className={styles.lessonLabel}>Lesson:</span>{" "}
             <span className={styles.lessonTitle}>{lessonTitle}</span>
@@ -186,55 +191,65 @@ export function SaveTargetDialog({
           aria-label="Save destination"
         >
           {/* ── Personalized Curriculum ─────────────────────────────────── */}
-          <button
-            ref={personalBtnRef}
-            type="button"
-            className={`${styles.choiceBtn} ${styles.choiceBtnPersonal}`}
-            onClick={choosePersonal}
-            aria-label="Save to Personalized Curriculum — keeps this change in your own copy. Only you see it."
-            title="Save into your personal copy only — nobody else's planner is affected"
+          <Tooltip
+            content="Save into your personal copy only — nobody else's planner is affected. This is the default for everyday lesson tweaks."
+            side="top"
           >
-            {/* Icon — person silhouette outline */}
-            <span className={styles.choiceIcon} aria-hidden="true">
-              <PersonalIcon />
-            </span>
-            <span className={styles.choiceText}>
-              <span className={styles.choiceTitle}>
-                Personalized Curriculum
+            <button
+              ref={personalBtnRef}
+              type="button"
+              className={`${styles.choiceBtn} ${styles.choiceBtnPersonal}`}
+              onClick={choosePersonal}
+              aria-label="Save to Personalized Curriculum — keeps this change in your own copy. Only you see it."
+              title="Save into your personal copy only — nobody else's planner is affected"
+            >
+              {/* Icon — person silhouette outline */}
+              <span className={styles.choiceIcon} aria-hidden="true">
+                <PersonalIcon />
               </span>
-              <span className={styles.choiceSub}>
-                Keeps this change in your own copy. Only you see it.
+              <span className={styles.choiceText}>
+                <span className={styles.choiceTitle}>
+                  Personalized Curriculum
+                </span>
+                <span className={styles.choiceSub}>
+                  Keeps this change in your own copy. Only you see it.
+                </span>
               </span>
-            </span>
-          </button>
+            </button>
+          </Tooltip>
 
           {/* ── Core Curriculum ─────────────────────────────────────────── */}
           {/* Visual weight: uses --core-mode token family (soft red/pink) to
               signal that this is the weightier, team-wide action. Not alarming —
               the tokens.css comment says "carries the shared plan warning without
               feeling like an emergency" — but clearly distinct from Personal. */}
-          <button
-            type="button"
-            className={`${styles.choiceBtn} ${styles.choiceBtnCore}`}
-            onClick={chooseCore}
-            aria-label="Save to Core Curriculum — updates the shared plan for the whole team."
-            title="Save into the team's Master / Core curriculum — every teacher in your grade sees this change on their planner"
+          <Tooltip
+            content="Save into the team's Master / Core curriculum — every teacher in your grade sees this change on their planner. Choose this for shared curriculum decisions."
+            side="top"
           >
-            {/* Icon — stacked-pages / team plan symbol */}
-            <span className={styles.choiceIcon} aria-hidden="true">
-              <CoreIcon />
-            </span>
-            <span className={styles.choiceText}>
-              <span className={styles.choiceTitle}>Core Curriculum</span>
-              <span className={styles.choiceSub}>
-                Updates the shared plan for the whole team.
+            <button
+              type="button"
+              className={`${styles.choiceBtn} ${styles.choiceBtnCore}`}
+              onClick={chooseCore}
+              aria-label="Save to Core Curriculum — updates the shared plan for the whole team."
+              title="Save into the team's Master / Core curriculum — every teacher in your grade sees this change on their planner"
+            >
+              {/* Icon — stacked-pages / team plan symbol */}
+              <span className={styles.choiceIcon} aria-hidden="true">
+                <CoreIcon />
               </span>
-            </span>
-            {/* Subtle "shared" badge reinforces the weight of this choice */}
-            <span className={styles.coreBadge} aria-hidden="true">
-              Shared
-            </span>
-          </button>
+              <span className={styles.choiceText}>
+                <span className={styles.choiceTitle}>Core Curriculum</span>
+                <span className={styles.choiceSub}>
+                  Updates the shared plan for the whole team.
+                </span>
+              </span>
+              {/* Subtle "shared" badge reinforces the weight of this choice */}
+              <span className={styles.coreBadge} aria-hidden="true">
+                Shared
+              </span>
+            </button>
+          </Tooltip>
         </div>
 
         {/* ── Dismiss link ────────────────────────────────────────────────── */}

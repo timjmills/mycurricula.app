@@ -31,6 +31,7 @@ import { useAcademicYear } from "@/lib/use-academic-year";
 import { useSchoolWeek, type Weekday } from "@/lib/use-school-week";
 import { pacingFor } from "@/lib/year-pacing";
 import { useMinimizedSubjects } from "@/lib/year-state";
+import { Tooltip } from "@/components/ui";
 import { subjectClassName } from "./roadTones";
 import { StatusGlyph } from "./StatusGlyph";
 import { LaneCard } from "./LaneCard";
@@ -323,18 +324,24 @@ export function ProgressionView({
                       const width = (u.maxIdx - u.minIdx + 1) * COL - 8;
                       if (width <= 0) return null;
                       return (
-                        <div
+                        <Tooltip
                           key={u.unitId}
-                          className={styles.unitBar}
-                          style={{ left, width }}
-                          title={`${u.lessonCount} lessons`}
+                          content={`This unit spans ${u.maxIdx - u.minIdx + 1} weeks and contains ${u.lessonCount} lesson${u.lessonCount === 1 ? "" : "s"} on the team's roadmap.`}
+                          side="top"
                         >
-                          <span className={styles.unitTile}>U{ui + 1}</span>
-                          <div className={styles.unitMeta}>
-                            <IconBook width={10} height={10} />
-                            <span>{u.lessonCount} lessons</span>
+                          <div
+                            className={styles.unitBar}
+                            style={{ left, width }}
+                            title={`${u.lessonCount} lessons in this unit, spanning ${u.maxIdx - u.minIdx + 1} weeks`}
+                            tabIndex={0}
+                          >
+                            <span className={styles.unitTile}>U{ui + 1}</span>
+                            <div className={styles.unitMeta}>
+                              <IconBook width={10} height={10} />
+                              <span>{u.lessonCount} lessons</span>
+                            </div>
                           </div>
-                        </div>
+                        </Tooltip>
                       );
                     })}
                   </div>

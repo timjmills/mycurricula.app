@@ -34,7 +34,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { TODOS, TAG_BY_ID } from "@/lib/mock";
 import type { Todo } from "@/lib/types";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import type { PanelDragHandleProps } from "./RightRail";
 import styles from "./TodayTodos.module.css";
 
@@ -173,12 +173,16 @@ function TodoRow({ todo, onToggle }: TodoRowProps): ReactNode {
       {tags.length > 0 && (
         <span className={styles.tags} aria-hidden="true">
           {tags.map((tag) => (
-            <span
-              key={tag.id}
-              className={styles.tagDot}
-              style={{ background: tag.fg }}
-              title={tag.label}
-            />
+            <Tooltip key={tag.id} content={tag.label} side="top">
+              <span
+                className={styles.tagDot}
+                style={{ background: tag.fg }}
+                title={tag.label}
+                tabIndex={0}
+                role="img"
+                aria-label={tag.label}
+              />
+            </Tooltip>
           ))}
         </span>
       )}
@@ -370,19 +374,31 @@ export function TodayTodos({
         {/* Drag grip — only rendered when the rail wires the bundle.
             Activator + listeners scope drag to this button alone. */}
         {dragHandleProps && (
-          <button
-            type="button"
-            ref={dragHandleProps.ref}
-            {...(dragHandleProps.attributes ?? {})}
-            {...(dragHandleProps.listeners ?? {})}
-            className={styles.gripBtn}
-            aria-label={dragHandleProps.label ?? "Drag to reorder To-do List"}
-            title="Drag to reorder"
+          <Tooltip
+            content="Drag to reorder the To-do List panel within the right rail."
+            side="bottom"
           >
-            <GripVerticalIcon />
-          </button>
+            <button
+              type="button"
+              ref={dragHandleProps.ref}
+              {...(dragHandleProps.attributes ?? {})}
+              {...(dragHandleProps.listeners ?? {})}
+              className={styles.gripBtn}
+              aria-label={dragHandleProps.label ?? "Drag to reorder To-do List"}
+              title="Drag to reorder the To-do List panel"
+            >
+              <GripVerticalIcon />
+            </button>
+          </Tooltip>
         )}
-        <h3 className={styles.title}>To-do List</h3>
+        <Tooltip
+          content="Personal to-do list — only you see it. Tick items off as you go, or click + Add a to-do to capture a quick reminder for today."
+          side="bottom"
+        >
+          <h3 className={styles.title} tabIndex={0}>
+            To-do List
+          </h3>
+        </Tooltip>
         {/* Green open-count badge — stays in the header even when
             collapsed so the teacher's remaining-work glance is always
             available. */}

@@ -216,7 +216,21 @@ export function LeftFilterPanel(): ReactNode {
           in new tab" all behave as a teacher expects from a primary
           navigation target. */}
       <div className={styles.header}>
-        <span className={styles.headerTitle}>Filters</span>
+        {/* Panel-header tooltip per CLAUDE.md §4 — teaches a first-time
+            teacher what this whole panel is FOR, not just what it's
+            named. The styled <Tooltip> primitive paints the black-
+            backdrop bubble so it matches every other shell tooltip. */}
+        <Tooltip
+          content="Narrow what you see across every view by subject, unit, status, or standard. Lessons that don't match are hidden — change here, the whole planner follows."
+          side="right"
+        >
+          <span
+            className={styles.headerTitle}
+            title="Narrow what you see across every view by subject, unit, status, or standard. Lessons that don't match are hidden — change here, the whole planner follows."
+          >
+            Filters
+          </span>
+        </Tooltip>
         <div className={styles.headerActions}>
           <Tooltip
             content="Open your settings — curriculum label, school year, school week, holidays, theme, and more."
@@ -226,20 +240,27 @@ export function LeftFilterPanel(): ReactNode {
               href="/settings"
               className={styles.settingsLink}
               aria-label="Settings"
+              title="Open your settings — curriculum label, school year, school week, holidays, theme, and more."
             >
               <SettingsGearIcon />
               <span className={styles.settingsLabel}>Settings</span>
             </Link>
           </Tooltip>
           {hasActiveFilters && (
-            <button
-              type="button"
-              className={styles.clearBtn}
-              onClick={resetFilters}
-              aria-label="Clear all filters"
+            <Tooltip
+              content="Reset every filter — show every lesson on every subject again"
+              side="bottom"
             >
-              Clear all
-            </button>
+              <button
+                type="button"
+                className={styles.clearBtn}
+                onClick={resetFilters}
+                aria-label="Clear all filters"
+                title="Reset every filter — show every lesson on every subject again"
+              >
+                Clear all
+              </button>
+            </Tooltip>
           )}
         </div>
       </div>
@@ -248,7 +269,17 @@ export function LeftFilterPanel(): ReactNode {
       <div className={styles.body}>
         {/* ── 1. Subject filter ──────────────────────────────────────────── */}
         <section className={styles.section}>
-          <p className={styles.sectionLabel}>Subject</p>
+          <Tooltip
+            content="Pick one or more subjects to focus on — Math, Reading, Writing, Grammar, Spelling, UFLI, Explorers, SEL. Others hide across every view."
+            side="right"
+          >
+            <p
+              className={styles.sectionLabel}
+              title="Pick one or more subjects to focus on — Math, Reading, Writing, Grammar, Spelling, UFLI, Explorers, SEL. Others hide across every view."
+            >
+              Subject
+            </p>
+          </Tooltip>
           <div className={styles.chips}>
             {SUBJECTS.map((subj) => {
               const active = isSubjectActive(subj.id);
@@ -285,7 +316,17 @@ export function LeftFilterPanel(): ReactNode {
 
         {/* ── 2. Unit filter ─────────────────────────────────────────────── */}
         <section className={styles.section}>
-          <p className={styles.sectionLabel}>Unit</p>
+          <Tooltip
+            content="Filter to a specific unit (e.g. Place Value, Realistic Fiction). The week-span chip on the right shows when that unit runs."
+            side="right"
+          >
+            <p
+              className={styles.sectionLabel}
+              title="Filter to a specific unit (e.g. Place Value, Realistic Fiction). The week-span chip on the right shows when that unit runs."
+            >
+              Unit
+            </p>
+          </Tooltip>
           <div className={styles.unitList}>
             {allUnits.map((unit) => {
               const active = isUnitActive(unit.id);
@@ -331,7 +372,17 @@ export function LeftFilterPanel(): ReactNode {
 
         {/* ── 3. Completion status filter ────────────────────────────────── */}
         <section className={styles.section}>
-          <p className={styles.sectionLabel}>Status</p>
+          <Tooltip
+            content="Show only lessons in a given state — Not done, Done, Partial, Carried over, or Skipped. Useful for catching up on what's left."
+            side="right"
+          >
+            <p
+              className={styles.sectionLabel}
+              title="Show only lessons in a given state — Not done, Done, Partial, Carried over, or Skipped. Useful for catching up on what's left."
+            >
+              Status
+            </p>
+          </Tooltip>
           <div className={styles.chips}>
             {ALL_STATUSES.map((s) => {
               const active = isStatusActive(s);
@@ -359,7 +410,17 @@ export function LeftFilterPanel(): ReactNode {
             (standardCodes). On all other routes it uses the global curated
             list. An empty list renders the section as a no-op placeholder. */}
         <section className={styles.section}>
-          <p className={styles.sectionLabel}>Standards</p>
+          <Tooltip
+            content="Filter to lessons that cover a specific standard (CCSS code). On a subject page the list narrows to that subject's standards only."
+            side="right"
+          >
+            <p
+              className={styles.sectionLabel}
+              title="Filter to lessons that cover a specific standard (CCSS code). On a subject page the list narrows to that subject's standards only."
+            >
+              Standards
+            </p>
+          </Tooltip>
           <div className={styles.standardList}>
             {standardCodes.length === 0 && (
               <p
@@ -399,42 +460,54 @@ export function LeftFilterPanel(): ReactNode {
           </div>
         </section>
 
-        {/* ── 5. Holiday / Ramadan toggle ────────────────────────────────── */}
-        <div className={styles.switchRow}>
-          {/* Visually-hidden real checkbox drives keyboard / screen-reader. */}
-          <label style={{ display: "contents", cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={filters.showHolidays}
-              onChange={handleHolidayToggle}
-              className={styles.switchInput}
-              aria-label="Show holiday and Ramadan markers"
-            />
-            <span className={styles.switchLabel}>
-              Holidays / Ramadan
-              <span className={styles.switchSub}>
-                Show markers in calendar views
+        {/* ── 5. Holiday / Ramadan toggle ──────────────────────────────────
+            Wrap in the styled <Tooltip> so the explanation appears on
+            hover — same black-bubble treatment as the rest of the panel.
+            The inner <label> keeps display:contents so its layout role
+            (forwarding clicks to the checkbox) is unchanged. */}
+        <Tooltip
+          content="Show or hide holiday and Ramadan markers across calendar views. Off = a clean grid with only instructional days."
+          side="right"
+        >
+          <div
+            className={styles.switchRow}
+            title="Show or hide holiday and Ramadan markers across calendar views. Off = a clean grid with only instructional days."
+          >
+            {/* Visually-hidden real checkbox drives keyboard / screen-reader. */}
+            <label style={{ display: "contents", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={filters.showHolidays}
+                onChange={handleHolidayToggle}
+                className={styles.switchInput}
+                aria-label="Show holiday and Ramadan markers"
+              />
+              <span className={styles.switchLabel}>
+                Holidays / Ramadan
+                <span className={styles.switchSub}>
+                  Show markers in calendar views
+                </span>
               </span>
-            </span>
-            {/* Custom toggle track + thumb */}
-            <span
-              className={
-                filters.showHolidays
-                  ? `${styles.switchTrack} ${styles.switchTrackOn}`
-                  : styles.switchTrack
-              }
-              aria-hidden
-            >
+              {/* Custom toggle track + thumb */}
               <span
                 className={
                   filters.showHolidays
-                    ? `${styles.switchThumb} ${styles.switchThumbOn}`
-                    : styles.switchThumb
+                    ? `${styles.switchTrack} ${styles.switchTrackOn}`
+                    : styles.switchTrack
                 }
-              />
-            </span>
-          </label>
-        </div>
+                aria-hidden
+              >
+                <span
+                  className={
+                    filters.showHolidays
+                      ? `${styles.switchThumb} ${styles.switchThumbOn}`
+                      : styles.switchThumb
+                  }
+                />
+              </span>
+            </label>
+          </div>
+        </Tooltip>
       </div>
     </aside>
   );
