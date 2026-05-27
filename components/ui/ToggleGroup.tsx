@@ -47,6 +47,15 @@ export interface ToggleOption<T extends string = string> {
    * the explanation shows on hover (desktop) AND long-press (touch).
    */
   title?: string;
+  /**
+   * Optional per-option dismissible tooltip id (W2-B3). When supplied the
+   * wrapping <Tooltip> opts in to dismissibility — the bubble carries a
+   * "Turn off these tips" mini-link, and once dismissed the tooltip is
+   * suppressed by `lib/tooltip-dismissal`. Omit for always-on tooltips
+   * (the legacy default). High-consequence options should set the group's
+   * `tooltipRequired` instead.
+   */
+  tooltipId?: string;
 }
 
 export interface ToggleGroupProps<T extends string = string> {
@@ -170,6 +179,7 @@ export function ToggleGroup<T extends string = string>({
             content={option.title}
             side="bottom"
             required={tooltipRequired}
+            tooltipId={option.tooltipId}
           >
             {buttonEl}
           </Tooltip>

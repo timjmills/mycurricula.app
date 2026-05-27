@@ -18,6 +18,29 @@
 //     hiding them recovers ~210px that would otherwise trigger overflow).
 //   • The right cluster (to-do, comments, profile, sign-out) has a minimum
 //     padding-right:16px so the last control is never flush with the edge.
+//
+// W3-C1 chrome-slimming (2026-05-27 audit) — minimum-viable scope shipped.
+//   The audit asked us to slim the bar to ONLY: "Where am I? Personal/Team?
+//   Where next?" + Help + Profile + Search. Two ambient/secondary controls
+//   already collapse below the desktop tier:
+//     • Catch-up flame — folds into the More menu at ≤1280 (the entire
+//       .rightClusterFull hides there); the More menu re-renders the
+//       <CatchupFlameButton /> in its own panel, so the affordance stays
+//       reachable on tablet. At ≤540 the flame's module CSS hides it
+//       entirely (count remains visible on the in-grid CatchupWeekBar).
+//     • Clock chip — hides at ≤900 via Clock.module.css (it's ambient
+//       context, not navigation). Not duplicated into the More menu by
+//       design: the OS clock + the in-grid week header carry the same
+//       information on phone/tablet.
+//
+//   TODO (next chrome-slim wave): the Grid/List/Schedule toggle below
+//   currently lives in the top bar at >1024px. The canonical W3-C1 plan
+//   wants it relocated INTO each route's local toolbar (Weekly + Daily
+//   own a Grid/List chooser; Schedule is the route itself). That move is
+//   a multi-file refactor — Weekly + Daily shells each gain a header
+//   slot, the toggle migrates with its viewMode wiring, the .module.css
+//   collapse rules drop. Out of scope for this lane (Wave 3 file-disjoint
+//   constraint). Track as W4 chrome-relocation when Wave 4 opens.
 // TOPBAR-004: the panel-collapse toggle calls useAppState().toggleLeftPanel —
 //   confirmed wired (see onClick below).
 // TOPBAR-003/006: search → setSearch ✓; view-mode pill → setViewMode ✓.
@@ -26,12 +49,13 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAppState, type CurrentUser } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip, ToggleGroup } from "@/components/ui";
 import { CatchupFlameButton } from "./catchup-flame-button";
 import { Clock } from "./Clock";
+import { SHORTCUTS_TOGGLE_EVENT } from "./global-shortcuts";
 import { TeamModeIntro } from "./team-mode-intro";
 import { TopBarMoreMenu } from "./top-bar-more-menu";
 import styles from "./top-bar.module.css";
@@ -125,6 +149,7 @@ export function TopBar(): ReactNode {
   } = usePlanner();
 
   const pathname = usePathname();
+  const router = useRouter();
 
   // TOPBAR-001 — collapsible search state.
   // The search field is hidden at rest (icon-only button shows instead).
@@ -518,19 +543,37 @@ export function TopBar(): ReactNode {
 
       <div className={styles.divider} aria-hidden="true" />
 
-      {/* ── View-mode pill (Grid | List) ─────────────────────────────
-          Migrated to the ToggleGroup primitive (prominent variant, sm size).
-          BUILD_STANDARD §7 designates Grid/List as a primary mode switch →
-          prominent. Hidden below 1024px by .viewModePillWrap in the CSS
-          (mirrors the old .viewModePill display:none rule).
+      {/* ── Layout-mode pill (Grid | List | Schedule) ────────────────
+          W3-C2 (2026-05-27 audit): a third Schedule option lives alongside
+          Grid + List so the timetable surface is discoverable next to the
+          two lesson-layout choices. The GlobalRail Schedule icon (added
+          in Decision #6) stays in place — this is the second, more-obvious
+          entry point for a teacher who is already looking at Weekly.
 
-          Schedule mode is NOT a value here — it is controlled by inline
-          pills inside each view's own chrome (Weekly + Daily). The
-          dedicated `/schedule` route renders the Schedule day-pane
-          directly. Keeping this toggle 2-way preserves the top-bar
-          collapse cascade unchanged. */}
+          ── Routing approach ───────────────────────────────────────────
+          Schedule is NOT widened into app-state.ViewMode. Adding a third
+          "schedule" branch to ViewMode would force every callsite of
+          useAppState().viewMode (Weekly/Daily renderers, persistence,
+          palette logic) to handle a value it never used to see, and the
+          Schedule surface already has its own route at /schedule. The
+          cleaner wiring is route-derived:
+            • `value` reflects pathname when on `/schedule`, otherwise
+              the existing viewMode. The toggle paints "Schedule" active
+              when the user is on /schedule regardless of the stored
+              Grid/List preference.
+            • `onChange` routes: Schedule → router.push("/schedule");
+              Grid/List → setViewMode(value) (no navigation when already
+              on a planner route). This preserves Grid/List memory across
+              Schedule round-trips: a teacher in Grid mode who clicks
+              Schedule and then clicks Grid lands back in Grid.
+            • If the teacher is on /schedule and picks Grid/List we also
+              navigate back to /weekly so the layout change is visible.
+
+          Hidden below 1024px by .viewModePillWrap in the CSS — same
+          collapse-cascade slot as before. Schedule remains reachable on
+          phone/tablet via the GlobalRail icon and the More menu nav. */}
       <div className={styles.viewModePillWrap}>
-        <ToggleGroup
+        <ToggleGroup<"grid" | "list" | "schedule">
           options={[
             {
               value: "grid",
@@ -544,9 +587,29 @@ export function TopBar(): ReactNode {
               title:
                 "List layout — a single scrollable stream of lessons grouped by day",
             },
+            {
+              value: "schedule",
+              label: "Schedule",
+              title:
+                "Open the daily timetable — see the time blocks for each subject",
+              // W3-C2: per audit, the new Schedule option is dismissible
+              // (it sits next to two long-established controls and isn't
+              // high-consequence). The tooltipId scopes the dismissal so
+              // the existing Grid/List tooltips stay unaffected.
+              tooltipId: "weekly-schedule-toggle",
+            },
           ]}
-          value={viewMode}
-          onChange={setViewMode}
+          value={pathname === "/schedule" ? "schedule" : viewMode}
+          onChange={(next) => {
+            if (next === "schedule") {
+              router.push("/schedule");
+              return;
+            }
+            setViewMode(next);
+            if (pathname === "/schedule") {
+              router.push("/weekly");
+            }
+          }}
           variant="prominent"
           size="sm"
           ariaLabel="Layout mode"
@@ -709,6 +772,41 @@ export function TopBar(): ReactNode {
           activePath={pathname}
         />
       </div>
+
+      {/* ── Help "?" button (W3-C8) ─────────────────────────────────
+          Visible discoverable trigger for the keyboard-shortcuts overlay,
+          which is now also the route-aware Help surface (shortcuts +
+          per-route "About this view" copy + replay-onboarding link). Per
+          Decision #10 we EXTEND the existing overlay rather than build a
+          new HelpDrawer.
+
+          Both this button and the `?` keyboard shortcut must drive the
+          SAME overlay state — they cannot be allowed to diverge. The
+          button dispatches a CustomEvent on window which GlobalShortcuts
+          listens for; the keyboard path stays untouched. One state, two
+          entry points.
+
+          Tooltip: Help is the safety net, so per the brief we mark it
+          `required` via tooltipId="help-button" + a `required` flag on
+          the Tooltip wrapper. The required flag bypasses the dismissible
+          mini-link AND the per-id dismissal — a teacher cannot turn off
+          this tooltip even if they've dismissed others. */}
+      <Tooltip
+        content="Show keyboard shortcuts and a quick guide to this view (or press ?)"
+        side="bottom"
+        tooltipId="help-button"
+        required
+      >
+        <Button
+          variant="icon"
+          iconAriaLabel="Open help and keyboard shortcuts"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent(SHORTCUTS_TOGGLE_EVENT));
+          }}
+        >
+          <HelpIcon />
+        </Button>
+      </Tooltip>
 
       {/* ── Profile avatar → settings ─────────────────────────────── */}
       {/* Keyed on the photo URL so ProfileAvatar's load-error state resets
@@ -899,6 +997,28 @@ function RedoIcon(): ReactNode {
     >
       <path d="M21 7v6h-6" />
       <path d="M21 13C18.6 7.4 11.7 4.5 6 7c-3.4 1.5-5.5 4.7-5.5 8.2" />
+    </svg>
+  );
+}
+
+// Question-mark in a circle — the canonical Help glyph. Drawn in the same
+// 18×18 vocabulary as the other top-bar icons so it reads as a sibling.
+function HelpIcon(): ReactNode {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.5 9a2.5 2.5 0 1 1 4.5 1.5c-.7.5-1.5 1-1.5 2.5" />
+      <line x1="12" y1="17" x2="12" y2="17.5" />
     </svg>
   );
 }

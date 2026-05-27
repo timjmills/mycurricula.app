@@ -15,7 +15,10 @@
 // Token rules: var(--token) only — no hard-coded hex or px font sizes.
 
 import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
+import { helpForPathname } from "@/lib/help-copy";
 import styles from "./shortcuts-overlay.module.css";
 
 // ── Shortcut table data ────────────────────────────────────────────────────────
@@ -92,6 +95,11 @@ export function ShortcutsOverlay({
   // button element inside this wrapper span on mount.
   const closeBtnWrapRef = useRef<HTMLSpanElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  // W3-C8: route-aware Help section. The pathname is read on every render
+  // so the overlay reflects the current route; `helpForPathname` returns
+  // null for routes outside the registry — we simply skip the section.
+  const pathname = usePathname();
+  const routeHelp = helpForPathname(pathname);
 
   // ── Open / close effects ─────────────────────────────────────────────────
 
@@ -210,6 +218,47 @@ export function ShortcutsOverlay({
               </table>
             </section>
           ))}
+
+          {/* W3-C8: route-aware Help section. Appended after the keyboard
+              shortcuts so the table stays the primary content (this
+              overlay's original job) and the route help reads as "and
+              here's what THIS surface does". Skipped when the current
+              pathname has no registered help copy. */}
+          {routeHelp && (
+            <section className={styles.group}>
+              <h3 className={styles.groupHeading}>{routeHelp.title}</h3>
+              <ul className={styles.helpList}>
+                {routeHelp.bullets.map((bullet) => (
+                  <li key={bullet} className={styles.helpItem}>
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* W3-C8: Replay onboarding tour CTA. The /onboarding wizard is
+              resumable per lib/onboarding-state.tsx (state persisted to
+              localStorage), so this link returns the teacher to wherever
+              they left off — or to the start if they completed it before.
+              Closing the overlay first lets the route transition register
+              focus restoration cleanly. */}
+          <section className={styles.group}>
+            <h3 className={styles.groupHeading}>New here?</h3>
+            <p className={styles.replayCopy}>
+              Walk through the first-run tour again — schedule, subjects,
+              standards, and the team setup. Your existing answers are
+              preserved.
+            </p>
+            <Link
+              href="/onboarding"
+              className={styles.replayLink}
+              onClick={onClose}
+            >
+              Replay the onboarding tour
+              <ReplayArrowIcon />
+            </Link>
+          </section>
         </div>
 
         {/* Footer hint */}
@@ -240,6 +289,26 @@ function CloseIcon() {
         strokeWidth="1.6"
         strokeLinecap="round"
       />
+    </svg>
+  );
+}
+
+// Small chevron-arrow shown inside the "Replay the onboarding tour" link.
+// Inherits currentColor so it tints with the link state (hover/focus).
+function ReplayArrowIcon(): ReactNode {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="9 18 15 12 9 6" />
     </svg>
   );
 }
