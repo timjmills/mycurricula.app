@@ -16,13 +16,20 @@
 // it only renders the canonical site-wide button set today.
 //
 // ── Context-gating rule ──────────────────────────────────────────────────
-// Some buttons make sense everywhere (Settings gear, To-dos toggle).
-// Others only make sense on a specific route — opening the Schedule side-
-// panel from /weekly or /year would be meaningless, because there's no
-// "current day" the panel can anchor to in those surfaces. We filter by
-// `usePathname()`:
+// Some buttons make sense everywhere (Settings gear, To-dos toggle,
+// Schedule trigger). Others only make sense on a specific route. We
+// filter by `usePathname()`:
 //
 //   GLOBAL (every planner route):
+//     • Schedule trigger — opens the SchedulePanel side-drawer. The
+//                          drawer's day-strip switches `selectedDay` so
+//                          it has a coherent meaning on every surface
+//                          ("show today's blocks while I work in the
+//                          multi-day view"). The actual <SchedulePanel>
+//                          mount lives in the planner shell layout so
+//                          the panel exists once per page; this trigger
+//                          only flips the shared `scheduleOpen` flag
+//                          (lib/app-state). Lane DD — audit F#8.
 //     • To-dos toggle    — toggles the planner-wide to-do panel
 //     • Chat (comments)  — on /daily wires to the comments slide-out;
 //                          on other routes a coming-soon affordance (the
@@ -36,7 +43,6 @@
 //
 //   /daily ONLY (context-specific):
 //     • Today            — visually-active marker for the daily surface
-//     • Schedule trigger — opens the SchedulePanel side-drawer for today
 //
 // To add a new globally-relevant button: just add a <li> in the JSX below.
 // To add a new context-specific button: gate it with `if (isOnDaily)` (or
@@ -51,15 +57,17 @@
 //   • Onboarding tooltips on every button (CLAUDE.md §4).
 //   • Reduced motion respected by the consumed form components.
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip } from "@/components/ui";
 // SchedulePanel — the right-side drawer that exposes today's timetable.
-// Only mounted when the rail is on /daily; on other routes the trigger
-// (and the panel state) doesn't exist.
+// Lane DD mounts it once at the rail level so it's reachable from every
+// planner route. The rail is itself mounted by the planner shell layout,
+// so the panel ships everywhere the rail ships (audit F#8). State comes
+// from useAppState so the trigger here and the panel share one toggle.
 import { SchedulePanel } from "@/components/schedule";
 import styles from "./GlobalRail.module.css";
 
@@ -251,6 +259,12 @@ export function GlobalRail(): ReactNode {
     toggleTodoPanel,
     commentsPanelOpen,
     toggleCommentsPanel,
+    // Schedule drawer state lives on app-state so the trigger here and the
+    // <SchedulePanel> mount below share one toggle across every planner
+    // route. See lib/app-state.tsx — scheduleOpen docstring.
+    scheduleOpen,
+    toggleSchedulePanel,
+    closeSchedulePanel,
   } = useAppState();
   // Lessons feed the unread-comments badge on the Chat button — mirrors
   // the top-bar's existing pattern so the two surfaces stay in lockstep.
@@ -259,15 +273,10 @@ export function GlobalRail(): ReactNode {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Context filter — the Today and Schedule buttons only make sense on
-  // the /daily surface, so we gate them here. Other routes get the
-  // global subset (To-dos, Year/Voice coming-soon, Settings).
+  // Context filter — the Today button only makes sense on the /daily
+  // surface, so we gate it here. Other rail buttons (Schedule, To-dos,
+  // Chat, Resources, Year/Voice coming-soon, Settings) render globally.
   const isOnDaily = pathname?.startsWith("/daily") ?? false;
-
-  // Local state for the Schedule side-panel toggle. Only relevant on
-  // /daily, but we always declare it (hooks must be unconditional).
-  // On other routes the panel + trigger simply never render.
-  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   // Choose an aria-label that reflects which route owns the rail. The
   // visual treatment is the same on every route; the label just helps
@@ -301,30 +310,30 @@ export function GlobalRail(): ReactNode {
           </li>
         )}
 
-        {/* Schedule — only on /daily. Toggles the SchedulePanel side-
-            drawer for today's timetable. A future wave will surface
-            an equivalent from Weekly/Subject/etc., but today the
-            trigger + panel are scoped to the daily context. */}
-        {isOnDaily && (
-          <li className={styles.item} data-context="daily">
-            <Tooltip
-              content="Open the schedule side panel — see your day's timetable while you work in any view"
-              side="right"
+        {/* Schedule — global. Toggles the planner-wide SchedulePanel
+            side-drawer (mounted by the shell layout) showing today's
+            time blocks. Lane DD un-gated this from /daily-only — the
+            drawer's day-strip means the schedule has a coherent meaning
+            on /weekly, /year, /catch-up, /subject too (audit F#8). The
+            tooltip follows Lane Z's onboarding voice (F#16). */}
+        <li className={styles.item} data-context="global">
+          <Tooltip
+            content="Schedule — today's time blocks, side-panel while you work"
+            side="right"
+          >
+            <Button
+              variant="icon"
+              iconAriaLabel={
+                scheduleOpen ? "Close schedule panel" : "Open schedule panel"
+              }
+              aria-pressed={scheduleOpen}
+              className={`${styles.button} ${scheduleOpen ? styles.buttonActive : ""}`}
+              onClick={toggleSchedulePanel}
             >
-              <Button
-                variant="icon"
-                iconAriaLabel={
-                  scheduleOpen ? "Close schedule panel" : "Open schedule panel"
-                }
-                aria-pressed={scheduleOpen}
-                className={`${styles.button} ${scheduleOpen ? styles.buttonActive : ""}`}
-                onClick={() => setScheduleOpen((o) => !o)}
-              >
-                <ScheduleIcon />
-              </Button>
-            </Tooltip>
-          </li>
-        )}
+              <ScheduleIcon />
+            </Button>
+          </Tooltip>
+        </li>
 
         {/* To-dos — global. Wired to the planner-wide to-do panel toggle. */}
         <li className={styles.item} data-context="global">
@@ -481,16 +490,16 @@ export function GlobalRail(): ReactNode {
         </li>
       </ul>
 
-      {/* ── Schedule side-panel ────────────────────────────────────────
-            Only mounted on /daily because the trigger that opens it is
-            also gated to /daily. The panel handles its own positioning
-            and portal, so we mount it inline at the bottom of the rail. */}
-      {isOnDaily && (
-        <SchedulePanel
-          open={scheduleOpen}
-          onClose={() => setScheduleOpen(false)}
-        />
-      )}
+      {/* ── Schedule side-panel — global mount (Lane DD) ───────────────
+            One mount, here at the rail level. The rail itself is mounted
+            by the planner shell layout, so the panel exists exactly once
+            per page and is reachable from every planner route. The
+            trigger above flips the shared `scheduleOpen` flag via
+            `toggleSchedulePanel` from useAppState (lib/app-state.tsx)
+            so the icon and the drawer never desync. The panel uses
+            createPortal internally, so it escapes the rail's positioning
+            context and renders against document.body. */}
+      <SchedulePanel open={scheduleOpen} onClose={closeSchedulePanel} />
 
       {/* ── Bottom-pinned settings gear ───────────────────────────────
             Global — renders on every planner route. position:sticky +

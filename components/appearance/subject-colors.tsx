@@ -225,6 +225,13 @@ export function SubjectColors({
                 disabled={locked}
                 aria-expanded={editing}
                 onClick={() => setEditingSubject(editing ? null : subject.id)}
+                tooltip={
+                  locked
+                    ? `${subject.name}'s color is locked by your team lead in the Core Curriculum — every teacher on your grade-level team sees the same hue.`
+                    : editing
+                      ? `Close the swatch picker for ${subject.name} and keep the current color.`
+                      : `Pick a different color swatch for ${subject.name} — only YOU see this change; team colors stay as the Core Curriculum sets them.`
+                }
               >
                 {locked ? "Locked" : editing ? "Done" : "Change"}
               </Button>

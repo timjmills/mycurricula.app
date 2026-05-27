@@ -141,13 +141,18 @@ export default function YearPrintPage(): ReactNode {
     <div data-print-view className={styles.page}>
       {/* ── Screen-only action bar ────────────────────────────────────── */}
       <div className={styles.actions}>
-        <Link href="/year" className={styles.backLink}>
+        <Link
+          href="/year"
+          className={styles.backLink}
+          title="Leave the print preview and go back to the interactive Year timeline — your year plan stays exactly as it was."
+        >
           ← Back to Year
         </Link>
         <button
           type="button"
           className={styles.printBtn}
           onClick={() => window.print()}
+          title="Open your browser's print dialog — choose Print to send to a printer, or Save as PDF to keep a copy of the year overview."
         >
           Print / Save as PDF
         </button>

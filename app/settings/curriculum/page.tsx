@@ -643,7 +643,7 @@ function SchoolWeekSection(): ReactNode {
   );
 }
 
-// ── Section 4 — Holidays ───────────────────────────────────────────────────
+// ── Section 5 — Holidays ───────────────────────────────────────────────────
 // Add / list / remove editor for the team's non-instruction days.
 //   • Add form  — date input + name input + Add button. Both fields are
 //                 required to submit. The form clears after a successful

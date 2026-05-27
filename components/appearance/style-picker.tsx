@@ -18,21 +18,31 @@ interface StyleOption {
 }
 
 // Descriptions lifted verbatim from artboard A2's style picker.
-const STYLE_OPTIONS: readonly StyleOption[] = [
+interface StyleOptionFull extends StyleOption {
+  tooltip: string;
+}
+
+const STYLE_OPTIONS: readonly StyleOptionFull[] = [
   {
     id: "quiet",
     label: "Quiet",
     desc: "Minimal. White cards, thin subject stripe. Best for long workdays.",
+    tooltip:
+      "Switch every card in your planner to the Quiet style — white background with a thin colored stripe. Easiest on the eyes during a full school day.",
   },
   {
     id: "calm",
     label: "Mid-Calm",
     desc: "White cards with a friendly subject monogram tile. Warmer.",
+    tooltip:
+      "Switch every card to the Mid-Calm style — white background with a colored subject monogram tile. A friendlier middle-ground between Quiet and Mid-Vivid.",
   },
   {
     id: "vivid",
     label: "Mid-Vivid",
     desc: "Subject tint fills the card. Colour reads at a glance.",
+    tooltip:
+      "Switch every card to the Mid-Vivid style — the subject's color tints the whole card, so you can identify lessons at a glance. The app default.",
   },
 ] as const;
 
@@ -64,6 +74,7 @@ export function StylePicker(): ReactNode {
               role="radio"
               aria-checked={selected}
               onClick={() => setStyle(opt.id)}
+              title={opt.tooltip}
               className="cp-focusable"
               style={{
                 display: "flex",

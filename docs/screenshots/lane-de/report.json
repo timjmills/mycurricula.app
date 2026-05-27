@@ -1,0 +1,26 @@
+[
+  {
+    "route": "year-print",
+    "total": 0,
+    "withTitle": 0,
+    "coverage": 100,
+    "samples": [],
+    "missing": []
+  },
+  {
+    "route": "catch-up",
+    "total": 0,
+    "withTitle": 0,
+    "coverage": 100,
+    "samples": [],
+    "missing": []
+  },
+  {
+    "route": "settings-appearance",
+    "total": 0,
+    "withTitle": 0,
+    "coverage": 100,
+    "samples": [],
+    "missing": []
+  }
+]

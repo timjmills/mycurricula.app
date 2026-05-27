@@ -227,6 +227,22 @@ export interface AppStateValue {
   toggleCommentsPanel: () => void;
 
   /**
+   * The Schedule side-drawer (components/schedule/SchedulePanel). Lives on
+   * app-state rather than local-to-rail because the trigger sits in the
+   * GlobalRail (mounted by the planner shell) while the panel is mounted
+   * by the same shell — two siblings that need to share open/close. Same
+   * cross-component ownership rationale as todoPanelOpen / commentsPanelOpen.
+   *
+   * NOT mutually exclusive with the todo/comments drawers — the schedule
+   * is a left-side, top-anchored peek at "what's next" rather than a
+   * right-side lesson-scoped panel, so a teacher can have it open while
+   * also looking at to-dos or comments.
+   */
+  scheduleOpen: boolean;
+  toggleSchedulePanel: () => void;
+  closeSchedulePanel: () => void;
+
+  /**
    * The lesson whose detail the contextual right panel shows. `null` means
    * the panel is closed (or showing a non-lesson state).
    */
@@ -278,6 +294,10 @@ export function AppStateProvider({
   const [leftPanelOpen, setLeftPanelOpen] = useState<boolean>(true);
   const [todoPanelOpen, setTodoPanelOpen] = useState<boolean>(false);
   const [commentsPanelOpen, setCommentsPanelOpen] = useState<boolean>(false);
+  // Schedule side-drawer open state. Cross-component (GlobalRail trigger +
+  // SchedulePanel mount both live in the shell layout), so it lives here
+  // alongside the other planner-wide panel toggles.
+  const [scheduleOpen, setScheduleOpen] = useState<boolean>(false);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [search, setSearch] = useState<string>("");
 
@@ -374,6 +394,16 @@ export function AppStateProvider({
     setCommentsPanelOpen((v) => !v);
     setTodoPanelOpen(false);
   }, []);
+  // Schedule drawer toggle. Intentionally does NOT close the todo/comments
+  // drawers — see the scheduleOpen docstring on AppStateValue: the schedule
+  // is a different anchor (left rail trigger vs right rail) so it can
+  // coexist with the right-side panels.
+  const toggleSchedulePanel = useCallback(() => {
+    setScheduleOpen((v) => !v);
+  }, []);
+  const closeSchedulePanel = useCallback(() => {
+    setScheduleOpen(false);
+  }, []);
 
   const value = useMemo<AppStateValue>(
     () => ({
@@ -396,6 +426,9 @@ export function AppStateProvider({
       toggleTodoPanel,
       commentsPanelOpen,
       toggleCommentsPanel,
+      scheduleOpen,
+      toggleSchedulePanel,
+      closeSchedulePanel,
       selectedLessonId,
       setSelectedLessonId,
       search,
@@ -418,6 +451,9 @@ export function AppStateProvider({
       toggleTodoPanel,
       commentsPanelOpen,
       toggleCommentsPanel,
+      scheduleOpen,
+      toggleSchedulePanel,
+      closeSchedulePanel,
       selectedLessonId,
       search,
       currentUser,

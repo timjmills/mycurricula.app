@@ -22,18 +22,26 @@ interface PaletteOption {
 }
 
 // First six swatches of the pool, one row per variant — as in artboard A2.
-const PALETTE_OPTIONS: readonly PaletteOption[] = [
+interface PaletteOptionFull extends PaletteOption {
+  tooltip: string;
+}
+
+const PALETTE_OPTIONS: readonly PaletteOptionFull[] = [
   {
     id: "normal",
     label: "Normal",
     desc: "Confident, slightly darker. Like a school workbook.",
     swatches: PALETTE_20.slice(0, 6).map((s) => s.normal),
+    tooltip:
+      "Switch your palette to Normal — slightly muted, workbook-style colors. The hue stays exactly the same across your team; only YOUR saturation changes.",
   },
   {
     id: "highlight",
     label: "Highlight",
     desc: "Highlighter-marker bright. Electric, distinct.",
     swatches: PALETTE_20.slice(0, 6).map((s) => s.highlight),
+    tooltip:
+      "Switch your palette to Highlight — brighter, marker-style colors that pop on the grid. The hue stays the same across your team; only YOUR saturation changes.",
   },
 ] as const;
 
@@ -65,6 +73,7 @@ export function PaletteToggle(): ReactNode {
               role="radio"
               aria-checked={selected}
               onClick={() => setPalette(opt.id)}
+              title={opt.tooltip}
               className="cp-focusable"
               style={{
                 display: "flex",
