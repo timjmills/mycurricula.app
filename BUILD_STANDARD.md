@@ -252,13 +252,13 @@ Three viewport tiers. Every page works at every tier.
 
 ### Top-bar collapse cascade (do not regress)
 
-| Breakpoint | Behavior                                  |
-| ---------- | ----------------------------------------- | ------------------------ |
-| ≤ 1280px   | "Soon" view tabs hidden                   |
-| ≤ 1024px   | Save indicator + view-mode pill hidden    |
-| ≤ 768px    | Week label + undo/redo hidden             |
-| ≤ 540px    | View-tab + edit-toggle padding compressed |
-| ≤ 480px    | Master/Personal labels become "P          | M"; bar padding tightens |
+| Breakpoint | Behavior                                                       |
+| ---------- | -------------------------------------------------------------- |
+| ≤ 1280px   | "Soon" view tabs hidden                                        |
+| ≤ 1024px   | Save indicator + view-mode pill hidden                         |
+| ≤ 768px    | Week label + undo/redo hidden                                  |
+| ≤ 540px    | View-tab + edit-toggle padding compressed                      |
+| ≤ 480px    | Master/Personal labels become `P \| M`; bar padding tightens   |
 
 ### Verification
 
