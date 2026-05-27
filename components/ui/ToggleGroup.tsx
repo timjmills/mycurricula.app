@@ -58,6 +58,14 @@ export interface ToggleGroupProps<T extends string = string> {
   /** Required — labels the radiogroup for screen readers. */
   ariaLabel: string;
   className?: string;
+  /**
+   * W2-B3 — when true, every per-option onboarding tooltip is marked
+   * `required` so it ignores the dismissible-tooltip global off switch
+   * and the per-id dismissal set. Use for high-consequence segmented
+   * controls per CLAUDE.md §4 — namely the Personal / Team Curriculum
+   * toggle. Default false.
+   */
+  tooltipRequired?: boolean;
 }
 
 // ── ToggleGroup ─────────────────────────────────────────────────────────────
@@ -70,6 +78,7 @@ export function ToggleGroup<T extends string = string>({
   variant = "subtle",
   ariaLabel,
   className,
+  tooltipRequired = false,
 }: ToggleGroupProps<T>): ReactNode {
   const groupRef = useRef<HTMLDivElement>(null);
 
@@ -156,7 +165,12 @@ export function ToggleGroup<T extends string = string>({
         );
 
         return option.title ? (
-          <Tooltip key={option.value} content={option.title} side="bottom">
+          <Tooltip
+            key={option.value}
+            content={option.title}
+            side="bottom"
+            required={tooltipRequired}
+          >
             {buttonEl}
           </Tooltip>
         ) : (

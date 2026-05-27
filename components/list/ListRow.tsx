@@ -128,7 +128,7 @@ function MoveArrow({ moved }: { moved: Lesson["moved"] }): ReactNode {
     moved === "across-weeks" ? "Moved across weeks" : "Moved within the week";
   return (
     <Tooltip
-      content={`${label} — your personal copy was relocated from the team's Master.`}
+      content={`${label} — your personal copy was relocated from the Team Curriculum.`}
       side="top"
     >
       <span
@@ -314,7 +314,7 @@ export function ListRow({
           content={
             isDone
               ? "Mark this lesson not done — useful if you completed it by mistake or need to re-teach."
-              : "Mark this lesson done — completion is personal and never forks the team's Master copy."
+              : "Mark this lesson done — completion is personal and never forks the Team Curriculum copy."
           }
           side="left"
         >
@@ -326,7 +326,7 @@ export function ListRow({
             title={
               isDone
                 ? "Mark this lesson not done — useful if you completed it by mistake or need to re-teach"
-                : "Mark this lesson done — completion is personal and never forks the team's Master copy"
+                : "Mark this lesson done — completion is personal and never forks the Team Curriculum copy"
             }
             className={`${styles.checkbox}${isDone ? ` ${styles.checked}` : ""}`}
             onClick={handleCheckboxClick}

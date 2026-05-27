@@ -71,6 +71,45 @@
   opacity: 1;
 }
 
+/* W2-B3 — when the bubble carries the "Turn off these tips" mini-link, the
+   bubble must accept pointer events so the user can move from the trigger
+   onto the bubble and click the link. Without this the base
+   `pointer-events: none` swallows the click. Used only on tooltips with a
+   tooltipId AND required !== true — every other bubble stays inert. */
+.tooltip.interactive {
+  pointer-events: auto;
+}
+
+/* W2-B3 — "Turn off these tips" mini-link inside the bubble. Visually
+   unobtrusive per the spec: small, secondary color, single line, no
+   button-y chrome. Lives on its own row under the main content with a
+   thin hairline separator so it reads as an afterthought, not a CTA. */
+.dismissLink {
+  display: block;
+  margin: 6px -4px -2px;
+  padding: 4px 4px 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.62);
+  font: inherit;
+  font-size: var(--t-11);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dismissLink:hover {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.dismissLink:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+
 /* Under prefers-reduced-motion skip the fade — show/hide instantly. */
 @media (prefers-reduced-motion: reduce) {
   .tooltip {

@@ -661,7 +661,7 @@ export function WeeklyLessonCard({
               ergonomics meet the minimum even at reduced chip height. */}
           {dragHandleProps && (
             <Tooltip
-              content="Drag to move this lesson to a different day or column — moves are personal unless you explicitly save them to the team's Master."
+              content="Drag to move this lesson to a different day or column — moves are personal unless you explicitly save them to the Team Curriculum."
               side="top"
             >
               <span
@@ -817,7 +817,7 @@ export function WeeklyLessonCard({
                       </span>
                     )}
                     <Tooltip
-                      content="Open the lesson menu — mark status, relocate, duplicate, save as template, save to Master, or archive"
+                      content="Open the lesson menu — mark status, relocate, duplicate, save as template, save to Team Curriculum, or archive"
                       side="top"
                     >
                       <Button
@@ -852,8 +852,8 @@ export function WeeklyLessonCard({
                     <Tooltip
                       content={
                         lesson.moved === "across-weeks"
-                          ? "This lesson was moved across weeks in your personal copy — the team's Master version still lives in the original slot."
-                          : "This lesson was moved within the week in your personal copy — the team's Master version still lives in the original slot."
+                          ? "This lesson was moved across weeks in your personal copy — the Team Curriculum version still lives in the original slot."
+                          : "This lesson was moved within the week in your personal copy — the Team Curriculum version still lives in the original slot."
                       }
                       side="top"
                     >
@@ -890,10 +890,10 @@ export function WeeklyLessonCard({
                     <Tooltip
                       content={
                         lesson.moved === "across-weeks"
-                          ? `Moved to another week by ${ME.name} · personally modified from Core Curriculum`
+                          ? `Moved to another week by ${ME.name} · personally modified from Team Curriculum`
                           : lesson.moved === "same-week"
-                            ? `Moved to ${WEEK_DAYS[lesson.day] ?? "another day"} by ${ME.name} · personally modified from Core Curriculum`
-                            : `Personally modified from the Core Curriculum by ${ME.name}`
+                            ? `Moved to ${WEEK_DAYS[lesson.day] ?? "another day"} by ${ME.name} · personally modified from Team Curriculum`
+                            : `Personally modified from the Team Curriculum by ${ME.name}`
                       }
                       side="top"
                     >
@@ -1548,7 +1548,7 @@ export function WeeklyLessonCard({
         />
       )}
 
-      {/* Compare-to-master modal — opened by "Compare to Master" menu item */}
+      {/* Compare-to-master modal — opened by "Compare to Team Curriculum" menu item */}
       {compareOpen && (
         <CompareToMaster
           lesson={lesson}

@@ -46,9 +46,11 @@ import {
   type ReactElement,
   type CSSProperties,
   type JSX,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
 import styles from "./Tooltip.module.css";
+import { useTooltipDismissal } from "@/lib/tooltip-dismissal";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,31 @@ export interface TooltipProps {
   delay?: number;
   /** Exactly one child element — the trigger. */
   children: ReactElement;
+  /**
+   * Stable opaque id enabling W2-B3 dismissibility. When set AND the id is
+   * dismissed, AND `required` is not true, the tooltip is suppressed. When
+   * the tooltip opens for the first time for a non-required id, an inline
+   * "Turn off these tips" mini-link is appended to the bubble. Clicking
+   * the link dismisses this id and closes the bubble.
+   *
+   * Source of truth for the dismissal state: `lib/tooltip-dismissal.ts`.
+   *
+   * Leave undefined for tooltips that should never be dismissed (the legacy
+   * "always-on" path — identical render to pre-prop callsites).
+   */
+  tooltipId?: string;
+  /**
+   * When true, the tooltip is **always on** regardless of per-id dismissal
+   * or the global off switch. Use for high-consequence controls per
+   * CLAUDE.md §4:
+   *   • The Personal / Team Curriculum toggle
+   *   • Destructive actions (archive, delete, …)
+   *   • Team-wide settings cards (changes affect every teacher)
+   *
+   * The "Turn off these tips" mini-link is also suppressed for required
+   * tooltips — the only escape hatch is to stop hovering.
+   */
+  required?: boolean;
 }
 
 type Side = NonNullable<TooltipProps["side"]>;
@@ -144,6 +171,8 @@ export function Tooltip({
   side: preferredSide = "top",
   delay = 400,
   children,
+  tooltipId: dismissalId,
+  required = false,
 }: TooltipProps) {
   const tooltipId = useId();
   const triggerRef = useRef<HTMLElement>(null);
@@ -154,6 +183,14 @@ export function Tooltip({
   // Whether the current open was triggered by hover (vs focus).
   // Used to conditionally suppress on touch devices in CSS.
   const [byHover, setByHover] = useState(false);
+
+  // W2-B3 dismissibility. The hook is SSR-safe (initial render = NOT
+  // dismissed) so it cannot cause a hydration mismatch in the trigger
+  // subtree. `dismissed` flips post-mount once the hook reads localStorage.
+  // `required` callsites bypass dismissal entirely — used for the
+  // Personal/Team toggle, destructive actions, and team-wide settings.
+  const { dismissed, dismiss } = useTooltipDismissal(dismissalId);
+  const suppress = !required && dismissed;
 
   const clearDelay = () => {
     if (delayTimer.current !== null) {
@@ -171,16 +208,38 @@ export function Tooltip({
     setPlacement(p);
   }, [preferredSide]);
 
-  const show = useCallback((fromHover: boolean) => {
-    setByHover(fromHover);
-    setOpen(true);
-  }, []);
+  const show = useCallback(
+    (fromHover: boolean) => {
+      // W2-B3: respect dismissal — never open a suppressed tooltip. The
+      // disabled-button wrapper-span and aria-describedby still wire up
+      // normally, but the bubble never paints.
+      if (suppress) return;
+      setByHover(fromHover);
+      setOpen(true);
+    },
+    [suppress],
+  );
 
   const hide = useCallback(() => {
     clearDelay();
     setOpen(false);
     setPlacement(null);
   }, []);
+
+  // "Turn off these tips" handler. Only available to non-required tooltips
+  // that opted in to dismissibility (have a dismissalId). Hides the bubble
+  // immediately and writes the id to localStorage so subsequent opens are
+  // suppressed.
+  const showDismissLink = !required && dismissalId !== undefined;
+  const handleDismissClick = useCallback(
+    (e: ReactMouseEvent<HTMLButtonElement>): void => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismiss();
+      hide();
+    },
+    [dismiss, hide],
+  );
 
   // After opening, measure and position. Run on each open.
   useEffect(() => {
@@ -201,6 +260,14 @@ export function Tooltip({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, hide]);
 
+  // If suppression flips to true while the bubble is open — e.g. the global
+  // off switch is toggled in another tab and the storage event arrives —
+  // close immediately so the teacher's preference is respected without a
+  // page refresh.
+  useEffect(() => {
+    if (suppress && open) hide();
+  }, [suppress, open, hide]);
+
   // ── Event handlers injected into the trigger ─────────────────────────────
 
   const handleMouseEnter = () => {
@@ -209,6 +276,26 @@ export function Tooltip({
   };
 
   const handleMouseLeave = () => {
+    clearDelay();
+    // W2-B3: when the tooltip carries an interactive "Turn off these tips"
+    // link, defer the close briefly so the user has time to move the
+    // cursor from the trigger onto the bubble. Mouse-enter on the bubble
+    // (.tooltip:hover) cancels the timer; mouse-leave on the bubble
+    // triggers the close. Without this defer the bubble closes the instant
+    // the cursor enters the 8px gap between trigger and bubble.
+    if (showDismissLink) {
+      delayTimer.current = setTimeout(() => hide(), 120);
+      return;
+    }
+    hide();
+  };
+
+  // Bubble hover handlers — only used when the dismiss link is shown.
+  // Hovering the bubble keeps it open; leaving the bubble closes it.
+  const handleBubbleMouseEnter = () => {
+    clearDelay();
+  };
+  const handleBubbleMouseLeave = () => {
     clearDelay();
     hide();
   };
@@ -289,12 +376,30 @@ export function Tooltip({
         styles.tooltip,
         open && placement ? styles.visible : "",
         byHover ? styles.hoverOnly : "",
+        // Switch the bubble to pointer-events:auto only when the dismiss
+        // link is present — otherwise the bubble must stay non-interactive
+        // so it doesn't capture clicks intended for content underneath.
+        showDismissLink ? styles.interactive : "",
       ]
         .filter(Boolean)
         .join(" ")}
       style={positionStyle}
+      onMouseEnter={showDismissLink ? handleBubbleMouseEnter : undefined}
+      onMouseLeave={showDismissLink ? handleBubbleMouseLeave : undefined}
     >
       {content}
+      {/* W2-B3: inline "Turn off these tips" mini-link. Shown only when the
+          tooltip opted in to dismissibility (has a tooltipId) and is NOT
+          required. Visually unobtrusive — small, dimmed, single line. */}
+      {showDismissLink && (
+        <button
+          type="button"
+          className={styles.dismissLink}
+          onClick={handleDismissClick}
+        >
+          Turn off these tips
+        </button>
+      )}
       <span className={styles.arrow} />
     </div>
   );

@@ -61,8 +61,9 @@ export default function PlannerLayout({
               {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
                   Mounted as a client leaf so the layout stays a Server Component. */}
               <GlobalShortcuts />
-              {/* Master-mode heads-up → persistent banner. Renders only while
-                  the Master edit mode is active; pins above the top bar. */}
+              {/* Team Curriculum mode heads-up → persistent banner. Renders only
+                  while the Team Curriculum edit mode (internal value: "master")
+                  is active; pins above the top bar. */}
               <MasterBanner />
               <TopBar />
               {/* RailsDndProvider wraps the body row in a single dnd-kit

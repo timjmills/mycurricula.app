@@ -481,11 +481,17 @@ export function TopBar(): ReactNode {
                 "Edit YOUR copy of the curriculum — changes only affect your view",
             },
             {
+              // Internal value stays "master" — the localStorage key, the
+              // EditMode enum, and the master-banner filename all key off
+              // it. Only user-facing copy switches to "Team Curriculum"
+              // per the Unified Audit Section 0 Decision #2 vocabulary
+              // standard ("Personal / Team Curriculum").
               value: "master",
-              label: "Master",
-              ariaLabel: "Master mode — changes affect the whole team",
+              label: "Team Curriculum",
+              ariaLabel:
+                "Team Curriculum mode — changes affect the whole team",
               title:
-                "Edit the team's MASTER curriculum — changes affect every teacher on your grade-level team",
+                "Edit the team's curriculum — changes affect every teacher on your team",
             },
           ]}
           value={editMode}
@@ -493,6 +499,12 @@ export function TopBar(): ReactNode {
           variant="subtle"
           size="sm"
           ariaLabel="Edit mode"
+          // W2-B3: this is the single high-consequence toggle on the top bar.
+          // Per CLAUDE.md §4 the Personal/Team Curriculum tooltip is on the
+          // always-on exception list — `tooltipRequired` propagates
+          // `required` to each option's wrapping <Tooltip>, so neither the
+          // per-id dismissal set nor the global off switch can suppress it.
+          tooltipRequired
         />
       </div>
 

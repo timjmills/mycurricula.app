@@ -3,16 +3,17 @@
 // save-target-dialog.tsx — pop-up that asks a teacher where to save lesson edits.
 //
 // Shown whenever a teacher finishes editing a lesson card and the app needs to
-// know whether the change goes to their own Personalized Curriculum (a personal
-// fork of the master plan, visible only to them) or to the shared Core
-// Curriculum (the Master plan every team member sees).
+// know whether the change goes to their own Personal Curriculum (a personal
+// fork of the team plan, visible only to them) or to the shared Team
+// Curriculum (the plan every team member sees). Internal "core" / "master"
+// values are retained in code/IDs (Unified Audit Section 0 Decision #2).
 //
 // Anatomy (top to bottom):
 //   • Dim backdrop — full-viewport overlay; click closes.
 //   • Modal panel (centered):
 //       Heading "Save your changes" + lesson title line
 //       Two choice cards, side-by-side on wider viewports:
-//         [Personalized Curriculum]  [Core Curriculum  ← weighted warning]
+//         [Personal Curriculum]  [Team Curriculum  ← weighted warning]
 //       Each card: icon · title · sub-line description.
 //
 // Accessibility contract:
@@ -190,7 +191,7 @@ export function SaveTargetDialog({
           role="group"
           aria-label="Save destination"
         >
-          {/* ── Personalized Curriculum ─────────────────────────────────── */}
+          {/* ── Personal Curriculum ─────────────────────────────────────── */}
           <Tooltip
             content="Save into your personal copy only — nobody else's planner is affected. This is the default for everyday lesson tweaks."
             side="top"
@@ -200,7 +201,7 @@ export function SaveTargetDialog({
               type="button"
               className={`${styles.choiceBtn} ${styles.choiceBtnPersonal}`}
               onClick={choosePersonal}
-              aria-label="Save to Personalized Curriculum — keeps this change in your own copy. Only you see it."
+              aria-label="Save to Personal Curriculum — keeps this change in your own copy. Only you see it."
               title="Save into your personal copy only — nobody else's planner is affected"
             >
               {/* Icon — person silhouette outline */}
@@ -209,7 +210,7 @@ export function SaveTargetDialog({
               </span>
               <span className={styles.choiceText}>
                 <span className={styles.choiceTitle}>
-                  Personalized Curriculum
+                  Personal Curriculum
                 </span>
                 <span className={styles.choiceSub}>
                   Keeps this change in your own copy. Only you see it.
@@ -218,28 +219,28 @@ export function SaveTargetDialog({
             </button>
           </Tooltip>
 
-          {/* ── Core Curriculum ─────────────────────────────────────────── */}
+          {/* ── Team Curriculum ─────────────────────────────────────────── */}
           {/* Visual weight: uses --core-mode token family (soft red/pink) to
               signal that this is the weightier, team-wide action. Not alarming —
               the tokens.css comment says "carries the shared plan warning without
               feeling like an emergency" — but clearly distinct from Personal. */}
           <Tooltip
-            content="Save into the team's Master / Core curriculum — every teacher in your grade sees this change on their planner. Choose this for shared curriculum decisions."
+            content="Save into the Team Curriculum — every teacher in your grade sees this change on their planner. Choose this for shared curriculum decisions."
             side="top"
           >
             <button
               type="button"
               className={`${styles.choiceBtn} ${styles.choiceBtnCore}`}
               onClick={chooseCore}
-              aria-label="Save to Core Curriculum — updates the shared plan for the whole team."
-              title="Save into the team's Master / Core curriculum — every teacher in your grade sees this change on their planner"
+              aria-label="Save to Team Curriculum — updates the shared plan for the whole team."
+              title="Save into the Team Curriculum — every teacher in your grade sees this change on their planner"
             >
               {/* Icon — stacked-pages / team plan symbol */}
               <span className={styles.choiceIcon} aria-hidden="true">
                 <CoreIcon />
               </span>
               <span className={styles.choiceText}>
-                <span className={styles.choiceTitle}>Core Curriculum</span>
+                <span className={styles.choiceTitle}>Team Curriculum</span>
                 <span className={styles.choiceSub}>
                   Updates the shared plan for the whole team.
                 </span>

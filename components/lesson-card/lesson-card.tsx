@@ -236,8 +236,8 @@ export function LessonCard({
           <Tooltip
             content={
               lesson.moved === "across-weeks"
-                ? "This lesson was moved across weeks in your personal copy — the team's Master version still lives in the original slot."
-                : "This lesson was moved within the week in your personal copy — the team's Master version still lives in the original slot."
+                ? "This lesson was moved across weeks in your personal copy — the Team Curriculum version still lives in the original slot."
+                : "This lesson was moved within the week in your personal copy — the Team Curriculum version still lives in the original slot."
             }
             side="top"
           >
@@ -295,7 +295,7 @@ export function LessonCard({
               be a <Button> as it receives an external ref and event spread. */}
           {dragHandleProps && (
             <Tooltip
-              content="Drag to move this lesson — moves stay personal unless you save them to the team's Master."
+              content="Drag to move this lesson — moves stay personal unless you save them to the Team Curriculum."
               side="top"
             >
               <span
@@ -317,7 +317,7 @@ export function LessonCard({
               styles.affordance className overrides Button's own styles to
               preserve the hover-reveal behaviour defined in lesson-card.module.css. */}
           <Tooltip
-            content="Open the lesson menu — mark status, move this lesson to another day or week, edit details, or save changes to the team's Master copy"
+            content="Open the lesson menu — mark status, move this lesson to another day or week, edit details, or save changes to the Team Curriculum"
             side="top"
           >
             <Button
@@ -327,7 +327,7 @@ export function LessonCard({
               onClick={handleAffordance}
               iconAriaLabel="More actions"
               aria-haspopup="menu"
-              tooltip="Open the lesson menu — mark status, move the lesson, edit, or push changes to Master"
+              tooltip="Open the lesson menu — mark status, move the lesson, edit, or push changes to Team Curriculum"
             >
               <span className={styles.affordanceVisual}>
                 <Icon name="dots" size={12} />

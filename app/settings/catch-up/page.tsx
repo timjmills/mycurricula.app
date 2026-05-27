@@ -53,7 +53,7 @@ function CatchupSettingsInner(): ReactNode {
           eyebrow="Layer 1"
           title={
             <Tooltip
-              content="Master switch for the ambient catch-up surface. When ON, the planner shows a slim per-week count of uncovered lessons and a top-bar flame badge. When OFF, neither cue appears anywhere — but the dedicated Catch-up screen is still reachable from this page."
+              content="Main switch for the ambient catch-up surface. When ON, the planner shows a slim per-week count of uncovered lessons and a top-bar flame badge. When OFF, neither cue appears anywhere — but the dedicated Catch-up screen is still reachable from this page."
               side="bottom"
             >
               <span>Show catch-up cues</span>

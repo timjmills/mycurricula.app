@@ -1,16 +1,20 @@
 "use client";
 
-// master-banner.tsx — Master-mode entry banner.
+// master-banner.tsx — Team-Curriculum-mode entry banner.
 //
-// When the teacher flips the top-bar toggle to "master", a two-phase
-// warning sequence runs at the very top of the viewport (z-index 40,
-// above the top bar):
+// (Filename and internal `editMode === "master"` value stay for code
+// continuity — see Unified Audit Decision #2. Only user-facing copy
+// uses "Team Curriculum" / "team's curriculum".)
+//
+// When the teacher flips the top-bar toggle to Team Curriculum, a
+// two-phase warning sequence runs at the very top of the viewport
+// (z-index 40, above the top bar):
 //
 //   Phase 1 — "heads up" (pulsing): fades in/out on a ~1.2s cycle for
-//             3 seconds, communicating that master mode carries team-wide
+//             3 seconds, communicating that this mode carries team-wide
 //             consequences without a confirm dialog (§3.3, CLAUDE.md §2).
 //   Phase 2 — "persistent" (slim): replaces the heads-up banner and stays
-//             visible for the entire master session.
+//             visible for the entire team-edit session.
 //
 // Returns null while editMode === "personal".
 //
@@ -30,7 +34,7 @@ const HEADS_UP_DURATION = 3000;
 
 // ── MasterBanner ─────────────────────────────────────────────────────────
 
-/** Master-mode warning banner — null in Personal mode. */
+/** Team-Curriculum-mode warning banner — null in Personal mode. */
 export function MasterBanner(): ReactNode {
   const { editMode } = useAppState();
 
@@ -64,12 +68,12 @@ export function MasterBanner(): ReactNode {
   const isHeadsUp = phase === "headsup";
 
   // Panel-header tooltip per CLAUDE.md §4 — teach a first-time teacher
-  // what Master mode IS (editing the team's shared curriculum) and how
-  // to leave it (toggle back to Personal). Wrapped in the styled
-  // <Tooltip> primitive so the explanation paints the black-backdrop
-  // bubble that matches the rest of the chrome.
+  // what Team Curriculum mode IS (editing the team's shared curriculum)
+  // and how to leave it (toggle back to Personal). Wrapped in the
+  // styled <Tooltip> primitive so the explanation paints the
+  // black-backdrop bubble that matches the rest of the chrome.
   const bannerCopy =
-    "You're editing the team's MASTER curriculum — every change here is shared with every teacher on your grade-level team. Flip the top-bar toggle back to Personal to keep edits private.";
+    "You're editing the Team Curriculum — every change here is shared with every teacher on your team. Flip the top-bar toggle back to Personal to keep edits private.";
   return (
     <Tooltip content={bannerCopy} side="bottom">
       <div

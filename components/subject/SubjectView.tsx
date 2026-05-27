@@ -230,7 +230,7 @@ function LessonRowItem({
           </span>
 
           <Tooltip
-            content={`Mark "${lesson.title}" done or not done — completion is personal and never forks the team's Master copy.`}
+            content={`Mark "${lesson.title}" done or not done — completion is personal and never forks the Team Curriculum copy.`}
             side="top"
           >
             <button
@@ -240,7 +240,7 @@ function LessonRowItem({
                 onToggleStatus();
               }}
               aria-label={`Toggle completion for ${lesson.title}`}
-              title={`Mark "${lesson.title}" done or not done — completion is personal and never forks the team's Master copy`}
+              title={`Mark "${lesson.title}" done or not done — completion is personal and never forks the Team Curriculum copy`}
             >
               <CheckIcon status={lesson.status} />
             </button>

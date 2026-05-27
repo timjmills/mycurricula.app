@@ -188,31 +188,65 @@ The visual system has two independent axes, both set as `<html>` data attributes
   sideways. Work is only "done" once it has been verified at all three tiers
   (DevTools device emulation is fine; document in the PR/commit message which
   widths were checked).
-- **Every interactive control and every named panel must have an onboarding
-  explanation.** The intent is first-time-teacher discoverability — a new
-  teacher should be able to learn the app by hovering or long-pressing things.
+- **Every non-obvious interactive control and every named panel must have an
+  onboarding explanation — shown ONCE, then dismissible.** The intent is
+  first-time-teacher discoverability without long-term hover noise. A new
+  teacher learns the app by hovering / long-pressing; once they know it, they
+  turn it off. Mechanism: the W2-B3 **dismissible onboarding-tooltip system**
+  in `lib/tooltip-dismissal.ts` (source of truth for state).
   - **Surface:** desktop = tooltip on hover **and** keyboard focus; touch
-    (phone/tablet) = long-press OR a native `title=` attribute the platform
-    surfaces on touch-hold OR a visible `?` affordance for ambiguous controls.
-  - **Scope:** every `<Button>`, every switch / toggle / radio, every named
-    panel (sticky rails, drawers, modals), every icon-only control, every
-    disabled control (the tooltip explains _why_ it's disabled), every
-    settings input. Plain text buttons whose label IS the explanation
-    ("Save", "Cancel") still get a tooltip — but the tooltip _expands_
-    on the verb to teach the action ("Save your edits to this lesson",
-    not just "Save").
+    (phone/tablet) = long-press surfacing the native `title=` attribute the
+    Tooltip primitive mirrors, OR a visible `?` affordance for ambiguous
+    controls.
+  - **Scope:** every non-obvious `<Button>`, every switch / toggle / radio,
+    every named panel (sticky rails, drawers, modals), every icon-only
+    control, every disabled control (the tooltip explains _why_ it's
+    disabled), every settings input. **Self-evident text buttons whose label
+    IS the explanation ("Save", "Cancel", "Close") do NOT get a tooltip** —
+    this supersedes the prior rule that even "Save" should expand to "Save
+    your edits to this lesson". A tooltip that restates the label adds noise
+    without teaching.
+  - **Dismissibility model:** every onboarding tooltip passes a stable
+    `tooltipId` to the `<Tooltip>` primitive. On the first hover the bubble
+    paints with an inline "Turn off these tips" mini-link. Clicking it
+    dismisses that id forever (persisted to localStorage). Settings →
+    Appearance has a master toggle ("Show onboarding tooltips") and a
+    "Reset dismissed tooltips" button.
+  - **Always-on exception (`required: true`).** High-consequence tooltips
+    ignore both per-id dismissal AND the global off switch:
+    - The **Personal / Team Curriculum** toggle (top-bar).
+    - **Destructive actions** — archive, delete, remove, mass-clear, etc.
+    - **Team-wide settings** — every SettingsCard whose change affects every
+      teacher (curriculum-label save, holidays, academic year, school
+      week, …).
+
+    These callsites pass `required: true` and never render the "Turn off
+    these tips" link. For segmented controls the `ToggleGroup` primitive
+    exposes a `tooltipRequired` prop that propagates `required` to every
+    option's wrapping tooltip.
   - **Voice:** tell a first-time teacher what the control _accomplishes_, in
     the surrounding context. Not "Toggle X" but "Switch to editing the
     team's curriculum (changes affect everyone)".
-  - **Implementation:** the `components/ui/Button` primitive carries a
-    `tooltip?: string` prop that wraps the rendered button in `<Tooltip>` AND
-    mirrors to native `title=` for the disabled-button browser quirk. Other
-    interactive primitives (ToggleGroup, etc.) accept a similar prop or wrap
-    each option in a Tooltip. Panels carry a `title` attribute on their root
-    so touch users get an explanation by holding the header.
+  - **Implementation:** the `components/ui/Tooltip` primitive carries:
+    - `tooltipId?: string` — opt-in dismissibility id. When set, the bubble
+      renders the "Turn off these tips" mini-link and reads/writes the
+      dismissal state via `lib/tooltip-dismissal.ts`.
+    - `required?: boolean` — always-on override for the high-consequence
+      list above. Ignores both per-id dismissal and the global flag, and
+      hides the dismiss link.
+
+    The `components/ui/Button` primitive's existing `tooltip?: string` prop
+    wraps the rendered button in `<Tooltip>` and mirrors to native `title=`
+    for the disabled-button browser quirk; future passes will expose a
+    matching `tooltipId` / `tooltipRequired` pair on Button for ergonomic
+    callsite migration. Panels carry a `title` attribute on their root so
+    touch users get an explanation by holding the header.
   - **Reduced-motion + accessibility:** tooltip fade respects
     `prefers-reduced-motion`; tooltip text is linked to the trigger via
-    `aria-describedby` so screen-reader users hear it.
+    `aria-describedby` so screen-reader users hear it. SSR-safe — the
+    initial render assumes "not dismissed" so the server-rendered HTML
+    matches the first client paint; the real state arrives in a post-mount
+    effect.
 
 ---
 

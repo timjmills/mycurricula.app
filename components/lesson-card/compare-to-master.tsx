@@ -152,27 +152,27 @@ export function CompareToMaster({
   const diffFields: DiffField[] = [
     {
       label: "Title",
-      masterValue: "(Master snapshot not available yet)",
+      masterValue: "(Team Curriculum snapshot not available yet)",
       personalValue: stripHtml(lesson.title),
     },
     {
       label: "Objective",
-      masterValue: "(Master snapshot not available yet)",
+      masterValue: "(Team Curriculum snapshot not available yet)",
       personalValue: stripHtml(lesson.objective),
     },
     {
       label: "Day",
-      masterValue: "(Master snapshot not available yet)",
+      masterValue: "(Team Curriculum snapshot not available yet)",
       personalValue: dayLabel,
     },
     {
       label: "Time",
-      masterValue: "(Master snapshot not available yet)",
+      masterValue: "(Team Curriculum snapshot not available yet)",
       personalValue: lesson.time ?? "—",
     },
     {
       label: "Status",
-      masterValue: "(Master snapshot not available yet)",
+      masterValue: "(Team Curriculum snapshot not available yet)",
       personalValue: STATUS_LABEL[lesson.status] ?? lesson.status,
     },
   ];
@@ -182,7 +182,7 @@ export function CompareToMaster({
   // the sentinel string; this logic is ready for when real data arrives.
   const isDifferent = (f: DiffField) =>
     f.masterValue !== f.personalValue &&
-    f.masterValue !== "(Master snapshot not available yet)";
+    f.masterValue !== "(Team Curriculum snapshot not available yet)";
 
   return (
     <div
@@ -201,8 +201,8 @@ export function CompareToMaster({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Compare to Master"
-        title="Compare to Master dialog — see your personal edits side-by-side with the team's curriculum version of this lesson"
+        aria-label="Compare to Team Curriculum"
+        title="Compare to Team Curriculum dialog — see your personal edits side-by-side with the team's curriculum version of this lesson"
         onKeyDown={handleKeyDown}
         style={{
           background: "var(--paper)",
@@ -229,7 +229,7 @@ export function CompareToMaster({
         >
           <div style={{ flex: 1 }}>
             <Tooltip
-              content="Compare to Master dialog — see your personal edits side-by-side with the team's curriculum version of this lesson. Useful before deciding whether to push your changes to the team."
+              content="Compare to Team Curriculum dialog — see your personal edits side-by-side with the team's curriculum version of this lesson. Useful before deciding whether to push your changes to the team."
               side="bottom"
             >
               <div
@@ -241,7 +241,7 @@ export function CompareToMaster({
                   marginBottom: 3,
                 }}
               >
-                Compare to Master
+                Compare to Team Curriculum
               </div>
             </Tooltip>
             <div
@@ -275,9 +275,9 @@ export function CompareToMaster({
             lineHeight: 1.45,
           }}
         >
-          Master snapshots are not yet stored in the data model. The Master
-          column below shows placeholder text. Once the backend lands, this
-          panel will show the real diff.
+          Team Curriculum snapshots are not yet stored in the data model. The
+          Team Curriculum column below shows placeholder text. Once the
+          backend lands, this panel will show the real diff.
         </div>
 
         {/* ── Column headers ───────────────────────────────────────────────── */}
@@ -300,7 +300,7 @@ export function CompareToMaster({
               paddingBottom: 4,
             }}
           >
-            Core Curriculum (Master)
+            Team Curriculum
           </div>
           <div
             style={{
@@ -410,8 +410,8 @@ export function CompareToMaster({
                   flex: 1,
                 }}
               >
-                This will replace your personal version with the Master. Are you
-                sure?
+                This will replace your personal version with the Team
+                Curriculum. Are you sure?
               </span>
               <Button
                 variant="secondary"
@@ -428,9 +428,9 @@ export function CompareToMaster({
                   onRestore();
                   close();
                 }}
-                tooltip="Confirm: replace your personal copy with the team's Master version (your edits will be lost)"
+                tooltip="Confirm: replace your personal copy with the Team Curriculum version (your edits will be lost)"
               >
-                Restore from Master
+                Restore from Team Curriculum
               </Button>
             </>
           ) : (
@@ -439,9 +439,9 @@ export function CompareToMaster({
                 variant="secondary"
                 size="md"
                 onClick={() => setConfirmRestore(true)}
-                tooltip="Discard your personal edits and revert to the team's Master version — you'll be asked to confirm"
+                tooltip="Discard your personal edits and revert to the Team Curriculum version — you'll be asked to confirm"
               >
-                Restore from Master
+                Restore from Team Curriculum
               </Button>
               <Button
                 variant="primary"

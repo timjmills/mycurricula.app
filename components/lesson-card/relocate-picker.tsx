@@ -174,7 +174,7 @@ export function RelocatePicker({
       >
         {/* Header */}
         <Tooltip
-          content="Relocate lesson dialog — pick a new day, week, and subject; optionally keep the original lesson where it is. Moves are personal unless you explicitly save them to the team's Master."
+          content="Relocate lesson dialog — pick a new day, week, and subject; optionally keep the original lesson where it is. Moves are personal unless you explicitly save them to the Team Curriculum."
           side="bottom"
         >
           <div

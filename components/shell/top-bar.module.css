@@ -245,21 +245,23 @@
   align-items: center;
 }
 
-/* Master option active override: when the Master button is aria-checked,
-   paint its chip with the Core Mode red instead of the default paper fill.
+/* Team Curriculum option active override: when the chip is aria-checked,
+   paint it with the core-mode red instead of the default paper fill.
    :global escapes the CSS Module hash so we can target the ToggleGroup's
-   rendered DOM without modifying the primitive. */
+   rendered DOM without modifying the primitive. Selector keys on the
+   user-facing aria-label "Team Curriculum mode" (vocabulary sweep
+   2026-05-27 — internal editMode value is still "master"). */
 .editToggleWrap
-  :global([role="radio"][aria-label*="Master"][aria-checked="true"]) {
+  :global([role="radio"][aria-label*="Team Curriculum"][aria-checked="true"]) {
   background: var(--core-mode);
   color: var(--paper);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--core-mode) 40%, transparent);
 }
 
-/* Master option inactive: warm the label color toward core-mode so the
-   teacher can read "danger" even before activating the option. */
+/* Team Curriculum option inactive: warm the label color toward core-mode
+   so the teacher can read "danger" even before activating the option. */
 .editToggleWrap
-  :global([role="radio"][aria-label*="Master"][aria-checked="false"]) {
+  :global([role="radio"][aria-label*="Team Curriculum"][aria-checked="false"]) {
   color: var(--core-mode);
 }
 

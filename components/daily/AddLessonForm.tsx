@@ -263,7 +263,7 @@ export function AddLessonForm({
               type="submit"
               className={styles.btnSave}
               disabled={!title.trim()}
-              tooltip="Add the lesson to the selected day in your personal copy — you can move it to Master later"
+              tooltip="Add the lesson to the selected day in your personal copy — you can move it to the Team Curriculum later"
             >
               Add lesson
             </Button>

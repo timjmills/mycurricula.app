@@ -732,7 +732,9 @@ function LessonRow({
               : "var(--c, var(--ink-400))",
           }}
           title={
-            lesson.pendingMaster ? "Pending push to Master" : "Personal copy"
+            lesson.pendingMaster
+              ? "Pending push to Team Curriculum"
+              : "Personal copy"
           }
           aria-hidden="true"
         />

@@ -85,7 +85,7 @@ const FILTERS: FilterDefWithCopy[] = [
     activeVar: "var(--important-bg)",
     activeTextVar: "var(--important)",
     tooltip:
-      "Show units where you've personally edited lessons — these differ from the team's Master copy",
+      "Show units where you've personally edited lessons — these differ from the Team Curriculum copy",
   },
   {
     id: "skipped",

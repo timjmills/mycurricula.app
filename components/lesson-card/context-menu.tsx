@@ -11,7 +11,7 @@
 // Action groups (separated by dividers):
 //   1. Navigation  — Open in Daily, Relocate, Bump, Duplicate, Save as template
 //   2. Status/work — Mark status (submenu), Skip (quick), Add resource, Add to to-do, See standards
-//   3. Forking     — Restore from Master*, Compare to Master*, Copy to personal*
+//   3. Forking     — Restore from Team Curriculum*, Compare to Team Curriculum*, Copy to personal*
 //   4. Printing    — Print this lesson, Archive
 //   (* conditional on lesson.modified)
 
@@ -77,7 +77,7 @@ interface ContextMenuProps {
   /** Viewport coordinates of the open point. */
   x: number;
   y: number;
-  /** Master mode unlocks the destructive "Delete from Core" item. */
+  /** Master mode (internal value: "master" = Team Curriculum) unlocks the destructive "Delete from Team Curriculum" item. */
   isMaster?: boolean;
   onClose: () => void;
   /**
@@ -235,25 +235,25 @@ export function LessonContextMenu({
       { kind: "divider" },
 
       // ── Group 3: forking — conditional on lesson.modified ────────────────
-      // "Restore from Master" and "Compare to Master" are only relevant when
+      // "Restore from Team Curriculum" and "Compare to Team Curriculum" are only relevant when
       // a personal overlay exists; "Copy to personal" is only relevant when
       // there is no overlay yet. The audit rule: never grey out, fully omit.
       {
-        label: "Restore from Master",
+        label: "Restore from Team Curriculum",
         hidden: !lesson.modified,
-        tip: "Discard your personal edits and revert to the team's Master version of this lesson",
+        tip: "Discard your personal edits and revert to the Team Curriculum version of this lesson",
         onSelect: () => fire("restore-master"),
       },
       {
-        label: "Compare to Master",
+        label: "Compare to Team Curriculum",
         hidden: !lesson.modified,
-        tip: "Side-by-side view of your version next to the team's Master — so you can see exactly what you changed",
+        tip: "Side-by-side view of your version next to the Team Curriculum — so you can see exactly what you changed",
         onSelect: () => fire("compare-master"),
       },
       {
         label: "Copy to my personal",
         hidden: lesson.modified,
-        tip: "Fork the team's Master lesson into your personal copy so you can edit it without affecting anyone else",
+        tip: "Fork the Team Curriculum lesson into your personal copy so you can edit it without affecting anyone else",
         onSelect: () => fire("copy-to-personal"),
       },
 
@@ -272,14 +272,14 @@ export function LessonContextMenu({
         onSelect: () => fire("archive"),
       },
 
-      // Master-only destructive item — only in Core Curriculum mode.
+      // Master-only destructive item — only in Team Curriculum mode (internal value: "master").
       ...(isMaster
         ? ([
             { kind: "divider" },
             {
-              label: "Delete from Core",
+              label: "Delete from Team Curriculum",
               danger: true,
-              tip: "Permanently remove this lesson from the team's Master curriculum — affects every teacher's plan",
+              tip: "Permanently remove this lesson from the Team Curriculum — affects every teacher's plan",
               onSelect: () => fire("delete"),
             },
           ] as MenuRow[])

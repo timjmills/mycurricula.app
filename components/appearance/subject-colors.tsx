@@ -126,7 +126,7 @@ export function SubjectColors({
           <span>Which swatch represents each subject</span>
         </Tooltip>
       }
-      hint="Team subjects are set in the Core Curriculum — only your team lead can change them. Personal subjects (Morning Meeting, Afternoon Circle) you own and edit."
+      hint="Team subjects are set in the Team Curriculum — only your team lead can change them. Personal subjects (Morning Meeting, Afternoon Circle) you own and edit."
       action={
         // Scope selector — true radiogroup (Team / Personal), migrated to ToggleGroup.
         <ToggleGroup<Scope>
@@ -159,7 +159,7 @@ export function SubjectColors({
         >
           <strong style={{ flex: "0 0 auto" }}>Locked</strong>
           <span style={{ flex: 1 }}>
-            Your team lead, Omar Bishara, set these in the Core Curriculum so
+            Your team lead, Omar Bishara, set these in the Team Curriculum so
             the whole team sees the same hue for each subject. Ask the lead to
             change them.
           </span>
@@ -234,10 +234,10 @@ export function SubjectColors({
                 onClick={() => setEditingSubject(editing ? null : subject.id)}
                 tooltip={
                   locked
-                    ? `${subject.name}'s color is locked by your team lead in the Core Curriculum — every teacher on your grade-level team sees the same hue.`
+                    ? `${subject.name}'s color is locked by your team lead in the Team Curriculum — every teacher on your grade-level team sees the same hue.`
                     : editing
                       ? `Close the swatch picker for ${subject.name} and keep the current color.`
-                      : `Pick a different color swatch for ${subject.name} — only YOU see this change; team colors stay as the Core Curriculum sets them.`
+                      : `Pick a different color swatch for ${subject.name} — only YOU see this change; team colors stay as the Team Curriculum sets them.`
                 }
               >
                 {locked ? "Locked" : editing ? "Done" : "Change"}

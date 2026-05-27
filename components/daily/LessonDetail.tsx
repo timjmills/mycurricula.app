@@ -416,7 +416,7 @@ export function LessonDetail({
               iconAriaLabel="More options"
               className={detailStyles.bandIconBtn}
               aria-haspopup="menu"
-              tooltip="Open the lesson menu — mark status, relocate, save as template, print, archive, or fork to Master"
+              tooltip="Open the lesson menu — mark status, relocate, save as template, print, archive, or fork to Team Curriculum"
             >
               {/* Vertical three-dots — kebab overflow per spec §1.2(C). */}
               <svg
@@ -574,7 +574,7 @@ export function LessonDetail({
                 tooltip={
                   lesson.status === "done"
                     ? "Click to cycle to partial credit, then to not-done — useful when something needs to be re-taught"
-                    : "Mark this lesson done — completion is personal, it never forks the team's Master copy"
+                    : "Mark this lesson done — completion is personal, it never forks the Team Curriculum copy"
                 }
                 leadingIcon={
                   <StatusCheckbox status={lesson.status} size={16} />

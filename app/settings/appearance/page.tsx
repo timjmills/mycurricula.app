@@ -29,6 +29,10 @@ import {
   useSetLabels,
   type HierarchyLabels,
 } from "@/lib/labels";
+import {
+  countDismissed,
+  useTooltipDismissal,
+} from "@/lib/tooltip-dismissal";
 import { StylePicker } from "@/components/appearance/style-picker";
 import { PaletteToggle } from "@/components/appearance/palette-toggle";
 import { LivePreview } from "@/components/appearance/live-preview";
@@ -38,7 +42,7 @@ import { SettingsCard } from "@/components/appearance/settings-card";
 import { Button, PageHeader, Tooltip } from "@/components/ui";
 
 export default function AppearancePage(): ReactNode {
-  // Core Curriculum subject → swatch mapping. Local state for this build:
+  // Team Curriculum subject → swatch mapping. Local state for this build:
   // reassignments are not persisted (no backend yet).
   const [mapping, setMapping] = useState<SubjectMapping>(
     DEFAULT_SUBJECT_MAPPING,
@@ -88,6 +92,13 @@ export default function AppearancePage(): ReactNode {
             change immediately, app-wide; the underlying behavior does
             not. Persists to localStorage via the LabelsProvider. */}
         <HierarchyLabelsCard />
+
+        {/* ── Onboarding tooltips (W2-B3) ───────────────────────────────
+            Global on/off + reset for the dismissible onboarding-tooltip
+            system. High-consequence tooltips (Personal/Team toggle,
+            destructive actions, team-wide settings) are marked
+            `required: true` at their callsites and ignore both controls. */}
+        <OnboardingTooltipsCard />
       </div>
     </div>
   );
@@ -298,5 +309,179 @@ function LabelInput({
         />
       </Tooltip>
     </div>
+  );
+}
+
+// ── Onboarding tooltips card (W2-B3) ────────────────────────────────────
+// Two controls:
+//   • Show onboarding tooltips — toggles the global off flag. Default ON.
+//     When OFF, every non-required tooltip is suppressed app-wide.
+//   • Reset dismissed tooltips — clears the per-id dismissal set. Disabled
+//     when nothing is dismissed.
+//
+// High-consequence tooltips (Personal/Team toggle, destructive actions,
+// team-wide settings) carry `required: true` at their callsites and ignore
+// both of these controls — the safety messaging always shows.
+
+function OnboardingTooltipsCard(): ReactNode {
+  const { globalOff, setGlobalOff, resetAll } = useTooltipDismissal(undefined);
+
+  // Count of currently-dismissed ids. SSR-safe — initial render is 0; the
+  // post-mount effect reads localStorage. Bumped on each toggle so the
+  // Reset button's disabled state reflects reality without taking the
+  // dismissal set as a re-render dep.
+  const [dismissedCount, setDismissedCount] = useState<number>(0);
+  useEffect(() => {
+    setDismissedCount(countDismissed());
+  }, []);
+
+  // Show-tooltips switch state is the inverse of the stored off flag.
+  // Default is ON (globalOff === false).
+  const tooltipsOn = !globalOff;
+
+  const onToggleGlobal = (): void => {
+    setGlobalOff(tooltipsOn); // currently on → off
+  };
+
+  const onReset = (): void => {
+    resetAll();
+    setDismissedCount(0);
+  };
+
+  // Tooltips on the controls themselves use `required` so the user can
+  // always read the explanation — meta-tooltips that teach the dismissal
+  // system must not themselves be dismissable.
+  const onLabel = tooltipsOn
+    ? "Hide one-time onboarding tooltips for non-critical controls (the Personal/Team toggle and destructive-action warnings stay on)"
+    : "Show one-time onboarding tooltips again across the app (the Personal/Team toggle and destructive-action warnings always show regardless)";
+
+  const resetLabel =
+    dismissedCount > 0
+      ? `Show again every onboarding tooltip you've individually dismissed (${dismissedCount} currently hidden)`
+      : "Nothing to reset — you haven't dismissed any individual tooltips yet";
+
+  return (
+    <SettingsCard
+      eyebrow="Onboarding"
+      title={
+        <Tooltip
+          content="Onboarding tooltips teach a first-time teacher what each control does. Once you know your way around, dismiss them one-by-one or all at once. High-consequence tooltips (the Personal/Team toggle, destructive actions, team-wide settings) always show regardless of these controls."
+          side="bottom"
+          required
+        >
+          <span>Onboarding tooltips</span>
+        </Tooltip>
+      }
+      hint="One-time tips that teach what each control does. You can turn them off once you're comfortable; the Personal/Team toggle and destructive-action warnings always show."
+    >
+      <div
+        style={{
+          marginTop: 16,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        {/* Show onboarding tooltips — a labelled switch built from a plain
+            button with role="switch". No Switch primitive exists yet
+            (BUILD_STANDARD §7 — when one lands the markup here should
+            migrate). Touch target ≥44px. */}
+        <Tooltip content={onLabel} side="bottom" required>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={tooltipsOn}
+            onClick={onToggleGlobal}
+            title={onLabel}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              width: "100%",
+              minHeight: 44,
+              padding: "10px 14px",
+              background: "var(--paper)",
+              border: "1px solid var(--ink-200)",
+              borderRadius: "var(--r-8)",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            <span
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                minWidth: 0,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "var(--t-13)",
+                  fontWeight: 600,
+                  color: "var(--ink-900)",
+                }}
+              >
+                Show onboarding tooltips
+              </span>
+              <span
+                style={{
+                  fontSize: "var(--t-12)",
+                  color: "var(--ink-500)",
+                  lineHeight: 1.45,
+                }}
+              >
+                {tooltipsOn
+                  ? "On — every non-critical control shows its tip once on hover."
+                  : "Off — only critical safety tooltips (Personal/Team, destructive actions) show."}
+              </span>
+            </span>
+            {/* Visual switch track. */}
+            <span
+              aria-hidden
+              style={{
+                position: "relative",
+                flex: "0 0 auto",
+                width: 36,
+                height: 20,
+                borderRadius: 999,
+                background: tooltipsOn ? "var(--ink-900)" : "var(--ink-300)",
+                transition: "background 140ms ease",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  left: tooltipsOn ? 18 : 2,
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  background: "var(--paper)",
+                  transition: "left 140ms ease",
+                }}
+              />
+            </span>
+          </button>
+        </Tooltip>
+
+        {/* Reset dismissed tooltips — disabled when nothing is dismissed.
+            Uses the canonical Button primitive's tooltip+disabled path. */}
+        <div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onReset}
+            disabled={dismissedCount === 0}
+            tooltip={resetLabel}
+            tooltipSide="bottom"
+          >
+            Reset dismissed tooltips
+            {dismissedCount > 0 ? ` (${dismissedCount})` : ""}
+          </Button>
+        </div>
+      </div>
+    </SettingsCard>
   );
 }
