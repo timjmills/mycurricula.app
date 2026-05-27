@@ -246,9 +246,10 @@ planning_document.md` has a screen-by-screen section (§5) and the data model (�
 ## 6. How we work — DO NOT
 
 - **Do not build out of phase.** Phase 1A is the late-August beta gate; everything else
-  waits. See the roadmap (§8 of the planning doc). In particular, do **not** start:
+  waits. See the roadmap (§8 of the planning doc) and the status table in §1 for what
+  is already shipped. In particular, do **not** start:
   student/parent/admin-facing features, gradebook/attendance, a marketplace, file
-  hosting/annotation (Phase 1B+), AI features (Phase 3+), Vivid theme production build,
+  hosting/annotation (Phase 1B+), AI features (Phase 3+),
   LMS/SIS integration, or multi-language UI.
 - **Do not add theme colors or design tokens to `tailwind.config.ts`.** Tokens live in
   `tokens.css`.
@@ -260,7 +261,7 @@ planning_document.md` has a screen-by-screen section (§5) and the data model (�
   explicit toggle + banner.
 - **Do not add confirm dialogs for entering Master mode** — the flashing/persistent
   banner is the deliberate safety mechanism.
-- **Do not assume a singlale grade level** anywhere in data or queries.
+- **Do not assume a single grade level** anywhere in data or queries.
 - **Do not hard-code the school week** (the set of weekdays, or a 5-day assumption). It
   is chosen at setup; every calendar surface derives its day columns from it. Today's
   mock fixtures use a Sun–Thu week — treat that as sample data, not a constraint.
@@ -297,11 +298,15 @@ All under `Documents/` (reference only — never imported by the app):
 - `docs/claude-bypass.sql` — DDL for `public.claude_access_log` (the bypass audit
   table). Run once in the Supabase SQL editor.
 
-**Phasing reminder:** Phase 1A = beta-ready core (Weekly/Daily/basic Subject views,
-Master/Personal toggle, Simple/Task/Advanced view modes, standards tagging, daily notes,
-basic print/export). Phase 1B fills in the rest of Phase 1. Phase 2 brings Vivid +
-full forking + Schedule + Year rollover. Phase 3+ brings annotation, admin, and AI.
-When in doubt about whether to build something, check the roadmap and ask.
+**Phasing reminder:** Phase 1A shipped — Weekly/Daily/Subject/Year/Schedule/Catch-up
+views, Master/Personal toggle, Simple/Task/Advanced view modes, standards tagging,
+daily notes, basic print/export, Vivid theme as default, unified Settings hub, and
+the onboarding wizard (see §1 status table for the full list). Phase 1B is the
+**Supabase backend wave** — wiring persistence so the forking model writes through,
+holidays render, schedule rotation cycles work end-to-end, unit-import lands. Phase 2
+brings full forking semantics + year rollover. Phase 3+ brings annotation, admin, and
+AI. When in doubt about whether to build something, check the §1 table and the
+roadmap, and ask.
 
 ---
 

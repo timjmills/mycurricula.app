@@ -1,7 +1,12 @@
 # MyCurricula
 
-Weekly curriculum planning tool for Grade 5 teachers. Next.js (App Router,
-TypeScript) frontend.
+Curriculum planning tool for school teaching teams. Next.js (App Router,
+React 19, TypeScript) frontend deployed to Cloudflare at
+[mycurricula.app](https://mycurricula.app). First deployment is a Grade 5
+team in Qatar but the data model and UI are multi-grade by design.
+
+See `CLAUDE.md` and `BUILD_STANDARD.md` at the repo root before contributing —
+those are the authoritative project guide and visual contract.
 
 ## Getting started
 

@@ -1,4 +1,4 @@
-# mycurriculum.app — Build Standard
+# mycurricula.app — Build Standard
 
 The visual, structural, and responsive contract every page must follow.
 Read this file at the start of every build session. CLAUDE.md links to it.
