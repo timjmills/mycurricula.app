@@ -33,6 +33,10 @@ import { useAcademicYear } from "@/lib/use-academic-year";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { pacingFor } from "@/lib/year-pacing";
 import { useMinimizedSubjects } from "@/lib/year-state";
+import {
+  useCustomUnits,
+  customUnitWeekIdxForDate,
+} from "@/lib/use-custom-units";
 import { subjectClassName } from "./roadTones";
 import { LaneCard } from "./LaneCard";
 import { UnitBar } from "./UnitBar";
@@ -147,6 +151,15 @@ export function RoadmapView({
   // TEAM-scoped academic year. Drives the week column count + the
   // start date the unit-bar labels are anchored to.
   const { start: yearStart, end: yearEnd } = useAcademicYear();
+  // USER-scoped teacher-authored units (Lane DG). Rendered alongside the
+  // mock fixture units in the same per-subject lane. Each one occupies its
+  // own UnitBar with the same recipe — no special "custom" styling so the
+  // roadmap reads as one timeline (the import/edit flows are where teachers
+  // distinguish their additions). MVP rendering note: the bar spans the
+  // unit's start→end week range as a continuous block; the daysOfWeek
+  // constraint affects the lessons-count math but not the visual stripe
+  // (per the Lane DG spec — a per-cell lesson-dot overlay is a follow-up).
+  const { units: customUnits } = useCustomUnits();
 
   // CURRENT_WEEK is 1-based in the fixture; convert to 0-based for index math.
   const currentWeekIdx = CURRENT_WEEK - 1;
@@ -273,6 +286,75 @@ export function RoadmapView({
         };
       });
 
+      // ── Inject teacher-authored custom units (Lane DG) ──────────────
+      // Custom units carry their own (start, end) ISO dates rather than
+      // 1-based fixture week numbers. Project both into the academic-year
+      // coordinate space so UnitBar renders them on the same column grid
+      // as the mock units. Custom units with dates falling outside the
+      // configured academic-year window are silently dropped — they'd
+      // render at -1 / out-of-bounds columns otherwise.
+      const customForSubject = customUnits.filter(
+        (cu) => cu.subjectId === subjectId,
+      );
+      for (const cu of customForSubject) {
+        const startWeekIdx = customUnitWeekIdxForDate(cu.startDate, yearStart);
+        const endWeekIdx = customUnitWeekIdxForDate(cu.endDate, yearStart);
+        if (
+          startWeekIdx < 0 ||
+          endWeekIdx < 0 ||
+          endWeekIdx < startWeekIdx
+        ) {
+          continue;
+        }
+        const spanWeeks = endWeekIdx - startWeekIdx + 1;
+        const lessonCount = cu.lessons;
+        const completedLessons = 0; // teacher-added units start at 0/0
+        const unitStatus = deriveUnitStatus(
+          completedLessons,
+          lessonCount,
+          false, // not modified — these ARE the personal version
+          startWeekIdx,
+          currentWeekIdx,
+        );
+        const completePctUnit = 0;
+        // schoolDays for the custom unit honors the per-day cadence: weeks
+        // × selected-days-of-the-week. A 3-day-a-week course over 4 weeks
+        // reports 12 school days, not 4×schoolWeekLen.
+        const schoolDays = spanWeeks * Math.max(1, cu.daysOfWeek.length);
+
+        units.push({
+          id: cu.id,
+          subjectId,
+          // Prepend the user's unit-type label so the bar reads
+          // "Unit of Study — Fractions on a Number Line" without
+          // requiring a separate prefix property on UnitBar.
+          name: cu.unitTypeLabel
+            ? `${cu.unitTypeLabel} — ${cu.name}`
+            : cu.name,
+          // Number it after the existing fixture units so labels stay
+          // unique within the lane (cosmetic only — the U# tile shows
+          // this number).
+          unitNumber: units.length + 1,
+          startWeekIdx,
+          endWeekIdx,
+          startDate: weekIdxToDateLabel(startWeekIdx, yearStart, 0),
+          endDate: weekIdxToDateLabel(
+            endWeekIdx,
+            yearStart,
+            schoolWeekLen - 1,
+          ),
+          lessons: lessonCount,
+          schoolDays,
+          completePct: completePctUnit,
+          completedLessons,
+          status: unitStatus,
+        });
+      }
+
+      // Sort all units in this subject by startWeekIdx ascending so the
+      // injection order is stable + matches reading order on the timeline.
+      units.sort((a, b) => a.startWeekIdx - b.startWeekIdx);
+
       // Pacing status for the LaneCard body row.
       const pacing = pacingFor(subjectId, lessons, todaySchoolDayIdx, {
         dayCount: schoolWeekLen,
@@ -280,7 +362,14 @@ export function RoadmapView({
 
       return { subject, subjectId, completePct, units, pacing };
     });
-  }, [lessons, schoolWeekLen, todaySchoolDayIdx, currentWeekIdx, yearStart]);
+  }, [
+    lessons,
+    schoolWeekLen,
+    todaySchoolDayIdx,
+    currentWeekIdx,
+    yearStart,
+    customUnits,
+  ]);
 
   // Sort: expanded subjects first (in canonical order), minimized at the bottom.
   const orderedLanes = useMemo(() => {

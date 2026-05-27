@@ -1,0 +1,439 @@
+/* AddUnitDialog.module.css
+   The "+ Add unit" modal launched from the /year header. Tokens-only
+   (no hex), 4-8-12-16-24-32 spacing scale, responsive at the 360/768/1280
+   tiers required by BUILD_STANDARD.md §8.
+
+   The dialog is a centered modal (not the inline popover pattern in
+   AddLessonForm) because the form takes 8 fields — too tall to anchor
+   alongside a button without overlapping the timeline. */
+
+/* ── Scrim ─────────────────────────────────────────────────────────────── */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  /* Translucent ink-900 — token-driven so the scrim color tracks the
+     ink ramp if it's ever retuned. color-mix is the canonical way to
+     introduce alpha without raw rgba() (BUILD_STANDARD.md §3). */
+  background: color-mix(in srgb, var(--ink-900) 55%, transparent);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  /* Prevent page-body scroll capture: the body-scroll-lock handled in JS
+     covers the document; this scrim sits inside the locked viewport. */
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scrim {
+    animation: scrimIn 0.15s ease-out both;
+  }
+}
+
+@keyframes scrimIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Dialog box ────────────────────────────────────────────────────────── */
+
+.dialog {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-popover);
+  display: flex;
+  flex-direction: column;
+  z-index: 1001;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dialog {
+    animation: dialogIn 0.18s ease-out both;
+  }
+}
+
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Header ────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.headerCopy {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--t-18);
+  font-weight: 700;
+  color: var(--ink-900);
+  letter-spacing: -0.2px;
+  line-height: 1.2;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  font-weight: 400;
+}
+
+/* Close button — ≥44px hit area via padding+margin trick. */
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 8px;
+  margin: -8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-6);
+  color: var(--ink-400);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.closeBtn:hover {
+  background: var(--ink-50);
+  color: var(--ink-700);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Form body ─────────────────────────────────────────────────────────── */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 24px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Two-up row for short fields (start/end dates, weeks/lessons). */
+.fieldRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.label {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-700);
+  letter-spacing: -0.05px;
+}
+
+.required {
+  color: var(--important);
+  margin-left: 2px;
+}
+
+.hint {
+  font-size: var(--t-11);
+  color: var(--ink-400);
+  margin-top: 2px;
+}
+
+.input,
+.select {
+  height: 40px;
+  padding: 0 10px;
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-6);
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.input:focus,
+.select:focus {
+  border-color: var(--ink-700);
+  box-shadow: 0 0 0 3px var(--ink-100);
+}
+
+.input::placeholder {
+  color: var(--ink-300);
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--important);
+}
+
+.input[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--important) 20%, transparent);
+}
+
+/* Override styling on number inputs for the weeks/lessons fields so the
+   spinner controls remain native-cross-browser-functional but the visual
+   chrome matches our other inputs. */
+.input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.input[type="date"] {
+  /* Native date pickers vary in chrome height across browsers; pin to the
+     same visual height as text inputs to keep the field-row aligned. */
+  line-height: 1;
+}
+
+.autoBadge {
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  background: var(--ink-50);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-4);
+  padding: 1px 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* ── Days-of-week chip group ──────────────────────────────────────────── */
+
+.dayChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dayChip {
+  /* Each chip is a 44×44 minimum tap target (CLAUDE.md §4). */
+  min-width: 44px;
+  height: 44px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--t-12);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  background: var(--paper);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-6);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.dayChip:hover:not(.dayChipDisabled) {
+  background: var(--ink-50);
+  color: var(--ink-700);
+}
+
+.dayChipActive {
+  background: var(--ink-900);
+  color: var(--paper);
+  border-color: var(--ink-900);
+}
+
+.dayChipActive:hover {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+.dayChipDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--ink-50);
+  color: var(--ink-300);
+}
+
+.dayChip:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Validation error row ────────────────────────────────────────────── */
+
+.errorBanner {
+  background: var(--catchup-bg);
+  color: var(--catchup);
+  border: 1px solid color-mix(in srgb, var(--catchup) 30%, transparent);
+  border-radius: var(--r-6);
+  padding: 8px 12px;
+  font-size: var(--t-12);
+  font-weight: 500;
+}
+
+/* ── Action footer ───────────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 24px 16px;
+  border-top: 1px solid var(--ink-100);
+  background: var(--ink-50);
+}
+
+.btnCancel,
+.btnSave {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: var(--t-13);
+  font-weight: 600;
+  border-radius: var(--r-6);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+  font-family: inherit;
+}
+
+.btnCancel {
+  background: var(--paper);
+  border-color: var(--ink-200);
+  color: var(--ink-700);
+}
+
+.btnCancel:hover {
+  background: var(--ink-100);
+}
+
+.btnSave {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+.btnSave:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink-900) 88%, var(--ink-700));
+}
+
+.btnSave:disabled,
+.btnSave[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btnCancel:focus-visible,
+.btnSave:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .scrim {
+    padding: 0;
+    /* On phone the modal goes full-screen so the keyboard doesn't push
+       the form off-screen. */
+    align-items: stretch;
+  }
+
+  .dialog {
+    width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+    border-width: 0;
+  }
+
+  .header {
+    padding: 16px 16px 10px;
+  }
+
+  .form {
+    padding: 12px 16px 16px;
+    gap: 12px;
+  }
+
+  .actions {
+    padding: 10px 16px 14px;
+  }
+
+  .fieldRow {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .dialog,
+  .input,
+  .select,
+  .dayChip,
+  .btnCancel,
+  .btnSave,
+  .closeBtn {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ── Accessibility ──────────────────────────────────────────────────── */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}

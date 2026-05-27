@@ -71,6 +71,22 @@
   box-shadow: var(--shadow-card);
 }
 
+/* Primary variant — used for "+ Add unit". Filled ink-900 background so
+   it reads as the dominant action in the header cluster. Hover deepens
+   slightly without changing height (keeps the row alignment stable). */
+.actionBtnPrimary {
+  background: var(--ink-900);
+  color: var(--paper);
+  border-color: var(--ink-900);
+}
+
+.actionBtnPrimary:hover {
+  background: color-mix(in srgb, var(--ink-900) 88%, var(--ink-700));
+  color: var(--paper);
+  border-color: var(--ink-900);
+  box-shadow: var(--shadow-card-hover);
+}
+
 .actionBtn:focus-visible {
   outline: 2px solid var(--ink-900);
   outline-offset: 2px;

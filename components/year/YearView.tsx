@@ -41,6 +41,7 @@ import { StatusFilterBar } from "./StatusFilterBar";
 import { MonthPicker } from "./MonthPicker";
 import { CurriculumFilter, useCurriculumFilter } from "./CurriculumFilter";
 import { TODAY_PULSE_EVENT } from "./TodayMarker";
+import { AddUnitDialog } from "./AddUnitDialog";
 import type { StatusFilterId } from "./StatusFilterBar";
 import type { SubjectId } from "@/lib/types";
 import styles from "./YearView.module.css";
@@ -154,6 +155,20 @@ const IconLayers = (p: React.SVGProps<SVGSVGElement>) => (
   >
     <path d="M12 2L2 7l10 5 10-5-10-5z" />
     <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
+  </svg>
+);
+
+const IconPlus = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    {...p}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
+    <path d="M12 5v14M5 12h14" />
   </svg>
 );
 
@@ -324,6 +339,11 @@ export function YearView() {
     SUBJECTS[0].id as SubjectId,
   );
 
+  // ── Add-unit dialog open state ────────────────────────────────────────
+  // Lane DG: surfaces the AddUnitDialog modal from the header. Persistence
+  // is owned by `useCustomUnits()`; this component only owns visibility.
+  const [addUnitOpen, setAddUnitOpen] = useState(false);
+
   // ── Stat strip values ─────────────────────────────────────────────────
   const totalUnits = new Set(lessons.map((l) => l.unit)).size;
   const totalLessons = lessons.length;
@@ -341,6 +361,26 @@ export function YearView() {
           </p>
         </div>
         <div className={styles.pageHeaderActions}>
+          {/* "+ Add unit" — opens the AddUnitDialog. Sits FIRST in the
+              action cluster so it reads as the primary action; matches
+              the "+ new" placement on Daily/Weekly. Tooltip explains the
+              flow for first-time teachers (CLAUDE.md §4). */}
+          <Tooltip
+            content="Add a unit of study to your year roadmap — set the dates, days of the week, and lesson count. Adds to your personal copy by default."
+            side="bottom"
+          >
+            <button
+              type="button"
+              className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+              aria-label="Add a unit to the year roadmap"
+              title="Add a unit of study to your year roadmap"
+              onClick={() => setAddUnitOpen(true)}
+            >
+              <IconPlus width={14} height={14} />
+              Add unit
+            </button>
+          </Tooltip>
+
           <button
             type="button"
             className={styles.actionBtn}
@@ -494,6 +534,14 @@ export function YearView() {
               )}
             </div>
           </div>
+
+          {/* Add-unit dialog — portal-rendered to <body>, so its mount
+              position in the JSX tree is incidental. Owns its own focus
+              trap / scroll lock / Esc handler. */}
+          <AddUnitDialog
+            open={addUnitOpen}
+            onClose={() => setAddUnitOpen(false)}
+          />
 
           {/* Bottom stat strip */}
           <div className={styles.statStrip}>

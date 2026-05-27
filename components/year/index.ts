@@ -19,3 +19,5 @@ export { StatusFilterBar } from "./StatusFilterBar";
 export type { StatusFilterBarProps, StatusFilterId } from "./StatusFilterBar";
 export { MonthPicker } from "./MonthPicker";
 export type { MonthPickerProps } from "./MonthPicker";
+export { AddUnitDialog } from "./AddUnitDialog";
+export type { AddUnitDialogProps } from "./AddUnitDialog";
