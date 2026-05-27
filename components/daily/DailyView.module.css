@@ -1037,9 +1037,16 @@
     display: none;
   }
 
-  /* The "← Back to list" button is visible only in the narrow layout. */
+  /* The "← Back to list" button is visible only in the narrow layout.
+     W3-C9: pin it to the top of the scroll container so a teacher who
+     has scrolled deep into a lesson detail can always reach it without
+     scrolling back up. */
   .backToList {
     display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--paper);
   }
 
   /* Let the in-column day-header wrap when space is tight (the title can
