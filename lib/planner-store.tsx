@@ -242,8 +242,22 @@ type AddSectionResourceAction = {
   type: "addSectionResource";
   lessonId: string;
   sectionId: string;
-  resourceType?: SectionResource["type"];
-  label?: string;
+  /** Full or partial new resource. `type` + `label` are required; `id` is
+   *  minted if absent; every other field is optional and carries through. */
+  resource: Partial<SectionResource> & {
+    type: SectionResource["type"];
+    label: string;
+  };
+};
+
+type EditSectionResourceAction = {
+  type: "editSectionResource";
+  lessonId: string;
+  sectionId: string;
+  resourceId: string;
+  patch: Partial<SectionResource>;
+  coalesceKey?: string;
+  coalesceTs?: number;
 };
 
 type RemoveSectionResourceAction = {
@@ -297,6 +311,7 @@ type PlannerAction =
   | RemoveSectionAction
   | DuplicateSectionAction
   | AddSectionResourceAction
+  | EditSectionResourceAction
   | RemoveSectionResourceAction
   | MoveSectionResourceAction
   | ToggleSectionWebsiteAction
@@ -345,6 +360,8 @@ function labelFor(action: PlannerAction): string {
       return "Duplicate section";
     case "addSectionResource":
       return "Add resource";
+    case "editSectionResource":
+      return "Edit resource";
     case "removeSectionResource":
       return "Remove resource";
     case "moveSectionResource":
@@ -793,10 +810,12 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
 
     case "addSectionResource": {
       const current = ensureSections(doc.sections, action.lessonId);
-      const resource = newSectionResource(
-        action.resourceType ?? "link",
-        action.label ?? "New resource",
-      );
+      const seed = newSectionResource(action.resource.type, action.resource.label);
+      const resource: SectionResource = {
+        ...seed,                       // gives us a fresh id
+        ...action.resource,            // caller's fields win — type, label, url, etc.
+        id: action.resource.id ?? seed.id,
+      };
       return {
         ...doc,
         sections: {
@@ -804,6 +823,26 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
           [action.lessonId]: current.map((s) =>
             s.id === action.sectionId
               ? { ...s, resources: [...s.resources, resource] }
+              : s,
+          ),
+        },
+      };
+    }
+
+    case "editSectionResource": {
+      const current = ensureSections(doc.sections, action.lessonId);
+      return {
+        ...doc,
+        sections: {
+          ...doc.sections,
+          [action.lessonId]: current.map((s) =>
+            s.id === action.sectionId
+              ? {
+                  ...s,
+                  resources: s.resources.map((r) =>
+                    r.id === action.resourceId ? { ...r, ...action.patch } : r,
+                  ),
+                }
               : s,
           ),
         },
@@ -959,8 +998,13 @@ function historyReducer(
   // key AND it fired within COALESCE_WINDOW_MS, update present in place
   // without pushing a new past entry. This collapses a typing burst into
   // a single undo step.
-  const coalesceKey = "coalesceKey" in action ? action.coalesceKey : null;
-  const coalesceTs = "coalesceTs" in action ? action.coalesceTs : Date.now();
+  // The new editSectionResource action makes both fields optional, so the
+  // `in` check returns true even when the property is `undefined` — coerce
+  // through the null/now() defaults to keep downstream types strict.
+  const coalesceKey =
+    "coalesceKey" in action ? (action.coalesceKey ?? null) : null;
+  const coalesceTs =
+    "coalesceTs" in action ? (action.coalesceTs ?? Date.now()) : Date.now();
 
   const shouldCoalesce =
     coalesceKey !== null &&
@@ -1069,6 +1113,7 @@ function buildLastChange(action: PlannerAction): LastChange {
       };
 
     case "addSectionResource":
+    case "editSectionResource":
     case "removeSectionResource":
       return {
         kind: action.type,
@@ -1218,12 +1263,23 @@ export interface PlannerValue {
   removeSection: (lessonId: string, sectionId: string) => void;
   /** Duplicate a section, inserting the copy immediately after the original. */
   duplicateSection: (lessonId: string, sectionId: string) => void;
-  /** Add a resource chip to a section. */
+  /** Add a resource to a section. Pass `type` + `label` minimally; carry
+   *  through `url`, `provider`, `displayMode`, etc. for real embeds. */
   addSectionResource: (
     lessonId: string,
     sectionId: string,
-    resourceType?: SectionResource["type"],
-    label?: string,
+    resource: Partial<SectionResource> & {
+      type: SectionResource["type"];
+      label: string;
+    },
+  ) => void;
+  /** Patch a section resource (e.g. flip a link's displayMode). Coalesced
+   *  under `editResource:<lessonId>:<sectionId>:<resourceId>`. */
+  editSectionResource: (
+    lessonId: string,
+    sectionId: string,
+    resourceId: string,
+    patch: Partial<SectionResource>,
   ) => void;
   /** Remove a resource chip from a section. */
   removeSectionResource: (
@@ -1460,15 +1516,36 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     (
       lessonId: string,
       sectionId: string,
-      resourceType?: SectionResource["type"],
-      label?: string,
+      resource: Partial<SectionResource> & {
+        type: SectionResource["type"];
+        label: string;
+      },
     ) => {
       dispatchRef.current({
         type: "addSectionResource",
         lessonId,
         sectionId,
-        resourceType,
-        label,
+        resource,
+      });
+    },
+    [],
+  );
+
+  const editSectionResource = useCallback(
+    (
+      lessonId: string,
+      sectionId: string,
+      resourceId: string,
+      patch: Partial<SectionResource>,
+    ) => {
+      dispatchRef.current({
+        type: "editSectionResource",
+        lessonId,
+        sectionId,
+        resourceId,
+        patch,
+        coalesceKey: `editResource:${lessonId}:${sectionId}:${resourceId}`,
+        coalesceTs: Date.now(),
       });
     },
     [],
@@ -1554,6 +1631,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       removeSection,
       duplicateSection,
       addSectionResource,
+      editSectionResource,
       removeSectionResource,
       moveSectionResource,
       toggleSectionWebsite,
@@ -1589,6 +1667,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       removeSection,
       duplicateSection,
       addSectionResource,
+      editSectionResource,
       removeSectionResource,
       moveSectionResource,
       toggleSectionWebsite,

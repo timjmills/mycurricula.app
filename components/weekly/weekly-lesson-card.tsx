@@ -1301,12 +1301,10 @@ export function WeeklyLessonCard({
                         // If no sections exist yet the store creates a default section.
                         const sections = getSections(lesson.id);
                         const targetSectionId = sections[0]?.id ?? lesson.id;
-                        addSectionResource(
-                          lesson.id,
-                          targetSectionId,
-                          "link",
-                          "New resource",
-                        );
+                        addSectionResource(lesson.id, targetSectionId, {
+                          type: "link",
+                          label: "New resource",
+                        });
                       }}
                       aria-label="Add resource to this lesson"
                       tooltip="Attach a link, file, or video to this lesson — drops into the first section"
