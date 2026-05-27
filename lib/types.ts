@@ -43,11 +43,58 @@ export interface Unit {
   shade: number;
 }
 
-/** A resource attached to a lesson or task. */
+/** A resource attached to a lesson or task.
+ *
+ *  Two shapes coexist in the document today: the legacy `{ type, label }`
+ *  fixture rows (synthesized labels, no real URL) and the post-Phase-1B
+ *  shape with `url` + provider metadata. Everything beyond `type`/`label`
+ *  is optional so the existing mock fixtures stay valid; views fall back
+ *  to the synthetic glyph render when `url` is absent. */
 export interface LessonResource {
   type: "slides" | "pdf" | "doc" | "image" | "youtube" | "website" | "link";
   label: string;
+  /** Real URL — embed source, link target, or R2 signed-GET endpoint. When
+   *  absent, this is a legacy/placeholder fixture row. */
+  url?: string;
+  /** Fine-grained provider detected from the URL — drives the renderer's
+   *  embed switch. Computed by `parseResourceUrl` at link-creation time. */
+  provider?: ResourceProvider;
+  /** How a LINK resource (provider in {"website","link"}) is rendered in
+   *  the lesson body. Files always render as their native embed (image →
+   *  <img>, pdf → iframe, etc.); this is link-only. Default: thumbnail. */
+  displayMode?: "literal" | "hyperlink" | "thumbnail";
+  /** Visible anchor text when `displayMode === "hyperlink"`. */
+  linkText?: string;
+  /** Mime type for hosted files. */
+  mimeType?: string;
+  /** Hosted file size in bytes — informs the limits UI. */
+  sizeBytes?: number;
+  /** Intrinsic image/video dimensions, when known. */
+  width?: number;
+  height?: number;
+  /** Thumbnail URL — OG image, YouTube poster, generated WebP, etc. */
+  thumbnailUrl?: string;
+  /** OG-fetched title/description for `provider="website"` rows. */
+  previewTitle?: string;
+  previewDescription?: string;
+  /** Server-side row id — present after the row has been persisted. */
+  resourceId?: string;
 }
+
+/** Provider tag computed from the resource URL — narrows the renderer's
+ *  embed strategy without touching the DB's coarse `resource_kind` enum. */
+export type ResourceProvider =
+  | "youtube"
+  | "vimeo"
+  | "gslides"
+  | "gdocs"
+  | "gsheets"
+  | "gdrive"
+  | "pdf"
+  | "image"
+  | "video"
+  | "audio"
+  | "website";
 
 /** Per-lesson completion / catch-up state. */
 export type LessonStatus =

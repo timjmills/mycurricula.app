@@ -14,4 +14,14 @@
   // Serve the Worker on the production domain. `custom_domain` provisions the
   // DNS record + TLS cert automatically, since the zone is in this account.
   "routes": [{ "pattern": "mycurricula.app", "custom_domain": true }],
+
+  // R2 binding for lesson resources. The Worker uses it server-side (the
+  // browser uploads directly via presigned URLs from lib/r2.ts). Bucket
+  // must exist before deploy — see docs/claude-access.md §Resource embed.
+  "r2_buckets": [
+    {
+      "binding": "LESSON_RESOURCES",
+      "bucket_name": "lesson-resources",
+    },
+  ],
 }
