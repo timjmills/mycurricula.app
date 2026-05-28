@@ -57,6 +57,7 @@ import { CatchupFlameButton } from "./catchup-flame-button";
 import { Clock } from "./Clock";
 import { SHORTCUTS_TOGGLE_EVENT } from "./global-shortcuts";
 import { NotificationBell } from "./NotificationBell";
+import { SearchResults } from "./SearchResults";
 import { TeamModeIntro } from "./team-mode-intro";
 import { TopBarMoreMenu } from "./top-bar-more-menu";
 import styles from "./top-bar.module.css";
@@ -639,34 +640,65 @@ export function TopBar(): ReactNode {
             ⋯ More menu (TopBarMoreMenu) as an inline input — that path
             keeps every control reachable. */}
         {searchOpen ? (
-          <div className={styles.searchWrap}>
-            <span className={styles.searchIcon} aria-hidden="true">
-              <SearchIcon />
-            </span>
-            <input
-              ref={searchInputRef}
-              type="search"
-              className={styles.searchInput}
-              placeholder="Search lessons…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search lessons"
-              data-search-input
-              // Collapse on blur when the query is empty; keep open otherwise
-              // so results stay visible after the teacher types something.
-              onBlur={() => {
-                if (!search) setSearchOpen(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  setSearch("");
-                  setSearchOpen(false);
-                }
-              }}
-            />
-          </div>
+          // W4-D2: the expanded search input drives BOTH the existing
+          // useAppState().search query string (consumed by WeeklyGrid to
+          // filter the visible grid) AND the new overlay results panel
+          // (<SearchResults> below). The two consumers are intentionally
+          // independent — the grid filter is the legacy single-route narrow,
+          // the results panel is the global jump-to-anything surface.
+          //
+          // Tooltip onboarding copy follows CLAUDE.md §4 voice: the search
+          // input's first-time-teacher discovery story names the four
+          // sources + the click-to-jump affordance, so a teacher who only
+          // ever used the planner's old in-grid search learns the global
+          // search shape on hover. tooltipId="topbar-search" makes the tip
+          // dismissible via the W2-B3 system (it's an explanatory tip, not
+          // a high-consequence one — no `required`).
+          <Tooltip
+            content="Search lessons, standards, resources, and team comments. Click a result to jump there."
+            side="bottom"
+            tooltipId="topbar-search"
+          >
+            <div className={styles.searchWrap}>
+              <span className={styles.searchIcon} aria-hidden="true">
+                <SearchIcon />
+              </span>
+              <input
+                ref={searchInputRef}
+                type="search"
+                className={styles.searchInput}
+                placeholder="Search lessons…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search lessons"
+                aria-haspopup="listbox"
+                data-search-input
+                // Collapse on blur when the query is empty; keep open otherwise
+                // so results stay visible after the teacher types something.
+                // The SearchResults panel manages its OWN click-outside
+                // close — it ignores blurs that move focus into the panel
+                // (the panel's mousedown stopPropagation keeps the input
+                // focused). When the user clicks a result, SearchResults
+                // calls back via onDismiss which clears `search`; the next
+                // blur then collapses the input naturally.
+                onBlur={() => {
+                  if (!search) setSearchOpen(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearch("");
+                    setSearchOpen(false);
+                  }
+                }}
+              />
+            </div>
+          </Tooltip>
         ) : (
-          <Tooltip content="Search lessons" side="bottom">
+          <Tooltip
+            content="Search lessons, standards, resources, and team comments. Click a result to jump there."
+            side="bottom"
+            tooltipId="topbar-search"
+          >
             <Button
               variant="icon"
               iconAriaLabel="Search lessons"
@@ -681,6 +713,25 @@ export function TopBar(): ReactNode {
             </Button>
           </Tooltip>
         )}
+        {/* W4-D2 — overlay results panel anchored under the search input.
+            Self-gates on `query.trim() !== ""` and renders nothing on the
+            SSR pass. The panel portals to document.body so it escapes the
+            top bar's overflow-x: clip. Mounted unconditionally here (not
+            inside the searchOpen branch) because the input ref is what
+            anchors it — keeping the panel adjacent to its anchor minimizes
+            React tree churn when the input collapses. */}
+        <SearchResults
+          query={search}
+          anchorRef={searchInputRef}
+          onDismiss={() => {
+            // Clear the query so the input collapses on its next blur, and
+            // so the grid-level filter (WeeklyGrid) stops narrowing too —
+            // the teacher just jumped somewhere new and shouldn't land with
+            // a filter still active. Keep searchOpen as-is; the input
+            // collapses naturally when blur fires on an empty query.
+            setSearch("");
+          }}
+        />
 
         {/* ── Layer-3 Catch-up flame badge (planning-doc §1262) ────────
             Self-gates on enabled + total uncovered count > 0. Renders the

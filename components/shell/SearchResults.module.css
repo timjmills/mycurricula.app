@@ -1,0 +1,258 @@
+/* SearchResults.module.css — top-bar search overlay panel (W4-D2 frontend).
+ *
+ * The panel mirrors the NotificationBell.module.css recipe: portalled, fixed
+ * positioning, paper background, line-strong border, popover shadow. The
+ * width is wider (420px vs 360px) because the rows carry a breadcrumb + a
+ * snippet on a third line — narrow rows would force wrapping and break the
+ * single-result-per-row rhythm.
+ *
+ * All values reference `var(--token)` per CLAUDE.md §4 — no hex.
+ */
+
+/* ── Panel ───────────────────────────────────────────────────────────── */
+
+.panel {
+  position: fixed;
+  /* Width is set inline from computePlacement so the panel can clamp into
+     viewport at narrow widths without overflowing past the right edge.
+     Default fallback kept here for clarity. */
+  width: 420px;
+  max-width: calc(100vw - 16px);
+  max-height: min(75vh, 560px);
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: var(--line-strong);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-popover);
+  /* Above the top bar (z:30) and tooltip portal but below modal scrims —
+     same band the NotificationBell panel uses. */
+  z-index: 50;
+  pointer-events: auto;
+  /* Enter fade — 120ms ease. Suppressed under prefers-reduced-motion. */
+  animation: panelFade 120ms ease-out;
+}
+
+@keyframes panelFade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}
+
+/* ── Filter row ──────────────────────────────────────────────────────── */
+/* The ToggleGroup primitive ships its own tray styles — this wrapper just
+   gives it room to breathe at the top of the panel. The row is the panel's
+   sticky chrome: as the result list scrolls, the filter pills stay put. */
+
+.filterRow {
+  padding: 10px 12px;
+  border-bottom: var(--line);
+  flex: 0 0 auto;
+  /* Allow the ToggleGroup to scroll horizontally if the panel is clamped
+     narrow on phone — five chips don't fit at 320px otherwise. */
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* ── Scrollable result body ──────────────────────────────────────────── */
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+/* ── Group section ───────────────────────────────────────────────────── */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  border-bottom: var(--line);
+}
+
+.group:last-child {
+  border-bottom: none;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px 6px;
+}
+
+.groupLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.groupCount {
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-400);
+}
+
+.rowList {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Row ─────────────────────────────────────────────────────────────── */
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.row:hover {
+  background: var(--ink-50);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+/* ── Row icon ────────────────────────────────────────────────────────── */
+/* The icon column is fixed-width (28px) so all rows align regardless of
+   which source they came from. Lessons paint a subject-color monogram chip
+   (uses the .cp-subj.<id> palette bridge — never a hard-coded color);
+   standards/comments/resources get a neutral ink-500 mono glyph. */
+
+.rowIcon {
+  flex: 0 0 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-6);
+  /* Neutral ink tray — overridden when the inner node is a subject chip
+     (the chip itself paints the colored fill via .cp-subj). */
+  background: var(--ink-100);
+  color: var(--ink-500);
+  margin-top: 1px;
+}
+
+/* Subject monogram chip — fills the icon slot with the subject color via
+   the .cp-subj palette bridge (CLAUDE.md §4 — never hard-code a subject
+   color). The chip sits inside .rowIcon and paints over the neutral tray. */
+.subjectChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--r-6);
+  background: var(--c);
+  color: var(--paper);
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.resourceIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Row body — title / breadcrumb / snippet ────────────────────────── */
+
+.rowBody {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.rowTitle {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-900);
+  line-height: 1.3;
+  /* One-line clamp — long titles get an ellipsis so rows stay scannable. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowBreadcrumb {
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--ink-500);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowSnippet {
+  font-size: var(--t-11);
+  color: var(--ink-400);
+  line-height: 1.4;
+  /* Two-line clamp — the engine already caps the snippet at ~120 chars and
+     we re-cap at 80 here, but very long single-line snippets still need a
+     visual ceiling. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-wrap: pretty;
+  margin-top: 1px;
+}
+
+/* ── Comments stand-in ───────────────────────────────────────────────── */
+/* Wraps the <FutureControl> so it sits centered with comfortable padding
+   inside the Comments group section. */
+
+.commentsStandIn {
+  display: flex;
+  justify-content: center;
+  padding: 8px 14px 14px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────── */
+/* On phone, narrow the panel and let it nearly fill the viewport. The
+   inline width on .panel uses computePlacement's clamp, so this rule only
+   needs to absorb max-height tightening. */
+
+@media (max-width: 480px) {
+  .panel {
+    max-height: 70vh;
+  }
+  .filterRow {
+    padding: 8px 10px;
+  }
+  .row {
+    padding: 8px 10px;
+  }
+  .groupHeader {
+    padding: 8px 10px 4px;
+  }
+}
