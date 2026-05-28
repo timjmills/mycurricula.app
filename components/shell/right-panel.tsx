@@ -35,7 +35,7 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   TODOS,
   TAG_BY_ID,
@@ -993,6 +993,19 @@ function LessonDetailPanel({ lessonId }: { lessonId: string }): ReactNode {
 
 export function RightPanel(): ReactNode {
   const { todoPanelOpen, commentsPanelOpen, selectedLessonId } = useAppState();
+  const pathname = usePathname();
+
+  // ── /weekly gate (W3 carry-over fix) ───────────────────────────────────
+  // On the Weekly view the <WeeklyRailDrawer> overlay is the canonical
+  // surface for the to-do / Shoutbox / lesson-detail rail content — it
+  // mounts on ≤1280px viewports via WeeklyShell. The shell-level
+  // <RightPanel> reads the same `todoPanelOpen` / `commentsPanelOpen`
+  // flags, so without this gate BOTH surfaces would mount when a rail
+  // icon is clicked on Weekly at narrow widths (the shell pops a 320px
+  // column AND the drawer slides in over it). Returning null here on
+  // /weekly leaves the WeeklyRailDrawer as the single source for that
+  // content; every other route keeps the shell panel unchanged.
+  if (pathname?.startsWith("/weekly")) return null;
 
   // Priority: to-do > comments > lesson detail > null.
   if (todoPanelOpen) return <TodoPanel />;
