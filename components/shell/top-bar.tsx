@@ -56,6 +56,7 @@ import { Button, Tooltip, ToggleGroup } from "@/components/ui";
 import { CatchupFlameButton } from "./catchup-flame-button";
 import { Clock } from "./Clock";
 import { SHORTCUTS_TOGGLE_EVENT } from "./global-shortcuts";
+import { NotificationBell } from "./NotificationBell";
 import { TeamModeIntro } from "./team-mode-intro";
 import { TopBarMoreMenu } from "./top-bar-more-menu";
 import styles from "./top-bar.module.css";
@@ -514,8 +515,7 @@ export function TopBar(): ReactNode {
               // standard ("Personal / Team Curriculum").
               value: "master",
               label: "Team Curriculum",
-              ariaLabel:
-                "Team Curriculum mode — changes affect the whole team",
+              ariaLabel: "Team Curriculum mode — changes affect the whole team",
               title:
                 "Edit the team's curriculum — changes affect every teacher on your team",
             },
@@ -688,6 +688,16 @@ export function TopBar(): ReactNode {
             tints the chip with var(--catchup). Click navigates to
             /catch-up. */}
         <CatchupFlameButton />
+
+        {/* ── W4-D1 NotificationBell — team activity inbox ────────────
+            Bell + count badge + portalled dropdown. Mounts here per the
+            audit's "between Catch-up flame and Profile avatar" spec.
+            Backed today by a mocked presence layer
+            (lib/realtime-presence.ts); the hook contract is the Phase-1B
+            seam so swapping to Supabase Realtime is a single-file
+            change. The dropdown portals to document.body so it escapes
+            the top bar's overflow-x: clip. */}
+        <NotificationBell />
 
         {/* ── To-do panel toggle ──────────────────────────────────────
             tooltip= prop wraps the button in the canonical <Tooltip>

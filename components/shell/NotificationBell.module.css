@@ -1,0 +1,304 @@
+/* NotificationBell.module.css — top-bar bell button + portalled dropdown.
+ *
+ * The button itself mirrors the .signOutBtn / .flameBtn recipe in the
+ * top-bar / catchup-flame stylesheet: 44×44 ghost icon, neutral ink-500
+ * at rest, ink-100 fill on hover. The badge re-uses the top-bar .badgeWrap
+ * + .badge geometry (positioned absolutely top-right of the button).
+ *
+ * The dropdown is portalled to document.body (see NotificationBell.tsx)
+ * so it escapes the top bar's `overflow-x: clip`. Positioning is
+ * computed from the button's getBoundingClientRect() on each open —
+ * same pattern as components/ui/Tooltip.tsx.
+ *
+ * All values reference `var(--token)` per CLAUDE.md §4 — no hex.
+ */
+
+/* ── Bell icon button ───────────────────────────────────────────────── */
+
+.bellBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--r-8);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.bellBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.bellBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.bellBtn:active {
+  background: var(--ink-150);
+}
+
+/* Open state — the dropdown is showing. Mirror the top-bar `.iconActive`
+   recipe so the bell visually stays "pressed" while the panel is up. */
+.bellBtnOpen {
+  background: var(--ink-100);
+  border-color: var(--ink-200);
+  color: var(--ink-900);
+}
+
+/* Notification chip override — same geometry as the top-bar badge, but
+   tinted with --fyi so it reads as informational not urgent. */
+.notifBadge {
+  background: var(--fyi);
+}
+
+/* ── Dropdown panel (portalled) ─────────────────────────────────────── */
+
+.panel {
+  position: fixed;
+  width: 360px;
+  max-width: calc(100vw - 16px);
+  max-height: min(70vh, 520px);
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: var(--line-strong);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-popover);
+  /* Above the top bar (z:30) and the tooltip portal but below modal scrim. */
+  z-index: 50;
+  /* The panel is interactive — let pointer events through. */
+  pointer-events: auto;
+  /* Enter fade — 120ms ease. Suppressed under prefers-reduced-motion. */
+  animation: panelFade 120ms ease-out;
+}
+
+@keyframes panelFade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: var(--line);
+  flex: 0 0 auto;
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.headerCount {
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-400);
+  margin-left: 6px;
+}
+
+/* ── Scrollable list body ────────────────────────────────────────────── */
+
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.emptyWrap {
+  /* EmptyState wants a flex container to center inside. */
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 160px;
+}
+
+/* ── Row ─────────────────────────────────────────────────────────────── */
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px solid var(--ink-100);
+  transition: background 120ms ease;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: var(--ink-50);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+/* Non-clickable row variant — used for system notifications without a link.
+   Still keyboard-focusable for the dismiss action. */
+.rowStatic {
+  cursor: default;
+}
+
+.rowStatic:hover {
+  background: transparent;
+}
+
+/* ── Avatar chip ─────────────────────────────────────────────────────── */
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--paper);
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+/* System-notification avatar — neutral ink chip, no actor color. */
+.avatarSystem {
+  background: var(--ink-200);
+  color: var(--ink-700);
+}
+
+/* ── Row text ────────────────────────────────────────────────────────── */
+
+.rowBody {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rowTitle {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-900);
+  line-height: 1.35;
+  /* Two-line clamp keeps long titles tidy. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-wrap: pretty;
+}
+
+.rowSub {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-wrap: pretty;
+}
+
+.rowTime {
+  font-size: var(--t-10);
+  font-weight: 500;
+  color: var(--ink-400);
+  margin-top: 1px;
+}
+
+/* ── Dismiss × button ────────────────────────────────────────────────── */
+
+.dismissBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: var(--r-4);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-400);
+  cursor: pointer;
+  flex: 0 0 auto;
+  opacity: 0.7;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+.row:hover .dismissBtn,
+.dismissBtn:focus-visible {
+  opacity: 1;
+}
+
+.dismissBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.dismissBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-top: var(--line);
+  flex: 0 0 auto;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────── */
+/* On phone, narrow the panel and let it nearly fill the viewport. */
+
+@media (max-width: 480px) {
+  .panel {
+    width: calc(100vw - 16px);
+    max-height: 70vh;
+  }
+}

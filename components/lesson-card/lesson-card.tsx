@@ -26,6 +26,8 @@ import { SUBJECT_BY_ID } from "@/lib/mock";
 import { useSubjectColor } from "@/lib/palette";
 import { useTeamModeEditCue } from "@/lib/use-team-mode-edit-cue";
 import { useTheme } from "@/lib/theme";
+import { useTeacherPresence } from "@/lib/realtime-presence";
+import { EditingIndicator } from "./editing-indicator";
 import { Icon } from "./icon";
 import { LessonContextMenu } from "./context-menu";
 import type { ContextAction, ContextActionPayload } from "./context-menu";
@@ -102,6 +104,15 @@ export function LessonCard({
   const { style } = useTheme();
   const color = useSubjectColor(lesson.subject);
   const subject = SUBJECT_BY_ID[lesson.subject];
+
+  // W4-D1: per-lesson presence lookup. The hook reads from a module-frozen
+  // map today (lib/realtime-presence.ts); the result drives both the
+  // <EditingIndicator> chip AND the title row's padding-right reservation
+  // so the title never runs under the absolutely-positioned indicator
+  // cluster. `editorCount` is 0 for every lesson that has no active
+  // editors — the common case keeps its historical padding.
+  const { activeEditors } = useTeacherPresence();
+  const editorCount = activeEditors.get(lesson.id)?.length ?? 0;
 
   const [hovered, setHovered] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -226,7 +237,11 @@ export function LessonCard({
     >
       <div aria-hidden style={stripeStyle} />
 
-      {/* Top-right indicator cluster — move arrow / Modified pill / ⋯ */}
+      {/* Top-right indicator cluster — editing pill / move arrow / Modified pill / ⋯
+          W4-D1: the EditingIndicator is FIRST in the row so it reads as
+          status context BEFORE the personal-fork pills. It renders null
+          when no other teacher is editing, so the cluster keeps its
+          historical layout for the common case. */}
       <div
         style={{
           position: "absolute",
@@ -238,6 +253,7 @@ export function LessonCard({
           zIndex: 2,
         }}
       >
+        <EditingIndicator lessonId={lesson.id} />
         {lesson.moved && (
           <Tooltip
             content={
@@ -375,7 +391,11 @@ export function LessonCard({
             flex: 1,
             minWidth: 0,
             // Leave room for the top-right indicator cluster.
+            // W4-D1: reserve ~120px when an EditingIndicator paints so the
+            // title doesn't underrun the chip; the indicator clamps itself
+            // to maxWidth: 130 so the reservation is generous-but-finite.
             paddingRight:
+              (editorCount > 0 ? 124 : 0) +
               (lesson.modified ? 64 : 0) +
               (lesson.moved ? 20 : 0) +
               (dragHandleProps ? 24 : 22),
