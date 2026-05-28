@@ -329,18 +329,20 @@ export function TopBarMoreMenu({
             </button>
           </Tooltip>
 
-          {/* ── Shoutbox panel toggle (with unread badge) ────────────────
-              User-visible label is "Shoutbox" — the panel subsumes both
-              team chat and the comment index per the rename brief. The
-              unread count chip mirrors the desktop badge styling but
-              renders inline on the row's right edge rather than absolutely
-              over the icon — the menu row has more room to spell out the
-              count and the chip stays a sibling, not a layered overlay. */}
+          {/* ── Team Shoutbox panel toggle (with unread badge) ───────────
+              User-visible label is "Team Shoutbox" (W5-E3 disambiguation
+              from the per-day "Today's Shoutbox" surface on the Daily
+              view). The panel subsumes both team chat and the comment
+              index per the rename brief. The unread count chip mirrors the
+              desktop badge styling but renders inline on the row's right
+              edge rather than absolutely over the icon — the menu row has
+              more room to spell out the count and the chip stays a
+              sibling, not a layered overlay. */}
           <Tooltip
             content={
               commentsPanelOpen
-                ? "Close the Shoutbox panel"
-                : `Open the team Shoutbox — quick messages between teachers covering the same lessons and units${unreadCount > 0 ? ` — ${unreadCount} unread` : ""}`
+                ? "Close the Team Shoutbox panel"
+                : `Open the Team Shoutbox — quick messages between teachers covering the same lessons and units${unreadCount > 0 ? ` — ${unreadCount} unread` : ""}`
             }
             side="left"
           >
@@ -352,25 +354,25 @@ export function TopBarMoreMenu({
               aria-expanded={commentsPanelOpen}
               aria-label={
                 commentsPanelOpen
-                  ? "Close Shoutbox panel"
-                  : `Open Shoutbox panel${unreadCount > 0 ? ` (${unreadCount} unread Shoutbox messages)` : ""}`
+                  ? "Close Team Shoutbox panel"
+                  : `Open Team Shoutbox panel${unreadCount > 0 ? ` (${unreadCount} unread Team Shoutbox messages)` : ""}`
               }
               title={
                 commentsPanelOpen
-                  ? "Close the Shoutbox panel"
-                  : `Open the team Shoutbox — quick messages between teachers covering the same lessons and units${unreadCount > 0 ? ` — ${unreadCount} unread` : ""}`
+                  ? "Close the Team Shoutbox panel"
+                  : `Open the Team Shoutbox — quick messages between teachers covering the same lessons and units${unreadCount > 0 ? ` — ${unreadCount} unread` : ""}`
               }
             >
               <span className={styles.rowIcon} aria-hidden="true">
                 <CommentsIcon />
               </span>
               <span className={styles.rowLabel}>
-                {commentsPanelOpen ? "Close Shoutbox panel" : "Shoutbox"}
+                {commentsPanelOpen ? "Close Team Shoutbox panel" : "Team Shoutbox"}
               </span>
               {unreadCount > 0 && (
                 <span
                   className={styles.rowBadge}
-                  aria-label={`${unreadCount} unread Shoutbox messages`}
+                  aria-label={`${unreadCount} unread Team Shoutbox messages`}
                 >
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>

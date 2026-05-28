@@ -219,7 +219,7 @@ export function WeeklyRailDrawer({
   if (!open) return null;
   if (typeof document === "undefined") return null;
 
-  const headingText = `Resources, To-dos, and Shoutbox — Week ${week}`;
+  const headingText = `Resources, To-dos, and Today's Shoutbox — Week ${week}`;
 
   // Portal so the drawer escapes any overflow:hidden / transform parent in
   // the WeeklyShell layout. Same approach as SchedulePanel.
@@ -236,13 +236,13 @@ export function WeeklyRailDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
-        title="Week rail — Resources for every lesson in this week, your to-dos, and the team Shoutbox. Swipe or tap outside to dismiss."
+        title="Week rail — Resources for every lesson in this week, your to-dos, and Today's Shoutbox (per-day team chat). Swipe or tap outside to dismiss."
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header — eyebrow + title + × close ──────────────────────── */}
         <header className={styles.header}>
           <Tooltip
-            content="Week rail — Resources aggregates across every lesson in the week. To-dos and Shoutbox stay scoped to the focused day."
+            content="Week rail — Resources aggregates across every lesson in the week. To-dos and Today's Shoutbox stay scoped to the focused day."
             side="bottom"
           >
             <div className={styles.headerText} tabIndex={0}>

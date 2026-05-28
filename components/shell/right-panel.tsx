@@ -344,7 +344,7 @@ const SHOUTBOX_TABS: ReadonlyArray<{
     id: "team",
     label: "Team chat",
     tooltip:
-      "Team chat — quick messages between teachers covering the same lessons and units. The day-scoped Day Shoutbox on the Daily view is the per-day counterpart.",
+      "Team chat — quick messages between teachers covering the same lessons and units. The day-scoped Today's Shoutbox on the Daily view is the per-day counterpart.",
   },
   {
     id: "lesson",
@@ -447,24 +447,24 @@ function CommentsPanel(): ReactNode {
     <div
       className={`cp-root ${styles.panel}`}
       role="complementary"
-      aria-label="Shoutbox"
+      aria-label="Team Shoutbox"
     >
       {/* Header */}
       <div className={styles.header}>
         <Tooltip
-          content="The team Shoutbox — quick messages between teachers plus the index of every Lesson and Unit Comment across the curriculum."
+          content="The Team Shoutbox — quick messages between teachers plus the index of every Lesson and Unit Comment across the curriculum. The day-scoped Today's Shoutbox on the Daily view is the per-day counterpart."
           side="bottom"
         >
           <h2 className={styles.headerTitle} tabIndex={0}>
-            Shoutbox
+            Team Shoutbox
           </h2>
         </Tooltip>
         <button
           type="button"
           className={`cp-focusable ${styles.closeBtn}`}
           onClick={toggleCommentsPanel}
-          aria-label="Close Shoutbox panel"
-          title="Close the Shoutbox panel"
+          aria-label="Close Team Shoutbox panel"
+          title="Close the Team Shoutbox panel"
         >
           <CloseIcon />
         </button>
@@ -472,7 +472,7 @@ function CommentsPanel(): ReactNode {
 
       {/* Tabs row — reuses the .todoTabs / .todoTab vocabulary so the visual
           treatment matches the To-do panel above. */}
-      <div className={styles.todoTabs} role="tablist" aria-label="Shoutbox sections">
+      <div className={styles.todoTabs} role="tablist" aria-label="Team Shoutbox sections">
         {SHOUTBOX_TABS.map((tab) => {
           const isActive = tab.id === activeTab;
           return (
@@ -532,9 +532,9 @@ function TeamChatTab(): ReactNode {
         messages between teachers covering the same lessons and units.
       </p>
       <p className={styles.emptyState} style={{ padding: 0, textAlign: "left" }}>
-        While the global team chat is still being built, head to the{" "}
-        <strong>Day Shoutbox</strong> on the Daily view — it&apos;s the
-        day-scoped version that&apos;s live today.
+        While the global team chat is still being built, head to{" "}
+        <strong>Today&apos;s Shoutbox</strong> on the Daily view — it&apos;s
+        the day-scoped version that&apos;s live today.
       </p>
     </div>
   );

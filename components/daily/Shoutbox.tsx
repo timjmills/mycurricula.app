@@ -11,9 +11,11 @@
 //
 // ── Visual treatment (Image 13) ──────────────────────────────────────────
 // A WHITE card matching the Resources + To-do List cards above. The head
-// row shows "Day Shoutbox", a small "Team chat" fyi-blue pill clarifying
-// that this is the team-visible counterpart to the personal Daily Notes
-// banner, and a small red unread badge (Phase 1A: stub count). Messages
+// row shows "Today's Shoutbox" (W5-E3 disambiguation — was "Day Shoutbox";
+// the global Team Shoutbox on the top-bar is the curriculum-wide
+// counterpart), a small "Team chat" fyi-blue pill clarifying that this is
+// the team-visible counterpart to the personal Daily Notes banner, and a
+// small red unread badge (Phase 1A: stub count). Messages
 // each render as a compact bubble: a circular avatar on the left, then a
 // stack of author first-name + timestamp + the message bubble itself.
 // The composer at the bottom is a chat-style "Type a message…" input with
@@ -342,7 +344,7 @@ export function Shoutbox({
             iconAriaLabel="Post message"
             className={`${styles.iconBtn} ${styles.sendBtn}`}
             disabled={draft.trim().length === 0}
-            tooltip="Post this message to today's shoutbox — every teacher on the team sees it on their Daily view"
+            tooltip="Post this message to Today's Shoutbox — every teacher on the team sees it on their Daily view"
           >
             <SendIcon />
           </Button>
@@ -354,15 +356,15 @@ export function Shoutbox({
   return (
     <section
       className={styles.panel}
-      aria-label="Day shoutbox"
-      title="Day Shoutbox panel — a team-wide chat scoped to today; share quick updates, ask for cover, or flag something the whole grade should know"
+      aria-label="Today's Shoutbox"
+      title="Today's Shoutbox panel — a team-wide chat scoped to the focused day; share quick updates, ask for cover, or flag something the whole grade should know. The global Team Shoutbox on the top-bar is the curriculum-wide counterpart."
     >
       {/* ── Head: optional grip + title + Team-chat tag + unread + chevron ── */}
       <header className={styles.head}>
         {/* Drag grip — only rendered when the rail wires the bundle. */}
         {dragHandleProps && (
           <Tooltip
-            content="Drag to reorder the Day Shoutbox panel within the right rail."
+            content="Drag to reorder Today's Shoutbox panel within the right rail."
             side="bottom"
           >
             <button
@@ -372,20 +374,20 @@ export function Shoutbox({
               {...(dragHandleProps.listeners ?? {})}
               className={styles.gripBtn}
               aria-label={
-                dragHandleProps.label ?? "Drag to reorder Day Shoutbox"
+                dragHandleProps.label ?? "Drag to reorder Today's Shoutbox"
               }
-              title="Drag to reorder the Day Shoutbox panel"
+              title="Drag to reorder Today's Shoutbox panel"
             >
               <GripVerticalIcon />
             </button>
           </Tooltip>
         )}
         <Tooltip
-          content="Team chat scoped to today — quick notes between teachers covering the same day. Share quick updates, ask for cover, or flag something the whole grade should know."
+          content="Team chat scoped to the focused day — quick notes between teachers covering the same day. Share quick updates, ask for cover, or flag something the whole grade should know. The global Team Shoutbox on the top-bar is the curriculum-wide counterpart."
           side="bottom"
         >
           <h3 className={styles.title} tabIndex={0}>
-            Day Shoutbox
+            Today&apos;s Shoutbox
           </h3>
         </Tooltip>
         <span className={styles.tag}>Team chat</span>
@@ -403,16 +405,16 @@ export function Shoutbox({
             variant="icon"
             iconAriaLabel={
               collapsed
-                ? "Expand Day Shoutbox panel"
-                : "Collapse Day Shoutbox panel"
+                ? "Expand Today's Shoutbox panel"
+                : "Collapse Today's Shoutbox panel"
             }
             className={styles.collapseBtn}
             onClick={onToggleCollapsed}
             aria-expanded={!collapsed}
             tooltip={
               collapsed
-                ? "Expand the Day Shoutbox to see today's team chat"
-                : "Collapse the Day Shoutbox — unread count stays visible in the header"
+                ? "Expand Today's Shoutbox to see the day's team chat"
+                : "Collapse Today's Shoutbox — unread count stays visible in the header"
             }
           >
             <ChevronToggleIcon collapsed={collapsed} />

@@ -675,7 +675,7 @@ export function LessonCard({
         )}
         {lesson.commentCount > 0 && (
           <Tooltip
-            content={`${lesson.commentCount} Lesson Comment${lesson.commentCount === 1 ? "" : "s"} from your team — open the card to read them. Lesson Comments live in the Shoutbox under the All-comments tab.`}
+            content={`${lesson.commentCount} Lesson Comment${lesson.commentCount === 1 ? "" : "s"} from your team — open the card to read them. Lesson Comments live in the Team Shoutbox under the All-comments tab.`}
             side="top"
           >
             <span

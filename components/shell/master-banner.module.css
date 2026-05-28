@@ -69,3 +69,35 @@
   }
 }
 
+/* ── Phone polish (W5-E2) ───────────────────────────────────────────────
+ *
+ * The visible banner copy ("Heads up — changes here affect the whole team.")
+ * is ~47 characters. At ≤480px the desktop padding (10px 20px on heads-up,
+ * 5px 16px on persistent) leaves only ~294px / ~306px for the text + icon,
+ * which forces a 14px / 12px run to wrap onto two lines on phones — eating
+ * vertical space that's already at a premium on a 44px-bar topbar layout.
+ *
+ * Tightening horizontal padding and bumping the font down one step keeps the
+ * line single, the icon snug, and the safety message legible without
+ * hiding it (CLAUDE.md §2: the banner is a high-consequence safety
+ * affordance and is never collapsed away). Vertical padding is preserved
+ * so the strip's touch-target footprint doesn't shrink below the
+ * surrounding chrome rhythm.
+ *
+ * The text remains `white-space: normal` (default) — if a teacher uses a
+ * larger font-size accessibility setting and the line still wraps, that's
+ * acceptable: legibility wins over single-line.
+ */
+@media (max-width: 480px) {
+  .headsUp {
+    padding: 10px 12px;
+    font-size: var(--t-13);
+    gap: 6px;
+  }
+  .persistent {
+    padding: 5px 10px;
+    font-size: var(--t-11);
+    gap: 6px;
+  }
+}
+

@@ -55,7 +55,7 @@ const ICON_LABEL: Record<RailIconId, string> = {
   today: "Today",
   schedule: "Schedule",
   todos: "To-dos",
-  comments: "Shoutbox",
+  comments: "Team Shoutbox",
   resources: "Resources",
   year: "Year overview",
   voice: "Voice note",

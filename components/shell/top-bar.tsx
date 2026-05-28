@@ -773,11 +773,12 @@ export function TopBar(): ReactNode {
           <TodoIcon />
         </Button>
 
-        {/* ── Shoutbox panel toggle with unread badge ─────────────────
-            User-visible label is "Shoutbox" — the same internal panel that
-            was the "Comments" panel now subsumes both team chat and the
-            per-lesson/per-unit comment index. State names
-            (commentsPanelOpen / toggleCommentsPanel) stay as-is for
+        {/* ── Team Shoutbox panel toggle with unread badge ────────────
+            User-visible label is "Team Shoutbox" (W5-E3 disambiguation
+            from the per-day "Today's Shoutbox" surface on the Daily view).
+            The same internal panel that was the "Comments" panel subsumes
+            both team chat and the per-lesson/per-unit comment index. State
+            names (commentsPanelOpen / toggleCommentsPanel) stay as-is for
             internal stability per the rename brief. The unread-count is
             appended to the tooltip so a teacher hovering over the badge
             sees both the count and what it means without parsing the
@@ -787,13 +788,13 @@ export function TopBar(): ReactNode {
             variant="icon"
             iconAriaLabel={
               commentsPanelOpen
-                ? "Close Shoutbox panel"
-                : `Open Shoutbox panel${unreadCount > 0 ? ` (${unreadCount} unread Shoutbox messages)` : ""}`
+                ? "Close Team Shoutbox panel"
+                : `Open Team Shoutbox panel${unreadCount > 0 ? ` (${unreadCount} unread Team Shoutbox messages)` : ""}`
             }
             tooltip={
               commentsPanelOpen
-                ? "Close the Shoutbox panel"
-                : `Open the team Shoutbox — quick messages between teachers covering the same lessons and units${unreadCount > 0 ? ` — ${unreadCount} unread` : ""}`
+                ? "Close the Team Shoutbox panel"
+                : `Open the Team Shoutbox — quick messages between teachers covering the same lessons and units${unreadCount > 0 ? ` — ${unreadCount} unread` : ""}`
             }
             tooltipSide="bottom"
             onClick={toggleCommentsPanel}
@@ -805,7 +806,7 @@ export function TopBar(): ReactNode {
           {unreadCount > 0 && (
             <span
               className={styles.badge}
-              aria-label={`${unreadCount} unread Shoutbox messages`}
+              aria-label={`${unreadCount} unread Team Shoutbox messages`}
             >
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>

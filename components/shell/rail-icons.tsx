@@ -570,14 +570,15 @@ export function RailIcon({
       break;
 
     case "comments": {
-      // User-visible label is "Shoutbox" — the rail icon opens the global
-      // Shoutbox panel which now subsumes both team chat and the browse-by-
-      // lesson/unit comment index. The state name (commentsPanelOpen /
-      // toggleCommentsPanel) and rail-layout id "comments" stay as-is for
-      // internal stability per the rename brief.
+      // User-visible label is "Team Shoutbox" (W5-E3 disambiguation from the
+      // per-day "Today's Shoutbox" surface on the Daily view). The rail icon
+      // opens the global Team Shoutbox panel which subsumes both team chat
+      // and the browse-by-lesson/unit comment index. The state name
+      // (commentsPanelOpen / toggleCommentsPanel) and rail-layout id
+      // "comments" stay as-is for internal stability per the rename brief.
       body = (
         <Tooltip
-          content={`Open the team Shoutbox — quick messages between teachers covering the same lessons and units${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}\n${hint}`}
+          content={`Open the Team Shoutbox — quick messages between teachers covering the same lessons and units${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}\n${hint}`}
           side={tipSide}
         >
           <div className={styles.badgeWrap}>
@@ -585,8 +586,8 @@ export function RailIcon({
               variant="icon"
               iconAriaLabel={
                 commentsPanelOpen
-                  ? "Close Shoutbox panel"
-                  : `Open Shoutbox panel${unreadCount > 0 ? ` (${unreadCount} unread Shoutbox messages)` : ""}`
+                  ? "Close Team Shoutbox panel"
+                  : `Open Team Shoutbox panel${unreadCount > 0 ? ` (${unreadCount} unread Team Shoutbox messages)` : ""}`
               }
               aria-pressed={commentsPanelOpen}
               className={`${styles.button} ${commentsPanelOpen ? styles.buttonActive : ""}`}
@@ -597,7 +598,7 @@ export function RailIcon({
             {unreadCount > 0 && (
               <span
                 className={styles.badge}
-                aria-label={`${unreadCount} unread Shoutbox messages`}
+                aria-label={`${unreadCount} unread Team Shoutbox messages`}
               >
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
