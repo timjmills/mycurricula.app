@@ -250,6 +250,126 @@ The visual system has two independent axes, both set as `<html>` data attributes
 
 ---
 
+## 4a. Code Review Gate (Claude Code → Codex)
+
+> Mirror image of the gate in `AGENTS.md` §"Code Review Gate" (which covers
+> the Codex → Claude direction). The cross-review contract is the same; only
+> the invocation differs because each agent reviews via the other.
+
+> **HARD RULE — never execute the review command without sandboxing.** Every
+> invocation MUST carry `--sandbox read-only` (or a stricter sandbox). Never
+> use `--dangerously-bypass-approvals-and-sandbox`. Never run Codex
+> unsandboxed "just to see if it works" — the sandbox IS the gate.
+>
+> If the sandboxed command refuses to run (Codex missing / not authenticated
+> / sandbox blocked by local policy / network unavailable / unknown flag in
+> the installed CLI version / anything else that stops the gate from
+> completing under `--sandbox read-only`), STOP and tell the user. Do not
+> remove or weaken the sandbox flag, do not retry with a permissive flag,
+> and do not send code through another channel. Report the blocker and the
+> strongest local fallback verification you can run instead (typically
+> `npm run lint && npx tsc --noEmit && npm run build` + the responsive
+> probe script).
+
+For changes that affect logic, security, data handling, or public interfaces,
+run an adversarial review via Codex before declaring the task complete or
+asking for user review. Trivial comments, formatting, and copy-only edits do
+not require this gate.
+
+**Invocation.** Run Codex non-interactively with the read-only sandbox so it
+cannot write to the tree and cannot stall on approval prompts:
+
+```bash
+codex exec --sandbox read-only "$REVIEW_PROMPT"
+```
+
+The legacy `--approval-policy never` flag from earlier docs is NOT recognized
+by Codex CLI 0.133+. `--sandbox read-only` is sufficient — `exec` mode is
+already non-interactive and the read-only sandbox blocks every side effect
+that could otherwise trigger an approval prompt.
+
+**Review prompt** (use verbatim):
+
+```text
+Act as a strict, skeptical Senior Security & QA Engineer. Review the current
+uncommitted changes (run `git diff` and `git diff --cached` for context). For
+each issue report: file/line, severity (Critical / High / Medium / Low), the
+concrete failure scenario, and a suggested fix. Focus on logic errors, security
+flaws, race conditions, unhandled edge cases, broken error handling, and missing
+or wrong tests. Do not praise; report only problems. If nothing is Medium or
+above, output exactly: NO BLOCKING ISSUES.
+```
+
+**When to run.** Before committing a logic / security / data-handling / public-
+interface change. The gate reviews the **uncommitted** diff (`git diff` +
+`git diff --cached`), so it has to fire BEFORE the commit lands — once
+committed, the diff against working tree is empty and the gate has nothing to
+read.
+
+**Precondition — stage every in-scope file first.** The review prompt reads
+`git diff` (working tree vs index) and `git diff --cached` (index vs HEAD),
+which together cover staged and unstaged tracked-file changes but NOT
+untracked (`??`) files. A new route, new API handler, new lib, or new helper
+sitting as `??` in `git status` would be invisible to the reviewer. Always
+run `git status --short` first, then `git add` every file that's in scope
+for the change being reviewed, BEFORE invoking the gate. The gate then sees
+the full picture.
+
+**Acting on findings.** Evaluate Codex's findings critically. Do not apply
+suggestions blindly: fix every Critical and High finding that is legitimate,
+and state why any dismissed finding is a false positive, out of scope, or
+intended behavior. Re-run the gate after fixes until Codex outputs
+`NO BLOCKING ISSUES`, or until only justified Low/Medium items remain.
+
+**If the gate cannot run** (Codex not installed, not authenticated, sandbox
+denied by local policy, network unavailable, etc.), do not bypass the
+restriction or send code through another path. Report the blocker to the user
+and fall back to the strongest available local verification — typically
+`npm run lint && npx tsc --noEmit && npm run build`, the responsive probe
+script (`node scripts/probe-uxa.mjs`), and a manual diff re-read against the
+review-prompt checklist.
+
+### Known sandbox limitations + mitigations (Windows, 2026-05-28)
+
+Observed during the first real gate invocations on this machine. Surface
+these to the user if the gate behaves unexpectedly — they are not
+permission to bypass the gate.
+
+1. **`windows sandbox: spawn setup refresh` on git commands.** Codex's
+   read-only sandbox can fail to spawn `git diff` / `git diff --cached` /
+   downstream shells on Windows. Codex falls back to direct file reads +
+   `git status --short`, so findings still arrive — but the diff-centric
+   prompt loses some context. The failure is sometimes intermittent (first
+   invocation succeeds, later invocations in the same shell session fail).
+2. **Mitigations** (in increasing order of intrusiveness):
+   - **(a) Retry in a fresh shell.** The spawn failure sometimes resolves
+     after closing + reopening the terminal.
+   - **(b) Upgrade Codex CLI.** `npm i -g @openai/codex@latest`. The npm
+     package is `@openai/codex` (not `@anthropic/codex`). The
+     `--approval-policy` flag was removed around the 0.133/0.134 boundary;
+     as of 2026-05-28 the latest is 0.134.0. If a newer release ships with
+     a Windows-sandbox fix, this is where it lands. Verify the installed
+     version with `npm list -g --depth=0 | grep codex`.
+   - **(c) Pipe the diff as stdin context.** Bypass Codex's in-sandbox
+     `git diff` by capturing the diff yourself + piping it into the
+     prompt: `git diff --cached | codex exec --sandbox read-only
+     "$REVIEW_PROMPT"`. The `[PROMPT]` argument is optional when stdin is
+     piped (Codex appends stdin as a `<stdin>` block, per
+     `codex exec --help`). This lets Codex review even when its own
+     sandbox can't shell out for the diff.
+   - **(d) Accept the gate as best-effort on Windows.** If (a)+(b)+(c)
+     all still fail, the gate is genuinely blocked. Surface the blocker
+     per the failure protocol above + run the full local verification
+     stack instead. Note in the commit message that the gate could not
+     run, what was tried, and what local verification was substituted.
+3. **Do NOT use `--dangerously-bypass-approvals-and-sandbox` as a
+   workaround.** Per the hard rule at the top of this section, every
+   invocation runs under `--sandbox read-only`. If you cannot get a
+   read-only run to work, that's a blocker to report, not a license to
+   weaken the sandbox.
+
+---
+
 ## 5. How we work — DO
 
 - **Read the spec before building a screen.** `Documents/Project Files/5.16.26

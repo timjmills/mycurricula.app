@@ -105,6 +105,57 @@ For UI work, also run the app and inspect the affected views at the required
 responsive widths. If you cannot run a command or verification step, say so
 clearly in the handoff.
 
+## Code Review Gate
+
+For changes that affect logic, security, data handling, or public interfaces,
+run an adversarial review before declaring the task complete or asking for user
+review. Trivial comments, formatting, and copy-only edits do not require this
+gate.
+
+**Precondition — stage every in-scope file first.** The review prompt reads
+`git diff` (working tree vs index) and `git diff --cached` (index vs HEAD),
+which together cover staged and unstaged tracked-file changes but NOT
+untracked (`??`) files. New files sitting as `??` in `git status` would be
+invisible to the reviewer. Run `git status --short` first and `git add`
+every file that's in scope for the change before invoking the gate.
+
+Codex must invoke Claude Code headlessly with read-only tools only:
+
+```bash
+claude -p "$REVIEW_PROMPT" --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git diff --cached:*)"
+```
+
+Use this exact review prompt:
+
+```text
+Act as a strict, skeptical Senior Security & QA Engineer. Review the current
+uncommitted changes (run `git diff` and `git diff --cached` for context). For
+each issue report: file/line, severity (Critical / High / Medium / Low), the
+concrete failure scenario, and a suggested fix. Focus on logic errors, security
+flaws, race conditions, unhandled edge cases, broken error handling, and missing
+or wrong tests. Do not praise; report only problems. If nothing is Medium or
+above, output exactly: NO BLOCKING ISSUES.
+```
+
+Evaluate Claude Code's findings critically. Do not apply suggestions blindly:
+fix every Critical and High finding that is legitimate, and state why any
+dismissed finding is a false positive, out of scope, or intended behavior.
+Re-run the review after fixes until Claude Code reports `NO BLOCKING ISSUES`, or
+until only justified Low/Medium items remain.
+
+If local policy, sandboxing, authentication, or CLI availability prevents the
+review command from running, do not bypass the restriction or send code through
+another path. Report the blocker and the safest available local verification
+instead.
+
+## Sandbox Discipline
+
+Run commands inside the normal sandbox. Do not request escalation or execute
+outside sandboxing unless the user explicitly asks for that specific command to
+run unsandboxed after being told why sandboxing blocks it. If a command fails
+because of sandbox limits, stop that path, report the blocker, and use a safer
+sandboxed alternative when one exists.
+
 ## Working Practices
 
 - Read nearby code before editing. Follow local naming, comment density, component boundaries, and state-management patterns.
