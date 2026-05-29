@@ -1,0 +1,121 @@
+/* BoardCanvasResource.module.css — full-bleed resource renderer (plan §5.1).
+   All colour/spacing from app/tokens.css; no hard-coded hex. */
+
+.frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  background: var(--ink-900);
+  overflow: hidden;
+}
+
+/* A media container that fills the board box. */
+.fill {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--paper);
+  /* Hidden until onLoad so the skeleton shows through. */
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+.iframe[data-loaded="true"] {
+  opacity: 1;
+}
+
+.image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+.image[data-loaded="true"] {
+  opacity: 1;
+}
+
+.video {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--ink-900);
+}
+
+.audioWrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink-50);
+  padding: var(--r-24, 24px);
+}
+.audio {
+  width: min(640px, 100%);
+}
+
+/* ── Loading skeleton ─────────────────────────────────────────────────── */
+.skeleton {
+  position: absolute;
+  inset: 0;
+  background: var(--ink-100, #f1f2f6);
+  overflow: hidden;
+}
+.skeletonShimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    var(--paper) 50%,
+    transparent 80%
+  );
+  opacity: 0.55;
+  transform: translateX(-100%);
+  animation: board-canvas-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes board-canvas-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ── Link fallback ────────────────────────────────────────────────────── */
+.fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink-50);
+  padding: var(--r-24, 24px);
+}
+.fallbackLink {
+  text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iframe,
+  .image {
+    transition: none;
+  }
+  .skeletonShimmer {
+    animation: none;
+    opacity: 0.3;
+  }
+}

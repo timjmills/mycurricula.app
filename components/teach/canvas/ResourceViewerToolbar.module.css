@@ -1,0 +1,43 @@
+/* ResourceViewerToolbar.module.css — T3/T4 chrome above the resource canvas.
+   Tokens only; no hard-coded hex. */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  flex: none;
+  height: 44px;
+  padding: 0 var(--r-12);
+  background: var(--paper);
+  border-bottom: var(--line);
+  min-width: 0;
+}
+
+.filename {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50%;
+}
+
+.spacer {
+  flex: 1;
+  min-width: var(--r-8);
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: var(--r-6);
+}
+
+.pageLabel,
+.zoomLabel {
+  font-size: 12px;
+  color: var(--ink-500);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

@@ -1,0 +1,363 @@
+/* ResourcesModule.module.css — Teach Resources module (grid/list + search +
+ * filter chips + draggable cards). Colour/type/radius come from tokens only
+ * (CLAUDE.md §4); the type pills draw from the --tag-*-bg / --tag-*-fg family. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+}
+
+/* ── Search ────────────────────────────────────────────────────────────── */
+.searchRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 9px;
+  display: inline-flex;
+  color: var(--ink-400);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 10px 8px 30px;
+  border: 1px solid var(--ink-150);
+  border-radius: 8px;
+  background: var(--ink-50);
+  color: var(--ink-900);
+  font-size: var(--t-13);
+  font-family: inherit;
+}
+
+.searchInput::placeholder {
+  color: var(--ink-400);
+}
+
+.searchInput:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+  background: var(--paper);
+}
+
+.searchInput:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Grid / list toggle ─────────────────────────────────────────────────── */
+.viewToggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--ink-50);
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.viewBtn {
+  width: 30px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--ink-500);
+}
+
+.viewBtnActive {
+  background: var(--paper);
+  color: var(--ink-900);
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Filter chips ───────────────────────────────────────────────────────── */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.chip {
+  padding: 4px 11px;
+  min-height: 26px;
+  border: 1px solid var(--ink-150);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-500);
+  font-size: var(--t-11);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--ink-300);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.chipActive {
+  background: var(--fyi);
+  border-color: var(--fyi);
+  color: var(--paper);
+}
+
+/* ── Body / scroll region ───────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.empty {
+  margin: 14px 4px;
+  color: var(--ink-400);
+  font-size: var(--t-13);
+  text-align: center;
+}
+
+/* ── Grid ───────────────────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* ── Grid card ──────────────────────────────────────────────────────────── */
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ink-150);
+  border-radius: 9px;
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+.dragging {
+  opacity: 0.5;
+}
+
+.thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 78px;
+}
+
+.cardTitle {
+  padding: 7px 9px 9px;
+  font-size: var(--t-11);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink-900);
+}
+
+.cardPill {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+}
+
+.cardMagnifyBtn {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  color: var(--ink-500);
+  box-shadow: var(--shadow-card);
+  opacity: 0;
+  transition: opacity 0.12s ease-out;
+}
+
+.card:hover .cardMagnifyBtn,
+.card:focus-within .cardMagnifyBtn {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  /* Touch: no hover, so keep the magnify affordance always visible. */
+  .cardMagnifyBtn {
+    opacity: 1;
+  }
+}
+
+/* ── List row ───────────────────────────────────────────────────────────── */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 1px solid var(--ink-150);
+  border-radius: 8px;
+  background: var(--paper);
+  cursor: grab;
+  touch-action: none;
+}
+
+.listRow:active {
+  cursor: grabbing;
+}
+
+.listChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  flex: 0 0 auto;
+}
+
+.listLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Type pill ──────────────────────────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  flex: 0 0 auto;
+}
+
+/* Per-kind tint — sourced from the --tag-*-bg / --tag-*-fg family. The grid
+ * thumbnail reuses the same modifier class so the chip and the thumbnail share
+ * one tint. The thumbnail wants a tinted FILL, so we set both bg + the glyph
+ * colour; the pill text reads on the same bg. */
+.pillPink {
+  background: var(--tag-pink-bg);
+  color: var(--tag-pink-fg);
+}
+.pillBlue {
+  background: var(--tag-blue-bg);
+  color: var(--tag-blue-fg);
+}
+.pillRed {
+  background: var(--tag-red-bg);
+  color: var(--tag-red-fg);
+}
+.pillGray {
+  background: var(--tag-gray-bg);
+  color: var(--tag-gray-fg);
+}
+.pillAmber {
+  background: var(--tag-amber-bg);
+  color: var(--tag-amber-fg);
+}
+.pillGreen {
+  background: var(--tag-green-bg);
+  color: var(--tag-green-fg);
+}
+
+/* ── Card overflow menu ─────────────────────────────────────────────────── */
+.cardMenuWrap {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+}
+
+/* In list mode the wrap is inline, not absolute — reset the position there. */
+.listRow .cardMenuWrap {
+  position: relative;
+  top: auto;
+  right: auto;
+  flex: 0 0 auto;
+}
+
+.cardMenuBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  color: var(--ink-500);
+}
+
+.menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 168px;
+  padding: 5px;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  border-radius: 9px;
+  box-shadow: var(--shadow-popover);
+  z-index: 20;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 9px;
+  min-height: 36px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-700);
+  font-size: var(--t-12);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--ink-50);
+}
+
+.menuItem:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+.menuItemAccent {
+  color: var(--fyi);
+}
+
+/* ── Footer count ───────────────────────────────────────────────────────── */
+.count {
+  margin: 0;
+  color: var(--ink-400);
+  font-size: var(--t-11);
+}

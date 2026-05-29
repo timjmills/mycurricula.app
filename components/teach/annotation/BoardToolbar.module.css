@@ -1,0 +1,93 @@
+/* BoardToolbar.module.css — the live annotation toolbar (plan §5.3).
+   Tokens only; no hard-coded hex. */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  flex-wrap: wrap;
+  padding: var(--r-8) var(--r-12);
+  background: var(--paper);
+  border-bottom: var(--line);
+}
+
+.tools {
+  flex: none;
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 24px;
+  background: var(--ink-150);
+}
+
+/* ── Colour swatches ──────────────────────────────────────────────────── */
+.swatches {
+  display: flex;
+  align-items: center;
+  gap: var(--r-4);
+}
+
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-pill);
+  border: 2px solid var(--ink-200);
+  padding: 0;
+  cursor: pointer;
+  /* ≥44px hit area on touch via the padding trick. */
+  position: relative;
+}
+.swatch::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+}
+.swatch:hover {
+  border-color: var(--ink-400);
+}
+.swatchActive {
+  border-color: var(--ink-900);
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* ── Width ────────────────────────────────────────────────────────────── */
+.widths {
+  display: flex;
+  align-items: center;
+  gap: var(--r-2);
+}
+
+.width {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-6);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+.width::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+.width:hover {
+  background: var(--ink-100);
+}
+.widthActive {
+  background: var(--ink-100);
+  border-color: var(--ink-200);
+}
+.widthDot {
+  display: block;
+  border-radius: var(--r-pill);
+  background: var(--ink-900);
+  min-width: 2px;
+  min-height: 2px;
+}

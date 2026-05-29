@@ -1,0 +1,51 @@
+/* ToolDock.module.css — the floating, draggable quick-tools dock (plan §5.3).
+   Tokens only; no hard-coded hex. */
+
+.dock {
+  position: absolute;
+  left: 50%;
+  bottom: var(--r-12);
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: var(--r-4);
+  padding: var(--r-6) var(--r-8);
+  background: var(--paper);
+  border: var(--line-strong);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-popover);
+}
+
+.handle {
+  cursor: grab;
+  color: var(--ink-400);
+  font-size: 14px;
+  padding: 0 var(--r-2);
+  user-select: none;
+}
+.dock:active .handle {
+  cursor: grabbing;
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 20px;
+  background: var(--ink-150);
+  margin: 0 var(--r-2);
+}
+
+.activeTool {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+.activeTool:hover {
+  background: var(--ink-900);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .handle {
+    cursor: default;
+  }
+}
