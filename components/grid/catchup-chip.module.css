@@ -1,0 +1,48 @@
+/* catchup-chip.module.css — the compact "🔥 N catch-up" pill rendered beside
+   the week header. Reuses the catch-up color vocabulary from the (retired)
+   CatchupWeekBar.module.css: an 8% rust tint on paper with a hairline border
+   in the same hue. Color/type/radius go through var(--token); spacing stays on
+   the 4-8-12 scale (BUILD_STANDARD §6). */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  /* RES: 28px visual height keeps the chip compact next to the week title; the
+     header row's own height already affords a comfortable hit target. */
+  height: 28px;
+  padding: 0 10px;
+  background: color-mix(in srgb, var(--catchup) 8%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--catchup) 25%, transparent);
+  border-radius: var(--r-pill);
+  color: var(--catchup);
+  font-size: var(--t-11);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.chip:hover {
+  background: color-mix(in srgb, var(--catchup) 14%, var(--paper));
+  border-color: color-mix(in srgb, var(--catchup) 40%, transparent);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--catchup);
+  outline-offset: 2px;
+}
+
+.text {
+  font-size: var(--t-11);
+}
+
+/* Reduced motion — drop the hover transition. */
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
+  }
+}

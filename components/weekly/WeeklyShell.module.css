@@ -33,17 +33,6 @@
   background: var(--ink-50);
 }
 
-/* ── Page header (title + subtitle) ──────────────────────────────────────
-   Wraps the canonical <PageHeader> primitive with a paper background +
-   bottom hairline to match the Year view's visual recipe
-   (components/year/YearView.module.css .pageHeader). Padding is owned by
-   the primitive; we only paint the surface here. */
-.weeklyPageHeader {
-  background: var(--paper);
-  border-bottom: 1px solid var(--ink-150);
-  flex-shrink: 0;
-}
-
 /* ── Body row: icon rail (fixed) + resizable body ─────────────────────── */
 /* The icon rail is a sibling of the resizable body so it stays pinned to
    the far left and never participates in the splitter math. */

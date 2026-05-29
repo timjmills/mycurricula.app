@@ -1,0 +1,12 @@
+/* weekly-view-controls.module.css — the merged Grid|List|Schedule toggle plus
+   the inline Lessons|All scope toggle, sitting in the page-header actions slot.
+   Spacing stays on the 4-8-12-16-24-32 scale (BUILD_STANDARD §6); color/type
+   live inside the ToggleGroup primitive. The row wraps to a second line when
+   the header runs out of width so neither toggle overflows on narrow tiers. */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}

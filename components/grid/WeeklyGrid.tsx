@@ -92,7 +92,6 @@ import {
   useDndSensors,
 } from "@/lib/collapse-on-drag";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
-import { WeekNavigator } from "./WeekNavigator";
 import { GridCell } from "./GridCell";
 import { resolveCellShade } from "./unitShading";
 import type { CellShade } from "./unitShading";
@@ -102,15 +101,9 @@ import styles from "./WeeklyGrid.module.css";
 
 const DAY_COUNT = WEEK_DAYS.length;
 
-/** Span of navigable weeks, derived from the lesson fixture. */
-function weekBounds(lessons: Lesson[]): { min: number; max: number } {
-  const weeks = lessons.map((l) => l.week);
-  return { min: Math.min(...weeks), max: Math.max(...weeks) };
-}
-
 export function WeeklyGrid(): ReactNode {
   const { style } = useTheme();
-  const { week, setWeek, search, filters } = useAppState();
+  const { week, search, filters } = useAppState();
   const prefersReducedMotion = useReducedMotion();
 
   // ── Planner store — single source of truth for lessons and layouts ─────────
@@ -123,7 +116,6 @@ export function WeeklyGrid(): ReactNode {
     setLessonStatus,
     editLesson,
     duplicateLesson,
-    duplicateWeek,
     setSaveTarget,
     lastChange,
   } = usePlanner();
@@ -158,12 +150,6 @@ export function WeeklyGrid(): ReactNode {
     lastClickedIdRef.current = null;
   }, []);
 
-  // ── Duplicate-week confirmation toast ─────────────────────────────────────
-  // A brief inline message confirming the operation succeeded — per CLAUDE.md
-  // no blocking confirm dialog is used.
-  const [dupeToast, setDupeToast] = useState<string | null>(null);
-  const dupeToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   // ── dnd-kit drag state (spec §2.2) ────────────────────────────────────────
   // Also UI state — drag phase is never part of history.
   const [dragState, setDragState] = useState<DragState>({ phase: "idle" });
@@ -175,12 +161,6 @@ export function WeeklyGrid(): ReactNode {
   // ── Accessibility live region ─────────────────────────────────────────────
   // Announces pick-up / over / drop for screen readers (spec §2.5).
   const [liveAnnouncement, setLiveAnnouncement] = useState("");
-
-  // ── Week bounds — derived from all lessons (including store mutations) ─────
-  const { min: minWeek, max: maxWeek } = useMemo(
-    () => weekBounds(lessons),
-    [lessons],
-  );
 
   // ── Holiday lookup for the active week ────────────────────────────────────
   // Map<dayIndex, Holiday>; days without a holiday are absent. The map is
@@ -293,16 +273,6 @@ export function WeeklyGrid(): ReactNode {
   const collapseAll = useCallback(() => {
     setExpandedIds((prev) => (prev.size === 0 ? prev : new Set()));
   }, []);
-
-  const expandAll = useCallback(() => {
-    setExpandedIds(() => {
-      const next = new Set<string>();
-      for (const l of lessons) {
-        if (l.week === week) next.add(l.id);
-      }
-      return next;
-    });
-  }, [lessons, week]);
 
   const gridNav = useGridNavigation({
     rowCount: SUBJECTS.length,
@@ -549,6 +519,79 @@ export function WeeklyGrid(): ReactNode {
     dupeToastTimerRef.current = setTimeout(() => setDupeToast(null), 4000);
   }
 
+  // ── Week-menu open/close helpers ────────────────────────────────────────────
+  const closeWeekMenu = useCallback(() => setWeekMenu(null), []);
+
+  // True when the event originated inside a lesson card OR any interactive grid
+  // control — used to guard the week-level right-click / long-press so the
+  // week menu only opens on the genuine background. WeeklyLessonCard roots
+  // carry data-planner-item="lesson:<id>"; the cell add (+) and expand/collapse
+  // buttons are <button>/[role="button"]; [data-card-interactive] marks other
+  // in-card controls. Without this, long-pressing or right-clicking one of
+  // those controls would pop the Duplicate-week menu instead of leaving the
+  // control alone. The same selector vocabulary GridCell uses for its
+  // interactive-target check (GridCell.tsx) is reused here for consistency.
+  function isOnInteractiveTarget(target: EventTarget | null): boolean {
+    return Boolean(
+      (target as HTMLElement | null)?.closest?.(
+        '[data-planner-item^="lesson:"], button, a, input, textarea, select, [role="button"], [data-card-interactive]',
+      ),
+    );
+  }
+
+  // Right-click the week background → open the week menu at the cursor.
+  function handleWeekContextMenu(e: React.MouseEvent): void {
+    if (e.defaultPrevented || isOnInteractiveTarget(e.target)) return;
+    e.preventDefault();
+    setWeekMenu({ x: e.clientX, y: e.clientY });
+  }
+
+  // Long-press (touch) the week background → open after ~500ms. The timer is
+  // cleared on touchend / touchmove / touchcancel so a tap, a scroll, or an
+  // OS-interrupted gesture never opens the menu. `e.preventDefault()` in the
+  // fired path suppresses the synthesized mousedown/click some mobile browsers
+  // emit after touchend — without it that synthetic event would land outside
+  // the just-opened menu and the dismissal listener would immediately close it.
+  function handleWeekTouchStart(e: React.TouchEvent): void {
+    if (isOnInteractiveTarget(e.target)) return;
+    const t = e.touches[0];
+    if (!t) return;
+    const x = t.clientX;
+    const y = t.clientY;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null;
+      setWeekMenu({ x, y });
+    }, 500);
+  }
+  function clearLongPress(): void {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+  // Suppress the synthesized mouse events after a long-press fired the menu so
+  // the document-level mousedown dismissal doesn't close it on the same gesture.
+  function handleWeekTouchEnd(e: React.TouchEvent): void {
+    // If the timer already fired (menu open) we are at the end of a long press;
+    // swallow the synthetic mouse sequence. A pending timer means it was a tap
+    // or short press — clear it and let normal events flow.
+    if (longPressTimerRef.current === null && weekMenu) {
+      e.preventDefault();
+      return;
+    }
+    clearLongPress();
+  }
+
+  // Tear down any pending long-press timer on unmount so a fired callback never
+  // calls setWeekMenu after the component is gone.
+  useEffect(() => () => clearLongPress(), []);
+
+  // Duplicate-week chosen from the menu → run the existing handler, then close.
+  function handleDuplicateWeekFromMenu(): void {
+    handleDuplicateWeek();
+    setWeekMenu(null);
+  }
+
   // ── Bulk move handler (BIG-1) ──────────────────────────────────────────────
   // Routes N individual moveLesson calls through the store so each joins the
   // undo history. Moves all bulk-selected lessons to the given target day
@@ -579,73 +622,23 @@ export function WeeklyGrid(): ReactNode {
         {liveAnnouncement}
       </div>
 
-      <WeekNavigator
-        week={week}
-        currentWeek={CURRENT_WEEK}
-        minWeek={minWeek}
-        maxWeek={maxWeek}
-        onChange={setWeek}
-      />
+      {/* The WeekNavigator (week row + Grid|List|Schedule toggle) is now
+          lifted to WeeklyShell so a single shared instance sits above ALL
+          canvas modes. WeeklyGrid renders only its grid + toolbar below. */}
 
-      {/* ── Toolbar — anchored chrome (spec §3.5) ──────────────────────── */}
-      {/* POLISH-006: Expand-all / Minimize-all are TWO INDEPENDENT ACTIONS
-          (not a stateful toggle): each calls a different function and there
-          is no single boolean tracking which is "active". They are rendered
-          as a visually-grouped pair of Button primitives rather than a
-          ToggleGroup (which would imply exclusive-select / radiogroup
-          semantics). The .expandBtnGroup wrapper matches the old .expandSegment
-          selector used in the responsive rule that hides it at ≤480px. */}
-      <div className={styles.moveToolbar}>
-        <div
-          className={styles.expandBtnGroup}
-          role="group"
-          aria-label="Card expansion"
-        >
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={expandAll}
-            aria-label="Expand all lesson cards"
-            tooltip="Open every lesson card on this week's grid — useful for a full read-through before planning"
-          >
-            Expand all
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={collapseAll}
-            aria-label="Minimize all lesson cards"
-            tooltip="Collapse every lesson card back to its preview — gives you a fast overview of the whole week"
-          >
-            Minimize all
-          </Button>
-        </div>
-
-        {/* BIG-2: Duplicate this week into the next week. */}
-        <Tooltip
-          content={`Copy every lesson from week ${week} into week ${week + 1} — fast way to repeat a successful week or seed a similar plan`}
-          side="top"
-        >
-          <Button
-            variant="secondary"
-            size="sm"
-            leadingIcon={<CopyIcon />}
-            className={styles.dupeWeekBtn}
-            onClick={handleDuplicateWeek}
-            aria-label={`Duplicate week ${week} into week ${week + 1}`}
-            tooltip={`Copy every lesson in week ${week} forward into week ${week + 1}`}
-          >
-            Duplicate week
-          </Button>
-        </Tooltip>
-
-        {/* Inline confirmation toast — shown for 4 s after a duplicate. */}
-        {dupeToast && (
+      {/* The former toolbar (expand-all / collapse-all + ⋯ more-actions) was
+          removed: the week row + view toggle now live in the lifted
+          WeekNavigator above, and Duplicate-week is reachable by right-click
+          (desktop) / long-press (touch) on the grid background — see
+          handleWeekContextMenu below. Only the post-duplicate confirmation
+          toast remains, now rendered standalone. */}
+      {dupeToast && (
+        <div className={styles.dupeToastRow}>
           <span className={styles.dupeToast} role="status" aria-live="polite">
             {dupeToast}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── DndContext wraps the entire scrollable grid ──────────────────── */}
       <DndContext
@@ -854,6 +847,7 @@ export function WeeklyGrid(): ReactNode {
           </Button>
         </div>
       )}
+
     </div>
   );
 }
@@ -971,24 +965,108 @@ function SubjectRow({
   );
 }
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
+// ── WeekActionsMenu ─────────────────────────────────────────────────────────
+// A small cursor-anchored menu holding the single "Duplicate week" action.
+// Same visual recipe + viewport-clamp + dismissal behavior as
+// components/shell/RailContextMenu.tsx so menus across the app feel related;
+// kept local (not the lesson context-menu) because that menu is bound to the
+// Lesson data model and a week background has none of that.
 
-/** Copy icon for the "Duplicate week" toolbar button. */
-function CopyIcon(): ReactNode {
+interface WeekActionsMenuProps {
+  /** Open-point viewport coordinates. */
+  x: number;
+  y: number;
+  /** Active week — drives the action's onboarding copy. */
+  week: number;
+  /** Fired when the teacher picks Duplicate week. */
+  onDuplicate: () => void;
+  onClose: () => void;
+}
+
+function WeekActionsMenu({
+  x,
+  y,
+  week,
+  onDuplicate,
+  onClose,
+}: WeekActionsMenuProps): ReactNode {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x, y });
+
+  // Clamp the menu inside the viewport once it has measured itself — same
+  // recipe as RailContextMenu / the lesson context-menu.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    const nx = Math.min(x, window.innerWidth - width - 8);
+    const ny = Math.min(y, window.innerHeight - height - 8);
+    setPos({ x: Math.max(8, nx), y: Math.max(8, ny) });
+  }, [x, y]);
+
+  // Move focus into the menu on open so it is keyboard-operable — we focus the
+  // first role="menuitem" inside the container (the Button primitive isn't a
+  // forwardRef, so we query the rendered DOM rather than hold a button ref). The
+  // menu now opens only via right-click / long-press (the ⋯ trigger button was
+  // removed), so there is no fixed trigger element to return to. Instead we
+  // capture whatever element held focus when the menu mounted (e.g. the grid
+  // cell a keyboard user opened it from) and restore it on unmount, so keyboard
+  // focus never falls back to <body> on any close path (Esc, outside-click,
+  // selection).
+  useEffect(() => {
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const item = ref.current?.querySelector<HTMLElement>('[role="menuitem"]');
+    item?.focus();
+    return () => {
+      previouslyFocused?.focus();
+    };
+  }, []);
+
+  // Dismiss on outside-click or Esc. Escape additionally returns focus to the
+  // trigger via the unmount cleanup above (onClose unmounts this component).
+  useEffect(() => {
+    const onDown = (e: MouseEvent): void => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
   return (
-    <svg
-      width={14}
-      height={14}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
+    <div
+      ref={ref}
+      role="menu"
+      aria-label="Week actions"
+      onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+      className={styles.weekMenu}
+      style={{ top: pos.y, left: pos.x }}
     >
-      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
+      <div className={styles.weekMenuHead}>{`Week ${week}`}</div>
+      <Button
+        variant="ghost"
+        size="sm"
+        role="menuitem"
+        leadingIcon={<CopyIcon />}
+        onClick={onDuplicate}
+        className={styles.weekMenuItem}
+        tooltip={`Copy every lesson in week ${week} forward into week ${week + 1} — fast way to repeat a successful week or seed a similar plan`}
+        tooltipSide="right"
+      >
+        Duplicate week
+      </Button>
+    </div>
   );
 }
+
+

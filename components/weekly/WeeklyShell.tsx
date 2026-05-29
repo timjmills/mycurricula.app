@@ -80,7 +80,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Button, IntroSubtitle, PageHeader, Tooltip } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import {
   DndContext,
   DragOverlay,
@@ -96,16 +96,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { IconRail, PaneSplitter, RightRail } from "@/components/daily";
-import { WeeklyGrid } from "@/components/grid";
+import { WeeklyGrid, WeekNavigator } from "@/components/grid";
 import { WeeklyList } from "@/components/list";
 import { ScheduleTimeline } from "@/components/schedule";
-import { CatchupWeekBar } from "./CatchupWeekBar";
-import { WeeklySchedulePills } from "./weekly-schedule-pills";
+import { WeeklyViewControls } from "./WeeklyViewControls";
 import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
 import { useAppState } from "@/lib/app-state";
 import { useWeeklyScheduleMode } from "@/lib/weekly-schedule-state";
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import { usePlanner } from "@/lib/planner-store";
+import { CURRENT_WEEK } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
 import styles from "./WeeklyShell.module.css";
 
@@ -481,6 +481,7 @@ export function WeeklyShell(): ReactNode {
   // `resourcesPanelOpen` alongside the existing two.
   const {
     week,
+    setWeek,
     selectedDay,
     selectedLessonId,
     setSelectedLessonId,
@@ -492,12 +493,12 @@ export function WeeklyShell(): ReactNode {
   } = useAppState();
   const { lessons } = usePlanner();
 
-  // Inline schedule-pill state (Subject↔Schedule + Lessons-only↔All). Lives
+  // Inline schedule-mode state (Subject↔Schedule + Lessons-only↔All). Lives
   // in localStorage so a teacher's choice survives across sessions. The
-  // pills themselves render via <WeeklySchedulePills> inside the grid
-  // panel; this hook just exposes the derived booleans for the render
-  // branch below. `scheduleMode` is true when the Schedule pill is on;
-  // `includeAllEvents` is true when the Lessons-only/All-events pill is on
+  // Subject/Schedule + scope toggles render via <WeeklyViewControls> in the
+  // page-header actions slot; this hook just exposes the derived booleans for
+  // the render branch below. `scheduleMode` is true when Schedule is selected;
+  // `includeAllEvents` is true when the Lessons-only/All-events toggle is on
   // "all" (i.e. non-academic blocks should appear in the timeline).
   const { scheduleMode, includeAllEvents } = useWeeklyScheduleMode();
 
@@ -559,6 +560,23 @@ export function WeeklyShell(): ReactNode {
   const weekLessons = useMemo<Lesson[]>(
     () => lessons.filter((l) => l.week === week),
     [lessons, week],
+  );
+
+  // ── Navigable week span — drives the lifted WeekNavigator's prev/next
+  //    disabled bounds. Same derivation WeeklyGrid + weekly-board use:
+  //    min/max of every lesson's `week`. Memoized on the full lesson list
+  //    so it only recomputes when lessons are added/removed. Falls back to
+  //    the current week when there are no lessons (empty fixture) so the
+  //    navigator never produces NaN bounds. */
+  const { minWeek, maxWeek } = useMemo<{ minWeek: number; maxWeek: number }>(
+    () => {
+      if (lessons.length === 0) {
+        return { minWeek: CURRENT_WEEK, maxWeek: CURRENT_WEEK };
+      }
+      const weeks = lessons.map((l) => l.week);
+      return { minWeek: Math.min(...weeks), maxWeek: Math.max(...weeks) };
+    },
+    [lessons],
   );
 
   // ── Selected lesson object — resolves selectedLessonId → Lesson | null ─
@@ -907,12 +925,11 @@ export function WeeklyShell(): ReactNode {
     return (
       <div className={styles.columnWithGrip} data-pane="grid">
         {grip}
-        {/* Pills bar sits at the top of the grid panel slot so the chrome
-            stays inside the same drag-reorder host as the grid content.
-            Hidden at ≤900px (the narrow gate) because Schedule mode is
-            disabled there anyway — the dedicated /schedule route is the
-            entry. */}
-        {!isNarrow && <WeeklySchedulePills />}
+        {/* The Subject↔Schedule + Lessons/All toggles that used to live in a
+            standalone in-grid "VIEW" bar are now merged into the page-header
+            <WeeklyViewControls />. The grid panel renders just the canvas
+            below; `scheduleMode` / `includeAllEvents` still drive which
+            canvas appears. */}
         {showSchedule ? (
           <ScheduleTimeline scope="week" showNonAcademic={includeAllEvents} />
         ) : showList ? (
@@ -1006,35 +1023,26 @@ export function WeeklyShell(): ReactNode {
         {columnAnnouncement}
       </div>
 
-      {/* ── Page header (title + onboarding subtitle) ──────────────────
-          Matches the YearView page-header recipe (BUILD_STANDARD.md §5
-          page-level type: --t-24 weight 800, --t-13 subtitle). The
-          single h1 satisfies WCAG 2.4.6; the subtitle tells a first-time
-          teacher what this surface is FOR per CLAUDE.md §4 onboarding
-          voice. PageHeader is the canonical primitive (components/ui)
-          so the rest of the routes use the same recipe. */}
-      <PageHeader
-        title="Weekly View"
-        subtitle="Your week at a glance — every lesson laid out by subject and day. Switch between Grid and List, drag to re-plan, edit in place."
-        className={styles.weeklyPageHeader}
+      {/* ── Single shared week row ──────────────────────────────────────
+          The Weekly view's only header chrome. The former "Weekly View"
+          title band was removed; this <WeekNavigator> is lifted here (out
+          of the per-canvas renders) so exactly ONE instance exists and it
+          is always visible regardless of which canvas (grid / list /
+          schedule) is showing below. Its `actions` slot hosts the
+          Grid|List|Schedule toggle at the far right, guaranteeing the
+          toggle stays reachable in every mode — the schedule timeline has
+          no navigator of its own, so a per-canvas toggle would vanish in
+          schedule mode and trap the teacher there. */}
+      <WeekNavigator
+        week={week}
+        currentWeek={CURRENT_WEEK}
+        minWeek={minWeek}
+        maxWeek={maxWeek}
+        onChange={setWeek}
+        showCatchupChip
+        headingLevel="h1"
+        actions={<WeeklyViewControls isNarrow={isNarrow} />}
       />
-
-      {/* ── W3-C10 once-per-view onboarding subtitle ──────────────────
-          Tells a first-time teacher what THIS surface is FOR, in the new
-          Personal/Team Curriculum vocabulary (no "Master"). Dismissed via
-          "Got it" and persisted to localStorage under
-          `mycurricula:user:weekly-intro-seen` so a returning teacher
-          never sees it again. */}
-      <IntroSubtitle viewKey="weekly">
-        The Team Curriculum grid — every subject, the whole school week.
-      </IntroSubtitle>
-
-      {/* ── Layer-2 catch-up bar (planning-doc §1262) ──────────────────
-          The bar self-gates on enabled + per-week count + per-week dismissal,
-          so the WeeklyShell stays decoupled from the catch-up state. It
-          consumes no width — only a slim band of height — and never appears
-          on a week with zero uncovered lessons. */}
-      <CatchupWeekBar />
 
       {/* ── Body row: icon rail (fixed) + reorderable grid/rail body ───── */}
       <div className={styles.bodyRow}>

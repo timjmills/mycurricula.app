@@ -35,7 +35,7 @@
 }
 
 .navTitleWrap {
-  flex: 1;
+  flex: 0 0 auto;
   min-width: 0;
 }
 
@@ -68,10 +68,26 @@
   vertical-align: 2px;
 }
 
+/* Prev/next/today cluster — pinned to the FAR RIGHT of the week row via
+   margin-left:auto, since the title block no longer flex-grows. */
 .navControls {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
+}
+
+/* Left-aligned view-controls slot — hosts the Weekly view's
+   Grid|List|Schedule (+ scope) toggle immediately after the "Week N" title so
+   it reads as part of the week row. It stays on the LEFT (no margin-left:auto)
+   while `.navControls` takes the far-right anchor. The toggle lives here, not
+   per-canvas, so it stays visible in every mode (the schedule timeline has no
+   navigator of its own). */
+.navActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
 }
 
 /* Prev/next arrows — 44px touch target. */
@@ -129,40 +145,6 @@
 .navToday:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-/* ── Toolbar ────────────────────────────────────────────────────────────
- * A slim bar immediately below the WeekNavigator's sticky header holding
- * the Expand all / Minimize all controls. Sticky itself so it stays pinned
- * when the grid scrolls. The z-index is one below the navigator's (20) so
- * they stack cleanly. */
-.moveToolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 22px;
-  background: var(--ink-50);
-  border-bottom: var(--line);
-  position: sticky;
-  /* WeekNavigator header is ~69px tall (eyebrow + title + padding); the
-     toolbar stacks just below it. Using top:0 keeps both sticky bars from
-     overlapping — the browser stacks them via normal flow. */
-  top: 0;
-  z-index: 19;
-}
-
-/* ── Expand-all / Minimize-all action pair (POLISH-006) ─────────────────────
- *
- * Two independent Button primitives (secondary/sm) grouped visually. These
- * are action buttons, not a stateful toggle — ToggleGroup (radiogroup
- * semantics) would be wrong here. The wrapper provides a flex row with a
- * small gap so the two buttons read as a paired group. Touch targets and
- * focus rings are handled by the Button primitive.
- */
-.expandBtnGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 
 /* Separator between toolbar controls and the week-nav arrows. */
@@ -845,19 +827,18 @@
   }
 }
 
-/* ── Responsive: narrow navbar / toolbar collapse ────────────────────────
+/* ── Responsive: narrow navbar collapse ──────────────────────────────────
    The .scroll container already has overflow: auto so the wide grid
    (min-width: 1082px) scrolls horizontally inside its own track — no
-   change needed there. The sticky .navbar and .moveToolbar bars are
-   the only chrome that could overflow at narrow widths because they
-   hold several fixed-width controls in one flex row.
+   change needed there. The sticky .navbar bar is the only chrome that
+   could overflow at narrow widths because it holds several fixed-width
+   controls in one flex row. (The former expand/collapse + ⋯ toolbar was
+   removed; the week row + view toggle now live in the lifted
+   WeekNavigator, and Duplicate-week is a right-click / long-press action.)
 
    Strategy (additive only — desktop ≥1280px is unchanged):
-     ≤768px  hide the "Today" and "Duplicate week" text labels, keep icons.
-     ≤540px  also hide the dupe-week button entirely; collapse .navTitle
-             eyebrow so only the week title remains.
-     ≤480px  also hide the expand/minimize segmented control to clear room
-             for the navigation arrows.
+     ≤768px  tighten navbar padding; hide the "Today" button + its separator.
+     ≤540px  collapse the .navEyebrow so only the week title remains.
    All rules live inside @media blocks; no base rule is touched. */
 
 @media (max-width: 768px) {
@@ -867,20 +848,9 @@
     padding: 10px 14px;
     gap: 8px;
   }
-  /* The toolbar similarly has 22px inline padding; trim it here. */
-  .moveToolbar {
-    padding: 6px 14px;
-    gap: 6px;
-  }
   /* The navToday "This week" / "Today" button shows only at larger widths;
      hide it here so the prev / next arrows keep their 44px footprint. */
   .navToday {
-    display: none;
-  }
-  /* Duplicate-week button is a secondary workflow — hide it at narrow
-     widths where the grid is horizontally scrolled and the teacher
-     is in a read/navigate mode rather than an edit mode. */
-  .dupeWeekBtn {
     display: none;
   }
   /* navSep loses its paired control on the left — hide the orphan line. */
@@ -904,12 +874,6 @@
 }
 
 @media (max-width: 480px) {
-  /* The expand/minimize action pair is a convenience at narrow widths —
-     a teacher on a 480px viewport is primarily scrolling and reading.
-     Remove it so the nav arrows have the full toolbar width. */
-  .expandBtnGroup {
-    display: none;
-  }
   /* Allow the bulk action bar to wrap its day-button row onto a second
      line so the Clear button is always reachable without overflow. */
   .bulkBar {
