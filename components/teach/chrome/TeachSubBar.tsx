@@ -1,0 +1,422 @@
+"use client";
+
+// TeachSubBar.tsx — the Teach workspace's secondary toolbar
+// (docs/teach-view-plan.md §3, §4.1, §4.2, §7; Agent A). Left-to-right
+// (prototype `SubBar`):
+//   Week ▾ · Subject ▾ · board tab strip (numbered pills + Add Board) ·
+//   spacer · layout toolbar (1up…3×3) · ⚙ board settings · action cluster
+//   (Present · Full Screen · Pop-Out[soon] · Duplicate[soon]).
+//
+// A PURE presentational component. Board data + the active subject arrive via
+// props (the integrating component reads the teach repository / usePlanner()).
+// It dispatches against the frozen `TeachWorkspaceAction` union:
+//   • board pill          → { type: "selectBoard", boardId }
+//   • layout toolbar      → { type: "setLayout", layout }
+//   • Present             → { type: "setPresent", present: true }
+//   • Full Screen         → { type: "setFullscreen", fullscreen } + Fullscreen API
+//
+// Pop-Out + Duplicate are Phase 2 (plan §7) — rendered as `FutureControl`
+// "Soon" tiles, never live.
+
+import type { Dispatch, ReactNode } from "react";
+import { useCallback } from "react";
+import type { TeachWorkspaceAction } from "../TeachWorkspace";
+import type { BoardLayout, TeachWorkspaceState } from "@/lib/teach/types";
+import { BOARD_LAYOUT_GRID } from "@/lib/teach/types";
+import type { Board, SubjectId } from "@/lib/types";
+import { FutureControl, ToggleGroup, Tooltip } from "@/components/ui";
+import styles from "./TeachChrome.module.css";
+
+// ── Layout toolbar options ───────────────────────────────────────────────────
+// Driven by BOARD_LAYOUT_GRID keys (the single geometry source) so a new layout
+// added there flows through here without a hard-coded list. Human label maps
+// the enum to the prototype's "1up / 2×2 / …" copy.
+
+const LAYOUT_LABEL: Record<BoardLayout, string> = {
+  "1up": "1up",
+  "2up": "2up",
+  "3up": "3up",
+  "2x2": "2×2",
+  "2x3": "2×3",
+  "3x3": "3×3",
+};
+
+const LAYOUT_TOOLTIP: Record<BoardLayout, string> = {
+  "1up": "One widget full-bleed — best for projecting a single resource",
+  "2up": "Two widgets side-by-side",
+  "3up": "Three widgets in a row",
+  "2x2": "Four widgets in a 2-by-2 grid",
+  "2x3": "Six widgets in a 3-wide, 2-tall grid",
+  "3x3": "Nine widgets in a 3-by-3 grid",
+};
+
+const LAYOUT_OPTIONS = (Object.keys(BOARD_LAYOUT_GRID) as BoardLayout[]).map(
+  (key) => ({
+    value: key,
+    label: LAYOUT_LABEL[key],
+    ariaLabel: `${LAYOUT_LABEL[key]} layout`,
+    title: LAYOUT_TOOLTIP[key],
+    tooltipId: `teach-layout-${key}`,
+  }),
+);
+
+// ── Props ──────────────────────────────────────────────────────────────────
+
+export interface TeachSubBarProps {
+  state: TeachWorkspaceState;
+  dispatch: Dispatch<TeachWorkspaceAction>;
+  /** Boards for the active lesson, in display order — the numbered pill strip. */
+  boards: readonly Board[];
+  /** Subject of the active lesson — drives the subject-tinted active pill via
+   *  `.cp-subj.<id>` on the strip root. Falls back to math when absent. */
+  subject?: SubjectId;
+  /** Week label for the Week ▾ chip (e.g. "Week 12"). */
+  weekLabel?: string;
+  /** Subject label for the Subject ▾ chip (e.g. "Math"). */
+  subjectLabel?: string;
+  /** Open the week jumper. Optional. */
+  onPickWeek?: () => void;
+  /** Open the subject picker. Optional. */
+  onPickSubject?: () => void;
+  /** Add a new board to the active lesson. Optional. */
+  onAddBoard?: () => void;
+  /** Open board settings (⚙). Optional. */
+  onBoardSettings?: () => void;
+  /** Request the whole-view Fullscreen API toggle. The reducer flag is set here;
+   *  the actual `requestFullscreen()` / `exitFullscreen()` is the caller's so
+   *  the API lives with the element it targets. Optional. */
+  onToggleFullscreen?: (next: boolean) => void;
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
+
+export function TeachSubBar({
+  state,
+  dispatch,
+  boards,
+  subject = "math",
+  weekLabel = "This week",
+  subjectLabel = "Subject",
+  onPickWeek,
+  onPickSubject,
+  onAddBoard,
+  onBoardSettings,
+  onToggleFullscreen,
+}: TeachSubBarProps): ReactNode {
+  const handleLayout = useCallback(
+    (layout: BoardLayout) => dispatch({ type: "setLayout", layout }),
+    [dispatch],
+  );
+
+  const handlePresent = useCallback(
+    () => dispatch({ type: "setPresent", present: true }),
+    [dispatch],
+  );
+
+  const handleFullscreen = useCallback(() => {
+    const next = !state.fullscreen;
+    dispatch({ type: "setFullscreen", fullscreen: next });
+    onToggleFullscreen?.(next);
+  }, [state.fullscreen, dispatch, onToggleFullscreen]);
+
+  return (
+    <div className={styles.subBar}>
+      {/* Week ▾ */}
+      <Tooltip
+        content="Switch which week's lessons you're teaching from"
+        side="bottom"
+        tooltipId="teach-week-chip"
+      >
+        <button
+          type="button"
+          className={styles.contextChip}
+          onClick={onPickWeek}
+          aria-label={`${weekLabel} — change week`}
+        >
+          {weekLabel}
+          <ChevronDownIcon />
+        </button>
+      </Tooltip>
+
+      {/* Subject ▾ */}
+      <Tooltip
+        content="Filter the board strip to one subject's lessons"
+        side="bottom"
+        tooltipId="teach-subject-chip"
+      >
+        <button
+          type="button"
+          className={styles.contextChip}
+          onClick={onPickSubject}
+          aria-label={`${subjectLabel} — change subject`}
+        >
+          {subjectLabel}
+          <ChevronDownIcon />
+        </button>
+      </Tooltip>
+
+      {/* Board tab strip — subject-tinted active pill via .cp-subj. */}
+      <div
+        className={`${styles.boardStrip} cp-subj ${subject}`}
+        role="tablist"
+        aria-label="Lesson boards"
+      >
+        {boards.map((board, i) => {
+          const isActive = board.id === state.activeBoardId;
+          return (
+            <Tooltip
+              key={board.id}
+              content={`Switch to the "${board.title}" board — its widgets replace the canvas`}
+              side="bottom"
+              tooltipId="teach-board-tab"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                className={`${styles.boardTab} ${isActive ? styles.boardTabActive : ""}`}
+                onClick={() =>
+                  dispatch({ type: "selectBoard", boardId: board.id })
+                }
+              >
+                <span className={styles.boardNum} aria-hidden="true">
+                  {i + 1}
+                </span>
+                {board.title}
+              </button>
+            </Tooltip>
+          );
+        })}
+
+        {/* + Add Board */}
+        <Tooltip
+          content="Add a new board to this lesson (a new teaching phase)"
+          side="bottom"
+          tooltipId="teach-add-board"
+        >
+          <button
+            type="button"
+            className={styles.addBoard}
+            onClick={onAddBoard}
+            aria-label="Add board"
+          >
+            <PlusIcon />
+            Add Board
+            <ChevronDownIcon />
+          </button>
+        </Tooltip>
+      </div>
+
+      <div className={styles.spacer} aria-hidden="true" />
+
+      {/* Layout toolbar — 1up…3×3, driven by BOARD_LAYOUT_GRID keys. */}
+      <ToggleGroup<BoardLayout>
+        options={LAYOUT_OPTIONS}
+        value={state.layout}
+        onChange={handleLayout}
+        variant="subtle"
+        size="sm"
+        ariaLabel="Board layout"
+      />
+
+      {/* ⚙ board settings. */}
+      <Tooltip
+        content="Board settings — rename, reorder, or reset this board"
+        side="bottom"
+        tooltipId="teach-board-settings"
+      >
+        <button
+          type="button"
+          className={styles.gearBtn}
+          onClick={onBoardSettings}
+          aria-label="Board settings"
+        >
+          <CogIcon />
+        </button>
+      </Tooltip>
+
+      {/* Action cluster. */}
+      <div className={styles.actionCluster}>
+        {/* Present — Phase 1 functional. */}
+        <Tooltip
+          content="Present this board full-screen for the class — all editing chrome hides"
+          side="bottom"
+          tooltipId="teach-present"
+        >
+          <button
+            type="button"
+            className={`${styles.boardTab} cp-subj ${subject} ${styles.boardTabActive}`}
+            onClick={handlePresent}
+            aria-label="Present this board"
+          >
+            <PlayIcon />
+            Present
+          </button>
+        </Tooltip>
+
+        {/* Full Screen — Phase 1 functional (Fullscreen API). */}
+        <Tooltip
+          content={
+            state.fullscreen
+              ? "Exit full screen — show the browser chrome again"
+              : "Fill the whole screen with the Teach workspace (hides browser chrome)"
+          }
+          side="bottom"
+          tooltipId="teach-fullscreen"
+        >
+          <button
+            type="button"
+            className={styles.contextChip}
+            onClick={handleFullscreen}
+            aria-pressed={state.fullscreen}
+            aria-label={state.fullscreen ? "Exit full screen" : "Full screen"}
+          >
+            <FullscreenIcon />
+            Full Screen
+          </button>
+        </Tooltip>
+
+        {/* Pop-Out + Duplicate — Phase 2 (plan §7). */}
+        <FutureControl
+          label="Pop-Out"
+          leadingIcon={<PopOutIcon />}
+          tooltip="Pop the board into a second window for a second monitor — coming after beta"
+        />
+        <FutureControl
+          label="Duplicate"
+          leadingIcon={<DuplicateIcon />}
+          tooltip="Mirror this board to a second window — coming after beta"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Icons ────────────────────────────────────────────────────────────────────
+
+function ChevronDownIcon(): ReactNode {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function PlusIcon(): ReactNode {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function CogIcon(): ReactNode {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15H4a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+    </svg>
+  );
+}
+
+function PlayIcon(): ReactNode {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+function FullscreenIcon(): ReactNode {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 4h6M4 4v6M20 4h-6M20 4v6M4 20h6M4 20v-6M20 20h-6M20 20v-6" />
+    </svg>
+  );
+}
+
+function PopOutIcon(): ReactNode {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M14 4h6v6" />
+      <path d="M10 14L20 4" />
+      <path d="M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6" />
+    </svg>
+  );
+}
+
+function DuplicateIcon(): ReactNode {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="8" y="8" width="12" height="12" rx="1" />
+      <path d="M4 16V4h12" />
+    </svg>
+  );
+}
