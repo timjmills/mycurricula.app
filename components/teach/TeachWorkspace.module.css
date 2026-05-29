@@ -1,0 +1,135 @@
+/* TeachWorkspace.module.css — the five-zone shell layout
+   (docs/teach-view-plan.md §3). Colour, spacing, and radii come from
+   app/tokens.css — never a hard-coded hex here. Wave 1 fills the zone
+   internals; this file owns only the shell geometry. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+/* ── Top bar + sub bar (chrome — Agent A fills) ───────────────────────── */
+.topBar,
+.subBar {
+  display: flex;
+  align-items: center;
+  gap: var(--r-12);
+  flex: none;
+  padding: 0 var(--r-12);
+  background: var(--paper);
+  border-bottom: var(--line);
+}
+
+.topBar {
+  height: 52px;
+  font-weight: 600;
+}
+
+.subBar {
+  height: 44px;
+  font-size: 13px;
+  color: var(--ink-700);
+}
+
+/* ── Body row: rail · panel · center · panel · rail ───────────────────── */
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.rail {
+  flex: none;
+  width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--r-8);
+  padding: var(--r-12) 0;
+  background: var(--paper);
+  border-right: var(--line);
+  font-size: 10px;
+  color: var(--ink-500);
+}
+
+.railRight {
+  border-right: none;
+  border-left: var(--line);
+}
+
+.panel {
+  flex: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-right: var(--line);
+  overflow: hidden;
+}
+
+.panelRight {
+  border-right: none;
+  border-left: var(--line);
+}
+
+.center {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ink-50);
+  padding: var(--r-12);
+}
+
+.centerStub {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--ink-150);
+  border-radius: var(--r-12);
+  color: var(--ink-400);
+  background: var(--paper);
+}
+
+/* ── Footer (chrome — Agent A fills) ──────────────────────────────────── */
+.footer {
+  flex: none;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: var(--r-12);
+  padding: 0 var(--r-12);
+  font-size: 11px;
+  color: var(--ink-500);
+  background: var(--paper);
+  border-top: var(--line);
+}
+
+/* Stub placeholder label inside any zone box. */
+.stubLabel {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+/* Present mode hides every chrome zone, leaving only the center board. */
+.present .topBar,
+.present .subBar,
+.present .rail,
+.present .panel,
+.present .footer {
+  display: none;
+}
+
+.present .center {
+  padding: 0;
+}

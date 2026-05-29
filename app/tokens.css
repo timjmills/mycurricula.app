@@ -173,6 +173,18 @@
   --hlp-red: #fcc7d0;
   --hlp-cheese: #fcdcc7;
 
+  /* ── Teach board widget tints ─────────────────────────────────────── */
+  /* Soft pastel washes for widget-tile backgrounds on the Teaching Board
+     (docs/teach-view-plan.md §9). Consistent with the --tag-*-bg family:
+     light, low-saturation surfaces that keep dark ink legible at AA. Used
+     only as informational tile backgrounds — never decoration. */
+  --board-tint-yellow: #fdf6c7;
+  --board-tint-mint: #d6f5e3;
+  --board-tint-sky: #d9ecfd;
+  --board-tint-pink: #fce0ef;
+  --board-tint-lavender: #e8e2fb;
+  --board-tint-peach: #fde6d3;
+
   /* ── Spacing / radii ──────────────────────────────────────────────── */
   --r-2: 2px;
   --r-4: 4px;

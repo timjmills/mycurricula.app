@@ -115,6 +115,12 @@ export const VIEWS: ViewDef[] = [
     tooltip:
       "The full year of units and lessons per subject, with the standards each covers",
   },
+  {
+    label: "Teach",
+    href: "/teach",
+    tooltip:
+      "Go live: open the in-class teaching workspace — boards, resources, and annotation for delivering this lesson",
+  },
 ];
 export type { ViewDef };
 
