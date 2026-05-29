@@ -114,14 +114,19 @@ confirmation toast is surfaced in Teach (likely yes — see §10 tooltips). No
 
 ### 2.3 Entry points
 
-1. **Top-nav tab.** Add `{ label: "Teach", href: "/teach", tooltip }` to the
-   `VIEWS` array in `components/shell/top-bar.tsx`. It appears automatically on
-   desktop and in the `≤768px` More menu (both read the same exported `VIEWS`).
-   Clicking it is a full navigation **out** of the planner shell into the Teach
-   group.
-2. **Per-lesson deep link.** A "Teach this lesson" affordance on the Daily
-   lesson detail (and optionally Weekly/Subject lesson cards) links to
-   `/teach?lesson=<id>`. *(Wired in Wave 2; low-risk, additive.)*
+1. **Top-nav tab (now).** Add `{ label: "Teach", href: "/teach", tooltip }` to
+   the `VIEWS` array in `components/shell/top-bar.tsx`. It appears automatically
+   on desktop and in the `≤768px` More menu (both read the same exported
+   `VIEWS`). Clicking it is a full navigation **out** of the planner shell into
+   the Teach group.
+2. **Per-lesson entry (now).** A "Teach" affordance on an individual lesson links
+   to `/teach?lesson=<id>`:
+   - **Weekly** — at the **very bottom of the lesson** (card/expanded detail).
+   - **Daily** — on the lesson detail.
+   Opening it lands the **three-panel workspace** (left + center + right, both
+   rails) in the teacher's **saved configuration** — the default split until they
+   press reset/default — and surfaces the **Present** button for full-screen
+   teach mode. The saved configuration is the `TeachWorkspaceLayout` from §8.
 
 ### 2.4 Central workspace state (the integration contract)
 
@@ -195,7 +200,7 @@ the rail). The center is the persistent workspace — it can be fullscreened or
 | Boards | Left | Board thumbnails for active lesson, + Add Board |
 | Notes | Left | Free-form teacher notes (reuse Daily notes) — **display/basic** |
 | Groups | Left | Student groups (from widget config) — **display-only** |
-| Class | Left | Roster/attendance — **stub** (see §13 scope tension) |
+| Class | Left | Roster/attendance — **stub**; any names are local-only (§11.4) |
 | Tools | Left | Picker/dice/etc. — **stub** |
 | Resources | Right | Grid/list of lesson resources (interactive: embed/open) |
 | Chat | Right | Day Shoutbox (reuse Daily `<Shoutbox>`) |
@@ -258,6 +263,26 @@ the dedicated follow-up phase (§12).
   returns. (Timer demoed at 96px in the prototype — rendered display-only in v1.)
 - **Present:** all chrome hidden; thin top strip (board name, slide counter,
   prev/next, Esc-to-exit); widget chrome hidden. Functional in v1.
+
+### 4a. Sandbox (lesson-less) Teach mode (§13.2)
+
+A teacher can open Teach and build boards **without a lesson** — e.g. spinning up
+a quick board for an unplanned moment. Sandbox state is **ephemeral**, held in
+the central workspace state + a localStorage draft
+(`mycurricula:user:teach-sandbox`), and clearly badged as "Sandbox · not saved".
+
+To keep it, the teacher chooses one of:
+1. **Save to a new lesson** — opens the existing add-lesson flow (planner-store
+   `duplicateLesson`/add path), creates the lesson, then attaches the sandbox
+   boards to it as the personal set.
+2. **Pin to an existing lesson** — a lesson picker; the sandbox boards become the
+   personal set for the chosen lesson (warn if a personal set already exists —
+   same displacement semantics as §13.1, but personal-scoped).
+
+Until saved, nothing reaches the repository/DB. v1 implements the sandbox shell +
+the save/pin flows against the mock repository; the entry point is a "New board
+(sandbox)" action on the Teach top bar and a "Teach (sandbox)" option where the
+nav tab lives.
 
 ---
 
@@ -343,16 +368,22 @@ library in the repo — this is fully net-new, built custom (no new deps).
   drawn via `ctx.fillText`. Single-style for v1.
 - **Shapes (rect/line/arrow):** two-point strokes with live preview; arrow head
   computed from the angle.
-- **v1 registration model — "projector glass":** the board is a fixed,
-  non-scrolling frame; the annotation canvas is locked to the board box. Ink
-  lives in **board-space, not resource-content-space** — scrolling a PDF
+- **v1 registration model — "projector glass" (board-space):** the board is a
+  fixed, non-scrolling frame; the annotation canvas is locked to the board box.
+  Ink lives in **board-space, not resource-content-space** — scrolling a PDF
   *inside* its iframe does not move the ink (like drawing on glass over a
-  projector). Content-anchored ink is Phase 2 (needs pdf.js for PDFs; cross-
-  origin iframes can't expose scroll, a stated hard limit).
-- **Persistence:** `BoardAnnotations` is plain JSON. v1 keeps it in React +
-  optional `sessionStorage` keyed by `lessonId:resourceId`. Designed to drop
-  into a DB column later via an `onChange(annotations)` callback (no v1 schema
-  change).
+  projector). Content-*anchored* ink (ink that follows the PDF's internal scroll)
+  is Phase 2 (needs pdf.js for PDFs; cross-origin iframes can't expose scroll, a
+  stated hard limit). **Note this is independent of persistence (next bullet) —
+  board-space ink still persists across sessions.**
+- **Persistence (per §13.5 — persists in v1):** `BoardAnnotations` is plain JSON,
+  keyed by `lessonId:boardId:resourceId` (`resourceId` empty = the board grid
+  itself). v1 persists it to **localStorage** (`mycurricula:user:teach-annotations`)
+  so it survives reloads and reopening the lesson; it is removed only by an
+  explicit **Clear annotations** action on the board/resource (a destructive,
+  `required:true`-tooltip control). An `onChange(annotations)` callback keeps the
+  store decoupled so Phase 4 swaps localStorage for the owner-scoped
+  `board_annotations` table (§11.1) with no UI change.
 
 ### 5.3 `BoardToolbar` + `ToolDock`
 
@@ -417,6 +448,17 @@ Per-teacher UI state, the direct analogue of `use-rail-layout.ts`. New hook
 Board/widget *content* (not UI layout) flows through the repository seam (§11),
 not this hook.
 
+**Other USER-scoped local stores in v1** (same SSR-safe pattern, all migrate to
+owner-scoped DB rows later — except groups, which never do):
+
+| Store | Key | Notes |
+| --- | --- | --- |
+| Workspace layout | `mycurricula:user:teach-workspace` | §8 above |
+| Annotations | `mycurricula:user:teach-annotations` | persists across sessions (§5.2) → `board_annotations` later |
+| Sandbox draft | `mycurricula:user:teach-sandbox` | ephemeral lesson-less boards (§4a) |
+| Board draft | `mycurricula:user:teach-boards-draft` | keeps a live board across refresh in the prototype |
+| **Groups / names** | `mycurricula:user:teach-groups` | **local-only forever — never synced, never in DB (§11.4)** |
+
 ---
 
 ## 9. Design-system mapping
@@ -443,10 +485,9 @@ All colour/type/spacing tokens come from `app/tokens.css`; **no hard-coded hex**
 canvas tints — `--board-tint-yellow|mint|sky|pink|lavender|peach` — for the
 widget tile backgrounds (yellow/mint/sky/pink/lavender/peach in the brief).
 
-**Handwriting (Notes widget):** the prototype uses `Caveat` (cursive). Adding a
-font is discouraged (`CLAUDE.md`). **v1 default: use the existing Geist stack
-with an italic treatment**; adding `Caveat` via `next/font/google` is an open
-question (§13).
+**Handwriting (Notes widget):** the prototype uses `Caveat` (cursive). Per
+§13.4, **use the existing easy-to-read Geist stack — no `Caveat`, no new font.**
+The Notes paper tint stays; the handwriting face is dropped.
 
 **Onboarding tooltips (`CLAUDE.md` §4):** every non-obvious control gets a
 `<Tooltip>` with a stable `tooltipId` and contextual voice ("Switch the center
@@ -496,20 +537,33 @@ Conventions matched against `20260518102823_initial_schema.sql`:
 - Grade-scoping: every Teach entity carries `grade_level_id` (never assume one
   grade).
 - `set_updated_at()` triggers; FK + hot-path indexes; `display_order_within_lesson`.
-- **Forking-aware:** a `Board` hangs off a lesson via the **master lesson id**
-  (`master_core_lesson_event_id`), the same stable identity `completion_status`
-  uses. Boards are modeled as **owned-per-teacher** (`owner_id` + `scope`, like
-  `time_blocks`/`extra_lesson_events`) — a personal board is one teacher's
-  delivery surface; a `team` board is lead-authored and shared. Sharing happens
-  via "Save board as template", not a master/personal fork pair. **(This is the
-  #1 open question — §13.1.)**
-- **RLS** on all four tables, via the existing `security definer` helpers
+- **Board scope (per §13.1):** a `Board` hangs off a lesson via the **master
+  lesson id** (`master_core_lesson_event_id`), the same stable identity
+  `completion_status` uses. `scope` is `personal` (owner-scoped) or `team`
+  (`owner_id` null, shared across the grade). **Per lesson: at most one team set
+  + one personal set per teacher** — enforced by a partial unique index, e.g.
+  `unique (master_core_lesson_event_id, owner_id, title)` for personal and
+  `unique (master_core_lesson_event_id, title) where scope='team'` for the single
+  team set. **Push-to-team** is a repository operation that deletes the existing
+  team-scoped boards for that lesson and re-inserts the pushed set in one
+  transaction (the displacement in §13.1) — gated by a warning in the UI.
+- **RLS** on all tables, via the existing `security definer` helpers
   (`can_read_grade`, `is_grade_lead`, `can_edit_subject_master`) plus one new
   helper `auth_can_read_lesson(master_lesson_id)` (mirrors the polymorphic
-  resolver added in the resources-embed migration). Personal rows: owner-only.
-  Team rows: readable by the grade, writable by a grade lead. Widgets inherit
-  their board's policy. `teach_workspace_layouts`: strictly the owning teacher's
+  resolver from the resources-embed migration). Personal rows: owner-only. **Team
+  rows: readable AND writable by any teacher who can read the grade** —
+  `using (can_read_grade(grade_level_id))` for both `select` and the write
+  `with check` (per §13.1, *any* team member, not lead-only; `is_grade_lead` is
+  **not** used as a board write gate). Widgets inherit their board's policy.
+  `teach_workspace_layouts` and `board_annotations`: strictly the owning teacher's
   row (identical to `teacher_ui_state_owner`).
+- **Annotations table (per §13.5):** add `board_annotations` —
+  `(id, board_id fk, resource_id text null, owner_id fk teachers, annotations
+  jsonb, grade_level_id, created_at, updated_at)`, owner-scoped RLS. Annotations
+  are a teacher's personal markup even over a team board, so they are always
+  owner-keyed (`resource_id` null = annotations over the board grid itself; set =
+  over a specific resource-in-canvas). v1 persists the same JSON to localStorage;
+  the table is the Phase-4 destination.
 
 The complete SQL is ready to drop in (≈220 lines) — held until backend wiring so
 `supabase db reset` stays green; it applies cleanly on top of both existing
@@ -541,6 +595,27 @@ interface with a swappable implementation:
 
 Resources reuse the existing data path (a `toTeachResource()` adapter derives
 `kind` from `provider`/`type`); **no new resource fetch path**.
+
+### 11.4 Groups & student names — local-only (privacy hard rule, §13.3)
+
+Group definitions and student names **never touch the database and never sync
+across devices**. They live in a dedicated USER-scoped local store
+(`mycurricula:user:teach-groups`, cookies/localStorage) on the teacher's own
+machine.
+
+- The Groups module and any name-bearing widget (Groups, Names/randomizer)
+  read/write names **only** through this local store — never through
+  `lib/teach/queries.ts` / the `widgets` table.
+- The persistable widget `config`/`state` carries only **structure** (e.g. group
+  count, slot ids), not names. The repository's `boardToRow()` adapter
+  **asserts/strips** any name-bearing field before a Supabase write, so a future
+  backend cannot accidentally persist a name.
+- A teacher who opens Teach on a different computer sees their boards but **not**
+  their rosters — by design.
+
+This makes the "students are out of product scope" rule (`CLAUDE.md` §1)
+concrete: there is no roster entity, no students table, no cross-device name
+storage anywhere in the Teach surface.
 
 ---
 
@@ -575,28 +650,39 @@ devices, co-teaching, public sharing, marketplace remain **out of scope**, spec
 
 ---
 
-## 13. Open questions for Tim (review gate)
+## 13. Resolved decisions (Tim, 2026-05-29)
 
-1. **Do boards fork, or are they per-teacher live state?** *(highest-stakes —
-   shapes the schema.)* The spec is silent. The plan models boards as
-   owned-per-teacher keyed to the master lesson (sharing via templates), because
-   boards are *delivery* artifacts, not curriculum. If instead a lead should
-   author a **default board that lazily forks** into every teacher's copy of a
-   lesson (like `master_core_lesson_events` → `personal_..._copies`), boards need
-   the two-table fork shape. **Which model?**
-2. **Groups / Class scope.** Spec says these reuse existing data, but there is
-   **no roster/students table** and students are explicitly out of product scope
-   (`CLAUDE.md` §1). v1 treats Groups as widget-config only and Class as a stub.
-   OK, or do you want a shared roster (new scope)?
-3. **`Caveat` handwriting font** for the Notes widget — add via
-   `next/font/google`, or keep the Geist italic fallback? (Leaning fallback to
-   honour the "no new fonts" rule.)
-4. **Team-board write gate** — grade-lead-only (conservative, matches deferred
-   co-teaching), or any team member?
-5. **Annotation persistence** — is "projector glass" (board-space, per-session)
-   acceptable for v1, with content-anchored ink deferred to Phase 2?
-6. **Top-nav placement** — Teach as a primary `VIEWS` tab now, or only reachable
-   via per-lesson "Teach this lesson" deep links until it's further along?
+1. **Board model — personal by default, with one team set per lesson.** Boards
+   are **personal** (owner-scoped) unless explicitly **shared with the team**, or
+   the lead has authored team boards. **Per lesson there are at most two board
+   sets: one team set, and one personal set per teacher.** A teacher sees their
+   personal set where it exists, otherwise the team set. **Pushing a personal set
+   to the team displaces (overwrites) the existing team set** — destructive and
+   team-wide, so it requires an explicit **warning before it applies**
+   (consequence toast + confirm; §11.1). **Write gate: any team member** may
+   push/edit team boards (not lead-only). No lazy master→personal fork — sharing
+   is an explicit push.
+2. **Sandbox (lesson-less) Teach mode.** A teacher can enter Teach / build boards
+   **without a lesson**. Sandbox work is ephemeral until saved; to persist it they
+   must **save it to a new lesson** or **pin it to an existing lesson** (§4a).
+3. **Groups & student names are local-only (privacy hard rule).** Group
+   definitions and student names persist **only on the teacher's own device**
+   (cookies / localStorage). They are **never** written to the database and
+   **never** sync across computers. Name-bearing data lives in a separate
+   USER-scoped local store and is stripped from any board/widget row that
+   persists to Supabase (§11.4).
+4. **Notes font** — use the existing easy-to-read Geist stack; **no `Caveat`**,
+   no new font.
+5. **Annotations persist in v1.** Annotations persist across sessions
+   (localStorage in v1, DB later) and are removed only when the teacher
+   explicitly **clears a board/resource of annotations**. Content-*anchored* ink
+   (ink that follows a PDF's internal scroll) stays Phase 2 — persistence and
+   anchoring are independent concerns (§5.2).
+6. **Entry points.** Teach is a **primary nav tab now**, *and* reachable from an
+   individual lesson in **Weekly** (at the very bottom of the lesson) and
+   **Daily**. Opening it lands the three-panel workspace (left + center + right,
+   both rails) in the teacher's **saved configuration** (default until they hit
+   reset). The **Present** button gives full-screen teach mode (§2.3).
 
 ---
 
@@ -618,7 +704,12 @@ seam, and the shell skeleton with stubbed zones.
 - `lib/mock/boards.ts` — board/widget fixtures for the active mock lessons.
 - `lib/teach/queries.ts` + `lib/teach/mock-source.ts` + `lib/teach/toTeachResource.ts`
   — repository seam (mock-backed) + resource adapter + id bridge.
-- `lib/use-teach-workspace.ts` — localStorage workspace hook (§8).
+- `lib/use-teach-workspace.ts` — localStorage workspace hook (§8). Wave 0
+  defines the local-store family + keys (workspace, annotations, sandbox,
+  board-draft, groups-local — §8 table); the owning zone agents build each
+  feature store on the same SSR-safe pattern.
+- Central state includes `centerMode`, sandbox flags (§4a), and the
+  push-to-team / displacement contract (§13.1) so B can wire them.
 - `app/(teach)/layout.tsx` — providers only (§2.1); `app/(teach)/teach/page.tsx`.
 - `components/teach/TeachWorkspace.tsx` — shell skeleton, central state, the one
   `DndContext`, zone mount points (stubs), `index.ts` barrel.
@@ -633,9 +724,9 @@ green with stubbed zones; the contract in §2.4 is frozen.
 | Agent | Owns | Builds |
 | --- | --- | --- |
 | **A — Chrome & modes** | `components/teach/chrome/*` | `TeachTopBar`, `TeachSubBar` (board tabs, layout toolbar, action cluster), `TeachFooter`, `PresentMode` (T6), Full-Screen wiring, layout-switcher; `use-teach-shortcuts.ts` (⌘1–9, ⌘L/R/J/K, ⌘/, ⌘P, Esc cascade). Pop-Out/Duplicate as "Soon". |
-| **B — Left zone** | `components/teach/rails/TeachLeftRail*`, `components/teach/panels/left/*` | Left icon rail + collapsible left panel + module tabs; Lesson card, Lesson list (reuse `usePlanner`), Boards thumbs (+Add), Notes/Groups/Class/Tools (display/stub). |
+| **B — Left zone** | `components/teach/rails/TeachLeftRail*`, `components/teach/panels/left/*`, `lib/teach/use-teach-groups.ts` | Left icon rail + collapsible left panel + module tabs; Lesson card, Lesson list (reuse `usePlanner`), Boards thumbs (+Add). **Boards module owns Share-to-team / push (with the §13.1 displacement warning) and the §4a sandbox Save-to-new-lesson / Pin-to-lesson flows.** Notes (display); Groups/Names (**local-only store, §11.4 — never DB**); Class/Tools stub. |
 | **C — Center board** | `components/teach/board/*`, `components/teach/widgets/*` | `TeachingBoard` (CSS-grid + layout switch + `@dnd-kit` reorder), `WidgetShell` (hover chrome), `WidgetPicker` (T5), `BoardEmptyState` (T9), `FocusMode` (T7), all **display-only** widget bodies, droppable cells for T8. |
-| **D — Resource canvas & annotation** ⭐ | `components/teach/canvas/*`, `components/teach/annotation/*`, `lib/board-annotations.ts`, `lib/board-embed.ts`, `lib/use-board-annotations.ts` | `BoardCanvasResource` (§5.1), `AnnotationLayer` (§5.2), `BoardToolbar` + `ToolDock` (§5.3), PDF viewer toolbar chrome (T3/T4). **The v1 interactive priority.** |
+| **D — Resource canvas & annotation** ⭐ | `components/teach/canvas/*`, `components/teach/annotation/*`, `lib/board-annotations.ts`, `lib/board-embed.ts`, `lib/use-board-annotations.ts` | `BoardCanvasResource` (§5.1), `AnnotationLayer` (§5.2), `BoardToolbar` + `ToolDock` (§5.3), PDF viewer toolbar chrome (T3/T4). **Annotations persist to localStorage across sessions + explicit Clear (§5.2, §13.5).** The v1 interactive priority. |
 | **E — Right zone** | `components/teach/rails/TeachRightRail*`, `components/teach/panels/right/*` | Right icon rail + collapsible right panel + module tabs; `ResourcesModule` (grid/list, search, filter chips, hover menu → Embed/Open Large, draggable cards for T8), `ChatModule` (reuse Daily `<Shoutbox>`), `TodoModule` (reuse Daily `<TodayTodos>`). |
 
 Shared touch-points are read-only contracts from Wave 0 (workspace state, dnd
@@ -689,4 +780,5 @@ Wave 0 ──┬─> A (chrome/modes)
 
 ---
 
-*End of plan. Awaiting review (§13) before implementation.*
+*End of plan. §13 decisions resolved with Tim (2026-05-29); ready to begin
+Wave 0 (§14) on approval.*
