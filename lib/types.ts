@@ -456,7 +456,8 @@ export type RepeatKind =
   | "weekly"
   | "subject"
   | "slot"
-  | "lesson";
+  | "lesson"
+  | "week";
 
 /** One repeat rule. Carries REAL planner-entity references (not cosmetic
  *  labels), resolved through the planner's own selectors so the link is live:

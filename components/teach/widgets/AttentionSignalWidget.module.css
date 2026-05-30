@@ -1,0 +1,85 @@
+/* AttentionSignalWidget.module.css — token-only, em-sized. Default blue/blue. */
+
+.hero {
+  padding: 1.6em 1.4em;
+  display: flex;
+  align-items: center;
+  gap: 1.1em;
+}
+
+.mega {
+  flex: none;
+  color: var(--w-accent);
+  display: grid;
+  place-items: center;
+}
+
+.signal {
+  font-size: 1.85em;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  min-width: 0;
+  color: var(--w-ink);
+}
+
+.ring {
+  margin-left: auto;
+  width: 4.8em;
+  height: 4.8em;
+  border-radius: 50%;
+  border: 0.32em solid var(--w-soft);
+  border-top-color: var(--w-accent);
+  border-right-color: var(--w-accent);
+  display: grid;
+  place-items: center;
+  flex: none;
+  transform: rotate(45deg);
+}
+
+.ringInner {
+  transform: rotate(-45deg);
+  text-align: center;
+  line-height: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ringNum {
+  font-size: 1.6em;
+  font-weight: 800;
+  color: var(--w-ink);
+}
+
+.ringUnit {
+  font-size: 0.7em;
+  font-weight: 700;
+  color: var(--w-ink);
+  opacity: 0.55;
+}
+
+.readyBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55em;
+  margin-top: 0.9em;
+  padding: 0.85em;
+  background: var(--w-soft);
+  border-radius: 0.85em;
+  color: var(--w-accent);
+  font-size: 0.95em;
+  font-weight: 800;
+}
+
+@media (max-width: 480px) {
+  .hero {
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+  }
+  .ring {
+    margin-left: 0;
+  }
+}

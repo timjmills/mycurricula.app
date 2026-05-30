@@ -1,0 +1,66 @@
+/* WhenDoneWidget.module.css — token-only, em-sized. Default orange/orange. */
+
+.sectionLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin-bottom: 0.65em;
+}
+
+.maySection {
+  margin-top: 1em;
+}
+
+.mustIcon {
+  color: var(--wf-yellow-accent);
+  display: grid;
+  place-items: center;
+}
+
+.mustText {
+  font-size: 0.78em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--tone-orange-fg);
+}
+
+.mayIcon {
+  color: var(--tone-purple-fg);
+  display: grid;
+  place-items: center;
+}
+
+.mayText {
+  font-size: 0.78em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--tone-purple-fg);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65em;
+}
+
+.doCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55em;
+  padding: 1em 0.5em;
+  text-align: center;
+}
+
+.doIcon {
+  display: grid;
+  place-items: center;
+}
+
+.doText {
+  font-size: 0.8em;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--w-ink);
+}

@@ -1,0 +1,113 @@
+/* ParticipationTrackerWidget.module.css — token-only, em-sized. Default blue/blue.
+   Avatar buttons are tap targets; columns stack on phone. */
+
+.panel {
+  padding: 1em 1.1em;
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 1em;
+}
+
+.divider {
+  background: var(--w-line);
+}
+
+.col {
+  min-width: 0;
+}
+
+.colHead {
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  margin-bottom: 0.75em;
+}
+
+.colIconShared {
+  color: var(--tone-blue-fg);
+  display: grid;
+  place-items: center;
+}
+
+.colIconNot {
+  color: var(--tone-pink-fg);
+  display: grid;
+  place-items: center;
+}
+
+.colTitle {
+  font-size: 0.95em;
+  font-weight: 800;
+  color: var(--w-ink);
+}
+
+.badge {
+  margin-left: auto;
+  width: 1.8em;
+  height: 1.8em;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.82em;
+  font-weight: 800;
+  flex: none;
+}
+
+.badgeShared {
+  background: var(--tone-blue-bg);
+  color: var(--tone-blue-fg);
+}
+
+.badgeNot {
+  background: var(--tone-pink-bg);
+  color: var(--tone-pink-fg);
+}
+
+.cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45em;
+  align-content: flex-start;
+  min-height: 2.3em;
+}
+
+.avBtn {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  border-radius: 50%;
+}
+
+.avBtn:hover {
+  filter: brightness(0.97);
+}
+
+.empty {
+  font-size: 0.82em;
+  font-weight: 600;
+  color: var(--w-ink);
+  opacity: 0.5;
+}
+
+.foots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75em;
+}
+
+@media (max-width: 600px) {
+  .cols {
+    grid-template-columns: 1fr;
+  }
+  .divider {
+    height: 1px;
+  }
+  .foots {
+    grid-template-columns: 1fr;
+  }
+}

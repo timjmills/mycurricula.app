@@ -1,0 +1,61 @@
+/* HelpQueueWidget.module.css — token-only, em-sized. Default orange/orange.
+   Each row is a full-width tap target (≥44px tall at scale 1). */
+
+.list {
+  padding: 0.25em 1em;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.85em 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.bordered {
+  border-bottom: 1px solid var(--w-line);
+}
+
+.initial {
+  font-size: 0.98em;
+  font-weight: 700;
+  min-width: 1.4em;
+  color: var(--w-ink);
+}
+
+.status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-weight: 700;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.countBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  margin-top: 0.85em;
+  padding: 0.8em;
+  background: var(--w-soft);
+  border-radius: 0.85em;
+  color: var(--w-accent);
+  font-size: 0.9em;
+  font-weight: 700;
+}
+
+@media (max-width: 480px) {
+  .status {
+    font-size: 0.78em;
+  }
+}

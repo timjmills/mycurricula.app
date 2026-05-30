@@ -39,7 +39,10 @@ export interface AppearancePanelProps {
   /** The selected widget's display label, shown in the per-widget subtitle. */
   widgetLabel?: string;
   /** Set one appearance property (per-widget override, or board theme). */
-  onSet: <K extends ThemeProp>(prop: K, value: NonNullable<ThemeOverride[K]>) => void;
+  onSet: <K extends ThemeProp>(
+    prop: K,
+    value: NonNullable<ThemeOverride[K]>,
+  ) => void;
   /** Reset: per-widget mode → clear this widget's overrides; board mode →
    *  clear every widget's overrides. */
   onReset: () => void;

@@ -105,7 +105,7 @@
 }
 .tbtn.solid {
   background: var(--wf-blue-accent);
-  color: #fff;
+  color: var(--paper);
   border-color: transparent;
 }
 .tbtn.solid:hover {
@@ -337,9 +337,28 @@
   border-radius: var(--r-pill);
   font-size: var(--t-14);
   font-weight: 700;
-  color: #fff;
+  color: var(--paper);
   background: var(--wf-blue-accent);
   box-shadow: var(--shadow-popover);
+}
+
+/* Tier switch: desktop docks the panel and hides the FAB; tablet/phone hides
+   the docked panel (so the canvas keeps full width) and surfaces the FAB +
+   bottom sheet instead. 960px is the cutover between "room for a dock" and
+   "give the canvas the width". */
+@media (min-width: 961px) {
+  .panelFab {
+    display: none;
+  }
+  .panelSheet,
+  .sheetBackdrop {
+    display: none;
+  }
+}
+@media (max-width: 960px) {
+  .panel:not(.panelSheet) {
+    display: none;
+  }
 }
 
 /* ── Add-widget popover ─────────────────────────────────────────────────── */

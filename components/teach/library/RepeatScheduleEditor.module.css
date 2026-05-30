@@ -1,0 +1,187 @@
+/* RepeatScheduleEditor.module.css — the Repeat action's rule-builder UI.
+ *
+ * Lives inside a board card / popover, so it must stay usable in a narrow
+ * (~280–340px) panel and down to a 360px viewport. Tokens only (CLAUDE.md §4):
+ * colour / type / radius / spacing all reference app/tokens.css. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--ink-150);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+/* ── Explainer ─────────────────────────────────────────────────────────────── */
+.lead {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--wf-blue-grad);
+  border: 1px solid var(--wf-blue-line);
+  color: var(--ink-700);
+  font-size: var(--t-12);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.lead strong {
+  color: var(--ink-900);
+  font-weight: 700;
+}
+
+.leadIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--wf-blue-accent);
+  margin-top: 1px;
+}
+
+/* ── Existing rules ────────────────────────────────────────────────────────── */
+.ruleList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ruleItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 9px;
+  background: var(--wf-blue-soft);
+  border: 1px solid var(--wf-blue-line);
+}
+
+.ruleLabel {
+  flex: 1;
+  min-width: 0;
+  color: var(--wf-blue-accent);
+  font-size: var(--t-13);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.noRules {
+  margin: 0;
+  color: var(--ink-400);
+  font-size: var(--t-12);
+  font-weight: 500;
+}
+
+/* ── Builder ───────────────────────────────────────────────────────────────── */
+.builder {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 11px;
+  border-radius: 10px;
+  background: var(--ink-50);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.fieldLabel {
+  color: var(--ink-500);
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.select,
+.input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--ink-150);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink-900);
+  font-size: var(--t-13);
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.select:focus-visible,
+.input:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* ── Weekday picker ────────────────────────────────────────────────────────── */
+.weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dayPill {
+  min-width: 44px;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid var(--ink-150);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-500);
+  font-size: var(--t-12);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dayPill:hover {
+  border-color: var(--ink-300);
+}
+
+.dayPill:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.dayPillActive {
+  background: var(--wf-blue-accent);
+  border-color: var(--wf-blue-accent);
+  color: var(--paper);
+}
+
+/* ── Preview ───────────────────────────────────────────────────────────────── */
+.preview {
+  margin: 0;
+  color: var(--ink-400);
+  font-size: var(--t-12);
+  font-weight: 500;
+}
+
+.preview strong {
+  color: var(--ink-900);
+  font-weight: 700;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.footer > * {
+  flex: 0 1 auto;
+}
+
+@media (max-width: 480px) {
+  .footer > * {
+    flex: 1 1 auto;
+  }
+}

@@ -1,0 +1,47 @@
+/* MaterialsNeededWidget.module.css — token-only, em-sized. Default purple/purple. */
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8em;
+  margin-bottom: 0.8em;
+}
+
+.restGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8em;
+}
+
+.mat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65em;
+  padding: 1em 0.4em;
+  text-align: center;
+}
+
+.matBig {
+  padding: 1.4em 0.5em;
+}
+
+.matIcon {
+  color: var(--w-accent);
+  display: grid;
+  place-items: center;
+}
+
+.matName {
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--w-ink);
+}
+
+/* Narrow tiles: collapse the 3-up row to 2-up so labels don't clip. */
+@media (max-width: 480px) {
+  .restGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
