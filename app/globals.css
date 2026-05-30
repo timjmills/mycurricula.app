@@ -72,9 +72,10 @@ body:has([data-print-view]) [role="complementary"] {
  * the subject-color stripe collapses to indistinguishable gray and lessons
  * across subjects start to look identical. To preserve subject identity on
  * paper we overlay a SHAPE pattern on the stripe — eight distinct hatch
- * patterns, one per canonical subject. The patterns paint in pure
- * `var(--ink-900)` (near-black) so they survive any B&W printer driver's
- * color-to-gray conversion at 600dpi.
+ * patterns, one per canonical subject. The patterns paint in a light gray
+ * (`var(--ink-400)`) for a faint-watermark look that doesn't overpower the
+ * stripe; subject identity is carried by the pattern SHAPE (angle / dash /
+ * density), not its darkness.
  *
  * Architecture:
  *   - Each `.cp-subj.<id>` declares a `--subject-pattern` custom property
@@ -87,96 +88,101 @@ body:has([data-print-view]) [role="complementary"] {
  *   - Pattern stripe widens to 6px in print so the hatch is readable. The
  *     screen stripe stays 3px for a clean preview.
  *
- * Patterns are calibrated for 600dpi laser:
- *   - line thickness ≥ 1.5px so it doesn't collapse to half-tone gray
- *   - period ≥ 4px so adjacent lines don't fuse into a solid block
+ * Patterns rely on SHAPE, not weight, to stay distinct:
  *   - the eight subjects pick distinct line angles, dash patterns, and
- *     densities so two subjects never look alike at low contrast.
+ *     densities so two subjects never look alike even as a faint tint.
+ *   - relative weight is preserved (explorers boldest, math/reading finest,
+ *     spelling cross-hatched) as a secondary cue.
+ *   - TRADE-OFF: the light-gray ink is a deliberate aesthetic choice. On a
+ *     low-quality B&W printer with aggressive toner thresholding a faint
+ *     1px gray line can wash out; if a school reports vanishing hatches,
+ *     darken `--ink-400` → `--ink-600`/`--ink-900` here.
  *
  * `print-color-adjust: exact` forces the browser to keep backgrounds
  * during print (Chromium/Edge/Safari respect it; Firefox honors the
  * legacy `-webkit-print-color-adjust` alias which we also set).
  */
 @media print {
-  /* Pattern definitions keyed by subject. Tokens only — ink-900 is the
-     pattern ink, paper is the void between lines so the underlying
-     colored stripe shows through on color printers. */
+  /* Pattern definitions keyed by subject. Tokens only — ink-400 is the
+     light-gray pattern ink (faint watermark), paper is the void between
+     lines so the underlying colored stripe shows through on color printers. */
   .cp-subj.math {
-    /* Diagonal / forward-slash hatch — the most common subject gets the
-       canonical "math-grid" diagonal. */
+    /* Fine forward-slash diagonal (45°) — the most common subject gets the
+       canonical "math-grid" diagonal. Finest weight in the set. */
     --subject-pattern: repeating-linear-gradient(
       45deg,
-      var(--ink-900) 0 1.5px,
-      transparent 1.5px 5px
+      var(--ink-400) 0 1px,
+      transparent 1px 6px
     );
   }
   .cp-subj.reading {
-    /* Diagonal \ backslash — mirrors math so the two literacy-adjacent
-       subjects are immediately distinguishable. */
+    /* Fine backslash diagonal (135°) — mirrors math's axis so the two
+       literacy-adjacent subjects read as opposite diagonals. */
     --subject-pattern: repeating-linear-gradient(
       135deg,
-      var(--ink-900) 0 1.5px,
-      transparent 1.5px 5px
+      var(--ink-400) 0 1px,
+      transparent 1px 6px
     );
   }
   .cp-subj.writing {
-    /* Vertical lines — a different axis class from math/reading. */
+    /* Fine vertical lines — a different axis class from math/reading. */
     --subject-pattern: repeating-linear-gradient(
       90deg,
-      var(--ink-900) 0 1.5px,
-      transparent 1.5px 4px
+      var(--ink-400) 0 1px,
+      transparent 1px 5px
     );
   }
   .cp-subj.grammar {
-    /* Horizontal rules — paired axis to writing's verticals. */
+    /* Fine horizontal rules — paired axis to writing's verticals. */
     --subject-pattern: repeating-linear-gradient(
       0deg,
-      var(--ink-900) 0 1.5px,
-      transparent 1.5px 4px
+      var(--ink-400) 0 1px,
+      transparent 1px 5px
     );
   }
   .cp-subj.spelling {
-    /* Cross-hatch (two 45° gradients composed) — denser, very distinct
-       from the single-axis hatches above. */
+    /* Cross-hatch (two diagonals composed) — the only 2-axis pattern, so it
+       reads as a mesh regardless of how faint it gets. */
     --subject-pattern:
       repeating-linear-gradient(
         45deg,
-        var(--ink-900) 0 1px,
-        transparent 1px 5px
+        var(--ink-400) 0 1px,
+        transparent 1px 6px
       ),
       repeating-linear-gradient(
         135deg,
-        var(--ink-900) 0 1px,
-        transparent 1px 5px
+        var(--ink-400) 0 1px,
+        transparent 1px 6px
       );
   }
   .cp-subj.ufli {
-    /* Dashed diagonal — broken-up pattern, visually distinct from math's
-       continuous diagonal. */
+    /* Dashed backslash diagonal (135°). Deliberately OFF math's 45° axis so
+       the two don't collide on a narrow stripe; the broken dash rhythm keeps
+       it distinct from reading's continuous 135° lines (dashed vs solid). */
     --subject-pattern: repeating-linear-gradient(
-      45deg,
-      var(--ink-900) 0 2px,
-      transparent 2px 4px,
-      var(--ink-900) 4px 5px,
+      135deg,
+      var(--ink-400) 0 1px,
+      transparent 1px 4px,
+      var(--ink-400) 4px 5px,
       transparent 5px 9px
     );
   }
   .cp-subj.explorers {
-    /* Thick diagonal bars — bold, low-frequency. The lemon/amber subject
-       reads as the "warm-bright" identity on paper. */
+    /* Bold, low-frequency forward diagonal — the heaviest line + widest gap
+       in the set, so it stays the "boldest" identity even as a light tint. */
     --subject-pattern: repeating-linear-gradient(
       45deg,
-      var(--ink-900) 0 2.5px,
-      transparent 2.5px 7px
+      var(--ink-400) 0 2px,
+      transparent 2px 9px
     );
   }
   .cp-subj.sel {
-    /* Sparse horizontal dashes — quietest pattern for the least frequent
-       subject; reads as "neutral / supplementary" on paper. */
+    /* Sparsest horizontal lines — quietest pattern for the least frequent
+       subject; wider gap than grammar so the two horizontals stay distinct. */
     --subject-pattern: repeating-linear-gradient(
       0deg,
-      var(--ink-900) 0 1px,
-      transparent 1px 6px
+      var(--ink-400) 0 1px,
+      transparent 1px 8px
     );
   }
 

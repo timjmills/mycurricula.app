@@ -757,76 +757,6 @@
   flex-direction: column;
 }
 
-/* ── Duplicate-week button (BIG-2) ─────────────────────────────────────────
- *
- * A ghost button sitting in the toolbar next to the expand/minimize control.
- * Matches the navToday treatment — border + background + hover transition —
- * but includes a copy icon on the left.
- */
-.dupeWeekBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 44px;
-  padding: 0 14px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  color: var(--ink-700);
-  font-size: var(--t-13);
-  font-weight: 500;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease;
-}
-
-.dupeWeekBtn:hover:not(:disabled) {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
-}
-
-.dupeWeekBtn:focus-visible {
-  outline: 2px solid var(--math);
-  outline-offset: 2px;
-}
-
-/* ── Duplicate-week toast (BIG-2) ──────────────────────────────────────────
- *
- * A slim confirmation line shown inside the toolbar for 4 s after the
- * duplication fires. Uses the --done token (green) for positive feedback.
- * No motion under prefers-reduced-motion — just a visibility toggle.
- */
-.dupeToast {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--t-13);
-  font-weight: 500;
-  color: var(--done);
-  padding: 4px 10px;
-  border-radius: var(--r-8);
-  background: color-mix(in oklch, var(--done) 10%, transparent);
-  border: 1px solid color-mix(in oklch, var(--done) 25%, transparent);
-  animation: toastIn 0.15s ease;
-}
-
-@keyframes toastIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dupeToast {
-    animation: none;
-  }
-}
-
 /* ── Responsive: narrow navbar collapse ──────────────────────────────────
    The .scroll container already has overflow: auto so the wide grid
    (min-width: 1082px) scrolls horizontally inside its own track — no
@@ -834,7 +764,8 @@
    could overflow at narrow widths because it holds several fixed-width
    controls in one flex row. (The former expand/collapse + ⋯ toolbar was
    removed; the week row + view toggle now live in the lifted
-   WeekNavigator, and Duplicate-week is a right-click / long-press action.)
+   WeekNavigator. The Duplicate-week feature was removed entirely — no
+   context-menu or long-press handler remains here.)
 
    Strategy (additive only — desktop ≥1280px is unchanged):
      ≤768px  tighten navbar padding; hide the "Today" button + its separator.
