@@ -266,3 +266,27 @@ changes board on touch; countdown ticks; presets apply; focus trapped in Present
 - Artboard: `…/project/teach524.jsx` (+ `teach-handoff/` variant)
 - Reference HTML: `…/project/5.24.26 - Teach View.html`
 - These are reference only — never imported (CLAUDE.md §6).
+
+---
+
+## 6. Wave 0 decisions (recorded 2026-05-30)
+
+- **<900px fallback → stacked single-panel (not redirect).** Below ~900px the
+  five-zone grid collapses to a single column showing only the **center board**,
+  with a short note that the rails/panels are available on a larger screen. This
+  keeps Teach reachable on tablet/phone rather than redirecting away to Daily.
+  Implemented purely in CSS (a `@media (max-width: 900px)` block in
+  `components/teach/TeachShell.module.css`) as the Wave 0 stub; later waves add
+  the real single-panel module switcher.
+- **Shell suppression mirrors the print route.** `/teach` lives in `(planner)`
+  so it inherits auth + the Personal/Team banner + the top bar (top bar stays so
+  the Teach tab highlights). A `data-teach-view` attribute on the `TeachShell`
+  root triggers `:global` rules in `app/globals.css` that hide the planner's
+  default left filter panel (`aside`), right panel (`[role="complementary"]`),
+  and the two icon rails (`nav:has([data-rail-side])`) — Teach owns its own
+  chrome. This deliberately leaves the top-bar `<header>` and the `MasterBanner`
+  in place.
+- **Present param is a stub.** Daily's Present button will push
+  `/teach?present=1`; Wave 0 reads the param (`useSearchParams`, under a
+  `<Suspense>` boundary as the App Router requires) and surfaces a small note.
+  Full fullscreen-immersive Present mode is Wave 5.

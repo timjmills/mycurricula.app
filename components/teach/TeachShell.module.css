@@ -1,0 +1,195 @@
+/* TeachShell.module.css — the Teach view's 5-zone shell (Wave 0 skeleton).
+   All color / type / spacing come from tokens.css via var(--…).
+
+   Layout: a single CSS-grid row of five zones, left → right —
+     [far-left rail] [left panel] [center board] [right panel] [far-right rail]
+   The center board is the only flexible track (minmax(0, 1fr)); the rails are
+   fixed-width slim strips and the side panels have a sensible default width.
+
+   Wave 0 is a SKELETON: each zone shows a labeled placeholder so the structure
+   is visible. Resize/collapse/tabs/widgets arrive in later waves.
+
+   ── <900px fallback (Wave 0 decision) ──────────────────────────────────────
+   Below ~900px we collapse to a STACKED single-panel view: only the center
+   board shows, with a short note that the rails/panels are available on a
+   larger screen. This keeps Teach reachable on tablet/phone rather than
+   redirecting away. Implemented purely in CSS via the media query at the
+   bottom of this file. */
+
+/* ── Shell chrome suppression ──────────────────────────────────────────────
+ * Global rules that hide the planner shell's filter panel, right panel, and
+ * the two icon rails on the /teach route live in app/globals.css (scoped by
+ * [data-teach-view]) — CSS Modules requires at least one local class per
+ * selector, so those rules cannot live here. This file owns only the
+ * teach-page-local styles below. We KEEP the top bar (so the Teach tab
+ * highlights) and the Personal/Team banner (inherited from the route group). */
+
+/* ── Page root ─────────────────────────────────────────────────────────────
+   Fills the main content area (which fills the viewport once the shell's
+   side panels + rails are suppressed). A column flex so a future sub-bar
+   (TeachTopControls, Wave 2) can sit above the zone grid. */
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--ink-50);
+  overflow: hidden;
+}
+
+/* ── Zone grid ─────────────────────────────────────────────────────────────
+   The five zones as grid columns. Rails are slim fixed strips; side panels
+   carry the spec's default widths (left ~280px, right ~320px — spec §2); the
+   center board is the only flexible track. `minmax(0, 1fr)` lets the center
+   shrink so wide panels never force document-level horizontal scroll. */
+.zones {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns:
+    var(--teach-rail-w)
+    var(--teach-left-w)
+    minmax(0, 1fr)
+    var(--teach-right-w)
+    var(--teach-rail-w);
+  gap: 0;
+}
+
+/* Local layout constants expressed as custom properties so the media-query
+   fallback can flip them without restating the grid template. */
+.page {
+  --teach-rail-w: 52px;
+  --teach-left-w: 280px;
+  --teach-right-w: 320px;
+}
+
+/* ── Zone shells ───────────────────────────────────────────────────────────
+   Each zone is a bordered placeholder in Wave 0. A hairline separates
+   adjacent zones; the labels make the structure legible. Later waves replace
+   the placeholder body with real panels/board/rails. */
+.zone {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--paper);
+  border-right: var(--line);
+  overflow: auto;
+}
+
+/* The far-right rail has no trailing separator. */
+.zone:last-child {
+  border-right: none;
+}
+
+/* Rails read as slim chrome strips — a faint fill distinguishes them from
+   the paper panels/board between them. */
+.rail {
+  background: var(--ink-50);
+  align-items: center;
+}
+
+/* The center board sits on a slightly tinted surface so it reads as the
+   focal workspace even while empty. */
+.center {
+  background: var(--ink-50);
+}
+
+/* ── Placeholder content ───────────────────────────────────────────────────
+   A centered label naming the zone, plus an optional sub-note. Replaced with
+   real content in later waves. */
+.placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 10px;
+  text-align: center;
+}
+
+.placeholderLabel {
+  font-size: var(--t-12);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.placeholderNote {
+  font-size: var(--t-11);
+  color: var(--ink-300);
+  max-width: 22ch;
+  line-height: 1.4;
+}
+
+/* Rail placeholder labels read vertically so they fit the slim strip. */
+.rail .placeholderLabel {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  letter-spacing: 1px;
+}
+
+/* ── Present-mode note (Wave 0 stub) ───────────────────────────────────────
+   When ?present=1 is set we surface a small note acknowledging it. Full
+   fullscreen-immersive Present mode lands in Wave 5. */
+.presentNote {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--ink-500);
+  background: var(--ink-100);
+  border-bottom: var(--line);
+}
+
+/* ── Mobile fallback note (hidden ≥900px) ──────────────────────────────────
+   Shown only in the stacked single-panel fallback below ~900px. */
+.fallbackNote {
+  display: none;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  font-size: var(--t-12);
+  line-height: 1.4;
+  color: var(--ink-500);
+  background: var(--ink-100);
+  border-bottom: var(--line);
+}
+
+/* ── <900px stacked single-panel fallback (Wave 0 decision) ────────────────
+   Below ~900px the 5-zone grid is unusable (rails + two panels + a board
+   would force horizontal scroll). We collapse to a single column showing
+   only the center board, and reveal the explanatory note above it. The rails
+   and side panels are hidden (their content remains reachable from the rest
+   of the app at larger widths). */
+@media (max-width: 900px) {
+  .zones {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Hide every zone except the center board. */
+  .rail,
+  .left,
+  .right {
+    display: none;
+  }
+
+  /* The center board fills the single column; drop its trailing border. */
+  .center {
+    border-right: none;
+  }
+
+  .fallbackNote {
+    display: block;
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────────
+   No transitions in the Wave 0 skeleton; this block reserves the contract
+   for later waves so the file is the single home for motion gating. */
+@media (prefers-reduced-motion: reduce) {
+  .page * {
+    transition: none !important;
+  }
+}

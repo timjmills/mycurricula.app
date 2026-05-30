@@ -32,6 +32,16 @@
   flex-shrink: 0;
 }
 
+/* Actions cluster in the page-header actions slot — the Subject/Schedule
+   toggle and the Present button sit on one row, wrapping to a second row
+   on narrow viewports so neither control overflows the header. */
+.headerActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* ── Breadcrumb: Week N / Day / Subject (BIG-7) ─────────────────────────
    A slim single-line strip across the top of the Daily view.  Each segment
    is a clickable link; chevron separators are presentational (aria-hidden).
