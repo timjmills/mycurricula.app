@@ -75,7 +75,10 @@ interface ViewDef {
   tooltip?: string;
 }
 
-// Top-bar tab order, left → right: Daily · Weekly · Yearly · Curriculum.
+// Top-bar tab order, left → right: Daily · Teach · Weekly · Yearly · Curriculum.
+// Teach (/teach) is the full-screen live-delivery view; it sits next to Daily
+// because both answer "what am I teaching right now". Like Daily/Weekly it has
+// no narrowOnly flag, so it stays visible at every width.
 // Yearly is a label rename of the Year route (/year stays the canonical URL).
 // Curriculum is a label rename of the Subject route (/subject/[slug] stays the
 // canonical URL — "subject" is the data-model entity; "Curriculum" is just the
@@ -97,6 +100,12 @@ export const VIEWS: ViewDef[] = [
     href: "/daily",
     tooltip:
       "Today's lessons in detail — schedule, lesson cards, and the day's notes",
+  },
+  {
+    label: "Teach",
+    href: "/teach",
+    tooltip:
+      "Full-screen Teaching View for live class delivery — boards, timers, and resources on the projector",
   },
   {
     label: "Weekly",
@@ -297,8 +306,8 @@ export function TopBar(): ReactNode {
       />
 
       {/* ── View switcher ─────────────────────────────────────────── */}
-      {/* RES-CRIT-002 / Round 2: at ≤768px (tablet/phone) the four inline
-          tabs (Daily / Weekly / Yearly / Curriculum) cannot fit alongside
+      {/* RES-CRIT-002 / Round 2: at ≤768px (tablet/phone) the inline tabs
+          (Daily / Teach / Weekly / Yearly / Curriculum) cannot fit alongside
           the Logo, Personal/Master toggle, More trigger, and Profile
           avatar within the viewport. They collapse into the More menu's
           Navigation section (rendered by TopBarMoreMenu) via

@@ -1,0 +1,130 @@
+/* TeachPanel.module.css — a dockable-lite Teach side panel.
+   Tokens only (var(--…)); no hard-coded hex/px font sizes. */
+
+/* ── Panel shell ───────────────────────────────────────────────────────────
+   Fills its grid track (TeachShell sizes the track to the panel's width).
+   Column flex: header (tab strip + collapse toggle) above a scrollable body.
+   min-height:0 lets the body scroll instead of growing the document. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+/* ── Header row ─────────────────────────────────────────────────────────────
+   The tab strip flexes to fill; the collapse toggle pins to the inner edge.
+   A LEFT panel's toggle reads naturally at the far right of the header; a
+   RIGHT panel's toggle moves to the far left so it always sits toward the
+   board. We reorder via flex `order` keyed off data-side. */
+.header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.headerTabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.panel[data-side="right"] .headerTabs {
+  order: 2;
+}
+
+/* ── Collapse toggle ───────────────────────────────────────────────────────
+   A ≥44px square icon button on the inner edge of the header. */
+.collapseBtn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--ink-50);
+  border: none;
+  border-bottom: var(--line);
+  border-left: var(--line);
+  color: var(--ink-500);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.panel[data-side="right"] .collapseBtn {
+  order: 1;
+  border-left: none;
+  border-right: var(--line);
+}
+
+.collapseBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.collapseBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+/* ── Body ──────────────────────────────────────────────────────────────────
+   The active module renders here. Scrolls internally; the module owns its
+   own padding so different modules can present edge-to-edge or padded. */
+.body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+
+/* ── Collapsed strip ───────────────────────────────────────────────────────
+   A 32px rail with a single full-height re-expand button. The width is set
+   here so the panel reads as a slim strip even though TeachShell also sizes
+   the grid track; the two agree on 32px. */
+.collapsed {
+  width: 32px;
+  background: var(--ink-50);
+  align-items: stretch;
+}
+
+.expandStrip {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Min 44px tall via the parent's full height; the strip itself fills it. */
+  padding: 8px 0;
+  background: transparent;
+  border: none;
+  color: var(--ink-500);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.expandStrip:hover {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.expandStrip:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .collapseBtn,
+  .expandStrip {
+    transition: none;
+  }
+}

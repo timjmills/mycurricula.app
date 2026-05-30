@@ -2072,12 +2072,40 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
       {/* The Subject ↔ Schedule toggle now lives in the page-header actions
           slot (W5) instead of a standalone in-page "VIEW" bar, mirroring the
           Weekly view's title-row toggle. The onboarding tip banner was
-          removed. */}
+          removed.
+
+          The Present button sits beside the toggle in the same actions slot.
+          It launches the full-screen Teaching View (/teach) for the current
+          day — `?present=1` tells TeachShell to start in fullscreen-immersive
+          mode. The dismissible onboarding tooltip teaches the first-time
+          teacher what the button is FOR (CLAUDE.md §4); it's an explanatory
+          tip, not a high-consequence one, so it carries a tooltipId (the
+          W2-B3 dismissibility system) rather than `required`. The Button keeps
+          a matching native title= for the touch long-press fallback, and the
+          wrapping <Tooltip> mirrors the search-trigger idiom in the top bar
+          (the Button primitive's own `tooltip` prop has no tooltipId yet). */}
       <PageHeader
         title="Daily View"
         subtitle="Today's lessons in detail, side-by-side with the day's schedule and notes."
         className={styles.dailyPageHeader}
-        actions={<DailySchedulePill />}
+        actions={
+          <div className={styles.headerActions}>
+            <DailySchedulePill />
+            <Tooltip
+              content="Open this day in the full-screen Teaching View for live class delivery"
+              side="bottom"
+              tooltipId="daily-present"
+            >
+              <Button
+                variant="primary"
+                onClick={() => router.push("/teach?present=1")}
+                title="Open this day in the full-screen Teaching View for live class delivery"
+              >
+                Present
+              </Button>
+            </Tooltip>
+          </div>
+        }
       />
 
       {/* ── Breadcrumb: Week N / Day / Subject (BIG-7) ───────────────────

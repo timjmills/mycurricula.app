@@ -47,6 +47,26 @@ body:has([data-print-view]) [role="complementary"] {
   display: none !important;
 }
 
+/* ── Teach-view shell suppression ──────────────────────────────────────────
+ * The /teach route renders inside the (planner) group so it inherits auth,
+ * the Personal/Team banner, and the top bar (the top bar stays so the Teach
+ * tab can highlight). But Teach owns its own chrome — its own five zones with
+ * two side rails and two side panels — so it suppresses the planner's DEFAULT
+ * left filter panel, right panel, and the two icon rails. The [data-teach-view]
+ * attribute on the page root scopes these rules to the route, mirroring the
+ * [data-print-view] pattern above.
+ *
+ * The two icon rails (GlobalRail / RightIconRail) render as <nav> elements
+ * containing a [data-rail-side] list, so `nav:has([data-rail-side])` targets
+ * exactly those two without touching the top-bar's view-switcher <nav> (which
+ * has no [data-rail-side] descendant). The filter panel is the only <aside>;
+ * the right panel is the only [role="complementary"]. */
+body:has([data-teach-view]) aside,
+body:has([data-teach-view]) [role="complementary"],
+body:has([data-teach-view]) nav:has([data-rail-side]) {
+  display: none !important;
+}
+
 /* Paper output: hide all chrome elements in @media print. */
 @media print {
   header,
