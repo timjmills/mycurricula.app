@@ -2119,11 +2119,6 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
         </ol>
       </nav>
 
-      {/* ── Inline schedule-mode pill (Subject ↔ Schedule). Hidden ≤1280px
-          where the additional rail would not fit (same fold the existing
-          right rail uses). The pill state persists per-teacher. */}
-      <DailySchedulePill />
-
       {/* ── aria-live region: column reorder announcements ───────────────
           A visually hidden polite live region — when a column moves
           (mouse, touch, or keyboard) we write the new order into it so

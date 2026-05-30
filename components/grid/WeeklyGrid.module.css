@@ -68,26 +68,26 @@
   vertical-align: 2px;
 }
 
-/* Prev/next/today cluster — pinned to the FAR RIGHT of the week row via
-   margin-left:auto, since the title block no longer flex-grows. */
+/* Prev/next/today cluster — follows the view-controls toggle at the trailing
+   edge of the week row (a small gap separates the two). */
 .navControls {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
+  margin-left: 12px;
 }
 
-/* Left-aligned view-controls slot — hosts the Weekly view's
-   Grid|List|Schedule (+ scope) toggle immediately after the "Week N" title so
-   it reads as part of the week row. It stays on the LEFT (no margin-left:auto)
-   while `.navControls` takes the far-right anchor. The toggle lives here, not
+/* Right-aligned view-controls slot — hosts the Weekly view's
+   Grid|List|Schedule (+ scope) toggle. `margin-left: auto` pushes it (and the
+   prev/next/today nav that follows) to the FAR RIGHT of the week row, leaving
+   the "Week N" title + catch-up chip on the left. The toggle lives here, not
    per-canvas, so it stays visible in every mode (the schedule timeline has no
    navigator of its own). */
 .navActions {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 12px;
+  margin-left: auto;
 }
 
 /* Prev/next arrows — 44px touch target. */

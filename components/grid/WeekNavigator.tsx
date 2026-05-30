@@ -77,16 +77,17 @@ export function WeekNavigator({
         </Heading>
       </div>
 
-      {/* Left-aligned view controls (Grid|List|Schedule + scope) — sit right
-          after the week title so they read as part of the week row and stay
-          visible in every canvas mode (the schedule timeline has no navigator
-          of its own). */}
-      {actions && <div className={styles.navActions}>{actions}</div>}
-
-      {/* Compact catch-up chip — sits next to the view controls and deep-links
+      {/* Compact catch-up chip — sits just after the week title and deep-links
           to the /catch-up triage screen. Self-gates (renders nothing when the
           feature is off or the week has zero uncovered lessons). */}
       {showCatchupChip && <CatchupChip />}
+
+      {/* View controls (Grid|List|Schedule + scope) — right-aligned, grouped
+          with the prev/next/today nav at the trailing edge of the week row.
+          Stays visible in every canvas mode (the schedule timeline has no
+          navigator of its own). `.navActions` carries margin-left:auto to push
+          the whole trailing cluster right. */}
+      {actions && <div className={styles.navActions}>{actions}</div>}
 
       <div className={styles.navControls}>
         <Tooltip

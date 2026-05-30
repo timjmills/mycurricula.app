@@ -1039,7 +1039,6 @@ export function WeeklyShell(): ReactNode {
         minWeek={minWeek}
         maxWeek={maxWeek}
         onChange={setWeek}
-        showCatchupChip
         headingLevel="h1"
         actions={<WeeklyViewControls isNarrow={isNarrow} />}
       />
