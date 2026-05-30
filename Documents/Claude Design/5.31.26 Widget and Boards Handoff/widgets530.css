@@ -1,0 +1,130 @@
+/* widgets530.css — shared design system for the classroom widget set */
+:root{
+  --font:"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ink:#101729; --ink-soft:#37405a; --ink-mute:#6b7280; --ink-faint:#9aa1ad;
+  --chrome:#abb1bd; --line:#e9ebf0; --paper:#fff; --page:#f6f7f9;
+  --r-card:22px; --r-inner:16px; --r-pill:999px; --pad:22px;
+  --shadow-card:0 1px 2px rgba(16,23,41,.04), 0 6px 20px rgba(16,23,41,.05);
+  --shadow-inner:0 1px 2px rgba(16,23,41,.05), 0 2px 8px rgba(16,23,41,.04);
+  --shadow-pop:0 18px 60px rgba(16,23,41,.22);
+
+  --yellow-bg:#fdf5da; --yellow-chip:#f6df84; --yellow-accent:#d99c08; --yellow-soft:#fbeec3; --yellow-line:#f0e3b0;
+  --green-bg:#eaf6ed;  --green-chip:#bce6c6;  --green-accent:#1fa85a;  --green-soft:#d9f0df;  --green-line:#cde9d4;
+  --pink-bg:#fce5ee;   --pink-chip:#f7bcd4;   --pink-accent:#e84e93;   --pink-soft:#fad3e3;   --pink-line:#f3c9da;
+  --purple-bg:#f0ecfc; --purple-chip:#d6cbf7; --purple-accent:#7c5cf6; --purple-soft:#e5dcfb; --purple-line:#ddd3f5;
+  --orange-bg:#fdeede; --orange-chip:#fbd2ac; --orange-accent:#f2802b; --orange-soft:#fbddc1; --orange-line:#f7d8bc;
+  --blue-bg:#e9f1fe;   --blue-chip:#c1d9fb;   --blue-accent:#2e6be6;   --blue-soft:#d8e7fd;   --blue-line:#cfe0fb;
+
+  --yellow-grad:linear-gradient(165deg,#fffdf3 0%,#fbf1cf 100%);
+  --green-grad: linear-gradient(165deg,#f7fcf9 0%,#e4f3e9 100%);
+  --pink-grad:  linear-gradient(165deg,#fef5f9 0%,#fbe0e9 100%);
+  --purple-grad:linear-gradient(165deg,#faf8fe 0%,#ede8fb 100%);
+  --orange-grad:linear-gradient(165deg,#fffbf5 0%,#fce8d6 100%);
+  --blue-grad:  linear-gradient(165deg,#f6faff 0%,#e4edfe 100%);
+
+  /* neutral theme options (for the appearance editor) */
+  --slate-bg:#eef0f4; --slate-soft:#eef0f4; --slate-chip:#e1e5ec; --slate-accent:#5b6478; --slate-line:#dde1e8;
+  --slate-grad:linear-gradient(165deg,#f8f9fb 0%,#e9ecf1 100%);
+  --cloud-bg:#f6f7f9; --cloud-soft:#f5f7f9; --cloud-chip:#eef0f4; --cloud-accent:#3b4456; --cloud-line:#e9ebf0;
+  --cloud-grad:linear-gradient(165deg,#ffffff 0%,#f3f5f8 100%);
+  --dark-bg:#1c2333; --dark-soft:#2b3346; --dark-chip:#3a435c; --dark-accent:#9db4e8; --dark-line:#39425a;
+  --dark-grad:linear-gradient(165deg,#262e42 0%,#171d2c 100%);
+  --ink-accent:#101729;
+}
+html,body{margin:0;padding:0;min-height:100%;font-family:var(--font);color:var(--ink);background:var(--page);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+*{box-sizing:border-box}
+#root{min-height:100%}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit;color:inherit}
+svg{display:block}
+
+.page{max-width:1500px;margin:0 auto;padding:30px 30px 90px}
+.page-head{display:flex;align-items:baseline;gap:14px;margin:6px 4px 6px}
+.page-head h1{margin:0;font-size:28px;font-weight:800;letter-spacing:-.6px}
+.page-head .sub{font-size:13.5px;color:var(--ink-mute);font-weight:500}
+.page-note{margin:0 4px 26px;font-size:13.5px;color:var(--ink-mute);font-weight:500;max-width:780px;line-height:1.55;text-wrap:pretty}
+.section-label{display:flex;align-items:center;gap:12px;margin:40px 4px 18px}
+.section-label .t{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
+.section-label .ln{flex:1;height:1px;background:var(--line)}
+
+/* widget card */
+.w{position:relative;border-radius:var(--r-card);padding:var(--pad);box-shadow:var(--shadow-card), inset 0 0 0 1px rgba(16,23,41,.04);overflow:hidden;min-width:0}
+.w-head{display:flex;align-items:center;gap:11px;margin-bottom:16px}
+.w-label{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-mute)}
+.w-chip{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none}
+.w-title{font-size:18px;font-weight:800;letter-spacing:-.3px;line-height:1.15}
+.w-sub{font-size:13px;font-weight:500;color:var(--ink-mute);margin-top:1px}
+.w-chrome{display:flex;align-items:center;gap:2px;margin-left:auto}
+.w-chrome button{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--chrome);transition:background .12s,color .12s}
+.w-chrome button:hover{background:rgba(16,23,41,.06);color:var(--ink-soft)}
+.w-actionlink{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink-soft)}
+.w-actionlink:hover{color:var(--ink)}
+.sub{background:var(--paper);border-radius:var(--r-inner);box-shadow:var(--shadow-inner)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;border-radius:14px;padding:13px 20px;font-size:15px;transition:transform .08s,filter .12s}
+.btn:active{transform:translateY(1px)}
+.btn-solid{color:#fff}
+.btn-ghost{background:var(--paper);box-shadow:var(--shadow-inner)}
+
+.spin{animation:spin .5s ease}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.pop{animation:pop .22s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{0%{transform:scale(.7);opacity:.4}100%{transform:scale(1);opacity:1}}
+
+/* ── app screen frame (full classroom-board screen) ───────────────── */
+.screen{background:#fff;border:1px solid var(--line);border-radius:26px;box-shadow:var(--shadow-card);overflow:hidden}
+.appbar{display:flex;align-items:center;gap:16px;padding:16px 24px}
+.appbar .logo{width:40px;height:40px;border-radius:12px;background:var(--green-accent);display:grid;place-items:center;color:#fff;flex:none}
+.appbar .name{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:800;letter-spacing:-.4px}
+.appbar .chev{color:var(--ink-faint)}
+.panel-pill{display:inline-flex;align-items:center;padding:7px 16px;border-radius:10px;background:#e7ecf5;color:#5d6b85;font-size:13.5px;font-weight:700}
+.appbar .right{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--chrome)}
+.appbar .right button{padding:6px;color:var(--chrome);border-radius:8px}
+.appbar .right button:hover{background:rgba(16,23,41,.05);color:var(--ink-soft)}
+.appbar .boxbtn{width:38px;height:30px;border-radius:9px;border:1px solid var(--line);background:#fff;display:grid;place-items:center}
+.screen-body{padding:8px 24px 28px}
+
+/* avatar */
+.av{border-radius:50%;border:2px solid #fff;box-shadow:0 1px 2px rgba(16,23,41,.12);display:grid;place-items:center;flex:none;overflow:hidden}
+
+/* status pill */
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap}
+
+/* handwriting style — used by the Mini Whiteboard */
+.hand{font-family:"Caveat", "Comic Sans MS", cursive}
+
+/* ── themeable widget (board editor) ───────────────────────────── */
+.tw{position:relative;background:var(--w-grad);color:var(--w-ink,#101729);border-radius:var(--w-radius,22px);
+  font-family:var(--w-font, var(--font));font-size:calc(15px * var(--w-scale,1));line-height:1.4;
+  box-shadow:var(--shadow-card), inset 0 0 0 1px rgba(16,23,41,.05);padding:1.5em;overflow:hidden}
+.tw .twcard{background:var(--w-card,#fff);border-radius:.85em;box-shadow:var(--shadow-inner)}
+.tw .twchip{width:2.6em;height:2.6em;border-radius:.75em;display:grid;place-items:center;flex:none;background:var(--w-chip);color:var(--w-accent)}
+.tw .twlabel{font-size:.8em;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--w-ink);opacity:.55}
+.tw .twchrome{display:flex;gap:.1em;margin-left:auto;color:var(--w-ink);opacity:.4}
+.tw .twchrome button{color:inherit;padding:.25em;border-radius:.4em}
+.tw .twbtn{background:var(--w-accent);color:#fff;border-radius:.85em;font-weight:700;padding:.8em 1.2em;font-size:1em;display:inline-flex;align-items:center;justify-content:center;gap:.5em}
+
+/* selection chrome on the canvas */
+.tw-wrap{position:absolute;transition:box-shadow .1s}
+.tw-wrap.sel{outline:2.5px solid var(--blue-accent);outline-offset:3px;border-radius:calc(var(--w-radius,22px) + 3px)}
+.tw-wrap .tw-tools{position:absolute;top:-42px;left:0;display:flex;gap:4px;background:#fff;border:1px solid var(--line);
+  border-radius:10px;padding:4px;box-shadow:var(--shadow-pop);z-index:5}
+.tw-wrap .tw-tools button{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;color:var(--ink-soft)}
+.tw-wrap .tw-tools button:hover{background:#eef0f4}
+.tw-wrap .tw-handle{position:absolute;right:-7px;bottom:-7px;width:18px;height:18px;border-radius:5px;background:#fff;
+  border:2px solid var(--blue-accent);cursor:nwse-resize;z-index:5}
+
+/* dotted canvas */
+.be-canvas{position:relative;background:#fbfbfd;
+  background-image:radial-gradient(circle, #dfe3ea 1.3px, transparent 1.3px);background-size:26px 26px}
+
+/* appearance panel swatch */
+.sw{width:100%;aspect-ratio:1.5;border-radius:11px;cursor:pointer;border:2px solid transparent;box-shadow:inset 0 0 0 1px rgba(16,23,41,.08)}
+.sw.on{border-color:var(--blue-accent);box-shadow:0 0 0 2px rgba(46,107,230,.2)}
+.dot{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 1px rgba(16,23,41,.12)}
+.dot.on{box-shadow:0 0 0 2px var(--blue-accent)}
+
+/* generic scrollbar */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#d7dbe3;border-radius:6px;border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-track{background:transparent}
