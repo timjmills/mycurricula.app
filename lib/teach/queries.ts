@@ -9,8 +9,14 @@
 // Resources do NOT flow through here: they reuse the existing data path via the
 // `toTeachResource()` adapter. This seam is board/widget/template only.
 
-import type { Board, BoardTemplate, Widget } from "../types";
+import type { Board, BoardTag, BoardTemplate, Widget } from "../types";
+import type { BoardContext } from "./board-tags";
 import { mockTeachSource } from "./mock-source";
+
+// The cap + error live in a leaf module to avoid a runtime circular import
+// (this file → mock-source → this file). Re-exported here so the documented
+// repository seam remains the single import site for consumers.
+export { BoardCapError, MAX_BOARDS_PER_TEACHER } from "./limits";
 
 /**
  * The repository contract for Teach board data. Every method is async
@@ -75,6 +81,70 @@ export interface TeachDataSource {
     masterLessonId: string,
     boardIds: string[],
   ): Promise<Board[]>;
+
+  // ── Boards Library (the reusable-board catalog) ────────────────────────────
+  /**
+   * "My Boards" — every board the teacher owns (personal scope, this owner),
+   * across all lessons + the sandbox + whiteboards, EXCLUDING unsaved ephemeral
+   * whiteboards. This is the set the 50-cap counts and the library "My Boards"
+   * tab lists. Sorted newest-updated first.
+   */
+  listMyBoards(ownerId: string): Promise<Board[]>;
+  /**
+   * "Team Library" — boards teammates published (a COPY each), for the grade.
+   * Additive + non-destructive: pulling one (`copyTeamBoardToMine`) leaves the
+   * shared copy in place. Sorted newest-published first.
+   */
+  listTeamLibraryBoards(gradeLevelId: string): Promise<Board[]>;
+  /** Count the owner's kept boards (drives the cap UI). */
+  countMyBoards(ownerId: string): Promise<number>;
+
+  /**
+   * Duplicate a board into an INDEPENDENT editable copy owned by `ownerId`
+   * (fresh ids, "… (copy)" title, same lesson binding + tags). Counts toward the
+   * cap → throws `BoardCapError` when the owner is already at the limit.
+   */
+  duplicateBoard(boardId: string, ownerId: string): Promise<Board>;
+
+  /**
+   * Open a blank free-form whiteboard. It is created EPHEMERAL (does not count
+   * toward the cap) so a teacher can scratch instantly; on close the UI prompts
+   * "keep this board?" → `keepBoard` (cap enforced) or `deleteBoard` (discard).
+   * Attaches to `masterLessonId` when given so it shows in that lesson's strip.
+   */
+  createBlankBoard(input: {
+    ownerId: string;
+    gradeLevelId: string;
+    masterLessonId?: string | null;
+    title?: string;
+  }): Promise<Board>;
+  /**
+   * Promote an ephemeral whiteboard to a kept board ("keep? → Yes"). Enforces
+   * the cap at this point → throws `BoardCapError` when at the limit.
+   */
+  keepBoard(boardId: string): Promise<Board>;
+
+  /** Replace a board's tags (the tag editor / "Repeat" affordance write path). */
+  setBoardTags(boardId: string, tags: BoardTag[]): Promise<Board>;
+
+  /**
+   * Boards that auto-surface in a context (the tag = assignment behaviour):
+   * the owner's boards whose tags match `ctx` (see `boardMatchesContext`),
+   * UNION the matching Team-Library boards.
+   */
+  listBoardsForContext(ctx: BoardContext, ownerId: string): Promise<Board[]>;
+
+  /**
+   * Publish a COPY of one of the owner's boards to the shared Team Library
+   * (`libraryVisibility: "team"`, lesson-detached, fresh ids). Additive — does
+   * not touch the source or any team set. Does NOT count toward the cap.
+   */
+  publishBoardToTeamLibrary(boardId: string, ownerId: string): Promise<Board>;
+  /**
+   * Pull a Team-Library board into "My Boards" as a private editable copy.
+   * Counts toward the cap → throws `BoardCapError` at the limit.
+   */
+  copyTeamBoardToMine(boardId: string, ownerId: string): Promise<Board>;
 }
 
 /**

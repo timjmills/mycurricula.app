@@ -16,18 +16,21 @@
 // future `boardToRow()` Supabase adapter asserts/strips any name-bearing field
 // before a write; this mock does not synthesize names into `config`/`state`.
 
-import type { Board, BoardTemplate, Widget } from "../types";
+import type { Board, BoardTag, BoardTemplate, Widget } from "../types";
 import {
   BOARDS,
   buildDefaultBoardSet,
   MOCK_GRADE_LEVEL_ID,
+  TEAM_LIBRARY_BOARDS,
 } from "../mock/boards";
+import { boardMatchesContext, type BoardContext } from "./board-tags";
+import { BoardCapError, MAX_BOARDS_PER_TEACHER } from "./limits";
 import type { TeachDataSource } from "./queries";
 
 // ── Mutable in-memory store ─────────────────────────────────────────────────
 // Cloned from the fixtures so editing the live store never mutates the exported
 // fixture arrays (which other modules may read).
-const boards: Board[] = BOARDS.map(cloneBoard);
+const boards: Board[] = [...BOARDS, ...TEAM_LIBRARY_BOARDS].map(cloneBoard);
 const templates: BoardTemplate[] = [];
 
 let idSeq = 0;
@@ -39,8 +42,41 @@ function nextId(prefix: string): string {
 function cloneBoard(b: Board): Board {
   return {
     ...b,
+    tags: b.tags ? b.tags.map((t) => ({ ...t })) : b.tags,
     widgets: b.widgets.map((w) => ({ ...w, position: { ...w.position } })),
   };
+}
+
+/** Deep-clone a board's widgets onto a NEW board id (fresh widget ids too) — the
+ *  shared copy primitive behind duplicate / publish / pull. */
+function cloneWidgetsOnto(source: Board, boardId: string): Widget[] {
+  return source.widgets.map((w) => ({
+    ...w,
+    id: nextId("w"),
+    boardId,
+    position: { ...w.position },
+  }));
+}
+
+/** The owner's KEPT boards (personal scope, this owner, not ephemeral, not a
+ *  published Team-Library copy). This is exactly what the 50-cap counts and what
+ *  the "My Boards" library lists. */
+function myBoards(owner: string): Board[] {
+  return boards.filter(
+    (b) =>
+      b.scope === "personal" &&
+      b.ownerId === owner &&
+      b.ephemeral !== true &&
+      b.libraryVisibility !== "team",
+  );
+}
+
+/** Throw `BoardCapError` when the owner is already at the cap. Called BEFORE any
+ *  create/duplicate/keep/pull that would add a kept board. */
+function assertUnderCap(owner: string): void {
+  if (myBoards(owner).length >= MAX_BOARDS_PER_TEACHER) {
+    throw new BoardCapError();
+  }
 }
 
 // ── Id bridge (mock slugs ↔ db uuids) ───────────────────────────────────────
@@ -100,6 +136,11 @@ export const mockTeachSource: TeachDataSource = {
   },
 
   async createBoard(input) {
+    // A new PERSONAL board counts toward the owner's cap (the user's "50 total,
+    // must delete"); team-set boards (per-lesson fallback) are uncapped.
+    if (input.scope === "personal" && input.ownerId != null) {
+      assertUnderCap(resolveOwnerId(input.ownerId));
+    }
     const id = nextId("b");
     const now = new Date().toISOString();
     // Derive ordering authoritatively from the CURRENT sibling set (same
@@ -290,5 +331,209 @@ export const mockTeachSource: TeachDataSource = {
       pushed.push(copy);
     });
     return pushed.map(cloneBoard);
+  },
+
+  // ── Boards Library ─────────────────────────────────────────────────────────
+
+  async listMyBoards(ownerId) {
+    const owner = resolveOwnerId(ownerId);
+    return myBoards(owner)
+      .slice()
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map(cloneBoard);
+  },
+
+  async listTeamLibraryBoards(gradeLevelId) {
+    return boards
+      .filter(
+        (b) =>
+          b.libraryVisibility === "team" && b.gradeLevelId === gradeLevelId,
+      )
+      .slice()
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map(cloneBoard);
+  },
+
+  async countMyBoards(ownerId) {
+    return myBoards(resolveOwnerId(ownerId)).length;
+  },
+
+  async duplicateBoard(boardId, ownerId) {
+    const owner = resolveOwnerId(ownerId);
+    const source = boards.find((b) => b.id === boardId);
+    if (!source) throw new Error(`Board not found: ${boardId}`);
+    assertUnderCap(owner);
+    const id = nextId("b");
+    const now = new Date().toISOString();
+    // A duplicate is INDEPENDENT (the user's "duplicate vs repeat" split): it
+    // joins the source's lesson strip as a personal copy with its own ids.
+    const siblings = boards.filter(
+      (b) =>
+        b.masterLessonId === source.masterLessonId &&
+        b.scope === "personal" &&
+        b.ownerId === owner,
+    );
+    const nextOrder = siblings.reduce(
+      (max, b) => Math.max(max, b.displayOrderWithinLesson + 1),
+      0,
+    );
+    const copy: Board = {
+      ...cloneBoard(source),
+      id,
+      ownerId: owner,
+      scope: "personal",
+      title: `${source.title} (copy)`,
+      displayOrderWithinLesson: nextOrder,
+      // A duplicate is the teacher's OWN private board, never a team-library copy.
+      libraryVisibility:
+        source.libraryVisibility === "team"
+          ? "private"
+          : source.libraryVisibility,
+      publishedBy: null,
+      ephemeral: undefined,
+      sourceBoardId: source.id,
+      widgets: cloneWidgetsOnto(source, id),
+      createdAt: now,
+      updatedAt: now,
+    };
+    boards.push(copy);
+    return cloneBoard(copy);
+  },
+
+  async createBlankBoard(input) {
+    const owner = resolveOwnerId(input.ownerId);
+    const id = nextId("b");
+    const now = new Date().toISOString();
+    const lesson =
+      input.masterLessonId == null
+        ? null
+        : resolveLessonId(input.masterLessonId);
+    // Ordered after the lesson's current personal siblings so it lands at the
+    // end of the strip; a lesson-less whiteboard starts at 0.
+    const siblings = boards.filter(
+      (b) =>
+        b.masterLessonId === lesson &&
+        b.scope === "personal" &&
+        b.ownerId === owner,
+    );
+    const nextOrder = siblings.reduce(
+      (max, b) => Math.max(max, b.displayOrderWithinLesson + 1),
+      0,
+    );
+    const board: Board = {
+      id,
+      masterLessonId: lesson,
+      ownerId: owner,
+      scope: "personal",
+      title: input.title ?? "Whiteboard",
+      displayOrderWithinLesson: nextOrder,
+      templateId: null,
+      background: null,
+      tags: [],
+      whiteboard: true,
+      // Ephemeral until kept — does NOT count toward the cap (no assertUnderCap
+      // here, so a capped teacher can still scratch on a throwaway whiteboard).
+      ephemeral: true,
+      libraryVisibility: "private",
+      publishedBy: null,
+      sourceBoardId: null,
+      widgets: [],
+      gradeLevelId: input.gradeLevelId ?? MOCK_GRADE_LEVEL_ID,
+      createdAt: now,
+      updatedAt: now,
+    };
+    boards.push(board);
+    return cloneBoard(board);
+  },
+
+  async keepBoard(boardId) {
+    const board = boards.find((b) => b.id === boardId);
+    if (!board) throw new Error(`Board not found: ${boardId}`);
+    // Already kept → idempotent no-op (don't re-check the cap against itself).
+    if (board.ephemeral !== true) return cloneBoard(board);
+    // Cap enforced HERE (keep), not at open — the board is still ephemeral so it
+    // isn't double-counted by assertUnderCap.
+    assertUnderCap(board.ownerId ?? "");
+    board.ephemeral = false;
+    board.updatedAt = new Date().toISOString();
+    return cloneBoard(board);
+  },
+
+  async setBoardTags(boardId, tags) {
+    const board = boards.find((b) => b.id === boardId);
+    if (!board) throw new Error(`Board not found: ${boardId}`);
+    board.tags = tags.map((t: BoardTag) => ({ ...t }));
+    board.updatedAt = new Date().toISOString();
+    return cloneBoard(board);
+  },
+
+  async listBoardsForContext(ctx, ownerId) {
+    const owner = resolveOwnerId(ownerId);
+    const context = ctx as BoardContext;
+    return boards
+      .filter((b) => {
+        const mine =
+          b.scope === "personal" && b.ownerId === owner && b.ephemeral !== true;
+        const teamLib = b.libraryVisibility === "team";
+        if (!mine && !teamLib) return false;
+        return boardMatchesContext(b, context);
+      })
+      .map(cloneBoard);
+  },
+
+  async publishBoardToTeamLibrary(boardId, ownerId) {
+    const owner = resolveOwnerId(ownerId);
+    const source = boards.find((b) => b.id === boardId);
+    if (!source) throw new Error(`Board not found: ${boardId}`);
+    const id = nextId("b");
+    const now = new Date().toISOString();
+    // A published board is a lesson-DETACHED, team-owned COPY. It does NOT count
+    // toward the publisher's cap (team-owned), and it is additive: the source
+    // stays exactly as it was.
+    const copy: Board = {
+      ...cloneBoard(source),
+      id,
+      masterLessonId: null,
+      ownerId: null,
+      scope: "team",
+      displayOrderWithinLesson: 0,
+      libraryVisibility: "team",
+      publishedBy: owner,
+      ephemeral: undefined,
+      sourceBoardId: source.id,
+      widgets: cloneWidgetsOnto(source, id),
+      createdAt: now,
+      updatedAt: now,
+    };
+    boards.push(copy);
+    return cloneBoard(copy);
+  },
+
+  async copyTeamBoardToMine(boardId, ownerId) {
+    const owner = resolveOwnerId(ownerId);
+    const source = boards.find((b) => b.id === boardId);
+    if (!source) throw new Error(`Board not found: ${boardId}`);
+    assertUnderCap(owner);
+    const id = nextId("b");
+    const now = new Date().toISOString();
+    // Pull = a PRIVATE editable copy in My Boards (lesson-detached, like the
+    // shared original). Counts toward the cap (checked above).
+    const copy: Board = {
+      ...cloneBoard(source),
+      id,
+      masterLessonId: null,
+      ownerId: owner,
+      scope: "personal",
+      displayOrderWithinLesson: 0,
+      libraryVisibility: "private",
+      publishedBy: null,
+      ephemeral: undefined,
+      sourceBoardId: source.id,
+      widgets: cloneWidgetsOnto(source, id),
+      createdAt: now,
+      updatedAt: now,
+    };
+    boards.push(copy);
+    return cloneBoard(copy);
   },
 };

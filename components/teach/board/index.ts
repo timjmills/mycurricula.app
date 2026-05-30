@@ -25,3 +25,9 @@ export type { BoardBackgroundPickerProps } from "./BoardBackgroundPicker";
 
 export { WidgetSettingsPopover } from "./WidgetSettingsPopover";
 export type { WidgetSettingsPopoverProps } from "./WidgetSettingsPopover";
+
+export { BoardTagChips } from "./BoardTagChips";
+export type { BoardTagChipsProps } from "./BoardTagChips";
+
+export { BoardTagPicker } from "./BoardTagPicker";
+export type { BoardTagPickerProps } from "./BoardTagPicker";

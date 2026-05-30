@@ -293,6 +293,45 @@ export type ResourceRenderTarget = "embed" | "magnify" | "external";
  *  sees their personal set where one exists, otherwise the team set (plan §13.1). */
 export type BoardScope = "personal" | "team";
 
+/** Where a board lives in the Boards Library (the reusable-board catalog, NOT the
+ *  per-lesson team set). `private` = the owning teacher's own library ("My
+ *  Boards", counts toward the 50-board cap). `team` = a COPY the owner published
+ *  to the shared Team Library; teammates pull a private copy from it. Absent on a
+ *  per-lesson team board (those use `scope: "team"` keyed to a lesson). */
+export type BoardLibraryVisibility = "private" | "team";
+
+/** The dimension a board tag binds to. Tags drive BOTH library filtering AND
+ *  auto-surfacing — the tag IS the assignment (the user's "auto-surface + filter"
+ *  decision). A board tagged `weekday:1` + `subject:math` appears automatically
+ *  when the teacher opens Monday's Math context, and is filterable by either tag
+ *  in the library. `label` tags are free text and library-only (they never
+ *  auto-surface). Values are kind-dependent and stored as strings:
+ *  - `subject`  → a `SubjectId`
+ *  - `lesson`   → a master lesson id
+ *  - `phase`    → a lesson-phase slug (e.g. "warm-up")
+ *  - `weekday`  → a weekday index "0".."6" into the configured school week
+ *  - `week`     → a week id / number
+ *  - `slot`     → a schedule time-slot id
+ *  - `label`    → arbitrary free text */
+export type BoardTagKind =
+  | "subject"
+  | "lesson"
+  | "phase"
+  | "weekday"
+  | "week"
+  | "slot"
+  | "label";
+
+/** One typed tag on a board (see `BoardTagKind`). Display-only structure — safe
+ *  to persist; carries no student names. */
+export interface BoardTag {
+  kind: BoardTagKind;
+  /** Kind-dependent value, always a string (see `BoardTagKind`). */
+  value: string;
+  /** Optional display override; falls back to a derived label (board-tags.ts). */
+  label?: string;
+}
+
 /** A widget's anchor + span within the board's CSS grid. Coordinates are
  *  0-based column/row; `colSpan`/`rowSpan` default to 1 (a single cell). */
 export interface WidgetGridPosition {
@@ -348,6 +387,26 @@ export interface Board {
    *  (`lib/teach/backgrounds.ts`), e.g. "pattern-3". Null/absent → the default
    *  paper surface. Display-only structure — safe to persist to the DB. */
   background?: string | null;
+  /** Library/auto-surface tags. Absent/empty → an untagged board (it never
+   *  auto-surfaces; it's reachable only via its lesson or the library list).
+   *  See `lib/teach/board-tags.ts` for the matching + display helpers. */
+  tags?: BoardTag[];
+  /** True for a free-form whiteboard (opened via "New whiteboard") — a blank
+   *  canvas with no lesson-phase structure. */
+  whiteboard?: boolean;
+  /** True while a quick whiteboard is unsaved. An ephemeral board does NOT count
+   *  against the 50-board cap and is discarded on "keep? → No". `keepBoard()`
+   *  clears this (and enforces the cap at that point). */
+  ephemeral?: boolean;
+  /** Library placement (see `BoardLibraryVisibility`). Absent on a per-lesson
+   *  team board. `private` for a teacher's own library board; `team` for a
+   *  published copy in the shared Team Library. */
+  libraryVisibility?: BoardLibraryVisibility;
+  /** For a Team-Library copy: the teacher who published it (provenance only). */
+  publishedBy?: string | null;
+  /** For a duplicated / pulled / published copy: the board it was copied from
+   *  (provenance only; null for an original). */
+  sourceBoardId?: string | null;
   widgets: Widget[];
   gradeLevelId: string;
   createdAt: string;

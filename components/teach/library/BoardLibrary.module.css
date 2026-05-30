@@ -1,0 +1,307 @@
+/* BoardLibrary.module.css — the Teach Boards "Board Library" panel.
+ *
+ * Two tabs (My Boards · Team Library), a cap badge, search, tag-filter pills,
+ * and a vertical list of compact board cards. Designed for a NARROW panel
+ * (~280–340px) and usable down to a 360px viewport — no horizontal scroll.
+ *
+ * Colour / type / radius / spacing come from tokens only (CLAUDE.md §4); the
+ * tag chips reuse the --tag-*-bg / --tag-*-fg family, matching ResourcesModule. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+}
+
+/* ── Tabs + cap badge header ─────────────────────────────────────────────── */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--ink-50);
+  border-radius: 8px;
+  width: 100%;
+}
+
+.tab {
+  flex: 1;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-500);
+  font-size: var(--t-12);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ink-900);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.tabActive {
+  background: var(--paper);
+  color: var(--ink-900);
+  box-shadow: var(--shadow-card);
+}
+
+.capRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.capLabel {
+  color: var(--ink-400);
+  font-size: var(--t-11);
+  font-weight: 600;
+}
+
+.capBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ink-50);
+  color: var(--ink-700);
+  font-size: var(--t-11);
+  font-weight: 800;
+}
+
+/* At-cap state — draw attention with the catch-up tint family. */
+.capBadgeFull {
+  background: var(--tag-red-bg);
+  color: var(--tag-red-fg);
+}
+
+/* ── Search ──────────────────────────────────────────────────────────────── */
+.searchRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 9px;
+  display: inline-flex;
+  color: var(--ink-400);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 10px 8px 30px;
+  border: 1px solid var(--ink-150);
+  border-radius: 8px;
+  background: var(--ink-50);
+  color: var(--ink-900);
+  font-size: var(--t-13);
+  font-family: inherit;
+}
+
+.searchInput::placeholder {
+  color: var(--ink-400);
+}
+
+.searchInput:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+  background: var(--paper);
+}
+
+/* ── Filter pills ────────────────────────────────────────────────────────── */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.filterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  min-height: 26px;
+  border: 1px solid var(--ink-150);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-500);
+  font-size: var(--t-11);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filterPill:hover {
+  border-color: var(--ink-300);
+}
+
+.filterPill:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.filterPillActive {
+  background: var(--fyi);
+  border-color: var(--fyi);
+  color: var(--paper);
+}
+
+.filterKind {
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  opacity: 0.7;
+}
+
+/* ── Body / scroll region ────────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty {
+  margin: 16px 6px;
+  color: var(--ink-400);
+  font-size: var(--t-13);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.capNotice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--tag-red-bg);
+  color: var(--tag-red-fg);
+  font-size: var(--t-12);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* ── Footer count ────────────────────────────────────────────────────────── */
+.count {
+  margin: 0;
+  color: var(--ink-400);
+  font-size: var(--t-11);
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--ink-150);
+  border-radius: 9px;
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-13);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink-900);
+  /* Wrap rather than truncate — titles carry meaning in a narrow panel. */
+  overflow-wrap: anywhere;
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-400);
+  font-size: var(--t-11);
+  font-weight: 600;
+}
+
+.metaDot {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--ink-300);
+  flex: 0 0 auto;
+}
+
+.publisher {
+  color: var(--ink-500);
+  font-weight: 700;
+}
+
+/* ── Inline tag chips (self-contained — no external dependency) ──────────── */
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tagChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--tag-gray-bg);
+  color: var(--tag-gray-fg);
+  font-size: var(--t-10);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* ── Card actions ────────────────────────────────────────────────────────── */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.actions > * {
+  flex: 1 1 auto;
+}
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.confirmText {
+  flex: 1;
+  min-width: 0;
+  color: var(--tag-red-fg);
+  font-size: var(--t-12);
+  font-weight: 700;
+}

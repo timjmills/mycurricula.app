@@ -17,6 +17,7 @@
 import type {
   Board,
   BoardScope,
+  BoardTag,
   Widget,
   WidgetGridPosition,
   WidgetPersistence,
@@ -86,7 +87,17 @@ interface BoardInput {
   scope?: BoardScope;
   ownerId?: string | null;
   templateId?: string | null;
+  tags?: BoardTag[];
   widgets?: Omit<Widget, "boardId" | "gradeLevelId">[];
+}
+
+/** Slugify a phase title for the `phase` tag value (e.g. "Warm-Up" →
+ *  "warm-up"). Keeps the tag value stable + matchable across boards. */
+function phaseSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 const SEED_AT = "2026-05-29T08:00:00.000Z";
@@ -109,6 +120,10 @@ function B(o: BoardInput): Board {
     title: o.title,
     displayOrderWithinLesson: o.order,
     templateId: o.templateId ?? null,
+    // Default phase boards carry a `phase` tag derived from their title so the
+    // auto-surface path has realistic data to match (a board tagged
+    // `phase:warm-up` surfaces in a Warm-Up context). Callers can override.
+    tags: o.tags ?? [{ kind: "phase", value: phaseSlug(o.title) }],
     widgets,
     gradeLevelId: MOCK_GRADE_LEVEL_ID,
     createdAt: SEED_AT,
@@ -301,3 +316,103 @@ export const BOARDS: Board[] = [
 export function buildDefaultBoardSet(masterLessonId: string): Board[] {
   return defaultBoardSet(masterLessonId);
 }
+
+/** Build a Team-Library board: a lesson-DETACHED, team-owned reusable board a
+ *  teammate published (the additive share model). Reuses `B()` for the widget
+ *  stamping, then overrides the ownership/visibility fields. */
+function lib(o: {
+  title: string;
+  publishedBy: string;
+  tags: BoardTag[];
+  background?: string | null;
+  widgets?: Omit<Widget, "boardId" | "gradeLevelId">[];
+}): Board {
+  return {
+    ...B({
+      masterLessonId: "lib",
+      title: o.title,
+      order: 0,
+      tags: o.tags,
+      widgets: o.widgets,
+    }),
+    masterLessonId: null,
+    ownerId: null,
+    scope: "team",
+    background: o.background ?? null,
+    libraryVisibility: "team",
+    publishedBy: o.publishedBy,
+    sourceBoardId: null,
+  };
+}
+
+/** A few teammate-published boards so the "Team Library" tab has realistic data
+ *  before the backend lands. Tags drive both library filtering and auto-surface.
+ *  PRIVACY (§11.4): structure only — no student names anywhere. */
+export const TEAM_LIBRARY_BOARDS: Board[] = [
+  lib({
+    title: "Number Talks Routine",
+    publishedBy: "sk", // Sarah Khouri
+    tags: [
+      { kind: "subject", value: "math" },
+      { kind: "phase", value: "warm-up" },
+      { kind: "label", value: "Routine" },
+    ],
+    widgets: [
+      W({ type: "objective", title: "Today's Big Idea", col: 0, row: 0 }),
+      W({ type: "timer", title: "Talk Timer", col: 1, row: 0 }),
+      W({
+        type: "notes",
+        title: "Strategies Shared",
+        col: 0,
+        row: 1,
+        colSpan: 2,
+      }),
+    ],
+  }),
+  lib({
+    title: "Close Reading Stations",
+    publishedBy: "ma", // Maya Al-Rashid
+    background: "pattern-3",
+    tags: [
+      { kind: "subject", value: "reading" },
+      { kind: "phase", value: "centers" },
+      { kind: "label", value: "Stations" },
+    ],
+    widgets: [
+      W({ type: "agenda", title: "Station Rotation", col: 0, row: 0 }),
+      W({ type: "stopwatch", title: "Rotation Timer", col: 1, row: 0 }),
+      W({
+        type: "text",
+        title: "Station 1",
+        col: 0,
+        row: 1,
+        config: { text: "Annotate paragraph 2 for the main idea.", size: "m" },
+      }),
+      W({ type: "traffic", title: "Noise Level", col: 1, row: 1 }),
+    ],
+  }),
+  lib({
+    title: "Friday Reflection Whiteboard",
+    publishedBy: "jd", // Jonas Delacroix
+    background: "gradient-3",
+    // Whiteboard-style: only a weekday tag + free label, so it auto-surfaces on
+    // Fridays for any subject.
+    tags: [
+      { kind: "weekday", value: "5", label: "Friday" },
+      { kind: "label", value: "Reflection" },
+    ],
+    widgets: [
+      W({
+        type: "text",
+        title: "Prompt",
+        col: 0,
+        row: 0,
+        colSpan: 2,
+        config: {
+          text: "What's one thing you're proud of this week?",
+          size: "l",
+        },
+      }),
+    ],
+  }),
+];
