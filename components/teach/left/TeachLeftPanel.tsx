@@ -299,7 +299,13 @@ export function TeachLeftPanel({
         aria-label="Left modules"
         onKeyDown={handleTabKeyDown}
       >
-        <DndContext sensors={sensors} onDragEnd={handleTabReorder}>
+        {/* Stable id → deterministic dnd-kit `DndDescribedBy-<id>` across
+            SSR/CSR (see TeachWorkspace's DndContext for the full rationale). */}
+        <DndContext
+          id="teach-left-tabs-dnd"
+          sensors={sensors}
+          onDragEnd={handleTabReorder}
+        >
           <SortableContext
             items={tabIds}
             strategy={horizontalListSortingStrategy}

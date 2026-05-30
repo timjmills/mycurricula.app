@@ -327,7 +327,13 @@ export function BoardsModule({
       {loading && boards.length === 0 ? (
         <p className={styles.muted}>Loading boards…</p>
       ) : (
-        <DndContext sensors={sensors} onDragEnd={handleReorder}>
+        <DndContext
+          // Stable id → deterministic dnd-kit `DndDescribedBy-<id>` across
+          // SSR/CSR (see TeachWorkspace's DndContext for the full rationale).
+          id="teach-boards-dnd"
+          sensors={sensors}
+          onDragEnd={handleReorder}
+        >
           <SortableContext
             items={boards.map((b) => b.id)}
             strategy={verticalListSortingStrategy}

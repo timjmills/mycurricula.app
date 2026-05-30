@@ -253,7 +253,21 @@ function writeToStorage(layout: TeachWorkspaceLayout): void {
 type Listener = (next: TeachWorkspaceLayout) => void;
 const listeners = new Set<Listener>();
 
+// The single, tab-wide source of truth for the latest committed layout. Every
+// hook instance is kept in lockstep with this via `broadcast`, so deriving a
+// `commit`'s next value from it (rather than per-instance React state) is both
+// race-free across instances in the same tick AND lets the actual `setLayout`
+// happen OUTSIDE any updater — which is what keeps a commit from updating one
+// component while another is mid-render. Initialized to the normalized default
+// so a `commit` that somehow fires before any mount still composes off a valid
+// base; the mount/storage effects below overwrite it from localStorage.
+let currentLayout: TeachWorkspaceLayout = freshDefault();
+
+/** Push a new layout to every hook instance and advance the shared mirror.
+ *  The `setLayout` calls happen here, in the caller's normal flow — never
+ *  inside a React state updater. */
 function broadcast(layout: TeachWorkspaceLayout): void {
+  currentLayout = layout;
   for (const fn of listeners) fn(layout);
 }
 
@@ -287,9 +301,14 @@ export function useTeachWorkspace(): UseTeachWorkspaceResult {
   const [layout, setLayout] = useState<TeachWorkspaceLayout>(freshDefault);
 
   // Post-mount: sync from localStorage + subscribe to in-process broadcasts.
+  // The first mounted instance seeds the tab-wide `currentLayout` mirror from
+  // localStorage so every later `commit` composes off the persisted value.
   useEffect(() => {
     const stored = readFromStorage();
-    if (stored != null) setLayout(stored);
+    if (stored != null) {
+      currentLayout = stored;
+      setLayout(stored);
+    }
     const listener: Listener = (next) => setLayout(next);
     listeners.add(listener);
     return () => {
@@ -303,12 +322,15 @@ export function useTeachWorkspace(): UseTeachWorkspaceResult {
     const handler = (e: StorageEvent): void => {
       if (e.key !== STORAGE_KEY) return;
       if (e.newValue == null) {
-        setLayout(freshDefault());
+        const next = freshDefault();
+        currentLayout = next;
+        setLayout(next);
         return;
       }
       try {
-        const parsed: unknown = JSON.parse(e.newValue);
-        setLayout(normalize(parsed));
+        const next = normalize(JSON.parse(e.newValue) as unknown);
+        currentLayout = next;
+        setLayout(next);
       } catch {
         // Ignore malformed values; keep current state.
       }
@@ -317,15 +339,24 @@ export function useTeachWorkspace(): UseTeachWorkspaceResult {
     return () => window.removeEventListener("storage", handler);
   }, []);
 
-  /** Apply a producer, normalize, persist, and broadcast. */
+  /** Apply a producer, normalize, persist, and broadcast.
+   *
+   * The next layout is derived from the tab-wide `currentLayout` mirror OUTSIDE
+   * any `setLayout` updater, so the side effects — `writeToStorage` and
+   * `broadcast` (which fans the new value to every hook instance via their
+   * `setLayout`, and also advances `currentLayout`) — run in the calling event
+   * handler's normal flow, never inside React's render/commit-phase updater.
+   * That is what removes the prior setState-in-render path (the old code ran
+   * `broadcast` inside a `setLayout` updater, which React 19 could invoke /
+   * replay during render → "Cannot update TeachLeftRail while rendering
+   * TeachWorkspace"). Reading from the shared mirror also keeps back-to-back
+   * commits — even from different hook instances in the same tick — composing
+   * off the latest committed value rather than a stale per-instance snapshot. */
   const commit = useCallback(
     (producer: (prev: TeachWorkspaceLayout) => TeachWorkspaceLayout): void => {
-      setLayout((prev) => {
-        const next = normalize(producer(prev));
-        writeToStorage(next);
-        broadcast(next);
-        return next;
-      });
+      const next = normalize(producer(currentLayout));
+      writeToStorage(next);
+      broadcast(next);
     },
     [],
   );
@@ -382,8 +413,11 @@ export function useTeachWorkspace(): UseTeachWorkspaceResult {
 
   const resetToDefault = useCallback((): void => {
     const next = freshDefault();
-    setLayout(next);
     writeToStorage(next);
+    // `broadcast` advances the shared mirror AND updates every instance
+    // (including this one, whose `setLayout` is a registered listener), so no
+    // separate local `setLayout` is needed — and like `commit`, the state
+    // update happens outside any updater.
     broadcast(next);
   }, []);
 

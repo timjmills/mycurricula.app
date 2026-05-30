@@ -708,6 +708,12 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
 
   return (
     <DndContext
+      // Stable id keeps dnd-kit's internal `DndDescribedBy-<id>` (the
+      // screen-reader instructions' `aria-describedby`) deterministic across
+      // server and client. Without it, dnd-kit falls back to a module-level
+      // counter (`useUniqueId`) whose value differs between SSR and hydration,
+      // producing a React hydration mismatch on every draggable on this surface.
+      id="teach-surface-dnd"
       sensors={sensors}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
