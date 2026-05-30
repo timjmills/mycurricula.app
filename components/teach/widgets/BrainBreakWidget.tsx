@@ -23,7 +23,13 @@ interface Activity {
   duration: string;
 }
 
-const ICONS: readonly KitIconName[] = ["spark", "star", "hand", "users", "bulb"];
+const ICONS: readonly KitIconName[] = [
+  "spark",
+  "star",
+  "hand",
+  "users",
+  "bulb",
+];
 
 const FALLBACK: Activity[] = [
   { icon: "spark", name: "5 Jumping Jacks", duration: "1 min" },
@@ -71,7 +77,8 @@ export function BrainBreakWidget({ widget }: WidgetBodyProps): ReactNode {
   const initial = useMemo<BreakState>(() => ({ index: 0 }), []);
   const { state, setState } = useWidgetState<BreakState>(widget.id, initial);
 
-  const idx = ((state.index % activities.length) + activities.length) % activities.length;
+  const idx =
+    ((state.index % activities.length) + activities.length) % activities.length;
   const current = activities[idx]!;
 
   const next = useCallback((): void => {

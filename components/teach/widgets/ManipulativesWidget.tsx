@@ -1,14 +1,18 @@
-// ManipulativesWidget — fraction-strip manipulatives, display-only
-// (docs/teach-view-plan.md §4.5). Renders the partitioned strip rows
-// (1, 1/2, 1/3, 1/4, 1/6) from `config.rows` (an array of denominators) or the
-// default set. Optionally renders a supplied `config.imageUrl` photo of
-// physical tiles beside the strips. Strip fill/outline are subject-tinted.
+// ManipulativesWidget — fraction-strip manipulatives, restyled into the 5.31
+// system (consumes the `--w-*` themeable vars + _WidgetKit). Display-only:
+// renders the partitioned strip rows from `config.rows` (denominators) or the
+// default set, with an optional `config.imageUrl` photo beside them. Behaviour +
+// export unchanged from v1.
+//
+// DEFAULT THEME: inherits the global default (cloud/blue) until rebinned.
 
-import type { ReactNode } from "react";
 /* eslint-disable @next/next/no-img-element -- a teacher-supplied resource photo,
    not a Next-optimizable asset; the board renders it raw. */
+import type { ReactNode } from "react";
 import type { WidgetBodyProps } from "./types";
-import styles from "./widgets.module.css";
+import { WHead } from "./_WidgetKit";
+import styles from "./ManipulativesWidget.module.css";
+import kit from "./widgets530.module.css";
 
 const DEFAULT_ROWS = [1, 2, 3, 4, 6];
 
@@ -27,10 +31,7 @@ function readRows(config: Record<string, unknown>): number[] {
   return DEFAULT_ROWS;
 }
 
-export function ManipulativesWidget({
-  widget,
-  subjectId,
-}: WidgetBodyProps): ReactNode {
+export function ManipulativesWidget({ widget }: WidgetBodyProps): ReactNode {
   const rows = readRows(widget.config);
   const imageUrl =
     typeof widget.config.imageUrl === "string"
@@ -38,17 +39,10 @@ export function ManipulativesWidget({
       : undefined;
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: "grid",
-          gridTemplateColumns: imageUrl ? "1fr 1fr" : "1fr",
-          gap: "var(--r-12)",
-        }}
-      >
-        <div className={styles.manip}>
+    <div className={kit.body}>
+      <WHead label="Manipulatives" />
+      <div className={`${styles.layout} ${imageUrl ? styles.layoutSplit : ""}`}>
+        <div className={styles.strips}>
           {rows.map((parts, ri) => (
             <div key={`${parts}-${ri}`} className={styles.stripRow}>
               {Array.from({ length: parts }).map((_, j) => (
@@ -60,11 +54,7 @@ export function ManipulativesWidget({
           ))}
         </div>
         {imageUrl ? (
-          <img
-            className={styles.mediaThumb}
-            src={imageUrl}
-            alt={widget.title}
-          />
+          <img className={styles.thumb} src={imageUrl} alt={widget.title} />
         ) : null}
       </div>
     </div>

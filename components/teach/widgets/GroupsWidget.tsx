@@ -1,12 +1,14 @@
-// GroupsWidget — student groups, rendered from the LOCAL-ONLY groups store
-// (docs/teach-view-plan.md §11.4, §13.3). Names NEVER come from `widget.config`
-// or the repository — they live only in `useTeachGroups()` (localStorage on the
-// teacher's device). The widget's persistable `config` carries STRUCTURE only
-// (group/slot counts); when the local store is empty we render that structure
-// as anonymous initial-less placeholder slots so the tile still reads.
+// GroupsWidget — student groups, restyled into the 5.31 system (consumes the
+// `--w-*` themeable vars + _WidgetKit primitives, incl. the privacy-safe Avatar).
+// Names NEVER come from `widget.config` or the repository — they live only in
+// `useTeachGroups()` (localStorage on the teacher's device); the widget's
+// persistable `config` carries STRUCTURE only (group/slot counts). When the local
+// store is empty we render that structure as anonymous placeholder slots.
 //
-// Display-only in v1 (no live re-grouping). The avatar colours cycle a fixed
-// set of subject/highlighter tokens — never a hard-coded hex.
+// PRIVACY (§11.4): members render as initials-on-tint `Avatar`s only — no full
+// name is ever shown or stored. Behaviour + export unchanged from v1.
+//
+// DEFAULT THEME: { bg: "green", accent: "green" } (per widget-defaults SEEDS).
 
 "use client";
 
@@ -14,23 +16,16 @@ import type { ReactNode } from "react";
 import { useTeachGroups } from "@/lib/teach/use-teach-groups";
 import type { TeachGroup } from "@/lib/teach/use-teach-groups";
 import type { WidgetBodyProps } from "./types";
-import { TeachIcon } from "./icons";
-import styles from "./widgets.module.css";
+import { WHead, KitIcon, Avatar, FootNote } from "./_WidgetKit";
+import styles from "./GroupsWidget.module.css";
+import kit from "./widgets530.module.css";
 
-// Avatar swatch cycle — token-driven, no literal hex (CLAUDE.md §4).
-const AVATAR_VARS = [
-  "var(--writing)",
-  "var(--done)",
-  "var(--tag-blue)",
-  "var(--urgent)",
-] as const;
-
-/** Two-letter initials from a name (LOCAL-ONLY data — used for display only). */
+/** Two-letter initials from a name (LOCAL-ONLY data — display only). */
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
 
 function readStructure(config: Record<string, unknown>): {
@@ -52,7 +47,6 @@ export function GroupsWidget({ widget }: WidgetBodyProps): ReactNode {
   const { store } = useTeachGroups();
   const { groupCount, slotsPerGroup } = readStructure(widget.config);
 
-  // Prefer the real local roster; otherwise render the structural skeleton.
   const hasLocalGroups = store.groups.length > 0;
 
   const rows: {
@@ -81,40 +75,39 @@ export function GroupsWidget({ widget }: WidgetBodyProps): ReactNode {
       }));
 
   return (
-    <div className={`${styles.body} ${styles.groups}`}>
-      {rows.map((row) => (
-        <div key={row.key} className={styles.groupRow}>
-          <span className={styles.groupName}>{row.name}</span>
-          <span className={styles.groupCount}>
-            {row.members.length} student{row.members.length === 1 ? "" : "s"}
-          </span>
-          <div className={styles.avatars}>
-            {row.members.map((m, i) => (
-              <span
-                key={m.id}
-                className={styles.avatar}
-                style={{ background: AVATAR_VARS[i % AVATAR_VARS.length] }}
-              >
-                {m.label}
+    <div className={`${kit.body} ${kit.tones}`}>
+      <WHead label="Groups" />
+      <div className={styles.list}>
+        {rows.map((row) => (
+          <div key={row.key} className={`${kit.card} ${styles.group}`}>
+            <div className={styles.groupHead}>
+              <span className={styles.groupName}>{row.name}</span>
+              <span className={styles.groupCount}>
+                {row.members.length} student
+                {row.members.length === 1 ? "" : "s"}
               </span>
-            ))}
-            {Array.from({ length: row.emptySlots }).map((_, i) => (
-              <span key={`empty-${i}`} className={styles.avatarEmpty}>
-                +
-              </span>
-            ))}
+            </div>
+            <div className={styles.avatars}>
+              {row.members.map((m) => (
+                <Avatar key={m.id} label={m.label} size={1.9} />
+              ))}
+              {Array.from({ length: row.emptySlots }).map((_, i) => (
+                <span key={`empty-${i}`} className={styles.empty}>
+                  +
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
-      <div className={styles.groupsHint}>
-        {hasLocalGroups ? (
-          <>
-            <TeachIcon name="users" size={11} /> Saved on this device only
-          </>
-        ) : (
-          "Add names in the Groups panel — kept on this device only"
-        )}
+        ))}
       </div>
+      <FootNote
+        tone={hasLocalGroups ? "green" : "gray"}
+        icon={<KitIcon name="users" size={1} />}
+      >
+        {hasLocalGroups
+          ? "Saved on this device only"
+          : "Add names in the Groups panel — kept on this device only"}
+      </FootNote>
     </div>
   );
 }

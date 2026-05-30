@@ -31,6 +31,38 @@ export { WorkSymbolsWidget } from "./WorkSymbolsWidget";
 export { SoundLevelWidget } from "./SoundLevelWidget";
 export { TextWidget } from "./TextWidget";
 
+// 5.31 named pedagogical widgets (handoff §2 / Ultraplan §4).
+// Lesson Essentials
+export { LearningTargetWidget } from "./LearningTargetWidget";
+export { NowNextThenWidget } from "./NowNextThenWidget";
+export { DirectionsWidget } from "./DirectionsWidget";
+export { MaterialsNeededWidget } from "./MaterialsNeededWidget";
+export { WorkCompletedWidget } from "./WorkCompletedWidget";
+// Routines & Management
+export { TransitionWidget } from "./TransitionWidget";
+export { AttentionSignalWidget } from "./AttentionSignalWidget";
+export { VoiceMovementWidget } from "./VoiceMovementWidget";
+export { WhenDoneWidget } from "./WhenDoneWidget";
+export { StudentJobsWidget } from "./StudentJobsWidget";
+// Assessment & Support
+export { ExitTicketWidget } from "./ExitTicketWidget";
+export { UnderstandingCheckWidget } from "./UnderstandingCheckWidget";
+export { HelpQueueWidget } from "./HelpQueueWidget";
+export { ParticipationTrackerWidget } from "./ParticipationTrackerWidget";
+export { QuestionParkingLotWidget } from "./QuestionParkingLotWidget";
+// Small Groups & Language
+export { CenterRotationWidget } from "./CenterRotationWidget";
+export { TeacherTableWidget } from "./TeacherTableWidget";
+export { VocabularyWidget } from "./VocabularyWidget";
+export { SentenceFramesWidget } from "./SentenceFramesWidget";
+export { DiscussionProtocolWidget } from "./DiscussionProtocolWidget";
+// Regulation & Teacher Tools
+export { BrainBreakWidget } from "./BrainBreakWidget";
+export { CalmCornerWidget } from "./CalmCornerWidget";
+export { ClassPointsWidget } from "./ClassPointsWidget";
+export { TeacherNotesWidget } from "./TeacherNotesWidget";
+export { MiniWhiteboardWidget } from "./MiniWhiteboardWidget";
+
 export { MediaCard } from "./MediaCard";
 export type { MediaCardProps } from "./MediaCard";
 

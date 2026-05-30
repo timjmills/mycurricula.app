@@ -23,9 +23,21 @@ const ICONS: readonly KitIconName[] = ["bulb", "users", "msg", "hand"];
 const FALLBACK = {
   name: "Think · Pair · Share",
   steps: [
-    { icon: "bulb" as KitIconName, text: "Think on your own.", hint: "1 min, silent" },
-    { icon: "users" as KitIconName, text: "Pair with your partner.", hint: "2 min" },
-    { icon: "msg" as KitIconName, text: "Share with the class.", hint: "Whole group" },
+    {
+      icon: "bulb" as KitIconName,
+      text: "Think on your own.",
+      hint: "1 min, silent",
+    },
+    {
+      icon: "users" as KitIconName,
+      text: "Pair with your partner.",
+      hint: "2 min",
+    },
+    {
+      icon: "msg" as KitIconName,
+      text: "Share with the class.",
+      hint: "Whole group",
+    },
   ],
 };
 

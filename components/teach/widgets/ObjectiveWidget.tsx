@@ -1,14 +1,16 @@
-// ObjectiveWidget — the "I Can" objective tile + standard chips, subject-tinted
-// (docs/teach-view-plan.md §4.5). Display-only: it renders the objective text
-// and CCSS standard codes from `widget.config`, falling back to the prototype's
-// fraction example so an unconfigured tile still reads. Subject accent comes
-// through `.cp-subj` (the wrapper applies the subject id as a class so the
-// `--c / --cl / --cd` tokens resolve), per CLAUDE.md §4 / §9 note #8.
+// ObjectiveWidget — the "I Can" objective tile + CCSS standard chips, restyled
+// into the 5.31 visual system (consumes the `--w-*` themeable vars + _WidgetKit
+// primitives). Display-only: renders the objective text and standard codes from
+// `widget.config`, falling back to the prototype's fraction example so an
+// unconfigured tile still reads. Behaviour + export are unchanged from v1.
+//
+// DEFAULT THEME: { bg: "yellow", accent: "purple" } (per widget-defaults SEEDS).
 
 import type { ReactNode } from "react";
 import type { WidgetBodyProps } from "./types";
-import { TeachIcon } from "./icons";
-import styles from "./widgets.module.css";
+import { WHead, KitIcon, Pill } from "./_WidgetKit";
+import styles from "./ObjectiveWidget.module.css";
+import kit from "./widgets530.module.css";
 
 /** Read the objective text from config, with a faithful fallback. */
 function readText(config: Record<string, unknown>): string {
@@ -28,32 +30,34 @@ function readStandards(config: Record<string, unknown>): string[] {
   return ["5.NF.B.3", "5.NF.A.1"];
 }
 
-export function ObjectiveWidget({
-  widget,
-  subjectId,
-}: WidgetBodyProps): ReactNode {
+export function ObjectiveWidget({ widget }: WidgetBodyProps): ReactNode {
   const text = readText(widget.config);
   const standards = readStandards(widget.config);
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.objective}`}>
-      <span className={styles.objectiveIcon}>
-        <TeachIcon name="target" size={24} />
-      </span>
-      <div className={styles.objectiveMain}>
-        <span className={styles.objectivePill}>I CAN</span>
-        <div className={styles.objectiveText}>{text}</div>
-        {standards.length > 0 ? (
-          <div className={styles.objectiveStandards}>
-            <span>Standard:</span>
-            {standards.map((code) => (
-              <span key={code} className={`cp-mono ${styles.objectiveChip}`}>
-                {code}
-              </span>
-            ))}
-          </div>
-        ) : null}
+    <div className={`${kit.body} ${kit.tones}`}>
+      <WHead label="Objective" />
+
+      <div className={styles.hero}>
+        <span className={`${kit.chip} ${styles.iconChip}`}>
+          <KitIcon name="target" size={2.2} />
+        </span>
+        <div className={styles.main}>
+          <span className={styles.pill}>I CAN</span>
+          <div className={styles.text}>{text}</div>
+        </div>
       </div>
+
+      {standards.length > 0 ? (
+        <div className={styles.standards}>
+          <span className={styles.standardsLabel}>Standard:</span>
+          {standards.map((code) => (
+            <Pill key={code} tone="purple">
+              {code}
+            </Pill>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

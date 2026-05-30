@@ -28,15 +28,15 @@
 }
 
 .bannerActive {
-  background: var(--cl);
-  border-color: var(--c);
-  color: var(--cd);
+  background: var(--w-soft);
+  border-color: var(--w-accent);
+  color: var(--w-accent);
 }
 
 .bannerGlyph {
   flex: none;
   display: inline-flex;
-  color: var(--cd);
+  color: var(--w-accent);
 }
 
 .bannerGlyph svg {
@@ -49,11 +49,11 @@
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1;
-  color: var(--cd);
+  color: var(--w-accent);
 }
 
 .bannerEmpty {
-  font-size: 13px;
+  font-size: 0.929em;
   font-weight: 700;
   color: var(--ink-400);
 }
@@ -96,9 +96,9 @@
 }
 
 .modeBtnOn {
-  background: var(--cl);
-  border-color: var(--c);
-  color: var(--cd);
+  background: var(--w-soft);
+  border-color: var(--w-accent);
+  color: var(--w-accent);
 }
 
 .modeGlyph {
@@ -106,7 +106,7 @@
 }
 
 .modeLabel {
-  font-size: 11px;
+  font-size: 0.786em;
   font-weight: 700;
   letter-spacing: 0.01em;
   white-space: nowrap;

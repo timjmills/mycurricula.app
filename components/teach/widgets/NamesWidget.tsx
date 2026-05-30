@@ -38,7 +38,7 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-export function NamesWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
+export function NamesWidget({ widget }: WidgetBodyProps): ReactNode {
   const { store } = useTeachGroups();
   const { state, setState, hydrated } = useWidgetState(widget.id, INITIAL);
 
@@ -142,7 +142,7 @@ export function NamesWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
   // Empty roster — names are device-local by design; never invent names.
   if (hydrated && students.length === 0) {
     return (
-      <div className={`cp-subj ${subjectId} ${styles.body}`}>
+      <div className={styles.body}>
         <div className={styles.empty}>
           <TeachIcon name="users" size={22} />
           <span>Add your class in the Class panel to pick names</span>
@@ -157,7 +157,7 @@ export function NamesWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
     : (picked ?? (poolEmpty ? "All picked!" : "Ready"));
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       <div
         className={`${styles.pick} ${picked && !spinning ? styles.pickLanded : ""} ${spinning ? styles.pickSpin : ""}`}
         aria-live="polite"

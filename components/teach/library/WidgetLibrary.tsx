@@ -89,38 +89,23 @@ const BROWSE_NAV: ReadonlyArray<{
 ];
 
 const CATEGORY_NAV: readonly CategoryNav[] = [
-  // TODO(lead): re-bin catalog `category` to these six ids; then `match` === [id].
-  {
-    id: "lesson",
-    label: "Lesson",
-    icon: "notes",
-    match: ["display", "content"],
-  },
+  // catalog.ts now emits these six ids directly, so each `match` is `[id]`.
+  { id: "lesson", label: "Lesson", icon: "notes", match: ["lesson"] },
   {
     id: "management",
     label: "Management",
     icon: "check",
-    match: ["classroom"],
+    match: ["management"],
   },
   {
     id: "assessment",
     label: "Assessment",
     icon: "target",
-    match: ["engagement"],
+    match: ["assessment"],
   },
   { id: "language", label: "Language", icon: "text", match: ["language"] },
-  {
-    id: "wellbeing",
-    label: "Well-Being",
-    icon: "star",
-    match: ["wellbeing", "sel"],
-  },
-  {
-    id: "utilities",
-    label: "Utilities",
-    icon: "timer",
-    match: ["timing", "utility"],
-  },
+  { id: "wellbeing", label: "Well-Being", icon: "star", match: ["wellbeing"] },
+  { id: "utilities", label: "Utilities", icon: "timer", match: ["utilities"] },
 ];
 
 const CATEGORY_BY_ID: Record<string, CategoryNav> = Object.fromEntries(

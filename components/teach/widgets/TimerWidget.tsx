@@ -85,7 +85,7 @@ function playBeep(): void {
   }
 }
 
-export function TimerWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
+export function TimerWidget({ widget }: WidgetBodyProps): ReactNode {
   const initial = useMemo<TimerPersisted>(
     () => ({
       durationSeconds: readConfigSeconds(widget.config),
@@ -184,7 +184,7 @@ export function TimerWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
   const editable = !running;
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       <div className={styles.main}>
         <svg
           className={styles.ring}
@@ -206,7 +206,7 @@ export function TimerWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
             cy="35"
             r={RADIUS}
             fill="none"
-            stroke={isAlarm ? "var(--teach-alarm)" : "var(--c)"}
+            stroke={isAlarm ? "var(--teach-alarm)" : "var(--w-accent)"}
             strokeWidth="7"
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={dashOffset}

@@ -1,7 +1,7 @@
-// YouTubeWidget — a video placeholder card, display-only
-// (docs/teach-view-plan.md §4.5). v1 renders a static frame (or a configured
-// thumbnail), NOT a live embed — the live player is Agent D's center canvas.
-// Reads `config.thumbnailUrl` / `config.url`.
+// YouTubeWidget — a video placeholder card, restyled into the 5.31 system.
+// Display-only: renders a framed placeholder (or a configured thumbnail), NOT a
+// live player — the live player is the board's center canvas. Reads
+// `config.thumbnailUrl` / `config.url`. Behaviour + export unchanged.
 
 import type { ReactNode } from "react";
 import type { WidgetBodyProps } from "./types";
@@ -10,7 +10,8 @@ import { MediaCard } from "./MediaCard";
 export function YouTubeWidget({ widget }: WidgetBodyProps): ReactNode {
   return (
     <MediaCard
-      icon="youtube"
+      icon="laptop"
+      heading="Video"
       label="Video clip"
       url={
         typeof widget.config.url === "string" ? widget.config.url : undefined

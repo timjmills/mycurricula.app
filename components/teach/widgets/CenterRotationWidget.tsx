@@ -31,8 +31,18 @@ const ICONS: readonly KitIconName[] = [
 // Groups are colour/number LABELS only — never student names (privacy §11.4).
 const FALLBACK: Center[] = [
   { icon: "book", name: "Read to Self", now: "Red Group", next: "Blue Group" },
-  { icon: "calc", name: "Math Fact Fluency", now: "Blue Group", next: "Green Group" },
-  { icon: "laptop", name: "Tech Center", now: "Green Group", next: "Yellow Group" },
+  {
+    icon: "calc",
+    name: "Math Fact Fluency",
+    now: "Blue Group",
+    next: "Green Group",
+  },
+  {
+    icon: "laptop",
+    name: "Tech Center",
+    now: "Green Group",
+    next: "Yellow Group",
+  },
   { icon: "pencil", name: "Word Work", now: "Yellow Group", next: "Red Group" },
 ];
 

@@ -41,7 +41,7 @@ function stepSize(size: TextSize, dir: 1 | -1): TextSize {
   return SIZE_ORDER[next];
 }
 
-export function TextWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
+export function TextWidget({ widget }: WidgetBodyProps): ReactNode {
   const initial = useMemo<TextPersisted>(
     () => readConfig(widget.config),
     [widget.config],
@@ -110,7 +110,7 @@ export function TextWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
   );
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       {/* Size stepper, top-right corner. */}
       <div className={styles.stepper}>
         <button

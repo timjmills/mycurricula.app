@@ -40,10 +40,7 @@ function teamId(): string {
   return `t-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
 }
 
-export function ScoreboardWidget({
-  widget,
-  subjectId,
-}: WidgetBodyProps): ReactNode {
+export function ScoreboardWidget({ widget }: WidgetBodyProps): ReactNode {
   const { state, setState } = useWidgetState<ScorePersisted>(
     widget.id,
     INITIAL,
@@ -121,7 +118,7 @@ export function ScoreboardWidget({
   const hasScores = teams.some((t) => t.score > 0);
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       <div className={styles.teams}>
         {teams.map((t) => {
           const isLeader = t.id === leaderId;

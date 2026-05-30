@@ -1,0 +1,141 @@
+/* ClassPointsWidget.module.css — token-only, em-sized. Default green/green. */
+
+.scoreCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4em;
+  padding: 1.1em 1em;
+  text-align: center;
+}
+
+.starIcon {
+  color: var(--w-accent);
+  display: grid;
+  place-items: center;
+}
+
+.score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3em;
+}
+
+.points {
+  font-size: 2.6em;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--w-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.goal {
+  font-size: 1.2em;
+  font-weight: 700;
+  color: var(--w-ink);
+  opacity: 0.5;
+}
+
+.reward {
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--w-ink);
+  opacity: 0.7;
+}
+
+.bar {
+  margin: 0.95em 0;
+  height: 0.7em;
+  border-radius: var(--r-pill);
+  background: var(--w-chip);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--w-accent);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.btn {
+  min-height: 2.75em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  border: none;
+  border-radius: var(--r-pill);
+  font-size: 0.95em;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.plus {
+  flex: 1;
+  padding: 0 1em;
+  background: var(--w-accent);
+  color: var(--paper);
+}
+
+.plus:hover {
+  filter: brightness(0.96);
+}
+
+.minus {
+  flex: none;
+  width: 2.75em;
+  background: var(--w-chip);
+  color: var(--w-ink);
+}
+
+.minus:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.minusBar {
+  width: 1em;
+  height: 0.18em;
+  border-radius: var(--r-pill);
+  background: currentColor;
+}
+
+.resetBtn {
+  flex: none;
+  min-height: 2.75em;
+  padding: 0 0.9em;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--w-ink);
+  opacity: 0.6;
+  font-size: 0.85em;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.resetBtn:hover {
+  opacity: 0.9;
+}
+
+.btn:focus-visible,
+.resetBtn:focus-visible {
+  outline: 0.15em solid var(--w-accent);
+  outline-offset: 0.15em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fill {
+    transition: width 200ms ease;
+  }
+}

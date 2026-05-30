@@ -43,7 +43,7 @@
   border-radius: var(--r-pill);
   background: var(--paper);
   color: var(--ink-500);
-  font-size: 11px;
+  font-size: 0.786em;
   font-weight: 700;
   cursor: pointer;
 }
@@ -71,7 +71,7 @@
   padding: 6px 2px;
   border: var(--line);
   border-radius: var(--r-12);
-  background: var(--cl);
+  background: var(--w-soft);
 }
 
 .value {
@@ -79,7 +79,7 @@
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1;
-  color: var(--cd);
+  color: var(--w-accent);
   font-variant-numeric: tabular-nums;
 }
 
@@ -124,7 +124,7 @@
 }
 
 .fieldLabel {
-  font-size: 11px;
+  font-size: 0.786em;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -138,13 +138,13 @@
   border-radius: var(--r-8);
   background: var(--paper);
   color: var(--ink-900);
-  font-size: 14px;
+  font-size: 1em;
   font-family: inherit;
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--c);
+  border-color: var(--w-accent);
 }
 
 .editActions {
@@ -161,9 +161,9 @@
   justify-content: center;
   border: none;
   border-radius: var(--r-pill);
-  background: var(--c);
+  background: var(--w-accent);
   color: var(--paper);
-  font-size: 13px;
+  font-size: 0.929em;
   font-weight: 800;
   cursor: pointer;
 }
@@ -183,7 +183,7 @@
   border-radius: var(--r-pill);
   background: var(--paper);
   color: var(--ink-700);
-  font-size: 13px;
+  font-size: 0.929em;
   font-weight: 700;
   cursor: pointer;
 }

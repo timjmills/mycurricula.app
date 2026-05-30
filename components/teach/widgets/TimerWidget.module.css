@@ -58,7 +58,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: 0.857em;
   font-weight: 800;
   letter-spacing: 0.02em;
   color: var(--teach-alarm);
@@ -82,9 +82,9 @@
   padding: 0 14px;
   border: none;
   border-radius: var(--r-pill);
-  background: var(--c);
+  background: var(--w-accent);
   color: var(--paper);
-  font-size: 13px;
+  font-size: 0.929em;
   font-weight: 800;
   cursor: pointer;
 }
@@ -143,7 +143,7 @@
   border-radius: var(--r-pill);
   background: var(--paper);
   color: var(--ink-700);
-  font-size: 12px;
+  font-size: 0.857em;
   font-weight: 700;
   cursor: pointer;
 }
@@ -157,9 +157,9 @@
 }
 
 .chipActive {
-  background: var(--cl);
-  border-color: var(--c);
-  color: var(--cd);
+  background: var(--w-soft);
+  border-color: var(--w-accent);
+  color: var(--w-accent);
 }
 
 .steppers {

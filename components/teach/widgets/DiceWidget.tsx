@@ -93,13 +93,19 @@ function DieFace({ value }: { value: number }): ReactNode {
         strokeWidth="3"
       />
       {(PIPS[value] ?? []).map(([px, py], i) => (
-        <circle key={i} cx={px * 100} cy={py * 100} r="9" fill="var(--cd)" />
+        <circle
+          key={i}
+          cx={px * 100}
+          cy={py * 100}
+          r="9"
+          fill="var(--w-accent)"
+        />
       ))}
     </svg>
   );
 }
 
-export function DiceWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
+export function DiceWidget({ widget }: WidgetBodyProps): ReactNode {
   const { state, setState } = useWidgetState(widget.id, INITIAL);
   const count = clampCount(state.count);
 
@@ -153,7 +159,7 @@ export function DiceWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
   const sum = shown.reduce((a, b) => a + b, 0);
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       <div className={styles.countRow} role="group" aria-label="Number of dice">
         {COUNT_OPTIONS.map((n) => (
           <button

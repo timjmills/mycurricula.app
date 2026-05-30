@@ -55,7 +55,7 @@ function formatDigital(
   return `${core}${suffix}`;
 }
 
-export function ClockWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
+export function ClockWidget({ widget }: WidgetBodyProps): ReactNode {
   const initial = useMemo<ClockPersisted>(
     () => ({
       hour24: readBool(widget.config, "hour24", false),
@@ -107,7 +107,7 @@ export function ClockWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
     : null;
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       {/* Pref toggles — hidden until hover/focus so the face reads cleanly. */}
       <div className={styles.toggles}>
         <button
@@ -214,7 +214,7 @@ export function ClockWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
                   y1="56"
                   x2="50"
                   y2="14"
-                  stroke="var(--c)"
+                  stroke="var(--w-accent)"
                   strokeWidth="1.5"
                   strokeLinecap="round"
                   transform={`rotate(${handAngles.second} 50 50)`}

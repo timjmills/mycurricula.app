@@ -11,9 +11,10 @@
 import { useCallback, useMemo } from "react";
 import type { ReactNode } from "react";
 import { useWidgetState } from "@/lib/teach/use-widget-state";
-import { TeachIcon } from "./icons";
+import { WHead, KitIcon } from "./_WidgetKit";
 import type { WidgetBodyProps } from "./types";
 import styles from "./AgendaWidget.module.css";
+import kit from "./widgets530.module.css";
 
 interface AgendaItem {
   label: string;
@@ -64,10 +65,7 @@ function readDoneMap(raw: unknown): Record<string, boolean> {
   return out;
 }
 
-export function AgendaWidget({
-  widget,
-  subjectId,
-}: WidgetBodyProps): ReactNode {
+export function AgendaWidget({ widget }: WidgetBodyProps): ReactNode {
   const items = useMemo(() => readItems(widget.config), [widget.config]);
 
   // Seed initial done-flags from config so a preset agenda restores its ticks.
@@ -108,7 +106,8 @@ export function AgendaWidget({
   );
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={`${kit.body} ${styles.body}`}>
+      <WHead label="Agenda" />
       <div className={styles.list}>
         {items.map((it, i) => {
           const isDone = !!doneMap[String(i)];
@@ -129,7 +128,7 @@ export function AgendaWidget({
                 className={`${styles.box} ${isDone ? styles.boxDone : ""}`}
                 aria-hidden="true"
               >
-                {isDone ? <TeachIcon name="check" size={13} /> : null}
+                {isDone ? <KitIcon name="check" size={0.85} /> : null}
               </span>
               <span
                 className={`${styles.label} ${isDone ? styles.labelDone : ""}`}

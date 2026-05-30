@@ -1,12 +1,16 @@
-// ModelWidget — the "Model It" bar-model + equivalent-fractions tile, ported
-// from the prototype's ModelBar / Frac (docs/teach-view-plan.md §4.5).
-// Display-only: it renders the partitioned bars + fraction equalities from
-// `config.fractions` (an array of {n,d} read top-down) or the default
-// 2/3 = 4/6 = 6/9 example. Bar fill + outline are subject-tinted via `.cp-subj`.
+// ModelWidget — the "Model It" bar-model + equivalent-fractions tile, restyled
+// into the 5.31 system (consumes the `--w-*` themeable vars + _WidgetKit).
+// Display-only: renders partitioned bars + fraction equalities from
+// `config.fractions` (an array of {n,d}) or the default 2/3 = 4/6 = 6/9 example.
+// Behaviour + export unchanged from v1.
+//
+// DEFAULT THEME: inherits the global default (cloud/blue) until rebinned.
 
 import type { ReactNode } from "react";
 import type { WidgetBodyProps } from "./types";
-import styles from "./widgets.module.css";
+import { WHead } from "./_WidgetKit";
+import styles from "./ModelWidget.module.css";
+import kit from "./widgets530.module.css";
 
 interface Fraction {
   n: number;
@@ -62,20 +66,21 @@ function Bar({ parts, filled }: { parts: number; filled: number }): ReactNode {
   );
 }
 
-export function ModelWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
+export function ModelWidget({ widget }: WidgetBodyProps): ReactNode {
   const fractions = readFractions(widget.config);
-  const lead = fractions[0];
+  const lead = fractions[0]!;
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body} ${styles.model}`}>
-      <div className={styles.modelHeading}>
+    <div className={kit.body}>
+      <WHead label="Model It" />
+      <div className={styles.heading}>
         Find equivalent fractions for <Frac n={lead.n} d={lead.d} big />
       </div>
-      <div className={styles.modelBars}>
+      <div className={styles.bars}>
         {fractions.map((f) => (
-          <div key={`${f.n}/${f.d}`} className={styles.modelCol}>
+          <div key={`${f.n}/${f.d}`} className={styles.col}>
             <Bar parts={f.d} filled={f.n} />
-            <div style={{ textAlign: "center" }}>
+            <div className={styles.colFrac}>
               <Frac n={f.n} d={f.d} />
             </div>
           </div>
@@ -83,7 +88,7 @@ export function ModelWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
       </div>
       <div className={styles.fracRow}>
         {fractions.map((f, i) => (
-          <span key={`eq-${f.n}/${f.d}`} style={{ display: "contents" }}>
+          <span key={`eq-${f.n}/${f.d}`} className={styles.fracRowItem}>
             <Frac n={f.n} d={f.d} />
             {i < fractions.length - 1 ? (
               <span className={styles.fracEq}>=</span>

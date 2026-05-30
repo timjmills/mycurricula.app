@@ -77,10 +77,7 @@ function toLocalInputValue(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function CountdownWidget({
-  widget,
-  subjectId,
-}: WidgetBodyProps): ReactNode {
+export function CountdownWidget({ widget }: WidgetBodyProps): ReactNode {
   // `defaultTargetISO` reads the clock, so memoise it once per widget so the
   // initial object stays a stable reference (and doesn't drift each render).
   const initial = useMemo<CountdownPersisted>(
@@ -144,7 +141,7 @@ export function CountdownWidget({
     : [];
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       {editing ? (
         <form
           className={styles.editForm}

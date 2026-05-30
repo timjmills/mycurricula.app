@@ -28,7 +28,7 @@
   border-radius: var(--r-8);
   background: var(--paper);
   color: var(--ink-500);
-  font-size: 13px;
+  font-size: 0.929em;
   font-weight: 800;
   cursor: pointer;
   transition:
@@ -38,13 +38,13 @@
 }
 
 .countChip:hover:not(:disabled) {
-  border-color: var(--c);
+  border-color: var(--w-accent);
 }
 
 .countChipOn {
-  background: var(--cl);
-  border-color: var(--c);
-  color: var(--cd);
+  background: var(--w-soft);
+  border-color: var(--w-accent);
+  color: var(--w-accent);
 }
 
 .countChip:disabled {
@@ -95,13 +95,13 @@
 
 .sum {
   flex: none;
-  font-size: 13px;
+  font-size: 0.929em;
   font-weight: 700;
   color: var(--ink-500);
 }
 
 .sum strong {
-  color: var(--cd);
+  color: var(--w-accent);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -112,9 +112,9 @@
   min-height: 44px;
   border: none;
   border-radius: var(--r-8);
-  background: var(--c);
+  background: var(--w-accent);
   color: var(--paper);
-  font-size: 14px;
+  font-size: 1em;
   font-weight: 800;
   cursor: pointer;
   transition: filter 120ms ease;

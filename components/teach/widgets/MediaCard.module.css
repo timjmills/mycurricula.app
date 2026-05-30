@@ -1,0 +1,50 @@
+/* MediaCard.module.css — restyled into the 5.31 system. Token-only, em-sized.
+   A soft framed placeholder rather than a dark video chrome, to match the new
+   light card system. */
+
+.frame {
+  flex: 1;
+  min-height: 6em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  border-radius: 0.85em;
+  border: 0.13em dashed var(--w-line);
+  background: var(--w-card);
+  box-shadow: var(--wf-shadow-inner);
+  color: var(--w-ink);
+  text-align: center;
+  padding: 1em;
+}
+
+.icon {
+  width: 3em;
+  height: 3em;
+  border-radius: 0.85em;
+  background: var(--w-chip);
+  color: var(--w-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.label {
+  font-size: 0.9em;
+  font-weight: 700;
+}
+
+.meta {
+  font-size: 0.78em;
+  opacity: 0.65;
+  word-break: break-all;
+}
+
+.thumb {
+  flex: 1;
+  width: 100%;
+  min-height: 6em;
+  object-fit: cover;
+  border-radius: 0.85em;
+}

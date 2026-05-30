@@ -1,0 +1,55 @@
+/* ManipulativesWidget.module.css — restyled into the 5.31 system. Token-only,
+   em-sized. Strip fill/outline use the themeable accent. */
+
+.layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.8em;
+}
+
+.layoutSplit {
+  grid-template-columns: 1fr 1fr;
+}
+
+.strips {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  justify-content: center;
+}
+
+.stripRow {
+  display: flex;
+  gap: 0.2em;
+}
+
+.stripCell {
+  flex: 1;
+  min-height: 1.7em;
+  border: 0.1em solid var(--w-accent);
+  border-radius: 0.35em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72em;
+  font-weight: 700;
+  color: var(--w-ink);
+  background: var(--w-soft);
+}
+
+.thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0.6em;
+}
+
+@media (max-width: 30em) {
+  .layoutSplit {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

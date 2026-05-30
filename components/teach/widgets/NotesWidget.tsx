@@ -1,12 +1,15 @@
-// NotesWidget — free-form teacher notes on a paper tint, display-only
-// (docs/teach-view-plan.md §4.5, §13.4). Per §13.4 the handwriting face is
-// DROPPED — this uses the app's default (Geist) stack, not Caveat. The paper
-// tint comes from the --board-tint-yellow token via the WidgetShell, so the
-// body itself only renders the text. Reads `config.text`.
+// NotesWidget — free-form notes on a soft card, restyled into the 5.31 system
+// (consumes the `--w-*` themeable vars + _WidgetKit). Display-only; reads
+// `config.text`. Behaviour + export unchanged from v1. (The §13.4 rule still
+// holds: the app default font, never Caveat.)
+//
+// DEFAULT THEME: { bg: "orange", accent: "orange" } (per widget-defaults SEEDS).
 
 import type { ReactNode } from "react";
 import type { WidgetBodyProps } from "./types";
-import styles from "./widgets.module.css";
+import { WHead, KitIcon } from "./_WidgetKit";
+import styles from "./NotesWidget.module.css";
+import kit from "./widgets530.module.css";
 
 const FALLBACK =
   "Circulate during centers. Check in with the group working on partitioning into equal parts. Use fraction strips if needed.";
@@ -25,11 +28,17 @@ function readText(config: Record<string, unknown>): {
 export function NotesWidget({ widget }: WidgetBodyProps): ReactNode {
   const { text, isPlaceholder } = readText(widget.config);
   return (
-    <div className={`${styles.body} ${styles.notes}`}>
-      <div
-        className={`${styles.notesText} ${isPlaceholder ? styles.notesPlaceholder : ""}`}
-      >
-        {text}
+    <div className={kit.body}>
+      <WHead label="Notes" />
+      <div className={`${kit.card} ${styles.note}`}>
+        <span className={styles.noteIcon}>
+          <KitIcon name="note" size={1.4} />
+        </span>
+        <p
+          className={`${styles.text} ${isPlaceholder ? styles.placeholder : ""}`}
+        >
+          {text}
+        </p>
       </div>
     </div>
   );

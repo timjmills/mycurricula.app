@@ -37,10 +37,7 @@ function readConfigThreshold(config: Record<string, unknown>): number {
   return INITIAL.threshold;
 }
 
-export function SoundLevelWidget({
-  widget,
-  subjectId,
-}: WidgetBodyProps): ReactNode {
+export function SoundLevelWidget({ widget }: WidgetBodyProps): ReactNode {
   const initial = useMemo<SoundPersisted>(
     () => ({ threshold: readConfigThreshold(widget.config) }),
     [widget.config],
@@ -179,7 +176,7 @@ export function SoundLevelWidget({
   const meterColour = tooLoud ? "var(--teach-alarm)" : "var(--teach-go)";
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       <div
         className={styles.meterWrap}
         role="meter"

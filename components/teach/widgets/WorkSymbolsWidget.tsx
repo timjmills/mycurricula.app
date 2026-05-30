@@ -118,10 +118,7 @@ function Glyph({ mode, size }: { mode: WorkMode; size: number }): ReactNode {
   );
 }
 
-export function WorkSymbolsWidget({
-  widget,
-  subjectId,
-}: WidgetBodyProps): ReactNode {
+export function WorkSymbolsWidget({ widget }: WidgetBodyProps): ReactNode {
   const initial = useMemo<WorkPersisted>(
     () => ({ mode: readConfigMode(widget.config) }),
     [widget.config],
@@ -139,7 +136,7 @@ export function WorkSymbolsWidget({
   );
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       <div
         className={`${styles.banner} ${current ? styles.bannerActive : ""}`}
         aria-live="polite"

@@ -108,7 +108,7 @@ function SmileyFace({ rank }: { rank: number }): ReactNode {
   );
 }
 
-export function PollWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
+export function PollWidget({ widget }: WidgetBodyProps): ReactNode {
   // Seed durable state from config on first run; the kind decides the options.
   const initial = useMemo<PollPersisted>(() => {
     const kind = readKind(widget.config);
@@ -156,7 +156,7 @@ export function PollWidget({ widget, subjectId }: WidgetBodyProps): ReactNode {
   const isSmiley = state.kind === "smiley";
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       <div className={styles.head}>
         <div className={styles.question}>{state.question}</div>
         <button

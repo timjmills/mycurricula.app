@@ -45,10 +45,7 @@ function formatSplit(ms: number): string {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}.${tenths}`;
 }
 
-export function StopwatchWidget({
-  widget,
-  subjectId,
-}: WidgetBodyProps): ReactNode {
+export function StopwatchWidget({ widget }: WidgetBodyProps): ReactNode {
   // `elapsed` is the accumulated, rendered total. `accumulatedRef` holds the
   // committed time before the current run segment; `startedAtRef` marks when the
   // current segment began (performance.now()). This keeps pause/resume accurate.
@@ -109,7 +106,7 @@ export function StopwatchWidget({
   }, [running]);
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       <div className={styles.digits}>{formatElapsed(elapsed)}</div>
 
       <div className={styles.controls}>

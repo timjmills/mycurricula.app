@@ -41,10 +41,7 @@ function readConfigActive(config: Record<string, unknown>): TrafficColour {
   return "off";
 }
 
-export function TrafficLightWidget({
-  widget,
-  subjectId,
-}: WidgetBodyProps): ReactNode {
+export function TrafficLightWidget({ widget }: WidgetBodyProps): ReactNode {
   const initial = useMemo<TrafficPersisted>(
     () => ({ active: readConfigActive(widget.config) }),
     [widget.config],
@@ -68,7 +65,7 @@ export function TrafficLightWidget({
   );
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+    <div className={styles.body}>
       <div
         className={styles.housing}
         role="radiogroup"

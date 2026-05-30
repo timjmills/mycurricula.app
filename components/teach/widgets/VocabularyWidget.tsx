@@ -17,7 +17,10 @@ interface Term {
 }
 
 const FALLBACK: Term[] = [
-  { word: "summarize", def: "To tell the most important parts in a short way." },
+  {
+    word: "summarize",
+    def: "To tell the most important parts in a short way.",
+  },
   { word: "evidence", def: "Proof from the text that supports your idea." },
   { word: "infer", def: "To figure something out using clues." },
 ];
