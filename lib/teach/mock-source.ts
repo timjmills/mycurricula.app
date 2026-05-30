@@ -16,7 +16,13 @@
 // future `boardToRow()` Supabase adapter asserts/strips any name-bearing field
 // before a write; this mock does not synthesize names into `config`/`state`.
 
-import type { Board, BoardTag, BoardTemplate, Widget } from "../types";
+import type {
+  Board,
+  BoardPage,
+  BoardTag,
+  BoardTemplate,
+  Widget,
+} from "../types";
 import {
   BOARDS,
   buildDefaultBoardSet,
@@ -39,11 +45,25 @@ function nextId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${idSeq}`;
 }
 
+function cloneWidget(w: Widget): Widget {
+  return {
+    ...w,
+    position: { ...w.position },
+    canvas: w.canvas ? { ...w.canvas } : undefined,
+    appearance: w.appearance ? { ...w.appearance } : undefined,
+  };
+}
+
 function cloneBoard(b: Board): Board {
   return {
     ...b,
     tags: b.tags ? b.tags.map((t) => ({ ...t })) : b.tags,
-    widgets: b.widgets.map((w) => ({ ...w, position: { ...w.position } })),
+    boardTheme: b.boardTheme ? { ...b.boardTheme } : b.boardTheme,
+    repeat: b.repeat ? b.repeat.map((r) => ({ ...r })) : b.repeat,
+    pages: b.pages
+      ? b.pages.map((p) => ({ ...p, widgets: p.widgets.map(cloneWidget) }))
+      : b.pages,
+    widgets: b.widgets.map(cloneWidget),
   };
 }
 
@@ -77,6 +97,51 @@ function assertUnderCap(owner: string): void {
   if (myBoards(owner).length >= MAX_BOARDS_PER_TEACHER) {
     throw new BoardCapError();
   }
+}
+
+// ── 5.31 page model helpers ──────────────────────────────────────────────────
+// A board's widgets live either on explicit `pages` (multi-page, 5.31) or on the
+// legacy flat `widgets` array (treated as a single implicit page). These helpers
+// give every mutation ONE consistent view: read pages, find a widget across all
+// pages, and keep the flat `widgets` mirror in sync with page-0 so grid-era
+// consumers (and the cap/library reads) keep working unchanged.
+
+/** Return a board's pages, materializing a single implicit page from the flat
+ *  `widgets` array when the board has none. Never mutates the board. */
+function pagesOf(board: Board): BoardPage[] {
+  if (board.pages && board.pages.length > 0) return board.pages;
+  return [{ id: `${board.id}-p0`, order: 0, widgets: board.widgets ?? [] }];
+}
+
+/** Keep `board.pages` authoritative AND mirror page-0's widgets onto the flat
+ *  `board.widgets` field so legacy readers stay correct. Sorts pages by order. */
+function commitPages(board: Board, pages: BoardPage[]): void {
+  const sorted = pages
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((p, i) => ({ ...p, order: i }));
+  board.pages = sorted;
+  board.widgets = sorted[0]?.widgets ?? [];
+  board.updatedAt = new Date().toISOString();
+}
+
+/** Find a widget anywhere on a board (across all pages); returns the owning
+ *  board, page, and widget, or null. Searches the live store. */
+function findWidget(
+  widgetId: string,
+): { board: Board; page: BoardPage; widget: Widget } | null {
+  for (const board of boards) {
+    for (const page of pagesOf(board)) {
+      const widget = page.widgets.find((w) => w.id === widgetId);
+      if (widget) return { board, page, widget };
+    }
+  }
+  return null;
+}
+
+/** Clamp a free-form canvas width to the handoff's 230–640 range. */
+function clampWidth(w: number): number {
+  return Math.min(640, Math.max(230, Math.round(w)));
 }
 
 // ── Id bridge (mock slugs ↔ db uuids) ───────────────────────────────────────
@@ -535,5 +600,137 @@ export const mockTeachSource: TeachDataSource = {
     };
     boards.push(copy);
     return cloneBoard(copy);
+  },
+
+  // ── 5.31: appearance, repeat, free-form canvas, pages ──────────────────────
+
+  async setBoardTheme(boardId, theme) {
+    const board = boards.find((b) => b.id === boardId);
+    if (!board) throw new Error(`Board not found: ${boardId}`);
+    board.boardTheme = { ...theme };
+    board.updatedAt = new Date().toISOString();
+    return cloneBoard(board);
+  },
+
+  async setBoardRepeat(boardId, repeat) {
+    const board = boards.find((b) => b.id === boardId);
+    if (!board) throw new Error(`Board not found: ${boardId}`);
+    // Real-link rules are stored as-is (the matcher resolves them live). Clone
+    // so the caller's array can't mutate the store.
+    board.repeat = repeat ? repeat.map((r) => ({ ...r })) : null;
+    board.updatedAt = new Date().toISOString();
+    return cloneBoard(board);
+  },
+
+  async upsertWidgetOnPage(boardId, pageId, widget) {
+    const board = boards.find((b) => b.id === boardId);
+    if (!board) throw new Error(`Board not found: ${boardId}`);
+    const pages = pagesOf(board).map((p) => ({
+      ...p,
+      widgets: p.widgets.slice(),
+    }));
+    const target = (pageId && pages.find((p) => p.id === pageId)) || pages[0];
+    const next: Widget = {
+      ...widget,
+      boardId,
+      position: { ...widget.position },
+      canvas: widget.canvas ? { ...widget.canvas } : undefined,
+    };
+    const idx = target.widgets.findIndex((w) => w.id === widget.id);
+    if (idx >= 0) {
+      target.widgets[idx] = next;
+    } else {
+      // Derive displayOrder authoritatively from the page's current widgets.
+      next.displayOrder = target.widgets.reduce(
+        (max, w) => Math.max(max, w.displayOrder + 1),
+        0,
+      );
+      target.widgets.push(next);
+    }
+    commitPages(board, pages);
+    return { ...next };
+  },
+
+  async moveWidget(widgetId, x, y) {
+    const hit = findWidget(widgetId);
+    if (!hit) throw new Error(`Widget not found: ${widgetId}`);
+    const prev = hit.widget.canvas ?? { x: 0, y: 0, w: 320 };
+    hit.widget.canvas = {
+      x: Math.max(0, Math.round(x)),
+      y: Math.max(0, Math.round(y)),
+      w: prev.w,
+    };
+    hit.board.updatedAt = new Date().toISOString();
+    return { ...hit.widget };
+  },
+
+  async resizeWidget(widgetId, w) {
+    const hit = findWidget(widgetId);
+    if (!hit) throw new Error(`Widget not found: ${widgetId}`);
+    const prev = hit.widget.canvas ?? { x: 0, y: 0, w: 320 };
+    hit.widget.canvas = { x: prev.x, y: prev.y, w: clampWidth(w) };
+    hit.board.updatedAt = new Date().toISOString();
+    return { ...hit.widget };
+  },
+
+  async setWidgetAppearance(widgetId, appearance) {
+    const hit = findWidget(widgetId);
+    if (!hit) throw new Error(`Widget not found: ${widgetId}`);
+    hit.widget.appearance = { ...appearance };
+    hit.board.updatedAt = new Date().toISOString();
+    return { ...hit.widget };
+  },
+
+  async listPages(boardId) {
+    const board = boards.find((b) => b.id === boardId);
+    if (!board) throw new Error(`Board not found: ${boardId}`);
+    return pagesOf(board).map((p) => ({
+      ...p,
+      widgets: p.widgets.map((w) => ({ ...w })),
+    }));
+  },
+
+  async addPage(boardId, title) {
+    const board = boards.find((b) => b.id === boardId);
+    if (!board) throw new Error(`Board not found: ${boardId}`);
+    const pages = pagesOf(board).map((p) => ({ ...p }));
+    const page: BoardPage = {
+      id: nextId("pg"),
+      order: pages.length,
+      title,
+      widgets: [],
+    };
+    commitPages(board, [...pages, page]);
+    return { ...page, widgets: [] };
+  },
+
+  async deletePage(boardId, pageId) {
+    const board = boards.find((b) => b.id === boardId);
+    if (!board) throw new Error(`Board not found: ${boardId}`);
+    const pages = pagesOf(board);
+    // Never delete the only page — a board always has ≥1 page.
+    if (pages.length <= 1) return cloneBoard(board);
+    commitPages(
+      board,
+      pages.filter((p) => p.id !== pageId).map((p) => ({ ...p })),
+    );
+    return cloneBoard(board);
+  },
+
+  async reorderPages(boardId, orderedPageIds) {
+    const board = boards.find((b) => b.id === boardId);
+    if (!board) throw new Error(`Board not found: ${boardId}`);
+    const byId = new Map(pagesOf(board).map((p) => [p.id, p]));
+    const reordered = orderedPageIds
+      .map((id) => byId.get(id))
+      .filter((p): p is BoardPage => p != null)
+      .map((p, i) => ({ ...p, order: i }));
+    // Append any pages the caller omitted (defensive) so none are lost.
+    for (const p of pagesOf(board)) {
+      if (!orderedPageIds.includes(p.id))
+        reordered.push({ ...p, order: reordered.length });
+    }
+    commitPages(board, reordered);
+    return cloneBoard(board);
   },
 };

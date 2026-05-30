@@ -9,7 +9,15 @@
 // Resources do NOT flow through here: they reuse the existing data path via the
 // `toTeachResource()` adapter. This seam is board/widget/template only.
 
-import type { Board, BoardTag, BoardTemplate, Widget } from "../types";
+import type {
+  Board,
+  BoardPage,
+  BoardTag,
+  BoardTemplate,
+  RepeatSchedule,
+  ThemeOverride,
+  Widget,
+} from "../types";
 import type { BoardContext } from "./board-tags";
 import { mockTeachSource } from "./mock-source";
 
@@ -145,6 +153,43 @@ export interface TeachDataSource {
    * Counts toward the cap → throws `BoardCapError` at the limit.
    */
   copyTeamBoardToMine(boardId: string, ownerId: string): Promise<Board>;
+
+  // ── 5.31 redesign: appearance, repeat, free-form canvas, pages ─────────────
+  /** Set a board's global appearance theme (the Board Theme panel write path).
+   *  Pass `{}` to clear the board theme back to per-widget defaults. */
+  setBoardTheme(boardId: string, theme: ThemeOverride): Promise<Board>;
+  /** Set a board's REAL repeat schedule (weekday/lesson/subject/week/slot
+   *  links). Pass `null` to stop repeating. One board, many live contexts. */
+  setBoardRepeat(boardId: string, repeat: RepeatSchedule): Promise<Board>;
+
+  /** Insert or replace a widget on a specific PAGE of a board (free-form canvas).
+   *  When `pageId` is omitted the board's first page is used. Keyed by
+   *  `widget.id`; derives `displayOrder` on insert. */
+  upsertWidgetOnPage(
+    boardId: string,
+    pageId: string | null,
+    widget: Widget,
+  ): Promise<Widget>;
+  /** Move a widget to a new absolute canvas position (x/y) — drag commit. */
+  moveWidget(widgetId: string, x: number, y: number): Promise<Widget>;
+  /** Resize a widget's canvas width (corner-resize commit; clamp 230–640). */
+  resizeWidget(widgetId: string, w: number): Promise<Widget>;
+  /** Set a widget's per-widget appearance override (the Appearance panel write
+   *  path). Pass `{}` to reset the widget back to the board theme. */
+  setWidgetAppearance(
+    widgetId: string,
+    appearance: ThemeOverride,
+  ): Promise<Widget>;
+
+  /** List a board's pages (always ≥1; a board with no explicit pages yields a
+   *  single implicit page built from its flat `widgets`). */
+  listPages(boardId: string): Promise<BoardPage[]>;
+  /** Append a new blank page to a board; returns the created page. */
+  addPage(boardId: string, title?: string): Promise<BoardPage>;
+  /** Delete a page (no-op if it is the board's only page). */
+  deletePage(boardId: string, pageId: string): Promise<Board>;
+  /** Re-order a board's pages by id. */
+  reorderPages(boardId: string, orderedPageIds: string[]): Promise<Board>;
 }
 
 /**

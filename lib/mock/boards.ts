@@ -18,6 +18,7 @@ import type {
   Board,
   BoardScope,
   BoardTag,
+  RepeatSchedule,
   Widget,
   WidgetGridPosition,
   WidgetPersistence,
@@ -325,6 +326,9 @@ function lib(o: {
   publishedBy: string;
   tags: BoardTag[];
   background?: string | null;
+  /** Real-link repeat schedule (5.31) — surfaces this one board in many live
+   *  contexts (weekday/subject/week/lesson). */
+  repeat?: RepeatSchedule;
   widgets?: Omit<Widget, "boardId" | "gradeLevelId">[];
 }): Board {
   return {
@@ -339,6 +343,7 @@ function lib(o: {
     ownerId: null,
     scope: "team",
     background: o.background ?? null,
+    repeat: o.repeat ?? null,
     libraryVisibility: "team",
     publishedBy: o.publishedBy,
     sourceBoardId: null,
@@ -352,6 +357,10 @@ export const TEAM_LIBRARY_BOARDS: Board[] = [
   lib({
     title: "Number Talks Routine",
     publishedBy: "sk", // Sarah Khouri
+    // Real repeat: every Math warm-up. Surfaces in any Math context (live link).
+    repeat: [
+      { kind: "subject", subjectId: "math", label: "Every Math lesson" },
+    ],
     tags: [
       { kind: "subject", value: "math" },
       { kind: "phase", value: "warm-up" },
@@ -395,6 +404,8 @@ export const TEAM_LIBRARY_BOARDS: Board[] = [
     title: "Friday Reflection Whiteboard",
     publishedBy: "jd", // Jonas Delacroix
     background: "gradient-3",
+    // Real repeat: every Friday (weekday index 5 into the configured week).
+    repeat: [{ kind: "weekday", weekdays: [5], label: "Fridays" }],
     // Whiteboard-style: only a weekday tag + free label, so it auto-surfaces on
     // Fridays for any subject.
     tags: [
