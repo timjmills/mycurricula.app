@@ -496,9 +496,7 @@
   font-weight: 600;
 }
 
-/* Reduced-motion: nothing here animates, but guard future transitions. */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
-  }
-}
+/* Reduced-motion: nothing in this module animates today, so there is no global
+   guard here — a bare `*` selector is illegal in a CSS module (must contain a
+   local class/id). Add a scoped `prefers-reduced-motion` rule next to any
+   future transition instead. */
