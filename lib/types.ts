@@ -276,7 +276,45 @@ export type WidgetType =
   | "traffic" // red/amber/green light
   | "work_symbols" // silent / whisper / partner / group work mode
   | "soundlevel" // live microphone level meter
-  | "text"; // large editable display text
+  | "text" // large editable display text
+  // ── 5.31 named pedagogical widgets (handoff §2; superset, see Ultraplan §4) ─
+  // Lesson Essentials
+  | "learning-target" // I-can + success criteria (restyles `objective`)
+  | "now-next-then" // current → next → then activity sequence
+  | "directions" // numbered step instructions
+  | "materials-needed" // supply list with icons
+  | "work-completed" // student × subject progress grid
+  // Routines & Management
+  | "transition" // movement guide: timer + voice level + steps
+  | "attention-signal" // attention call + readiness count
+  | "voice-movement" // voice/movement/help/work expectations
+  | "when-done" // Must Do / May Do early-finisher options
+  | "student-jobs" // rotating classroom roles
+  // Assessment & Support
+  | "exit-ticket" // end-of-lesson check (restyles inline)
+  | "understanding-check" // emoji/face mood + class summary
+  | "help-queue" // students waiting for help
+  | "participation-tracker" // shared / not-yet-shared tally
+  | "question-parking-lot" // collected questions + status
+  // Small Groups & Language
+  | "center-rotation" // now/next center assignments
+  | "teacher-table" // small-group mastery grid
+  | "vocabulary" // key words + definitions
+  | "sentence-frames" // language stems with blanks
+  | "discussion-protocol" // partner discussion structure
+  // Regulation & Teacher Tools
+  | "brain-break" // movement activity + timer
+  | "calm-corner" // breathing + mood check-in
+  | "class-points" // class reward progress
+  | "teacher-notes" // private reminders (restyles `notes`)
+  | "mini-whiteboard" // worked example + pen tools
+  // Helpers surfaced in the editor/library
+  | "namepick" // name picker (restyles `names`)
+  | "sound" // microphone level (restyles `soundlevel`)
+  | "work-sound" // voice-level selector
+  | "lesson-flow" // activity agenda (replaces `agenda`)
+  | "note-view" // multi-page resource slideshow
+  | "resource"; // embedded resource card on the canvas
 
 /** Whether a widget's interactive `state` survives across teaching sessions.
  *  Maps to the DB `widget_persistence` enum. `inherit` defers to the board's
