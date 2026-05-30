@@ -95,3 +95,39 @@
 .present .center {
   padding: 0;
 }
+
+/* ── Small-screen drawer scrim ─────────────────────────────────────────────
+   Rendered in TSX only at ≤900px when a panel drawer is open (the Wave-4
+   responsive follow-up; the panels become fixed overlay drawers at z-index 45
+   in the panel CSS modules — TeachLeft.module.css / TeachRightPanel.module.css).
+   The scrim sits just BELOW the drawer (z-index 40) and above the board/rails,
+   dimming the surface and closing the drawer on tap. Colour is tokens-only —
+   a color-mix of --ink-900, the same recipe the board's modal scrims use. It is
+   a real <button> so it is keyboard-focusable + Enter/Space-activatable. */
+.drawerScrim {
+  --teach-drawer-scrim: color-mix(in srgb, var(--ink-900) 45%, transparent);
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: var(--teach-drawer-scrim);
+  cursor: pointer;
+  animation: teachDrawerScrimIn 200ms ease;
+}
+
+@keyframes teachDrawerScrimIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawerScrim {
+    animation: none;
+  }
+}

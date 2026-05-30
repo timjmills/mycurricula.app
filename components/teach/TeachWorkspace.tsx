@@ -38,6 +38,7 @@ import {
 } from "@/lib/use-teach-workspace";
 import { useBoardAnnotations } from "@/lib/use-board-annotations";
 import { useTeachShortcuts } from "@/lib/use-teach-shortcuts";
+import { useTeachViewport } from "@/lib/use-teach-viewport";
 import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { lessonResources } from "@/lib/lesson-resources";
@@ -187,6 +188,12 @@ function initState(props: TeachWorkspaceProps): TeachWorkspaceState {
 export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   const [state, dispatch] = useReducer(reducer, props, initState);
   const workspace = useTeachWorkspace();
+  // Responsive tier (SSR-safe — desktop on the server + first paint, real value
+  // post-mount). Drives the small-screen panel-drawer behaviour: auto-collapse
+  // both panels when crossing into ≤900px, one-drawer-at-a-time, and the
+  // tap-to-dismiss scrim. See lib/use-teach-viewport.ts + the Wave-4 follow-up
+  // in docs/teach-a11y-responsive-notes.md.
+  const viewport = useTeachViewport();
   const sensors = useDndSensors();
   const { lessons, getSections } = usePlanner();
   const { week, selectedDay, currentUser } = useAppState();
@@ -230,6 +237,60 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
       collapsed: workspace.layout.rightCollapsed,
     });
   }, [workspace.layout.leftCollapsed, workspace.layout.rightCollapsed]);
+
+  // ── Viewport-aware default collapse (the Wave-4 fix) ───────────────────────
+  // SSR + first client paint render as DESKTOP (viewport.isSmall === false), so
+  // the server HTML and first hydration agree — no mismatch. Post-mount the hook
+  // reports the real tier; when we cross INTO the small breakpoint we collapse
+  // BOTH panels so neither overlay drawer is open on a small-screen first load.
+  // We only act on the DOWN-crossing edge (desktop/large → small) so we never
+  // fight a teacher who has deliberately reopened a drawer at the same tier; we
+  // do not auto-EXPAND when crossing back up to desktop (the persisted layout
+  // already drives that via the sync effect above). `prevSmallRef` starts at the
+  // SSR assumption (false) so the very first post-mount transition into a small
+  // viewport is treated as a down-crossing and collapses both panels.
+  const prevSmallRef = useRef(false);
+  useEffect(() => {
+    const wasSmall = prevSmallRef.current;
+    prevSmallRef.current = viewport.isSmall;
+    if (viewport.isSmall && !wasSmall) {
+      dispatch({ type: "setLeftCollapsed", collapsed: true });
+      dispatch({ type: "setRightCollapsed", collapsed: true });
+    }
+  }, [viewport.isSmall]);
+
+  // ── Esc closes the open drawer on small screens ────────────────────────────
+  // On small screens a panel is a modal-ish overlay drawer, so Esc should
+  // dismiss it. This runs at the workspace level (the global teach-shortcuts Esc
+  // cascade handles resource/present/fullscreen; drawer dismissal is a
+  // small-screen-only concern owned here). Only active when small AND a drawer
+  // is open; in Present mode the panels are unmounted so there's nothing to
+  // close. Capture phase + stopPropagation so we win before the global cascade
+  // when a drawer is the top-most dismissible layer.
+  useEffect(() => {
+    if (!viewport.isSmall || state.present) return;
+    const leftOpen = !state.leftCollapsed;
+    const rightOpen = !state.rightCollapsed;
+    if (!leftOpen && !rightOpen) return;
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== "Escape") return;
+      // Don't steal Esc from a more-nested overlay (resource canvas / picker).
+      if (state.centerMode === "resource" && state.activeResource) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (rightOpen) dispatch({ type: "setRightCollapsed", collapsed: true });
+      if (leftOpen) dispatch({ type: "setLeftCollapsed", collapsed: true });
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [
+    viewport.isSmall,
+    state.present,
+    state.leftCollapsed,
+    state.rightCollapsed,
+    state.centerMode,
+    state.activeResource,
+  ]);
 
   // ── Default lesson seed (only when not deep-linked + not sandbox) ──────────
   useEffect(() => {
@@ -374,19 +435,46 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     }
   }, []);
 
+  // ── One-drawer-at-a-time expand helpers ────────────────────────────────────
+  // On small screens (≤900px) the panels are overlay drawers (Wave-3 CSS), so
+  // two open at once would stack/overlap. These helpers funnel EVERY expand
+  // path (rail icons, the module-focus chord, the footer dots) so that opening
+  // one panel force-collapses the other on small screens. On desktop both may
+  // stay open — current behaviour is preserved.
+  //
+  // The persisted collapse flag is only toggled via `workspace.toggle*` (which
+  // writes through to localStorage); the FORCED collapse of the OTHER side uses
+  // a direct reducer dispatch so we don't clobber the teacher's desktop
+  // preference — it's a transient small-screen layout override, not a saved
+  // choice. The collapse-sync effect above only re-runs when the PERSISTED
+  // flags change, so this direct dispatch is not overwritten.
+  const isSmall = viewport.isSmall;
+  const openLeftPanel = useCallback((): void => {
+    if (state.leftCollapsed) workspace.toggleLeftCollapsed();
+    if (isSmall && !state.rightCollapsed) {
+      dispatch({ type: "setRightCollapsed", collapsed: true });
+    }
+  }, [state.leftCollapsed, state.rightCollapsed, isSmall, workspace]);
+  const openRightPanel = useCallback((): void => {
+    if (state.rightCollapsed) workspace.toggleRightCollapsed();
+    if (isSmall && !state.leftCollapsed) {
+      dispatch({ type: "setLeftCollapsed", collapsed: true });
+    }
+  }, [state.rightCollapsed, state.leftCollapsed, isSmall, workspace]);
+
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   const boardIds = useMemo(() => boards.map((b) => b.id), [boards]);
   const onFocusModule = useCallback(
     (module: "lessons" | "boards" | "resources" | "chat" | "todo"): void => {
       if (module === "resources" || module === "chat" || module === "todo") {
         setRightActiveModule(module);
-        if (state.rightCollapsed) workspace.toggleRightCollapsed();
+        openRightPanel();
       } else {
         setLeftActiveModule(module);
-        if (state.leftCollapsed) workspace.toggleLeftCollapsed();
+        openLeftPanel();
       }
     },
-    [state.leftCollapsed, state.rightCollapsed, workspace],
+    [openLeftPanel, openRightPanel],
   );
   useTeachShortcuts({
     state,
@@ -414,9 +502,30 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   }, [activeLessonId, ownerId, boards.length, activeBoard, reloadBoards]);
 
   const togglePanels = useCallback((): void => {
+    // On small screens the panels are overlay drawers, so "show panels" must
+    // not open both at once (they'd overlap). If anything is open, collapse
+    // everything; otherwise open just the LEFT drawer (the primary panel). On
+    // desktop keep the original both-at-once toggle.
+    //
+    // Self-contained (no dependency on the openLeft/openRight helpers, which are
+    // declared further down) so it can't trip a temporal-dead-zone reference.
+    if (viewport.isSmall) {
+      const anyOpen = !state.leftCollapsed || !state.rightCollapsed;
+      if (anyOpen) {
+        if (!state.leftCollapsed)
+          dispatch({ type: "setLeftCollapsed", collapsed: true });
+        if (!state.rightCollapsed)
+          dispatch({ type: "setRightCollapsed", collapsed: true });
+      } else {
+        // Open the left drawer via the persisted toggle (so it round-trips to
+        // localStorage); the right is already collapsed here.
+        workspace.toggleLeftCollapsed();
+      }
+      return;
+    }
     workspace.toggleLeftCollapsed();
     workspace.toggleRightCollapsed();
-  }, [workspace]);
+  }, [viewport.isSmall, state.leftCollapsed, state.rightCollapsed, workspace]);
 
   // ── Board widget callbacks ─────────────────────────────────────────────────
   const handleAddWidget = useCallback((target: BoardCellTarget): void => {
@@ -654,7 +763,7 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
               activeModuleId={state.leftCollapsed ? null : leftActiveModule}
               onSelectModule={(id) => {
                 setLeftActiveModule(id);
-                if (state.leftCollapsed) workspace.toggleLeftCollapsed();
+                openLeftPanel();
               }}
             />
           ) : null}
@@ -762,7 +871,29 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
               activeModuleId={state.rightCollapsed ? null : rightActiveModule}
               onActivateModule={(id) => {
                 setRightActiveModule(id);
-                if (state.rightCollapsed) workspace.toggleRightCollapsed();
+                openRightPanel();
+              }}
+            />
+          ) : null}
+
+          {/* Tap-to-dismiss scrim — only on small screens (≤900px) when a panel
+              drawer is open. Sits BELOW the drawer (scrim z-index 40 < drawer
+              z-index 45) and above the board/rails; tapping anywhere outside the
+              drawer collapses whichever drawer(s) are open. Keyboard users get
+              Esc (the effect above) and the scrim is itself a focusable
+              <button> (Enter/Space activate it). */}
+          {!state.present &&
+          viewport.isSmall &&
+          (!state.leftCollapsed || !state.rightCollapsed) ? (
+            <button
+              type="button"
+              className={styles.drawerScrim}
+              aria-label="Close panel"
+              onClick={() => {
+                if (!state.rightCollapsed)
+                  dispatch({ type: "setRightCollapsed", collapsed: true });
+                if (!state.leftCollapsed)
+                  dispatch({ type: "setLeftCollapsed", collapsed: true });
               }}
             />
           ) : null}

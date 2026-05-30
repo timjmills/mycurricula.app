@@ -38,7 +38,10 @@ export default function RootLayout({
       data-palette={DEFAULT_PALETTE}
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
-      <body suppressHydrationWarning className="cp-root flex min-h-full flex-col">
+      <body
+        suppressHydrationWarning
+        className="cp-root flex min-h-full flex-col"
+      >
         <ThemeProvider>
           {/* LabelsProvider hosts the renameable Subject/Unit/Lesson/Section
               captions. Mounted near the root so every surface — Settings,
