@@ -12,6 +12,12 @@
   gap: var(--r-12);
   width: 100%;
   min-width: 0;
+  /* Internal horizontal scroll: when the bar's non-shrinking right cluster
+     can't fit (narrow phones), the bar scrolls inside itself instead of
+     widening the document (the slot clips it — TeachWorkspace.module.css).
+     CLAUDE.md §4 allows internal element scroll; the document must not move. */
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .wordmark {
@@ -175,6 +181,13 @@
   gap: var(--r-12);
   width: 100%;
   min-width: 0;
+  /* Internal horizontal scroll: the layout toolbar (1up…3×3) + action cluster
+     (Present / Full Screen / Pop-Out / Duplicate) are fixed-width, non-shrinking
+     `flex: none` clusters that exceed a phone/tablet viewport. The bar scrolls
+     inside itself (the sub-bar slot clips it — TeachWorkspace.module.css) so the
+     document never gains horizontal scroll. CLAUDE.md §4: internal scroll OK. */
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 /* Week ▾ / Subject ▾ context chips. */
@@ -325,6 +338,11 @@
   gap: var(--r-12);
   width: 100%;
   min-width: 0;
+  /* Internal horizontal scroll for the same reason as the top/sub bars: the
+     footer's nowrap groups (board counter, module dots, saved chip, shortcuts)
+     scroll inside the bar rather than widening the document. */
+  overflow-x: auto;
+  scrollbar-width: thin;
   font-size: var(--t-11);
   color: var(--ink-700);
 }
@@ -401,6 +419,11 @@
   gap: var(--r-12);
   height: 44px;
   flex: none;
+  min-width: 0;
+  /* Internal horizontal scroll: the present strip's nav buttons + exit chip are
+     nowrap; scroll inside the bar rather than widening the document. */
+  overflow-x: auto;
+  scrollbar-width: thin;
   padding: 0 var(--r-12);
   background: var(--ink-900);
   color: var(--paper);

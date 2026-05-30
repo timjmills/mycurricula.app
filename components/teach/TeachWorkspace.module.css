@@ -8,23 +8,43 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  /* Document-level horizontal-scroll guard (CLAUDE.md §4 hard rule): the Teach
+     view is non-scrolling at the document level — the board scrolls inside its
+     own canvas and the chrome bars scroll inside themselves (see below). Clip
+     the shell horizontally so no over-wide descendant (e.g. the sub-bar's
+     fixed-width layout toolbar + action cluster at phone/tablet) can ever widen
+     the page. `min-width: 0` lets this flex item shrink to the viewport. */
+  min-width: 0;
+  overflow: hidden;
   background: var(--ink-50);
   color: var(--ink-900);
 }
 
 /* ── Chrome slots: the zone components own their own internal chrome, so the
-   slots are bare flex children that simply sit at the top of the column. ── */
+   slots are bare flex children that simply sit at the top of the column. They
+   carry `min-width: 0` + `overflow: hidden` so a bar whose intrinsic
+   (non-shrinking) content exceeds the viewport is contained by the slot — the
+   bar itself then scrolls internally (TeachChrome.module.css) rather than
+   forcing document-level horizontal scroll. ── */
 .topBarSlot,
 .subBarSlot,
 .footerSlot,
 .presentStrip {
   flex: none;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* ── Body row: rail · panel · center · panel · rail ───────────────────── */
 .body {
   flex: 1;
   min-height: 0;
+  /* `min-width: 0` lets the row shrink to the shell width; `overflow: hidden`
+     keeps any in-flow child (the rails + center) from widening the document.
+     The center carries its own `min-width: 0` so the board grid stays inside
+     `100vw − 2×64px` (the two icon rails) at phone/tablet. */
+  min-width: 0;
+  overflow: hidden;
   display: flex;
   align-items: stretch;
 }
