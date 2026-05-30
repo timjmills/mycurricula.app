@@ -780,5 +780,111 @@ Wave 0 ──┬─> A (chrome/modes)
 
 ---
 
-*End of plan. §13 decisions resolved with Tim (2026-05-29); ready to begin
-Wave 0 (§14) on approval.*
+## 16. Build status & deferred work (live — updated 2026-05-30)
+
+Waves 0–4 + a hardening pass are **shipped on PR #1** (branch
+`claude/ecstatic-bohr-1ovo3`); build is green (tsc + lint + build). Two
+functional audits (left+center+data; right+canvas+chrome) classified every
+interactive control as WIRED / STUB-OK / BROKEN. This section is the
+single source of truth for what is done vs. outstanding.
+
+### 16.1 Verified working (audited WIRED)
+
+Core teaching loop is solid: board grid + layout switch (1up→3×3), all 12
+display-only widgets (config-driven, no crash on empty config), WidgetPicker
+(T5, creates at target cell), add/remove/pin widget, drag-resource-to-cell
+(T8), FocusMode (T7, focus-trapped), BoardEmptyState (T9), Present + Full
+Screen + PresentBar prev/next, the **full resource canvas** (every embed
+branch + PDF via `/api/resources/{id}` + link fallback) and the **complete
+annotation system** (pen/highlighter/eraser/shapes/text, swatches, width,
+undo/redo, Clear, cross-session persist), Resources grid/list + search + base
+filters + ⋯ menu, Chat/To-do mounting the Daily components, lazy default
+5-board set, push-to-team displacement, ordering correctness, groups/names
+local-only (§11.4 verified), security (tiered sandboxes, no raw presigned URL,
+`rel=noopener`). Plus the responsive drawers, the three hardened warnings, and
+the no-horizontal-scroll fix.
+
+### 16.2 Being fixed in the 2026-05-30 fix wave
+
+Bugs: board-list desync (BoardsModule self-fetch → single source of truth);
+close-tab stranding; sandbox Save-to-new-lesson / Pin-to-lesson persistence
+(§4a); `Cmd+Shift+P` slamming Present; embed-at-(0,0) occupancy. Features:
+board-settings popover + **Reset board** (§13.5); student→group assignment
+(wires the unused `setGroupMembers`). Honesty: dead chrome controls that need a
+net-new surface are marked **"Soon"** (visible, disabled, "coming soon"
+tooltip) rather than silent no-ops.
+
+### 16.3 Deferred — NEEDS PLANNING before build
+
+Recorded so nothing is silently dropped. Each needs a design decision or a
+net-new surface; none is wired today.
+
+- **Global search (top bar)** — marked "Soon". Needs a Teach search surface or
+  reuse of the shell `SearchResults`. Decide scope (resources? lessons?
+  widgets?).
+- **Notifications inbox + unread bell badge (top bar)** — marked "Soon". Needs
+  a notifications source; `notificationCount` wiring.
+- **Quick-add "+" (top bar)** — marked "Soon". Define what it adds in Teach
+  context (board? widget? resource?).
+- **Week ▾ / Subject ▾ jumpers (sub bar)** — marked "Soon". Need jumper menus
+  (could reuse the planner week/subject pickers). Decide whether changing them
+  re-scopes the active lesson.
+- **Add-Board ▾ dropdown** — the chevron implies template/phase choice; today
+  Add Board makes a blank "Board N". Needs a board-template picker (ties to
+  `BoardTemplate` in the schema, §11.1) — **plan a "create from template" flow.**
+- **Widget-settings cog (per tile)** — marked "Soon" unless the fix wave lands a
+  minimal editor. Full per-widget config editors (Timer minutes, Objective
+  text, Poll questions, Agenda items, etc.) are a **widget-library phase**
+  (already Phase 3 in §12) — needs per-type editor surfaces.
+- **Arrow-keys-between-cells (spec §7.6)** — deferred with a TODO in
+  `use-teach-shortcuts.ts`. Needs a grid-focus model + an `onMoveCell` callback
+  from TeachWorkspace (the hook has no cell layout today). **Plan the
+  grid-focus model.**
+- **`Cmd+/` layout-switcher popover** — currently cycles layouts (functional
+  fallback). The documented behavior is a switcher popover; needs
+  `onOpenLayoutSwitcher` + the popover surface.
+- **Chat unread badge on the Teach rail/tab/footer (spec §6.2/§7.2)** — the
+  reused Shoutbox has only a Phase-1A stub count; needs a live unread model.
+- **To-do active-lesson auto-tag (spec §6.3)** — `TodayTodos` quick-add is a
+  stub that appends no tag; needs the active-lesson context threaded + the
+  Daily quick-add made real.
+- **Resources custom-tag filter chips (spec §6.1)** — `toTeachResource` hard-
+  codes `tags: []`; needs a resource-tagging source before custom chips render.
+- **URL-less resource "Open in new tab"/"Copy link"** — no-op for hosted files
+  carrying only `resourceId`; needs the `/api/resources/{id}` fallback (ties to
+  the backend wave).
+- **`?board=` deep-link to non-default lessons** — board ids are runtime-minted,
+  so externally-shared `?board=` links don't resolve for lazily-seeded lessons;
+  needs stable board ids (arrives with the Supabase backend, §11).
+- **`lastUsedBoardPerLesson`** — stored but never read; wire restore-last-board
+  when convenient.
+- **Push-to-team Undo** — the consequence toast implies reversibility but there's
+  no snapshot/rollback; either add a snapshot or adjust the copy. **Plan.**
+- **Class module is a full roster editor** (plan §3.1 said "stub") — over-
+  delivery, not a gap; keep, but note the plan/code divergence.
+
+### 16.4 Already-scheduled later phases (unchanged from §12)
+
+- **Phase 2** — floating windows, drag tabs between panels, layout presets,
+  **Pop-Out** (`Cmd+Shift+P`, T11) + **Duplicate** with cross-window sync,
+  pdf.js content-anchored annotation.
+- **Phase 3** — interactive widget library (live timers/stopwatch/countdown,
+  polls, randomizer, dice, editable groups/agenda, whiteboard, scoreboard,
+  per-widget persistence overrides).
+- **Phase 4** — wire `supabase-source.ts`, apply the migration, persist
+  boards/widgets/workspace/annotations through RLS, realtime for team
+  boards/chat.
+
+### 16.5 Process note
+
+The **Codex review gate (§4a)** could not run in this environment (Codex CLI
+not installed). Every logic/security/data change in these waves was instead
+verified with `tsc + lint + build` and a manual diff re-read against the
+review-prompt checklist. **Re-run the Codex gate over the Teach diff before
+merge** — the annotation canvas, embed sandboxing, the repository seam, and the
+sandbox persistence are exactly what it should review.
+
+---
+
+*End of plan. §13 decisions resolved with Tim (2026-05-29). Waves 0–4 +
+hardening + fix wave shipped on PR #1; §16.3 tracks deferred work.*
