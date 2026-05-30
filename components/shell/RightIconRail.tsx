@@ -34,6 +34,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useRailLayout } from "@/lib/use-rail-layout";
 import { RailIcon } from "./rail-icons";
+import { RailAddButton } from "./RailAddButton";
 import styles from "./RightIconRail.module.css";
 
 export function RightIconRail(): ReactNode {
@@ -78,6 +79,16 @@ export function RightIconRail(): ReactNode {
           )}
         </ul>
       </SortableContext>
+
+      {/* ── Bottom-pinned chrome slot ───────────────────────────────────
+            The "+" add-panel button, pinned to the very bottom of the
+            rail. Sits outside the SortableContext — it's plain chrome,
+            not a draggable rail icon. .list carries flex:1 so margin-top:
+            auto on this slot keeps the "+" at the bottom even when icons
+            are present. */}
+      <div className={styles.bottom}>
+        <RailAddButton side="right" />
+      </div>
     </nav>
   );
 }

@@ -1,0 +1,39 @@
+/* RailAddButton.module.css — the "+" add-panel affordance that sits at the
+ * bottom of an icon rail. A DASHED border distinguishes it from the solid
+ * rail buttons so it reads as an "add" slot rather than a feature. All color
+ * via tokens (CLAUDE.md §4); 44x44 keeps it a ≥44px touch target. */
+
+.addButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 1px dashed var(--ink-200);
+  border-radius: var(--r-6);
+  color: var(--ink-400);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+
+.addButton:hover {
+  background: var(--ink-50);
+  color: var(--ink-700);
+  border-color: var(--ink-300);
+}
+
+.addButton:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .addButton {
+    transition: none;
+  }
+}

@@ -58,16 +58,19 @@
   cursor: grabbing;
 }
 
-/* Bottom-pinned slot — the gear. mt:auto pushes it to the bottom of the
-   rail without needing a flex-spacer element. */
+/* Bottom-pinned slot — stacks the settings gear and the "+" add button.
+   mt:auto pushes the whole slot to the bottom of the rail without needing
+   a flex-spacer element; gap keeps a small breath between the two. */
 .bottom {
   margin-top: auto;
   padding-top: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* A short hairline above the gear so the visual separation between the
-     navigation buttons and the settings affordance is unambiguous. */
+  gap: 4px;
+  /* A short hairline above the slot so the visual separation between the
+     navigation buttons and the bottom chrome (settings + add) is
+     unambiguous. */
   border-top: 1px solid var(--ink-100);
   width: calc(100% - 12px);
   align-self: center;

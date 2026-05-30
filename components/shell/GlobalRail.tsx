@@ -54,6 +54,7 @@ import { useRailLayout } from "@/lib/use-rail-layout";
 // from useAppState so the trigger here and the panel share one toggle.
 import { SchedulePanel } from "@/components/schedule";
 import { RailIcon } from "./rail-icons";
+import { RailAddButton } from "./RailAddButton";
 import styles from "./GlobalRail.module.css";
 
 // ── GlobalRail ───────────────────────────────────────────────────────────
@@ -106,18 +107,22 @@ export function GlobalRail(): ReactNode {
               drawer never desync. */}
         <SchedulePanel open={scheduleOpen} onClose={closeSchedulePanel} />
 
-        {/* ── Bottom-pinned settings gear ─────────────────────────────
-              Only renders when the settings id lives on the LEFT rail
-              (its default). When a teacher drags it to the right rail
-              the regular RailIcon path renders it inside the right-rail
-              list. */}
-        {hasSettingsOnLeft && (
-          <div className={styles.bottom} data-context="global">
+        {/* ── Bottom-pinned chrome slot ───────────────────────────────
+              Always renders. Holds the settings gear (only when settings
+              lives on the LEFT rail — its default; dragging it to the
+              right rail routes it through the regular RailIcon path) and,
+              pinned to the very bottom edge, the "+" add-panel button.
+              RailAddButton is plain chrome, not a sortable rail icon, so
+              it sits as a direct child of .bottom — never inside a <ul>
+              / SortableContext items list. */}
+        <div className={styles.bottom} data-context="global">
+          {hasSettingsOnLeft && (
             <ul className={styles.list} role="list" data-rail-pinned="true">
               <RailIcon id="settings" side="left" pathname={pathname ?? null} />
             </ul>
-          </div>
-        )}
+          )}
+          <RailAddButton side="left" />
+        </div>
       </SortableContext>
     </nav>
   );
