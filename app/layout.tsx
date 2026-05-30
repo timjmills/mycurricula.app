@@ -27,11 +27,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      // suppressHydrationWarning is scoped to <html>'s own attributes (it is
+      // non-recursive — it does NOT hide mismatches in the component tree
+      // below). The root element is the node browser extensions (Grammarly,
+      // dark-mode/translation tools) and the ThemeProvider's post-mount dataset
+      // writes mutate before/at hydration, producing a benign attribute diff on
+      // <html>/<body>. This is the standard Next.js theme-provider mitigation.
+      suppressHydrationWarning
       data-style={DEFAULT_STYLE}
       data-palette={DEFAULT_PALETTE}
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
-      <body className="cp-root flex min-h-full flex-col">
+      <body suppressHydrationWarning className="cp-root flex min-h-full flex-col">
         <ThemeProvider>
           {/* LabelsProvider hosts the renameable Subject/Unit/Lesson/Section
               captions. Mounted near the root so every surface — Settings,
