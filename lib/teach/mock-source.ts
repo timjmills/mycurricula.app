@@ -102,13 +102,38 @@ export const mockTeachSource: TeachDataSource = {
   async createBoard(input) {
     const id = nextId("b");
     const now = new Date().toISOString();
+    // Derive ordering authoritatively from the CURRENT sibling set (same
+    // lesson + scope + owner), so two near-simultaneous creates reading a stale
+    // caller-supplied length can't collide on `displayOrderWithinLesson` or the
+    // default "Board N" title. The Supabase impl computes the same from rows.
+    const lesson =
+      input.masterLessonId == null
+        ? null
+        : resolveLessonId(input.masterLessonId);
+    const owner = input.ownerId == null ? null : resolveOwnerId(input.ownerId);
+    const siblings = boards.filter(
+      (b) =>
+        b.masterLessonId === lesson &&
+        b.scope === input.scope &&
+        b.ownerId === owner,
+    );
+    const nextOrder = siblings.reduce(
+      (max, b) => Math.max(max, b.displayOrderWithinLesson + 1),
+      0,
+    );
+    // Re-index a default "Board N" title to the authoritative next slot so two
+    // stale creates don't both produce the same tab label. A custom title is
+    // left untouched.
+    const title = /^Board \d+$/.test(input.title)
+      ? `Board ${nextOrder + 1}`
+      : input.title;
     const board: Board = {
       id,
       masterLessonId: input.masterLessonId,
       ownerId: input.ownerId ?? null,
       scope: input.scope,
-      title: input.title,
-      displayOrderWithinLesson: input.displayOrderWithinLesson,
+      title,
+      displayOrderWithinLesson: nextOrder,
       templateId: input.templateId ?? null,
       gradeLevelId: input.gradeLevelId ?? MOCK_GRADE_LEVEL_ID,
       widgets: (input.widgets ?? []).map((w) => ({ ...w, boardId: id })),
@@ -149,8 +174,20 @@ export const mockTeachSource: TeachDataSource = {
     if (!board) throw new Error(`Board not found: ${widget.boardId}`);
     const idx = board.widgets.findIndex((w) => w.id === widget.id);
     const next: Widget = { ...widget, position: { ...widget.position } };
-    if (idx >= 0) board.widgets[idx] = next;
-    else board.widgets.push(next);
+    if (idx >= 0) {
+      board.widgets[idx] = next;
+    } else {
+      // INSERT: derive `displayOrder` authoritatively from the board's current
+      // widgets, overriding a possibly-stale caller-supplied length so two
+      // near-simultaneous embeds can't collide on the same order. (A replace of
+      // an existing widget keeps its order.) The Supabase impl computes the same
+      // from existing rows.
+      next.displayOrder = board.widgets.reduce(
+        (max, w) => Math.max(max, w.displayOrder + 1),
+        0,
+      );
+      board.widgets.push(next);
+    }
     board.updatedAt = new Date().toISOString();
     return { ...next, position: { ...next.position } };
   },

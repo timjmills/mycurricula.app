@@ -210,8 +210,21 @@ export function useBoardAnnotations(
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
+  // ── Persist gate (declared before the hydrate effect so the hydrate effect
+  // can reset it) ───────────────────────────────────────────────────────────
+  // The persist effect below skips its first run after each (re)hydrate so it
+  // doesn't echo the just-loaded value back to storage / `onChange`. We reset
+  // this on EVERY surface change (not just mount) because switching surface
+  // A→B re-runs HYDRATE, which changes `state.strokes` and would otherwise fire
+  // a spurious persist of B's freshly-hydrated value.
+  const hydratedRef = useRef(false);
+
   // ── Hydrate from storage post-mount (SSR-safe) + on surface change ────────
   useEffect(() => {
+    // Suppress the immediate post-hydrate persist run for THIS surface. The
+    // hydrate effect is declared before the persist effect, so this reset lands
+    // before the persist effect re-runs in the same commit.
+    hydratedRef.current = false;
     const stored = readEntry(subKey);
     dispatch({ type: "HYDRATE", annotations: stored ?? EMPTY_ANNOTATIONS });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,8 +257,8 @@ export function useBoardAnnotations(
   }, []);
 
   // ── Persist on committed-document change (not draft) ──────────────────────
-  // Skip the very first run (hydration) so we don't echo the loaded value back.
-  const hydratedRef = useRef(false);
+  // Skip the first run after each (re)hydrate (see `hydratedRef` above) so we
+  // don't echo the loaded value back to storage / `onChange`.
   useEffect(() => {
     if (!hydratedRef.current) {
       hydratedRef.current = true;
@@ -358,11 +371,16 @@ export function useBoardAnnotations(
   // edge) — generous enough to feel forgiving without erasing distant ink.
   const ERASE_TOL = 0.02;
   const eraseAt = useCallback((point: Pt) => {
+    const box = boxRef.current;
+    // Before the first measure the box is 0×0; `strokeHit` would then divide the
+    // tolerance by `|| 1` and produce a wildly oversized normalized reach that
+    // could erase distant strokes. No measured box → nothing to hit-test yet.
+    if (box.width === 0 || box.height === 0) return;
     dispatch({
       type: "ERASE_AT",
       point,
       tol: ERASE_TOL,
-      box: boxRef.current,
+      box,
     });
   }, []);
 

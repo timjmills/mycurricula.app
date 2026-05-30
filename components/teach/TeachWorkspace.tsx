@@ -303,6 +303,12 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
 
   // ── Load boards for the active lesson ──────────────────────────────────────
   const activeLessonId = state.activeLessonId;
+  // Latest active lesson id, mirrored into a ref so an in-flight async
+  // `reloadBoards` can detect a lesson switch (or sandbox transition →
+  // activeLessonId null) that landed while its fetch was pending, and bail
+  // before writing the OLD lesson's boards into the NEW lesson's state.
+  const activeLessonIdRef = useRef(activeLessonId);
+  activeLessonIdRef.current = activeLessonId;
   useEffect(() => {
     if (activeLessonId == null) {
       setBoards([]);
@@ -323,9 +329,14 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   }, [activeLessonId, ownerId]);
 
   // Re-fetch the active lesson's boards (used after a mutating repo call).
+  // Captures the lesson id at call time and re-checks the live ref before
+  // committing, so a lesson switch / sandbox entry mid-fetch can't write stale
+  // boards into the freshly-selected lesson.
   const reloadBoards = useCallback(async (): Promise<Board[]> => {
-    if (activeLessonId == null) return [];
-    const next = await teach.listBoardsForLesson(activeLessonId, ownerId);
+    const requestedLessonId = activeLessonId;
+    if (requestedLessonId == null) return [];
+    const next = await teach.listBoardsForLesson(requestedLessonId, ownerId);
+    if (activeLessonIdRef.current !== requestedLessonId) return next;
     setBoards(next);
     return next;
   }, [activeLessonId, ownerId]);
@@ -442,23 +453,26 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   // one panel force-collapses the other on small screens. On desktop both may
   // stay open — current behaviour is preserved.
   //
-  // The persisted collapse flag is only toggled via `workspace.toggle*` (which
-  // writes through to localStorage); the FORCED collapse of the OTHER side uses
-  // a direct reducer dispatch so we don't clobber the teacher's desktop
-  // preference — it's a transient small-screen layout override, not a saved
-  // choice. The collapse-sync effect above only re-runs when the PERSISTED
-  // flags change, so this direct dispatch is not overwritten.
+  // The persisted collapse flag is the single source of truth: opening one side
+  // toggles its persisted flag via `workspace.toggle*`, and on a small screen we
+  // ALSO persist the OTHER side's collapse (one-drawer-at-a-time). Persisting
+  // both keeps the central reducer state — which the sync effect above derives
+  // strictly from the persisted flags — consistent with localStorage. A direct
+  // reducer dispatch for the forced-collapse would be clobbered: flipping the
+  // persisted flag re-runs the sync effect, which re-applies BOTH persisted
+  // sides and overwrites a transient dispatch. By persisting the other side
+  // here, the sync effect re-applies a value that already agrees, so no loop.
   const isSmall = viewport.isSmall;
   const openLeftPanel = useCallback((): void => {
     if (state.leftCollapsed) workspace.toggleLeftCollapsed();
     if (isSmall && !state.rightCollapsed) {
-      dispatch({ type: "setRightCollapsed", collapsed: true });
+      workspace.toggleRightCollapsed();
     }
   }, [state.leftCollapsed, state.rightCollapsed, isSmall, workspace]);
   const openRightPanel = useCallback((): void => {
     if (state.rightCollapsed) workspace.toggleRightCollapsed();
     if (isSmall && !state.leftCollapsed) {
-      dispatch({ type: "setLeftCollapsed", collapsed: true });
+      workspace.toggleLeftCollapsed();
     }
   }, [state.rightCollapsed, state.leftCollapsed, isSmall, workspace]);
 
