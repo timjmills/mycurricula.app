@@ -87,3 +87,74 @@
   overflow-y: auto;
   padding: 12px;
 }
+
+/* ── Responsive: panel → overlay drawer / bottom sheet (plan §10 / audit B2) ─
+   Mirror of the left panel's treatment (TeachLeft.module.css), pinned to the
+   RIGHT edge. On desktop the panel is an inline flex column. Below 900px the
+   two fixed-px side panels would squeeze the center to nothing or force
+   document-level horizontal scroll (CLAUDE.md §4 hard rule). So at tablet and
+   phone tiers we lift the panel OUT of the flex flow into a fixed overlay that
+   slides over the board from the right, leaving the center full-width
+   underneath.
+
+   The panel carries an inline `style={{ width }}` (fixed px from the persisted
+   layout); author `!important` overrides it at these tiers. A tap-to-dismiss
+   scrim needs a TSX sibling (documented under "CSS-only limits — needs TSX" in
+   docs/teach-a11y-responsive-notes.md); the right rail icon already toggles
+   collapse, so the drawer stays dismissible without it. */
+
+/* Tablet (≤900px): overlay drawer pinned to the right edge, just left of the
+   64px right rail, sliding over the board. Caps its own width so it never
+   exceeds the viewport. */
+@media (max-width: 900px) {
+  .panel {
+    position: fixed;
+    right: 64px;
+    top: 0;
+    bottom: 0;
+    z-index: 45;
+    width: min(360px, calc(100vw - 64px)) !important;
+    box-shadow: var(--shadow-2, 0 8px 28px rgba(20, 20, 26, 0.22));
+    animation: rightDrawerIn 200ms ease-out;
+  }
+}
+
+/* Phone (≤480px): full-height drawer covering the viewport MINUS the 64px
+   right rail, so the rail icon stays visible and tappable to dismiss the
+   drawer (the only CSS-only close affordance — there is no scrim sibling; see
+   the "CSS-only limits — needs TSX" note in
+   docs/teach-a11y-responsive-notes.md). */
+@media (max-width: 480px) {
+  .panel {
+    right: 64px;
+    width: calc(100vw - 64px) !important;
+    animation: rightDrawerInPhone 220ms ease-out;
+  }
+}
+
+@keyframes rightDrawerIn {
+  from {
+    transform: translateX(12px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes rightDrawerInPhone {
+  from {
+    transform: translateX(105%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Reduced motion: no slide. */
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none !important;
+  }
+}

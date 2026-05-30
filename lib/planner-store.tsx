@@ -38,7 +38,12 @@ import {
 import type { ReactNode } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 
-import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
+import type {
+  Lesson,
+  LessonResource,
+  LessonStatus,
+  SubjectId,
+} from "@/lib/types";
 import type { LessonSectionContent, SectionResource } from "@/lib/lesson-flow";
 import {
   nextInstructionalDay,
@@ -377,22 +382,35 @@ function labelFor(action: PlannerAction): string {
 
 /** Build the initial section content for a lesson.
  *  Uses the default template; falls back to a single blank section if the
- *  template registry is missing or misconfigured. */
-function buildInitialSections(): LessonSectionContent[] {
+ *  template registry is missing or misconfigured. The lesson's own
+ *  `resources` (the fixture lesson-level array) are threaded through so the
+ *  Teach Resources panel + canvas — which read a lesson's resources off its
+ *  sections via `getSections(lessonId)` — see real resources. Lazily-added
+ *  lessons pass no resources and seed empty sections, as before. */
+function buildInitialSections(
+  resources: LessonResource[] = [],
+): LessonSectionContent[] {
   const template = LESSON_TEMPLATE_BY_ID[DEFAULT_LESSON_TEMPLATE_ID];
   if (!template) {
-    return [newLessonSection()];
+    const section = newLessonSection();
+    section.resources = resources.map((r) => ({
+      ...newSectionResource(r.type, r.label),
+      ...r,
+    }));
+    return [section];
   }
-  return instantiateSections(template);
+  return instantiateSections(template, resources);
 }
 
-/** Seed sections for every lesson in the initial fixture. */
+/** Seed sections for every lesson in the initial fixture. Each lesson's
+ *  fixture `resources` flow onto its sections (round-robin) so the Teach
+ *  surface has real resources to render. */
 function seedSections(
   lessons: Lesson[],
 ): Record<string, LessonSectionContent[]> {
   const result: Record<string, LessonSectionContent[]> = {};
   for (const lesson of lessons) {
-    result[lesson.id] = buildInitialSections();
+    result[lesson.id] = buildInitialSections(lesson.resources);
   }
   return result;
 }
@@ -810,10 +828,13 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
 
     case "addSectionResource": {
       const current = ensureSections(doc.sections, action.lessonId);
-      const seed = newSectionResource(action.resource.type, action.resource.label);
+      const seed = newSectionResource(
+        action.resource.type,
+        action.resource.label,
+      );
       const resource: SectionResource = {
-        ...seed,                       // gives us a fresh id
-        ...action.resource,            // caller's fields win — type, label, url, etc.
+        ...seed, // gives us a fresh id
+        ...action.resource, // caller's fields win — type, label, url, etc.
         id: action.resource.id ?? seed.id,
       };
       return {

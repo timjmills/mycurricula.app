@@ -169,6 +169,75 @@
   padding: var(--r-12);
 }
 
+/* ── Responsive: panel → overlay drawer / bottom sheet (plan §10 / audit B2) ─
+   On desktop the panel is an inline flex column. Below 900px two fixed-px
+   panels either side would squeeze the center to nothing or force
+   document-level horizontal scroll (CLAUDE.md §4 hard rule). So at tablet and
+   phone tiers we lift the panel OUT of the flex flow into a fixed overlay that
+   slides over the board, leaving the center full-width underneath.
+
+   The panel carries an inline `style={{ width }}` (fixed px from the persisted
+   layout); author `!important` overrides it at these tiers. A click-scrim +
+   tap-to-dismiss needs a TSX sibling element (documented under "CSS-only
+   limits — needs TSX" in docs/teach-a11y-responsive-notes.md); the rail icon
+   already toggles collapse, so the drawer remains dismissible without it. */
+
+/* Tablet (≤900px): overlay drawer pinned to the left edge, just right of the
+   64px rail, sliding over the board. Caps its own width so it never exceeds
+   the viewport. */
+@media (max-width: 900px) {
+  .panel {
+    position: fixed;
+    left: 64px;
+    top: 0;
+    bottom: 0;
+    z-index: 45;
+    width: min(360px, calc(100vw - 64px)) !important;
+    box-shadow: var(--shadow-2, 0 8px 28px rgba(20, 20, 26, 0.22));
+    animation: leftDrawerIn 200ms ease-out;
+  }
+}
+
+/* Phone (≤480px): full-height drawer covering the viewport MINUS the 64px
+   rail, so the rail icon stays visible and tappable to dismiss the drawer
+   (the only CSS-only close affordance — there is no scrim sibling; see the
+   "CSS-only limits — needs TSX" note in docs/teach-a11y-responsive-notes.md).
+   Acts as the single-column bottom-sheet-equivalent overlay. */
+@media (max-width: 480px) {
+  .panel {
+    left: 64px;
+    width: calc(100vw - 64px) !important;
+    animation: leftDrawerInPhone 220ms ease-out;
+  }
+}
+
+@keyframes leftDrawerIn {
+  from {
+    transform: translateX(-12px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes leftDrawerInPhone {
+  from {
+    transform: translateX(-105%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Reduced motion: no slide. */
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none !important;
+  }
+}
+
 /* ── Generic module section header ───────────────────────────────────────── */
 .sectionHeader {
   display: flex;

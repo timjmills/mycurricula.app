@@ -19,7 +19,7 @@
 // also guards on `collapsed` so it can animate the close.
 
 import { useCallback } from "react";
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
 import type { TeachModuleId } from "@/lib/use-teach-workspace";
@@ -132,6 +132,39 @@ export function TeachRightPanel({
     [activeLessonId, onMagnifyResource, onEmbedResource, week, day],
   );
 
+  // Stable ids wire each tab to its panel (audit A4 — WAI-ARIA tabs need
+  // aria-controls / aria-labelledby + roving tabindex + arrow-key nav).
+  const tabId = (id: TeachModuleId): string => `teach-right-tab-${id}`;
+  const panelId = `teach-right-panel-${effectiveActive ?? "none"}`;
+
+  // Roving tabindex: only the active tab is in the tab sequence; Arrow keys
+  // move selection (and DOM focus) between tabs within the tablist.
+  const visibleTabIds = order.filter((id) => MODULE_META[id]);
+  const handleTabKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
+    if (
+      e.key !== "ArrowRight" &&
+      e.key !== "ArrowLeft" &&
+      e.key !== "ArrowDown" &&
+      e.key !== "ArrowUp"
+    ) {
+      return;
+    }
+    if (visibleTabIds.length === 0) return;
+    e.preventDefault();
+    const currentIndex = Math.max(
+      0,
+      visibleTabIds.indexOf(effectiveActive ?? visibleTabIds[0]),
+    );
+    const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1;
+    const nextIndex =
+      (currentIndex + delta + visibleTabIds.length) % visibleTabIds.length;
+    const nextId = visibleTabIds[nextIndex];
+    onActivateModule(nextId);
+    e.currentTarget
+      .querySelector<HTMLButtonElement>(`[id="${tabId(nextId)}"]`)
+      ?.focus();
+  };
+
   // Collapsed → render nothing (the rail carries the affordance to reopen).
   if (collapsed) return null;
 
@@ -147,7 +180,12 @@ export function TeachRightPanel({
     >
       {/* ── Thin tab header ─────────────────────────────────────────────── */}
       <header className={styles.head}>
-        <div className={styles.tabs} role="tablist" aria-label="Right modules">
+        <div
+          className={styles.tabs}
+          role="tablist"
+          aria-label="Right modules"
+          onKeyDown={handleTabKeyDown}
+        >
           {order.map((id) => {
             const meta = MODULE_META[id];
             if (!meta) return null;
@@ -161,8 +199,13 @@ export function TeachRightPanel({
               >
                 <button
                   type="button"
+                  id={tabId(id)}
                   role="tab"
                   aria-selected={isActive}
+                  aria-controls={isActive ? panelId : undefined}
+                  // Roving tabindex — only the active tab is tab-reachable;
+                  // Arrow keys move between the rest (handled on the tablist).
+                  tabIndex={isActive ? 0 : -1}
                   className={`${styles.tab} ${isActive ? styles.tabActive : ""}`}
                   onClick={() => onActivateModule(id)}
                 >
@@ -188,7 +231,13 @@ export function TeachRightPanel({
       </header>
 
       {/* ── Active module body ──────────────────────────────────────────── */}
-      <div className={styles.body} role="tabpanel">
+      <div
+        className={styles.body}
+        id={panelId}
+        role="tabpanel"
+        aria-labelledby={effectiveActive ? tabId(effectiveActive) : undefined}
+        tabIndex={0}
+      >
         {effectiveActive ? renderBody(effectiveActive) : null}
       </div>
     </motion.section>

@@ -24,6 +24,7 @@ import {
   TeachIcon,
 } from "../widgets";
 import type { WidgetMeta } from "../widgets";
+import { useFocusTrap } from "./useFocusTrap";
 import styles from "./board.module.css";
 
 export interface WidgetPickerProps {
@@ -58,13 +59,16 @@ export function WidgetPicker({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    inputRef.current?.focus();
     function onKey(e: KeyboardEvent): void {
       if (e.key === "Escape") onClose();
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // Trap Tab within the picker and focus the search input on open; focus
+  // restores to the trigger (the empty `+` cell) on close (audit A1).
+  useFocusTrap({ containerRef: scrimRef, initialFocusRef: inputRef });
 
   // Filter + group the catalog by the active search term.
   const grouped = useMemo(() => {

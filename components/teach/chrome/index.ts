@@ -10,7 +10,7 @@
 export { TeachTopBar } from "./TeachTopBar";
 export type { TeachTopBarProps } from "./TeachTopBar";
 
-export { TeachSubBar } from "./TeachSubBar";
+export { TeachSubBar, TEACH_CENTER_PANEL_ID } from "./TeachSubBar";
 export type { TeachSubBarProps } from "./TeachSubBar";
 
 export { TeachFooter } from "./TeachFooter";

@@ -40,6 +40,8 @@ import { useBoardAnnotations } from "@/lib/use-board-annotations";
 import { useTeachShortcuts } from "@/lib/use-teach-shortcuts";
 import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
+import { lessonResources } from "@/lib/lesson-resources";
+import { toTeachResource } from "@/lib/teach/toTeachResource";
 import { ME } from "@/lib/mock/teachers";
 import { teach } from "@/lib/teach/queries";
 import {
@@ -58,6 +60,7 @@ import {
   TeachFooter,
   TeachSubBar,
   TeachTopBar,
+  TEACH_CENTER_PANEL_ID,
   type TeachFooterModule,
 } from "./chrome";
 import { TeachLeftPanel, TeachLeftRail } from "./left";
@@ -185,12 +188,15 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   const [state, dispatch] = useReducer(reducer, props, initState);
   const workspace = useTeachWorkspace();
   const sensors = useDndSensors();
-  const { lessons } = usePlanner();
+  const { lessons, getSections } = usePlanner();
   const { week, selectedDay, currentUser } = useAppState();
 
   const rootRef = useRef<HTMLDivElement>(null);
   const resourceContainerRef = useRef<HTMLDivElement>(null);
   const ownerId = ME.id;
+  // Guards the `?resource=` deep-link auto-open so it fires AT MOST once — after
+  // the teacher closes the canvas (openResource(null)) we must not re-open it.
+  const resourceDeepLinkDone = useRef(false);
 
   // ── Boards for the active lesson (repo-driven, effect-loaded) ──────────────
   const [boards, setBoards] = useState<Board[]>([]);
@@ -269,6 +275,37 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
       dispatch({ type: "selectBoard", boardId: boards[0].id });
     }
   }, [boards, state.activeBoardId]);
+
+  // ── Resource deep-link resolution (?resource=<id>) ─────────────────────────
+  // The server seeds `centerMode: "resource"` from `?resource=`, but the canvas
+  // only renders when an `activeResource` is set. Resolve the id to a real
+  // TeachResource off the active lesson's section resources (the canonical
+  // data path — NO new fetch, plan §11.3) and open it. Match by the resource's
+  // server row id / section id / url; if nothing matches, fall back to the
+  // FIRST available resource so the canvas still demonstrates the annotation
+  // surface. When the lesson has no resources we stay in board mode (the
+  // resource-data agent is separately ensuring section resources exist).
+  const initialResourceId = props.initialResourceId;
+  useEffect(() => {
+    if (resourceDeepLinkDone.current) return;
+    if (!initialResourceId) return;
+    if (activeLessonId == null) return;
+
+    const sections = getSections(activeLessonId);
+    const resources = lessonResources(sections);
+    if (resources.length === 0) return; // no resources yet — stay in board mode
+
+    const match =
+      resources.find(
+        (r) =>
+          r.id === initialResourceId ||
+          r.resourceId === initialResourceId ||
+          r.url === initialResourceId,
+      ) ?? resources[0];
+
+    resourceDeepLinkDone.current = true;
+    dispatch({ type: "openResource", resource: toTeachResource(match) });
+  }, [initialResourceId, activeLessonId, getSections]);
 
   // ── Derived board / widget / subject ──────────────────────────────────────
   const activeBoard: Board | null = useMemo(
@@ -584,7 +621,12 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
           <>
             <header className={styles.topBarSlot}>
               <TeachTopBar
-                gradeLabel="Grade 5"
+                // Multi-grade by design (CLAUDE.md §1): the curriculum/grade
+                // label is FREE TEXT sourced from the signed-in teacher's
+                // context — the same source the shell top-bar uses
+                // (currentUser.curriculumLabel). Never hard-code "Grade 5".
+                // When the label is absent the suffix simply disappears.
+                gradeLabel={currentUser.curriculumLabel}
                 avatarInitials={avatarInitials}
                 teacherName={currentUser.name}
               />
@@ -629,8 +671,18 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
             />
           ) : null}
 
-          {/* Center — board grid OR full-bleed resource canvas */}
-          <main className={styles.center}>
+          {/* Center — board grid OR full-bleed resource canvas. This is the
+              panel the sub-bar board-tab strip controls (audit A4): it carries
+              the shared TEACH_CENTER_PANEL_ID + role="tabpanel", labelled by
+              the active board's tab. */}
+          <main
+            className={styles.center}
+            id={TEACH_CENTER_PANEL_ID}
+            role="tabpanel"
+            aria-labelledby={
+              activeBoard ? `teach-board-tab-${activeBoard.id}` : undefined
+            }
+          >
             {state.centerMode === "resource" && activeResource ? (
               <div ref={resourceContainerRef} className={styles.resourceStage}>
                 <ResourceViewerToolbar

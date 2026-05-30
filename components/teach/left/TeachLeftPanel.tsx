@@ -70,6 +70,10 @@ export interface TeachLeftPanelProps {
 
 // ── A sortable tab ─────────────────────────────────────────────────────────────
 
+// Stable ids so the active tab can label / control the panel body (audit A4).
+const leftTabId = (id: TeachModuleId): string => `teach-left-tab-${id}`;
+const LEFT_PANEL_BODY_ID = "teach-left-panel-body";
+
 function PanelTab({
   moduleId,
   active,
@@ -109,8 +113,6 @@ function PanelTab({
       ]
         .filter(Boolean)
         .join(" ")}
-      role="tab"
-      aria-selected={active}
     >
       <button
         type="button"
@@ -130,6 +132,17 @@ function PanelTab({
         }}
         {...attributes}
         {...listeners}
+        // ARIA tab semantics live on the focusable control (the button), not
+        // the presentational span wrapper (audit A4). These deliberately come
+        // AFTER the dnd-kit `attributes` spread so they override dnd-kit's
+        // default `role="button"` / `tabIndex`. Roving tabindex: only the
+        // active tab is in the tab sequence; Arrow keys move between the rest
+        // (handled on the tablist).
+        id={leftTabId(moduleId)}
+        role="tab"
+        aria-selected={active}
+        aria-controls={active ? LEFT_PANEL_BODY_ID : undefined}
+        tabIndex={active ? 0 : -1}
       >
         <span aria-hidden="true" style={{ display: "inline-flex" }}>
           {moduleIcon(moduleId, 14)}
@@ -248,6 +261,31 @@ export function TeachLeftPanel({
     ? activeModuleId
     : (tabIds[0] ?? null);
 
+  // Roving tabindex + Arrow-key navigation across the module tab strip
+  // (audit A4 — WAI-ARIA tabs expect Left/Right to move between tabs).
+  function handleTabKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    if (
+      e.key !== "ArrowRight" &&
+      e.key !== "ArrowLeft" &&
+      e.key !== "ArrowDown" &&
+      e.key !== "ArrowUp"
+    ) {
+      return;
+    }
+    if (tabIds.length === 0 || effectiveActive == null) return;
+    e.preventDefault();
+    const currentIndex = Math.max(0, tabIds.indexOf(effectiveActive));
+    const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1;
+    const nextIndex = (currentIndex + delta + tabIds.length) % tabIds.length;
+    const nextId = tabIds[nextIndex];
+    onActiveModuleChange(nextId);
+    // Query by id attribute (not `#id`) to avoid the dnd-kit `CSS` import
+    // shadowing the browser `CSS.escape`; module ids are simple known strings.
+    e.currentTarget
+      .querySelector<HTMLButtonElement>(`[id="${leftTabId(nextId)}"]`)
+      ?.focus();
+  }
+
   return (
     <section
       className={styles.panel}
@@ -259,6 +297,7 @@ export function TeachLeftPanel({
         className={styles.tabHeader}
         role="tablist"
         aria-label="Left modules"
+        onKeyDown={handleTabKeyDown}
       >
         <DndContext sensors={sensors} onDragEnd={handleTabReorder}>
           <SortableContext
@@ -278,7 +317,15 @@ export function TeachLeftPanel({
         </DndContext>
       </div>
 
-      <div className={styles.panelBody}>
+      <div
+        className={styles.panelBody}
+        id={LEFT_PANEL_BODY_ID}
+        role="tabpanel"
+        aria-labelledby={
+          effectiveActive ? leftTabId(effectiveActive) : undefined
+        }
+        tabIndex={0}
+      >
         {effectiveActive ? (
           <ModuleBody
             moduleId={effectiveActive}

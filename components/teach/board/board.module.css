@@ -106,6 +106,20 @@
   color: var(--ink-900);
 }
 
+/* Touch devices have no hover, so the hover-revealed widget chrome would be
+   unreachable (audit B4). Surface it persistently and grow the hit area to the
+   44px touch minimum on hover-less pointers. */
+@media (hover: none) {
+  .chrome {
+    opacity: 1;
+  }
+
+  .chromeBtn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
 .dragHandle {
   cursor: grab;
 }
@@ -465,6 +479,51 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* ── Responsive: board-grid caps (plan §10 / audit B1) ───────────────────
+   The grid-template + each child's grid-column/row are set inline from JS
+   (BOARD_LAYOUT_GRID), so the only way to clamp the effective layout in CSS
+   is to override both the container template AND the inline per-child
+   placement with author `!important` rules (author-important beats a
+   non-important inline declaration). We re-flow the children with
+   grid-auto-flow so any authored 2×2 / 3×3 placement collapses cleanly into
+   the capped column count instead of pointing at columns that no longer
+   exist. Children are the bare widget/empty-cell wrapper divs — targeted via
+   the `.grid > *`-equivalent child combinator (`.grid > div`), which keeps a
+   local class in the selector (CSS-module-safe; no bare `*`). */
+
+/* Tablet (≤900px): cap to 2 columns regardless of chosen layout. */
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: none !important;
+    grid-auto-rows: minmax(160px, 1fr) !important;
+    grid-auto-flow: row !important;
+  }
+
+  .grid > div {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    min-height: 160px;
+  }
+}
+
+/* Phone (≤480px): force a single column; widgets stack and stay tappable. */
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-auto-rows: minmax(180px, auto) !important;
+  }
+
+  .grid > div {
+    min-height: 180px;
+  }
+
+  /* Empty add cells keep a comfortable ≥44px touch target when stacked. */
+  .emptyCell {
+    min-height: 120px;
+  }
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────── */

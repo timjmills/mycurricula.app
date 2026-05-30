@@ -18,7 +18,7 @@
 // Pop-Out + Duplicate are Phase 2 (plan §7) — rendered as `FutureControl`
 // "Soon" tiles, never live.
 
-import type { Dispatch, ReactNode } from "react";
+import type { Dispatch, KeyboardEvent, ReactNode } from "react";
 import { useCallback } from "react";
 import type { TeachWorkspaceAction } from "../TeachWorkspace";
 import type { BoardLayout, TeachWorkspaceState } from "@/lib/teach/types";
@@ -59,6 +59,17 @@ const LAYOUT_OPTIONS = (Object.keys(BOARD_LAYOUT_GRID) as BoardLayout[]).map(
     tooltipId: `teach-layout-${key}`,
   }),
 );
+
+/** Id of the center board region — the board-tab strip is a `role="tablist"`
+ *  whose tabs control this panel (audit A4). The center <main> in
+ *  TeachWorkspace carries this id + `role="tabpanel"`. */
+export const TEACH_CENTER_PANEL_ID = "teach-center-board";
+
+/** Per-board tab id so each tab can be `aria-labelledby`-referenced and roving
+ *  tabindex can move DOM focus to a specific tab. */
+function boardTabId(boardId: string): string {
+  return `teach-board-tab-${boardId}`;
+}
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -119,6 +130,36 @@ export function TeachSubBar({
     onToggleFullscreen?.(next);
   }, [state.fullscreen, dispatch, onToggleFullscreen]);
 
+  // Roving tabindex + Arrow-key navigation across the board tab strip
+  // (audit A4 — WAI-ARIA tabs expect Left/Right to move between tabs).
+  const handleBoardTabKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLDivElement>): void => {
+      if (
+        e.key !== "ArrowRight" &&
+        e.key !== "ArrowLeft" &&
+        e.key !== "ArrowDown" &&
+        e.key !== "ArrowUp"
+      ) {
+        return;
+      }
+      if (boards.length === 0) return;
+      e.preventDefault();
+      const currentIndex = Math.max(
+        0,
+        boards.findIndex((b) => b.id === state.activeBoardId),
+      );
+      const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1;
+      const nextIndex = (currentIndex + delta + boards.length) % boards.length;
+      const next = boards[nextIndex];
+      if (!next) return;
+      dispatch({ type: "selectBoard", boardId: next.id });
+      e.currentTarget
+        .querySelector<HTMLButtonElement>(`[id="${boardTabId(next.id)}"]`)
+        ?.focus();
+    },
+    [boards, state.activeBoardId, dispatch],
+  );
+
   return (
     <div className={styles.subBar}>
       {/* Week ▾ */}
@@ -160,6 +201,7 @@ export function TeachSubBar({
         className={`${styles.boardStrip} cp-subj ${subject}`}
         role="tablist"
         aria-label="Lesson boards"
+        onKeyDown={handleBoardTabKeyDown}
       >
         {boards.map((board, i) => {
           const isActive = board.id === state.activeBoardId;
@@ -172,8 +214,13 @@ export function TeachSubBar({
             >
               <button
                 type="button"
+                id={boardTabId(board.id)}
                 role="tab"
                 aria-selected={isActive}
+                aria-controls={isActive ? TEACH_CENTER_PANEL_ID : undefined}
+                // Roving tabindex — only the active board tab is tab-reachable;
+                // Arrow keys move between the rest (handled on the tablist).
+                tabIndex={isActive ? 0 : -1}
                 className={`${styles.boardTab} ${isActive ? styles.boardTabActive : ""}`}
                 onClick={() =>
                   dispatch({ type: "selectBoard", boardId: board.id })

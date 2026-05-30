@@ -250,3 +250,67 @@ Flag for the integration pass.
 4. **A4** (tab `aria-controls` wiring + roving tabindex), **A2** (Present focus),
    **B4** (touch-surface widget chrome), **C** gaps (panel-collapse reduce guard).
 5. **E**, **A3**, **A5**, **A6**, **D3/D4** polish.
+
+---
+
+## CSS-only limits — needs TSX (Wave 3 follow-up)
+
+The Wave-3 RESPONSIVE pass was scoped to `*.module.css` under `components/teach/**`
+only. The board-grid caps (B1) and the panel→overlay-drawer treatment (B2) are now
+done **in CSS** (`board.module.css`, `left/TeachLeft.module.css`,
+`right/TeachRightPanel.module.css`): below 900px both panels are lifted out of the
+flex flow into `position: fixed` overlay drawers (left pinned at `left: 64px`, right
+at `right: 64px`, each capped so the center is never squeezed and the document never
+scrolls sideways); below 480px they become full-height drawers covering the viewport
+**minus the 64px rail** (so the rail icon stays tappable to dismiss). The board grid
+caps to 2 columns ≤900px and 1 column ≤480px via `!important` overrides of the
+inline JS grid template + per-child placement.
+
+The following cannot be completed in CSS alone and must be done by the agent that
+owns `TeachWorkspace.tsx` / the zone TSX:
+
+1. **Default panels collapsed below ~900px (the biggest remaining gap).**
+   `TeachWorkspace.tsx` initialises `leftCollapsed: false, rightCollapsed: false`
+   (`~:167-168`) regardless of viewport, and renders each panel only when its
+   `*Collapsed` flag is false (`~:621, :688`). So on a **first load** at tablet/phone
+   width **both** panels mount at once. The CSS now makes each a fixed overlay
+   (instead of squeezing the center to zero — that breakage is fixed), but two open
+   drawers still overlap: at ≤900px the left (64→424px) and right (capped) drawers
+   can visually collide in the middle, and at ≤480px the second-painted (right) drawer
+   sits over the first. **Needs TSX:** initialise `leftCollapsed`/`rightCollapsed` to
+   `true` when the viewport is below ~900px (a `matchMedia('(max-width: 900px)')`
+   check in the reducer init / a mount effect), and ideally enforce **one panel open
+   at a time** on small screens (opening one collapses the other). Pure CSS cannot
+   read the collapse state or change the default.
+
+2. **Tap-to-dismiss scrim behind an open drawer.** Plan §10 calls for a scrim under
+   the tablet overlay drawer. A scrim is a sibling element that must be conditionally
+   mounted (and wired to dispatch a collapse on click), so it needs a TSX node in the
+   `.body` row. The CSS-only dismiss path today is the rail icon (which toggles
+   collapse) — functional but not a tap-outside-to-close. **Needs TSX:** render a
+   `position: fixed` scrim div behind the panel at ≤900px whose `onClick` collapses
+   the open panel; respect `prefers-reduced-motion` for any fade.
+
+3. **Phone board: 1-up with horizontal swipe between widgets.** The CSS forces the
+   grid to a single column ≤480px (widgets stack and scroll vertically — usable, no
+   horizontal document scroll). Plan §10's *swipe between widgets* (1 widget per
+   screen, paged horizontally) is a gesture/paging behaviour that needs JS (a
+   scroll-snap carousel driven by widget state, or a swipe handler). The CSS
+   vertical-stack is the correct degraded fallback; the swipe carousel is a TSX
+   follow-up.
+
+4. **Rails → bottom tab bar on phone (plan §10).** The plan wants the two 64px side
+   rails to become a single bottom tab bar at phone width. The rails are separate
+   TSX components (`TeachLeftRail` / `TeachRightRail`) rendered as flex children of
+   the body row; collapsing them into one bottom bar is a structural/DOM change, not
+   a restyle. The CSS keeps them as two 64px side rails at all tiers (they fit:
+   64 + center + 64 ≤ 360px, no overflow), which is a usable degrade. **Needs TSX:**
+   conditional bottom-tab-bar layout at ≤480px if the bottom-bar form factor is
+   wanted.
+
+All four are layout/state/gesture concerns that require reading the viewport in JS,
+changing default state, mounting new nodes, or handling gestures — none expressible
+in a CSS module. The CSS shipped in this pass removes the **[H]** contract breakages
+(center no longer collapses to zero; no document-level horizontal scroll at any tier;
+board grid capped; touch targets ≥44px) and provides the best CSS-only approximation
+of the §10 drawers; the items above refine the first-load default + dismiss ergonomics.

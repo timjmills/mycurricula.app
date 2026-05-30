@@ -10,6 +10,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef } from "react";
 import type { SubjectId, Widget } from "@/lib/types";
 import { WidgetBody, widgetMeta, boardTintVar, TeachIcon } from "../widgets";
+import { useFocusTrap } from "./useFocusTrap";
 import styles from "./board.module.css";
 
 export interface FocusModeProps {
@@ -41,10 +42,11 @@ export function FocusMode({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Move focus into the focus card on open for keyboard users.
-  useEffect(() => {
-    cardRef.current?.focus();
-  }, []);
+  // Trap Tab within the dialog and move focus onto the focus card on open;
+  // focus restores to the trigger (the widget's Expand button) on close
+  // (audit A1). The card is the initial target — it's the programmatic
+  // `tabIndex={-1}` focus host so a keyboard user lands inside the overlay.
+  useFocusTrap({ containerRef: scrimRef, initialFocusRef: cardRef });
 
   return (
     <div
