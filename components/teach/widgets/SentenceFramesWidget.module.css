@@ -1,0 +1,40 @@
+/* SentenceFramesWidget.module.css — token-only, em-sized. Default orange/orange.
+   The "blank" is an underlined gap drawn with the accent so the stem reads as a
+   fill-in. */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65em;
+}
+
+.frame {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8em;
+  padding: 0.85em 1em;
+}
+
+.quoteIcon {
+  color: var(--w-accent);
+  display: grid;
+  place-items: center;
+  flex: none;
+  margin-top: 0.05em;
+}
+
+.frameText {
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--w-ink);
+  min-width: 0;
+}
+
+.blank {
+  display: inline-block;
+  width: 3.5em;
+  border-bottom: 0.15em solid var(--w-accent);
+  margin: 0 0.2em;
+  vertical-align: baseline;
+}

@@ -1,0 +1,103 @@
+/* CenterRotationWidget.module.css — token-only, em-sized. Default blue/blue.
+   Two-up center cards that stack to one column on a narrow tile. */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7em;
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7em;
+  padding: 0.85em 1em;
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  min-width: 0;
+}
+
+.icon {
+  color: var(--w-accent);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.name {
+  font-size: 0.95em;
+  font-weight: 800;
+  color: var(--w-ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.tag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3em;
+  padding: 0.2em 0.5em;
+  border-radius: var(--r-pill);
+  font-size: 0.72em;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tagNow {
+  background: var(--tone-blue-bg);
+  color: var(--tone-blue-fg);
+}
+
+.tagNext {
+  background: var(--tone-gray-bg);
+  color: var(--tone-gray-fg);
+}
+
+.group {
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--w-ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupMuted {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--w-ink);
+  opacity: 0.7;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 30em) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
