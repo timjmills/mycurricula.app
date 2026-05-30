@@ -13,8 +13,6 @@ export type { ButtonProps } from "./Button";
 export { ToggleGroup } from "./ToggleGroup";
 export type { ToggleGroupProps, ToggleOption } from "./ToggleGroup";
 
-export { ViewModeToggle } from "./ViewModeToggle";
-
 export { Card } from "./Card";
 export type { CardProps } from "./Card";
 
