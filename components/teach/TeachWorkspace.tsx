@@ -56,7 +56,15 @@ import {
   type TeachDragData,
   type TeachWorkspaceState,
 } from "@/lib/teach/types";
-import type { Board, SubjectId, TeachResource, Widget } from "@/lib/types";
+import type {
+  Board,
+  BoardPage,
+  CanvasPosition,
+  SubjectId,
+  TeachResource,
+  Widget,
+  WidgetType,
+} from "@/lib/types";
 
 import {
   PresentBar,
@@ -75,6 +83,13 @@ import {
   BoardSettingsPopover,
   WidgetSettingsPopover,
 } from "./board";
+import {
+  BoardEditor,
+  type BoardEditorIntent,
+  type ResourceItem,
+} from "./board/editor";
+import { BoardFullscreen } from "./board/fullscreen";
+import { widgetMeta } from "@/components/teach/widgets";
 import { BoardCanvasResource, ResourceViewerToolbar } from "./canvas";
 import {
   AnnotationLayer,
@@ -223,6 +238,12 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
 
   // ── Boards for the active lesson (repo-driven, effect-loaded) ──────────────
   const [boards, setBoards] = useState<Board[]>([]);
+  // Free-form pages of the active board (5.31). A board with no explicit pages
+  // yields a single implicit page built from its flat widgets (repo contract).
+  // `activePageId` is a view concern local to the workspace — kept here rather
+  // than in the frozen reducer state.
+  const [pages, setPages] = useState<BoardPage[]>([]);
+  const [activePageId, setActivePageId] = useState<string | null>(null);
   // Local widget-picker target (the board calls onAddWidget; this file owns the
   // picker mount because TeachingBoard renders only the cells, not the picker).
   const [pickerTarget, setPickerTarget] = useState<BoardCellTarget | null>(
@@ -432,6 +453,51 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     [lessons, activeLessonId],
   );
 
+  // ── Pages of the active board (free-form canvas, 5.31) ─────────────────────
+  // Re-derived whenever the active board's identity OR its widget set changes
+  // (a mutating repo call swaps in a fresh Board object via reloadBoards), so
+  // the editor/fullscreen always render the committed widget geometry.
+  const activeBoardId = state.activeBoardId;
+  const reloadPages = useCallback(async (): Promise<BoardPage[]> => {
+    if (!activeBoard) {
+      setPages([]);
+      return [];
+    }
+    const next = await teach.listPages(activeBoard.id);
+    setPages(next);
+    return next;
+  }, [activeBoard]);
+  useEffect(() => {
+    void reloadPages();
+  }, [reloadPages]);
+  // Keep the active page valid: default to the first page, and recover if the
+  // current selection vanished (page delete) or the board switched.
+  useEffect(() => {
+    if (pages.length === 0) {
+      if (activePageId !== null) setActivePageId(null);
+      return;
+    }
+    if (!activePageId || !pages.some((p) => p.id === activePageId)) {
+      setActivePageId(pages[0].id);
+    }
+  }, [pages, activePageId]);
+  // Reset the page selection when the board changes so the first page of the
+  // new board is chosen by the effect above.
+  useEffect(() => {
+    setActivePageId(null);
+  }, [activeBoardId]);
+
+  // Real lesson resources for the editor's resource picker/drop (maps the
+  // section resources to the editor's lightweight {id,title,kind} shape).
+  const editorResources = useMemo<ResourceItem[]>(() => {
+    if (activeLessonId == null) return [];
+    return lessonResources(getSections(activeLessonId)).map((r) => ({
+      id: r.id,
+      title: r.label,
+      kind: r.type,
+    }));
+  }, [activeLessonId, getSections]);
+
   const boardIndex = activeBoard
     ? Math.max(
         0,
@@ -609,6 +675,151 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     setSettingsWidget(widget);
   }, []);
 
+  // ── Free-form editor intent → repo (5.31) ──────────────────────────────────
+  // The BoardEditor emits a single typed intent per mutation; we map each to the
+  // TeachDataSource and refresh boards + pages so the committed geometry flows
+  // back through props. Geometry/appearance intents carry their page id.
+  const newWidgetId = useCallback(
+    (kind: string) =>
+      `w-${kind}-${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+    [],
+  );
+  const buildWidget = useCallback(
+    (
+      boardId: string,
+      type: WidgetType,
+      title: string,
+      canvas: CanvasPosition,
+      config: Record<string, unknown> = {},
+    ): Widget => ({
+      id: newWidgetId(type),
+      boardId,
+      type,
+      title,
+      // Legacy grid position is retained on the model; the canvas drives layout.
+      position: { col: 0, row: 0, colSpan: 1, rowSpan: 1 },
+      canvas,
+      displayOrder: pages.reduce((n, p) => n + p.widgets.length, 0),
+      pinned: false,
+      config,
+      state: {},
+      persistence: "inherit",
+      gradeLevelId: activeBoard?.gradeLevelId ?? "g5",
+    }),
+    [newWidgetId, pages, activeBoard],
+  );
+  const handleEditorIntent = useCallback(
+    (intent: BoardEditorIntent): void => {
+      const board = activeBoard;
+      if (!board) return;
+      void (async () => {
+        switch (intent.type) {
+          case "selectPage":
+            setActivePageId(intent.pageId);
+            return;
+          case "addPage": {
+            const page = await teach.addPage(board.id);
+            await reloadPages();
+            setActivePageId(page.id);
+            return;
+          }
+          case "addWidget": {
+            const meta = widgetMeta(intent.widgetType);
+            const widget = buildWidget(
+              board.id,
+              intent.widgetType,
+              meta?.label ?? intent.widgetType,
+              intent.canvas,
+            );
+            await teach.upsertWidgetOnPage(board.id, intent.pageId, widget);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          }
+          case "addResource": {
+            const widget = buildWidget(
+              board.id,
+              "resource",
+              intent.resource.title,
+              intent.canvas,
+              { label: intent.resource.title, kind: intent.resource.kind },
+            );
+            await teach.upsertWidgetOnPage(board.id, intent.pageId, widget);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          }
+          case "moveWidget":
+            await teach.moveWidget(intent.widgetId, intent.x, intent.y);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          case "resizeWidget":
+            await teach.resizeWidget(intent.widgetId, intent.w);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          case "duplicateWidget": {
+            const src = pages
+              .find((p) => p.id === intent.pageId)
+              ?.widgets.find((w) => w.id === intent.widgetId);
+            if (!src) return;
+            const base = src.canvas ?? { x: 24, y: 24, w: 300 };
+            const copy: Widget = {
+              ...src,
+              id: newWidgetId(src.type),
+              canvas: { x: base.x + 24, y: base.y + 24, w: base.w },
+            };
+            await teach.upsertWidgetOnPage(board.id, intent.pageId, copy);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          }
+          case "deleteWidget":
+            await teach.deleteWidget(intent.widgetId);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          case "setWidgetAppearance":
+            await teach.setWidgetAppearance(intent.widgetId, intent.appearance);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          case "resetWidgetAppearance":
+            await teach.setWidgetAppearance(intent.widgetId, {});
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          case "setBoardTheme":
+            await teach.setBoardTheme(board.id, intent.theme);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          case "clearAllWidgetAppearance": {
+            const all = pages.flatMap((p) => p.widgets);
+            await Promise.all(
+              all.map((w) => teach.setWidgetAppearance(w.id, {})),
+            );
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          }
+          case "present":
+            dispatch({ type: "setPresent", present: true });
+            return;
+          case "share":
+            await teach.publishBoardToTeamLibrary(board.id, ownerId);
+            await reloadBoards();
+            return;
+          case "back":
+            setLeftActiveModule("boards");
+            openLeftPanel();
+            return;
+        }
+      })();
+    },
+    [
+      activeBoard,
+      pages,
+      buildWidget,
+      newWidgetId,
+      reloadBoards,
+      reloadPages,
+      ownerId,
+      openLeftPanel,
+    ],
+  );
+
   // ── Embed a resource onto the active board (explicit T8 path) ──────────────
   const embedResourceAtCell = useCallback(
     async (resource: TeachResource, target: BoardCellTarget): Promise<void> => {
@@ -777,6 +988,33 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
 
   const avatarInitials = currentUser.initials || ME.initials;
   const subjClass = subject ? `cp-subj ${subject}` : undefined;
+  // The page to render — the selection, or the first page while the sync effect
+  // catches up (avoids a one-frame fallback flash on board load/switch).
+  const resolvedPageId = activePageId ?? pages[0]?.id ?? null;
+
+  // ── Present mode → full-bleed Board Fullscreen takeover (5.31 §5) ───────────
+  // When presenting, the whole shell is replaced by the projected board. Exit
+  // returns to the editor. Guarded on a real board + resolved page.
+  if (state.present && activeBoard && resolvedPageId) {
+    return (
+      <BoardFullscreen
+        board={activeBoard}
+        pages={pages}
+        activePageId={resolvedPageId}
+        subjectId={subject}
+        onExit={() => dispatch({ type: "setPresent", present: false })}
+        onSelectPage={(id) => setActivePageId(id)}
+        onAddWidget={(type) =>
+          handleEditorIntent({
+            type: "addWidget",
+            pageId: resolvedPageId,
+            widgetType: type,
+            canvas: { x: 96, y: 96, w: 320 },
+          })
+        }
+      />
+    );
+  }
 
   return (
     <DndContext
@@ -933,6 +1171,15 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                   onWidthChange={setStrokeWidth}
                 />
               </div>
+            ) : activeBoard && resolvedPageId ? (
+              <BoardEditor
+                board={activeBoard}
+                pages={pages}
+                activePageId={resolvedPageId}
+                onChange={handleEditorIntent}
+                subjectId={subject}
+                resources={editorResources}
+              />
             ) : (
               <TeachingBoard
                 state={state}
