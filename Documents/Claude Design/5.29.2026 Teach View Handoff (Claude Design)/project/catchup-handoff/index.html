@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Catch-up — Claude Code preview</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="tokens.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html,body{margin:0;padding:0;height:100%;font-family:"Geist",system-ui,-apple-system,sans-serif;color:#14141a;background:#f6f7f9}
+  .page{max-width:1480px;margin:0 auto;padding:24px}
+  .ab-card{background:#fff;border:1px solid #e6e8ed;border-radius:10px;overflow:hidden;margin-bottom:18px;box-shadow:0 1px 2px rgba(20,22,32,.04)}
+  .ab-header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #eef0f4;background:#fafbfc;font-size:12px;color:#5b5e69}
+  .ab-header .num{font-family:"Geist Mono",ui-monospace,monospace;color:#8a8d99;font-size:11px;font-weight:500}
+  .ab-header .title{color:#14141a;font-weight:600;font-size:14px}
+  .ab-header .desc{flex:1;color:#5b5e69;font-size:11.5px;text-wrap:pretty}
+  .ab-frame{position:relative;width:100%;background:#fff;overflow:hidden}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="shared.jsx"></script>
+<script type="text/babel" src="artboards-new.jsx"></script>
+<script type="text/babel" src="artboards-extras.jsx"></script>
+<script type="text/babel" src="artboards-tasklist.jsx"></script>
+<script type="text/babel" src="artboards-simple.jsx"></script>
+<script type="text/babel" data-presets="react">
+function Artboard({ num, title, desc, h = 820, children }) {
+  return (
+    <div className="ab-card">
+      <div className="ab-header">
+        {num && <span className="num">{num}</span>}
+        <span className="title">{title}</span>
+        {desc && <span className="desc">— {desc}</span>}
+      </div>
+      <div className="ab-frame" style={{ height: h }}>{children}</div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div className="page">
+      <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 18px" }}>Catch-up — three layers + Simple variant</h1>
+      <Artboard num="C1" title="Catch-up filter — three layers (Off → Menu → On)" h={780}>
+        <window.ABCatchupFlow />
+      </Artboard>
+      <Artboard num="C2" title="Catch-up screen (§5.17) — full triage view" desc="Scope chips · status filter · bulk actions · carry-over picker · per-row 'Add a note'." h={840}>
+        <window.ABCatchupScreen />
+      </Artboard>
+      <Artboard num="C3" title="Catch-up — Task view (Missed scope)" desc="Same items as a flat checklist." h={840}>
+        <window.ABTaskListViews />
+      </Artboard>
+      <Artboard num="C4" title="Simple Catch-up" desc="Low-floor variant. Single 'Decide what to do' button per row → 4 plain-English choices including Skip for now and Add a note." h={820}>
+        <window.ABSimpleCatchup />
+      </Artboard>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

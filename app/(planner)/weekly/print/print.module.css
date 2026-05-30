@@ -108,9 +108,12 @@
     margin: 0;
   }
 
+  /* W5 print fidelity — A4 default page size (Qatar standard, where the
+     first beta school operates). Landscape gives the subject × day
+     matrix room to breathe without a horizontal scale-down. */
   @page {
-    size: landscape;
-    margin: 14mm 12mm;
+    size: A4 landscape;
+    margin: 12mm 14mm;
   }
 }
 

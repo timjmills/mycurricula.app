@@ -103,10 +103,12 @@
     margin: 0;
   }
 
-  /* Landscape per audit M4 recommendation — gives 4-5 week columns room
-     to breathe at ≥10pt typography. */
+  /* A4 landscape per audit M4 recommendation — the year matrix is wide
+     (4-5 week columns × 8 subjects), so landscape gives the columns room
+     to breathe at ≥10pt typography. A4 matches the Qatar/A4 fidelity
+     standard used by /weekly/print. */
   @page {
-    size: landscape;
+    size: A4 landscape;
     margin: 0.5in;
   }
 }

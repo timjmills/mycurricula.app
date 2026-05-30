@@ -67,6 +67,150 @@ body:has([data-print-view]) [role="complementary"] {
   }
 }
 
+/* ── W5: Black-and-white print pattern fallback ────────────────────────
+ * When a teacher prints to a B&W laser printer (the school-office default),
+ * the subject-color stripe collapses to indistinguishable gray and lessons
+ * across subjects start to look identical. To preserve subject identity on
+ * paper we overlay a SHAPE pattern on the stripe — eight distinct hatch
+ * patterns, one per canonical subject. The patterns paint in pure
+ * `var(--ink-900)` (near-black) so they survive any B&W printer driver's
+ * color-to-gray conversion at 600dpi.
+ *
+ * Architecture:
+ *   - Each `.cp-subj.<id>` declares a `--subject-pattern` custom property
+ *     (a CSS image, typically `repeating-linear-gradient(...)`).
+ *   - The print pages mark each stripe element with `myc-print-stripe`
+ *     and wrap an ancestor in `.cp-subj <subject>` so the pattern cascades
+ *     down. The non-print stripe styling (subject color background) is
+ *     declared inline in the print page components and remains untouched
+ *     on screen; we only paint the pattern in `@media print`.
+ *   - Pattern stripe widens to 6px in print so the hatch is readable. The
+ *     screen stripe stays 3px for a clean preview.
+ *
+ * Patterns are calibrated for 600dpi laser:
+ *   - line thickness ≥ 1.5px so it doesn't collapse to half-tone gray
+ *   - period ≥ 4px so adjacent lines don't fuse into a solid block
+ *   - the eight subjects pick distinct line angles, dash patterns, and
+ *     densities so two subjects never look alike at low contrast.
+ *
+ * `print-color-adjust: exact` forces the browser to keep backgrounds
+ * during print (Chromium/Edge/Safari respect it; Firefox honors the
+ * legacy `-webkit-print-color-adjust` alias which we also set).
+ */
+@media print {
+  /* Pattern definitions keyed by subject. Tokens only — ink-900 is the
+     pattern ink, paper is the void between lines so the underlying
+     colored stripe shows through on color printers. */
+  .cp-subj.math {
+    /* Diagonal / forward-slash hatch — the most common subject gets the
+       canonical "math-grid" diagonal. */
+    --subject-pattern: repeating-linear-gradient(
+      45deg,
+      var(--ink-900) 0 1.5px,
+      transparent 1.5px 5px
+    );
+  }
+  .cp-subj.reading {
+    /* Diagonal \ backslash — mirrors math so the two literacy-adjacent
+       subjects are immediately distinguishable. */
+    --subject-pattern: repeating-linear-gradient(
+      135deg,
+      var(--ink-900) 0 1.5px,
+      transparent 1.5px 5px
+    );
+  }
+  .cp-subj.writing {
+    /* Vertical lines — a different axis class from math/reading. */
+    --subject-pattern: repeating-linear-gradient(
+      90deg,
+      var(--ink-900) 0 1.5px,
+      transparent 1.5px 4px
+    );
+  }
+  .cp-subj.grammar {
+    /* Horizontal rules — paired axis to writing's verticals. */
+    --subject-pattern: repeating-linear-gradient(
+      0deg,
+      var(--ink-900) 0 1.5px,
+      transparent 1.5px 4px
+    );
+  }
+  .cp-subj.spelling {
+    /* Cross-hatch (two 45° gradients composed) — denser, very distinct
+       from the single-axis hatches above. */
+    --subject-pattern:
+      repeating-linear-gradient(
+        45deg,
+        var(--ink-900) 0 1px,
+        transparent 1px 5px
+      ),
+      repeating-linear-gradient(
+        135deg,
+        var(--ink-900) 0 1px,
+        transparent 1px 5px
+      );
+  }
+  .cp-subj.ufli {
+    /* Dashed diagonal — broken-up pattern, visually distinct from math's
+       continuous diagonal. */
+    --subject-pattern: repeating-linear-gradient(
+      45deg,
+      var(--ink-900) 0 2px,
+      transparent 2px 4px,
+      var(--ink-900) 4px 5px,
+      transparent 5px 9px
+    );
+  }
+  .cp-subj.explorers {
+    /* Thick diagonal bars — bold, low-frequency. The lemon/amber subject
+       reads as the "warm-bright" identity on paper. */
+    --subject-pattern: repeating-linear-gradient(
+      45deg,
+      var(--ink-900) 0 2.5px,
+      transparent 2.5px 7px
+    );
+  }
+  .cp-subj.sel {
+    /* Sparse horizontal dashes — quietest pattern for the least frequent
+       subject; reads as "neutral / supplementary" on paper. */
+    --subject-pattern: repeating-linear-gradient(
+      0deg,
+      var(--ink-900) 0 1px,
+      transparent 1px 6px
+    );
+  }
+
+  /* The stripe element on every print page. In screen mode this class is
+     a no-op (the screen stripe is styled by the print module). In print
+     mode it widens the stripe and overlays the subject pattern via a
+     ::after pseudo-element. We deliberately do NOT touch the element's own
+     `background` — the print pages set that inline (solid subject color for
+     normal stripes, a dashed gradient for *modified* lessons/units, which
+     is the three-tier "modified" cue from CLAUDE.md §2). Painting the hatch
+     with `background-image: … !important` here would clobber that inline
+     value and erase the modified cue on paper, so the hatch lives on the
+     pseudo-element instead: the element keeps its color/dash, the overlay
+     adds subject identity. Color printers see both layers; B&W printers
+     still get the distinguishing hatch. */
+  .myc-print-stripe {
+    width: 6px !important;
+    position: relative;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .myc-print-stripe::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--subject-pattern);
+    background-repeat: repeat;
+    background-size: auto;
+    pointer-events: none;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
 /* ── W2-B1 inline edit cue ─────────────────────────────────────────────
    A subtle ring + faint tint applied to lesson-card editable surfaces
    while editMode === "master", so a teacher sees that the field they're

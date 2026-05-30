@@ -56,6 +56,48 @@ export const WEEKDAY_INDEX: Readonly<Record<Weekday, number>> = {
   sat: 6,
 };
 
+// ── Weekday display labels ────────────────────────────────────────────────
+//
+// Token-keyed labels for the seven weekdays. Consumers should look up by
+// token (`WEEKDAY_LABEL[WEEKDAY_ORDER[i]]`) rather than indexing the
+// legacy `WEEK_DAYS[i]` / `WEEK_DAYS_SHORT[i]` arrays in `lib/mock`, which
+// were locked to the Sun–Thu beta week and broke whenever a school chose
+// a different week (e.g. Mon–Fri).
+//
+// These maps cover all seven days unconditionally — the configured school
+// week (via `useSchoolWeek()`) decides which days are rendered; the label
+// map just provides the display string for whatever token the consumer
+// already resolved.
+
+/**
+ * Short (3-letter) labels for a compact header / pill / chip context.
+ * Indexed by Weekday token so labels follow the configured school week
+ * rather than position in the legacy Sun-first array.
+ */
+export const WEEKDAY_LABEL: Readonly<Record<Weekday, string>> = {
+  sun: "Sun",
+  mon: "Mon",
+  tue: "Tue",
+  wed: "Wed",
+  thu: "Thu",
+  fri: "Fri",
+  sat: "Sat",
+};
+
+/**
+ * Full weekday names for headings, breadcrumbs, and accessible labels.
+ * Same lookup pattern as WEEKDAY_LABEL.
+ */
+export const WEEKDAY_LABEL_LONG: Readonly<Record<Weekday, string>> = {
+  sun: "Sunday",
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+};
+
 /**
  * Default school week — matches the beta Qatar school (Sun–Thu) and
  * the existing mock fixtures. Treat this as sample data, not a
