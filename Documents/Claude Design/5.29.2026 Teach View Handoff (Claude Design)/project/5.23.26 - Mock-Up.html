@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>5.23.26 — Mock-Up v2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="tokens.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html,body{margin:0;padding:0;height:100%;font-family:var(--body, "Geist", system-ui, -apple-system, sans-serif);color:var(--ink-900);background:#F6F7F9}
+  #root{min-height:100%}
+  .page{max-width:1480px;margin:0 auto;padding:24px}
+  .pagetitle{display:flex;align-items:baseline;gap:14px;margin-bottom:22px}
+  .pagetitle h1{margin:0;font-size:28px;font-weight:700;color:#0B181E;letter-spacing:-0.5px}
+  .pagetitle .sub{font-size:13px;color:#64748B}
+  .pageintro{background:#fff;border:1px solid #E6E8ED;border-radius:12px;padding:18px 22px;margin-bottom:18px}
+  .pageintro h2{margin:0 0 6px;font-size:18px;font-weight:700;color:#0B181E;letter-spacing:-0.3px}
+  .pageintro p{margin:0;font-size:13.5px;color:#475569;line-height:1.6;text-wrap:pretty}
+  .ab-card{background:#fff;border:1px solid #E6E8ED;border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(20,22,32,.04),0 1px 3px rgba(20,22,32,.04);margin-bottom:18px}
+  .ab-header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #EEF0F4;background:#FAFBFC;font-size:12px;color:#5B5E69}
+  .ab-header .num{font-family:"Geist Mono", ui-monospace, monospace;color:#8A8D99;font-size:11px;font-weight:500}
+  .ab-header .title{color:#14141A;font-weight:600;font-size:14px;letter-spacing:-0.1px}
+  .ab-header .desc{flex:1;color:#5B5E69;font-size:11.5px;text-wrap:pretty}
+  .ab-frame{position:relative;width:100%;background:#fff;overflow:hidden}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="shared.jsx"></script>
+<script type="text/babel" src="artboards-mock523.jsx"></script>
+<script type="text/babel" src="mock523-v2.jsx"></script>
+<script type="text/babel" src="mock523-roadmap.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function Artboard({ num, title, desc, h = 900, children }) {
+  return (
+    <div className="ab-card">
+      <div className="ab-header">
+        {num && <span className="num">{num}</span>}
+        <span className="title">{title}</span>
+        {desc && <span className="desc">— {desc}</span>}
+      </div>
+      <div className="ab-frame" style={{ height: h }}>{children}</div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div className="page">
+      <div className="pagetitle">
+        <h1>5.23.26 — Mock-Up v2</h1>
+        <span className="sub">Live-build snapshot · subject timeline · highlight list views</span>
+      </div>
+      <div className="pageintro">
+        <h2>What's on this page</h2>
+        <p>
+          A focused iteration off the 4.10.26 reference build. The <strong>Subject page</strong> is rebuilt around a colorful <strong>Unit Timeline</strong> (months across the top, periods stacked, subject-tinted unit bars) plus <strong>Unit Health</strong> cards that surface coverage %, standards covered, skipped lessons, and a "Don't miss" callout for each unit. The original Resources-by-type sort is kept and lives at the bottom of the page so it's still reachable.<br/><br/>
+          Below the Subject page are three <strong>list-view variants</strong> for Weekly, Daily, and Subject — all using the highlight-palette aesthetic from the live Weekly view. Same row anatomy across all three so the visual rhythm carries between pages.
+        </p>
+      </div>
+
+      <Artboard num="R1" title="Curriculum Roadmap — Zoomed-out + Zoomed-in (with toggle)" desc="Marker / highlighter brush-stroke unit bars on a clean white grid. Tab toggle at the top switches between the two modes. Zoomed-out gives Month × Lane with date / weeks / lesson chips inside each brush. Zoomed-in gives Week × Lane with status pills, per-lesson dot rows, and checkpoint flags between units." h={1620}>
+        <window.ABRoadmap />
+      </Artboard>
+
+      <Artboard num="S1" title="Subject (Math) — Unit Health + Lessons + Resources" desc="Stat strip, per-unit Health cards with coverage / standards / skipped / Don't-miss callout, current-unit lesson list, and Resources sort. The year-level Curriculum Roadmap is the R1 artboard above." h={1500}>
+        <window.ABSubjectV2 />
+      </Artboard>
+
+      <Artboard num="L1" title="Weekly — list view (highlight palette)" desc="Same Week 12 data, listed by day. Each row carries a subject monogram + time + title + preview + CCSS + resource count. Modified rows get a dashed left edge." h={1200}>
+        <window.ABWeeklyList />
+      </Artboard>
+
+      <Artboard num="L2" title="Daily — list view (highlight palette)" desc="Sunday's lessons as a single-column list. Same row anatomy as the weekly list for visual continuity." h={760}>
+        <window.ABDailyList />
+      </Artboard>
+
+      <Artboard num="L3" title="Subject (Math) — list view (highlight palette)" desc="Every lesson in the current Math unit as a list. Drill from here into the lesson detail." h={820}>
+        <window.ABSubjectList />
+      </Artboard>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

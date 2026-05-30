@@ -133,7 +133,11 @@ export default function WeeklyPrintPage(): ReactNode {
                 const subj = SUBJECT_BY_ID[subjectId];
                 const color = resolveSubjectColor(subjectId, "normal");
                 return (
-                  <tr key={subjectId}>
+                  // `cp-subj <id>` on the row anchors the @media print
+                  // pattern-fallback cascade in globals.css — every stripe
+                  // descendant marked `myc-print-stripe` picks up the
+                  // per-subject hatch on B&W laser output.
+                  <tr key={subjectId} className={`cp-subj ${subj.cls}`}>
                     {/* Subject stub */}
                     <th
                       scope="row"
@@ -155,9 +159,13 @@ export default function WeeklyPrintPage(): ReactNode {
                               return (
                                 <div key={l.id} className={styles.lessonEntry}>
                                   <div className={styles.lessonStripe}>
-                                    {/* Subject stripe — dashed when modified */}
+                                    {/* Subject stripe — dashed when modified.
+                                        `myc-print-stripe` is the global hook
+                                        that overlays the subject's B&W hatch
+                                        pattern under @media print (see
+                                        globals.css W5 print fallback). */}
                                     <span
-                                      className={styles.stripe}
+                                      className={`${styles.stripe} myc-print-stripe`}
                                       aria-hidden="true"
                                       style={
                                         l.modified

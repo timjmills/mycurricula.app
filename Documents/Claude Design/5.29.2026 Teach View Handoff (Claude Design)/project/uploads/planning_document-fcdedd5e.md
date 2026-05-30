@@ -1,0 +1,3101 @@
+# Grade 5 Curriculum Planner — Planning Document
+
+> **Audience:** This document is written to serve BOTH Claude Design (for prototyping the UI and visual components) AND Claude Code (for building the production application). Sections are tagged where they primarily serve one audience or the other.
+>
+> **Status:** Draft v1.0 — derived from the conversation record dated this session. Open questions are listed in §10 and should be resolved before Phase 1 build kickoff.
+
+---
+
+## Table of Contents
+
+1. Product Overview
+2. User & Use Cases
+3. Information Architecture
+4. Data Model
+5. Screen-by-Screen Specifications
+6. Visual Design System
+7. Technical Architecture
+8. Phased Roadmap
+9. Acceptance Criteria
+10. Open Questions
+11. Glossary
+
+---
+
+## 1. Product Overview
+
+### 1.1 Purpose
+
+A single-page web application that consolidates the Grade 5 teaching team's five separate planning documents into one unified, filterable, editable curriculum operating system. Replaces:
+
+- Padlet resource boards (one per unit per subject)
+- Week-by-week lesson planning document
+- Weekly focus document
+- CCSS standards document
+- Per-teacher personal copies of the above
+
+**Multi-grade ready by design.** The app launches with Grade 5 as the only active grade level, but the data model and UI support additional grade levels being enabled at any time without re-architecture. Each grade has its own teaching team, master plan, units, standards, and lead teachers.
+
+### 1.2 Core principles
+
+- **Single source of truth.** One master plan; teachers fork personal copies as needed.
+- **Personal-first viewing.** A teacher always sees their version where one exists; master appears as fallback.
+- **Friction where it matters.** Editing the master is intentional and explicit. Editing personal is invisible and automatic.
+- **Each UI surface has one clear job.** Modes and toggles change the *content* of a surface, not its purpose. Filtering and management live in dedicated surfaces (slide-outs, settings), not in primary view panes.
+- **Filter everywhere.** Every view supports filtering by subject, unit, time period, completion status, and standards.
+- **Color-driven recognition.** Subjects and units are visually unmistakable at a glance.
+- **Print and paper friendly.** Daily, weekly, and unit views all have clean print templates.
+- **Reusable year-over-year.** Plans archive and roll forward with minimal manual rebuilding.
+
+### 1.3 Out of scope (v1)
+
+- Student-facing portal (this is teacher-only)
+- Parent communication
+- Grading or gradebook integration
+- Attendance tracking
+- File hosting for **lesson resources** (Phase 2) — note: small generated PDF/Excel files from the Export Center are stored from Phase 1.
+- PDF / image annotation (Phase 3)
+- Auto-tagging of standards (Phase 2+)
+- Vertical CCSS alignment across grade levels (Phase 3+)
+- Bilingual exports (Phase 2 if MOEHE templates require it)
+- Custom branded PDF templates (Phase 2 — Phase 1 ships with one clean default template)
+
+---
+
+## 2. User & Use Cases
+
+### 2.1 Primary users
+
+**Grade 5 teaching team** — small group (estimated 4–6 teachers) at a single school in Qatar. All teach the same grade level. Some lessons are taught in lockstep across all classes; others are paced individually per class.
+
+### 2.2 Authentication scope
+
+- Google SSO via the school's Google Workspace account.
+- Sign-up restricted to the school's email domain (TBD — see §10 open question).
+
+### 2.3 Use case archetypes
+
+| # | Use Case | Who | How Often |
+|---|---|---|---|
+| 1 | Pull up today's plan, mark items done as I teach | All teachers | Daily |
+| 2 | Adjust this week's plan because we ran behind | All teachers | Weekly |
+| 3 | Update the master because the team agreed on a change | Whoever's leading that subject | Weekly–monthly |
+| 4 | Print the week's plan for my substitute folder | All teachers | Weekly |
+| 5 | See all math resources across the year | All teachers | Unit-prep |
+| 6 | Tag a new assignment with its CCSS standards | Whoever creates it | Per new lesson |
+| 7 | Catch up on what was missed last week | All teachers | Weekly |
+| 8 | Archive this year's plan and start fresh for next year | Lead teacher | Once per year |
+
+---
+
+## 3. Information Architecture
+
+### 3.1 The six views
+
+| View | Time Frame | Default? | Use Case |
+|---|---|---|---|
+| **Daily** | One day | Optional | "What am I teaching today" |
+| **Weekly** | One school week (Sun–Thu) | Most likely default | "What are we doing this week" |
+| **Schedule** | One day, slotted into teacher's actual time blocks | Optional | "What does my actual day look like, including PE and lunch" |
+| **Unit** | One unit (variable length) | Occasional | "Where are we in this unit, what's the summary" |
+| **Subject** | All time / unit / month / week (filterable) | Frequent | "All math resources across the year" |
+| **Year** | Whole 40-week calendar | Occasional | "Annual overview, drag-and-drop reshuffling" |
+
+Default view is per-teacher preference, saved to their profile.
+
+### 3.2 Navigation model
+
+- **Top bar:** **grade-level switcher** (when multiple grades are active), view switcher (the six views), today/week jumper, master-vs-personal toggle, search, to-do panel toggle, **comments panel toggle (with unread badge)**, profile menu.
+- **Left side panel (collapsible):** subject filter, unit filter, completion status filter, standards filter, holiday/Ramadan toggle.
+- **Main canvas:** the active view.
+- **Right side panel (collapsible, contextual):** details for selected lesson — directions, notes, resources, standards, completion status. The right side also hosts the **to-do slide-out** (a separate panel toggled from the top bar).
+
+For Grade 5–only launch, the grade switcher is hidden if the teacher is assigned to only one grade.
+
+### 3.3 Master vs. Personal mode
+
+- A single toggle in the top bar: **Personal | Master**. This is the **only** way to flip between personal and master in any view. There are no separate "Daily Master" or "Daily Personal" views — the toggle does that work.
+- **Personal mode** (default): shows the **whole week's lessons** — every lesson in its current location, regardless of whether it's an unedited master lesson or a personal modification. Edits write to personal (auto-forking from master if needed).
+- **Master mode**: shows only master content. Editing requires pressing an additional "Now editing master" button to enable writes.
+- **Master-mode entry banner sequence (visual friction without click friction):**
+  1. On toggling to Master mode, a **flashing red heads-up message** appears at the top of the viewport: *"Heads up — changes here affect the whole team."* The message flashes (pulses red, fade-in/fade-out) for ~3 seconds, then fades to step 2.
+  2. The flashing message resolves into a **small persistent red banner** that stays at the top of the viewport for the entire duration the teacher is in Master mode. It carries the same text, smaller, non-pulsing. Visible across all six views as long as Master mode is active.
+  3. Switching back to Personal mode dismisses the banner.
+- **No confirm dialog.** The flashing-then-persistent banner provides visual safety without training people to click-through "are you sure?" prompts. (The earlier discussion in Open Question 30 settled on this approach.)
+- **`prefers-reduced-motion`** respected: under reduced motion, the heads-up message appears immediately solid (no fade-in flash) and resolves into the persistent banner after 3 seconds. The persistent banner is never animated.
+
+
+### 3.4 Visual differentiation in Personal mode
+
+Personal mode shows the whole week, including unedited-from-master lessons sitting alongside lessons the teacher has personally modified. Teachers must be able to tell them apart at a glance — both to know what they've changed and to find what they haven't.
+
+**Three-tier visual differentiation:**
+
+| State | Visual treatment |
+|---|---|
+| **Unedited from master** (no personal copy exists) | Solid subject-color left stripe (the default 4px). No extra marker. |
+| **Personally modified — content changed** (personal copy with field edits) | **Dashed left stripe** in the subject color (replaces the solid stripe). Plus a small "Modified" indicator pill in the card's top-right corner. |
+| **Personally moved** (personal copy whose `day_of_week` or `display_order_within_day` differs from master) | Solid subject-color stripe **+ a small move-arrow icon** (↔ for same-week, ⤴ for moved across weeks) in the card's top-right corner. |
+
+A lesson can be in two states at once — modified content AND moved. In that case both treatments compose: dashed stripe + Modified pill + move-arrow icon. They are independent visual signals.
+
+**Why dashed stripes (not solid color change):**
+- Solid color changes (e.g. tinting the whole card) would conflict with the Vivid theme's existing subject-tint card backgrounds. A dashed stripe works against any background and any theme.
+- "Modified" is a property of the lesson, not the subject. The stripe staying in the subject's color preserves subject recognition; the dash pattern adds a new dimension of information.
+
+**Right-click context menu changes accordingly:**
+- On an unedited-from-master lesson: "Copy to my personal" (creates a personal fork).
+- On a personally-modified lesson: "Reset to master" (deletes the personal copy; lesson reverts to master state).
+- On a personally-moved lesson: "Return to master location" (resets day/order to match master).
+- Both options appear on a lesson that is modified AND moved.
+
+**At-a-glance scanning:**
+- A teacher scanning their week sees: subject color (what subject), solid-or-dashed stripe (whose version), optional pill (modified flag), optional icon (moved flag). All four readable in under a second per card.
+
+**Old "M" badge / lock dot retired.** The dashed stripe + pill + arrow icon system replaces it. The lock icon was too small (9px) and too binary (locked vs. unlocked) — it didn't distinguish modified from moved.
+
+---
+
+## 4. Data Model
+
+### 4.1 Entity overview
+
+```
+SchoolAdmin (school-wide, optional teacher link)
+     │
+GradeLevel ──< TeacherGradeAssignment >── Teacher ──< TeacherUIState (one per teacher)
+     │                                       │
+     │                                       └──< PersonalCoreLessonEventCopy ──> MasterCoreLessonEvent
+     │                                                 │
+     │                                                 └──< Completion Status
+     │
+     ├──< GradeFrameworkAssignment >── StandardsFramework ──< Standard
+     │                                       (catalog or school_uploaded)
+     │
+School Year (school-wide) ──< Unit (grade-scoped) ──< CoreLessonEvent ──< Resource (link or file)
+                                              ├──< Standard (any framework, multi-tag allowed)
+                                              ├──< Direction (collapsible body)
+                                              └──< Notes (hover-revealed body)
+
+Subject (team OR personal — personal subjects owned by a teacher, e.g. "Morning Meeting")
+   └──< default_framework_ids (drives standards picker defaults per subject)
+
+Day ──< Time Block (per teacher, per grade) ──< CoreLessonEvent | ExtraLessonEvent | DayEvent | Non-academic block
+Day ──< DayEvent (assembly, drill, guest speaker — not curriculum)
+Day ──< ExtraLessonEvent (one-off OR recurring teaching activity outside the master curriculum)
+   └──< RecurrencePattern (optional — daily/weekly/etc.)
+        └──< RecurrenceInstanceOverride (per-instance edits/skips/moves)
+Day ──< EventDayOrderOverride (per teacher, per date — orders all three event types in the sequence actually taught)
+
+Daily Note ──< Day (grade-scoped, **personal only**, with priority level)
+
+ToDo ──< Tag (color-coded, grade-scoped if team, teacher-scoped if personal)
+   └─ scope: personal | team
+   └─ optional: due_date, linked_event_or_unit_or_resource
+
+SavedExport (snapshot mode only) ──> SchoolYear
+
+Comment (anchored to CoreLessonEvent | ExtraLessonEvent | DayEvent | Unit | Resource | day_shoutbox date)
+   └─ optional parent_comment_id (one level of nesting only)
+   └─< CommentRead (per-teacher read state, drives unread badges)
+
+CoverageSnapshot (nightly scheduled job: per school_year × grade × framework × subject)
+
+AuditLog (append-only, every mutation writes a row)
+   ├─ actor: Teacher OR SchoolAdmin
+   ├─ scope: grade-level OR school-wide
+   └─ entity: core_lesson_event | extra_lesson_event | day_event | unit | export | role | grade | framework | ...
+```
+
+### 4.2 Entity definitions
+
+**GradeLevel**
+- `id`, `name` (e.g. "Kindergarten", "Grade 1", "Grade 5", "Grade 6")
+- `display_order`, `is_active` (only Grade 5 = true at launch)
+
+**Teacher**
+- `id`, `email`, `display_name`
+- `preferences`: default view, completion-privacy (`private` | `shared`), default `grade_level_id` (the one shown on login)
+- Role is granted per-grade via `TeacherGradeAssignment`, not on the teacher record itself.
+
+**TeacherGradeAssignment** (junction)
+- `teacher_id`, `grade_level_id`
+- `role`: `teacher` | `lead` | `grade_admin` (per grade)
+  - `teacher` — standard access (default).
+  - `lead` — can edit master content for this grade, manage team to-dos and team tags, delete saved exports for this grade.
+  - `grade_admin` — superset of `lead`: can additionally view the audit log scoped to this grade, see aggregate completion across teammates, manage `TeacherGradeAssignment` records for this grade.
+- A teacher can be assigned to multiple grades; role can differ per grade.
+
+**SchoolAdmin** (separate role, not tied to grades)
+- `id`, `teacher_id` (can be a teacher who is also a school admin, OR a standalone admin account with no grade assignment), `granted_at`, `granted_by_teacher_id`
+- A school admin has **read-only access across all grades by default**, plus the ability to:
+  - Manage `GradeLevel` records (activate/deactivate grades)
+  - Manage `TeacherGradeAssignment` records school-wide
+  - Manage `SchoolYear` records (start new year, archive, configure holidays/Ramadan)
+  - View school-wide audit logs and system metrics
+  - View (but not edit) any grade's master content
+- School admins do not get write access to lesson content unless they also hold a `lead` or `grade_admin` role for that grade.
+- **Why separate from `TeacherGradeAssignment`:** a school-wide admin (principal, IT coordinator, curriculum coordinator) may not teach any single grade, so they should not require a grade assignment to function. Conversely, a teacher who is also a school admin needs both records.
+
+**School Year**
+- `id`, `label` (e.g. "2025–2026"), `start_date`, `end_date`, `weeks` (40), `is_active`
+- `holidays`: array of dates
+- `ramadan_range`: optional `{start, end}` for the Ramadan timetable override
+
+**Subject**
+- `id`, **`grade_level_id`**, `name`, `parent_id` (null, or e.g. Literacy → Reading)
+- `default_pacing`: `synchronized` | `self_paced`
+- `color`: from a fixed team-wide palette (see §6.2)
+- `display_order`
+- `scope`: `team` | `personal` — team subjects appear for everyone in the grade; personal subjects (e.g. "Morning Meeting", "Afternoon Circle") appear only for the teacher who created them, unless promoted to team-shared.
+- `owner_id`: `teacher_id` for personal subjects; null for team subjects.
+- `promotion_status`: `not_requested` | `pending` | `approved` | `rejected` — applies only to personal subjects. Tracks whether the owner has requested promotion to team-shared.
+- `promotion_requested_at`, `promotion_approver_id`, `promotion_resolved_at` (nullable)
+- `default_framework_ids`: array of `StandardsFramework` IDs — the standards frameworks the picker shows by default when tagging events in this subject. Phase 1.
+- `rollover_preference`: enum — `ask_me` | `yes` | `no` (applies only to personal subjects). Default on creation: `ask_me`. Drives the pre-selected radio on the year-rollover prompt — but the teacher is always asked at rollover regardless of value. See §4.5 for the prompt behavior.
+- `created_at`, `updated_at`
+- Subjects are grade-scoped: Grade 5's "Math" and Grade 3's "Math" are separate records. Personal subjects are also grade-scoped (a teacher's "Morning Meeting" lives under the grade they're teaching).
+- **Team subjects** are managed by `lead` role only.
+- **Personal subjects** are managed by the owning teacher only. They appear as additional subject rows in that teacher's Weekly view, Daily view, and Schedule view. Other teachers don't see them.
+- **Personal subjects behave exactly like team subjects for their owner.** Can hold all three event types (CoreLessonEvent, ExtraLessonEvent, DayEvent). Can have Units. Can have weekly structure. The only difference is visibility — they exist in one teacher's world.
+- **Promotion flow.** A teacher can request to share their personal subject with the team via Settings → My personal subjects → "Share with team." This sets `promotion_status = pending` and creates an entry in the lead's (or `grade_admin`'s) approval queue. On approval, `scope` changes to `team`, `owner_id` clears, and the subject appears in every team member's view. **Promotion shares the subject definition, not its event history** — the owner's existing events on that subject remain personal-only; other teachers can now add their own events on the now-team-shared subject going forward. **Lead self-promotion:** when the lead creates a personal subject and wants to share, they can self-approve (one click, still an audit-logged action — the audit trail preserves the "who promoted, who approved" record even when they're the same person).
+- **Lead-or-delegate approval.** The `lead` role for the grade can approve or reject. The `lead` can also delegate approval authority to a `grade_admin` via Settings.
+- **Conversion in both directions** (between time-slot-only and personal subject) is supported — see Time Block entity.
+- **Cap:** maximum 5 personal subjects per teacher per grade. Warn at 4, block creation at 5 with a "Archive an existing one first" prompt. School admin can override the cap per school in Phase 3+.
+
+**SubjectTeamMembership** (new — enables per-subject editing permissions)
+- `id`, `subject_id`, `teacher_id`, `can_edit_master`: boolean
+- A subject's "team" is the set of teachers who can edit its master content. By default, when a subject is created or promoted to team-shared, it auto-populates with `SubjectTeamMembership` rows for every teacher currently in the grade's team (`can_edit_master = true` for all).
+- **Default editing permission:** any teacher on a subject's team can edit that subject's master content. This is the right behavior for most schools — the team that teaches Math edits the Math master.
+- **Lead overrides (in either direction):**
+  - **Restrict** — lead can remove specific teachers from a subject's team (e.g., "only the 2 teachers who actually teach Spelling can edit the Spelling master"). Setting `can_edit_master = false` removes editing rights without removing visibility.
+  - **Extend** — lead can add teachers from *outside* the grade team (e.g., another school leader, a subject specialist who supports multiple grades). Setting requires admin approval at the school level.
+- **UI surfaces** (Phase 2):
+  - Settings → Team subjects → per-subject card has a "Who can edit master" section listing current members with toggle for `can_edit_master`.
+  - Adding a teacher from outside the grade requires `school_admin` permission and is logged in the audit trail.
+- **RLS implication:** master-edit permissions are enforced at the Subject level via `SubjectTeamMembership`, not at the grade level. The check is: "Does the editing teacher have an active `SubjectTeamMembership` row for this subject with `can_edit_master = true`?"
+- **Personal subjects:** a personal subject has exactly one `SubjectTeamMembership` row — the owner with `can_edit_master = true`. On promotion to team, the row stays plus new rows are added for the rest of the team.
+
+**Unit**
+- `id`, **`grade_level_id`**, `subject_id`, `school_year_id`, `name`, `summary`, `start_week`, `end_week`
+- `pacing_override`: optional, overrides the subject's default pacing for this unit only
+
+**MasterCoreLessonEvent**
+- `id`, `unit_id` (which carries grade_level_id transitively), `subject_id`, `week_number`, `day_of_week` (`sun`–`thu`)
+- `title`, `directions` (rich text, collapsed by default in UI)
+- **`learning_objectives`** (rich text or array of strings — explicit learning objectives required for governing-authority exports; surfaced in PDF/Excel exports and on the lesson detail panel)
+- `notes` (rich text, hover-revealed in UI)
+- `resources`: array of `{type, url, label}` where type is `pdf | image | doc | youtube | slides | website | other`
+- `standards`: array of standard IDs (CCSS or other)
+- `display_order_within_day`
+- `recurrence_pattern_id` (optional) — learning events inside units can be recurring. Example: a weekly "Math Talks" lesson that fires every Monday for the duration of a unit. When `recurrence_pattern_id` is set, the system materializes instances at the right dates within the unit's week range (`start_week` to `end_week`) without pre-creating database rows. The same `RecurrencePattern` + `RecurrenceInstanceOverride` mechanism that powers Extra Lesson Event recurrence (see §4.2) is reused — one mechanism for both event types. Per-instance edits, skips, and full-template edits work the same way.
+- `is_recurrence_template`: boolean — true for the seed event of a recurring series; false for materialized instances.
+
+**PersonalCoreLessonEventCopy**
+- `id`, `teacher_id`, `master_core_lesson_event_id`, `forked_at`
+- All fields from MasterCoreLessonEvent (independent copy)
+- `is_diverged_from_master`: boolean
+- `pending_master_updates`: array of `{change_type, master_field, master_value, queued_at}` — awaiting teacher's accept/reject
+
+**StandardsFramework**
+- `id`, `name` (e.g. "Common Core State Standards", "Qatar MOEHE Standards", "International Baccalaureate Primary Years", "School EE Standards")
+- `short_code` (e.g. "CCSS", "MOEHE", "IB-PYP", "EE") — used in tag display and the picker
+- `jurisdiction` (e.g. "US national", "Qatar MOEHE", "International (IB)", "Custom — Acme School")
+- `description`
+- `provenance`: `catalog | school_uploaded`
+  - **Catalog frameworks** are vetted and maintained by the planner's team (eventually a community library). Visible to all schools using the planner, read-only.
+  - **School-uploaded frameworks** are uploaded by a school admin via CSV. Private to that school.
+- `owner_school_id` (nullable; only populated when `provenance = school_uploaded`)
+- `color`, `icon` — display metadata so tags can visually indicate their framework at a glance.
+- `max_depth`: integer indicating hierarchy depth (e.g., 3 for CCSS-style domain → cluster → standard; 1 for flat frameworks). The standards picker uses this to decide how to render.
+- `supports_languages`: array — `['en']` for Phase 1; ready for `['en', 'ar']` or others when bilingual UI ships.
+- `is_active`: boolean — archived frameworks remain visible on historical lessons but don't appear in the picker.
+
+**GradeFrameworkAssignment** (junction)
+- `grade_level_id`, `framework_id`
+- `display_order` (controls grouping order in the standards picker)
+- One row per (grade, framework) combination this grade actually uses. A Grade 5 team using both CCSS and EE has two rows.
+
+**Standard**
+- `id`, **`framework_id`**, **`grade_level_id`** (nullable for cross-grade frameworks; usually set)
+- `code` (e.g. "CCSS.5.NBT.B.5", "EE-5.2.1", "IB-PYP-LA-5") — unique within a framework
+- `description` (rich text)
+- `parent_standard_id` (nullable, self-referential — supports any hierarchy depth)
+- `description_translations`: JSON keyed by language code (Phase 1: just `en`)
+- `display_order_within_parent`
+- Standards are queryable across frameworks but presented grouped by framework in the picker.
+
+**Event-to-standards relationship (clarification)**
+- The `CoreLessonEvent.standards`, `ExtraLessonEvent.standards`, and `DayEvent.standards` arrays can hold standard IDs from **any framework** simultaneously. A single Core Lesson Event in Math can be tagged with CCSS.5.NBT.B.5 + EE-5.2.1 + SEL-4.A at the same time.
+- Each tag visibly carries its framework badge (small colored chip from the framework's color/icon).
+- All three event types use the same standards-picker component for tagging.
+
+**Completion Status**
+- `teacher_id`, `core_lesson_event_id` (master OR personal — fork-aware)
+- `status`: `not_done | done | skipped | carried_over | partial`
+- `updated_at`
+- `is_public`: derived from teacher's privacy preference
+
+**Daily Note**
+- `id`, **`grade_level_id`**, `teacher_id`, `date`, `priority` (`urgent | important | fyi`)
+- `body`, `created_at`
+- **Scope: personal only.** Daily Notes are private reminders for the author. The team-visible-by-date surface is the **Day Shoutbox** (see Comment with `anchor_type = day_shoutbox`).
+- **Priority semantics on personal notes:**
+  - `urgent` — solid red background (NOT pulsing, since pulsing is reserved for team-wide alerts no one else sees here).
+  - `important` — amber background.
+  - `fyi` — blue background.
+- Why personal-only: in earlier rounds we treated Daily Notes as shared-or-personal AND introduced the Day Shoutbox for team-by-date discussion. Two overlapping surfaces caused confusion. Cleaner split: Daily Notes = personal reminders; Day Shoutbox = team conversation.
+
+**TeachingReminder** (new — curated quotes and research summaries surfaced throughout the day)
+- `id`, `category`: `behavioral | academic`
+  - `behavioral` = learning-culture / mindset / encouragement / classroom climate
+  - `academic` = pedagogy / instruction / research practices
+- `quote_text` (required, max ~300 chars) — the short quote or pull-out line.
+- `summary` (optional, max ~500 chars) — additional context shown when the reminder is clicked.
+- `source_name` (optional) — author or attribution (e.g. "Carol Dweck", "Hattie & Yates 2014").
+- `source_link` (optional) — URL to the full article, study, or source.
+- `is_active`: boolean — admin-controlled; inactive entries don't appear in rotation.
+- `display_count`: integer — incremented each time the reminder is shown to a teacher (for analytics + low-frequency rotation logic). Phase 1: simple counter; Phase 2 may add per-teacher view tracking.
+- `created_at`, `updated_at`
+- **Catalog scope.** Phase 1: the library is school-scoped (one library per school) and managed by the school admin (or by the teacher running the deployment — initially Heather's collection). Phase 2+: cross-school shared library options.
+- **Surfacing rules** (see §5.x TeachingReminder banner spec):
+  - Appears as a slim banner on Daily, Weekly, and Schedule views. Always visible (when enabled).
+  - Two categories interleave — both can show simultaneously (one Behavioral banner + one Academic banner), or one of each can appear depending on what's enabled.
+  - Click to expand: shows summary + source name + source link (if any).
+- **Rotation logic.** A new reminder surfaces:
+  - On page reload, AND
+  - On navigation to the view, AND
+  - On a 60-minute timer if the teacher stays on the same view (refreshes in place).
+  - The same reminder isn't shown twice in a row for the same teacher within a 24-hour window (best-effort, based on `TeacherUIState.last_shown_reminder_ids`).
+- **Per-teacher on/off.** Settings → Teaching reminders has two independent toggles: "Show behavioral / culture reminders" and "Show academic / teaching reminders." Default: both on.
+
+**TeacherReminderState** (new — tracks per-teacher reminder history for rotation logic)
+- `teacher_id`, `last_shown_behavioral_ids`: array of last ~20 reminder IDs the teacher saw in the Behavioral category, with timestamps.
+- `last_shown_academic_ids`: same shape for Academic category.
+- `updated_at`
+- **Purpose:** rotation logic uses this to avoid showing the same reminder twice in a row. Cleaned up periodically (older than 30 days is purged).
+
+**EventDayOrderOverride**
+- `id`, `teacher_id`, `class_id` (or `grade_level_id` if class concept not yet introduced — see future-secondary section), `date`
+- `ordered_event_refs`: array of `{event_type, event_id}` pairs in the order the teacher chose for that specific date. `event_type` is `core_lesson_event | extra_lesson_event | day_event`.
+- `created_at`, `updated_at`
+- **Lazy creation:** only written when a teacher actually reorders. Until then, the master `display_order_within_day` applies for core lesson events, and extra lesson events / day events fall at the end in creation order.
+- **Per-teacher, per-date.** Reordering on Tuesday Week 12 does NOT propagate to Tuesday Week 13. Reordering by one teacher does NOT affect a teammate's view. If permanent change is needed, that's a master edit.
+- **Persistent history.** Overrides are never auto-deleted. They become part of the historical record — months later, viewing Tuesday Week 12 shows the order that was actually taught that day, not the master order. This makes the planner a teaching journal as well as a planner.
+- **Covers all three event types.** Reordering can interleave Core Lesson Events, Extra Lesson Events, and Day Events in any sequence the teacher chooses.
+
+**DayEvent**
+- `id`, **`grade_level_id`**, `date`, `title` *(required — the only required field)*
+- `description` (optional, longer text)
+- `learning_objective` (optional — same field shape as on Lesson)
+- `standards` (optional — array of standard IDs; can be from any framework assigned to the grade)
+- `resources` (optional — array of `{type, url, label}`, same shape as Lesson resources)
+- `time` (optional — null if all-day or untimed)
+- `duration_minutes` (optional)
+- `scope`: `team | personal`
+- `author_id` (the teacher who created it)
+- `event_type` (optional enum): `assembly | guest_speaker | drill | celebration | field_trip | teachable_moment | other`
+- `is_complete`: boolean (defaults false; each event has its own completion checkbox)
+- `completed_at`, `completed_by_id` (nullable)
+- `created_at`, `updated_at`
+- **Distinct from Lessons and ExtraLessonEvents.** A DayEvent is something that happens during the school day but is **not curriculum** — assembly, drill, guest speaker, birthday celebration, field trip. The standards/objective/resources fields exist for the rare case where an event genuinely maps to learning (a guest speaker's talk maps to a SEL standard) but are typically unused.
+- **Authoring symmetry.** When a teacher adds anything to the day, they go through the same "+ Add to day" chooser (see §6.5). Day Events share the same authoring fields as Lessons — only `title` is required.
+- **Appears in Daily View** at the end of the day's left-pane list (after academic blocks and any extra lesson events), in **Schedule View** as its own block (at assigned time or at end of day), and in **Weekly View** as a small banner at the bottom of each day column.
+- **Exportable.** Day events are included in PDF and Excel exports by default (toggle present in the Export Center to exclude).
+- **Auditable.** Every create / edit / delete / complete writes to the audit log.
+
+**ExtraLessonEvent**
+- `id`, `teacher_id` (or **`grade_level_id`** for team-wide extras), `date`, `title` *(required)*
+- `description` (optional)
+- `learning_objective` (optional)
+- `standards` (optional — array of standard IDs from any framework)
+- `resources` (optional — same shape as Lesson resources)
+- `subject_id` (optional — many extras don't belong to a single subject; can reference a personal subject like "Morning Meeting")
+- `time` (optional)
+- `duration_minutes` (optional)
+- `scope`: `team | personal` (defaults `personal` — most extras are a teacher's own ritual). A team-scoped recurring extra (e.g. "Weekly team planning meeting") is visible to all team members.
+- `author_id`
+- `is_complete`: boolean (own completion checkbox, independent of lessons). For recurring instances, completion is **per-instance** — completing one instance does not complete future instances.
+- `completed_at`, `completed_by_id` (nullable)
+- `recurrence_pattern_id` (nullable) — if set, this event is one instance of a recurring series. See `RecurrencePattern` entity below.
+- `is_recurrence_template`: boolean — true for the first/template event of a recurring series; false for materialized instances. The template carries the latest edits; instances inherit from it lazily.
+- `created_at`, `updated_at`
+- **What this is.** An Extra Lesson Event is a teaching activity outside the master curriculum. Examples: a one-off enrichment activity, a teacher's signature "closing circle" (typically recurring), a school-wide assembly speaker (team-scoped, one-off), a weekly team meeting (team-scoped, recurring).
+- **What it isn't.** Not master/personal forked (it's owned by the teacher who created it, or team-scoped). Not part of a unit. Not driving the catch-up filter (since it isn't expected to be taught on a master schedule). Not tied to a `unit_id` or `week_number`.
+- **Recurrence.** When `recurrence_pattern_id` is set, the system materializes instances on dates per the pattern. Editing a single instance edits only that instance; editing the template propagates to future instances (with a "this instance only / this and future / all" choice on edit, see §5.x).
+- **Templates (deferred).** Phase 2+: a teacher can save an Extra Lesson Event as a personal `ExtraLessonTemplate` so they can drop it into any future day with one click. Distinct from recurrence — templates are one-click reuse without a schedule; recurrence is a schedule.
+- **Appears alongside lessons** in Daily/Schedule/Weekly views, with a subtle visual marker (different border style or a small ✨ icon) indicating it's an extra, not a master-derived lesson. Recurring extras carry a small 🔁 icon in addition.
+- **Exportable.** Included in PDF/Excel exports by default, with a checkbox in the Export Center to toggle off if needed.
+- **Auditable.** Every create / edit / delete / complete writes to the audit log.
+
+**RecurrencePattern**
+- `id`, `owner_id` (teacher_id; null for team-scoped patterns)
+- `scope`: `personal | team` — matches the parent event's scope.
+- `frequency`: `daily | weekly | every_n_days | every_n_weeks`
+- `interval`: integer (for `every_n_days` / `every_n_weeks` — e.g. 2 for "every 2 weeks")
+- `days_of_week`: array of `sun | mon | tue | wed | thu` (for weekly patterns — empty array means every day in `daily` mode)
+- `start_date`: date the recurrence begins.
+- `end_condition`: enum — `never | end_date | after_n_occurrences`.
+- `end_date` (nullable, used with `end_condition = end_date`)
+- `occurrences_limit` (nullable, used with `end_condition = after_n_occurrences`)
+- `skip_dates`: array of dates — specific dates the teacher has opted out of (e.g. "skip morning meeting on field trip day"). Per-teacher even on team-scoped recurrences (one teacher's skip doesn't affect others).
+- `school_year_id` — recurrences are scoped to one school year. They do not auto-roll into the next year; that's a year-rollover action (see §4.4).
+- **Materialization model.** Instances are NOT pre-created in the database for the whole year. Instead, when a view queries events for a date range, the system computes which dates the pattern would fire on within that range and surfaces them. Edits to specific instances are stored as `RecurrenceInstanceOverride` records (below). This keeps the database small and reorder/skip operations cheap.
+
+**RecurrenceInstanceOverride**
+- `id`, `recurrence_pattern_id`, `original_date`, `override_type`: `edited | deleted | moved`
+- `override_data`: JSON blob — for `edited`, the field changes for that instance; for `moved`, the new date.
+- A teacher who edits Tuesday's morning meeting to be 10 minutes longer creates an `edited` override for that date; future Tuesdays continue using the template.
+
+**Time Block (Schedule View)**
+- `id`, `teacher_id`, **`grade_level_id`**, `day_of_week`, `start_time`, `end_time`
+- `type`: `academic | non_academic`
+  - `academic` — holds events from a team or personal subject. Standard subject behavior (rows in Weekly grid, completion tracking, standards, resources).
+  - `non_academic` — a labeled time slot. Holds notes and resource links only. Does NOT appear as a subject row in Weekly view. Used for lunch, recess, PE, Arabic (when not curriculum-tracked), commute, prep time, etc.
+- `subject_id` (null for non-academic; required for academic — points to a team OR personal subject)
+- `label` (e.g. "Lunch", "PE", "Arabic", "Math", "Morning Meeting")
+- `notes` (rich text — for non-academic blocks, this is the primary content surface; for academic blocks, this is supplementary to the subject's events)
+- `resources` (optional — same shape as Lesson resources; allowed on both block types)
+- `ramadan_variant`: alternate `{start_time, end_time}` used when Ramadan mode is on
+- A teacher assigned to multiple grades has independent time blocks per grade.
+- **Multiple events per block:** the relationship from Time Block to events is **one-to-many**, not one-to-one. A block can host two or more events — any combination of Core Lesson Events, Extra Lesson Events, and Day Events. Each event in a multi-event slot retains its own completion status, standards, directions, and resources. UI renders side-by-side for two events, stacked for three or more.
+
+**Time-slot-vs-subject creation flow (Schedule view setup):**
+- When a teacher adds a new time block in the Schedule view setup, the creation form asks:
+  - **○ Time slot** — labeled time with optional notes/resources. Does not appear in Weekly view as a subject row. (Lunch, recess, prep, etc.)
+  - **○ Personal subject** — appears as a subject row in Weekly view. Has its own color. Supports all event types, can have units, standards, completion tracking. (Morning Meeting with a structured year, etc.)
+- Default selection: **Time slot** (the common case for non-academic blocks).
+- If "Personal subject" is selected, a sub-form appears: name (required), color (picker), display order (defaults to end of subject list), default standards frameworks (multi-select from grade-assigned frameworks).
+- The created personal subject is saved to the teacher's profile and persists across views and across school years (see §4.5 Year rollover).
+
+**Conversion between time-slot and personal subject (later):**
+- A time-slot block can be promoted to a personal subject via "Convert to personal subject" in the block's context menu. Asks for name, color, framework defaults. After conversion, the existing notes and resources are migrated into the new subject's structure (notes become an opening Day Event; resources attach to it). Past data is preserved.
+- A personal-subject block can be demoted to a time slot via "Convert to time slot." Warning shown: "This will move your existing events on this subject to the Catch-up archive. The time slot will keep the block's notes and resources only." Requires confirmation.
+
+**ToDo**
+- `id`, `title`, `description` (optional)
+- `scope`: `personal | team`
+- **`grade_level_id`** (team scope: scoped to grade; personal scope: teacher's currently active grade at creation, optional cross-grade visibility)
+- `author_id` (teacher who created it)
+- `assignee_id` (optional, team scope only)
+- `due_date` (optional — null means "no date")
+- `priority` (optional): `urgent | important | fyi` — reuses daily-notes priority palette
+- `tags`: array of Tag IDs
+- `linked_entity` (optional): `{type, id}` where type is `core_lesson_event | extra_lesson_event | day_event | unit | resource`
+- `is_complete`: boolean
+- `completed_by_id`, `completed_at` (null if not complete)
+- `created_at`, `updated_at`
+
+**Tag**
+- `id`, `name`, `color` (from a palette of ~10 distinct colors)
+- `scope`: `personal | team`
+- **`grade_level_id`** (team tags scoped to a grade; personal tags can be cross-grade for the teacher)
+- `owner_id` (teacher_id for personal tags; null for team tags)
+- Team tags are managed by `lead` role; personal tags by the owning teacher
+
+**TeacherUIState**
+- `teacher_id` (one row per teacher, upserted on change)
+- `expanded_event_ids`: array of `{event_type, event_id}` pairs for events currently expanded (Weekly / Subject / Unit views). `event_type` is `core_lesson_event | extra_lesson_event | day_event`.
+- `last_active_view`: which view the teacher had open last (`daily | weekly | schedule | unit | subject | year`)
+- `last_active_grade_level_id`: which grade was active last (for multi-grade teachers)
+- `view_mode`: `simple | task | advanced` — the teacher's globally-persisted view mode (see §5.22). Default: `simple` for new non-lead teachers, `advanced` for lead/admin roles.
+- `filter_state`: JSON blob holding the teacher's active filter selections per view (subject filter, unit filter, completion filter, tag filter, etc.)
+- `panel_state`: JSON blob holding left/right panel open/closed states, to-do slide-out open/closed, etc.
+- `appearance_settings`: JSON blob holding the teacher's selected theme, density, color_intensity, background_id (curated) or background_url (uploaded), and reduce_motion preference. Phase 1 writes only the default values; Phase 2 wires the Appearance settings panel to this blob.
+- `teaching_reminders_settings`: JSON blob — `{ show_behavioral: bool, show_academic: bool, hide_all: bool }` (see §5.20).
+- `hide_missed_events`: boolean (Subject view's "Hide missed events" toggle, see §5.6).
+- `catch_up_global_enabled`: boolean (Settings → "Show catch-up reminders" toggle, see §5.16 catch-up controls).
+- `updated_at`
+- **Sync behavior:** writes are **debounced ~500ms** after the last interaction to avoid hammering the database on rapid clicks. Reads happen once on login/view-mount and via realtime subscription for cross-device sync (teacher's laptop and iPad stay in sync within a second or two of each other).
+- **Why server-side, not localStorage:** teachers frequently switch between laptop (planning at home) and iPad (in classroom). Expansion state, filters, and active view should follow them across devices.
+
+**SavedExport**
+- `id`, **`grade_level_id`**, `created_by_teacher_id`, `created_at`
+- `format`: `pdf | excel`
+- `scope`: `daily | weekly | unit | subject_year`
+- `scope_params`: JSON identifying what was exported (e.g. `{week_number: 12}`, `{unit_id: "..."}`, `{subject_id: "...", school_year_id: "..."}`)
+- `mode`: `live | snapshot` — `live` exports are not stored (downloaded and discarded); only `snapshot` records exist in this table
+- `data_version`: `master | personal` (personal exports include the exporting teacher's diverged copies)
+- `include_completion`: boolean (whether per-teacher completion status is rendered in the export)
+- `file_url`: link to the generated file in Supabase Storage (snapshots only)
+- `label`: optional teacher-supplied label ("End-of-Q2 MOEHE submission")
+- **Retention:** snapshots persist indefinitely until manually deleted by a lead. Live exports are not retained.
+- **Visibility:** snapshots are visible to all teachers in the same grade (so any teammate can re-download what was sent to admin).
+
+**Comment**
+- `id`, `author_id`, **`grade_level_id`**, `created_at`, `updated_at`
+- `anchor_type`: `core_lesson_event | extra_lesson_event | day_event | unit | resource | day_shoutbox`
+- `anchor_id`: the ID of the anchored entity. For `day_shoutbox`, this is the date (ISO string).
+- `parent_comment_id`: nullable. Null for top-level comments; set for replies. **One level of nesting only** — replies cannot have replies.
+- `body`: text. Plain text in Phase 1; rich-text upgrade possible later.
+- `is_edited`: boolean, set true on any update after creation.
+- `deleted_at`: nullable timestamp. Soft delete — body is replaced with "[Comment removed]" in the UI, but the row stays so reply threads keep their structure.
+- **Visibility:** all comments are readable by every teacher in the comment's `grade_level_id`. No DMs, no private comments.
+- **Edit/delete rules:** author can edit and delete their own. `lead` and `grade_admin` can delete (not edit) any comment in their grade. School admins can read but not edit/delete.
+- **Day shoutbox auto-archive:** comments with `anchor_type = day_shoutbox` and an anchor date older than 7 days are still readable in the Comment Browser but are not displayed inline in the Daily View. A flag on the query handles this — no separate archive table.
+
+**CommentRead** (per-teacher read state)
+- `comment_id`, `teacher_id`, `read_at`
+- One row per teacher per comment they have viewed. Drives the "unread" filter in the Comment Browser and the badge counts.
+- Inserted lazily when a teacher's view actually rendered the comment in their viewport (intersection observer on the client).
+
+**AuditLog**
+- `id`, `timestamp`, `actor_teacher_id` (or `actor_admin_id`)
+- **`grade_level_id`** (nullable — null for school-wide actions like grade activation)
+- `action`: enum — `core_lesson_event_created | core_lesson_event_edited | master_edited | personal_forked | personal_reset_to_master | event_reordered | event_moved_into_slot | event_moved_out_of_slot | unit_created | unit_edited | subject_created | subject_edited | personal_subject_created | personal_subject_promotion_requested | personal_subject_promotion_approved | personal_subject_promotion_rejected | personal_subject_promotion_cancelled | personal_subject_rollover_decided | personal_subject_archived | personal_subject_restored | time_block_converted_to_subject | subject_converted_to_time_block | standard_tagged | completion_status_changed | daily_note_created | daily_note_deleted | day_event_created | day_event_edited | day_event_deleted | day_event_completed | extra_lesson_event_created | extra_lesson_event_edited | extra_lesson_event_deleted | extra_lesson_event_completed | framework_uploaded | framework_assigned_to_grade | framework_unassigned_from_grade | curriculum_imported | background_uploaded | background_deleted | todo_created | todo_completed | todo_deleted | tag_created | tag_deleted | export_generated | export_deleted | comment_posted | comment_edited | comment_deleted | role_changed | grade_activated | grade_deactivated | teacher_assigned_to_grade | promotion_approval_delegated | subject_team_membership_changed | subject_team_member_added_from_outside_grade | undo_applied | copied_from_archive | permission_changed | ai_call_logged | departed_teacher_subject_archived | teaching_reminder_created | teaching_reminder_edited | teaching_reminder_deleted | teaching_reminder_csv_imported | resource_attached | resource_edited | resource_deleted | resource_reordered | resource_reanchored | resource_hosting_mode_changed | view_mode_changed | school_year_started | school_year_archived | login | settings_changed`
+- `entity_type`: enum — `core_lesson_event | extra_lesson_event | day_event | unit | subject | standard | framework | grade_framework_assignment | coverage_snapshot | completion | daily_note | todo | tag | export | comment | role_assignment | grade_level | school_year | settings`
+- `entity_id` (nullable)
+- `metadata`: JSON — for edits, contains a before/after diff of changed fields; for status changes, the old and new status; for exports, the export params; for logins, IP/user-agent fingerprint
+- **Write strategy:** every mutation writes one row, fire-and-forget (small server-side function or RPC, errors logged but don't block the user action). Reads come later, only from admin surfaces.
+- **Indexes:** `(actor_teacher_id, timestamp DESC)`, `(grade_level_id, timestamp DESC)`, `(entity_type, entity_id)`. Add when query workloads materialize, not before.
+- **Retention:** indefinite in Phase 1; revisit in Phase 3 once table grows beyond ~5M rows.
+- **Why now:** building this in Phase 1 means a future admin section can show months of history. Adding it later means history starts the day the table is created — too late for any retrospective analysis.
+
+**CoverageSnapshot**
+- `id`, `school_year_id`, `grade_level_id`, `framework_id`, `subject_id` (nullable — null for cross-subject framework summaries), `snapshot_date`
+- `total_standards` (count of standards in the framework × grade × subject scope)
+- `standards_touched_count` (count tagged on at least one lesson, anywhere)
+- `standards_touched_in_completed_lessons_count` (count tagged on a lesson that has status `done` for at least one teacher)
+- `total_lessons_tagged` (sum of standard-tag instances across all lessons)
+- `per_teacher_coverage`: JSON `{teacher_id: standards_touched_count}` — aggregated counts per teacher (for the "variance" admin report; admin UI defaults to aggregate, drill-in required to see per-teacher data)
+- `metadata`: JSON room for additional metrics added in future phases
+- **Computed once daily by a scheduled job.** Cheap to read at report time. Phase 1: write only, no UI reads. Phase 3+: backs the admin dashboards.
+- **Retention:** indefinite. A row per (school_year, grade, framework, subject) per day is tiny — for one grade with 3 frameworks × 7 subjects × 365 days, ~7,665 rows per year. Negligible.
+
+### 4.3 Fork-and-merge semantics
+
+- **Lazy forking.** Personal copies materialize only when a teacher first edits a master lesson in personal mode. Until then, all reads in personal mode pass through to master. No automatic mass-forking at unit start or year start — copies exist only where they earn their existence.
+- **Master changes flow through automatically for unforked lessons.** If a teacher has not yet edited a lesson, master changes to that lesson appear in the teacher's view immediately, no approval required. Approval only applies to lessons the teacher has already forked.
+- **Completion is independent of forking.** A teacher can mark any lesson (master or personal) as done without forking it. Completion is stored in the separate `CompletionStatus` entity keyed by (teacher_id, core_lesson_event_id). This means teachers never need to fork a lesson just to track their own progress — no double-checkoff problem.
+- **Divergence tracking for forked lessons.** When master is edited after a personal copy was forked, the personal copy stays unchanged but a `pending_master_updates` record is queued.
+- **Merge UX (Phase 2 — bulk-approval review screen):** when one or more pending master changes accumulate, the teacher sees a notification badge with the count. Clicking opens a **review screen** (similar in shape to the Catch-up screen):
+  - Columns: change type, lesson, field changed, master value, the teacher's current value.
+  - Top action bar: **Accept all · Reject all · Accept selected · Reject selected**.
+  - Per-row checkboxes for selective acceptance.
+  - Group-by toggle: by lesson / by week / by change-type / by unit.
+  - Scope chips: All pending / Last 7 days / Last 30 days.
+  - "Conflict" rows (where the teacher already edited the same field master then changed) are visually flagged and require explicit per-row resolution — they can't be bulk-accepted blindly.
+- **No three-way merge.** For conflict rows (teacher edited a field, master later changed the same field), the teacher sees "Master also changed this field — your version, master's version, choose one."
+- **Why not auto-create personal copies at unit start?** Considered and rejected. Auto-creating ~50,000 personal copies (6 teachers × 8,400 lessons) for a grade is wasteful storage, multiplies the master-change notification load, and undermines the lazy-fork model's main benefit (changes propagate automatically to teachers who haven't customized). The `CompletionStatus`-separate-from-`Lesson` design means teachers can track their own completion without forking.
+
+### 4.4 "Start Unit" action (Phase 2)
+
+A teacher action available from the Unit summary page. Does NOT auto-fork lessons. Instead:
+- Marks the date the teacher started the unit in `UnitStartRecord` (a new lightweight entity).
+- Surfaces a unit-intro tooltip / overview the first time.
+- Resets the catch-up filter scope to this unit if requested.
+- Generates an optional printable unit overview (objectives, week-by-week summary, standards covered).
+- Adds an optional team announcement to the Day Shoutbox ("Sarah started Unit 6").
+
+**UnitStartRecord** (Phase 2 entity)
+- `id`, `teacher_id`, `unit_id`, `started_at`
+- Used for reporting ("when did each teacher start each unit") and for the unit-intro tooltip's one-shot logic.
+
+### 4.5 Year rollover
+
+- Marking the year complete archives the current `School Year` record (read-only).
+- Creating a new year clones the master plan structure (units, lessons, standards, resource links) into a new `School Year` record with empty completion statuses and no personal copies.
+- Teachers' personal copies of master content from previous years are kept archived but not active.
+
+**Personal subjects — every teacher confirms at rollover.** Personal subjects do NOT automatically carry forward without confirmation. Each personal subject has a `rollover_preference` (`ask_me` | `yes` | `no`, defaulting to `ask_me` at creation). The teacher can change this anytime during the year. **At rollover, every teacher with at least one personal subject sees the Year-end Rollover Decision screen (§5.18) — the preference value pre-selects the row's radio but does not skip the prompt:**
+
+- **`yes`** — at rollover, the row appears with **Roll over** pre-selected. Teacher can override per-row or accept all with one click.
+- **`no`** — at rollover, the row appears with **Archive (can restore later)** pre-selected. Same override rules.
+- **`ask_me`** — at rollover, the row appears with **no radio pre-selected**. Teacher must actively choose before submission is enabled for that row.
+
+Why always-ask: a teacher who set `yes` at creation and forgot about it shouldn't have an old subject quietly resurrected a year later. The confirmation moment is intentional. The preference saves keystrokes (a teacher who set most subjects to `yes` can land on the screen, see them pre-selected, and submit with one click) — but it doesn't eliminate the ritual of checking in.
+
+**What rolling over and archiving mean:**
+
+- **Roll over** — subject definition, units, core lesson events with all authored content (titles, learning objectives, directions, standards tags, resource links, display order), and recurrence patterns clone to the new year. Completion records archive with the previous year.
+- **Archive** — subject archives with the prior year. The definition isn't deleted; it's marked inactive in the new year. The teacher can restore later via Settings → Archived subjects → "Restore."
+
+**Rollover decision prompt.** When the lead initiates rollover, **every teacher with at least one personal subject** receives a notification and a dedicated screen at next sign-in (or immediately, if they're online):
+
+- Header: "End-of-year rollover — confirm what to bring forward."
+- List of every personal subject the teacher owns. Each row shows: subject name, color, count of events authored on it this year, count of units, count of completed lessons.
+- Per-row radio: **○ Roll over to next year** | **○ Archive (can restore later)** — pre-selected per the subject's `rollover_preference` (or unselected if `ask_me`).
+- Bulk action: **Roll over all** | **Archive all** | **Reset to my preferences** (sets every row back to its `rollover_preference` default).
+- A small "Skip for now — ask me again at next sign-in" option for teachers who want time to think.
+- Submit button at the bottom: enabled when every row has an explicit choice (either pre-selected by preference or actively set by the teacher).
+
+**Recurring events follow their parent subject.** If a personal subject rolls over, its recurrence patterns clone forward (with `school_year_id` and `start_date` updated). If a personal subject archives, its recurrence patterns archive with it.
+
+**Promoted personal subjects** (those that became team-shared during the year) clone forward as team subjects in the new year, independent of any individual teacher's rollover decision.
+
+**Pending promotions are auto-cancelled on archive.** If a teacher chooses to archive a personal subject that had `promotion_status = pending`, the promotion request is cancelled (you can't promote a subject that no longer exists in the new year). The lead is notified that the request was withdrawn.
+
+**Day Events on personal subjects do not clone** in either path — they're date-specific, not curriculum.
+
+**Year rollover does NOT trigger promotion approvals.** A personal subject in `promotion_status = pending` that the teacher chose to roll over carries forward with its pending status intact — the lead can resolve it after the new year starts.
+
+### 4.5a Resource attachment model (Phase 1B)
+
+Lessons (CoreLessonEvent), extra lesson events, and units can have resources attached. A resource is one of:
+
+- **Hosted file** — uploaded to Cloudflare R2. Supported types: PDF, DOCX, RTF, single image (PNG/JPG/GIF/WEBP), image stack (multiple images bundled as a single resource for slideshow viewing).
+- **External link** — URL with auto-fetched preview banner (Open Graph metadata cached on attach).
+- **Video link** — YouTube URL only; the system extracts the video ID and renders a thumbnail preview banner. Direct video upload is NOT supported.
+- **Cloud document link** — Google Drive, Google Docs, Google Sheets, Google Slides URL; renders with a file-type icon + filename preview. Direct Drive upload is NOT supported.
+
+**Resource** (entity)
+- `id`, `owner_event_type` (`core_lesson_event | extra_lesson_event | day_event | unit | personal_subject`), `owner_event_id`
+- `kind`: enum — `hosted_file | external_link | youtube_link | drive_link`
+- `display_label` (the teacher's friendly name for this resource)
+- `display_order_within_event`
+- **For `hosted_file`:**
+  - `file_type`: enum — `pdf | docx | rtf | image | image_stack`
+  - `r2_object_keys`: array of R2 object keys (single key for most types; multiple keys for image_stack)
+  - `file_size_bytes` (per file; summed for stacks)
+  - `original_filename`
+- **For `external_link`, `youtube_link`, `drive_link`:**
+  - `url`
+  - `preview_title`, `preview_description`, `preview_thumbnail_url`, `preview_fetched_at` (cached Open Graph or platform-specific metadata)
+- `uploaded_by_id`, `created_at`, `updated_at`
+
+**Caps and limits:**
+- **Per-file size cap:** 25 MB. Larger files are rejected at upload time with a clear error message.
+- **Per-event hosted-file cap:** maximum 10 hosted files per lesson/event/unit. Soft warning at 8, hard block at 10 with a "Remove an existing file first" prompt. Configurable per-school by admin in Phase 3.
+- **Unlimited links.** No cap on the number of external/YouTube/Drive links per event.
+- **Image stack counts as ONE file slot**, not as N images. A 30-image stack is one of the 10 allowed hosted-file slots. Internal limit on stack size: 50 images per stack to keep the viewer performant.
+- **Total file size per stack:** also capped at 25 MB (the per-file cap applies to the bundle, not each image).
+
+**Storage backend:**
+- **Cloudflare R2** (chosen over Supabase Storage for zero egress fees at any future scale; same Cloudflare account already hosting Pages).
+- **Access control:** files in R2 are served via a Cloudflare Worker that verifies the requesting teacher's Supabase session before issuing a signed URL with a short TTL (5 minutes). Direct R2 public URLs are never exposed; this lets RLS-style permissions enforce who can view which files.
+- **Bucket layout:** `r2://planner-resources/{school_id}/{event_type}/{event_id}/{resource_id}/{filename}` — partitioned by school to make per-school usage accounting trivial.
+- **Free-tier coverage:** the R2 free tier (10 GB storage, 1M Class A operations, 10M Class B operations, zero egress forever) covers Heather's beta and most plausible schools. Paid usage starts at $0.015/GB storage; no egress fees.
+
+**School admin setting (Phase 1B):**
+- **Resource hosting mode** in Settings → School library:
+  - **Links only** (default for new schools) — disables hosted-file uploads entirely; teachers can only attach external/YouTube/Drive links. Lowest moderation risk, zero storage cost.
+  - **Files + links** — enables hosted-file uploads up to the per-file and per-event caps above.
+- Toggle requires school admin; lead cannot enable on their own (storage cost concern requires school-level visibility).
+
+**Preview banner behavior:**
+- **External link** → on attach, the system fetches the URL's Open Graph `og:title`, `og:description`, `og:image`. Cached in the `Resource` row; re-fetched manually via a "Refresh preview" action.
+- **YouTube link** → extracts the video ID via URL parsing; renders the standard YouTube thumbnail (`img.youtube.com/vi/{id}/hqdefault.jpg`). Title and duration fetched via YouTube oEmbed API.
+- **Drive link** → extracts the file ID; renders a Google Drive file-type icon (Doc, Sheet, Slides, generic Drive file) + the filename if accessible. Drive permissions are NOT modified — the link only works if the viewer has Drive access granted by the link's owner.
+- **Hosted file (PDF)** → renders the PDF's first page as a thumbnail (generated server-side via pdf-thumbnail or PDF.js on upload).
+- **Hosted file (image / image_stack)** → renders the first image as a thumbnail.
+- **Hosted file (DOCX / RTF)** → renders a generic document icon with the filename and file type badge.
+
+**Drag-and-drop UX:**
+- Teachers can drag a file from their desktop directly onto a lesson card in the Weekly or Daily view → attaches as a hosted file.
+- Teachers can drag a URL from the address bar onto a lesson card → attaches as a link (system auto-detects YouTube / Drive / generic).
+- Resource creation modal alternative: subject → unit → week → day → lesson chooser, then attach.
+- All resources on a lesson are draggable to reorder within the lesson, or draggable to a different lesson (re-anchoring).
+
+**Audit:** every resource upload, edit, deletion, and access writes an audit log entry. Storage usage is rolled up nightly to the `SchoolStorageUsage` snapshot for the admin dashboard (Phase 3).
+
+### 4.6 Undo stack (concurrency safety net)
+
+Last-write-wins concurrency would be hostile without a way to recover from accidental overwrites. The mitigation: every editable entity carries an undo stack.
+
+**EditUndoStack** (new entity)
+- `id`, `entity_type` (`core_lesson_event | extra_lesson_event | day_event | unit | subject | personal_subject | comment | daily_note | todo`), `entity_id`, `teacher_id`
+- `snapshot`: JSON blob of the entity's prior state (before the edit)
+- `created_at`
+- One row per edit. The stack is **per-entity-per-teacher**: each teacher who edits a given lesson has their own undo stack against it.
+
+**Stack depth:** **5 most recent edits per (entity, teacher).** When a 6th edit happens, the oldest snapshot is dropped. This is a Phase 1 minimum; the cap can be raised in Settings if teachers need it.
+
+**Undo UX:**
+- Right-click context menu on any editable entity has an "Undo last edit" entry that becomes "Undo (N available)" when the stack is non-empty.
+- Keyboard shortcut `⌘Z` / `Ctrl+Z` triggers undo on the currently focused entity. (This is scoped to the focused entity, not a global doc-wide undo — too risky.)
+- Each undo writes a new audit log entry (`undo_applied`) so the audit trail remains complete.
+- Undo is **always against the teacher's last edit on that entity** — never another teacher's edit. If Sarah edits a master lesson then Tom edits it, Tom's undo undoes Tom's change (revealing Sarah's edited state), not Sarah's.
+
+**Concurrency safety:** combined with the "Sarah is also editing this lesson" presence indicator (Supabase realtime presence), this lets teachers recover from accidental simultaneous-edit overwrites. The presence indicator warns before the edit; the undo stack saves them after.
+
+**What undo doesn't cover (Phase 1):**
+- Deletions of master lessons — Phase 1 keeps a 30-day soft-delete window for master lessons separate from the undo stack. Restoration is via Admin section (Phase 3) or contacting the developer.
+- Standards tags — covered, but undo affects the lesson's full standards array (not selective).
+- Resource attachments — covered the same way (full snapshot rollback).
+- Audit log entries — not undoable. The audit log is append-only.
+
+### 4.7 Copy from archived years
+
+The active school year is one at a time, but archived years remain queryable for the purpose of copying content into the active year. A new teacher who likes how the previous year's Coordinate Plane unit was structured can pull it forward without reinventing.
+
+**Copy-from-archive actions:**
+- **Settings → Year management → Copy from archive** — opens a browsing screen showing all archived school years for this grade. Each year is read-only.
+- **Per-entity copy** — from any view, right-click a unit / lesson / resource / personal subject in an archived year and choose "Copy to active year." The system:
+  - Clones the entity into the active year's school year record.
+  - Updates `school_year_id` and any week numbers to make sense in the new context (the teacher is asked which week to anchor it to).
+  - Preserves content (titles, learning objectives, directions, resource links, standards tags) but not completion records.
+  - Writes a `copied_from_archive` audit log entry.
+- **Bulk copy** — for entire units (clone the unit and all its lessons in one action) or entire archived personal subjects.
+
+**Browse permission:** Any teacher can browse any archived year for their assigned grade(s). Copying respects the same `SubjectTeamMembership` rules — a teacher can only copy *into* subjects they have `can_edit_master = true` on.
+
+**What can be copied vs. not:**
+- ✅ Master units, master lessons (with all content fields), resources, standards tags, personal subjects, recurrence patterns.
+- ❌ Completion records, daily notes, comments, day shoutbox posts, audit log entries.
+
+**Acceptance:**
+- Browsing an archived year loads within 2 seconds.
+- Copying a unit (~30 lessons) completes in under 5 seconds.
+- Copies preserve all author-facing fields; receiving year shows the lesson as if newly created (no completion, no comments inherited).
+
+### 4.8 Week cycles (one-week vs. AB two-week scheduling)
+
+Most elementary schools run on a one-week cycle: every Monday looks the same. Most high schools (and some middle schools) run on AB cycles: Monday of Week A looks different from Monday of Week B, alternating throughout the year.
+
+The data model supports both from Phase 1; the UI for switching ships in Phase 2 alongside the full Schedule view.
+
+**School Year changes:**
+- `active_cycle_pattern`: enum — `one_week | ab_two_week`. Default: `one_week` for all schools at launch.
+- For `ab_two_week`, the system needs to know which week is A vs. B for any given calendar date. Computed from a `cycle_anchor_date` (the date the cycle "starts" on Week A) and the calendar week count from that date.
+
+**Time Block changes:**
+- `week_cycle`: enum — `every_week | week_a | week_b` (default `every_week` for one-week schools, which means "applies regardless of cycle").
+- A Time Block with `week_cycle = week_a` only fires on Week A in `ab_two_week` schools.
+- This is a single field on each Time Block — no separate AB Schedule entity needed.
+
+**Display rules:**
+- In one-week schools, the cycle indicator is hidden.
+- In AB schools:
+  - Weekly view header shows "Week A" or "Week B" badge next to the week-of-N navigator.
+  - Schedule view shows the same badge.
+  - Time blocks marked `week_a` only appear in Week A views; `week_b` only in Week B views; `every_week` appears in both.
+- Switching weeks via the navigator alternates A → B → A → B through the year.
+
+**Override:** the lead (or `school_admin`) can break the cycle for special dates (holiday weeks, exam weeks) via Settings → Schedule overrides. Per-date overrides take precedence over the cycle.
+
+**Acceptance:**
+- A school configured as `one_week` shows no AB-related UI anywhere.
+- A school configured as `ab_two_week` correctly alternates Week A and Week B across navigator clicks.
+- Time blocks marked `week_a` do not appear when viewing a Week B date.
+
+---
+
+## 5. Screen-by-Screen Specifications
+
+> Each screen is described well enough that Claude Design can prototype it and Claude Code can build it. Visual specifics (colors, fonts) live in §6.
+
+### 5.1 Login / Sign-up
+- Single button: "Sign in with Google."
+- (Optional) domain restriction message: "Use your @school.edu.qa account."
+
+### 5.2 Weekly view (default)
+**Layout:**
+- Top: school-year selector, week-of-N navigator (with prev/next), master/personal toggle, view-switcher, search.
+- Daily notes banner row: 5 columns (Sun–Thu) with shared notes on top, personal underneath, color-coded by priority.
+- Main grid:
+  - Rows = subjects (in display order). Literacy parent row is expandable into its four strands.
+  - Columns = Sun, Mon, Tue, Wed, Thu.
+  - Cells contain 0 or more lesson cards. Variable cell height to accommodate ~7 subjects, with horizontal scroll if needed.
+- Each lesson card shows, in its **collapsed (default) state**:
+  - Title
+  - Subject color stripe (left edge)
+  - **Preview paragraph** — a meaningful 2–3 line summary of the lesson, drawn from the first portion of the lesson's directions field (auto-truncated with ellipsis). Long enough to convey what the lesson is actually about at a glance, not just its name. ~140–200 characters visible.
+  - Completion checkbox
+  - Standards count badge
+  - Resource icons (one per attached resource)
+  - "Personal" indicator if it's a fork
+- Cards are draggable to other days, weeks, or units.
+- **Within-day reordering:** in addition to inter-day drag, events can be dragged **up or down within their cell** to change their order for that specific day. Writes an `EventDayOrderOverride` for that teacher × date. The reordered sequence persists as historical record (never auto-cleared) — viewing Tuesday Week 12 months later shows the order that was actually taught.
+- **Multi-lesson stacking:** if two or more lessons are scheduled in the same effective slot, they appear stacked within the cell, each with its own card, completion checkbox, and disclosure controls. Drag one out of the shared stack to separate them.
+- **Day Events banner:** below each day's column (at the bottom, beneath all subject rows for that day) is a small banner listing any `DayEvent` records for that date. Each event shows its title, an event-type icon, and a completion checkbox if applicable. Click to expand for description; right-click to edit/delete (author or lead/grade_admin only).
+
+**Card expansion (weekly view specific):**
+- Click a lesson card to **expand it inline within its grid cell** — directions appear (still collapsible), notes accessible, resources listed, standards visible, **comment thread visible at the bottom**. Card grows downward; adjacent cards in the same column reflow.
+- **Expanded cards stay open until explicitly closed.** Opening one card does NOT close others — teachers can have multiple cards expanded across the grid simultaneously. This lets a teacher open Monday's math + Wednesday's writing + Thursday's science and compare them side by side.
+- To close an expanded card: click its collapse caret/chevron, click the card's header again, or press Esc (which closes the last-focused expanded card).
+- **Expansion state persists per-teacher across devices.** State is stored server-side (see §4.2 `TeacherUIState`), so a teacher who expands three cards on her laptop sees those same three expanded when she opens the planner on her classroom iPad. Sync is debounced (~500ms after the last interaction) to avoid hammering the database.
+- The right-side detail panel is **not** the primary detail surface for the weekly view — inline expansion is. (Right panel is the surface for Daily view.)
+
+**Right-click context menu** (also accessible via a "⋯" affordance on hover for touch/keyboard users):
+- Move to → submenu of week / day / unit targets
+- Duplicate
+- Copy to my personal (or Reset to master, if already a personal fork)
+- Mark status → done / skipped / carried over / partial / not done
+- Add to to-do list (creates a linked to-do)
+- **Tag standards →** opens a compact standards picker filtered to the subject's default frameworks (with a "Show all frameworks" override). Type to search; click to add tags. Closes on Escape or click-outside. Lets a teacher add standards to a lesson in 2-3 seconds without opening the full detail panel.
+- Delete (master mode only, with confirmation)
+- See standards
+- Print this lesson
+
+**Filters (left side panel):**
+- Subject (checkboxes)
+- Unit (checkboxes)
+- Completion status (multi-select)
+- Standards (typeahead)
+- "Show only uncovered" toggle (the catch-up filter)
+
+**Header callouts:**
+- "🔥 N items not covered" badge if catch-up filter would find something.
+- Holiday markers as week-row backgrounds.
+- Ramadan ribbon if active.
+
+### 5.3 Daily view
+
+**Two-pane layout (different from weekly's inline-expand pattern):**
+- **Left pane:** list of the day's subjects in display order. Each item shows subject color stripe, event title, and a completion checkbox. Click to select. **Events can be reordered by dragging up or down** — this writes an `EventDayOrderOverride` for that teacher × date. The reordered sequence persists as part of the historical record (never auto-cleared).
+- **Right pane:** has **one job at a time** — either lesson detail, or the Today dashboard. Never mixed.
+
+**Day Events at the end of the left pane:**
+- Below the academic-block list, a labeled section ("Today's Events") lists any `DayEvent` records for the current date.
+- Quick-add input: "+ Add an event" → opens a small inline form (title, optional time, optional description, scope team/personal).
+- Each event row shows its title, time if set, an icon for its event_type, and its own completion checkbox.
+- Events stay visible historically — viewing Daily View for a past date shows events that occurred that day.
+
+**Right pane states:**
+- **Lesson selected:** full lesson detail — directions (collapsible), notes (hover-revealed), resources, standards, completion controls, **comment thread for this lesson at the bottom (top-level comments + one level of replies)**.
+- **Nothing selected (Today dashboard):** read-only summary of the day, with quick-add inputs:
+  - Today's daily notes (personal reminders) + quick-add input
+  - Today's to-dos: a read-only slice of items dated today or in the "Today" bucket (personal and team) + quick-add input
+  - Daily completion summary (X of Y subjects done, % remaining)
+  - Note: full to-do management is in the slide-out panel, not here. The dashboard surfaces today's items; it does not replace the to-do panel.
+
+**Top of view:**
+- Daily Notes banner (personal reminders only — urgent/important/fyi) is also displayed inline with the day for context. Each teacher sees only their own.
+- **Day Shoutbox** appears immediately below the Daily Notes banner and is the **team-visible** counterpart: a single team thread for the current day. Flat list (no threading), quick-add input at the bottom, author + timestamp on each post. Auto-archives from this inline view after 7 days (still readable in the Comment Browser). The clean split: Daily Notes are *what I want to remember*; Day Shoutbox is *what we're talking about*.
+
+**Default selection on open:** first not-yet-done subject.
+
+**Personal vs. Master:** controlled by the top-bar toggle. Same view, same layout, different data source.
+
+**Mobile / narrow screens:** Left pane collapses to a header dropdown; right pane fills the screen.
+
+### 5.4 Schedule view
+
+**Two-pane layout:**
+- **Left pane:** vertical timeline of the teacher's day, in real time slots. Each slot shows time range, label, and (for academic blocks) lesson title + completion checkbox. Non-academic blocks (lunch, recess, PE, Arabic) display with neutral styling.
+- **Right pane:** has **one job at a time**:
+  - **Academic block selected** → full lesson detail.
+  - **Non-academic block selected** → notes editor for that block (notes only, no curriculum).
+  - **Nothing selected** → Today dashboard (same content as Daily view's dashboard).
+
+**Time block reordering and multi-lesson slots:**
+- Time blocks themselves are fixed by the teacher's master schedule (set in Settings) — they don't move around per day.
+- **Events inside academic blocks can be dragged up or down within the day**, just like Daily View. This re-sequences which event is in which slot for that date only. Writes an `EventDayOrderOverride`.
+- **A lesson can be dragged into a slot that already has a lesson.** The slot then shows both lessons side-by-side (two) or stacked (three+). Each lesson keeps its own completion checkbox, standards, directions, and resources — they are presentationally grouped, not merged.
+- **A lesson can be dragged back out of a shared slot** into a different slot (or its own slot). The other lessons in the shared slot are unaffected.
+
+**Day Events:**
+- Day events appear inline in the timeline at their assigned time (if a time is set) or in a "Today's Events" section at the bottom of the left pane (if no time).
+- Same quick-add affordance as Daily View.
+- Same historical persistence — past dates still show their events.
+
+**Highlighting:**
+- The current/next time block is highlighted in the left pane based on the **individual teacher's clock**, per-teacher (not a team-wide indicator).
+
+**Default selection on open:** the time block that matches the current time of day.
+
+**Source-of-truth rules (reaffirmed):**
+- Defaults to personal copy where one exists; falls back to master.
+- Edits write to personal only (auto-fork from master on first edit).
+- Master is unreachable from this view.
+
+**Ramadan mode:** A toggle (or auto-detected by date range) swaps in the alternate timings; left pane reflows accordingly.
+
+**Mobile / narrow screens:** Left collapses to dropdown; right fills screen.
+
+### 5.5 Unit view
+- Header: unit name, subject, weeks covered, completion summary (% per teacher).
+- Unit summary panel (editable in master mode).
+- List of all lessons in the unit, grouped by week.
+- "Copy unit to my personal" action.
+- "Start Unit" action (Phase 2 — see §4.4): marks the date the teacher started the unit, surfaces a one-time intro tooltip, optionally generates a printable overview.
+- Master-change notification banner if personal copy exists and master has changed.
+- Standards coverage map: visual showing which CCSS codes are touched in this unit.
+- **Missed-events task list** at the top of the page when any lessons in this unit are not-done past their scheduled date. Same shape as in the Subject view (§5.6): title, original date, days-overdue, quick actions. Respects the global catch-up toggle.
+- **Comment thread** at the bottom of the unit page (top-level + one level of replies). Anchored to the unit itself — separate from comments on individual lessons within the unit.
+
+### 5.6 Subject view
+- Header: subject name, total lessons, completion %, total resources.
+- Time-period filter: All / Unit / Month / Week.
+- Grouped lesson list (by unit or by week, toggleable).
+- Resource browser: all resources for this subject in one filterable list (Phase 2 expands this to file previews).
+- **Missed-events task list mode.** When viewing across a multi-week scope (Month, Unit, All), missed/not-done events are surfaced as a dedicated task list section at the top of the view (above the chronological list). Each item shows title, original date, days-overdue badge, and quick actions (Mark done, Mark skipped, Carry over to…, Jump to lesson). The task list respects the global catch-up toggle (Settings) — if catch-up is off, the section is hidden but missed events remain visible in the chronological list with their red highlighting.
+- **In Day and Week scope, missed events stay inline in their original date positions with red highlighting** (the existing behavior). The task-list summarization only appears at Month+ scopes where the visual clutter of inline missed-events becomes overwhelming.
+- **Toggle: "Hide missed events"** — removes missed events from the view entirely (both inline and task-list). For teachers who want to focus on what's ahead. Per-teacher preference, persisted in `TeacherUIState`.
+
+### 5.7 Year view
+- 40-week calendar grid.
+- One row per subject (parent rows; can expand into strands).
+- Each cell = one week of one subject = the unit currently active that week.
+- Holiday weeks visually marked.
+- Drag-and-drop to reshuffle units across the calendar.
+
+### 5.8 Standards browser
+
+**Purpose:** searchable across all frameworks assigned to the active grade. Used as a typeahead picker when tagging lessons/events, AND as a full-screen browser for understanding what standards exist and what they cover.
+
+**Layout:**
+- **Top:** search box + filter chips for framework (multi-select; defaults to all frameworks active for this grade), subject (if applicable), standard hierarchy depth (top-level domains vs. deepest standards).
+- **Body:** grouped list. Group header = framework name with its color/icon. Within each group, standards rendered as tree if the framework has hierarchy; flat list if `max_depth = 1`.
+- Each standard row shows: code, description (truncated, expandable), tag count ("touched on N lessons this year").
+- Click a standard → opens a side panel showing every lesson currently tagged with it (across master + personal, filterable by completion status). Useful for "show me every place we teach fractions." **The side panel includes a missed-events section at the top when any lessons tagged with this standard are not-done past their date** — surfaces "we haven't yet covered this skill" at a glance.
+
+**Standards picker (used inside lesson/event authoring):**
+- Compact version of the browser: search box, framework-grouped results, click to add. Selected standards show as colored chips below the picker.
+- Multiple frameworks selectable simultaneously — a single lesson can hold CCSS + EE + SEL tags at the same time, each visibly identified by framework color.
+
+**Acceptance:**
+- Picker returns results across all assigned frameworks within ~100ms for ≤5,000 standards.
+- Each tag visibly shows its framework via color and short-code badge.
+- Tagging a lesson with a standard creates a `standard_tagged` audit-log entry.
+
+### 5.9 Print Center
+
+A unified print interface reached from any view via the top-bar print icon or `⌘P` / `Ctrl+P`. Replaces the simple "Print this view" pattern with a filterable print configurator that handles every print use case.
+
+**Layout:**
+- **Left pane — Configuration:** all filters and toggles.
+- **Right pane — Live preview:** updates as filters change. Shows the actual paginated output the printer will receive. "Print" button at bottom triggers `window.print()` against the preview.
+
+**Scope chips (top of config pane, mutually exclusive):**
+- Day
+- Week
+- Month
+- Year (overview format — see below)
+- Subject (full year for one subject)
+- Unit (full unit overview)
+- Not-done (the Catch-up screen filtered to your current filters; reuses §5.17 data)
+
+**Date / target selector** (changes based on scope):
+- Day → date picker, defaults to today.
+- Week → week-of-N picker, defaults to current week.
+- Month → month picker, defaults to current month.
+- Year → school-year selector, defaults to active year.
+- Subject → subject dropdown + year-or-term selector.
+- Unit → unit picker.
+- Not-done → reuses the Catch-up screen's scope (Last week / Last 4 weeks / This term / All year) and filter set.
+
+**Completion filters (multi-select checkboxes):**
+- ✅ Include completed
+- ⬜ Include not-done
+- ⏭️ Include skipped
+- 🔄 Include carried-over
+- ⚠️ Include partial
+
+Default: all checked (everything prints). Uncheck to suppress that status.
+
+**Content toggles (multi-select):**
+- Include lesson titles (default on, can't be turned off)
+- Include 2-3 line preview / directions snippet
+- Include full directions
+- Include notes (otherwise hover-only)
+- Include standards codes
+- Include standards descriptions (not just codes)
+- Include resource links (URLs spelled out)
+- Include completion checkboxes (blank for not-done; ✓ for done)
+- Include personal vs. master version
+- Include daily notes
+- Include day shoutbox posts (Week view only)
+- Include extra lesson events
+- Include day events
+
+**Format toggles:**
+- Paper: Letter / A4 (auto-detect from browser locale).
+- Orientation: Portrait / Landscape.
+- Density: Comfortable / Compact (compact fits more per page).
+- Color: Color / Black-and-white-safe (replaces subject colors with shape-based subject indicators for B&W printers).
+
+**Year-view print format (special):**
+The full-detail year print (~1,400 events) would be 200+ pages and unusable. Year scope defaults to **overview format**:
+- One page per month (or per term).
+- Subject rows × day-of-week columns × week numbers.
+- Each cell shows lesson title only (no directions, no preview).
+- Completion checkboxes as small filled/empty squares.
+- Standards count as a small badge.
+- A "Full detail" override toggle exists for the rare case someone wants the 200-page version (with a confirmation: "This will produce ~200 pages — continue?").
+
+**Reachable from:**
+- Top-bar print icon (every view)
+- `⌘P` / `Ctrl+P` keyboard shortcut
+- Right-click context menu on any lesson card → "Print → Day / Week / Unit containing this lesson"
+- Catch-up screen → "Print this list" (opens Print Center with scope=Not-done and filters carried over)
+
+**Print pagination invariants:**
+- No lesson card split across pages mid-content.
+- Multi-page outputs include "(continued)" headers on continuation pages.
+- 9-subject week at full detail must paginate cleanly on Letter and A4 (stress test).
+- Year overview at default settings must fit in 12 pages or fewer.
+
+### 5.10 Settings
+- Profile: name, default view, default grade level, completion-privacy.
+- **Catch-up:** global on/off toggle for the catch-up bar and top-bar flame badge (default on); entry link to the Catch-up screen (§5.17).
+- Year management: active year, archive year, start new year.
+- Subject management:
+  - **Team subjects** (lead role only): add / remove / reorder team subjects, edit colors, set default frameworks for tagging.
+  - **My personal subjects** (every teacher): add / remove / reorder personal subjects (e.g. "Morning Meeting", "Afternoon Circle"), pick colors, set default frameworks. Personal subjects appear in the teacher's Weekly/Daily/Schedule views as additional rows, invisible to teammates.
+    - Each personal subject card shows: name, color, display order, current `promotion_status` badge if applicable ("Pending lead approval" / "Approved" / "Rejected").
+    - **Rollover preference** — each card has a small "End of year:" control with three options: **Ask me at rollover** (default), **Roll over automatically**, **Archive automatically**. The teacher can change this anytime during the year.
+    - **Share with team** action — sets `promotion_status = pending` and creates an entry in the lead's (and any delegated `grade_admin`'s) approval queue. Available only when `promotion_status` is `not_requested` or `rejected`.
+    - **Cancel share request** action — available while `promotion_status = pending`. Withdraws the request from the approval queue.
+    - **Archived subjects** subsection (collapsed by default) — lists personal subjects from prior years that the teacher chose to archive (or that defaulted to archive via `rollover_preference = no`). Each row has a "Restore to this year" action that clones the archived subject's definition + curriculum structure into the active year.
+  - **Subject promotion approval queue** (lead role + delegated grade_admins only): a list of pending personal-subject share requests across the team.
+    - Each row: requesting teacher, proposed subject name, color, display order, default frameworks, "View existing events on this subject" link (read-only — owner's events are not shared on promotion), Approve / Reject buttons.
+    - Approve: subject's `scope` becomes `team`, `owner_id` clears, subject appears in every team member's view going forward. Owner's existing events remain personal-only.
+    - Reject: `promotion_status = rejected` (owner can re-request after editing the subject).
+    - Lead can delegate approval to a `grade_admin` via a "Delegate approvals to…" picker in Settings; the delegate sees the same queue.
+- Time-block setup: define teacher's daily schedule (and Ramadan variant), per grade if multi-grade.
+- **Recurring events management:** view, edit, delete the teacher's recurring extra lesson events (e.g. weekly morning meeting). Set recurrence pattern, days of week, end conditions.
+- Master change log (lead role only): audit trail of all master edits.
+- Tag management: create / rename / recolor / delete personal tags. Lead role manages team tags per grade.
+- **Standards framework defaults per subject:** for each subject the teacher participates in, select which frameworks the standards picker shows by default when tagging events in that subject (e.g. "Math → CCSS + EE; SEL → CASEL only"). A "Show all frameworks" override remains available in the picker itself.
+- **Standards frameworks management** (school admin only):
+  - Browse catalog frameworks (CCSS, IB, NZ Curriculum, Cambridge, etc.) and enable them for the school.
+  - Assign enabled frameworks to specific grades (e.g., "CCSS + EE for Grade 5; CCSS + Cambridge for Grade 7").
+  - Upload custom frameworks via CSV — columns: `framework_short_code, code, description, parent_code, grade_level, language`. Phase 1: basic parse and insert. Phase 2: preview before commit, validation, edit-after-upload. Phase 3+: in-app standards editor.
+  - View per-framework standards counts, last-updated date.
+- **Grade-level management** (admin / school lead only): activate or deactivate grade levels, assign teachers to grades, assign lead roles per grade.
+
+### 5.11 To-Do panel and view
+
+**The slide-out panel is the full to-do management surface.** This is where filtering, scoping, editing, bulk actions, and tagging happen. Today's to-dos also appear in the Daily/Schedule view's Today dashboard as a read-only slice for at-a-glance use — but management itself lives here.
+
+**Slide-out panel (primary access):**
+- Toggled from a checklist icon in the top bar, slides in from the right.
+- Two tabs at top: **Mine** | **Team**.
+- **Scope filter chips (one-click time scoping):** `Today` | `This week` | `This month` | `No date` | `All`. Mutually exclusive (one active at a time).
+- **Tag filter:** typeahead + color chips. Multiple tags selectable (OR semantics).
+- Below filters: a quick-add input ("Add a task…" with Enter to save). Optional date, tag, and priority pickers appear when the user clicks an expand caret.
+- Body: list of to-do items, sorted by due date (no-date items at the bottom of the active view).
+- Each item shows: checkbox, title, tag color dot(s), due date if any, linked-entity icon if any, and (on team list) "✅ done by Sarah" attribution when complete.
+- Hover an item to reveal: edit, delete, link-to-lesson, assign-to-teammate (team scope).
+
+**Full-screen To-Do view:**
+- Optional expand button on the slide-out opens a dedicated page with the same data, wider layout, and bulk-action support (multi-select, mark several complete, bulk re-tag).
+- This is the power-user surface; daily use is via the slide-out.
+
+**Today dashboard (in Daily and Schedule views):**
+- A **read-only summary**, not a management surface. Shows today's to-dos (personal + team, dated today or in the "Today" bucket) with completion checkboxes and a quick-add input.
+- Full editing, scoping, filtering, and tag management happen in the slide-out — not in the dashboard.
+
+**Acceptance behavior:**
+- Anyone on the team can check off a team-list item; the system records who completed it.
+- Personal items are private to the author; never visible to other teachers.
+- Tags filter inclusively (multiple tags = OR); scope chips filter restrictively (one bucket at a time).
+
+### 5.12 Export Center
+
+Curriculum exports for school and governing-authority submission. Reachable from a top-bar **Export** icon and from a "Print / Export" item in any lesson's right-click context menu.
+
+**Trigger surfaces:**
+- Top-bar Export icon → opens the Export Center modal (full configuration).
+- Right-click on a lesson card → "Export…" submenu (quick single-lesson PDF).
+- "Export" button on Unit view header → pre-fills scope = this unit.
+- "Export" button on Subject view header → pre-fills scope = this subject (with the active time-range filter applied).
+- "Print preview" pages from §5.9 remain for ad-hoc browser printing; the Export Center is the **archival** export path with consistent layout.
+
+**Modal layout (linear, top-to-bottom):**
+1. **Scope** — radio buttons: Daily / Weekly / Unit / Subject (year) / Custom range.
+2. **Scope params** — auto-shown based on choice: date picker (daily), week number (weekly), unit picker (unit), subject + school-year picker (subject), date range picker (custom).
+3. **Format** — radio: PDF | Excel | Both.
+4. **Data version** — Personal (this teacher's diverged copies + master fallback) | Master only.
+5. **Content toggles** — checkboxes:
+   - Include learning objectives (default on)
+   - Include directions / lesson content (default on)
+   - Include standards (default on)
+   - Include resource links (default on)
+   - Include completion status (default off — admins usually want the plan, not the per-teacher progress)
+   - Include teacher notes (default off — private by nature)
+   - **Include day events (default on)** — appends each day's events (assemblies, drills, guest speakers, teachable moments) to the corresponding date in the export.
+6. **Mode** — Live (download once, not retained) | Snapshot (save to Reports library for re-download).
+7. **Optional label** — text input shown only when Snapshot is selected.
+8. **Preview** button → opens a side-pane preview rendered from the same template.
+9. **Generate** button → produces the file(s) and triggers download. If Snapshot, also saves a `SavedExport` record.
+
+**PDF layout (default template — Phase 1):**
+- Cover page: school name, grade level, scope description (e.g. "Math — Unit 3: Fractions — Weeks 8–12"), generation date.
+- One section per unit (if scope spans multiple), one subsection per week, one block per lesson.
+- Each lesson block: title, day, learning objectives (bulleted), standards (CCSS codes + descriptions), directions (full text), resource links (URLs printed for reference).
+- Page numbers and small footer ("Generated by [App Name] on [date]").
+- Letter and A4 friendly.
+
+**Excel layout (default — Phase 2):**
+- One sheet, one row per lesson, columns: `Week | Day | Subject | Unit | Lesson Title | Learning Objectives | Standards (codes) | Standards (descriptions) | Directions | Resource Links | Completion Status (optional)`.
+- Header row frozen. Auto-filter on. Resource links written as Excel hyperlinks.
+- Wide cells, line-wrapped text — designed for an admin to scan and filter, not for visual polish.
+
+**Reports library (Snapshot mode):**
+- A section in Settings (visible to all grade-level teachers, manageable by leads) lists all saved exports.
+- Columns: created date, format, scope, label, exporter, file size, download / delete.
+- Delete restricted to leads.
+
+**Acceptance behavior:**
+- All exports include the lesson title, learning objectives, standards, and lesson content (per teacher's request).
+- A Live export is generated on demand from current data; nothing is retained server-side.
+- A Snapshot export is identical to a Live one at generation time, but the file is also persisted to `SavedExport` for later re-download.
+- The "Personal" data version produces a PDF that reflects the exporting teacher's diverged copies; "Master only" reflects the team-wide master regardless of who exports it.
+
+### 5.13 Admin section (Phase 3+ placeholder)
+
+> **Status:** Data infrastructure ships in Phase 1; UI is a Phase 3 (or later) build. This subsection exists so the data model and architecture are designed correctly *now* — actual screens are not specified yet.
+
+**Who sees it:**
+- `SchoolAdmin` role holders (school principal, IT coordinator, curriculum coordinator) — full school-wide view.
+- `grade_admin` role holders within `TeacherGradeAssignment` — grade-scoped view.
+
+**Access pattern:**
+- Top-bar profile menu shows an "Admin" item only for users with one of these roles.
+- The admin section sits outside the six main views (it's a separate area, not a seventh view).
+
+**Anticipated surfaces (not specified in detail — to be designed when this phase begins):**
+
+*Activity / oversight surfaces:*
+- **Activity timeline** — filtered view of `AuditLog`. Filter by actor, action, entity type, date range, grade.
+- **Roster** — list of teachers, role assignments per grade, last-login timestamps. Admin can promote/demote (lead/grade_admin/teacher), add or remove a teacher from a grade, deactivate accounts.
+- **Grade-level management** — activate/deactivate grades, set up teaching teams.
+- **School year management** — start a new year, archive a previous year, configure holidays and Ramadan range.
+- **System metrics dashboard** — number of active teachers (last 7/30 days), lessons created, exports generated, storage used, snapshot count.
+
+*Instructional leadership surfaces (the key payoff of building data infrastructure now):*
+- **Standards coverage dashboard** — matrix + heatmap showing which standards in each framework are tagged on lessons, filterable by framework / grade / subject / school year / completion status. Drives the "what are we teaching" question.
+- **Coverage gaps report** — list of standards in a framework's full list that have ZERO lessons tagged. The "what are we missing" report.
+- **Distribution over time** — for each standard, a histogram of which weeks it appears in. Surfaces unevenness (front-loading, late-skipping).
+- **Repetition / depth view** — how many lessons touch each standard. Standards touched once may be under-emphasized; standards touched 20+ times may be over-emphasized.
+- **Cross-subject integration** — for cross-cutting frameworks (SEL, 21st-century skills, digital citizenship), shows how many lessons across each subject touched standards from that framework.
+- **Teacher variance** — for the same grade and school year, compare which standards each teacher's *personal* copies touched. Reveals drift between master and what's actually being taught. **Defaults to aggregate view** ("the team's coverage is 67%") with explicit drill-in required for per-teacher data.
+- **Comment intensity heatmap** — units with high discussion vs. silent units. Highlights where teachers are engaging (or stuck).
+- **Year-over-year comparison** — same coverage reports across archived school years. "How does Grade 5's standards coverage this year compare to last year?"
+- **Unit deep-read** — one unit at a time: all standards covered, completion rates, comments, teacher variations. The drill-down view of a single unit's reality.
+- **Custom report builder** *(Phase 4+, deferred)* — lets an admin pick dimensions and filters to build their own report. Probably overkill until you've used the curated ones for a year.
+
+*Design principles for all reports (locked in now):*
+- **Aggregate by default; per-teacher views require deliberate drill-in.** The data shouldn't feel like surveillance. "67% of standards covered across the team" is more useful and less weaponizable than ranking teachers.
+- **Per-teacher drill-in may require a separate, higher permission tier** (configurable per school).
+- **All reports are read-only.** Admins observe; they don't edit teacher data from these screens.
+- **Reports run against `CoverageSnapshot` not live data** — fast loads, historical accuracy, no expensive joins at request time.
+
+**What ships in Phase 1 to make this work:**
+- `SchoolAdmin` table created (empty by default).
+- `TeacherGradeAssignment.role` enum includes `grade_admin`.
+- `AuditLog` table written-to from every mutation across the app (see §7.8).
+- RLS policies for the audit log: only admins (school-wide or grade-level) can read; everyone can write through a security-definer function.
+
+**What doesn't ship in Phase 1:**
+- No admin UI of any kind. No menu item. No screens.
+- The data is collecting silently. When you're ready, the UI is a Phase 3+ project against a database that already has months of history.
+
+### 5.14 Comment Browser
+
+The dedicated surface for searching, filtering, and reading all comments across the grade. Reached from the 💬 icon in the top bar (with unread badge) or from a "View all comments on this lesson/unit" link inside any inline thread.
+
+**Purpose:**
+- Inline comments live on the entity they're attached to. The Browser is where a teacher answers questions like "what's been discussed this week?", "what did Sarah comment on across the unit?", "what comments do I have unread?".
+- Mirrors the to-do slide-out's filtering grammar so teachers don't learn two filtering UIs.
+
+**Layout:**
+- **Slide-out from the right** (same surface pattern as the to-do panel) for quick access, with an optional expand-to-full-screen button for power browsing.
+- **Filter chips at top:**
+  - **Scope:** `Today` | `Past 7 days` | `This week` | `This month` | `All` (mutually exclusive, one active at a time)
+  - **Anchor type:** `All` | `Lesson` | `Unit` | `Resource` | `Day shoutbox` (mutually exclusive)
+- **Filters below chips:**
+  - **Subject** (multi-select dropdown — color-coded chips matching the subject palette)
+  - **Unit** (multi-select)
+  - **Author** (multi-select — pick teammates by name/avatar)
+  - **Has-replies-from-me** (toggle — "comments where I'm in the thread")
+  - **Unread only** (toggle — shows comments not yet in `CommentRead` for this teacher)
+- **Quick filter shortcuts at the very top** (icon buttons): "Unread", "Comments on lessons I taught today", "Comments I started", "Replies to me".
+
+**Result list:**
+- Most recent first.
+- Each row shows: author avatar + name, anchor label (e.g. "📘 Math · Unit 3 · Lesson 5 · Mon Wk 12"), timestamp ("2h ago"), body excerpt (~140 chars), reply count, unread dot if applicable.
+- Click a row → opens the parent view (Weekly grid scrolled and expanded to that lesson, or Unit view scrolled to the unit-level thread, or Daily view scrolled to the shoutbox for that date), with the comment thread scrolled into view.
+- Hover row → reveals: copy-link-to-comment, jump-to-anchor, mark-as-read.
+
+**Empty states:**
+- "No comments yet — start a conversation on any lesson, unit, or resource."
+- Filter-empty: "No comments match these filters. Try widening the scope or clearing filters."
+
+**Notifications (Phase 1):**
+- The 💬 top-bar icon shows an unread-count badge.
+- Badge updates on app load and on view-switch. **No real-time push in Phase 1.**
+
+**Notifications (Phase 2):**
+- Real-time badge updates via Supabase realtime subscription.
+- Optional opt-in daily email digest ("3 new comments since yesterday on lessons/units you authored or commented on").
+- No browser push, no toast popups, no SMS. Teachers should not feel surveilled or interrupted.
+
+**Acceptance behavior:**
+- Filtering is fast (<200ms) even with thousands of comments.
+- Unread state is per-teacher and survives sign-out/sign-in.
+- Jumping from a Browser row to the anchor view always lands with the thread visible and scrolled into view.
+
+### 5.15 Curriculum Import
+
+The on-ramp for schools coming from existing planning documents. Reached from Settings → "Import existing curriculum" (school admin or lead only). Without this, every new school has a multi-week manual data entry barrier before the planner delivers value.
+
+**Three layers of import support:**
+
+**Layer 1 — Strict CSV template (the cheap fallback):**
+- Settings page provides a downloadable CSV template with fixed columns: `week, day, subject, unit, title, learning_objectives, standards_codes, directions, resource_urls`.
+- If a school's existing data is already this clean (rare), they paste it into the template and upload. Validation errors surface inline (missing required column, unknown subject, malformed standards code).
+- This is the canonical schema that Layer 2 maps everything else into.
+
+**Layer 2 — AI-assisted import (the workhorse):**
+The teacher uploads whatever they have in any format — their messy Google Doc exported to CSV, an existing Excel sheet with merged cells and prose, a Word doc converted to plain text. Claude API parses it.
+
+*Flow:*
+1. **Upload screen:** drop zone accepts `.csv`, `.xlsx`, `.xls`, `.txt`, `.md`. File size cap ~5MB.
+2. **Parse:** a Claude API call reads the uploaded content and proposes a mapping to the strict template. The prompt includes the canonical schema and a few-shot examples of messy input → normalized output. Returns a JSON array of normalized lesson objects.
+3. **Preview screen:** displays "Found 1,247 lessons across 40 weeks" with a 10-sample table showing source row → mapped fields side-by-side. Confidence indicator per row (high / medium / low).
+4. **Conflict resolution:** rows the AI couldn't confidently map go into an "Needs review" tab. Teacher edits inline or skips.
+5. **Confirm and commit:** confirmed rows are inserted as `MasterCoreLessonEvent` records. The school year and units are created or matched as needed. Standards codes are matched against frameworks already assigned to the grade; unmatched codes surface as a separate "unmatched standards" report after import.
+6. **Audit log:** the entire import is one `curriculum_imported` audit entry with `{source_filename, rows_total, rows_inserted, rows_skipped, rows_flagged}` in metadata. Each individual lesson insert is also logged normally.
+
+*Cost estimate:* a 40-week × 7-subject × 5-day curriculum is ~1,400 rows. Single Claude API call (or batched into 3-5 calls if the source is large). Estimated cost per school import: **$1-3**. Run once at onboarding.
+
+*Why this approach beats a rigid form:* schools' existing curriculum docs are wildly varied — column names, merged cells, prose mixed with structure, multiple sheets, free-form notes. A rigid CSV importer fails on real data and forces hours of manual cleanup. Letting Claude do the schema-mapping work shifts the friction from the teacher (cleaning data manually) to the system (parsing intelligently).
+
+**Layer 3 — Developer-assisted seed (service offering, no code):**
+For schools whose data is too chaotic even for Layer 2 (e.g. 40 separate Word documents, scanned PDFs, inconsistent across weeks), the developer offers a paid migration: "We'll get your existing plan into the tool, $X flat fee." The developer uses the Layer 2 tooling under the hood with additional manual cleanup. Not a feature — a service line item, mentioned in onboarding documentation.
+
+**Phase 1 scope:**
+- Layer 1 template + validator: ships.
+- Layer 2 AI import: ships, with preview and conflict-resolution UI.
+- Layer 3: documented, not built.
+
+**Phase 2 polish:**
+- Multi-file uploads (one file per week or per subject).
+- Better few-shot prompting based on real schools' data observed during Phase 1 launches.
+- Import history view (re-run, undo last import).
+- Auto-extraction of resource URLs from prose ("see [link]" → resource record).
+
+**Acceptance behavior:**
+- A school can complete onboarding (entire year's curriculum imported) in under one hour from upload to confirmed-in-database for a 1,400-row dataset.
+- AI-assisted import correctly maps ≥80% of rows with high confidence on a well-structured but non-canonical source (e.g., a Google Doc with consistent columns).
+- The "Needs review" tab clearly surfaces low-confidence rows; teacher can edit, skip, or accept each.
+- All imports write a single top-level `curriculum_imported` audit log entry with row counts in metadata.
+- Unmatched standards codes do not block the import — they surface as a follow-up report so the teacher can map them after lessons are in.
+
+### 5.16 Additional UX improvements (Phase 1)
+
+> **Implementation status (as of this writing): NONE of the improvements in this section have been implemented in the existing Claude Design mockups.** They are specified here but the prototypes still need to be built. Treat this section as a to-do list for the next Claude Design pass. The current artifacts reflect the pre-improvement state.
+
+This subsection captures concrete UX behaviors flagged during prototype review that don't fit neatly into a single screen spec — they're cross-cutting refinements to discoverability, keyboard control, and inline feedback. All listed items are Phase 1 unless flagged otherwise.
+
+#### Pending Claude Design to-do list
+
+The following components and behaviors need to be built into the prototypes. Each is specified in detail below.
+
+- [ ] **Right-click `⋯` hover affordance** on every lesson card (parallel discoverability for the context menu)
+- [ ] **Personal-mode three-tier visual differentiation** — solid stripe / dashed stripe + "Modified" pill / solid stripe + move-arrow icon (replaces the old 9px lock icon)
+- [ ] **Master-mode entry banner sequence** — flashing red heads-up message ("Heads up — changes here affect the whole team") that fades to a small persistent red banner while editing (see §3.3)
+- [ ] **Collapsed comment thread** — "💬 N comments" count badge by default; expand on click; unread dot if applicable
+- [ ] **Keyboard shortcuts** — `j/k/h/l`, `e`, `Space`, `⌘D`, `⌘K`, `Delete`, `/`, `?`, `Esc` (full table below) plus a `?`-triggered cheat sheet modal
+- [ ] **Empty-day affordance** — "Drag a lesson here or click +" hint with subject-tint hover state on empty grid cells
+- [ ] **Catch-up controls** — global on/off toggle in Settings + per-week dismissible bar + top-bar flame badge when dismissed + dedicated Catch-up screen (see §5.17)
+- [ ] **Today/Now indicator (Schedule view)** — 2px subject-color top border + pulsing "▶ NOW" badge + horizontal red "now line"
+- [ ] **Print pagination stress test** — verified against a 9-subject week with full directions
+- [ ] **Carry-over click-through** — "N from last week" stat on Today dashboard becomes a clickable link
+- [ ] **Standards code drill-through** — clicking a standards chip opens a side panel listing every lesson tagged with that standard
+
+The detailed specs follow.
+
+#### Right-click discoverability via hover affordance
+
+The right-click context menu (specified in §5.2 and §6.5) carries powerful actions — Move to, Mark status, Add to to-do, See standards, etc. — but new teachers won't know right-click works. The fix: a small **"⋯" affordance** appears on every lesson card on hover (and is always visible on iPad / touch devices). Clicking it opens the same menu as right-click. The two are functionally equivalent; the affordance is the discoverability gateway, right-click is the power-user shortcut. Onboarding tooltip on the first hover ("Try right-clicking — or click this menu") teaches the gesture once, then disappears.
+
+#### Keyboard shortcuts (the dense-grid power-user toolkit)
+
+Teachers planning a 40-week × 7-subject grid will want fingers-only navigation. Bound shortcuts:
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Move focus down / up to the next lesson card |
+| `h` / `l` | Move focus left / right (between days in weekly view) |
+| `e` | Expand / collapse the focused card |
+| `Space` | Toggle completion on the focused card |
+| `⌘D` / `Ctrl+D` | Duplicate the focused lesson |
+| `⌘K` / `Ctrl+K` | Open the "Move to" submenu for the focused card |
+| `Delete` / `Backspace` | Delete (master mode only, requires confirm) |
+| `/` | Focus the global search input |
+| `?` | Open keyboard-shortcut cheat sheet modal |
+| `Esc` | Close detail panel, collapse expanded card, or close modal |
+| `g c` | Open the Catch-up screen (vim-style two-key — `g` followed by `c`) |
+
+Shortcuts are documented in a `?`-triggered cheat sheet modal and listed in the help menu. All shortcuts also work via menu items, so no keyboard is required to use the tool.
+
+#### Empty-day affordance
+
+An empty cell in the weekly grid currently shows nothing. The fix: empty cells display a faint **"Drag a lesson here or click +"** hint text with a small `+` icon. Hovering shows the cell border in subject-tint (for the subject row it belongs to). Clicking the `+` opens the "+ Add to day" chooser pre-populated with that subject and day. Removes the discovery problem of "how do I add a lesson?"
+
+#### Catch-up controls — three layers
+
+The catch-up system surfaces uncovered/incomplete lessons. Phase 1 ships three layers of control:
+
+**Layer 1 — Global on/off toggle in Settings.**
+A single switch under Profile → "Show catch-up reminders." Default: on. When off, the in-grid bar never appears, the top-bar flame badge never appears, the Catch-up screen (§5.17) is still reachable from Settings or by search but is not surfaced by ambient affordances. Useful for teachers who don't want the ongoing reminder.
+
+**Layer 2 — Per-week dismissible in-grid bar.**
+The "🔥 N items not covered" header callout (§5.2) is the default in-grid surface when the global toggle is on. The bar has a small ✕ to dismiss it for the current week. Once dismissed, a small flame icon **with the count badge** appears in the top bar. Clicking the top-bar badge restores the in-grid bar (or jumps to filtered view). Dismissal is per-teacher, per-week; opening next week's view restores the default. The global toggle (Layer 1) overrides this — if the global toggle is off, neither the bar nor the badge appears.
+
+**Layer 3 — Dedicated Catch-up screen.**
+A full-page view of every uncovered/incomplete event across the school year. Spec'd in §5.17 below. Reachable from: (a) Settings, (b) the top-bar flame badge's secondary menu ("Open Catch-up screen"), (c) the Today dashboard's carry-over click-through (which opens it filtered to last week's items), (d) any view's catch-up filter dropdown ("Show all year").
+
+#### Today / now indicator (Schedule view) — visibility verified
+
+The current/next time block highlight in Schedule view must be **unmissable at a glance during a busy classroom moment** — not a subtle outline. Specification:
+- The current time block is highlighted with a **2px subject-color top border** plus a small **pulsing "▶ NOW" badge** in the top-right corner of the block.
+- A horizontal **"now line"** spans the timeline at the exact current minute, drawn in a bold red, 2px thick, with an arrow on the left margin pointing to the current minute. The line shifts down every minute.
+- Both indicators respect `prefers-reduced-motion`: with motion reduced, the badge stops pulsing but stays solid red; the now-line stays static.
+
+#### Carry-over click-through
+
+The "2 from last week" stat on the Today dashboard (§5.3) currently displays as informational text. The fix: it becomes a **clickable link**. Clicking it opens the **Catch-up screen (§5.17) filtered to the previous week's items**. The teacher lands directly on the items that need attention, with the full Catch-up screen's actions (mark done, skip, carry over, jump-to-lesson) available.
+
+#### Standards code drill-through
+
+On a lesson detail panel, each standards code (e.g. `CCSS.5.NBT.B.5`) is shown as a colored chip. Currently those chips are display-only. The fix: each chip is **clickable** and opens a side panel showing every lesson currently tagged with that standard — across master + personal copies, filterable by completion status. This is the first cut of the vertical-alignment story (§5.8 Standards browser) and answers the question "what other lessons cover this same skill?"
+
+#### Comment thread collapsed by default
+
+On a lesson detail (Weekly expanded card, Daily right pane, Unit page), the comment thread currently renders fully. With active grade-level conversations this becomes visually heavy. The fix: a **"💬 N comments"** count badge replaces the full thread by default. Clicking the badge expands the thread inline. The badge shows a small unread dot if there are comments this teacher hasn't read. Once expanded, the thread stays open for the session (per the sticky-expansion rule in §6.5). Initial state on first-ever view of a lesson with a thread: **collapsed**; subsequent visits reflect the teacher's last state.
+
+#### Print pagination stress test
+
+The Phase 1 weekly print template must be stress-tested against the worst case: a 9-subject week (Literacy expanded into all four strands + 5 other subjects) at Letter size, with full directions text per lesson. Acceptance criterion: no horizontal overflow, no orphaned page breaks within a lesson card, no week split awkwardly across pages without a "(Week N continued)" header on the new page.
+
+### 5.17 Catch-up screen (Phase 1)
+
+A dedicated full-page view showing every uncovered or incomplete event across the school year, organized for triage and bulk action. The third layer of catch-up control (after the global toggle and the in-grid bar).
+
+**Purpose:**
+- Answer "what haven't I covered yet across the whole year?" without scrolling through 40 weeks.
+- Provide a bulk-action surface for end-of-week or end-of-quarter cleanup ("mark all these as carried over to next week").
+- Give the teacher a sense of overall coverage as a single number, not just per-week.
+
+**Layout:**
+
+- **Header:** the active grade, school year, and a coverage summary (e.g. "67% covered — 142 uncovered events across 12 weeks").
+- **Filters bar (top, sticky):**
+  - **Scope chips:** `Last week` | `Last 4 weeks` | `This term` | `All year` (mutually exclusive). Defaults to `Last 4 weeks` when opened from the carry-over click-through; defaults to `All year` when opened from Settings.
+  - **Subject** (multi-select).
+  - **Unit** (multi-select).
+  - **Status** (multi-select): `not_done` | `partial` | `skipped` | `carried_over`. Defaults to `not_done` + `partial` + `carried_over`.
+  - **Event type** (multi-select): Core Lesson Event / Extra Lesson Event / Day Event.
+  - **Group by:** dropdown — `Subject → Unit → Chronological` (default) | `Chronological flat` | `Standard` | `Unit only`.
+
+- **Body:** a grouped list per the active `Group by`. Each item shows:
+  - Subject color stripe + unit indicator
+  - Event title and 2-3 line preview
+  - Original scheduled date and current status
+  - Standards count badge, resource icons
+  - Per-item actions (right-side, hover-revealed): **Mark done · Mark skipped · Carry over to… · Jump to lesson · Add to to-do**
+  - A checkbox on the left edge for bulk-select
+
+- **Bulk action bar (bottom, appears when items are selected):**
+  - Count of selected items ("12 selected")
+  - Bulk actions: **Mark all done · Mark all skipped · Carry over all to… · Add all to to-do**
+  - Clear selection
+
+- **Empty state:** "🎉 Caught up. Nothing uncovered in this scope." with a small celebration motif. (One of the few places the planner is allowed to be a little playful — finishing the catch-up list is genuinely a small win.)
+
+**Carry-over destination picker:**
+When the teacher chooses "Carry over to…" (per-item or bulk), a small popover appears with options:
+- Next school day (default)
+- Next week (same day-of-week)
+- A specific date (date picker)
+- A specific week (week-number picker)
+
+Carry-over creates a new `EventDayOrderOverride` entry for that teacher + date if needed, and updates the event's status to `carried_over` with metadata pointing to the new scheduled date.
+
+**Jump to lesson:** opens the Weekly view scrolled to the event's original week, with the event card expanded.
+
+**Reachable from:**
+- Settings → "Catch-up screen"
+- Top-bar flame badge dropdown → "Open Catch-up screen"
+- Today dashboard carry-over stat → opens filtered to last week
+- Any view's catch-up filter → "Show all year"
+- Keyboard shortcut: `g c` (go to catch-up — vim-style two-key shortcut, doesn't conflict with anything)
+
+**Acceptance behavior:**
+- Loads within 2 seconds for a school year with up to 1,500 events.
+- Group-by changes re-render the list without losing the current selection.
+- Bulk actions on 50+ items complete within 3 seconds with progress indicator.
+- Coverage summary updates in real time as the teacher marks items.
+- The empty state ("Caught up") is shown when the active filter set returns zero rows — even if the global year-wide coverage isn't 100%, it celebrates the scope-level win.
+
+### 5.18 Year-end Rollover Decision screen (Phase 2)
+
+A dedicated screen that surfaces to every teacher with at least one personal subject when the lead initiates year rollover. Confirms personal-subject decisions explicitly — the per-subject `rollover_preference` set at creation only **pre-selects** the row's radio; it does not skip the prompt.
+
+**When it appears:**
+- When the lead clicks "Roll over to next year" in Settings → Year management, the system identifies every teacher with at least one personal subject in the active year.
+- Each such teacher gets a top-bar notification ("End-of-year rollover — your decisions needed") and, on next sign-in, lands on this screen instead of their default view.
+- Teachers with zero personal subjects skip this screen entirely (nothing to confirm).
+
+**Layout:**
+- **Header:** "End-of-year rollover — confirm what to bring forward." Subhead: "We've pre-selected based on the preferences you set when creating each subject. Adjust anything before confirming."
+- **List body:** one row per personal subject. Each row shows:
+  - Subject name + color stripe
+  - Preference badge ("You chose: Roll over" / "You chose: Archive" / "No preference set")
+  - Year-end stats: count of units, count of events authored, count completed, count not-done
+  - Per-row radio control: **○ Roll over to next year** | **○ Archive (can restore later)**
+  - Pre-selected per the subject's `rollover_preference`. Subjects with `ask_me` have nothing pre-selected and must be actively chosen.
+- **Bulk action bar** (top of list, sticky):
+  - **Roll over all** (selects "Roll over" on every row)
+  - **Archive all** (selects "Archive" on every row)
+  - **Reset to my preferences** (returns every row to its pre-selection state; `ask_me` rows clear)
+- **Skip option (footer):** "Skip for now — ask me again at next sign-in." Closes the screen without committing decisions; the rollover stays pending until resolved.
+- **Submit button:** "Confirm decisions" — enabled when every row has an explicit choice (either via pre-selection or active teacher action).
+
+**While pending (after the teacher skips):**
+- The Weekly view shows a banner at the top: "Rollover pending — N personal subjects awaiting your confirmation. [Decide now]"
+- Affected personal subjects stay visible in the old year's data but do not yet exist in the new year (their events are inert).
+
+**On submit:**
+- For each "Roll over" subject: clone forward (subject + units + core lesson events + recurrence patterns) per §4.5.
+- For each "Archive" subject: archive with the prior year; if the subject had a pending promotion, auto-cancel and notify the lead.
+- Each decision writes an audit log entry (`personal_subject_rollover_decided` with metadata indicating the decision and whether the teacher accepted or overrode the pre-selection).
+- Teacher is taken to the new year's Weekly view.
+
+**Reachable from:**
+- Top-bar rollover notification (the primary entry)
+- Settings → Year management → "Resolve pending rollover decisions" (if the teacher previously skipped)
+- The Weekly-view banner
+
+**Acceptance behavior:**
+- The screen renders within 1.5 seconds for a teacher with up to 20 personal subjects.
+- Bulk actions update all radios in <100ms.
+- Submission writes all subject rollover decisions atomically — partial-failure is not possible (either every chosen subject rolls over or the whole submission is rejected with an error).
+- A teacher who has zero personal subjects in the active year never sees this screen.
+
+### 5.19 Permissions Admin page (Phase 2-3)
+
+A dedicated administrative surface for managing who can do what across the school. Lives in the Admin section (Phase 3+) but the underlying permission model ships in Phase 1 so the data is captured from day one.
+
+**Audience:**
+- `school_admin` — full access.
+- `lead` (per grade) — read access for own grade; can adjust permissions within their grade for non-administrative features.
+- `grade_admin` — same scope as `lead` for the grades they admin.
+- Regular teachers — no access.
+
+**Layout:**
+- **Roster panel (left):** scrollable list of every teacher in the school, with name, email, primary grade assignment, and a single-line summary of their roles ("Lead — Grade 5; Teacher — Grade 6"). Filterable by grade, role, status. Click a teacher to see/edit their full permission profile in the right pane.
+- **Profile pane (right):** when a teacher is selected, shows three tabs:
+  1. **Roles** — per-grade role assignments. Each grade the teacher is on shows: `teacher | lead | grade_admin`. Adding the teacher to a new grade is a separate action.
+  2. **Subject memberships** — per-grade list of every subject the teacher is on (`SubjectTeamMembership`), with `can_edit_master` toggle per subject. Allows the admin to restrict editing rights without removing visibility.
+  3. **Feature overrides** — fine-grained per-feature permissions, organized as a permission matrix. Rows = features (see below); columns = Yes / No / Inherit-from-role.
+
+**Permission matrix (feature rows):**
+- Master editing (per subject) — overrides `SubjectTeamMembership` if set
+- Subject promotion approval (can approve other teachers' personal subject promotions for their grade)
+- Subject team management (can add/remove `SubjectTeamMembership` rows)
+- Personal subject cap override (can have more than 5 personal subjects)
+- Standards framework upload (CSV)
+- Standards framework assignment to grades
+- Curriculum import (AI-assisted)
+- Year management (start new year, archive, initiate rollover)
+- AI budget management (set caps, view spend)
+- Background uploads (school-wide enable/disable + per-teacher override)
+- Comment moderation (delete others' comments)
+- Admin section access (audit log viewer, reports, etc.)
+- Department-leader override (allowing teachers outside a grade to edit that grade's subjects — requires `school_admin`)
+
+Each row has three states: **Yes** (explicit allow), **No** (explicit deny), **Inherit** (use the default for their role). Inherit is the default for everything; explicit overrides exist only when an admin has deliberately changed something.
+
+**Bulk operations:**
+- Apply a permission template ("New teacher onboarding" sets Inherit everywhere; "Department head" sets specific overrides).
+- Bulk-edit multiple teachers (e.g., grant Standards framework upload to all Grade 5 leads).
+
+**Audit:**
+- Every permission change writes an audit log entry (`permission_changed`) with actor, target teacher, feature, before/after values.
+- A "Permission audit log" view in the Admin section filters the global audit log to permission-related actions only.
+
+**Phased rollout:**
+- **Phase 1:** Permission infrastructure (database tables: `TeacherGradeAssignment.role`, `SubjectTeamMembership`, a new `PermissionOverride` table). No UI yet — defaults apply everywhere (role-based behavior as spec'd elsewhere).
+- **Phase 2:** Per-subject team management UI (Settings → Team subjects → "Who can edit master"). Still no full Permissions Admin page.
+- **Phase 3:** Full Permissions Admin page in the Admin section.
+
+**PermissionOverride** (new Phase 1 entity, no UI until Phase 3)
+- `id`, `teacher_id`, `grade_level_id` (nullable — null means school-wide), `feature` (string enum), `value` (`allow | deny`)
+- Checked by RLS policies and feature gates throughout the app.
+- If no override row exists, the role-based default applies.
+
+### 5.20 Teaching Reminders banner (Phase 1A)
+
+A curated, low-friction surface for displaying research-backed quotes and pedagogy reminders to teachers throughout the day. Designed to encourage and inform without intruding.
+
+**Where it appears:**
+- **Today dashboard widget** — a quote card in the Daily view's "no selection" Today dashboard. Sits below the daily-notes summary and to-do summary.
+- **Subtle inline banner** — a slim banner on Daily, Weekly, and Schedule views, positioned just below the top navigation (above the main grid/list).
+- Both surfaces are active simultaneously: the Today dashboard card is the "settled in to read" surface; the inline banner is the "glance during work" surface.
+
+**Two categories interleave:**
+- **Behavioral / learning culture** — mindset, growth, encouragement, classroom climate. Visually styled with a warm tint (subtle amber background).
+- **Academic / teaching / learning** — pedagogy, instruction, research practices. Visually styled with a cool tint (subtle blue background).
+- Both can be visible at the same time (e.g., one of each in the inline banner row). The Today dashboard widget rotates through whichever categories the teacher has enabled.
+
+**Banner layout (inline):**
+- Slim horizontal banner ~50px tall.
+- Category color tint on left edge (subtle, like the lesson card subject stripe but lighter).
+- Quote text in normal weight, italic.
+- A small "more" / chevron indicator on the right hinting that it's expandable.
+- **A small × in the far right corner closes the banner for the current session only** — a clean way for teachers to silence reminders during a focused work block without changing their Settings preference. The banner reappears on the next session (new tab, fresh login, or browser restart). The Settings toggle remains the permanent off switch.
+- Hovering reveals a "Refresh" icon for manually advancing to a new quote.
+- Clicking the banner (anywhere except the × or refresh icons) opens an inline expansion (NOT a modal — stays on the page) showing:
+  - Full quote
+  - Summary (if available)
+  - Source name (if available)
+  - "Read more →" link to the source URL (opens in a new tab)
+  - A small "Save for later" action that adds the quote to a personal saved-quotes list (Phase 2; Phase 1 just shows the read-more link)
+
+**Today dashboard widget:**
+- Slightly larger card than the inline banner. Same content tiers (quote + click-to-expand).
+- Also has a session-close × in the corner, with the same behavior.
+- Sits naturally with the other dashboard cards (daily notes, to-dos).
+
+**Rotation:**
+- A new reminder is selected when:
+  - The page loads (fresh navigation to Daily / Weekly / Schedule view), OR
+  - The teacher navigates away and back, OR
+  - A 60-minute timer fires while the teacher stays on the same view (refreshes the banner in place with a gentle fade transition).
+- The system avoids showing the same reminder twice in a 24-hour window for the same teacher (best-effort, tracked in `TeacherReminderState`).
+- If both categories are enabled, the inline banner row shows two banners side by side (one of each). The Today dashboard widget rotates which category appears on the next refresh.
+
+**Settings — Teaching reminders:**
+- Two independent toggles in Settings → Profile:
+  - ☑ Show behavioral / culture reminders (default: on)
+  - ☑ Show academic / teaching reminders (default: on)
+- A subtle "Hide all reminders" master toggle below that disables both at once for noise-sensitive teachers.
+- Settings persist per-teacher in `TeacherUIState`.
+
+**Three control layers (summary):**
+1. **Session × (banner)** — closes the banner for this session only. Reappears next session. Lightweight "not now."
+2. **Per-category toggle (Settings)** — silences one category permanently while keeping the other. The granular control.
+3. **Master "Hide all reminders" (Settings)** — silences everything permanently. The big switch.
+
+**Library management (Phase 1A — minimal):**
+- Settings → School library → Teaching reminders (school-admin only).
+- Simple list view of all reminders with columns: Category, Quote (truncated), Source, Active toggle.
+- Add / edit / delete actions. Required fields: category, quote_text. Optional: summary, source_name, source_link.
+- Bulk import via CSV (columns: `category, quote_text, summary, source_name, source_link`) — saves Heather's existing collection from being manually re-entered.
+- No moderation queue, no shared-across-schools library in Phase 1A.
+
+**Phase 2+ enhancements (not Phase 1A):**
+- "Save quote for later" with a personal saved-quotes view.
+- Pinning a quote to a specific day (e.g., the daily standup quote).
+- Cross-school shared library with attribution.
+- Smart rotation (don't show "differentiation" reminders to a teacher who's already very strong at differentiation, based on inferred patterns) — speculative.
+- Browse-by-category view of the whole library.
+
+**Acceptance behavior (Phase 1A):**
+- Banners render on Daily / Weekly / Schedule views when at least one category is enabled.
+- Toggling off in Settings instantly hides banners across all views.
+- Click-to-expand reveals quote details inline without modal dismissal.
+- Rotation logic respects the 24-hour no-repeat rule for the same teacher.
+- CSV import accepts a well-formed file and surfaces row-level errors for malformed entries.
+- A school with zero reminders in their library shows no banner (no empty-state shouting).
+
+### 5.21 Resource viewer and lesson sidebar (Phase 1B)
+
+When a teacher clicks a resource on a lesson, the lesson opens into a focused two-pane view: the resource takes the main canvas, and a persistent sidebar keeps the lesson's other resources + scrollable notes visible.
+
+**Reachable from:**
+- Click any resource icon on a lesson card in Weekly view → expands the card inline and opens the resource in the inline expansion.
+- Click any resource in the Daily view's right detail pane → opens the resource in the main canvas (the Daily two-pane layout's right pane becomes the resource viewer).
+- Click "Open fully" on an inline-expanded resource → opens a full-screen viewer with the sidebar still visible.
+
+**Lesson resource indicator icons (on the lesson card):**
+- 📄 PDF
+- 🖼️ Image / image stack (image stack shown with a small "stack" badge)
+- 🔗 External link
+- 📺 YouTube video link
+- 📁 Google Drive document link
+- 📝 DOCX / RTF
+- A small numeric badge if more than 5 resources are attached (e.g. "5+")
+
+These icons appear in a small horizontal row on the lesson card. Hover reveals a tooltip with the resource count by type ("3 PDFs, 2 images, 1 video").
+
+**Full resource viewer layout:**
+- **Main canvas (left, ~70% width):** the focused resource.
+  - **PDF** — embedded PDF.js viewer with page navigation, zoom, search.
+  - **Image** — centered, fit-to-window with zoom controls.
+  - **Image stack** — slideshow with previous/next arrows, page indicator (e.g. "3 / 12"), thumbnail strip at the bottom.
+  - **External link / YouTube / Drive link** — preview banner (title, description, thumbnail) + "Open in new tab →" button. The system doesn't embed third-party content directly to avoid SSO/permission issues, but offers one-click open.
+  - **DOCX / RTF** — for Phase 1B, rendered as a downloadable file with a generic preview banner. Inline rendering of Word documents is deferred (would require mammoth.js or similar — Phase 2+).
+- **Lesson sidebar (right, ~30% width):**
+  - **Header:** lesson title, subject color stripe, completion status, the standard lesson context.
+  - **Other resources list:** all other resources attached to this lesson, each as a clickable row with its type icon + label. Click swaps the main canvas to that resource without leaving the lesson.
+  - **Scrollable notes/directions:** the lesson's rich-text body, scrollable independently of the main canvas. Hyperlinks embedded in the notes are clickable (open in new tab).
+  - **Standards chips:** the lesson's standards tags at the bottom of the sidebar.
+- **Top bar (above both panes):**
+  - Breadcrumb (Subject → Unit → Week → Lesson)
+  - Close button (X) returns to the previous view
+  - "Open in new tab" for external resources
+
+**Enlarged / full-screen mode:**
+- A teacher can click "Enlarge" or press `F` on the focused resource. This expands the main canvas to fill the viewport, hiding the sidebar.
+- Press `Esc` or click the contracted view's button to restore the sidebar.
+- Even when enlarged, the lesson's title and breadcrumb remain in a thin top bar so the teacher knows where they are.
+
+**Drag-and-drop attachment (Phase 1B):**
+- **From the desktop:** drag a file (PDF / image / DOCX / RTF) onto any lesson card in Weekly or Daily view. The system uploads to R2, attaches to that lesson, and refreshes the lesson card with the new resource icon.
+- **From the address bar:** drag a URL onto a lesson card. The system auto-detects the type (YouTube / Drive / generic external) and creates the appropriate link resource with preview metadata fetched.
+- **Multi-file drop:** dropping multiple files at once creates separate resources for each (or, if all are images, prompts the teacher with "Attach as image stack?" — one click bundles them).
+- **Visual feedback during drag:** the lesson card highlights with a dashed border + subject-tint glow when a draggable is over it; the cursor changes to indicate drop-acceptance.
+
+**Attachment via modal (alternative path):**
+- "+ Add resource" button on any lesson's detail panel.
+- Modal asks: **Hosted file** (browse to upload) or **Link** (paste URL).
+- For hosted files, the modal validates type and size before upload starts.
+- For links, the modal fetches preview metadata immediately so the teacher sees the banner before saving.
+
+**Attachment from outside the current view:**
+- A teacher can attach a resource from anywhere via Settings → Resource library → "+ Add to lesson" with a subject → unit → week → day → lesson chooser. Useful when batching imports.
+
+**Acceptance behavior:**
+- Lesson resource icons render within 200ms of card render on a 1366-wide screen.
+- Full resource viewer loads PDFs up to 25 MB within 3 seconds.
+- Image stacks of up to 50 images load progressively (first image shown immediately, others lazy-loaded).
+- Drag-and-drop file upload succeeds for files under the 25 MB cap; rejects larger files with a clear error.
+- Per-event hosted-file cap (10) is enforced; the 8/10 warning appears.
+- Per-school "Resource hosting mode" setting is respected — "Links only" mode disables file uploads entirely; UI hides the file-upload affordance and the modal's "Hosted file" option.
+
+### 5.22 View modes (Simple / Task / Advanced) — low floor, high ceiling (Phase 1A)
+
+Three view modes let teachers pick how much complexity they want to see. Same data, three lenses. New teachers default to Simple; power users live in Advanced; Catch-up Fridays go in Task. The toggle is a three-way pill in the top bar of every applicable view, always visible.
+
+> **Design intent.** "Low floor, high ceiling" — Simple is genuinely easier for a new teacher, not just Advanced with stuff hidden. Bigger touch targets, plain-language labels, larger type, simpler empty states, simpler add-lesson modal. Advanced is everything currently in the spec. Task is the flat checklist surface for grinding through work.
+>
+> **Note on existing Claude Design build.** The current build (May 2026) ships a three-way pill (Grid · Task list · Simple) and a flag-based Simple mode that hides indicators. This spec extends Simple beyond flag-hiding to a designed low-floor experience for the four most-trafficked views (Lesson card, Weekly, Daily, Subject). Phase 2 may add more views to Simple based on beta feedback. Other views in Phase 1A stay flag-hidden in Simple (good-enough fallback).
+
+#### Mode definitions
+
+**Simple** — designed for new teachers and quick-glance use during the school day. Bigger touch targets, larger type, plain-language labels, one primary action per surface. Hides advanced indicators (catch-up flame, comment counts, Modified pills, move-arrows, standards descriptions, completion submenus). The current state and the one main next action are visible; everything else is one layer deeper. Default mode for new teachers.
+
+**Task** — designed for catch-up sessions and bulk operations. Flat checklist of events; rows with completion checkbox + title + day + subject swatch; bulk-select and bulk-actions (Mark done / Carry over / Mark skipped) at top. Filterable. Replaces the visual grid with a productive worklist. Most useful in Weekly, Daily, Subject, Unit, and Catch-up views.
+
+**Advanced** — the current spec in full. Every right-click menu, every standards drill-through, every Modified pill, every dashed stripe, every keyboard shortcut. Opt-in for teachers who want the full toolkit. Default for the Lead role (since they're doing curriculum admin work).
+
+#### Mode toggle (top bar)
+
+Three-way pill, always visible in the top bar. Pre-built by Claude Design as `CPViewModeSwitch`. Labels adapt by view:
+- Weekly / Daily / Subject / Unit: **Grid · Task · Simple**
+- Schedule: **Timeline · Task · Simple**
+- Catch-up screen: hidden (already inherently Task)
+- Standards browser: hidden (inherently Advanced)
+
+The selected mode persists per-teacher in `TeacherUIState.view_mode` (one global mode applied across views, not per-view). Switching mode is instant; no page reload.
+
+**Default mode by role:**
+- New teacher (first login): **Simple**
+- Teachers who later toggle: whatever they last selected
+- Lead role: **Advanced** by default (they manage curriculum)
+- Grade admin / school admin: **Advanced** by default
+
+#### Simple mode — concrete per-view specs (Phase 1A)
+
+The four most-trafficked views get a dedicated Simple-mode design pass. Other views' Simple modes are flag-hidden in Phase 1A; designed Simple modes for additional views ship in Phase 2 based on beta feedback.
+
+**Simple Lesson card:**
+- Card height: 88px (vs Advanced's 64-72px). More breathing room.
+- Subject color stripe: 6px wide (vs 4px). More visible.
+- Lesson title: 16px Geist, weight 500 (vs Advanced's 14px). Easier to read at a glance.
+- Completion checkbox: 24×24 px (vs Advanced's 16×16). iPad-friendly tap target.
+- One line of preview text from directions, 13px, line-clamp 1 (vs Advanced's 2). Less to scan.
+- Resource count: single link icon + number ("🔗 3" or "🔗 0"). No per-type icon row.
+- Standards count: single chip ("3 standards"), tap-to-expand-list. No code chips inline.
+- **What's hidden in Simple:** dashed stripe + Modified pill, move-arrow icon, "Core has updates" indicator, comment count badge, sub-task pill (`tasks` count), `I-Can` objective inline, `reasonNotDone` inline note. All accessible via tap → expanded detail.
+- **On tap (Simple):** opens expanded modal with: full title, full directions, resource list (tap to view), standards list, completion toggle, "More options" disclosure for everything else.
+- **Right-click menu:** suppressed in Simple. The ⋯ button still works on hover/touch but offers only 3 options: Mark done, Move to day, Open detail. Full context menu is Advanced-only.
+
+**Simple Weekly:**
+- Grid is Sun-Thu × subjects, same shape as Advanced.
+- No catch-up bar at top in Simple. (The catch-up screen is still reachable from the top-bar flame badge if global toggle is on; the inline bar is hidden.)
+- No "Now editing core curriculum" banner in Simple. (Master mode is suppressed — Simple-mode teachers can't enter master mode. If they need to edit core, they toggle to Advanced.)
+- Empty day cells show: faint hint text "Drag a lesson here or tap +" + a 40×40 `+` button (Advanced's hint is 14px text; Simple's is 16px + bigger button).
+- Drag-and-drop still works.
+- Standards count badges on cards: hidden (use the standards chip on expanded card).
+- Day shoutbox: hidden in Simple. (Personal Daily Notes still visible.)
+- **Tap a lesson** → opens the Simple Lesson card expanded modal (not the inline-expand of Advanced).
+
+**Simple Daily:**
+- Two-pane layout same as Advanced, but with larger touch targets.
+- Left pane: today's lessons as a vertical list. Each row is 64px tall (vs Advanced's 48px). Big checkbox on the left, title + 1-line preview on the right.
+- Right pane: selected lesson's detail. Full directions in 14px (vs Advanced's 13px). Resource list with tap-to-view. Standards list. One "Mark done" button. "More options" disclosure for everything else.
+- No daily notes urgency-pulse animation (Simple keeps urgent notes solid red, no pulse — Advanced pulses).
+- Teaching reminders banner: shows in Simple, same as Advanced.
+- No keyboard-shortcut hints in the empty-state.
+
+**Simple Subject:**
+- Lesson list grouped by unit; each unit shows: unit name, week range ("Weeks 9 to 12" — plain language, not "Wk 9–12"), completion %, lesson count.
+- Each lesson row: subject stripe + title + completion checkbox + "Not done yet" / "Done" / "Skipped" status label in plain text (Advanced uses colored chips; Simple uses words).
+- "Today is here" marker: bigger and more visible than Advanced's subtle line.
+- Hide: standards drill-through chips, resource icons (use count badge only).
+- Missed-events task-list section at top: hidden in Simple. (Reachable via Catch-up screen if needed.)
+
+#### Simple mode — flag-hidden fallback for other views (Phase 1A)
+
+Views not listed above use the Claude Design build's existing flag-hidden Simple mode. The toggle works on every view; views without a dedicated design pass simply hide the same indicators (Modified pill, comment count, move-arrow, etc.) without resized components.
+
+Phase 2 considers dedicated Simple-mode passes for: Schedule, Unit, Catch-up (likely stays Task-only), Standards (likely stays Advanced-only), Print Center, Settings.
+
+#### Task mode — concrete per-view specs (Phase 1A)
+
+Task mode of any view is a flat checklist of that view's events, with bulk operations.
+
+**Task Weekly:**
+- All week's events as a flat list, grouped by day (Sun, Mon, Tue, Wed, Thu).
+- Each row: completion checkbox + subject color swatch + lesson title + small "subject · unit · day" meta line.
+- Top action bar: filter chips (Subject, Status, Unit), bulk-select toggle.
+- Bulk action bar appears when one or more rows selected: Mark done / Mark skipped / Carry over to… / Add to to-do.
+- Click a row → expands inline to show directions, resources, standards.
+
+**Task Daily:**
+- Today's events as a top-to-bottom checklist. Each row: completion checkbox + subject swatch + title.
+- One-line meta: "Subject · Time · Unit".
+- Bulk operations like Task Weekly.
+- Empty state: "🎉 No events left today — all caught up." or "Pick today's date to see events."
+
+**Task Subject:**
+- All lessons for the selected subject across the year, grouped by unit, flat checklist.
+- Useful for "show me everything I haven't covered in Math yet."
+- Filter chips for: status, completion.
+
+**Task Schedule:**
+- Today's time blocks as a checklist, with time-of-day on the left.
+- Bulk operations same as Task Weekly.
+
+**Task Unit:**
+- All lessons in the selected unit as a flat checklist.
+- Useful for "tick everything done from Unit 6."
+
+**Task Catch-up screen:**
+- The Catch-up screen IS task mode. Toggle is hidden on this view.
+
+#### Acceptance behavior (Phase 1A)
+
+- [ ] Three-way pill (`CPViewModeSwitch`) visible in the top bar of Weekly, Daily, Subject, Unit, Schedule views; hidden on Catch-up and Standards.
+- [ ] Mode persists per-teacher in `TeacherUIState.view_mode`; survives reload.
+- [ ] New teachers default to Simple on first login; Lead/admin roles default to Advanced.
+- [ ] Switching modes is instant — no page reload, no data refetch.
+- [ ] Simple Lesson card uses 88px height, 6px stripe, 16px title, 24px checkbox; hides Modified pill, move-arrow, comment count, tasks pill, I-Can objective inline, reasonNotDone note.
+- [ ] Simple Weekly hides catch-up bar, hides core-curriculum banner, uses 40×40 + button on empty days.
+- [ ] Simple Daily uses 64px row height in the left pane, 14px directions text in the right pane, single "Mark done" button.
+- [ ] Simple Subject uses plain-language status words and plain-language week ranges.
+- [ ] Simple mode suppresses Master/Core mode entirely — a Simple-mode teacher cannot enter Master mode without toggling to Advanced first.
+- [ ] Task mode on Weekly/Daily/Subject/Unit/Schedule renders a flat checklist with bulk-select and bulk-action support.
+- [ ] Bulk actions in Task mode (Mark done, Mark skipped, Carry over, Add to to-do) operate atomically on the selected set.
+- [ ] All teachers can switch modes at will; nothing is locked behind a role for mode-switching.
+
+---
+
+## 6. Visual Design System
+
+> **Primarily for Claude Design.** This section locks the visual language so prototypes and production code share the same look.
+
+### 6.1 Tone — two themes in parallel (Phase 1 deliverable)
+
+> **For Claude Design.** Two themes ship at launch and are designed in parallel from identical components. The teacher chooses which to use; both may be retained long-term if both work in practice. The point is to test two design philosophies against the same product, not to commit to one before seeing both.
+
+**The two themes:**
+
+**Theme A — Quiet (the existing aesthetic, continued):**
+- Clean, flat, calm — not playful. Visual noise minimized.
+- Subject color appears as a thin left-edge stripe on each lesson card; card backgrounds remain near-white.
+- Unit shading uses subtle grayscale steps.
+- Chrome and content read at similar visual weight.
+- Reference points: Asana, Linear's lighter modes, Notion's default workspace.
+- Already prototyped in the existing Claude Design mockups. Continue building remaining components in this aesthetic.
+
+**Theme B — Vivid (new, parallel build):**
+- Vibrant where color carries meaning; calm in supporting chrome.
+- Each subject has a **three-step color scale**: full-saturation **stripe** (~500-600 weight), light **tint** (~50-100 weight), and **deep** (~700-800 weight) for hover/emphasis.
+- Lesson cards use **subject tint as the card background**, not pure white. The full-saturation stripe sits on the left edge. Together they produce Padlet-grade color recognition.
+- Unit rows in the weekly grid use light tints of the subject color, not gray.
+- Top bar, side panels, body text, and navigation chrome remain restrained — the meaning-carrying color reads loudly against them.
+- Reference points: Padlet (vivid backgrounds), Notion's gallery view with colored backgrounds (subtle tints + clear cell color), Linear's project labels (saturated chips).
+- Anti-pattern to avoid: gray-on-white density. If the mockup looks like Asana, it's drifted away from this theme.
+
+**Shared across both themes:**
+- Identical layout, identical components, identical typography hierarchy, identical interaction patterns.
+- Same eight-subject palette (Math blue, Reading green, Writing purple, Grammar teal, Spelling pink, UFLI coral, Explorers amber, SEL gray) — just rendered differently.
+- Same status colors (urgent red, important amber, fyi blue, completed green, catch-up flame).
+- Same density, same iconography, same animation rules.
+- High information density welcomed; progressive disclosure keeps surfaces uncluttered.
+- Color is never decoration. Every colored element carries information.
+
+**Why parallel design (not sequential):**
+- Token-driven architecture (see §6.6) means both themes share components. Designing them together is faster than designing one and retrofitting the other.
+- Side-by-side comparison surfaces decisions the spec alone can't make (does subject tint help or distract? does the vivid grid feel chaotic at scale?).
+- Both themes may ship long-term as user-selectable options. If only one wins, the work isn't wasted — it's a decisive A/B test.
+
+**Phase 1 ships:**
+- Both themes complete and selectable from a minimal theme toggle in Settings (just these two options at launch; the fuller Appearance panel with density, color intensity, backgrounds, reduce-motion arrives in Phase 2).
+- Selected theme persists in `TeacherUIState.appearance_settings`.
+
+### 6.2 Color system
+
+**Subject palette (one color per subject, team-wide, fixed — used by both themes):**
+- Math — blue
+- Reading — green
+- Writing — purple
+- Grammar — teal
+- Spelling — pink
+- UFLI — coral
+- Explorers — amber
+- SEL — gray
+
+The eight subjects use the same hues in both themes. What changes between themes is **how much** of the color shows up and **where**.
+
+**Three-step color scale (used by both themes; intensity varies):**
+- **Stripe** — full-saturation, ~500-600 weight. Identifier color.
+- **Tint** — light, ~50-100 weight. Subtle background fill.
+- **Deep** — ~700-800 weight. Hover/emphasis state, deep unit shading.
+
+**How each theme uses the scale:**
+
+| Element | Theme A (Quiet) | Theme B (Vivid) |
+|---|---|---|
+| Lesson card background | Near-white (`surface` token) | Subject tint (~50 weight) |
+| Lesson card left stripe | Full-saturation, 4px wide | Full-saturation, 4px wide |
+| Unit row background | Subtle grayscale shade | Subject tint variants (50/100/200 for U1/U2/U3) |
+| Subject filter chip (active) | Subject color outline, white fill | Subject color full-saturation fill |
+| Subject row header | Subject stripe + neutral text | Subject stripe + subject-deep text |
+| Standards code badge | Mono text, neutral background | Mono text, subject-deep on subject-tint |
+
+The stripe is identical in both themes — it's the consistent anchor. Differences live in the **fill** of the card and the **tint** of surrounding surfaces.
+
+**Unit shading:** Within a subject's color, units cycle through three shade levels. In Theme A, this is grayscale steps (U1 = lightest gray, U2 = mid gray, U3 = darkest). In Theme B, this is tint-50 / tint-100 / tint-200 of the subject's own hue.
+
+**Status / semantic colors (identical in both themes):**
+- Urgent (daily notes, personal) — solid red background. Not pulsing — pulsing is reserved for team-visible alerts; since daily notes are personal-only, no one else needs to be visually summoned to it.
+- Important — yellow / amber background
+- FYI — blue background
+- Completed — green checkmark
+- Uncovered / catch-up — flame-red badge
+- Master-mode editing — red banner across the top of the screen
+
+**Master / personal indicator:**
+- A small dot or "M" badge on each lesson card showing personal-fork status. Subtle by design in both themes.
+
+**Tag palette (for to-do tags, identical in both themes):**
+- A fixed set of ~10 distinct colors teachers can pick from when creating tags: red, orange, amber, green, teal, blue, indigo, purple, pink, gray.
+- Visually distinct from the subject palette to avoid confusion (tags use rounded pills; subject stripes are flat bars).
+
+**Anti-muted-output guardrail (Theme B specifically):**
+- A Theme B prototype that comes back gray, white-on-white, or with subject color only as a 2px stripe on a white card has drifted toward Theme A. Send back for revision.
+- The visual test: at a 1-meter glance, can you tell which row is Math and which is Writing without reading the title? In Theme B, the answer must be yes.
+
+### 6.3 Typography
+
+- Sans-serif body, weights 400 and 500 only.
+- Heading hierarchy: 22 / 18 / 16 / 14 / 12 px.
+- Lesson titles 14px, weight 500.
+- Lesson body text 13px, weight 400.
+- Standards codes in mono font, 11px.
+
+### 6.4 Components to design / prototype
+
+> **Parallel-theme mandate:** every component below is built in BOTH themes (Quiet and Vivid, see §6.1) from identical layout and structure. The visual treatment differs; everything else is the same. Where existing Claude Design mockups already exist in the Quiet aesthetic, continue them in Quiet; produce a parallel Vivid version of each.
+
+Priority order for prototyping in Claude artifacts:
+
+0. **Side-by-side theme comparison view** (do this first) — a single artifact showing the same weekly grid rendered in both Quiet and Vivid. Same data, same layout, same components, only the theme tokens differ. This is the decision-maker artifact. Once both look right next to each other, every subsequent component can be built in both themes confidently.
+1. **Lesson card** (default state with **2–3 line preview paragraph from directions**, hover state, selected state, **expanded-inline state for grid views**, personal-vs-master indicator, completion checkbox, right-click context menu). **Build in both themes.**
+2. **Weekly grid** (3 sample weeks, all subjects, ~7 per day, fake data with drag-and-drop).
+3. **Daily notes banner** (personal-only reminders, all 3 priority levels — urgent solid red NOT pulsing, important amber, fyi blue). **Build in both themes.**
+4. **Right-side detail panel** (lesson details with collapsible directions and hover-revealed notes).
+5. **Subject view** (filtered list, resource browser sketch).
+6. **Unit summary card** (header + summary + completion bar + standards coverage).
+7. **Schedule view** (time-blocked timeline with academic + non-academic blocks).
+8. **Master/personal toggle + editing-master banner** (the key safety UX).
+9. **Catch-up filter affordance** (badge + filter activation flow).
+10. **Print preview** (letter-size weekly plan).
+11. **To-do slide-out panel** (Mine / Team tabs, Today/Week/Month/No date/All scope chips, tag filter, item list with completion checkboxes, quick-add).
+12. **Two-pane Daily/Schedule layout** with single-purpose right pane — three states: lesson detail, notes editor (Schedule view's non-academic blocks only), Today dashboard.
+13. **Today dashboard** (read-only daily summary: notes + today's to-dos + completion summary + quick-add).
+14. **Grade-level switcher** in top bar (only visible when teacher is assigned to multiple grades).
+15. **Export Center modal** (scope picker, format toggle, content checkboxes, Live/Snapshot mode, preview pane).
+16. **Reports library** (saved exports list in Settings, with re-download and delete).
+17. **Inline comment thread** (top-level comments + one level of replies, on lesson detail and unit pages).
+18. **Day shoutbox** (flat list, quick-add input, anchored to a date, displayed in Daily view below daily notes).
+19. **Comment Browser slide-out** (scope chips, anchor-type chips, subject/unit/author filters, result list with anchor labels and jump-to behavior).
+20. **Multi-lesson slot** (side-by-side for two, stacked for three+; each lesson card retains full functionality; drag-out interaction).
+21. **Day Events** in three places: inline at end of Daily View's left pane, inline in Schedule View's timeline (at assigned time or end of day), banner at bottom of each day column in Weekly View. Include the quick-add form.
+22. **Within-day reordering** — the up/down drag pattern in Daily View and within a Weekly View cell, with the "this changes only today" subtle messaging.
+23. **"+ Add to day" chooser** — small modal/popover offering Core Lesson Event / Extra Lesson Event / Day Event; same authoring shape across all three, only required fields differ.
+24. **Multi-framework standards picker** — search across all assigned frameworks, results grouped by framework with color/icon badges, multiple frameworks selectable on one lesson.
+25. **Framework management screen in Settings** — catalog browser, enable/assign-to-grade flow, CSV upload form for custom frameworks.
+26. **Curriculum Import flow** — upload screen accepting any format, preview screen with source-row → mapped-fields side-by-side and confidence indicators, "Needs review" tab for low-confidence rows, conflict resolution UI, final confirm-and-commit step.
+27. **Theme toggle in Settings** (Phase 1 minimal version) — a two-option control: Quiet | Vivid. Live preview as the teacher switches. Selection persists in `TeacherUIState.appearance_settings`. (The fuller Appearance panel with density, color intensity, backgrounds, and reduce-motion arrives in Phase 2.)
+28. **Appearance settings panel** (Phase 2 design, sketch now) — theme picker (Quiet / Vivid / Dark / Focus / High Contrast), density toggle (Comfortable / Compact), color intensity (Full / Muted), **background picker (curated library + Phase 3 upload-your-own with contrast preview)**, reduce motion toggle. Live preview as the teacher changes settings.
+29. **Vivid theme on a custom background** (Phase 2 / Phase 3 sketch) — explicit prototype showing how Vivid-theme cards sit on a curated custom background (e.g. soft texture or photo). Must demonstrate that the subject tint, subject stripe, and card content all remain clearly readable. This is the test of whether Vivid + decorative backdrop still works.
+30. **Personal-mode visual differentiation** — three card states rendered side-by-side: unedited from master (solid stripe), personally modified content (dashed stripe + "Modified" pill), personally moved (solid stripe + move-arrow icon), and the composed both-modified-and-moved state. **Build in both themes.**
+31. **Empty-day affordance** — empty grid cell with "Drag a lesson here or click +" hint text, hover state showing subject-tint cell border, click target on the `+` icon. **Build in both themes.**
+32. **Keyboard shortcut cheat sheet modal** — triggered by `?`. Two-column layout: shortcut on the left, action on the right, grouped by category (Navigation / Editing / Search / Modals). Identical content in both themes.
+33. **Today / now indicator (Schedule view)** — current time block with 2px subject-color top border and pulsing "▶ NOW" badge; horizontal red "now line" spanning the timeline at the current minute. **Build in both themes.** Show what happens at `prefers-reduced-motion`.
+34. **Catch-up bar dismissed state** — in-grid bar with ✕ to dismiss; top-bar flame badge with count after dismissal; click-to-restore. **Build in both themes.**
+35. **Collapsed comment thread** — "💬 N comments" count badge with optional unread dot, plus the expanded state on click. **Build in both themes.**
+36. **Standards code chip drill-through** — a lesson detail panel showing standards chips, the click target, and the side panel that opens listing every other lesson tagged with that standard. **Build in both themes.**
+37. **Catch-up screen** (§5.17) — full-page view with scope chips (Last week / Last 4 weeks / This term / All year), filter row (subject / unit / status / event type / group-by), grouped list with per-item action menu, bulk-action bar at bottom when items are selected, carry-over destination picker popover, empty-state celebration. **Build in both themes.**
+38. **Master-mode entry sequence** — the flashing red heads-up message ("Heads up — changes here affect the whole team") that fades to a small persistent red banner. Show: the toggle moment, the flashing state, the resolved persistent-banner state, and what happens when motion is reduced. **Build in both themes.**
+39. **Catch-up settings + global toggle** — Settings panel area showing the global on/off toggle plus an entry point to the Catch-up screen. **Build in both themes.**
+40. **Time block creation flow** — the form that asks "Time slot or Personal subject?" when a teacher adds a block in Schedule view setup, with the personal-subject sub-form (name, color, display order, default frameworks). Plus the context-menu Convert actions in both directions. **Quiet only (Phase 1 production).**
+41. **Personal subjects management in Settings** — list with cards showing name/color/promotion-status; add/edit/remove/reorder controls; "Share with team" action and "Cancel share request" action; the promotion-status badges. **Quiet only.**
+42. **Subject promotion approval queue (Settings, lead view)** — list of pending requests with requester, subject preview, "View existing events" link, Approve / Reject buttons; "Delegate approvals to…" picker for the lead. **Quiet only.**
+43. **Personal subject row in Weekly view** — show how a teacher's personal subject (e.g. "Morning Meeting" in orange) renders as a subject row alongside the team subjects, with units, events, and the same color/stripe treatment as team subjects. **Quiet only.**
+44. **Year-end Rollover Decision screen (Phase 2 design, sketch now)** — full-page list of **every** personal subject the teacher owns, per-row Roll over / Archive radios pre-selected from each subject's `rollover_preference` (no pre-selection for `ask_me` rows), preference badges per row, year-end stats per subject, bulk-action bar (Roll over all / Archive all / Reset to my preferences), Skip-for-now option, and the Weekly-view banner that surfaces while a teacher's rollover decisions are pending. **Quiet only.**
+45. **Per-subject rollover-preference control in Settings** — the "End of year:" three-option control on each personal subject card (Ask me / Roll over / Archive) and the Archived subjects subsection with Restore action. **Quiet only.**
+46. **SubjectTeamMembership panel (Settings → Team subjects, Phase 2)** — per-subject "Who can edit master" panel listing current members with `can_edit_master` toggle, plus an "Add teacher from outside the grade" action (gated by `school_admin`). **Quiet only.**
+47. **Undo affordance on lesson card** — right-click menu showing "Undo last edit (N available)"; small undo toast that appears after `⌘Z` confirming the action. **Quiet only.**
+48. **Copy-from-archive browser** — Settings → Year management → Copy from archive: archived-year picker, then a read-only browser of that year's units/lessons/resources/personal subjects with a "Copy to active year" action on right-click. **Quiet only.**
+49. **AB-week cycle navigator badge (Phase 2 design, sketch now)** — the Weekly and Schedule navigators showing "Week A" / "Week B" badges next to the week-of-N label; toggle alternates. Per-Time-Block week_cycle selector mockup. **Quiet only.**
+50. **Permissions Admin page (Phase 3 design, sketch now)** — full-page admin surface: roster panel (left) + per-teacher profile pane (right) with three tabs (Roles / Subject memberships / Feature overrides). Permission matrix on the Feature overrides tab. Bulk operations bar. **Quiet only.**
+51. **AI Spend dashboard + Caps management (Phase 3 design, sketch now)** — admin section view showing current-month and YTD spend by scope/feature; Caps management UI with the sentence-builder form ("Set a cap of $[___] per [month] for [school] on [all features]…"). **Quiet only.**
+52. **Teaching Reminders banner (Phase 1A)** — slim banner on Daily/Weekly/Schedule views showing a quote with category tint stripe and click-to-expand inline reveal. States: collapsed (quote only), expanded (quote + summary + source link), refresh affordance on hover, **session-close × in the far right corner**. Plus the Today dashboard widget variant (same content + close-×). Show both Behavioral (warm amber tint) and Academic (cool blue tint) versions. **Quiet only.**
+53. **Teaching Reminders library management (Settings, Phase 1A)** — admin view: list of all reminders with category/quote/source columns, add/edit/delete actions, CSV import flow. **Quiet only.**
+54. **Resource viewer with lesson sidebar (Phase 1B)** — two-pane view: main canvas showing PDF / image / image-stack / link preview / video-link preview / Drive-link preview; persistent right sidebar showing other resources + scrollable lesson notes + standards chips; top-bar breadcrumb (Subject → Unit → Week → Lesson) + close + open-in-new-tab + enlarge controls. Sketch both inline-in-Weekly-card and full-screen variants. **Quiet only.**
+55. **Lesson card resource indicator icons (Phase 1B)** — horizontal row of resource-type icons (📄 PDF / 🖼️ image / 🔗 link / 📺 video / 📁 Drive / 📝 DOCX) on collapsed lesson cards, with hover tooltip showing per-type counts and a "N+" badge for >5 resources. **Quiet only.**
+56. **Resource attachment modal (Phase 1B)** — "+ Add resource" modal with two paths (Hosted file or Link); file path includes browse + size validation; link path shows live preview banner as the teacher pastes. Also show the drag-and-drop landing state on a lesson card (dashed border + subject-tint glow). **Quiet only.**
+57. **Image-stack slideshow viewer (Phase 1B)** — main canvas slideshow with previous/next arrows, page indicator, and thumbnail strip at bottom. Show both inline (within lesson sidebar) and full-screen states. **Quiet only.**
+58. **Resource hosting mode toggle + Settings panel (Phase 1B)** — school-admin Settings → School library → "Resource hosting mode" toggle with Links-only and Files+links options, plus a small storage-usage gauge once files exist. **Quiet only.**
+59. **Three-way view-mode pill (Phase 1A)** — top-bar `CPViewModeSwitch` already built by Claude Design (Grid/Timeline · Task · Simple). Verify it appears on every applicable view and is hidden on Catch-up + Standards. **Quiet only.**
+60. **Simple Lesson card (Phase 1A)** — dedicated low-floor design: 88px height, 6px subject stripe, 16px title weight 500, 24px completion checkbox, single resource-count icon, single standards-count chip. Show alongside the Advanced lesson card for direct comparison. **Quiet only.**
+61. **Simple Weekly grid (Phase 1A)** — Weekly view with: no catch-up bar, no Master/Core banner, 40×40 + button on empty cells with hint, larger lesson cards, plain-language day labels. Show a full week of sample data side-by-side with Advanced Weekly for comparison. **Quiet only.**
+62. **Simple Daily two-pane (Phase 1A)** — Daily view with 64px row height in the left list, 14px directions in the right pane, single "Mark done" button + "More options" disclosure, no keyboard-shortcut hints, no urgency-pulse on daily notes. **Quiet only.**
+63. **Simple Subject view (Phase 1A)** — Subject view with plain-language status words and week ranges, no standards drill-through chips, no missed-events task list. **Quiet only.**
+64. **Simple "+ Add lesson" modal (Phase 1A)** — simplified modal with only Subject / Title / Day fields; "More fields" disclosure for advanced options. Compare to Advanced's 12-field modal. **Quiet only.**
+65. **Task mode — Weekly (Phase 1A)** — flat checklist grouped by day, with filter chips at top, bulk-select toggle, bulk-action bar that appears with selection. **Quiet only.**
+66. **Task mode — Daily / Subject / Unit / Schedule (Phase 1A)** — same flat-checklist pattern applied to each view; show the empty state and the bulk-action bar in active use. **Quiet only.**
+
+### 6.5 Interaction patterns
+
+- **Drag-and-drop:** events between days, weeks, units. **Plus within-day vertical reordering** in Daily View and within a Weekly View cell — moves the event up or down in that day's sequence and writes an `EventDayOrderOverride` for that teacher × date.
+- **Multi-lesson slots:** dragging a lesson onto a slot that already has a lesson stacks them (side-by-side for two, vertical for three+). Each retains its full lesson functionality. Drag one back out to separate.
+- **"+ Add to day" chooser (universal authoring entry point).** From Daily, Schedule, and Weekly views, a single "+ Add to day" affordance triggers a small picker:
+  - 📘 **Core Lesson Event** — the main lesson type, derived from the master curriculum (unit, week, master/personal forking, drives completion + catch-up filter, standards strongly encouraged).
+  - ✨ **Extra lesson event** — one-off teaching activity outside the master curriculum (e.g., closing circle, enrichment moment). Same authoring fields as a lesson, only title required, scoped to teacher or team.
+  - 📅 **Day event** — non-curriculum (assembly, drill, guest speaker, celebration). Same authoring fields as a lesson, only title required.
+  - All three flows share the same standards picker, resource attacher, and learning-objective field — symmetric authoring experience, different required fields, different downstream behavior.
+  - Phase 2+: ability to convert between types ("oh, this should be an Extra Lesson Event, not a Day Event") via a "Convert to…" action. Phase 1: delete and recreate.
+- **Day Events:** the lightweight non-curriculum flavor of the above. Always quick-addable from the chooser. Each event has its own completion checkbox. Events persist forever — no auto-clear, no archive.
+- **Lesson card expansion is view-dependent:**
+  - In the **Weekly view**, clicking a card **expands it inline within its grid cell**. This keeps the teacher anchored in the week context.
+  - In the **Daily view** and **Schedule view**, clicking a card **opens detail in the right pane** (per the two-pane layout). Inline expansion is not used in daily-shaped views.
+  - In **Subject view** and **Unit view**, clicking a card expands inline within the list.
+  - This per-view difference is intentional: weekly is grid-oriented and benefits from in-place expansion; daily is selection-oriented and benefits from a dedicated detail surface.
+- **Expanded cards are sticky:** once opened, a card stays open until the teacher explicitly closes it (collapse caret, click header, or Esc). Multiple cards can be expanded simultaneously across a view. Expansion state is persisted **per-teacher across devices** via server-side `TeacherUIState` (§4.2) — a teacher's expanded cards on her laptop sync to her iPad and back.
+- **Right-click context menu** is available on every lesson card across all views. Menu items:
+  - Move to (week / day / unit)
+  - Duplicate
+  - Copy to my personal (or Reset to master if already a fork)
+  - Mark status (done / skipped / carried over / partial / not done)
+  - Add to to-do list (creates a linked to-do)
+  - **Tag standards** → compact standards picker filtered to the subject's default frameworks (with a "Show all frameworks" override). 2-3 second tagging without opening the full detail panel.
+  - Delete (master mode only, with confirmation)
+  - See standards
+  - Print this lesson
+- For touch and keyboard users, a "⋯" affordance appears on card hover/focus and opens the same menu.
+- **Inline editing:** click a field, type, blur to save. No "Edit" buttons for routine edits.
+- **Lesson card content disclosure tiers:**
+  - **Collapsed (default)** — title, color stripe, 2–3 line preview paragraph (truncated from the directions field), completion checkbox, standards badge, resource icons. Always visible without interaction.
+  - **Expanded (after click)** — full directions (still collapsible into deeper sub-sections if very long), notes (hover-revealed), full resource list, full standards list. View-dependent location: inline in grid views, right pane in daily views.
+- **Collapsibles:** Directions collapsed by default; click to expand.
+- **Hover reveals:** Notes hidden; hover surfaces an icon; click expands. (Iterate if it feels too hidden in practice.)
+- **Filters:** persistent across view switches within a session.
+- **Keyboard:** arrow keys to navigate the grid; Cmd/Ctrl-F to search; Esc to close detail panel or collapse expanded card; right-click works on focused card via the keyboard menu key.
+
+### 6.6 Design tokens, accessibility, and state design
+
+> **For Claude Design.** This subsection captures cross-cutting visual and behavioral requirements that apply to every component, not specific surfaces. Use as a checklist when prototyping.
+
+**Design tokens file (`tokens.css` or `tokens.json`):**
+- **Spacing scale:** 4, 8, 12, 16, 24, 32, 48, 64 px.
+- **Radius scale:** 4, 6, 8, 12 px.
+- **Elevation scale:** 0, 1, 2, 3 (shadows for cards, slide-outs, modals).
+- **Type scale:** 11, 12, 13, 14, 16, 18, 22 px; weights 400 and 500.
+- **Semantic color tokens:** `background`, `surface`, `surface-elevated`, `text-primary`, `text-secondary`, `border`, `focus`, `danger`, `success`, `warning`, `info`. Plus the eight-subject palette and ten-tag palette named explicitly.
+- **Theme-ready architecture:** every color reference is a token, never a hex literal. Every theme (Default, Calm, Dark, Focus, High Contrast) is a single CSS variable override block. Switching themes is a class swap on the `<html>` element — no component changes required.
+- **Density-ready architecture:** every padding and gap reference uses a spacing token. A future density toggle ("Compact" mode) reassigns the base spacing scale — no component edits required.
+
+**Theme, density, and backgrounds (Quiet/Vivid ship Phase 1; full panel Phase 2):**
+- **Phase 1:** ships with **two themes** — Quiet and Vivid (see §6.1) — selectable from a minimal theme toggle in Settings. Both built in parallel from identical components. Default selection at first login: Quiet (the existing aesthetic, lower-risk). Teachers switch with one click. Token architecture supports the full theme/density/background system even though the fuller Appearance panel arrives in Phase 2.
+- **Phase 2 "Appearance" settings panel** (full version):
+  - **Theme:** Quiet / Vivid / Dark / Focus (low-color) / High Contrast. Quiet and Vivid carry over from Phase 1; Dark, Focus, and High Contrast are added in Phase 2.
+  - **Density:** Comfortable / Compact.
+  - **Color intensity:** Full / Muted (reduces subject color saturation across the active theme).
+  - **Background:** see "Custom backgrounds" below.
+  - **Reduce motion:** On / Off (also respects OS `prefers-reduced-motion`).
+- All five settings combine freely (Compact + Dark + cherry-blossom background is a valid combination).
+- Settings persist in `TeacherUIState.appearance_settings` and sync across devices.
+
+**Custom backgrounds (Phase 2 curated library; Phase 3 upload-your-own):**
+
+The backdrop behind the main canvas. Decorative, personalizes the workspace, evokes the Padlet feel without sacrificing readability.
+
+*Scope (locked):* the background appears **behind the main canvas only**. The top bar, side panels, lesson cards, modals, and slide-outs all remain opaque on solid surface colors. This protects readability — a teacher reading directions never sees text floating on a busy pattern. The background fills the negative space between cards and the area around the grid.
+
+*Phase 2 curated library:*
+- **Solid colors** — extended palette of soft pastels and neutrals beyond the theme's default background.
+- **Subtle textures** — paper, linen, faint geometric patterns at low contrast.
+- **Patterns** — bolder geometric, dots, stripes (still abstract, designed to sit calmly behind content).
+- **Photos / illustrations** — landscapes, classroom scenes, seasonal sets (cherry blossoms, autumn leaves, winter, summer). Each photo is darkened and slightly desaturated by default to keep cards readable on top.
+- Each background ships in light and dark variants so it works across themes.
+- Curated by the planner team; one library shared across all schools.
+- Default selection at launch: a clean neutral. Teachers opt into anything more decorative.
+
+*Phase 3 upload-your-own:*
+- Teacher uploads an image (JPG/PNG, ≤2MB, recommended ≥1920×1080).
+- **Scope: personal only.** A teacher's custom background is visible only to that teacher. Never team-wide, never on shared views. This sidesteps moderation concerns and the "what if a co-teacher uploads something inappropriate" problem.
+- **Automatic contrast adjustment:** uploaded images are processed client-side — a subtle dark overlay (or light, in dark themes) is auto-applied to keep card text legible. The teacher sees a live preview before committing.
+- **WCAG AA enforcement:** the upload form runs a contrast check against the surface tokens on top of the proposed background. If the check fails, the teacher is shown the failing surface and offered a stronger overlay; cannot save until passing.
+- **Per-school opt-out:** a `SchoolAdmin` setting can disable upload-your-own at the school level. Disabled by default for new schools — admins opt in.
+- Storage: Supabase Storage, ≤5 images per teacher, oldest auto-pruned beyond the cap.
+- Audit: uploads logged as `background_uploaded`; deletions as `background_deleted`.
+
+*Architectural notes for Phase 1:*
+- Reserve a `background_url` token in the token system; the default theme sets it to a solid neutral.
+- Add `appearance_settings` JSON blob to `TeacherUIState` (theme, density, color_intensity, background, reduce_motion) so Phase 2 has somewhere to write without a schema migration.
+- No UI for any of this in Phase 1.
+
+**Empty states (specify per surface):**
+- Weekly view (week with zero lessons), Daily view (day with no academic blocks), Subject view (filtered with no matches), Unit view (no lessons assigned), Comment Browser (no matches), To-Do panel (no items in active scope), Reports library (no saved exports), Standards picker (uploaded framework with no rows), first-login welcome.
+- Every empty state surfaces the **next action** ("Add a lesson", "Copy from a previous week"), not just an apology.
+
+**Loading, error, offline:**
+- **Loading:** skeleton placeholders matching the eventual layout. Specify for weekly grid, lesson card, right pane, to-do slide-out, Comment Browser. No spinners as primary loading state.
+- **Error:** inline error anchored to the failed action with a retry affordance. No global toast popups.
+- **Offline:** persistent subtle banner ("You're offline — changes will sync when you reconnect"). Optimistic UI for completion checkboxes and note edits so flaky school Wi-Fi doesn't break flow.
+
+**Accessibility (WCAG AA baseline):**
+- Keyboard navigation: arrow keys across the weekly grid; Tab through right pane; Enter to expand; Esc to collapse; the right-click menu reachable via keyboard menu key or focus on the "⋯" affordance.
+- ARIA landmarks on top bar, side panels, main canvas, modals.
+- Color contrast on subject-colored backgrounds: AA minimum.
+- Color-blind safety: test the eight-subject palette against deuteranopia and protanopia simulators. If two subjects collapse, adjust hue or add secondary differentiator (subtle pattern, short text code).
+- Focus indicators: visible 2px outline on whatever is keyboard-focused. Not optional.
+
+**iPad and tablet ergonomics:**
+- Touch targets ≥ 44px square.
+- Drag-and-drop on touch uses an explicit grab handle (drag-bars icon on the card's left edge), not long-press on the body (conflicts with click-to-expand).
+- The "⋯" context-menu affordance is always visible on iPad (not hover-revealed).
+- Soft keyboard handling: quick-add inputs must scroll into view when the on-screen keyboard appears.
+
+**Motion and animation:**
+- Allowed: card expand/collapse (200ms ease-out), drag ghosting, slide-out panel transitions (250ms), focus indicators (instant).
+- Forbidden: bounce, parallax, page-flip, decorative confetti, anything implying delight at the expense of speed.
+- `prefers-reduced-motion` respected: drop expand/collapse animation and the urgent-pulse when the OS setting is on.
+
+**Iconography:**
+- Single icon family (Lucide recommended for size + license; Heroicons and Phosphor are acceptable alternatives). Don't mix line and filled styles.
+- Emojis only in the "+ Add to day" chooser (📘 ✨ 📅), priority indicators (🔴 🟡 🔵), and notification badges (💬 🔥). Never in lesson content or core UI.
+
+**Holiday and Ramadan visual markers:**
+- Holidays: week-cell ribbon or subtle backdrop tint with holiday name in small text at the top of the day cell. Multi-day holidays span their days. No screaming red banner.
+- Ramadan: small "🌙 Ramadan timetable active" indicator at the top of any view when the date range is active; Schedule view shows the shortened time blocks; Daily view shows a small indicator on the date.
+- Weekends (Fri/Sat in Qatar): visually distinct from school days but not hidden — a thin end-of-row marker makes the Sun–Thu school week unambiguous.
+
+**Print and export design:**
+- Print stylesheet designed alongside the weekly view, not bolted on. Margins, page breaks between weeks, repeated headers (subject + week number on every page), font sizing for paper legibility.
+- Export PDF template (Phase 1 default): clean typographic hierarchy, no UI chrome, B&W-safe (use shape/label for standards type, not just color).
+
+**Onboarding (first-run experience):**
+- First login: short welcome modal — confirm name, pick default view, pick completion privacy. Skippable.
+- Empty-year state on Weekly view: guided prompt ("Let's add your first lesson, or import last year's plan from a CSV").
+- First lesson created: tooltip on completion checkbox explaining the privacy model.
+- First master-mode entry: one-shot tooltip explaining the "Now editing master" button.
+
+**Notification surface (Phase 2 build; Phase 1 design slot):**
+- Reserve a notification icon slot in the top bar from Phase 1, even if no notifications fire yet. Add badge + dropdown panel in Phase 2 for master-change notifications and real-time comment updates.
+
+**Search results surface:**
+- Top-bar search queries lessons, units, standards, comments, and to-dos. Results grouped by type with clear anchor labels and jump-to behavior. Its own component, deserves a prototype.
+
+
+
+> **Primarily for Claude Code.**
+
+### 7.1 Stack
+
+| Layer | Technology | Reason |
+|---|---|---|
+| Frontend framework | Next.js (App Router) or React + Vite | Familiar React stack; Next.js gives API routes if needed later |
+| Styling | Tailwind CSS | Fast, low-decision-cost styling |
+| State / data fetching | TanStack Query | Caching, optimistic updates, easy realtime |
+| Database | Supabase (Postgres) | Free tier; rich relational queries; row-level security |
+| Authentication | Supabase Auth (Google SSO) | Built into Supabase; ~10 lines of integration code |
+| File storage (Phase 2 for lesson resources; Phase 1 for snapshot exports) | Supabase Storage (1GB free) → Cloudflare R2 (10GB free) if outgrown | Pluggable |
+| **PDF generation** | `@react-pdf/renderer` (client-side) for Phase 1; Puppeteer in a Cloudflare Worker if branded templates needed in Phase 2 | Consistent output across browsers; archival-quality vs. `window.print()` |
+| **Excel generation** | SheetJS (`xlsx`) — runs client-side | Free, well-maintained, generates real `.xlsx` files |
+| **AI for curriculum import** | Anthropic Claude API (`claude-sonnet-4-6` or current cost-effective tier) | Parses messy curriculum data (Google Doc exports, varied Excel sheets, plain text) into the canonical schema. Estimated ~$1-3 per school import. Called server-side from a Cloudflare Worker (protects the API key). |
+| Code hosting | GitHub | Existing workflow |
+| Deployment | Cloudflare Pages | Free, fast, GitHub integration; aligned with MathQuest setup pattern |
+| Public site | Squarespace (existing) | Links out to planner via subdomain |
+
+### 7.2 Repository structure
+
+```
+/planner-app
+  /app                 — Next.js routes
+    /(auth)            — login flow
+    /weekly            — weekly view
+    /daily             — daily view
+    /schedule          — schedule view
+    /unit/[id]         — unit detail
+    /subject/[id]      — subject detail
+    /year              — year overview
+    /settings          — settings
+    /api/*             — server routes if needed
+  /components          — shared React components
+    /lesson-card
+    /grid
+    /filters
+    /panels
+    /print-templates
+  /lib
+    /supabase          — client + queries
+    /standards         — CCSS taxonomy data
+    /utils
+  /styles              — Tailwind config, globals
+  /public              — static assets
+  /docs                — this planning doc, conversation record
+```
+
+### 7.3 Authentication flow
+
+1. Teacher hits the app URL.
+2. Redirected to Supabase-hosted Google OAuth flow.
+3. (Optional) email domain check; reject non-school accounts.
+4. On first login, a `Teacher` row is created with default preferences.
+5. Session persists via Supabase cookie.
+
+### 7.4 Realtime considerations
+
+- Supabase supports realtime subscriptions to Postgres changes.
+- Use realtime for: day shoutbox (immediate team visibility for the day's conversation), master-change notifications, completion status (if shared mode), **TeacherUIState (cross-device sync of expansion / filters / active view)**.
+- Skip realtime for: most lesson edits (low-collision, optimistic updates suffice).
+- Writes to `TeacherUIState` are debounced ~500ms to avoid one-write-per-click spam.
+
+### 7.5 Row-level security (RLS)
+
+All policies are grade-scoped: a teacher only sees data for the grade(s) they're assigned to.
+
+- A teacher can read master lessons, master units, subjects, standards, day shoutbox posts, team to-dos, and team tags **for any grade they are assigned to**.
+- A teacher can read/write only their own daily notes, personal copies, completion records, personal to-dos, and personal tags.
+- Only `lead` or `grade_admin` role **for a given grade** can write to that grade's master content (lessons, units, subjects, team tags, team to-dos as creator/admin).
+- `grade_admin` additionally can read that grade's audit log and `TeacherGradeAssignment` records.
+- `SchoolAdmin` role: read-only across all grades by default; can write to `GradeLevel`, `TeacherGradeAssignment` (school-wide), `SchoolYear`, and `SchoolAdmin` records.
+- Daily notes: personal-only — readable and writable only by the author.
+- Completion records honor `is_public` based on each teacher's privacy preference.
+- **Comments:** all teachers in the comment's `grade_level_id` can read; only the author can edit; author + `lead` + `grade_admin` can delete (soft delete). `CommentRead` rows are private per-teacher (only the owning teacher can read/write their own).
+- **Standards frameworks:**
+  - Catalog frameworks readable by all authenticated users; only the planner team can write.
+  - School-uploaded frameworks readable only by teachers in the owning school; writable by `SchoolAdmin` of that school.
+  - `GradeFrameworkAssignment` writable by `SchoolAdmin`; readable by all teachers in the grade.
+- **CoverageSnapshot:** read restricted to `SchoolAdmin` and `grade_admin`; written only by the scheduled snapshot job (security-definer function).
+- **Audit log:**
+  - All authenticated users can INSERT into `AuditLog` via a security-definer function (so writes always succeed but the user can't choose what action or actor to log).
+  - SELECT restricted: `grade_admin` can read rows where `grade_level_id` matches their assignment; `SchoolAdmin` can read everything; everyone else, nothing.
+
+### 7.6 Print and export pipelines
+
+Two distinct paths, do not conflate:
+
+- **Ad-hoc print** (the §5.9 Print preview pages): browser-native `window.print()` with dedicated `@media print` Tailwind classes. Inconsistent across browsers, but zero-cost and fine for a teacher printing a substitute folder.
+- **Archival export** (the §5.12 Export Center): `@react-pdf/renderer` for PDF and SheetJS (`xlsx`) for Excel. Both run client-side; no server PDF rendering needed for Phase 1. Output is consistent across browsers, archival-quality, and required for school/MOEHE submission.
+
+Phase 2 may add Puppeteer (Cloudflare Worker) for PDFs if the school or MOEHE requires a specific branded template that `react-pdf` can't easily produce.
+
+### 7.7 Performance budget
+
+- Weekly view first paint < 1.5s on a school Chromebook.
+- Lesson card hover/click responses < 50ms.
+- Drag-and-drop frame rate ≥ 50 fps.
+- Catch-up filter applies in < 200ms across all 40 weeks.
+
+### 7.8 Audit logging architecture
+
+**Goal:** every state-changing action in the app writes a single row to `AuditLog`, fire-and-forget, so a future admin UI can reconstruct activity history.
+
+**Pattern:** wrap all Supabase mutations in a thin helper that:
+1. Performs the mutation.
+2. On success, calls a `log_action` RPC (security-definer Postgres function) that inserts into `AuditLog` with the authenticated user's ID as actor.
+3. If logging fails, the failure is captured to console / Sentry but does NOT block the user's action.
+
+**Why an RPC:** prevents users from forging audit rows (the RPC checks the JWT and sets actor server-side). Bypasses RLS for the insert.
+
+**Conventions enforced at the library level:**
+- All admin-style queries (audit reads, cross-grade aggregates, system metrics) live in `lib/admin/queries.ts`. Even in Phase 1 when this file has only one helper, the convention is set.
+- All audit writes go through a single `auditLog(action, entity, metadata)` helper. Adding a new action type is a code change in one place.
+- No direct INSERT into `AuditLog` from app code — always via `auditLog()` → RPC.
+
+**Actions logged from day one (Phase 1):**
+- Lesson create / edit / delete (master and personal)
+- Master-mode enter / exit
+- Personal-copy fork / reset-to-master
+- Completion status change
+- Daily note create / delete
+- To-do create / complete / delete
+- Tag create / delete
+- Export generated (both Live and Snapshot)
+- Export deleted from Reports library
+- Login
+- Settings changed (privacy preference, default view, etc.)
+
+**Actions logged when their feature ships (Phase 2+):**
+- Master-change accept/reject (Phase 2)
+- Year rollover (Phase 2)
+- Role change (whenever admin UI ships)
+- Grade activation/deactivation (whenever admin UI ships)
+- Teacher assigned/removed from grade (whenever admin UI ships)
+
+### 7.9 Reporting infrastructure
+
+**Goal:** all admin/instructional-leadership reports run fast against pre-computed snapshots, not live joins. The data infrastructure ships in Phase 1; the UI is Phase 3+.
+
+**Nightly snapshot job:**
+- A scheduled Postgres function (Supabase pg_cron or a Cloudflare Worker scheduled task) runs once daily.
+- Computes per (school_year, grade, framework, subject) standards-coverage stats and inserts one `CoverageSnapshot` row per combination.
+- Idempotent — re-running on the same date overwrites the day's snapshot.
+- Phase 1: writes only. No UI consumes the data yet.
+
+**Reporting query layer:**
+- All admin/reporting queries live in `lib/admin/queries.ts` and are called through Postgres functions marked `SECURITY DEFINER` so they can bypass RLS for aggregation while still enforcing admin role checks.
+- No teacher-facing surface ever queries reporting tables directly.
+- Convention is set in Phase 1 even though there's no admin UI yet — when the UI arrives, every aggregation query already has a home.
+
+**Design principles baked in from Phase 1:**
+- **Aggregate by default.** Reporting queries return team-aggregated counts (not per-teacher) unless an admin explicitly requests drill-in.
+- **Per-teacher detail requires explicit permission flag.** Configurable per school — some schools want per-teacher transparency, others want only aggregate.
+- **Reports are read-only.** Admin queries never write to lesson/curriculum tables.
+- **Snapshot date is the report's truth.** A coverage report for a date last month uses that day's snapshot, not today's data. This means archived reports stay accurate even as new lessons are added.
+
+### 7.10 AI-assisted curriculum import architecture (Phase 3+)
+
+> **Status:** Deferred to Phase 3 or 4. NOT in Phase 1A or 1B.
+>
+> **Why deferred:** Heather's team loads their existing curriculum into Phase 1A directly via Claude Code translating their existing planning documents into seed data. There's no need for a production AI import pipeline in the planner itself until the planner is being offered to other schools that don't have Claude Code access. At that point, the architecture below is the path forward.
+
+**Phase 1A approach (minimal):**
+- Settings → Import a CSV with the canonical schema (one row per lesson; required columns: subject, unit, week, day_of_week, title, learning_objective; optional: directions, standards, resource_urls).
+- Client-side parse via SheetJS, validate against schema, insert via standard Supabase mutations (audit-logged).
+- Errors surface per-row inline.
+- No AI involvement.
+
+**Phase 3+ architecture (when expanding beyond Heather's school):**
+
+**Goal:** transform a school's existing curriculum document (in any format) into a normalized set of `MasterCoreLessonEvent` rows with high confidence and minimal manual cleanup.
+
+**Flow:**
+1. Teacher uploads a file in the Settings → Curriculum Import flow (any of `.csv`, `.xlsx`, `.xls`, `.txt`, `.md`; ≤5MB).
+2. Client extracts plaintext from the upload (SheetJS for Excel/CSV; FileReader for text formats) and posts it to a Cloudflare Worker endpoint.
+3. Worker calls the Claude API with the extracted plaintext, the canonical schema, and a small set of few-shot examples in the system prompt. Returns JSON: array of normalized lesson objects, each tagged with a confidence level (`high | medium | low`).
+4. Worker returns the JSON to the client. Nothing is inserted yet.
+5. Client renders the preview screen. Teacher reviews, edits flagged rows, and confirms.
+6. On confirm, client inserts rows via the standard Supabase mutations (each routed through `auditLog()`). A top-level `curriculum_imported` audit entry is written first, with row counts in metadata.
+
+**Why the Worker:**
+- Protects the Anthropic API key (never exposed to the browser).
+- Centralizes prompt-engineering — changes to the system prompt deploy without a frontend release.
+- Allows rate limiting per school if needed later.
+
+**Prompt strategy:**
+- System prompt includes: the canonical schema (column names + types), the active grade's subjects, the active grade's frameworks and standard codes, 3-5 few-shot examples mapping varied source formats to canonical output.
+- Request prompt is the extracted plaintext.
+- Response constrained to JSON via the Anthropic JSON mode.
+- For large inputs (> ~30k tokens of extracted text), the worker batches the input into chunks by week and stitches results.
+
+**Confidence scoring:**
+- High: every required field (title, week, day, subject) has a clear match in the source.
+- Medium: required fields are present but one or more is inferred (e.g., subject inferred from header context rather than an explicit column).
+- Low: at least one required field is missing or ambiguous, and the AI guessed.
+- The preview UI groups by confidence so the teacher's eye goes to "low" first.
+
+**Standards mapping:**
+- Standards codes in the source are matched against the grade's assigned frameworks.
+- Matches go directly onto the lesson.
+- Unmatched codes are stored in a temporary `import_unmatched_standards` blob on the import session and surfaced post-import as a follow-up report ("These 12 codes weren't recognized — map them manually or upload the framework").
+
+**Future enhancements:**
+- Multi-file imports (one file per week or per subject).
+- Re-import / merge against existing data.
+- Auto-extraction of resource URLs from prose ("see [link to slides]" → resource record).
+
+### 7.11 AI budget controls (Phase 3)
+
+> **Status:** All-in-one Phase 3. The infrastructure (audit logging + `AISpendCap` entity) was previously Phase 1, but since there are no AI features in Phase 1A or 1B (AI curriculum import moved to Phase 3+; auto-tagging and intervention suggestions are Phase 3), there's nothing to log until Phase 3. Build everything together when the first AI feature ships.
+
+As AI features arrive in Phase 3 (curriculum import, auto-tagging, intervention suggestions), per-school spending becomes meaningful enough to need governance.
+
+**Infrastructure (Phase 3):**
+- Every AI API call is logged with metadata in the audit log: actor (teacher_id), feature (`curriculum_import | standards_autotag | intervention_suggest | other`), cost_usd, input_tokens, output_tokens, school_id, grade_id, timestamp.
+- `AISpendCap` entity stores caps at different scopes.
+
+**AISpendCap** (Phase 3 entity + UI)
+- `id`, `scope`: `school | grade | teacher`, `scope_id` (school_id, grade_id, or teacher_id matching the scope)
+- `period`: `month | year`
+- `feature` (optional — null means cap applies to all features combined; otherwise applies to one feature)
+- `cap_usd`: decimal — the spending limit in USD
+- `alert_threshold_pct`: percentage (default 80%) — alerts fire at this point
+- `block_at_cap`: boolean — if true, AI calls are refused when cap is reached; if false, calls continue but admin is notified
+- `created_at`, `updated_at`
+
+**Cap precedence:**
+- Multiple caps can apply to a single AI call (e.g., school-level cap AND a teacher-level cap). The most restrictive applies.
+- Feature-specific caps override the general-purpose cap for that feature only.
+
+**Phase 3 UI (Admin section):**
+- **AI Spend dashboard** — shows current month and year-to-date spend, broken down by scope (school total, per grade, per teacher) and feature (import, autotag, intervention). Graphs and totals.
+- **Caps management** — create/edit/delete `AISpendCap` rows. UI presents it as a sentence: "Set a cap of $[___] per [month/year] for [school/this grade/specific teacher] on [all features/specific feature]. Alert at [80%]. Block when reached: [yes/no]."
+- **Per-school onboarding:** sensible defaults seeded when AI features first activate.
+- **Alerts:** when an actor approaches their cap, they see a banner in the AI feature ("You've used 85% of your monthly AI budget"). When the cap is reached and `block_at_cap = true`, the feature is disabled with a message ("Monthly budget reached. Contact your school admin.").
+
+**Default for schools without caps configured:**
+- No caps. AI calls proceed until the school admin sets caps.
+- Audit log captures every call so retroactive analysis is possible.
+
+**Acceptance:**
+- Every AI API call writes an audit log entry with cost.
+- Admin UI accurately reports total spend matching audit log aggregates.
+- Caps configured by admin enforce correctly — calls are blocked or alerted per the cap's settings.
+
+---
+
+## 8. Phased Roadmap
+
+> **Phasing philosophy:** ship something teachers use daily as early as possible, then expand. Phase 1A is the **late-August beta target** for Heather's Grade 5 team (4 teachers). Phase 1B fills in the rest of what was originally Phase 1 during the fall semester, shipped iteratively while teachers are using 1A. Phase 2 brings Vivid + forking + Schedule view. Phase 3 brings Resources/Annotation/Admin. Phase 4 is polish + expansion.
+>
+> **Target dates (informational; subject to actual build pace):**
+> - **Phase 1A → late August 2026** (beta with Grade 5 team, ~14 weeks from May 12)
+> - **Phase 1B → through fall 2026** (iterative updates during real classroom use)
+> - **Phase 2 → spring 2027**
+> - **Phase 3 → late 2027 / 2028**
+> - **Phase 4 → TBD**
+
+### Phase 1A — Beta-ready core for Heather's Grade 5 team (May 12 → late August 2026, ~14 weeks)
+
+**Goal:** Heather's Grade 5 team (4 teachers) starts using the planner daily in late August. Replaces the **week-by-week Google Doc (#2) + the Standards doc (#4)** at minimum. Genuinely usable on day one, even though many features are still pending.
+
+**Honest constraint:** 14 weeks part-time on Max 5x is tight. The features in this section are deliberately scoped to what's actually achievable. Anything ambitious or polish-driven moves to Phase 1B.
+
+**Auth & profile:**
+- Google SSO via the school's Google Workspace domain.
+- Teacher profile with default view, completion-privacy preference.
+- Multi-grade data model in place (`GradeLevel`, `TeacherGradeAssignment`) but only Grade 5 active.
+
+**Core viewing & editing:**
+- **Weekly view** (Sun-Thu × all team subjects + personal subjects) with drag-and-drop between days.
+- **Daily view** with two-pane layout (left list + right detail).
+- **Basic Subject view** (lessons grouped by unit; resource list).
+- Color by subject + 3-step unit shading. **Quiet theme only** (Vivid is one design-direction prototype, no production build).
+- Lesson cards with: 2-3 line preview from directions, completion checkbox, standards count badge, resource icons, hover/expanded states.
+- **Three-tier visual differentiation in Personal mode** — solid stripe / dashed stripe + "Modified" pill / solid stripe + move-arrow icon.
+- Inline-expansion for Weekly view; right-pane detail for Daily view.
+- **Right-click ⋯ context menu** on every lesson card with Move to / Duplicate / Mark status / Tag standards / See standards / Print options.
+- **Master/personal toggle** in top bar + **flashing-then-persistent red banner** master-mode entry sequence.
+- Completion checkboxes (per-teacher, independent of forking).
+- **View modes — Simple / Task / Advanced (§5.22)** — three-way pill in the top bar of Weekly, Daily, Subject, Unit, Schedule views. New teachers default to Simple; leads/admins default to Advanced. Mode persists per-teacher across devices. **Simple mode is a designed low-floor experience** for the four most-trafficked views (Lesson card, Weekly, Daily, Subject) — bigger touch targets (24px checkboxes, 16px titles, 88px card height), plain-language labels ("Weeks 9 to 12" not "Wk 9–12"), single primary action per surface, suppressed Master/Core mode, simpler add-lesson modal (3 fields vs 12). Other views' Simple modes are flag-hidden in Phase 1A (Claude Design's existing build) and get dedicated design passes in Phase 2 based on beta feedback. **Task mode** is a flat-checklist surface with bulk-select for grinding through events.
+
+**Subjects & events:**
+- Team subjects + **personal subjects** (max 5 per teacher per grade). Personal subjects behave like team subjects for their owner (units, all event types, weekly structure).
+- **Time-block creation flow** asks "Time slot or Personal subject?" when adding a new block; conversion in both directions later via context menu.
+- **`SubjectTeamMembership`** entity + RLS — by default any teacher on a subject's team can edit master; lead overrides per subject. Phase 1A ships the data model + auto-population; Phase 2 ships the management UI.
+- **Personal subject promotion** to team-shared — Settings → "Share with team" + lead approval queue.
+- **Three event types** (foundational concept locked in from day one):
+  - **Learning events** = `CoreLessonEvent` (master curriculum lessons in a subject + unit; can be recurring).
+  - **School events** = `ExtraLessonEvent` (teacher-owned teaching activities; non-academic or specialized; can be recurring) + `DayEvent` (one-off non-curriculum days like assemblies, drills, field trips; not recurring).
+- Both Learning events (inside units) and School events (outside curriculum) **can be recurring** via the shared `RecurrencePattern` + `RecurrenceInstanceOverride` mechanism. Edit-this-instance / this-and-future / all-instances dialog on edit.
+- **Unified "+ Add to day" chooser** with Learning event / School event picker.
+- `EventDayOrderOverride` for per-teacher per-date within-day reordering.
+
+**Standards:**
+- **Multi-framework infrastructure** — `StandardsFramework`, `GradeFrameworkAssignment`, hierarchical `Standard`.
+- **CCSS Grade 5 preloaded** at launch. EE standards loadable via CSV.
+- Manual standards tagging on every event.
+- **Quick standards tagging via right-click / ⋯ menu** — compact picker filtered to the subject's default frameworks with "Show all frameworks" override.
+- **Per-subject default frameworks** in Settings.
+
+**Daily notes & encouragement:**
+- **Daily Notes** (personal-only, three priority levels — urgent solid red NOT pulsing).
+- **Teaching Reminders banner (§5.20, the new quotes feature)** — slim banners on Daily, Weekly, Schedule views + Today dashboard widget. Two categories (Behavioral / Academic), per-category toggles in Settings, click-to-expand for summary + source link. CSV import for Heather's existing quotes collection. Rotation on page load / navigation / 60-min timer.
+
+**Resources, exports, print:**
+- Resource links only (paste URL → auto-hyperlink). No file uploads in Phase 1A.
+- **Print Center (basic)** — Day / Week / Subject scopes; standards/notes/directions toggles. Year / Month / Unit / Not-done scopes ship in Phase 1B.
+- **Export Center (basic)** — PDF export for daily / weekly via `@react-pdf/renderer`. Excel export is Phase 2.
+
+**Curriculum loading (no AI in Phase 1A):**
+- **Primary path:** the teacher uses Claude Code separately (outside the planner) to translate their existing planning documents into SQL seed scripts or canonical-schema CSV files. These load directly into Supabase as a one-time job at beta setup. No production import pipeline needed.
+- **Fallback path:** Basic CSV upload in Settings → Import. Required columns: subject, unit, week, day_of_week, title, learning_objective. Optional: directions, standards (semicolon-separated codes), resource_urls (semicolon-separated). Client-side parse via SheetJS, validate against schema, insert via standard Supabase mutations (audit-logged). Row-level errors surface inline. No preview screen, no confidence scoring, no AI parsing.
+- **AI-assisted import (§7.10) is fully deferred to Phase 3+** — built when expanding the planner beyond Heather's school to teams that don't have Claude Code access.
+
+**Infrastructure (no UI in Phase 1A but data shapes locked):**
+- **Audit logging** — every mutation writes an `AuditLog` entry. No admin UI yet.
+- **Admin role infrastructure** — `SchoolAdmin` table, `grade_admin` role value on `TeacherGradeAssignment`, RLS recognizing all role tiers. No grants at launch.
+- **CoverageSnapshot** — nightly job computes per-(year, grade, framework, subject) stats. No reporting UI.
+- **EditUndoStack** — per-entity-per-teacher, 5 deep, `⌘Z` scoped to focused entity.
+- **AB-week cycle fields** — `School Year.active_cycle_pattern`, `Time Block.week_cycle`. Default one_week for Heather's school. UI ships in Phase 2.
+- **PermissionOverride** — entity + RLS plumbing. No UI.
+- **`lib/admin/queries.ts` convention** — established as the location for aggregation queries.
+- **AI cost logging + `AISpendCap` entity moved to Phase 3** — no AI features ship in Phase 1A or 1B, so there's nothing to log until the first AI feature lands in Phase 3.
+
+**Out of Phase 1A** (moved to 1B or later, see below): Catch-up screen, to-do lists, comments, day shoutbox, keyboard shortcuts beyond Esc, empty-day affordance hint, missed-events task-list mode, standards code drill-through, full Print Center, CSV upload for custom standards frameworks, subject promotion approval queue UI, copy-from-archive, full year management UI, all AI features (curriculum import, auto-tagging, intervention suggestions).
+
+> **Descope priority if Phase 1A timeline pinches:** if late-August beta is at risk, the dedicated Simple-mode design pass (~3-5 days of new components) is the first thing to descope. Falling back to Claude Design's existing flag-hidden Simple mode keeps the toggle functional without the bigger-touch-target / plain-language work. Beta still ships; the proper Simple-mode pass lands in Phase 1B based on what the team finds confusing. **Do not descope: the three-way pill itself, Task mode, or the data-model entries** (`view_mode` field on `TeacherUIState`).
+
+### Phase 1B — Filling in Phase 1 during fall semester (~9-11 weeks of shipping iteratively)
+
+**Goal:** complete the originally-scoped Phase 1 surface while Heather's team is actively using 1A. Each feature ships when it's ready; teachers see updates land throughout the semester. Feedback from real classroom use shapes priorities.
+
+- **Catch-up controls (three layers)** — global Settings toggle + per-week dismissible bar + dedicated **Catch-up screen (§5.17)** with scope chips, group-by, per-item and bulk actions, carry-over destination picker.
+- **Missed-events task-list mode** in Subject, Unit, and Standards-drill-through views (at Month+ scopes).
+- **Carry-over click-through** — Today dashboard's "N from last week" stat opens Catch-up filtered to last week.
+- **Standards code drill-through** — clickable chips on lesson detail open the side panel listing every lesson tagged with that standard, with missed-events section at top.
+- **To-do lists** — personal + team, slide-out panel, full-screen view, tags with color, date buckets.
+- **Comments + Day shoutbox** — inline threaded comments on lessons/units/resources, flat day-shoutbox stream, Comment Browser slide-out with filters, unread badge on top-bar icon.
+- **Collapsed comment threads** — "💬 N comments" badge by default, expand on click.
+- **Within-day reordering** — drag lessons up/down within a day; per-teacher, per-date override.
+- **Multi-event slots** — a Time Block can host multiple events; drag-out separates.
+- **Empty-day affordance** — hint text + subject-tint hover + `+` button on empty grid cells.
+- **Keyboard shortcuts** — `j/k/h/l`, `e`, `Space`, `⌘D`, `⌘K`, `/`, `?`, `Esc`, `g c` + cheat sheet modal.
+- **Print Center expansion** — adds Month / Year / Unit / Not-done scopes; format toggles; year-overview format.
+- **CSV upload for custom standards frameworks** (basic parse-and-insert; validation polish in Phase 2).
+- **Subject promotion approval queue** UI in Settings (lead + delegated grade_admin).
+- **Copy from archived years (basic)** — right-click in archived-year browser → "Copy to active year." Phase 2 expands with bulk-copy.
+- **Year management UI** — start new year, archive year, view archived years (basic).
+- **Recurring Extra Lesson Events** — full UI (data model ships in 1A; the authoring UI + edit-instance-vs-future dialog land here).
+- **Resource attachments (§4.5a + §5.21)** — full resource model: hosted files (PDF, DOCX, RTF, images, image stacks) up to 25 MB / 10 per event, plus unlimited links (external + YouTube + Drive) with auto-fetched preview banners. Cloudflare R2 backend with Worker-mediated access control. Full resource viewer with persistent lesson sidebar (other resources + scrollable notes). Drag-and-drop attachment from desktop and address bar. School-admin "Resource hosting mode" toggle (Links-only vs Files+links, default Links-only for new schools). **~3 weeks of focused engineering — the largest single Phase 1B addition.**
+
+**Phase 1A + 1B together = original Phase 1 scope plus resource attachments** (moved up from Phase 3). The split is purely about delivery sequence — 1A ships in late August so the team can start using it; 1B fills in throughout fall, wrapping late November / early December.
+
+### Phase 2 — Vivid theme, forking, schedule, year rollover (4–6 weeks; spring 2027)
+
+**Replaces:** Personal teacher copies (#5) + adds unit-level structure + Vivid theme in production.
+
+- **Vivid theme built and shipped in production.** Both themes selectable via a minimal toggle in Settings; default remains Quiet at first login. **Full Appearance settings panel** ships here (theme + density + color intensity + reduce-motion + backgrounds curated library).
+- **Personal copies with lazy forking** — the full master/personal forking model (lessons forked on first edit; `pending_master_updates` queued on master changes).
+- **Bulk master-change approval screen** — review screen (Catch-up-screen-like shape) with Accept all / Reject all / Accept selected / Reject selected, per-row checkboxes, group-by toggle, scope chips, conflict-row flagging.
+- **Schedule view** (time blocks + non-academic blocks + Ramadan toggle + Now indicator with pulsing "▶ NOW" badge + horizontal red now-line).
+- **"Start Unit" action** + `UnitStartRecord` entity. Unit view + unit summaries.
+- **Year view** (40-week reshuffleable).
+- **Year rollover** — full archive + clone flow + Year-end Rollover Decision screen (§5.18) for personal subjects.
+- **Print templates: daily + unit** (in addition to weekly which shipped in Phase 1).
+- Holiday display.
+- **Excel export** via SheetJS — one row per lesson, all metadata as columns.
+- **Custom PDF templates** (if MOEHE or school provides a required format).
+- **Real-time comment badge updates** via Supabase realtime; optional opt-in daily email digest.
+- **Comments in exports** — opt-in checkbox in the Export Center to include comment threads in PDF exports.
+- **CSV upload polish** for custom standards frameworks — preview-before-commit, validation errors inline, edit-after-upload.
+- **Catalog framework expansion** — IB, NZ Curriculum, British curriculum, Cambridge, etc.
+- **ExtraLessonEvent → ExtraLessonTemplate** — save as personal template, drop into future days with one click.
+- **Type conversion** — between CoreLessonEvent / ExtraLessonEvent / DayEvent via "Convert to…" action.
+- **SubjectTeamMembership management UI** — Settings → Team subjects → per-subject "Who can edit master" panel.
+- **AB-week cycle UI** — Settings cycle pattern toggle; Weekly/Schedule navigator Week A / Week B badges; per-Time-Block week_cycle selector; per-date override surface.
+
+### Phase 3 — Annotation, interventions, admin (open-ended; late 2027 onward)
+
+**Replaces:** Padlets (#1, file hosting moved up to Phase 1B; annotation adds the "interactive" half here) + adds tiered intervention support + administrative reporting.
+
+- **Annotation on existing resources** — files uploaded in Phase 1B can now be annotated. PDF annotation (PDF.js + canvas overlay). Image annotation + whiteboard mode. Annotated copies save to the resource record alongside the original.
+- **DOCX inline rendering** — replaces Phase 1B's download-only behavior with in-app Word-doc viewing via mammoth.js or similar.
+- **Vertical CCSS alignment** (Grade 4 / 6 view).
+- Audit trail viewer for master changes.
+- Anonymous team coverage view (aggregate completion).
+- **Admin section UI** — activity timeline (filtered audit log), roster + role management, grade-level management, school-year management, system metrics dashboard, export audit, plus the full instructional-leadership reporting suite (standards coverage dashboard, coverage gaps, distribution over time, repetition/depth, cross-subject integration, teacher variance, comment intensity, year-over-year comparison, unit deep-read). Built against `CoverageSnapshot` + `AuditLog` data accumulated since Phase 1A.
+- **In-app standards editor** — for school-uploaded frameworks, an in-app editor lets school admins add/edit/remove individual standards without re-uploading CSV.
+- **Tier 2-3 intervention strategies (strategies only, no student data)** — strategies attached to specific **learning events** (CoreLessonEvents) or **school events** (ExtraLessonEvents / DayEvents such as SAT practice, assembly, advisory). Strategies stored as text per event (master + personal). Language used throughout the UI: "learning events and school events." A separate `InterventionStrategy` entity allows reusable strategies to be saved and dropped onto multiple events. No named students in Phase 3.
+- **AI-suggested Tier 2-3 strategies** — Claude API reads the event's objectives, standards, directions, and produces 3-5 suggested differentiation strategies. Subject to AI budget caps (§7.11).
+- **AI-assisted curriculum import (§7.10)** — full production import pipeline (Cloudflare Worker + Claude API + preview + conflict resolution). Built when expanding the planner beyond Heather's school to teams without Claude Code access.
+- **AI-suggested standards auto-tagging** — Claude API reads lesson content and suggests tags filtered by the subject's default frameworks. Teacher reviews and accepts. Subject to AI budget caps.
+- **AI cost audit logging + `AISpendCap` entity** — built alongside the first AI feature. Every AI call writes cost metadata; caps enforced per §7.11.
+- **Permissions Admin page (§5.19)** — full administrative surface for managing roles, subject team memberships, and per-feature permission overrides. Roster + per-teacher profile (Roles / Subject memberships / Feature overrides tabs). Permission matrix UI. Bulk operations. Permission-change audit trail.
+- **AI budget management UI (§7.11)** — AI Spend dashboard (current month + YTD, by scope and feature) + Caps management (create/edit/delete `AISpendCap` rows). Alerts at configurable thresholds; optional block-at-cap.
+- **Teaching Reminders Phase 2 enhancements** — "Save quote for later" with personal saved-quotes view, browse-by-category view of the library, optional pinning of a quote to a specific day.
+
+### Phase 4 — Polish, students, expansion (TBD)
+
+- Substitute mode (read-only printable bundle for a sub).
+- Parent-share links (read-only excerpts of a week).
+- Mobile responsive refinements.
+- Multi-grade-level support (if the school expands the tool beyond Grade 5).
+- **Student-level intervention tracking** — adds a Students entity (initials or codes, no PII), intervention sessions per student, progress monitoring. Distinct sub-product; significant data-model expansion.
+- **Cross-school shared library** for Teaching Reminders with attribution.
+
+---
+
+## 9. Acceptance Criteria
+
+> Each phase ships when these criteria are met. Use as a checklist.
+
+### Phase 1 acceptance (criteria for Phase 1A + 1B combined)
+
+> **Note on 1A vs 1B split:** the criteria below cover the entire Phase 1 surface (both Phase 1A late-August beta + Phase 1B fall iteration). For Phase 1A specifically, only criteria covering features explicitly listed in the Phase 1A scope (§8) apply at beta launch — the rest are "must pass by end of Phase 1B." A criterion's scope can be inferred by mapping it to the corresponding feature in the Phase 1A or 1B bullet lists. When in doubt: if the feature is core to daily classroom use (Weekly grid, Daily view, master lessons, standards tagging, completion checkboxes, daily notes, teaching reminders, AI import, basic Print Center, personal subjects, recurring events), it's Phase 1A. If it's a follow-on workflow (catch-up screen, to-dos, comments, full keyboard shortcuts, missed-events task list, full Print Center, etc.), it's Phase 1B.
+
+**Phase 1A beta-readiness gate** (must all pass to start beta in late August):
+- [ ] Heather's 4 Grade 5 teachers can sign in via Google SSO with the school's Workspace domain.
+- [ ] The team's existing year of master lessons has been loaded into the database (via Claude Code translating their planning documents into seed scripts, or via basic CSV upload) and is viewable.
+- [ ] Weekly view renders Sun–Thu for the team's subjects on a 1366-wide screen without horizontal-scroll surprises.
+- [ ] Daily view renders the two-pane layout; selecting a subject on the left fills the right pane with that lesson's detail.
+- [ ] Drag-and-drop moves a lesson between days, with state persisting.
+- [ ] Lesson cards in collapsed state show a 2–3 line preview from directions, completion checkbox, standards count badge, resource icons.
+- [ ] Right-click ⋯ menu works on every lesson card (Move to / Duplicate / Mark status / Tag standards / See standards / Print).
+- [ ] Quick standards tagging via the context menu opens a compact picker filtered to the subject's default frameworks.
+- [ ] Completion checkboxes toggle state and persist per-teacher; teachers don't need to fork to mark complete.
+- [ ] CCSS Grade 5 standards preloaded; standards can be tagged manually on any event.
+- [ ] Daily Notes (personal-only) work on Daily and Weekly views with three priority levels.
+- [ ] Teaching Reminders banner appears on Daily/Weekly views when at least one category is enabled; Settings toggle silences them.
+- [ ] Personal subjects can be created (max 5 per teacher) and behave like team subjects for the owner.
+- [ ] Recurring Extra Lesson Events (Morning Meeting etc.) materialize on the right dates from a pattern.
+- [ ] Print Center supports Day / Week / Subject scopes with the core toggles (standards / directions / notes).
+- [ ] Master/personal toggle in the top bar works; the flashing-then-persistent red banner appears when entering Master mode.
+- [ ] The three-tier visual differentiation in Personal mode renders correctly.
+- [ ] **View modes (Simple / Task / Advanced)** — three-way pill appears in the top bar of Weekly, Daily, Subject, Unit, Schedule views; hidden on Catch-up and Standards. Toggle is instant. Mode persists per-teacher.
+- [ ] New non-lead teachers default to Simple on first login; Lead role defaults to Advanced.
+- [ ] Simple mode on the four most-trafficked views (Lesson card, Weekly, Daily, Subject) uses bigger touch targets, plain-language labels, and a simpler add-lesson modal — designed, not flag-hidden.
+- [ ] Task mode on Weekly, Daily, Subject, Unit, Schedule renders a flat checklist with bulk-select and bulk-action support.
+- [ ] The app deploys cleanly to Cloudflare Pages; Supabase is configured; basic RLS works.
+
+The rest of the Phase 1 acceptance criteria below cover the full Phase 1A + 1B surface.
+
+- [ ] All teachers can log in via Google SSO.
+- [ ] The team's existing year of master lessons is imported (or recreated) and viewable.
+- [ ] Weekly view renders Sun–Thu × ~7 subjects with no horizontal-scroll surprises on a 1366-wide screen.
+- [ ] Drag-and-drop moves a lesson between days, with state persisting across reloads.
+- [ ] Lesson cards in collapsed state show a 2–3 line preview paragraph drawn from the lesson's directions field, not just a title.
+- [ ] Clicking a lesson card in the Weekly view expands it inline; expanded cards stay open until explicitly closed (collapse control or Esc); multiple cards can be expanded simultaneously; expansion state syncs **across devices** for the same teacher via `TeacherUIState` (open three cards on laptop → see same three open on iPad within ~2 seconds).
+- [ ] Clicking a lesson card in Daily or Schedule view opens detail in the right pane (no inline expansion).
+- [ ] Right-clicking a lesson card opens a context menu with Move to / Duplicate / Mark status / Add to to-do / See standards / Print options.
+- [ ] Right-click context menu is also reachable via a "⋯" hover affordance for touch and keyboard users.
+- [ ] Subject color stripes + unit shading are visible and consistent across all views in **both themes**.
+- [ ] **Theme toggle** in Settings offers Quiet and Vivid as the two options; switching takes effect instantly across all views; selection persists in `TeacherUIState.appearance_settings` and syncs across devices.
+- [ ] **Quiet theme:** lesson cards render with near-white backgrounds and a thin subject-color left stripe; unit shading uses subtle grayscale steps. Matches the existing prototype aesthetic.
+- [ ] **Vivid theme:** lesson cards render with a subject-tinted background (not pure white) plus a full-saturation subject stripe on the left edge. Cards do NOT appear gray-on-white or muted. Unit rows in the weekly grid use light tints of the subject color, not gray.
+- [ ] At a 1-meter glance on the Vivid theme, a teacher can distinguish Math rows from Writing rows without reading any title text. (This is the qualitative test of whether Vivid achieved its goal.)
+- [ ] Both themes share identical layouts, components, typography, density, iconography, and animation rules. Only color tokens and surface fills differ.
+- [ ] `TeacherUIState.appearance_settings` JSON blob exists with default values written on first login. Phase 1 reads/writes theme selection; Phase 2 will wire in density, color intensity, backgrounds, and reduce-motion.
+- [ ] A `background_url` token exists in the design tokens file and resolves to a solid neutral by default in both themes. Swapping it produces a different backdrop without touching any component code.
+- [ ] CCSS code shows on hover; click opens standard details.
+- [ ] Completion checkbox toggles state, persists, and respects per-teacher privacy.
+- [ ] Catch-up filter surfaces uncovered items accurately.
+- [ ] Daily notes display with correct priority styling, and shared/personal scoping.
+- [ ] To-do slide-out opens from any view; Mine and Team tabs work independently.
+- [ ] Date-bucket filters (Today / This week / No date) accurately scope the visible items.
+- [ ] Tag creation, color assignment, and tag-based filtering work for both personal and team scopes.
+- [ ] Checking off a team item attributes completion to the correct teacher and is visible team-wide in real time.
+- [ ] To-do slide-out has scope chips (Today / This week / This month / No date / All); chips are mutually exclusive.
+- [ ] Daily view renders the two-pane layout; selecting a subject on the left fills the right pane with that lesson's detail.
+- [ ] Daily and Schedule view right panes show the Today dashboard (read-only) when no lesson/block is selected.
+- [ ] Today dashboard does NOT include to-do filtering or scope controls — those live only in the slide-out panel.
+- [ ] Personal/Master toggle in the top bar changes data source in every view (including Daily); no "Daily Master" or "Daily Personal" view exists separately.
+- [ ] Schedule view auto-highlights the current time block based on the individual teacher's clock.
+- [ ] All Phase 1 data tables include `grade_level_id` where applicable; queries filter by active grade automatically.
+- [ ] RLS policies prevent any teacher from reading data outside the grades they're assigned to.
+- [ ] Grade switcher in top bar is hidden for single-grade teachers (most users at launch).
+- [ ] Weekly view prints cleanly on letter or A4.
+- [ ] Lessons have a `learning_objectives` field visible in the lesson detail panel and editable in master-edit mode.
+- [ ] Export Center reachable from top-bar Export icon AND from any lesson card's context menu.
+- [ ] PDF export generates for daily / weekly / unit / subject-year scopes, includes title, learning objectives, standards, lesson content, and resource links by default.
+- [ ] Live export downloads immediately without persisting anything server-side.
+- [ ] Snapshot export downloads AND persists a `SavedExport` record; the file is re-downloadable from the Reports library in Settings.
+- [ ] Reports library is visible to all grade-level teammates; delete restricted to leads.
+- [ ] PDF output is consistent across Chrome, Safari, and Firefox (visual diff small enough to be archival).
+- [ ] `AuditLog` table exists; every mutation across the app writes one row via the `auditLog()` helper (verify with a sample run of 20 mixed actions in dev — all 20 appear in the log within 2 seconds).
+- [ ] Audit-log INSERTs go through a security-definer RPC; users cannot forge actor IDs or arbitrary actions.
+- [ ] `SchoolAdmin` table exists; `TeacherGradeAssignment.role` enum includes `grade_admin`.
+- [ ] RLS policies recognize `teacher`, `lead`, `grade_admin`, and `SchoolAdmin` roles; tests cover that a `teacher` cannot read another teacher's personal copy and that no role outside admins can read `AuditLog`.
+- [ ] No admin UI is exposed in Phase 1 (audit data and admin roles exist in the DB but no menu item appears for any user).
+- [ ] Inline comment threads appear under lesson detail (in Weekly expanded card + Daily right pane + Unit page); top-level + one level of replies; authors can edit/delete their own; soft-deleted comments display as "[Comment removed]".
+- [ ] Day shoutbox appears in the Daily view below the Daily Notes banner; flat post list; quick-add input; auto-hides from inline view after 7 days (still findable in the Comment Browser).
+- [ ] Comment Browser opens from the 💬 top-bar icon; filters (scope, anchor type, subject, unit, author, has-replies-from-me, unread) work independently; result rows include anchor labels.
+- [ ] Clicking a Browser result row jumps to the parent view with the relevant comment thread scrolled into view.
+- [ ] Unread badge on the 💬 icon shows the count of unread comments for the current teacher; updates on app load and on view-switch.
+- [ ] Lead and grade_admin roles can delete any comment in their grade; teachers can delete only their own.
+- [ ] Lessons can be reordered up/down within a single day in Daily View AND within a single Weekly View cell; reorder persists per teacher × date; original master order is unaffected for other dates.
+- [ ] `EventDayOrderOverride` records are created on first reorder for a given teacher × date and updated on subsequent reorders.
+- [ ] Reorder history is preserved indefinitely — viewing a past date shows the order taught, not the master order.
+- [ ] Two lessons can occupy the same time block (side-by-side rendering); three or more stack vertically. Each lesson retains its own completion checkbox and full functionality.
+- [ ] A lesson dragged out of a multi-lesson slot moves cleanly to its new slot with no effect on the other lessons.
+- [ ] "+ Add to day" chooser appears in Daily, Schedule, and Weekly views; offers Core Lesson Event / Extra Lesson Event / Day Event; renders the same authoring shape for all three with only required fields differing.
+- [ ] Core Lesson Event, Extra Lesson Event, and Day Event each have title, learning objective, standards, and resources fields. Only title is required for each.
+- [ ] Extra Lesson Events appear alongside Core Lesson Events in Daily/Schedule/Weekly views with a visual marker (border style or ✨ icon).
+- [ ] Day Events appear at end of left pane (Daily), inline at time (Schedule), and as bottom banner (Weekly), with their own completion checkbox.
+- [ ] All three event types persist indefinitely; past dates still show what occurred.
+- [ ] Export Center includes day events and extra lesson events by default; toggle present to exclude each.
+- [ ] `StandardsFramework` and `GradeFrameworkAssignment` entities exist. CCSS Grade 5 is preloaded as a catalog framework. The EE framework can be uploaded via CSV in Settings and immediately appears in the standards picker.
+- [ ] Standards picker shows results grouped by framework, color-coded by framework, with the framework's short-code badge on each result.
+- [ ] A single lesson, extra lesson event, or day event can be tagged with standards from multiple frameworks simultaneously.
+- [ ] CSV upload form accepts `framework_short_code, code, description, parent_code, grade_level, language` columns, parses, and inserts standards rows. Errors surface inline. (Polish/preview deferred to Phase 2.)
+- [ ] `CoverageSnapshot` table exists. A nightly scheduled job computes coverage stats per (school_year, grade, framework, subject). Verify with a manual trigger of the job; a row appears for each combination.
+- [ ] `lib/admin/queries.ts` exists with the snapshot-computation function as its only entry. No teacher-facing UI queries this file.
+- [ ] Audit log records `event_reordered`, `event_moved_into_slot`, `event_moved_out_of_slot`, `day_event_created`, `day_event_edited`, `day_event_deleted`, `day_event_completed`, `extra_lesson_event_created`, `extra_lesson_event_edited`, `extra_lesson_event_deleted`, `framework_uploaded`, `framework_assigned_to_grade`, `standard_tagged`, `curriculum_imported` actions.
+- [ ] Curriculum Import flow in Settings accepts `.csv`, `.xlsx`, `.xls`, `.txt`, `.md` uploads up to 5MB.
+- [ ] Strict CSV template is downloadable from the same Settings page; uploads matching the template insert directly without an AI mapping call.
+- [ ] Non-canonical uploads route to the Claude API for schema mapping; results render in a preview screen with high/medium/low confidence indicators per row.
+- [ ] "Needs review" tab surfaces low-confidence rows for inline editing or skipping; the teacher can confirm-and-commit only after acknowledging the review queue.
+- [ ] A single `curriculum_imported` audit log entry captures the import metadata (source_filename, rows_total, rows_inserted, rows_skipped, rows_flagged); individual lesson inserts are also logged normally.
+- [ ] Unmatched standards codes do not block the import; they surface in a follow-up report.
+- [ ] A 1,400-row import (40 weeks × 7 subjects × 5 days) completes upload → confirmed-in-database in under one hour of teacher time, including review of flagged rows.
+- [ ] Lighthouse score ≥ 85 on the weekly view.
+
+**Personal-mode visual differentiation (replaces the old "M" badge):**
+- [ ] Unedited-from-master lessons in Personal mode show a solid subject-color left stripe and no extra marker.
+- [ ] Personally-modified lessons show a **dashed** subject-color left stripe plus a "Modified" pill in the top-right corner.
+- [ ] Personally-moved lessons show a solid stripe plus a move-arrow icon (↔ or ⤴) in the top-right corner.
+- [ ] A lesson that is both modified AND moved composes both treatments (dashed stripe + Modified pill + move-arrow).
+- [ ] Right-click menu on an unedited lesson offers "Copy to my personal"; on a modified lesson offers "Reset to master"; on a moved lesson offers "Return to master location"; on a both-modified-and-moved lesson offers both.
+
+**Daily notes (personal-only):**
+- [ ] Daily notes are personal-only — only the author sees them. The team-visible-by-date surface is the Day Shoutbox.
+- [ ] Urgent personal daily notes render with a solid red background, NOT pulsing.
+
+**Teaching Reminders (§5.20, Phase 1A):**
+- [ ] Slim banner appears below the top navigation on Daily, Weekly, and Schedule views when at least one category is enabled.
+- [ ] Today dashboard widget shows a quote card with the same content tiers.
+- [ ] Two categories (Behavioral / Academic) render with distinct subtle background tints.
+- [ ] Both categories can show simultaneously in the inline banner row (one of each).
+- [ ] Clicking a banner (anywhere except × or refresh) expands it inline with summary + source name + source link (no modal).
+- [ ] **A small × in the banner's far right corner closes it for the current session only.** The banner reappears on a fresh session (new tab / login / browser restart). Per-session dismissal is the lightweight "not now" — Settings toggles are the permanent off switches.
+- [ ] Settings → Profile has two independent toggles (Show behavioral / Show academic) plus a master "Hide all reminders" override; toggles persist per teacher across sessions.
+- [ ] Disabling both categories instantly hides banners across all views.
+- [ ] A new reminder is selected on page load, on navigation to the view, and on a 60-minute timer while the teacher stays on the same view.
+- [ ] Best-effort: the same reminder is not shown twice within 24 hours for the same teacher.
+- [ ] School-admin Settings → School library → Teaching reminders allows add/edit/delete with required fields (category, quote_text) and optional fields (summary, source_name, source_link, active toggle).
+- [ ] CSV import (`category, quote_text, summary, source_name, source_link`) accepts well-formed files and reports row-level errors.
+- [ ] A school with zero active reminders shows no banner anywhere (empty-state silent, not loud).
+
+**View modes (§5.22, Phase 1A):**
+- [ ] Three-way pill (`CPViewModeSwitch`) renders in the top bar of Weekly, Daily, Subject, Unit, Schedule views; hidden on Catch-up and Standards.
+- [ ] Selecting a mode is instant — no page reload, no data refetch.
+- [ ] Mode persists per-teacher in `TeacherUIState.view_mode`; survives logout/login and cross-device sync.
+- [ ] First login: new non-lead teachers see Simple; Lead and admin roles see Advanced.
+- [ ] Simple Lesson card uses 88px height, 6px stripe, 16px title weight 500, 24px completion checkbox, 1-line preview, single resource-count icon, single standards-count chip.
+- [ ] Simple Lesson card hides: dashed stripe, Modified pill, move-arrow, tasks pill, I-Can objective inline, comment count badge, "Core has updates" pill, reasonNotDone inline note.
+- [ ] Simple Lesson card right-click menu offers only Mark done, Move to day, Open detail (3 options instead of Advanced's 8).
+- [ ] Simple Weekly hides the catch-up bar and any Master/Core-mode banner; uses 40×40 + button on empty cells with "Drag a lesson here or tap +" hint.
+- [ ] Simple Daily left pane uses 64px row height; right pane shows 14px directions, single "Mark done" button + "More options" disclosure.
+- [ ] Simple Subject shows plain-language status words ("Not done yet" / "Done" / "Skipped") and plain-language week ranges ("Weeks 9 to 12").
+- [ ] Simple mode suppresses entry to Master/Core mode — toggling to Master requires switching to Advanced first.
+- [ ] Task mode renders a flat checklist of events grouped by day (Weekly) or as a top-to-bottom list (Daily, Subject, Unit, Schedule).
+- [ ] Task mode supports bulk-select with bulk-action bar (Mark done / Mark skipped / Carry over / Add to to-do).
+- [ ] Task mode bulk actions on 50+ rows complete in under 3 seconds with progress indicator.
+- [ ] Mode-switching does not lose the teacher's current filter or focused-entity state.
+- [ ] A small × in the banner's right corner closes it for the current session only; banner reappears on next session (new tab / fresh login / browser restart). The session-close × is distinct from the Settings toggle, which is permanent.
+
+**Keyboard navigation:**
+- [ ] All shortcuts from §5.16 work (`j/k/h/l`, `e`, `Space`, `⌘D`, `⌘K`, `Delete`, `/`, `?`, `Esc`, `g c`).
+- [ ] `?` opens a cheat sheet modal listing all shortcuts grouped by category.
+- [ ] Every shortcut also has a menu equivalent — keyboard is enhancement, not requirement.
+
+**Discoverability and empty states:**
+- [ ] Every lesson card shows a "⋯" affordance on hover (always visible on touch devices) that opens the same menu as right-click.
+- [ ] First hover over a lesson card shows a one-time onboarding tooltip teaching the gesture.
+- [ ] Empty grid cells display "Drag a lesson here or click +" hint text with a subject-tint hover state.
+- [ ] Clicking `+` on an empty cell opens the "+ Add to day" chooser pre-populated with that subject and day.
+
+**Catch-up controls (three layers):**
+- [ ] Settings has a "Show catch-up reminders" global on/off toggle; default on.
+- [ ] When the global toggle is off, no in-grid bar, no top-bar flame badge, no ambient catch-up affordances appear in any view. The Catch-up screen is still reachable from Settings.
+- [ ] The in-grid catch-up bar has a ✕ to dismiss for the current week.
+- [ ] After dismissal, a flame badge with the count appears in the top bar.
+- [ ] Clicking the top-bar flame badge offers options to restore the in-grid bar OR open the Catch-up screen.
+- [ ] Dismissal state is per-teacher, per-week; resets when viewing a different week.
+
+**Catch-up screen (§5.17):**
+- [ ] Reachable from Settings, the top-bar flame badge, the Today dashboard carry-over click-through, and the `g c` keyboard shortcut.
+- [ ] Header shows year coverage summary ("X% covered — N uncovered events across W weeks").
+- [ ] Scope chips (Last week / Last 4 weeks / This term / All year) are mutually exclusive; defaults based on entry point.
+- [ ] Group-by dropdown offers Subject → Unit → Chronological (default), Chronological flat, Standard, Unit only.
+- [ ] Per-item actions: Mark done, Mark skipped, Carry over to…, Jump to lesson, Add to to-do.
+- [ ] Bulk-action bar appears when one or more items selected; supports bulk mark done/skipped/carry-over/add-to-todo.
+- [ ] Carry-over destination picker offers: Next school day, Next week (same day-of-week), Specific date, Specific week.
+- [ ] Empty state ("🎉 Caught up. Nothing uncovered in this scope.") appears when filter returns zero rows.
+- [ ] Loads in <2 seconds for up to 1,500 events; bulk actions on 50+ items complete in <3 seconds with progress indicator.
+
+**Master-mode entry sequence:**
+- [ ] Toggling to Master mode triggers a flashing red heads-up message at the top of the viewport with the text "Heads up — changes here affect the whole team."
+- [ ] The flashing message resolves after ~3 seconds into a smaller persistent red banner with the same text, which stays visible for the entire Master-mode session across all views.
+- [ ] Switching back to Personal mode dismisses both messages.
+- [ ] Under `prefers-reduced-motion`, the heads-up message appears immediately solid (no fade-in animation) and resolves into the persistent banner without animation.
+- [ ] No confirm dialog appears at any point in the entry sequence.
+
+**Today / now indicator (Schedule view):**
+- [ ] The current time block has a 2px subject-color top border and a "▶ NOW" badge that pulses (or stays solid if `prefers-reduced-motion`).
+- [ ] A horizontal red 2px "now line" spans the timeline at the current minute, with an arrow on the left margin.
+
+**Carry-over click-through:**
+- [ ] The "N from last week" stat on the Today dashboard is clickable.
+- [ ] Clicking it opens the Catch-up screen (§5.17) filtered to last week's items.
+
+**Standards code drill-through:**
+- [ ] Standards code chips on lesson detail are clickable.
+- [ ] Clicking opens a side panel showing every lesson tagged with that standard (master + personal, filterable by completion status).
+
+**Comment thread collapsing:**
+- [ ] Comment threads on lesson detail render as "💬 N comments" by default; click expands.
+- [ ] An unread dot appears on the badge when there are unread comments.
+- [ ] Once expanded, the thread stays open for the session (sticky-expansion rule).
+
+**Print stress test:**
+- [ ] A 9-subject week with full directions text prints to Letter without horizontal overflow.
+- [ ] No lesson card is split across pages.
+- [ ] When a week spans pages, the new page header reads "Week N continued".
+
+**Print Center (§5.9):**
+- [ ] Print Center reachable from top-bar icon and `⌘P` / `Ctrl+P`.
+- [ ] Scope chips (Day / Week / Month / Year / Subject / Unit / Not-done) work and update live preview.
+- [ ] Completion filters (✅ ⬜ ⏭️ 🔄 ⚠️) combine freely; default all checked.
+- [ ] Content toggles (directions / notes / standards codes / standards descriptions / resource links / completion checkboxes / personal vs master / daily notes / day shoutbox / extra lesson events / day events) work and update preview.
+- [ ] Year-scope defaults to overview format; "Full detail" toggle requires confirmation when >50 pages.
+- [ ] Catch-up screen has a "Print this list" action that opens Print Center pre-configured with scope=Not-done and current filters.
+
+**Personal subjects:**
+- [ ] Teachers can create personal subjects in Settings with name, color, display order, default frameworks.
+- [ ] Personal subjects appear as additional subject rows in the creating teacher's Weekly/Daily/Schedule views.
+- [ ] Personal subjects are invisible to other teachers in the same grade.
+- [ ] Personal subjects can host all three event types — including Core Lesson Events with units and weekly structure (i.e., they behave like team subjects for their owner). The owner can create units within their personal subject and place core lesson events on those units.
+- [ ] Personal subjects can have their own standards-framework defaults; the picker honors them.
+
+**Time-slot vs. personal-subject creation flow:**
+- [ ] When a teacher adds a new time block in Schedule view setup, the creation form asks: "Time slot" (label + notes/resources only, no subject row) or "Personal subject" (full subject row with color, units, events).
+- [ ] Default selection is "Time slot."
+- [ ] Selecting "Personal subject" reveals a sub-form for name, color, display order, default frameworks.
+- [ ] A time-slot block has a context-menu action "Convert to personal subject" that opens the same sub-form.
+- [ ] A personal-subject block has a context-menu action "Convert to time slot" that shows a warning about existing events archiving, requires confirmation.
+
+**Personal subject promotion (sharing to team):**
+- [ ] Settings → My personal subjects → "Share with team" sets `promotion_status = pending` and creates an entry in the lead's approval queue.
+- [ ] Settings → Subject promotion approval queue (visible to lead and delegated grade_admins only) shows all pending requests with Approve / Reject buttons.
+- [ ] Approving converts the subject's `scope` to `team`, clears `owner_id`, and makes the subject visible to every team member from that moment.
+- [ ] On approval, the owner's existing events on that subject remain personal-only to the owner; other teachers see the subject row but no inherited event history.
+- [ ] Lead can delegate approval authority to a `grade_admin` via Settings; delegate sees the same queue.
+- [ ] Rejected requests return `promotion_status = rejected`; owner can re-request after editing.
+
+**Year rollover for personal subjects (Phase 1 data-model; Phase 2 full flow):**
+- [ ] `Subject` entity has a `rollover_preference` field with values `ask_me` | `yes` | `no`; defaults to `ask_me` for newly-created personal subjects.
+- [ ] Settings → My personal subjects → each card has an "End of year:" control offering Ask me / Roll over / Archive; teacher can change anytime.
+- [ ] At year rollover (Phase 2), personal subjects with `rollover_preference = yes` clone forward automatically.
+- [ ] Personal subjects with `rollover_preference = no` archive with the prior year (not deleted; restorable via Settings → Archived subjects).
+- [ ] Personal subjects with `rollover_preference = ask_me` trigger the Year-end Rollover Decision screen (§5.18) for the owning teacher.
+- [ ] On rollover, cloned subjects bring forward: definition (name, color, display order, default frameworks), units, core lesson events with all authored content (titles, learning objectives, directions, standards tags, resource links, display order), and recurrence patterns (with `school_year_id` updated and `start_date` adjusted to the new year start).
+- [ ] Completion records do NOT clone — they archive with the previous year.
+- [ ] Day Events on personal subjects do not clone in either path.
+- [ ] A personal subject promoted to team mid-year rolls over as a team subject, independent of any individual rollover decision.
+- [ ] A personal subject in `promotion_status = pending` that is chosen to archive has its promotion auto-cancelled; the lead is notified.
+- [ ] A personal subject in `promotion_status = pending` that is rolled over carries forward with pending status intact.
+- [ ] Settings → Archived subjects lets the teacher restore any archived personal subject — restoration clones its definition + curriculum structure into the active year.
+
+**Year-end Rollover Decision screen (§5.18, Phase 2):**
+- [ ] When the lead initiates rollover, every teacher with at least one personal subject (regardless of preference value) receives a top-bar notification.
+- [ ] On next sign-in, those teachers land on the Rollover Decision screen.
+- [ ] Teachers with zero personal subjects never see this screen.
+- [ ] Each row shows subject name, color, preference badge ("You chose: Roll over" / "You chose: Archive" / "No preference set"), year-end stats (units, events, completed, not-done), and per-row radio (Roll over / Archive).
+- [ ] Rows are pre-selected per the subject's `rollover_preference`; `ask_me` rows have no pre-selection.
+- [ ] Bulk actions (Roll over all / Archive all / Reset to my preferences) work and update all rows.
+- [ ] Submit button is disabled until every row has an explicit choice.
+- [ ] "Skip for now" closes the screen without committing; pending state persists.
+- [ ] When pending, the Weekly view shows a banner "Rollover pending — N personal subjects awaiting your confirmation" with a "Decide now" link.
+- [ ] Submission writes all subject rollover decisions atomically; partial failure is rejected.
+- [ ] Each per-subject decision writes a `personal_subject_rollover_decided` audit log entry with metadata indicating whether the teacher accepted or overrode the pre-selection.
+- [ ] The screen renders within 1.5 seconds for a teacher with up to 20 personal subjects.
+
+**SubjectTeamMembership (Phase 1 data; Phase 2 UI):**
+- [ ] `SubjectTeamMembership` rows auto-populate when a team subject is created (one row per teacher currently in the grade team, `can_edit_master = true`).
+- [ ] When a personal subject is promoted to team-shared, additional `SubjectTeamMembership` rows are created for the rest of the grade team while the owner's row is preserved.
+- [ ] RLS policies enforce: a teacher can only edit a subject's master if they have a `SubjectTeamMembership` row for that subject with `can_edit_master = true`.
+- [ ] Adding a teacher from outside the grade requires `school_admin` permission and writes an audit log entry.
+- [ ] Phase 1 has no Settings UI for managing team membership — defaults apply; Phase 2 ships the per-subject "Who can edit master" panel.
+
+**Undo stack (EditUndoStack):**
+- [ ] Every edit on a CoreLessonEvent, ExtraLessonEvent, DayEvent, Unit, Subject, personal subject, Comment, DailyNote, or ToDo writes a snapshot of the prior state to the stack.
+- [ ] Stack depth is capped at 5 per (entity, teacher); oldest is dropped on overflow.
+- [ ] Right-click menu shows "Undo last edit (N available)" when the stack is non-empty for the focused entity.
+- [ ] `⌘Z` / `Ctrl+Z` triggers undo on the focused entity (NOT a global undo).
+- [ ] Each undo writes an `undo_applied` audit log entry.
+- [ ] Undo is always against the current teacher's last edit — never another teacher's edit.
+
+**Copy from archived years:**
+- [ ] Settings → Year management → Copy from archive lists every archived school year for the active grade.
+- [ ] Right-clicking a unit / lesson / resource / personal subject in an archived year offers "Copy to active year."
+- [ ] Bulk-copy of an entire unit clones the unit and all its lessons in one operation.
+- [ ] Copies preserve content (titles, learning objectives, directions, resource links, standards tags) but NOT completion records, daily notes, comments, day shoutbox posts.
+- [ ] Copying respects `SubjectTeamMembership` — a teacher can only copy into subjects they can edit.
+- [ ] Each copy writes a `copied_from_archive` audit log entry.
+- [ ] Browsing an archived year loads within 2 seconds; copying a unit (~30 lessons) completes within 5 seconds.
+
+**AB-week cycle infrastructure (Phase 1 data; Phase 2 UI):**
+- [ ] `School Year.active_cycle_pattern` field exists with default `one_week`.
+- [ ] `Time Block.week_cycle` field exists with default `every_week`.
+- [ ] In a `one_week` school, no AB-related UI appears anywhere.
+- [ ] The data model accepts and stores `ab_two_week` school years and `week_a` / `week_b` time blocks without throwing — Phase 2 UI consumes these without schema migration.
+
+**PermissionOverride infrastructure (Phase 1 data; Phase 3 UI):**
+- [ ] `PermissionOverride` table exists with columns `teacher_id`, `grade_level_id` (nullable), `feature`, `value`.
+- [ ] RLS policies and feature gates check `PermissionOverride` before falling back to role-based defaults.
+- [ ] No UI for managing overrides in Phase 1 — admin manages via direct database access if needed.
+
+**AI cost audit logging (Phase 1 infrastructure):**
+- [ ] Every Claude API call from any feature writes audit-log metadata: `actor` (teacher_id), `feature`, `cost_usd`, `input_tokens`, `output_tokens`.
+- [ ] The audit-log aggregation produces accurate totals broken down by school / grade / teacher / feature / period.
+- [ ] `AISpendCap` entity exists; no enforcement UI in Phase 1 (admin sets caps via DB if needed); Phase 3 builds the management UI.
+
+**Recurring Extra Lesson Events:**
+- [ ] Teachers can mark an Extra Lesson Event as recurring with daily / weekly / every-N pattern, days-of-week selection, end condition.
+- [ ] Recurring instances appear on the right dates without pre-creating database rows.
+- [ ] Editing a single instance prompts a choice: "This instance only / This and future / All instances."
+- [ ] Skipping a specific date creates a `RecurrenceInstanceOverride` of type `deleted` for that date only.
+- [ ] Team-scoped recurring events are visible to all teachers in the grade; personal-scoped only to the author.
+- [ ] Settings → Recurring events lists all of the teacher's recurrences with edit/delete actions.
+
+**Resource attachments (§4.5a + §5.21, Phase 1B):**
+- [ ] Teachers can attach hosted files (PDF, DOCX, RTF, image, image stack) and links (external, YouTube, Drive) to lessons, extra events, day events, and units.
+- [ ] Per-file size cap of 25 MB enforced at upload time with a clear error on oversize.
+- [ ] Per-event hosted-file cap of 10 enforced; soft warning at 8, hard block at 10.
+- [ ] Image stack counts as one file slot even when bundling multiple images; internal limit 50 images per stack.
+- [ ] Unlimited links per event (no count cap on external/YouTube/Drive links).
+- [ ] School-admin "Resource hosting mode" toggle works: "Links only" hides file-upload affordance everywhere; "Files + links" enables it. Default for new schools: Links only.
+- [ ] Lesson card displays resource-type indicator icons (📄 PDF / 🖼️ image / 🔗 link / 📺 video / 📁 Drive / 📝 DOCX) with hover tooltip showing per-type counts.
+- [ ] Clicking a resource on a lesson card opens the resource viewer with the lesson sidebar (other resources + scrollable notes + standards chips) persistently visible.
+- [ ] Full-screen mode (F or "Enlarge") hides the sidebar; Esc restores it.
+- [ ] Image stacks render as a slideshow with previous/next + thumbnail strip.
+- [ ] Link previews fetch Open Graph metadata on attach; YouTube extracts video ID for thumbnail; Drive extracts file ID for file-type icon.
+- [ ] Drag-and-drop from desktop attaches a file to the lesson it's dropped on (Weekly or Daily view); drag-and-drop from address bar attaches a link with auto-detected type.
+- [ ] Multi-file drop prompts "Attach as image stack?" if all files are images.
+- [ ] "+ Add resource" modal in lesson detail offers Hosted file or Link paths with validation before save.
+- [ ] Resources can be reordered within a lesson via drag, or re-anchored to a different lesson by dragging the resource itself onto another lesson card.
+- [ ] Files hosted in Cloudflare R2 are served via a Worker that verifies the Supabase session; signed URLs have 5-minute TTL; direct R2 public URLs never exposed.
+- [ ] Bucket layout `r2://planner-resources/{school_id}/{event_type}/{event_id}/{resource_id}/{filename}` allows per-school usage accounting.
+- [ ] Every resource upload, edit, delete, and access writes an audit log entry.
+- [ ] Nightly `SchoolStorageUsage` snapshot accurately reflects total R2 usage per school.
+
+**Quick standards tagging:**
+- [ ] Right-click / ⋯ menu on a lesson includes "Tag standards" entry.
+- [ ] Clicking opens a compact picker filtered to the subject's default frameworks (from Settings).
+- [ ] "Show all frameworks" override expands the picker to all frameworks assigned to the grade.
+- [ ] Typing filters the list; clicking a standard adds it as a tag on the lesson without opening the full detail panel.
+- [ ] Escape or click-outside closes the picker.
+
+**Per-subject default frameworks:**
+- [ ] Settings → "Standards framework defaults per subject" lets the teacher pick which frameworks the picker shows by default for each subject.
+- [ ] Quick standards tagging respects the per-subject defaults.
+- [ ] Defaults are per-teacher (each teacher can set their own).
+
+**Missed-events task-list mode:**
+- [ ] Subject view, Unit view, and the Standards-drill-through side panel show a missed-events task list at the top when in Month / Unit / All scopes.
+- [ ] Day and Week scopes do NOT show the task list — missed events stay inline with red highlight.
+- [ ] Each task-list item shows title, original date, days-overdue, and quick actions (Mark done, Mark skipped, Carry over to…, Jump to lesson).
+- [ ] "Hide missed events" toggle removes missed events from both inline and task-list rendering; persisted in `TeacherUIState`.
+- [ ] Global catch-up toggle (Settings) overrides the task list — when off, no task list appears anywhere.
+
+### Phase 2 acceptance
+
+- [ ] **Vivid theme built and shipped.** Theme toggle in Settings offers Quiet and Vivid; both render correctly; switching is instant.
+- [ ] **Full Appearance settings panel** ships: theme + density + color intensity + reduce-motion + backgrounds curated library.
+- [ ] Personal copy auto-creates on first edit in personal mode.
+- [ ] Master-mode banner is unmissable; editing master requires explicit "Now editing master" confirmation. (Banner sequence shipped in Phase 1; this verifies the full edit flow works on top.)
+- [ ] **Bulk master-change approval screen** — review screen with Accept all / Reject all / Accept selected / Reject selected, per-row checkboxes, group-by toggle (lesson / week / change-type / unit), scope chips, conflict-row flagging.
+- [ ] Master changes flow through automatically for unforked lessons (no approval required).
+- [ ] Approval applies only to forked lessons; the review screen only shows pending changes against forked lessons.
+- [ ] Schedule view auto-slots lessons into the correct time blocks for the teacher's day.
+- [ ] Ramadan toggle swaps time blocks and persists.
+- [ ] Unit dashboard shows summary, completion %, and standards coverage map.
+- [ ] "Start Unit" action exists on Unit view; creates a `UnitStartRecord`; surfaces the one-time intro tooltip.
+- [ ] Year rollover archives current year and seeds the next year without manual reentry.
+- [ ] Excel export generates a single `.xlsx` with one row per lesson, all required columns, hyperlinked resource URLs, and frozen header row.
+- [ ] If a custom MOEHE/school PDF template is provided, the Export Center offers it as a selectable layout in addition to the default.
+- [ ] Comment unread badge updates in real time when a teammate posts a new comment (badge increments within ~2 seconds without page reload).
+- [ ] Opt-in daily email digest sends to teachers who enable it in Settings; digest includes only comments since the last digest.
+- [ ] Export Center has a "Include comment threads" checkbox; when on, the PDF export appends comments per lesson/unit.
+
+**SubjectTeamMembership management UI (Phase 2):**
+- [ ] Settings → Team subjects → each subject card has a "Who can edit master" section listing current members with `can_edit_master` toggle.
+- [ ] Adding a teacher from outside the grade requires `school_admin` permission (button is disabled or hidden for non-admins).
+- [ ] Permission changes (toggle, add, remove) write `subject_team_membership_changed` audit log entries.
+- [ ] RLS enforcement matches the UI: changing the toggle immediately changes whether that teacher can edit the master.
+
+**AB-week cycle UI (Phase 2):**
+- [ ] Settings → School year → "Cycle pattern" toggle (one_week / ab_two_week) — visible to `lead` and `school_admin` only.
+- [ ] When `ab_two_week` is active: per-Time Block `week_cycle` selector appears in Schedule view setup.
+- [ ] Weekly and Schedule navigators show "Week A" / "Week B" badges.
+- [ ] Navigator alternates A → B → A → B through the year from the configured `cycle_anchor_date`.
+- [ ] Time blocks marked `week_a` do not appear when viewing a Week B date and vice versa; `every_week` always appears.
+- [ ] Per-date override surface (Settings → Schedule overrides) allows breaking the cycle for holiday weeks.
+
+### Phase 3 acceptance
+
+- [ ] PDFs and images upload, preview inline, and can be annotated.
+- [ ] Annotated copies save to the resource record.
+- [ ] Whiteboard mode is reachable from any displayed resource.
+- [ ] Admin section is visible only to `SchoolAdmin` or `grade_admin` role holders; hidden from all other accounts.
+- [ ] Activity timeline can filter audit-log entries by actor, action, entity, date range, and grade.
+- [ ] Roster screen allows promoting/demoting roles and assigning teachers to grades, with each change written to the audit log.
+- [ ] Aggregate metrics (active teachers last 7/30 days, lessons created, exports generated, storage used) load in under 2 seconds for a school with ≤200 teachers and ≤100k audit rows.
+
+**Interventions (Phase 3):**
+- [ ] Each **learning event** (CoreLessonEvent) and **school event** (ExtraLessonEvent / DayEvent) can carry a "Tier 2/3 strategies" panel listing differentiation approaches (text only, no student PII).
+- [ ] An `InterventionStrategy` entity stores reusable strategies that can be dropped onto multiple events.
+- [ ] AI-suggested strategies button on each event calls the Claude API with the event's objectives + standards + directions; returns 3-5 suggested strategies; teacher reviews and accepts/edits/rejects.
+- [ ] AI-suggested strategy costs are tracked in the audit log; cost cap configurable per school via §7.11 AI budget controls.
+
+**Permissions Admin page (Phase 3, §5.19):**
+- [ ] Visible only to `school_admin`; `lead` and `grade_admin` see a scoped variant for their grade.
+- [ ] Roster panel lists every teacher in the school with name, email, role summary, and grade assignments.
+- [ ] Profile pane shows three tabs: Roles, Subject memberships, Feature overrides.
+- [ ] Feature-overrides tab is a permission matrix; each row has Yes / No / Inherit states.
+- [ ] Bulk operations (apply template / bulk-edit multiple teachers) work and write a single audit-log entry per affected teacher.
+- [ ] Every permission change writes a `permission_changed` audit log entry with actor, target, feature, before/after.
+
+**AI budget controls (Phase 3, §7.11):**
+- [ ] Admin section → AI Spend dashboard shows current month + year-to-date spend, broken down by scope and feature.
+- [ ] Caps management UI allows creating/editing/deleting `AISpendCap` rows.
+- [ ] Most-restrictive-cap-wins precedence when multiple caps apply to a single AI call.
+- [ ] Alert threshold (default 80%) surfaces a banner to the affected teacher.
+- [ ] `block_at_cap = true` correctly disables the AI feature once the cap is reached; the teacher sees a message ("Monthly budget reached. Contact your school admin.").
+- [ ] Dashboard totals reconcile exactly with the underlying audit-log aggregation.
+
+---
+
+## 10. Open Questions
+
+Resolve these before Phase 1 build kickoff. Each blocks at least one design or technical decision.
+
+| # | Question | Affects | Recommendation |
+|---|---|---|---|
+| 1 | Who can enter "Editing master" mode for a given subject? | RBAC, RLS policies | **Resolved.** By default, **any teacher on the subject's team can edit that subject's master content.** "Team" is a new per-subject concept: each subject has an associated set of teacher members (in most cases this equals the grade's full team, but can differ — e.g. only 2 of 5 teachers teach Grade 5 Spelling). The `lead` role can override the default for any subject in either direction: (a) restrict to specific teachers, or (b) extend to teachers outside the grade team (e.g. another school leader). See §4.2 new entity `SubjectTeamMembership` and §3.4. |
+| 2 | Color scheme: subject = primary color + unit shading, OR subject color + unit ribbon at top of week? | Visual design language | Start with subject + shading (cleaner). Iterate after prototype review. |
+| 3 | Auth domain restriction enabled? | Supabase config | **Resolved.** Yes — restrict to school's Google Workspace domain for Phase 1. Standard Google account sign-up is acceptable as an interim fallback if the domain restriction is harder to configure during initial setup. |
+| 4 | Year rollover: clone full master structure, or just unit skeletons? | Year-end workflow | Clone full master (units + lessons + standards + resource links); empty completion and personal copies. |
+| 5 | Master-change merge prompt UX: live banner, sidebar queue, on-next-login dialog? | Notifications system | Sidebar queue with badge count; teacher reviews when ready. No interruption mid-edit. |
+| 6 | Auto-tagging standards: Phase 2 or Phase 3? | Phase 2 scope, API cost | Phase 2 — small per-lesson cost, high time savings. |
+| 7 | Concurrent master editing: last-write-wins, conflict warning, or row-level lock? | Concurrency model | **Resolved.** Last-write-wins **plus an undo stack** (3-5 deep minimum) on every editable entity. Combined with a "Sarah is also editing this lesson" presence indicator (Supabase realtime presence). Undo is per-entity-per-teacher and works for changes to lesson content, structure, and standards tags. See §4.6 new entity `EditUndoStack`. |
+| 8 | Default view per teacher: configurable now, or hard-default to weekly? | Settings scope | Configurable from Phase 1. Cheap to build. |
+| 9 | Single school year active at a time, or can teachers toggle between past years? | Data model + UI | **Resolved.** One active year. Archived years are read-only but **content from archived years can be manually copied into the active year** — units, lessons, resources, recurrence patterns, personal subjects all support a "Copy from archived year" action. See §4.7 new spec. |
+| 10 | Print: server-rendered PDF, or browser print only? | Print pipeline complexity | Browser print only in Phase 1–2. Server PDF if needed in Phase 3. |
+| 11 | Does MOEHE or the school have a specific required PDF template (logo, header, layout)? | Phase 1 PDF scope | If yes: collect templates before Phase 1 build and either match closely in `react-pdf` or push to Phase 2 with Puppeteer. If no: ship the Phase 1 default. |
+| 12 | Should exports include teacher notes by default, or never? | Export defaults | Default off. Teachers can opt in per export. Notes are private by nature. |
+| 13 | Reports library retention policy: indefinite, auto-delete after N months, or manual only? | Storage cost, audit trail | Manual delete only in Phase 1; revisit in Phase 2 if storage grows. |
+| 14 | Is the eventual admin role likely school-internal (principal, IT, curriculum coordinator) or external (MOEHE inspector)? | Admin role design, login flow | Spec assumes school-internal, read-only by default. External access would need a separate, more locked-down flow. |
+| 15 | Should `SchoolAdmin` be a standalone account (no teacher record needed) or always linked to a teacher record? | Schema choice | Designed both-ways: `SchoolAdmin.teacher_id` is nullable, supporting non-teacher admins (e.g., IT coordinator) and teacher-admins (e.g., a teacher who is also curriculum coordinator). |
+| 16 | Audit log retention — indefinite or rolling window (e.g., 2 years)? | Database growth, compliance | Indefinite in Phase 1 (small team, low row count). Revisit at 5M rows or Phase 3, whichever comes first. |
+| 17 | Should `grade_admin` be a separate role from `lead`, or just expanded permissions on `lead`? | Role enum design | Separate. `lead` = curriculum authority. `grade_admin` = lead + audit-log read + assignment management. Keeps responsibilities clean and migrations easy. |
+| 18 | Should comments support @mentions (with notifications) in Phase 1, or defer to Phase 2? | Notification scope, complexity | Defer. Phase 1 = unread badges only. Add @mentions in Phase 2 alongside real-time and email digest, if teachers ask for them. |
+| 19 | Day shoutbox archive — auto-hide from inline view at 7 days, or configurable per team? | Daily view noise | 7 days hard-coded in Phase 1. Make it a team setting only if teachers complain. |
+| 20 | Should "reactions" (👍 ❤️ etc.) be added to comments? | Engagement design | Defer to a later phase. Easy to add when there's evidence the team wants them; premature now. |
+| 21 | Catalog frameworks vetted by the planner team vs. crowdsourced? | Quality control, scaling | Vetted by planner team in Phase 1–2. Defer crowdsourcing model to Phase 4+ when there's enough demand. |
+| 22 | Per-teacher drill-in on admin reports — separate role, configurable school setting, or always available to school admin? | Privacy, surveillance risk | Configurable per school. Default: aggregate-only. Schools can opt in to per-teacher visibility for specific admins. |
+| 23 | Closing-circle-style templates: should an Extra Lesson Event template be personal-only or shareable with the team? | Phase 2+ scope | Personal-only in Phase 2. Add team-shareable templates if requested. |
+| 24 | When CSV upload encounters a duplicate `code` within a framework, behavior — error, overwrite, skip? | CSV upload UX | Error in Phase 1 (safest). Add overwrite/merge options in Phase 2. |
+| 25 | Live theme system + custom backgrounds — Phase 2 scope and which themes/backgrounds ship? | Theming, design tokens, settings | Phase 2. Default theme ships Phase 1; theme picker added in Phase 2 with 5 themes (Default / Calm / Dark / Focus low-color / High contrast) plus a curated background library (solid colors, textures, patterns, photos/illustrations in seasonal sets). Token + storage architecture ready in Phase 1. |
+| 26 | Density toggle — fold into theme settings, or separate? | Settings architecture | Fold into a single "Appearance" settings panel that includes theme, density (Comfortable / Compact), color intensity (Full / Muted), background picker, and reduce-motion. All Phase 2. Architecture (tokens + `appearance_settings` blob on `TeacherUIState`) Phase 1. |
+| 27 | AI-assisted curriculum import — confirm Phase 1 scope, Claude API budget, error-handling UX | Phase 1 scope, API costs, onboarding friction | Yes Phase 1. Layer 1: strict CSV template (cheap fallback). Layer 2: AI-assisted import — teacher uploads any format, Claude API parses to canonical schema, preview-and-confirm UI, conflict view for rows that need manual fix. Layer 3: paid developer-assisted seed for highly chaotic data (service offering, no code). Estimated Claude API cost: ~$1-3 per school import. Build cost: ~5 days. |
+| 28 | Upload-your-own backgrounds — should this be school-admin-opt-in or default-on? | Moderation risk, school policy | **Resolved.** Opt-in, off by default for new schools. School admin enables in Settings. Conservative posture for moderation/policy reasons. |
+| 29 | Background contrast enforcement — block save below WCAG AA, or warn and allow override? | Accessibility, teacher autonomy | Block save below AA. Backgrounds are a delight feature; readability is not negotiable. Show the failing surface and offer a stronger overlay until passing. |
+| 30 | Master-mode entry: add a confirm dialog, or use a flashing-then-persistent banner? | Safety vs. friction for the lead teacher | **Resolved.** Flashing red heads-up message on toggle ("Heads up — changes here affect the whole team") that fades to a small persistent red banner while editing. No confirm dialog. Visual friction without click friction; safety without training dismissal. See §3.3 for full sequence. |
+| 31 | Should the dashed-stripe/"Modified" pill visual treatment extend to **resource changes** and **completion changes**, or only structural changes (content + location)? | Visual differentiation granularity | **Deferred — needs more context.** Today's spec: when a teacher edits the directions/notes/title of a lesson, or moves it, the card shows a dashed stripe + "Modified" pill in Personal mode. Q31 asks whether the same visual flag should also appear when the teacher only added a resource link, or only marked it complete. **Recommendation for Phase 1: NO** — completion happens constantly and would flag every card; resource additions are minor and would visually noise the grid. Phase 1 treats only content/structural changes as "modified." Revisit after teachers have used the tool. |
+| 32 | Secondary-school AB-week scheduling — Phase 1, Phase 2, or Phase 4? | Schedule view scope, data model | **Resolved.** Architecturally supported from Phase 1 (the `Schedule` data model includes an optional `week_cycle` field on Time Block + an `active_cycle_pattern` on School Year). UI for setting and switching the active cycle ships in Phase 2 alongside the Schedule view. Default for all schools at launch: one-week cycle. Secondary schools can switch to two-week (AB) cycles. See §4.8 new spec. |
+| 33 | Personal subject cap — how many per teacher? | UI clutter, data hygiene | **Resolved.** Max 5 personal subjects per teacher per grade. Soft limit (warn at 4, block at 5 with a "Archive an existing one first" prompt). Configurable per-school by admin in Phase 3+. |
+| 34 | Departed-teacher subject handling — what happens to personal subjects when a teacher leaves the school? | Data retention, institutional memory | **Resolved.** Auto-archive on teacher departure. Team lead or school admin can retrieve from an "Archived (departed teachers)" view in Admin section; can restore as the original teacher's personal subject (if returning), reassign to another teacher as personal, or promote to team master. Lifecycle managed via the Admin section in Phase 3+. |
+| 35 | Permissions admin page — when to build, what's the scope? | Admin section, role/permission management | **Resolved.** Phase 2-3. Admin page lists every teacher with their role (teacher/lead/grade_admin/school_admin), team memberships, and per-feature permission overrides (which subjects they can edit master for, which Settings sections they can access, who can promote subjects, who can manage interventions, AI budget access, etc.). Designed as a permission matrix UI. See §5.19 new spec. |
+| 36 | AI budget controls — where, who, what granularities? | AI cost management, admin section | **Resolved.** Phase 3 administrative page includes AI budget controls: total budget (school per year/month), per-teacher caps (per month/year), feature-level caps (curriculum import / standards auto-tagging / intervention suggestions, each with their own line). Configurable by school admin only. Audit log captures every AI API call with the actor, feature, and cost. See §7.11 new spec. |
+
+---
+
+## 11. Glossary
+
+| Term | Definition |
+|---|---|
+| **Master** | The official team-wide curriculum plan. Single source of truth. Edited only in master mode. |
+| **Personal subject** | A subject row that exists only in one teacher's view at first (e.g. "Morning Meeting", "Afternoon Circle"). Created by the teacher in Settings or as part of adding a time block in Schedule view setup. Behaves exactly like a team subject for its owner: can hold units, weekly structure, and all three event types. Invisible to teammates unless promoted (see "Promotion"). Has its own color, display order, and standards-framework defaults. Persists year-over-year. |
+| **Time slot (non-academic block)** | A labeled time block in a teacher's Schedule view with optional notes and resources, but NOT a subject row in the Weekly view. Used for lunch, recess, prep, commute, anything where the teacher just wants to label time without curriculum tracking. Created via the Schedule view setup form's "Time slot" option. Can be converted to a personal subject later (and back). |
+| **Personal subject promotion** | The flow by which a teacher requests their personal subject become team-shared. Settings → My personal subjects → "Share with team" sets the subject's `promotion_status` to `pending` and adds it to the lead's approval queue. Lead (or delegated `grade_admin`) approves or rejects. On approval, the subject becomes a team subject (`scope = team`, `owner_id` cleared); the owner's existing events stay personal-only — promotion shares the subject definition, not its event history. |
+| **Promotion approval queue** | The Settings panel (lead and delegated `grade_admin` only) listing all pending personal-subject share requests across the team, with Approve / Reject controls. |
+| **Rollover preference** | A per-personal-subject setting (`ask_me` | `yes` | `no`) controlling the **pre-selected radio** on the Year-end Rollover Decision screen. Defaults to `ask_me` on creation. Every teacher is asked at rollover regardless of value — the preference saves keystrokes (pre-selects the radio) but never skips the confirmation. Teacher can change anytime via Settings. |
+| **Year-end Rollover Decision screen** | Phase 2 full-page surface (§5.18) shown to every teacher with at least one personal subject when the lead initiates rollover. Per-row Roll over / Archive radios pre-selected by the subject's `rollover_preference`; bulk actions; Skip-for-now option. Decisions write to the audit log with metadata on whether the teacher accepted or overrode the pre-selection. |
+| **Archived (personal) subject** | A personal subject from a prior year that the teacher chose not to roll over (or that defaulted to archive). The definition is preserved but inactive in the current year. Restorable via Settings → Archived subjects → "Restore." |
+| **SubjectTeamMembership** | Per-subject editing-permission record. Default behavior: every teacher in the grade team is auto-added with `can_edit_master = true` when a subject is created or promoted. Lead can restrict (remove specific teachers) or extend (add teachers from outside the grade — requires `school_admin`). Replaces the simpler "only lead can edit master" default. |
+| **EditUndoStack / Undo stack** | Per-entity-per-teacher undo history, 5 edits deep, exposed via right-click "Undo last edit" or `⌘Z` / `Ctrl+Z` scoped to the focused entity. Companion to last-write-wins concurrency — the safety net for accidental overwrites. |
+| **Copy from archived year** | Action available in Settings → Year management and via right-click on items in an archived year browser. Clones a unit, lesson, resource, or personal subject from an archived year into the active year. Preserves content; resets completion/notes/comments. |
+| **Week cycle (AB)** | Schedule pattern toggle (`one_week` | `ab_two_week`) at the School Year level. Most schools use one_week; some secondary schools alternate Week A and Week B. Individual Time Blocks have `week_cycle` (`every_week` | `week_a` | `week_b`) controlling which cycle they fire on. Default for all schools: one_week. UI ships Phase 2. |
+| **Permissions Admin page** | Phase 3 administrative surface (§5.19) for managing roles, subject-team memberships, and per-feature permission overrides across the school. Roster panel + per-teacher profile with three tabs (Roles, Subject memberships, Feature overrides). Permission matrix UI for fine-grained overrides. |
+| **PermissionOverride** | Per-teacher, per-feature explicit allow/deny record that overrides the role-based default. Checked by RLS policies and feature gates. Phase 1 data; Phase 3 UI. |
+| **AISpendCap** | Per-scope (school / grade / teacher), per-period (month / year), optionally per-feature spending limit on AI API usage. Drives alerts at a configurable threshold (default 80%) and optional block-at-cap behavior. Phase 1 entity (no UI); Phase 3 management UI. |
+| **Learning events vs. school events** | Terminology used in Phase 3 intervention spec. **Learning events** = CoreLessonEvents (master-curriculum lessons). **School events** = ExtraLessonEvents and DayEvents (typically non-academic but can include SAT practice, assemblies, advisory, etc.). Intervention strategies attach to either type. |
+| **TeachingReminder** | A curated quote or research-summary entry shown to teachers throughout the day as a slim banner on Daily/Weekly/Schedule views + Today dashboard widget. Two categories: behavioral (mindset/culture) and academic (pedagogy/practice). Each entry has a quote, optional summary, optional source name and URL. Per-category Settings toggles. |
+| **Resource attachment** | A PDF, DOCX, RTF, image, image stack, or link attached to a lesson, extra event, day event, or unit. Hosted files live in Cloudflare R2 (25 MB per file, max 10 hosted per event); links are unlimited. School admin chooses between Links-only and Files+links mode. |
+| **Image stack** | A single resource that bundles up to 50 images for slideshow viewing. Counts as one of the 10 hosted-file slots per event, not as N images. Useful for capturing a sequence of whiteboard photos, annotated examples, or step-by-step visuals as a single attachment. |
+| **Resource hosting mode** | School-admin setting (Settings → School library): "Links only" (default, no storage, no upload UI) or "Files + links" (full hosting up to per-file and per-event caps). Cost-control toggle that defaults to the safer mode. |
+| **Resource viewer + lesson sidebar** | Two-pane view (§5.21) where the main canvas shows the focused resource and a persistent right sidebar keeps the lesson's other resources + scrollable notes + standards chips visible. Full-screen mode (F or Enlarge) collapses the sidebar; Esc restores it. |
+| **Cloudflare R2** | The chosen object-storage backend for hosted resource files. Zero egress fees at any scale; $0.015/GB storage. Served via a Cloudflare Worker that verifies the requesting teacher's Supabase session before issuing a short-TTL signed URL — direct public R2 URLs are never exposed. |
+| **View mode** | One of three lenses on the same data: **Simple** (low-floor, designed for new teachers and quick-glance use — bigger touch targets, plain-language labels, single primary action), **Task** (flat checklist with bulk operations — designed for catch-up sessions), **Advanced** (the full spec — every right-click menu, drill-through, indicator). Switched via a three-way pill in the top bar of applicable views. Persisted per-teacher in `TeacherUIState.view_mode`. New non-lead teachers default to Simple; leads default to Advanced. |
+| **Simple mode** | The low-floor view-mode option (§5.22). Phase 1A ships a designed Simple-mode pass for Lesson card, Weekly, Daily, and Subject views — not just flag-hidden chrome but resized components, plain-language copy, simpler modals, single primary action per surface. Other views' Simple modes in Phase 1A are flag-hidden (the existing Claude Design build); Phase 2 considers dedicated passes for additional views based on beta feedback. |
+| **Task mode** | The flat-checklist view-mode option (§5.22). Same data as the visual grid rendered as rows with checkboxes, bulk-select, and bulk-action bar (Mark done / Mark skipped / Carry over / Add to to-do). Available on Weekly, Daily, Subject, Unit, Schedule. The Catch-up screen IS Task mode for the whole year. |
+| **Advanced mode** | The full-feature view-mode option (§5.22) — the current spec without any reductions. Every right-click menu, every drill-through, every indicator. Opt-in by toggle for teachers; default for lead and admin roles. |
+| **Phase 1A** | The beta-ready subset of Phase 1 targeted for late-August launch with Heather's Grade 5 team. Includes the foundational viewing/editing/standards/personal-subjects surface plus the AI curriculum import. Excludes follow-on workflows (Catch-up screen, to-dos, comments, full Print Center, full keyboard shortcuts) which ship in 1B. |
+| **Phase 1B** | The remainder of the original Phase 1 surface, shipped iteratively during fall semester while Heather's team is using Phase 1A in classrooms. Completes Catch-up screen, to-dos, comments, full keyboard shortcuts, missed-events task list, full Print Center, subject promotion approval queue UI, copy-from-archive, year management UI. |
+| **Recurring Extra Lesson Event** | An Extra Lesson Event with a `RecurrencePattern` attached. Materializes on the right dates per the pattern without pre-creating rows in the database. Edits can target one instance, this-and-future instances, or the whole series. |
+| **Bulk master-change approval** | The Phase 2 review screen for accepting/rejecting queued master changes against the teacher's personal copies. Accept all / Accept selected / per-row checkboxes / conflict-flagging. Replaces per-item Accept/Reject dialogs that don't scale beyond a few changes. |
+| **Missed-events task list** | The summary section at the top of Subject, Unit, and Standards-drill-through views (in multi-week scopes) that surfaces not-done events as a structured list with quick actions. Inline-with-red-highlight stays the behavior for Day and Week scopes; the task-list mode kicks in for Month / Unit / All. |
+| **Per-subject default frameworks** | The set of standards frameworks the picker defaults to when tagging events in a given subject. Set in Settings per subject; the picker offers a "Show all frameworks" override. Prevents teachers from scrolling through hundreds of irrelevant standards when tagging. |
+| **Quick standards tagging** | The right-click / ⋯ menu entry "Tag standards" that opens a compact standards picker pre-filtered to the subject's default frameworks. 2-3 second tagging without opening the full lesson detail. |
+| **Tier 2-3 interventions** | Differentiation strategies for students who need additional support to access a lesson's objectives. Phase 3: strategies only (no named students). Phase 3 also adds AI-suggested strategies per lesson. Phase 4: optional student-level intervention tracking. |
+| **UnitStartRecord** | Phase 2 entity marking when each teacher started each unit. Used for unit-intro tooltips, reporting, and the optional "started Unit N" team announcement. Does NOT trigger auto-forking. |
+| **Personal copy** | A teacher's forked version of a master lesson, unit, or week. Default editing target. |
+| **Lazy fork** | A personal copy materializes only when a teacher first edits a master lesson, not before. |
+| **Synchronized subject** | All teachers teach the same lesson the same week (Math, Writing, Reading, Grammar, Explorers, SEL). |
+| **Self-paced subject** | Each teacher's class moves at its own pace through the lesson sequence (UFLI; sometimes Spelling). |
+| **Strand** | A sub-subject under a parent (Reading, Writing, Grammar, Spelling are strands under Literacy). |
+| **Unit** | A coherent block of weeks within a subject. Variable length, redefined each year. |
+| **Daily Note** | A per-day **personal** reminder (urgent / important / fyi). Only the author sees it. The team-visible counterpart is the Day Shoutbox. |
+| **Catch-up filter** | "Show only uncovered" toggle in any view, surfaces missed/incomplete items. |
+| **Schedule View** | Time-blocked daily timeline including non-academic periods (lunch, PE, Arabic, recess). |
+| **Ramadan mode** | Toggle that swaps in shortened 30-minute class times for the Ramadan date range. |
+| **CCSS** | Common Core State Standards — the primary standards taxonomy used. |
+| **Editing master** | The explicit mode required to make changes to the master plan. Requires confirmation button. |
+| **Carryover** | A status indicating a lesson was meant to be taught but wasn't, and has been rescheduled. |
+| **To-Do** | A task item (not a lesson) on either the personal or team running list. Optional date and tags. |
+| **Tag** | A user-defined, color-coded label for grouping and filtering to-do items. Personal or team scoped. |
+| **Date bucket** | The to-do filter scope: Today, This week, or No date. |
+| **Grade level** | A teaching cohort (e.g., Grade 5). The app supports multiple grade levels in one database; only Grade 5 is active at launch. |
+| **Teacher-grade assignment** | The junction record linking a teacher to a grade with a specific role (teacher or lead). A teacher can be assigned to multiple grades with different roles per grade. |
+| **Two-pane daily layout** | The Daily and Schedule view layout: left list of subjects/time-blocks, right pane shows selected lesson detail, or notes editor (Schedule view's non-academic blocks), or the Today dashboard when nothing is selected. |
+| **Today dashboard** | The right pane's "no selection" state in Daily and Schedule views — a **read-only** summary of today's daily notes (personal), today's to-dos (slice of items dated today), and completion summary. Quick-add inputs are available; full management lives in the to-do slide-out. |
+| **Single-purpose surface principle** | Each UI surface has one clear job at a time. Modes and toggles change content, not purpose. Filtering and management live in dedicated surfaces (slide-outs, settings), not in primary view panes. |
+| **Inline expansion** | Weekly/Subject/Unit view pattern: clicking a lesson card expands its detail in place within the grid or list, keeping the teacher anchored in context. |
+| **Right-pane detail** | Daily/Schedule view pattern: clicking a lesson card or time block opens its detail in the right pane. Replaces inline expansion in daily-shaped views. |
+| **Context menu** | Right-click (or "⋯" affordance) menu on a lesson card: Move to, Duplicate, Mark status, Add to to-do, See standards, Print, and (in master mode) Delete. |
+| **TeacherUIState** | Server-side per-teacher record holding ephemeral UI state (expanded cards, active filters, last view, panel open/closed). Syncs across devices via Supabase realtime; writes debounced ~500ms. |
+| **Learning objectives** | Per-lesson explicit objectives statement, separate from directions and notes. Required for governing-authority exports. |
+| **Export Center** | The dedicated screen for generating archival PDF and Excel exports of curriculum at daily, weekly, unit, or subject-year scopes. Distinct from ad-hoc browser print. |
+| **Live export** | An export generated on demand from current data, downloaded once, not retained server-side. |
+| **Snapshot export** | An export saved to the Reports library so any grade-level teammate can re-download the exact file later — used for archival submissions to school or MOEHE. |
+| **Reports library** | Settings-page list of all `SavedExport` records, visible to grade-level teammates, re-downloadable, deletable by leads only. |
+| **School admin** | A school-wide role with read-only access across all grades by default, plus management rights over grade levels, teacher-grade assignments, school years, and the audit log. May or may not be a teacher. |
+| **Grade admin** | A per-grade role that is a superset of `lead` — adds read access to that grade's audit log and the ability to manage `TeacherGradeAssignment` records for that grade. |
+| **Audit log** | Append-only table holding one row per state-changing action across the app. Written from day one; read only by admin roles in a future Phase 3+ admin section. |
+| **Admin section** | A separate UI area (not a seventh view) visible only to school admins and grade admins. Phase 3+ build. The data infrastructure ships in Phase 1 so history is available when the UI arrives. |
+| **Comment** | A team-visible note anchored to a specific lesson, unit, resource, or shoutbox date. Threaded one level deep (top-level + replies). Editable and deletable by the author; deletable by lead/grade_admin. |
+| **Day shoutbox** | A flat, single-thread team conversation tied to one date, displayed inline in the Daily view below the Daily Notes banner. Auto-hides from inline view after 7 days but remains in the Comment Browser. |
+| **Comment Browser** | A slide-out (with optional full-screen) for filtering and searching all comments across the grade. Mirrors the to-do panel's filtering UX. |
+| **CommentRead** | Per-teacher row recording that a teacher has viewed a comment. Drives unread badges and the "unread only" filter. |
+| **Standards Framework** | A named collection of standards (CCSS, IB, NZ Curriculum, Cambridge, EE, etc.). Can be catalog (built-in, shared across schools) or school-uploaded (private to one school). |
+| **Catalog framework** | A built-in standards framework vetted by the planner team. Read-only; available for any school to enable. CCSS is the launch example. |
+| **School-uploaded framework** | A standards framework uploaded by a school admin (via CSV in Phase 1) for the school's own use. Private to that school. |
+| **GradeFrameworkAssignment** | Junction record linking a grade level to a framework it uses. A grade can use multiple frameworks. |
+| **Coverage snapshot** | A nightly-computed row capturing standards-coverage stats for a (school_year, grade, framework, subject) combination. Backs the future admin reporting UI without requiring expensive live queries. |
+| **Coverage gap** | A standard in a framework's assigned scope that has not been tagged on any lesson — i.e., not (yet) taught. |
+| **Core Lesson Event** | The main lesson type, derived from the master curriculum. Belongs to a unit and week, has master/personal forking, drives completion and catch-up filter. Implemented by the `MasterCoreLessonEvent` and `PersonalCoreLessonEventCopy` entities. Pairs with Extra Lesson Event and Day Event in the "+ Add to day" chooser. |
+| **Extra lesson event** | A one-off teaching activity outside the master curriculum (e.g., closing circle, enrichment). Same authoring shape as a lesson, but no unit/week binding and no master/personal forking. Per-teacher or team-scoped. |
+| **Day event** | Non-curriculum entry on a day (assembly, drill, guest speaker, celebration). Same authoring fields as a lesson but only title is required. |
+| **"+ Add to day" chooser** | The universal authoring entry point in Daily/Schedule/Weekly views: a small picker that asks Core Lesson Event / Extra Lesson Event / Day Event before opening the form. |
+| **Aggregate-by-default principle** | A design rule for admin reports: data is shown team-aggregated by default; drill-in to per-teacher data requires explicit permission. Reduces the risk of reports being used as surveillance. |
+| **Design tokens** | A shared file (`tokens.css` or `tokens.json`) holding every spacing, radius, elevation, color, and type value used in the design system. Both Claude Design (prototyping) and Claude Code (building) read from it, preventing drift between prototype and production. Theme- and density-ready from Phase 1 even though both ship in Phase 2. |
+| **Theme** | A named complete visual palette selectable from the theme toggle (Phase 1: Quiet / Vivid) or the Appearance settings panel (Phase 2: Quiet / Vivid / Dark / Focus / High Contrast). Each theme is a CSS variable override block; switching themes is an instant class swap. Independent of the background. |
+| **Quiet theme** | The original muted aesthetic — near-white card backgrounds, thin subject-color stripes, subtle grayscale unit shading. Designed for visual restraint over long workdays. Ships Phase 1. |
+| **Vivid theme** | The parallel-built alternative — subject-tinted card backgrounds, full-saturation stripes, light-tint unit row backgrounds. Vibrant where color carries meaning; calm in supporting chrome. Designed for Padlet-grade color recognition. Ships Phase 1. |
+| **Three-tier visual differentiation** | The Personal-mode card treatment that distinguishes unedited-from-master lessons (solid stripe) from personally-modified content (dashed stripe + "Modified" pill) and personally-moved lessons (solid stripe + move-arrow icon). A lesson can carry both modification and move markers simultaneously. Replaces the prior 9px lock icon. |
+| **⋯ affordance** | The small "more" icon on every lesson card, visible on hover (always visible on touch devices), that opens the right-click context menu. The discoverability gateway for the menu's actions for teachers who don't know right-click works. |
+| **Now indicator** | The visual marker in Schedule view showing the current real-time position in the day: a 2px subject-color top border + pulsing "▶ NOW" badge on the active block, plus a horizontal red "now line" spanning the timeline at the current minute. |
+| **Catch-up flame badge** | The top-bar indicator that appears when a teacher has dismissed the in-grid catch-up bar. Shows the count of uncovered items. Click to restore the in-grid bar. Per-teacher, per-week. |
+| **Standards drill-through** | Clicking a standards code chip on a lesson detail opens a side panel listing every other lesson tagged with that standard. First cut of the vertical-alignment story for Phase 1. |
+| **Comment collapse** | Default rendering of comment threads on lesson detail as a "💬 N comments" count badge. Clicking expands the thread inline (sticky — stays open for the session). |
+| **Catch-up screen** | Dedicated full-page view (§5.17) of every uncovered/incomplete event across the school year, with scope and group-by filters, per-item actions (mark done/skipped/carry-over/jump-to-lesson/add-to-todo), bulk action support, and a carry-over destination picker. Third layer of catch-up control after the global Settings toggle and the per-week dismissible in-grid bar. |
+| **Catch-up controls** | The three-layer system for surfacing uncovered lessons: (1) global on/off toggle in Settings, (2) per-week dismissible in-grid bar with top-bar flame badge after dismissal, (3) dedicated Catch-up screen for year-wide triage. |
+| **Master-mode entry banner sequence** | The visual safety pattern on entering Master mode: a flashing red heads-up message ("Heads up — changes here affect the whole team") that resolves into a small persistent red banner staying visible across all views for the duration of the Master-mode session. No confirm dialog — visual friction without click friction. |
+| **Custom background** | Decorative backdrop behind the main canvas, Padlet-style. Curated library in Phase 2 (solids, textures, patterns, photos). Upload-your-own in Phase 3 (personal-only, contrast-checked, school-admin opt-in). Cards remain opaque on top so content stays readable regardless of background. |
+| **Subject tint** | A light-saturation variant of a subject's color (~50-100 weight on the Tailwind/Material scale) used as the **background fill** of every lesson card in that subject. The vivid full-saturation stripe sits on the card's left edge; the tint fills the body. Together they produce a Padlet-grade color recognition without sacrificing density. |
+| **Appearance settings** | Phase 2 panel grouping theme, density (Comfortable / Compact), color intensity (Full / Muted), background picker, and reduce-motion toggle into one place. Settings persist in `TeacherUIState.appearance_settings` and sync across devices. |
+| **Empty state** | The intentional design of a surface when it contains no data (new school year, filter with no matches, brand-new teacher's first login). Always surfaces the next action, never a blank screen. |
+| **Skeleton placeholder** | A loading state that visually matches the eventual layout — gray boxes shaped like the lesson card or weekly grid — rather than a generic spinner. Keeps visual rhythm stable while data arrives. |
+| **Curriculum Import** | Phase 1 Settings flow for ingesting an existing year's curriculum. Strict CSV template as canonical schema (Layer 1); AI-assisted parsing of any format via Claude API (Layer 2); paid developer-assisted migration for highly chaotic data as a service offering (Layer 3). The friction-killer for school onboarding. |
+
+---
+
+*End of planning document. Companion document: `conversation_record.md`.*

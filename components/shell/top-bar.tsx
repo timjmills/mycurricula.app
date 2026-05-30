@@ -4,8 +4,10 @@
 //
 // Sticky chrome bar at the top of every planner view. Left-to-right order:
 //   wordmark → panel collapse → view switcher → week jumper →
-//   undo/redo → master/personal toggle → view-mode pill (Grid|List) → search →
+//   undo/redo → master/personal toggle → search →
 //   to-do button → comments button (with badge) → profile avatar.
+// (The Grid|List|Schedule view-mode pill moved out of this bar in the W4
+//  chrome-relocation wave — see the <ViewModeToggle> note below.)
 //
 // State from useAppState() — including `currentUser`, derived from the
 // Supabase Auth session, for the profile avatar. CURRENT_WEEK (mock) seeds the
@@ -33,23 +35,22 @@
 //       design: the OS clock + the in-grid week header carry the same
 //       information on phone/tablet.
 //
-//   TODO (next chrome-slim wave): the Grid/List/Schedule toggle below
-//   currently lives in the top bar at >1024px. The canonical W3-C1 plan
-//   wants it relocated INTO each route's local toolbar (Weekly + Daily
-//   own a Grid/List chooser; Schedule is the route itself). That move is
-//   a multi-file refactor — Weekly + Daily shells each gain a header
-//   slot, the toggle migrates with its viewMode wiring, the .module.css
-//   collapse rules drop. Out of scope for this lane (Wave 3 file-disjoint
-//   constraint). Track as W4 chrome-relocation when Wave 4 opens.
+//   W4 chrome-relocation (DONE): the Grid/List/Schedule toggle that used to
+//   live in this bar at >1024px has been relocated INTO each route's local
+//   control bar (Weekly + Daily own it; Schedule is the route itself). It now
+//   ships as the self-contained <ViewModeToggle> primitive in components/ui,
+//   which encapsulates its own viewMode wiring + schedule deep-link. The bar's
+//   .viewModePillWrap collapse rules were removed alongside it.
 // TOPBAR-004: the panel-collapse toggle calls useAppState().toggleLeftPanel —
 //   confirmed wired (see onClick below).
-// TOPBAR-003/006: search → setSearch ✓; view-mode pill → setViewMode ✓.
+// TOPBAR-003: search → setSearch ✓. (TOPBAR-006 view-mode pill → setViewMode
+//   moved to the <ViewModeToggle> primitive in the W4 chrome-relocation.)
 
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAppState, type CurrentUser } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip, ToggleGroup } from "@/components/ui";
@@ -123,8 +124,6 @@ export type { ViewDef };
 /** App shell top bar — sticky chrome above every planner view. */
 export function TopBar(): ReactNode {
   const {
-    viewMode,
-    setViewMode,
     editMode,
     setEditMode,
     week,
@@ -151,7 +150,6 @@ export function TopBar(): ReactNode {
   } = usePlanner();
 
   const pathname = usePathname();
-  const router = useRouter();
 
   // TOPBAR-001 — collapsible search state.
   // The search field is hidden at rest (icon-only button shows instead).
@@ -544,78 +542,12 @@ export function TopBar(): ReactNode {
 
       <div className={styles.divider} aria-hidden="true" />
 
-      {/* ── Layout-mode pill (Grid | List | Schedule) ────────────────
-          W3-C2 (2026-05-27 audit): a third Schedule option lives alongside
-          Grid + List so the timetable surface is discoverable next to the
-          two lesson-layout choices. The GlobalRail Schedule icon (added
-          in Decision #6) stays in place — this is the second, more-obvious
-          entry point for a teacher who is already looking at Weekly.
-
-          ── Routing approach ───────────────────────────────────────────
-          Schedule is NOT widened into app-state.ViewMode. Adding a third
-          "schedule" branch to ViewMode would force every callsite of
-          useAppState().viewMode (Weekly/Daily renderers, persistence,
-          palette logic) to handle a value it never used to see, and the
-          Schedule surface already has its own route at /schedule. The
-          cleaner wiring is route-derived:
-            • `value` reflects pathname when on `/schedule`, otherwise
-              the existing viewMode. The toggle paints "Schedule" active
-              when the user is on /schedule regardless of the stored
-              Grid/List preference.
-            • `onChange` routes: Schedule → router.push("/schedule");
-              Grid/List → setViewMode(value) (no navigation when already
-              on a planner route). This preserves Grid/List memory across
-              Schedule round-trips: a teacher in Grid mode who clicks
-              Schedule and then clicks Grid lands back in Grid.
-            • If the teacher is on /schedule and picks Grid/List we also
-              navigate back to /weekly so the layout change is visible.
-
-          Hidden below 1024px by .viewModePillWrap in the CSS — same
-          collapse-cascade slot as before. Schedule remains reachable on
-          phone/tablet via the GlobalRail icon and the More menu nav. */}
-      <div className={styles.viewModePillWrap}>
-        <ToggleGroup<"grid" | "list" | "schedule">
-          options={[
-            {
-              value: "grid",
-              label: "Grid",
-              title:
-                "Grid layout — see every subject for the week side-by-side in columns",
-            },
-            {
-              value: "list",
-              label: "List",
-              title:
-                "List layout — a single scrollable stream of lessons grouped by day",
-            },
-            {
-              value: "schedule",
-              label: "Schedule",
-              title:
-                "Open the daily timetable — see the time blocks for each subject",
-              // W3-C2: per audit, the new Schedule option is dismissible
-              // (it sits next to two long-established controls and isn't
-              // high-consequence). The tooltipId scopes the dismissal so
-              // the existing Grid/List tooltips stay unaffected.
-              tooltipId: "weekly-schedule-toggle",
-            },
-          ]}
-          value={pathname === "/schedule" ? "schedule" : viewMode}
-          onChange={(next) => {
-            if (next === "schedule") {
-              router.push("/schedule");
-              return;
-            }
-            setViewMode(next);
-            if (pathname === "/schedule") {
-              router.push("/weekly");
-            }
-          }}
-          variant="prominent"
-          size="sm"
-          ariaLabel="Layout mode"
-        />
-      </div>
+      {/* W4 chrome-relocation (Wave 2): the Grid | List | Schedule layout
+          switcher used to live here in the shared top bar. It has moved into
+          each route's local control bar (Weekly + Daily own it; Schedule is
+          the route itself) and now ships as the self-contained
+          <ViewModeToggle> primitive in components/ui. The top bar no longer
+          carries any layout-switcher chrome. */}
 
       {/* Push remaining controls to the right */}
       <div className={styles.spacer} aria-hidden="true" />

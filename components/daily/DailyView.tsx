@@ -140,7 +140,6 @@ import { AddEventForm } from "./AddEventForm";
 import {
   Button,
   EmptyState,
-  IntroSubtitle,
   PageHeader,
   Tooltip,
 } from "@/components/ui";
@@ -2070,20 +2069,16 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
           exactly one h1 in the a11y tree at all times. DailyList's
           inner day title is demoted to an h2 (see DailyList.tsx) to
           keep the single-h1-per-page invariant. */}
+      {/* The Subject ↔ Schedule toggle now lives in the page-header actions
+          slot (W5) instead of a standalone in-page "VIEW" bar, mirroring the
+          Weekly view's title-row toggle. The onboarding tip banner was
+          removed. */}
       <PageHeader
         title="Daily View"
         subtitle="Today's lessons in detail, side-by-side with the day's schedule and notes."
         className={styles.dailyPageHeader}
+        actions={<DailySchedulePill />}
       />
-
-      {/* ── W3-C10 once-per-view onboarding subtitle ──────────────────
-          Tells a first-time teacher what the Daily surface is FOR.
-          Dismissed via "Got it" and persisted to localStorage under
-          `mycurricula:user:daily-intro-seen`. */}
-      <IntroSubtitle viewKey="daily">
-        Today&rsquo;s lessons. The center panel follows whichever row you
-        select.
-      </IntroSubtitle>
 
       {/* ── Breadcrumb: Week N / Day / Subject (BIG-7) ───────────────────
           Renders above the body row so it sits flush with the page top,
@@ -2123,11 +2118,6 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
           )}
         </ol>
       </nav>
-
-      {/* ── Inline schedule-mode pill (Subject ↔ Schedule). Hidden ≤1280px
-          where the additional rail would not fit (same fold the existing
-          right rail uses). The pill state persists per-teacher. */}
-      <DailySchedulePill />
 
       {/* ── aria-live region: column reorder announcements ───────────────
           A visually hidden polite live region — when a column moves
