@@ -38,6 +38,14 @@ interface WeekNavigatorProps {
    * toggle can persist across all three). Left unset elsewhere.
    */
   actions?: ReactNode;
+  /**
+   * Heading level for the "Week N" title. Defaults to `h2`. The Weekly view
+   * deleted its page-level title band, so this navigator is now that page's
+   * top heading — it passes `h1` to keep exactly one page-level `<h1>` in the
+   * a11y tree (WCAG 2.4.6 / 1.3.1). Surfaces that still sit under their own
+   * page `<h1>` keep the `h2` default.
+   */
+  headingLevel?: "h1" | "h2";
 }
 
 /** Sticky week navigator: eyebrow + title + prev/next/today controls. */
@@ -49,10 +57,12 @@ export function WeekNavigator({
   onChange,
   showCatchupChip = false,
   actions,
+  headingLevel = "h2",
 }: WeekNavigatorProps): ReactNode {
   const isCurrent = week === currentWeek;
   const atStart = week <= minWeek;
   const atEnd = week >= maxWeek;
+  const Heading = headingLevel;
 
   return (
     <header className={styles.navbar}>
@@ -61,10 +71,10 @@ export function WeekNavigator({
         {/* h2 — the Weekly view's title band was removed, so this "Week N"
             heading is the view's top heading. Kept as h2 to sit under the
             app-shell chrome rather than competing as a second page h1. */}
-        <h2 className={styles.navTitle}>
+        <Heading className={styles.navTitle}>
           Week {week}
           {isCurrent && <span className={styles.currentTag}>This week</span>}
-        </h2>
+        </Heading>
       </div>
 
       {/* Left-aligned view controls (Grid|List|Schedule + scope) — sit right
