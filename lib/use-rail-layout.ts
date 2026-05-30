@@ -29,7 +29,7 @@
 // data added in a future release while a teacher's localStorage still holds
 // the older shape.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -260,6 +260,16 @@ export function useRailLayout(): UseRailLayoutResult {
     hidden: [...DEFAULT_RAIL_LAYOUT.hidden],
   }));
 
+  // Mirror the latest layout in a ref so the mutators can compute the next
+  // value WITHOUT reading it inside a setState updater. The updater is the
+  // wrong place for side-effects (writeToStorage / broadcast): broadcast
+  // fans a setState out to every other hook instance, and doing that during
+  // this instance's render phase trips React's "Cannot update a component
+  // while rendering a different component" guard. Keeping a ref lets us run
+  // those effects in the event handler (commit phase) instead.
+  const layoutRef = useRef<RailLayout>(layout);
+  layoutRef.current = layout;
+
   // Post-mount: sync from localStorage if a value is set, and subscribe to
   // in-process broadcasts so a write from any hook instance updates every
   // other instance in the same tab.
@@ -297,30 +307,42 @@ export function useRailLayout(): UseRailLayoutResult {
     return () => window.removeEventListener("storage", handler);
   }, []);
 
+  // Commit a fully-computed next layout: persist it, update THIS instance,
+  // and broadcast to sibling instances. Runs in the event-handler (commit)
+  // phase — never inside a setState updater — so the broadcast's cascading
+  // setStates don't fire during render. `broadcast` notifies every listener
+  // including this instance's own (registered in the mount effect), so a
+  // single broadcast keeps all instances in lockstep; we also call setLayout
+  // directly so the writing instance updates even before its listener runs.
+  const commit = useCallback((next: RailLayout): void => {
+    writeToStorage(next);
+    setLayout(next);
+    broadcast(next);
+  }, []);
+
   const moveIcon = useCallback(
     (id: RailIconId, toSide: RailSide, toIndex: number): void => {
-      setLayout((prev) => {
-        // Strip the icon from EVERY bucket so it can only ever live in one
-        // place. This is the single invariant the renderer relies on.
-        const left = prev.left.filter((x) => x !== id);
-        const right = prev.right.filter((x) => x !== id);
-        const hidden = prev.hidden.filter((x) => x !== id);
-        let target: RailIconId[];
-        if (toSide === "left") target = left;
-        else if (toSide === "right") target = right;
-        else target = hidden;
-        const idx = Math.max(0, Math.min(toIndex, target.length));
-        target.splice(idx, 0, id);
-        const next = normalize({ left, right, hidden });
-        writeToStorage(next);
-        // Notify every other hook instance in this tab so they re-render
-        // with the new arrangement (the native `storage` event only fires
-        // on OTHER tabs, not the writing one).
-        broadcast(next);
-        return next;
-      });
+      // Read the latest layout from the ref (not state) so back-to-back
+      // moves within one render tick each build on the previous result.
+      const prev = layoutRef.current;
+      // Strip the icon from EVERY bucket so it can only ever live in one
+      // place. This is the single invariant the renderer relies on.
+      const left = prev.left.filter((x) => x !== id);
+      const right = prev.right.filter((x) => x !== id);
+      const hidden = prev.hidden.filter((x) => x !== id);
+      let target: RailIconId[];
+      if (toSide === "left") target = left;
+      else if (toSide === "right") target = right;
+      else target = hidden;
+      const idx = Math.max(0, Math.min(toIndex, target.length));
+      target.splice(idx, 0, id);
+      const next = normalize({ left, right, hidden });
+      // Keep the ref current immediately so a second moveIcon in the same
+      // tick sees this result (setLayout is async; the ref is synchronous).
+      layoutRef.current = next;
+      commit(next);
     },
-    [],
+    [commit],
   );
 
   const resetToDefault = useCallback((): void => {
@@ -329,10 +351,9 @@ export function useRailLayout(): UseRailLayoutResult {
       right: [...DEFAULT_RAIL_LAYOUT.right],
       hidden: [...DEFAULT_RAIL_LAYOUT.hidden],
     };
-    setLayout(next);
-    writeToStorage(next);
-    broadcast(next);
-  }, []);
+    layoutRef.current = next;
+    commit(next);
+  }, [commit]);
 
   return { layout, moveIcon, resetToDefault };
 }

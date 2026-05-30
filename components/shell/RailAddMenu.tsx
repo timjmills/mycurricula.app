@@ -31,7 +31,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Button } from "@/components/ui";
+import { Tooltip } from "@/components/ui";
 import { useRailLayout } from "@/lib/use-rail-layout";
 import {
   RAIL_ICON_ORDER,
@@ -39,6 +39,7 @@ import {
   RAIL_ICON_BLURB,
   RailGlyph,
 } from "./rail-icon-meta";
+import styles from "./RailAddMenu.module.css";
 
 interface RailAddMenuProps {
   /** Which rail this picker fills — drives both the moves and the copy. */
@@ -100,32 +101,10 @@ export function RailAddMenu({
       aria-label={`Add a panel to the ${side} rail`}
       onClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
-      style={{
-        position: "fixed",
-        top: pos.y,
-        left: pos.x,
-        zIndex: 1000,
-        minWidth: 260,
-        background: "var(--paper)",
-        borderRadius: "var(--r-6)",
-        border: "1px solid var(--ink-150)",
-        boxShadow: "var(--shadow-popover)",
-        padding: 4,
-        fontSize: 13,
-      }}
+      className={styles.menu}
+      style={{ top: pos.y, left: pos.x }}
     >
-      <div
-        style={{
-          fontSize: "var(--t-10)",
-          color: "var(--ink-400)",
-          textTransform: "uppercase",
-          letterSpacing: 0.5,
-          fontWeight: 500,
-          padding: "6px 10px 2px",
-        }}
-      >
-        Add to {side} rail
-      </div>
+      <div className={styles.eyebrow}>Add to {side} rail</div>
 
       {RAIL_ICON_ORDER.map((id) => {
         const onThisRail = layout[side].includes(id);
@@ -134,108 +113,66 @@ export function RailAddMenu({
         const blurb = RAIL_ICON_BLURB[id];
 
         return (
-          <Button
+          <Tooltip
             key={id}
-            variant="ghost"
-            size="sm"
-            role="menuitemcheckbox"
-            aria-checked={onThisRail}
-            // Stay open after a pick — a teacher may add/remove several in a
-            // row. useRailLayout broadcasts in-process, so the menu re-renders
-            // with fresh selected-state on every toggle without closing.
-            onClick={() => {
-              if (onThisRail) {
-                moveIcon(id, "hidden", Number.POSITIVE_INFINITY);
-              } else {
-                moveIcon(id, side, Number.POSITIVE_INFINITY);
-              }
-            }}
-            tooltip={
+            side={tooltipSide}
+            content={
               onThisRail
                 ? `Remove ${label} from the ${side} rail (kept in your settings so you can add it back).`
                 : `Add ${label} to the ${side} rail — ${blurb}`
             }
-            tooltipSide={tooltipSide}
-            style={{
-              width: "100%",
-              minHeight: 44,
-              justifyContent: "flex-start",
-              gap: 10,
-              padding: "6px 10px",
-              // Active rows read as selected with a subtle fill.
-              background: onThisRail ? "var(--ink-100)" : "transparent",
-            }}
           >
-            {/* Feature glyph — the same icon the rail draws. */}
-            <span
-              aria-hidden
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flex: "0 0 auto",
-                color: "var(--ink-700)",
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={onThisRail}
+              className={`${styles.row} ${onThisRail ? styles.rowActive : ""}`.trim()}
+              // Stay open after a pick — a teacher may add/remove several in a
+              // row. useRailLayout broadcasts in-process, so the menu
+              // re-renders with fresh selected-state on every toggle without
+              // closing.
+              onClick={() => {
+                if (onThisRail) {
+                  moveIcon(id, "hidden", Number.POSITIVE_INFINITY);
+                } else {
+                  moveIcon(id, side, Number.POSITIVE_INFINITY);
+                }
               }}
             >
-              <RailGlyph id={id} />
-            </span>
+              {/* Feature glyph — the same icon the rail draws. */}
+              <span className={styles.glyph} aria-hidden>
+                <RailGlyph id={id} />
+              </span>
 
-            {/* Label + one-line description, left-aligned in a column. */}
-            <span
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-start",
-                minWidth: 0,
-                flex: "1 1 auto",
-                textAlign: "left",
-              }}
-            >
-              <span style={{ color: "var(--ink-900)", fontWeight: 500 }}>
-                {label}
+              {/* Label + one-line description, left-aligned in a column. */}
+              <span className={styles.text}>
+                <span className={styles.label}>{label}</span>
+                <span className={styles.blurb}>{blurb}</span>
               </span>
-              <span
-                style={{
-                  fontSize: "var(--t-11)",
-                  color: "var(--ink-500)",
-                  lineHeight: 1.3,
-                }}
-              >
-                {blurb}
-              </span>
-            </span>
 
-            {/* Trailing state: a check when it's on this rail; an "On {other}
-                rail" note when it lives on the opposite rail (so the teacher
-                knows picking it will MOVE it here, not duplicate it). */}
-            {onThisRail ? (
-              <svg
-                aria-hidden
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ flex: "0 0 auto", color: "var(--ink-700)" }}
-              >
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-            ) : onOtherRail ? (
-              <span
-                style={{
-                  flex: "0 0 auto",
-                  fontSize: "var(--t-11)",
-                  color: "var(--ink-400)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                On {otherSide} rail
-              </span>
-            ) : null}
-          </Button>
+              {/* Trailing state: a check when it's on this rail; an "On {other}
+                  rail" note when it lives on the opposite rail (so the teacher
+                  knows picking it will MOVE it here, not duplicate it). */}
+              {onThisRail ? (
+                <svg
+                  className={styles.check}
+                  aria-hidden
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              ) : onOtherRail ? (
+                <span className={styles.elsewhere}>On {otherSide} rail</span>
+              ) : null}
+            </button>
+          </Tooltip>
         );
       })}
     </div>

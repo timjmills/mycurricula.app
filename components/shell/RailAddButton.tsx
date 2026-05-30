@@ -6,17 +6,20 @@
  * the teacher picks which features live on this rail. The button itself reads
  * as an "add" slot via a dashed border (see RailAddButton.module.css).
  *
- * ── Anchoring note ──────────────────────────────────────────────────────────
- * The canonical <Button> primitive (components/ui/Button.tsx) is a plain
- * function component — it does NOT forward refs, but it DOES spread `...rest`
- * (including the synthetic onClick) onto the underlying <button>. So rather
- * than measuring via a ref, we read the rendered <button>'s rect straight off
- * the click event's currentTarget. Same end result, no ref-forwarding
- * dependency. */
+ * ── Why a plain <button>, not the <Button> primitive ────────────────────────
+ * The canonical <Button variant="icon"> sets its own size via `.icon.md`
+ * (width:40px) and `.btn` height rules whose specificity (0,2,0) beats this
+ * component's single `.addButton` class — so the rail "+" rendered at 36×29px,
+ * below the ≥44px touch-target floor (CLAUDE.md §4). Rendering a plain
+ * <button> styled entirely by the module guarantees the 44×44 target without a
+ * specificity fight. The onboarding tooltip is supplied by wrapping the button
+ * in the canonical <Tooltip> primitive (same requirement the <Button> tooltip
+ * prop satisfied). We read the rendered button's rect off the click event's
+ * currentTarget to anchor the menu — no ref needed. */
 
 import { useState, type MouseEvent, type ReactNode } from "react";
 
-import { Button } from "@/components/ui";
+import { Tooltip } from "@/components/ui";
 
 import { RailAddMenu } from "./RailAddMenu";
 import styles from "./RailAddButton.module.css";
@@ -33,8 +36,7 @@ export function RailAddButton({ side }: RailAddButtonProps): ReactNode {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
 
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
-    // currentTarget is the actual rendered <button>, so its rect is exact even
-    // though Button doesn't forward a ref.
+    // currentTarget is the rendered <button>, so its rect is exact.
     const rect = event.currentTarget.getBoundingClientRect();
 
     // Open the menu beside the button, toward the canvas. The menu's own clamp
@@ -48,31 +50,34 @@ export function RailAddButton({ side }: RailAddButtonProps): ReactNode {
 
   return (
     <>
-      <Button
-        variant="icon"
-        className={styles.addButton}
-        iconAriaLabel={`Add a panel to the ${side} rail`}
-        tooltip="Add a panel to this rail — pick which tools live here."
-        tooltipSide={side === "left" ? "right" : "left"}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={handleClick}
+      <Tooltip
+        content="Add a panel to this rail — pick which tools live here."
+        side={side === "left" ? "right" : "left"}
       >
-        {/* Plus glyph — two strokes forming a +. */}
-        <svg
-          width={20}
-          height={20}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.7}
-          strokeLinecap="round"
-          aria-hidden
+        <button
+          type="button"
+          className={styles.addButton}
+          aria-label={`Add a panel to the ${side} rail`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={handleClick}
         >
-          <path d="M12 5v14" />
-          <path d="M5 12h14" />
-        </svg>
-      </Button>
+          {/* Plus glyph — two strokes forming a +. */}
+          <svg
+            width={20}
+            height={20}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.7}
+            strokeLinecap="round"
+            aria-hidden
+          >
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+        </button>
+      </Tooltip>
 
       {open && pos ? (
         <RailAddMenu
