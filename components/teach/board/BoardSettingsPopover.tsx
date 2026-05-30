@@ -22,6 +22,7 @@ import { useConsequenceToast } from "@/lib/consequence-toast";
 import { teach } from "@/lib/teach/queries";
 import type { Board } from "@/lib/types";
 import { useFocusTrap } from "./useFocusTrap";
+import { BoardBackgroundPicker } from "./BoardBackgroundPicker";
 import styles from "./BoardSettingsPopover.module.css";
 
 export interface BoardSettingsPopoverProps {
@@ -150,6 +151,16 @@ export function BoardSettingsPopover({
           >
             Save
           </Button>
+        </div>
+
+        {/* ── Board background ────────────────────────────────────────────── */}
+        <div className={styles.section}>
+          <div className={styles.fieldLabel}>Board background</div>
+          <p className={styles.hint}>
+            A colour, pattern, or gradient shown behind the widgets — pick one
+            to set the mood for this board.
+          </p>
+          <BoardBackgroundPicker board={board} reloadBoards={reloadBoards} />
         </div>
 
         {/* ── Reorder hint ────────────────────────────────────────────────── */}

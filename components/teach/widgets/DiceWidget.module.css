@@ -1,0 +1,140 @@
+/* DiceWidget.module.css — roll 1–4 dice (Teach Phase 3 interactive library).
+   Tokens only; pip colour comes from the subject accent (--cd) via the
+   `.cp-subj` wrapper. The dice tumble during a roll then settle; the shake is
+   gated behind prefers-reduced-motion. Faces scale to fill the tile. */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--r-8);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Die-count selector chips (1/2/3/4) ─────────────────────────────────── */
+.countRow {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.countChip {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  color: var(--ink-500);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.countChip:hover:not(:disabled) {
+  border-color: var(--c);
+}
+
+.countChipOn {
+  background: var(--cl);
+  border-color: var(--c);
+  color: var(--cd);
+}
+
+.countChip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── The dice themselves — flex-wrap, each cell square + responsive ─────── */
+.dice {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 2vw, 14px);
+}
+
+.diceCell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.die {
+  width: clamp(40px, 16vw, 88px);
+  height: clamp(40px, 16vw, 88px);
+}
+
+/* Shake while rolling. */
+.diceRolling {
+  animation: diceShake 180ms ease-in-out infinite;
+}
+
+@keyframes diceShake {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-2px) rotate(-3deg);
+  }
+  75% {
+    transform: translateY(2px) rotate(3deg);
+  }
+}
+
+.sum {
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-500);
+}
+
+.sum strong {
+  color: var(--cd);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.rollBtn {
+  flex: none;
+  width: 100%;
+  min-height: 44px;
+  border: none;
+  border-radius: var(--r-8);
+  background: var(--c);
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+
+.rollBtn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.rollBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diceRolling {
+    animation: none;
+  }
+  .countChip,
+  .rollBtn {
+    transition: none;
+  }
+}

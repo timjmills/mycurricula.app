@@ -55,7 +55,7 @@ resources, and ambient context (notes, groups, chat, to-do). The intent: the
 teacher never leaves the app mid-lesson.
 
 It **extends** the existing Daily/Weekly/Subject/Year flow rather than replacing
-it — those planning surfaces link *out* to a lesson's Teach view.
+it — those planning surfaces link _out_ to a lesson's Teach view.
 
 ### Relationship to the product phasing
 
@@ -77,12 +77,12 @@ dismissible onboarding-tooltip system, and the three-tier responsive contract.
 Rationale — the `(planner)` layout (`app/(planner)/layout.tsx`) wraps every
 route in chrome that directly collides with the Teach workspace:
 
-| `(planner)` chrome | Teach equivalent | Conflict |
-| --- | --- | --- |
+| `(planner)` chrome                                   | Teach equivalent                                              | Conflict               |
+| ---------------------------------------------------- | ------------------------------------------------------------- | ---------------------- |
 | `TopBar` (Daily/Weekly/… tabs, week jumper, filters) | Teach top bar (board context) + sub bar (board tabs, Present) | Two different top bars |
-| `GlobalRail` (left icon rail) | Teach left icon rail (Lessons/Boards/…) | Two left rails |
-| `LeftFilterPanel` | Teach left panel (lesson/boards modules) | Two left panels |
-| `RightPanel` + `RightIconRail` | Teach right panel + right rail (Resources/Chat/To-do) | Two right panels |
+| `GlobalRail` (left icon rail)                        | Teach left icon rail (Lessons/Boards/…)                       | Two left rails         |
+| `LeftFilterPanel`                                    | Teach left panel (lesson/boards modules)                      | Two left panels        |
+| `RightPanel` + `RightIconRail`                       | Teach right panel + right rail (Resources/Chat/To-do)         | Two right panels       |
 
 Also, **Present** and **Full Screen** must escape the planner shell entirely.
 Nesting Teach inside `(planner)` would mean fighting that chrome on every screen.
@@ -91,7 +91,7 @@ Nesting Teach inside `(planner)` would mean fighting that chrome on every screen
 `PaletteProvider` + the `.cp-subj` CSS bridge), `LabelsProvider`, and the Geist
 fonts are all mounted at the **root** layout (`app/layout.tsx`) — so a
 `(teach)` group inherits subject colours, the palette bridge, renameable
-labels, and tokens *for free*. The `(teach)` layout only needs to re-mount the
+labels, and tokens _for free_. The `(teach)` layout only needs to re-mount the
 two data providers that currently live in the planner layout:
 
 ```
@@ -107,10 +107,10 @@ confirmation toast is surfaced in Teach (likely yes — see §10 tooltips). No
 
 ### 2.2 Routes
 
-| Route | Renders | Notes |
-| --- | --- | --- |
-| `app/(teach)/teach/page.tsx` | `<TeachWorkspace initialLessonId initialBoardId initialResourceId />` | Thin server component awaiting `searchParams` (`?lesson=&board=&resource=`), mirroring `daily/page.tsx`. |
-| `app/(teach)/teach/pop/page.tsx` | *(Phase 2)* detached board for second monitor (T11). | Deferred — needs cross-window `postMessage` sync. |
+| Route                            | Renders                                                               | Notes                                                                                                    |
+| -------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `app/(teach)/teach/page.tsx`     | `<TeachWorkspace initialLessonId initialBoardId initialResourceId />` | Thin server component awaiting `searchParams` (`?lesson=&board=&resource=`), mirroring `daily/page.tsx`. |
+| `app/(teach)/teach/pop/page.tsx` | _(Phase 2)_ detached board for second monitor (T11).                  | Deferred — needs cross-window `postMessage` sync.                                                        |
 
 ### 2.3 Entry points
 
@@ -123,10 +123,10 @@ confirmation toast is surfaced in Teach (likely yes — see §10 tooltips). No
    to `/teach?lesson=<id>`:
    - **Weekly** — at the **very bottom of the lesson** (card/expanded detail).
    - **Daily** — on the lesson detail.
-   Opening it lands the **three-panel workspace** (left + center + right, both
-   rails) in the teacher's **saved configuration** — the default split until they
-   press reset/default — and surfaces the **Present** button for full-screen
-   teach mode. The saved configuration is the `TeachWorkspaceLayout` from §8.
+     Opening it lands the **three-panel workspace** (left + center + right, both
+     rails) in the teacher's **saved configuration** — the default split until they
+     press reset/default — and surfaces the **Present** button for full-screen
+     teach mode. The saved configuration is the `TeachWorkspaceLayout` from §8.
 
 ### 2.4 Central workspace state (the integration contract)
 
@@ -137,17 +137,17 @@ parallel without stepping on each other:
 
 ```ts
 interface TeachWorkspaceState {
-  activeLessonId: string;            // master lesson id (forking §11)
+  activeLessonId: string; // master lesson id (forking §11)
   activeBoardId: string;
-  centerMode: "board" | "resource";  // board grid (C) vs full-bleed resource (D)
+  centerMode: "board" | "resource"; // board grid (C) vs full-bleed resource (D)
   activeResource: TeachResource | null;
-  layout: BoardLayout;               // "1up" | "2up" | "3up" | "2x2" | "2x3" | "3x3"
+  layout: BoardLayout; // "1up" | "2up" | "3up" | "2x2" | "2x3" | "3x3"
   leftCollapsed: boolean;
   rightCollapsed: boolean;
-  focusedWidgetId: string | null;    // Focus mode (T7)
-  present: boolean;                  // Present mode (T6)
+  focusedWidgetId: string | null; // Focus mode (T7)
+  present: boolean; // Present mode (T6)
   fullscreen: boolean;
-  activeTool: BoardTool;             // select | pen | highlighter | eraser | rect | line | arrow | text
+  activeTool: BoardTool; // select | pen | highlighter | eraser | rect | line | arrow | text
   // module tab focus per panel, panel widths, etc.
 }
 ```
@@ -156,8 +156,8 @@ interface TeachWorkspaceState {
   `<TeachingBoard>`; `centerMode === "resource"` → Agent D's
   `<BoardCanvasResource>` + `<AnnotationLayer>`. They never share a file; they
   share this state.
-- **Drag-resource-to-cell (T8):** the drag *source* is a resource card (Agent
-  E), the drop *target* is a board cell (Agent C); both register against the
+- **Drag-resource-to-cell (T8):** the drag _source_ is a resource card (Agent
+  E), the drop _target_ is a board cell (Agent C); both register against the
   one `DndContext` mounted here. The drag/drop ids + payload shape are defined
   in Wave 0.
 
@@ -193,18 +193,18 @@ the rail). The center is the persistent workspace — it can be fullscreened or
 
 ### 3.1 Modules & default rail split (spec §3.1)
 
-| Module | Default side | v1 behaviour |
-| --- | --- | --- |
-| Lessons | Left | Day's lesson list (reuse `usePlanner().lessons`) |
-| Lesson | Left | Read-only lesson text + "Open in Daily" |
-| Boards | Left | Board thumbnails for active lesson, + Add Board |
-| Notes | Left | Free-form teacher notes (reuse Daily notes) — **display/basic** |
-| Groups | Left | Student groups (from widget config) — **display-only** |
-| Class | Left | Roster/attendance — **stub**; any names are local-only (§11.4) |
-| Tools | Left | Picker/dice/etc. — **stub** |
-| Resources | Right | Grid/list of lesson resources (interactive: embed/open) |
-| Chat | Right | Day Shoutbox (reuse Daily `<Shoutbox>`) |
-| To-do | Right | Day to-do list (reuse Daily `<TodayTodos>`) |
+| Module    | Default side | v1 behaviour                                                    |
+| --------- | ------------ | --------------------------------------------------------------- |
+| Lessons   | Left         | Day's lesson list (reuse `usePlanner().lessons`)                |
+| Lesson    | Left         | Read-only lesson text + "Open in Daily"                         |
+| Boards    | Left         | Board thumbnails for active lesson, + Add Board                 |
+| Notes     | Left         | Free-form teacher notes (reuse Daily notes) — **display/basic** |
+| Groups    | Left         | Student groups (from widget config) — **display-only**          |
+| Class     | Left         | Roster/attendance — **stub**; any names are local-only (§11.4)  |
+| Tools     | Left         | Picker/dice/etc. — **stub**                                     |
+| Resources | Right        | Grid/list of lesson resources (interactive: embed/open)         |
+| Chat      | Right        | Day Shoutbox (reuse Daily `<Shoutbox>`)                         |
+| To-do     | Right        | Day to-do list (reuse Daily `<TodayTodos>`)                     |
 
 Rails are drag-rearrangeable and the arrangement persists per teacher; a "Reset
 to default rails" option restores this split. v1 ships the default split + the
@@ -272,6 +272,7 @@ the central workspace state + a localStorage draft
 (`mycurricula:user:teach-sandbox`), and clearly badged as "Sandbox · not saved".
 
 To keep it, the teacher chooses one of:
+
 1. **Save to a new lesson** — opens the existing add-lesson flow (planner-store
    `duplicateLesson`/add path), creates the lesson, then attaches the sandbox
    boards to it as the personal set.
@@ -300,22 +301,25 @@ branching on an **effective kind**. It reuses `lib/resource-embed.ts`
 embed logic.
 
 **Src resolution (hosted files have no public URL):**
+
 ```ts
-const src = resource.url
-  ?? (resource.resourceId ? `/api/resources/${resource.resourceId}` : null);
+const src =
+  resource.url ??
+  (resource.resourceId ? `/api/resources/${resource.resourceId}` : null);
 ```
+
 `/api/resources/{id}` 302-redirects to a short-lived **inline** presigned R2 URL
 (`lib/r2.ts` + `app/api/resources/[id]/route.ts`) — so PDFs/images render
 in-browser. Because that app-relative src won't match provider regexes, branch
 on `provider`/`mimeType` **first**, then fall back to `parsed.kind`.
 
-| Effective kind | Render |
-| --- | --- |
-| embed (youtube/vimeo/gslides/gdocs/gsheets/gdrive) | `<iframe>` filling board, reusing `ResourceEmbed`'s `allow`+`sandbox` |
-| image | `<img style="object-fit:contain">` centered |
-| video / audio | native `<video controls>` / `<audio>` |
-| **pdf** | `<iframe src="/api/resources/{id}">` — **browser-native viewer (no pdf.js in v1)** |
-| link (`canEmbed:false`) | `EmptyState` card "This link can't be displayed" + "Open in new tab" |
+| Effective kind                                     | Render                                                                             |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| embed (youtube/vimeo/gslides/gdocs/gsheets/gdrive) | `<iframe>` filling board, reusing `ResourceEmbed`'s `allow`+`sandbox`              |
+| image                                              | `<img style="object-fit:contain">` centered                                        |
+| video / audio                                      | native `<video controls>` / `<audio>`                                              |
+| **pdf**                                            | `<iframe src="/api/resources/{id}">` — **browser-native viewer (no pdf.js in v1)** |
+| link (`canEmbed:false`)                            | `EmptyState` card "This link can't be displayed" + "Open in new tab"               |
 
 **Sandbox tiers** live in a new `lib/board-embed.ts`: a `trustedProviderSandbox`
 (the current `ResourceEmbed` string, for the known Google/YouTube/Vimeo
@@ -326,7 +330,7 @@ never `allow-top-navigation`. Consult the stored og-preview `canEmbed`
 
 > **PDF decision (deliberate):** ship v1 with the browser-native iframe (zero
 > new deps, reuses infra that already works end-to-end). `pdfjs-dist` —
-> rendering pages onto our own canvas for *content-anchored* annotation and
+> rendering pages onto our own canvas for _content-anchored_ annotation and
 > designed chrome — is a **Phase 2** item; it carries a real Cloudflare/OpenNext
 > worker-bundling cost (`workerSrc`, cmaps, fonts) that only a content-anchored
 > feature justifies.
@@ -343,14 +347,29 @@ library in the repo — this is fully net-new, built custom (no new deps).
 
 - **Stroke model (`lib/board-annotations.ts`, pure + testable):**
   ```ts
-  type BoardTool = "select" | "pen" | "highlighter" | "eraser" | "rect" | "line" | "arrow" | "text";
-  type Pt = { x: number; y: number };          // normalized 0..1 of board box
+  type BoardTool =
+    | "select"
+    | "pen"
+    | "highlighter"
+    | "eraser"
+    | "rect"
+    | "line"
+    | "arrow"
+    | "text";
+  type Pt = { x: number; y: number }; // normalized 0..1 of board box
   interface Stroke {
-    id: string; tool: Exclude<BoardTool,"select"|"eraser">;
-    color: string; width: number; opacity?: number;
-    points: Pt[]; text?: string;
+    id: string;
+    tool: Exclude<BoardTool, "select" | "eraser">;
+    color: string;
+    width: number;
+    opacity?: number;
+    points: Pt[];
+    text?: string;
   }
-  interface BoardAnnotations { version: 1; strokes: Stroke[] }
+  interface BoardAnnotations {
+    version: 1;
+    strokes: Stroke[];
+  }
   ```
   Coordinates are **normalized** (fraction of the board box) so ink survives
   resize and is resolution-independent; converted to device pixels at draw time
@@ -371,8 +390,8 @@ library in the repo — this is fully net-new, built custom (no new deps).
 - **v1 registration model — "projector glass" (board-space):** the board is a
   fixed, non-scrolling frame; the annotation canvas is locked to the board box.
   Ink lives in **board-space, not resource-content-space** — scrolling a PDF
-  *inside* its iframe does not move the ink (like drawing on glass over a
-  projector). Content-*anchored* ink (ink that follows the PDF's internal scroll)
+  _inside_ its iframe does not move the ink (like drawing on glass over a
+  projector). Content-_anchored_ ink (ink that follows the PDF's internal scroll)
   is Phase 2 (needs pdf.js for PDFs; cross-origin iframes can't expose scroll, a
   stated hard limit). **Note this is independent of persistence (next bullet) —
   board-space ink still persists across sessions.**
@@ -406,7 +425,7 @@ library in the repo — this is fully net-new, built custom (no new deps).
   collapses into its rail (T2/T4). `+ More` opens all modules.
 - **Module tabs:** thin header per panel; each tab = icon + label + close;
   `+` opens the module picker. (v1: open/close + focus + reorder within a
-  panel. **Dragging tabs *between* panels and detaching to floating windows is
+  panel. **Dragging tabs _between_ panels and detaching to floating windows is
   Phase 2.**)
 - **Resize:** drag handles on the inner edge of each side panel (2px hit, 6px on
   hover); double-click snaps to default width; center is the flex remainder.
@@ -418,12 +437,12 @@ library in the repo — this is fully net-new, built custom (no new deps).
 
 ## 7. Present / Pop-Out / Duplicate / Full Screen
 
-| Action | v1 | Notes |
-| --- | --- | --- |
-| **Present** (T6) | ✅ | Fullscreen the center board, hide all chrome + widget chrome; thin top strip; Esc exits. |
-| **Full Screen** | ✅ | Fullscreen the entire Teach view (Fullscreen API), hiding browser chrome only. |
+| Action            | v1         | Notes                                                                                                   |
+| ----------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
+| **Present** (T6)  | ✅         | Fullscreen the center board, hide all chrome + widget chrome; thin top strip; Esc exits.                |
+| **Full Screen**   | ✅         | Fullscreen the entire Teach view (Fullscreen API), hiding browser chrome only.                          |
 | **Pop-Out** (T11) | ⛔ Phase 2 | New window at `/teach/pop?board=<id>` + `postMessage` state sync. Renders as a "Soon" affordance in v1. |
-| **Duplicate** | ⛔ Phase 2 | Mirror board to a second window. "Soon" in v1. |
+| **Duplicate**     | ⛔ Phase 2 | Mirror board to a second window. "Soon" in v1.                                                          |
 
 ---
 
@@ -445,19 +464,19 @@ Per-teacher UI state, the direct analogue of `use-rail-layout.ts`. New hook
   `teach_workspace_layouts` row in Phase 1B; localStorage stays as the offline
   cache, so the swap is additive.
 
-Board/widget *content* (not UI layout) flows through the repository seam (§11),
+Board/widget _content_ (not UI layout) flows through the repository seam (§11),
 not this hook.
 
 **Other USER-scoped local stores in v1** (same SSR-safe pattern, all migrate to
 owner-scoped DB rows later — except groups, which never do):
 
-| Store | Key | Notes |
-| --- | --- | --- |
-| Workspace layout | `mycurricula:user:teach-workspace` | §8 above |
-| Annotations | `mycurricula:user:teach-annotations` | persists across sessions (§5.2) → `board_annotations` later |
-| Sandbox draft | `mycurricula:user:teach-sandbox` | ephemeral lesson-less boards (§4a) |
-| Board draft | `mycurricula:user:teach-boards-draft` | keeps a live board across refresh in the prototype |
-| **Groups / names** | `mycurricula:user:teach-groups` | **local-only forever — never synced, never in DB (§11.4)** |
+| Store              | Key                                   | Notes                                                       |
+| ------------------ | ------------------------------------- | ----------------------------------------------------------- |
+| Workspace layout   | `mycurricula:user:teach-workspace`    | §8 above                                                    |
+| Annotations        | `mycurricula:user:teach-annotations`  | persists across sessions (§5.2) → `board_annotations` later |
+| Sandbox draft      | `mycurricula:user:teach-sandbox`      | ephemeral lesson-less boards (§4a)                          |
+| Board draft        | `mycurricula:user:teach-boards-draft` | keeps a live board across refresh in the prototype          |
+| **Groups / names** | `mycurricula:user:teach-groups`       | **local-only forever — never synced, never in DB (§11.4)**  |
 
 ---
 
@@ -466,20 +485,20 @@ owner-scoped DB rows later — except groups, which never do):
 All colour/type/spacing tokens come from `app/tokens.css`; **no hard-coded hex**
 (`CLAUDE.md` §4). The prototype's literal palette maps cleanly:
 
-| Prototype (`teach524.jsx`) | Token | Notes |
-| --- | --- | --- |
-| `T.blue #2563EB` | `var(--math)` via `.cp-subj.math` | **Derive from the lesson's subject**, not hard-coded math-blue (README note #8) — use `useSubjectColor(subjectId)` / `.cp-subj.<id>`. |
-| `T.blueTile #DBEAFE` | `--math-light` / `--tag-blue-bg` | subject-tinted tile |
-| `T.blueDeep #1E3A8A` | `--math-deep` / `--tag-blue-fg` | text-on-tint |
-| `T.ink #0B1220` | `--ink-900` | |
-| `T.ink2 #4B5563` | `--ink-700` / `--ink-500` | |
-| `T.ink3 #9CA3AF` | `--ink-400` / `--ink-300` | |
-| `T.line #E5E7EB` | `--ink-150` | card outline |
-| `T.lineSoft #F1F2F6` | `--ink-100` | soft/hover |
-| `T.pageBg #F4F6FB` | `--ink-50` | page bg |
-| resource-type pills (PDF/SLIDES/…) | `--tag-*-bg` / `--tag-*-fg` pairs | per type |
-| annotation colours | `--ink-900`, subject `--c`, `--urgent`, `--done`, `--writing` | |
-| highlighter swatches | `--hl-lemon … --hl-*` | already exist in tokens.css |
+| Prototype (`teach524.jsx`)         | Token                                                         | Notes                                                                                                                                 |
+| ---------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `T.blue #2563EB`                   | `var(--math)` via `.cp-subj.math`                             | **Derive from the lesson's subject**, not hard-coded math-blue (README note #8) — use `useSubjectColor(subjectId)` / `.cp-subj.<id>`. |
+| `T.blueTile #DBEAFE`               | `--math-light` / `--tag-blue-bg`                              | subject-tinted tile                                                                                                                   |
+| `T.blueDeep #1E3A8A`               | `--math-deep` / `--tag-blue-fg`                               | text-on-tint                                                                                                                          |
+| `T.ink #0B1220`                    | `--ink-900`                                                   |                                                                                                                                       |
+| `T.ink2 #4B5563`                   | `--ink-700` / `--ink-500`                                     |                                                                                                                                       |
+| `T.ink3 #9CA3AF`                   | `--ink-400` / `--ink-300`                                     |                                                                                                                                       |
+| `T.line #E5E7EB`                   | `--ink-150`                                                   | card outline                                                                                                                          |
+| `T.lineSoft #F1F2F6`               | `--ink-100`                                                   | soft/hover                                                                                                                            |
+| `T.pageBg #F4F6FB`                 | `--ink-50`                                                    | page bg                                                                                                                               |
+| resource-type pills (PDF/SLIDES/…) | `--tag-*-bg` / `--tag-*-fg` pairs                             | per type                                                                                                                              |
+| annotation colours                 | `--ink-900`, subject `--c`, `--urgent`, `--done`, `--writing` |                                                                                                                                       |
+| highlighter swatches               | `--hl-lemon … --hl-*`                                         | already exist in tokens.css                                                                                                           |
 
 **New tokens to add** (in `app/tokens.css`, not Tailwind): a small set of widget
 canvas tints — `--board-tint-yellow|mint|sky|pink|lavender|peach` — for the
@@ -503,11 +522,11 @@ their root for touch users.
 Resolves the brief's open question ("degrade or redirect?"): **degrade, never
 redirect.** Teach is laptop/projector-first, but must not break on phone/tablet.
 
-| Tier | Behaviour |
-| --- | --- |
-| **Desktop 1024–1920** | Full five-zone shell. |
-| **Tablet 600–900** | Both panels collapse to 64px rails by default; tapping a rail icon opens that panel as an **overlay drawer** over the board (one at a time). Board grid caps at 2×2; sub-bar board tabs scroll horizontally *inside* their strip (no page scroll). |
-| **Phone 360–480** | Single column: rails become a bottom tab bar; panels become full-height bottom sheets. Board grid forced to **1-up** with horizontal swipe between widgets. Top/sub bars condense (board tabs → a `Board ▾` dropdown). Present mode is the natural phone experience. |
+| Tier                  | Behaviour                                                                                                                                                                                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Desktop 1024–1920** | Full five-zone shell.                                                                                                                                                                                                                                                |
+| **Tablet 600–900**    | Both panels collapse to 64px rails by default; tapping a rail icon opens that panel as an **overlay drawer** over the board (one at a time). Board grid caps at 2×2; sub-bar board tabs scroll horizontally _inside_ their strip (no page scroll).                   |
+| **Phone 360–480**     | Single column: rails become a bottom tab bar; panels become full-height bottom sheets. Board grid forced to **1-up** with horizontal swipe between widgets. Top/sub bars condense (board tabs → a `Board ▾` dropdown). Present mode is the natural phone experience. |
 
 No document-level horizontal scroll at any tier; touch targets ≥44px on
 phone/tablet; sticky chrome ≤~30% viewport height on phone. Verified at ~400 /
@@ -540,26 +559,26 @@ Conventions matched against `20260518102823_initial_schema.sql`:
 - **Board scope (per §13.1):** a `Board` hangs off a lesson via the **master
   lesson id** (`master_core_lesson_event_id`), the same stable identity
   `completion_status` uses. `scope` is `personal` (owner-scoped) or `team`
-  (`owner_id` null, shared across the grade). **Per lesson: at most one team set
-  + one personal set per teacher** — enforced by a partial unique index, e.g.
-  `unique (master_core_lesson_event_id, owner_id, title)` for personal and
-  `unique (master_core_lesson_event_id, title) where scope='team'` for the single
-  team set. **Push-to-team** is a repository operation that deletes the existing
-  team-scoped boards for that lesson and re-inserts the pushed set in one
-  transaction (the displacement in §13.1) — gated by a warning in the UI.
+  (`owner_id` null, shared across the grade). \*\*Per lesson: at most one team set
+  - one personal set per teacher** — enforced by a partial unique index, e.g.
+    `unique (master_core_lesson_event_id, owner_id, title)` for personal and
+    `unique (master_core_lesson_event_id, title) where scope='team'` for the single
+    team set. **Push-to-team\*\* is a repository operation that deletes the existing
+    team-scoped boards for that lesson and re-inserts the pushed set in one
+    transaction (the displacement in §13.1) — gated by a warning in the UI.
 - **RLS** on all tables, via the existing `security definer` helpers
   (`can_read_grade`, `is_grade_lead`, `can_edit_subject_master`) plus one new
   helper `auth_can_read_lesson(master_lesson_id)` (mirrors the polymorphic
   resolver from the resources-embed migration). Personal rows: owner-only. **Team
   rows: readable AND writable by any teacher who can read the grade** —
   `using (can_read_grade(grade_level_id))` for both `select` and the write
-  `with check` (per §13.1, *any* team member, not lead-only; `is_grade_lead` is
+  `with check` (per §13.1, _any_ team member, not lead-only; `is_grade_lead` is
   **not** used as a board write gate). Widgets inherit their board's policy.
   `teach_workspace_layouts` and `board_annotations`: strictly the owning teacher's
   row (identical to `teacher_ui_state_owner`).
 - **Annotations table (per §13.5):** add `board_annotations` —
   `(id, board_id fk, resource_id text null, owner_id fk teachers, annotations
-  jsonb, grade_level_id, created_at, updated_at)`, owner-scoped RLS. Annotations
+jsonb, grade_level_id, created_at, updated_at)`, owner-scoped RLS. Annotations
   are a teacher's personal markup even over a team board, so they are always
   owner-keyed (`resource_id` null = annotations over the board grid itself; set =
   over a specific resource-in-canvas). v1 persists the same JSON to localStorage;
@@ -622,6 +641,7 @@ storage anywhere in the Teach surface.
 ## 12. Phasing
 
 ### Phase v1 (this build — see §14 for the agent breakdown)
+
 The faithful core: `(teach)` route group + shell, top/sub bars + footer, both
 rails + collapsible panels (default split + persistence), board tabs + widget
 grid (1up→3×3) + picker + chrome + Focus + Present + empty state + Mini-Lesson
@@ -632,17 +652,20 @@ responsive, and the **designed-but-unwired** Supabase migration + repository
 seam.
 
 ### Phase 2 (workspace power + PDF)
+
 Floating windows + detach; drag tabs between panels; full layout presets + "save
 preset"; **Pop-Out** + **Duplicate** with `postMessage` sync; pdf.js
 content-anchored annotation + designed PDF chrome; rail-to-rail icon drag parity
 with the shell.
 
 ### Phase 3 (interactive widget library)
+
 Live timers/stopwatch/countdown, polls/traffic-light with results, randomizer/
 name-picker, dice, editable groups + agenda (elapsed time), the whiteboard
 widget, scoreboard, per-widget persistence overrides + "Reset board".
 
 ### Phase 4 (backend on)
+
 Wire `supabase-source.ts`; apply the migration; persist boards/widgets/workspace/
 annotations through RLS; realtime for team boards/chat. (Real-time student
 devices, co-teaching, public sharing, marketplace remain **out of scope**, spec
@@ -675,10 +698,10 @@ devices, co-teaching, public sharing, marketplace remain **out of scope**, spec
    no new font.
 5. **Annotations persist in v1.** Annotations persist across sessions
    (localStorage in v1, DB later) and are removed only when the teacher
-   explicitly **clears a board/resource of annotations**. Content-*anchored* ink
+   explicitly **clears a board/resource of annotations**. Content-_anchored_ ink
    (ink that follows a PDF's internal scroll) stays Phase 2 — persistence and
    anchoring are independent concerns (§5.2).
-6. **Entry points.** Teach is a **primary nav tab now**, *and* reachable from an
+6. **Entry points.** Teach is a **primary nav tab now**, _and_ reachable from an
    individual lesson in **Weekly** (at the very bottom of the lesson) and
    **Daily**. Opening it lands the three-panel workspace (left + center + right,
    both rails) in the teacher's **saved configuration** (default until they hit
@@ -721,13 +744,13 @@ green with stubbed zones; the contract in §2.4 is frozen.
 
 ### Wave 1 — Five parallel agents (directory-disjoint)
 
-| Agent | Owns | Builds |
-| --- | --- | --- |
-| **A — Chrome & modes** | `components/teach/chrome/*` | `TeachTopBar`, `TeachSubBar` (board tabs, layout toolbar, action cluster), `TeachFooter`, `PresentMode` (T6), Full-Screen wiring, layout-switcher; `use-teach-shortcuts.ts` (⌘1–9, ⌘L/R/J/K, ⌘/, ⌘P, Esc cascade). Pop-Out/Duplicate as "Soon". |
-| **B — Left zone** | `components/teach/rails/TeachLeftRail*`, `components/teach/panels/left/*`, `lib/teach/use-teach-groups.ts` | Left icon rail + collapsible left panel + module tabs; Lesson card, Lesson list (reuse `usePlanner`), Boards thumbs (+Add). **Boards module owns Share-to-team / push (with the §13.1 displacement warning) and the §4a sandbox Save-to-new-lesson / Pin-to-lesson flows.** Notes (display); Groups/Names (**local-only store, §11.4 — never DB**); Class/Tools stub. |
-| **C — Center board** | `components/teach/board/*`, `components/teach/widgets/*` | `TeachingBoard` (CSS-grid + layout switch + `@dnd-kit` reorder), `WidgetShell` (hover chrome), `WidgetPicker` (T5), `BoardEmptyState` (T9), `FocusMode` (T7), all **display-only** widget bodies, droppable cells for T8. |
-| **D — Resource canvas & annotation** ⭐ | `components/teach/canvas/*`, `components/teach/annotation/*`, `lib/board-annotations.ts`, `lib/board-embed.ts`, `lib/use-board-annotations.ts` | `BoardCanvasResource` (§5.1), `AnnotationLayer` (§5.2), `BoardToolbar` + `ToolDock` (§5.3), PDF viewer toolbar chrome (T3/T4). **Annotations persist to localStorage across sessions + explicit Clear (§5.2, §13.5).** The v1 interactive priority. |
-| **E — Right zone** | `components/teach/rails/TeachRightRail*`, `components/teach/panels/right/*` | Right icon rail + collapsible right panel + module tabs; `ResourcesModule` (grid/list, search, filter chips, hover menu → Embed/Open Large, draggable cards for T8), `ChatModule` (reuse Daily `<Shoutbox>`), `TodoModule` (reuse Daily `<TodayTodos>`). |
+| Agent                                   | Owns                                                                                                                                           | Builds                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A — Chrome & modes**                  | `components/teach/chrome/*`                                                                                                                    | `TeachTopBar`, `TeachSubBar` (board tabs, layout toolbar, action cluster), `TeachFooter`, `PresentMode` (T6), Full-Screen wiring, layout-switcher; `use-teach-shortcuts.ts` (⌘1–9, ⌘L/R/J/K, ⌘/, ⌘P, Esc cascade). Pop-Out/Duplicate as "Soon".                                                                                                                       |
+| **B — Left zone**                       | `components/teach/rails/TeachLeftRail*`, `components/teach/panels/left/*`, `lib/teach/use-teach-groups.ts`                                     | Left icon rail + collapsible left panel + module tabs; Lesson card, Lesson list (reuse `usePlanner`), Boards thumbs (+Add). **Boards module owns Share-to-team / push (with the §13.1 displacement warning) and the §4a sandbox Save-to-new-lesson / Pin-to-lesson flows.** Notes (display); Groups/Names (**local-only store, §11.4 — never DB**); Class/Tools stub. |
+| **C — Center board**                    | `components/teach/board/*`, `components/teach/widgets/*`                                                                                       | `TeachingBoard` (CSS-grid + layout switch + `@dnd-kit` reorder), `WidgetShell` (hover chrome), `WidgetPicker` (T5), `BoardEmptyState` (T9), `FocusMode` (T7), all **display-only** widget bodies, droppable cells for T8.                                                                                                                                             |
+| **D — Resource canvas & annotation** ⭐ | `components/teach/canvas/*`, `components/teach/annotation/*`, `lib/board-annotations.ts`, `lib/board-embed.ts`, `lib/use-board-annotations.ts` | `BoardCanvasResource` (§5.1), `AnnotationLayer` (§5.2), `BoardToolbar` + `ToolDock` (§5.3), PDF viewer toolbar chrome (T3/T4). **Annotations persist to localStorage across sessions + explicit Clear (§5.2, §13.5).** The v1 interactive priority.                                                                                                                   |
+| **E — Right zone**                      | `components/teach/rails/TeachRightRail*`, `components/teach/panels/right/*`                                                                    | Right icon rail + collapsible right panel + module tabs; `ResourcesModule` (grid/list, search, filter chips, hover menu → Embed/Open Large, draggable cards for T8), `ChatModule` (reuse Daily `<Shoutbox>`), `TodoModule` (reuse Daily `<TodayTodos>`).                                                                                                              |
 
 Shared touch-points are read-only contracts from Wave 0 (workspace state, dnd
 ids, repository). Agents C + E coordinate **only** through the Wave-0 dnd
@@ -743,7 +766,7 @@ contract for drag-resource-to-cell; C + D **only** through `centerMode`.
   pass (§10) at all three tiers, a11y (tab order, focus traps in Present/Focus,
   `aria-pressed` tools, live-region announcements), reduced-motion audit.
 - **Verification:** `npm run lint && npm run format:check && npx tsc --noEmit &&
-  npm run build`; `node scripts/probe-uxa.mjs`; manual responsive check at
+npm run build`; `node scripts/probe-uxa.mjs`; manual responsive check at
   400/768/1280.
 - **Codex review gate** (`CLAUDE.md` §4a) on the uncommitted diff for every
   logic/security/data-handling change (the annotation canvas, embed sandboxing,
@@ -868,12 +891,43 @@ net-new surface; none is wired today.
 - **Phase 2** — floating windows, drag tabs between panels, layout presets,
   **Pop-Out** (`Cmd+Shift+P`, T11) + **Duplicate** with cross-window sync,
   pdf.js content-anchored annotation.
-- **Phase 3** — interactive widget library (live timers/stopwatch/countdown,
-  polls, randomizer, dice, editable groups/agenda, whiteboard, scoreboard,
-  per-widget persistence overrides).
+- **Phase 3 — SHIPPED (2026-05-30, this wave).** See §16.6.
 - **Phase 4** — wire `supabase-source.ts`, apply the migration, persist
   boards/widgets/workspace/annotations through RLS, realtime for team
   boards/chat.
+
+### 16.6 Phase 3 — interactive widget library + board backgrounds (SHIPPED)
+
+Built 2026-05-30 (this wave). Originally-authored implementations of standard
+classroom-tool functionality (modelled on classroomscreen's _behaviour_, not its
+code/assets), against the token system.
+
+- **Interactive widgets** (each its own `<Name>Widget.tsx` + `.module.css`,
+  switched in `WidgetBody`, registered in `catalog.ts`):
+  - Timing: **Timer** (live countdown ring, presets/±1min, alarm colour + Web-
+    Audio chime at 0), **Stopwatch** (laps), **Clock** (analog + digital,
+    12/24h), **Countdown** (to a date/event).
+  - Engagement: **Poll** (teacher-tally, choice/yes-no/smiley, % bars),
+    **Names** (randomizer; local-only roster; "don't repeat"), **Dice** (1–4
+    d6, tumble), **Scoreboard** (teams ±, leader).
+  - Classroom: **Traffic Light**, **Work Mode** (silent/whisper/partner/group/
+    ask), **Sound Level** (real `getUserMedia` + Web-Audio mic meter, threshold,
+    permission-gated + full teardown), **Text** (big editable display),
+    **Agenda** (now checkable).
+  - State persists per-widget via `lib/teach/use-widget-state.ts` (USER-scoped
+    localStorage; STRUCTURE only — never names). Reduced-motion + ≥44px touch +
+    tokens-only throughout. Verified at 1280 + 390: no horiz-scroll, 0 errors.
+- **Board backgrounds** — 15 solid colours, 15 repeating patterns, 15 seamless
+  repeating gradients (`app/tokens.css` `--teach-bg-*`; catalog in
+  `lib/teach/backgrounds.ts`). `Board.background` field; **BoardBackgroundPicker**
+  (tabbed swatch grid) in Board settings; applied to the board canvas.
+- **Still deferred from Phase 3:** per-widget **settings editors** (the cog) for
+  several types — most widgets are now self-editing inline (timer presets, poll
+  taps, scoreboard ±, text click-to-edit, traffic/work tap), but a unified
+  per-type config surface for authoring defaults (e.g. preset a poll's questions,
+  edit agenda item text) is still a net-new surface. **Whiteboard widget** and
+  per-widget **persistence-override** UI remain deferred. Live student-device
+  voting stays out of scope (no student app) — polls are teacher-tallied.
 
 ### 16.5 Process note
 
@@ -886,5 +940,5 @@ sandbox persistence are exactly what it should review.
 
 ---
 
-*End of plan. §13 decisions resolved with Tim (2026-05-29). Waves 0–4 +
-hardening + fix wave shipped on PR #1; §16.3 tracks deferred work.*
+_End of plan. §13 decisions resolved with Tim (2026-05-29). Waves 0–4 +
+hardening + fix wave shipped on PR #1; §16.3 tracks deferred work._

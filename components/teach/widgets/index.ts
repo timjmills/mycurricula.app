@@ -19,6 +19,18 @@ export { EmbedWidget } from "./EmbedWidget";
 export { PollWidget } from "./PollWidget";
 export { NamesWidget } from "./NamesWidget";
 
+// Phase 3 interactive widget library (TimerWidget/PollWidget/NamesWidget/
+// AgendaWidget were rewritten in place; exported above).
+export { StopwatchWidget } from "./StopwatchWidget";
+export { ClockWidget } from "./ClockWidget";
+export { CountdownWidget } from "./CountdownWidget";
+export { DiceWidget } from "./DiceWidget";
+export { ScoreboardWidget } from "./ScoreboardWidget";
+export { TrafficLightWidget } from "./TrafficLightWidget";
+export { WorkSymbolsWidget } from "./WorkSymbolsWidget";
+export { SoundLevelWidget } from "./SoundLevelWidget";
+export { TextWidget } from "./TextWidget";
+
 export { MediaCard } from "./MediaCard";
 export type { MediaCardProps } from "./MediaCard";
 

@@ -20,5 +20,8 @@ export type { FocusModeProps } from "./FocusMode";
 export { BoardSettingsPopover } from "./BoardSettingsPopover";
 export type { BoardSettingsPopoverProps } from "./BoardSettingsPopover";
 
+export { BoardBackgroundPicker } from "./BoardBackgroundPicker";
+export type { BoardBackgroundPickerProps } from "./BoardBackgroundPicker";
+
 export { WidgetSettingsPopover } from "./WidgetSettingsPopover";
 export type { WidgetSettingsPopoverProps } from "./WidgetSettingsPopover";

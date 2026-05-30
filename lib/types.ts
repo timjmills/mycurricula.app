@@ -250,8 +250,10 @@ export interface WeeklyCardDeck {
 // (`lib/teach/queries.ts`). Grade-scoping is carried on every Teach entity —
 // the app launches Grade 5-only but never assumes a single grade.
 
-/** The twelve core widget kinds a board cell can host (plan §4.4). The body
- *  renderers (Wave 1, Agent C) switch on this; v1 bodies are display-only. */
+/** The widget kinds a board cell can host (plan §4.4). The original twelve are
+ *  the content/display set; the `// interactive` block is the Phase 3 widget
+ *  library — live classroom tools (timer/dice/traffic-light/…) modelled after
+ *  classroomscreen. Body renderers switch on this in `WidgetBody`. */
 export type WidgetType =
   | "timer"
   | "objective" // "I Can" + standard chips
@@ -264,7 +266,17 @@ export type WidgetType =
   | "poll"
   | "names" // randomizer / name picker
   | "manipulatives"
-  | "embed";
+  | "embed"
+  // ── Phase 3 interactive library ──────────────────────────────────────────
+  | "stopwatch" // count-up timer + laps
+  | "clock" // live analog + digital clock
+  | "countdown" // count down to a date/event
+  | "dice" // roll 1–4 dice
+  | "scoreboard" // team points +/−
+  | "traffic" // red/amber/green light
+  | "work_symbols" // silent / whisper / partner / group work mode
+  | "soundlevel" // live microphone level meter
+  | "text"; // large editable display text
 
 /** Whether a widget's interactive `state` survives across teaching sessions.
  *  Maps to the DB `widget_persistence` enum. `inherit` defers to the board's
@@ -332,6 +344,10 @@ export interface Board {
   displayOrderWithinLesson: number;
   /** The template this board was instantiated from, if any. */
   templateId: string | null;
+  /** Board background id from the Teach background catalog
+   *  (`lib/teach/backgrounds.ts`), e.g. "pattern-3". Null/absent → the default
+   *  paper surface. Display-only structure — safe to persist to the DB. */
+  background?: string | null;
   widgets: Widget[];
   gradeLevelId: string;
   createdAt: string;

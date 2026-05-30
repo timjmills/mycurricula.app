@@ -1,0 +1,77 @@
+/* BoardBackgroundPicker.module.css — the board background chooser swatch grid
+   (Teach Phase 3). Colour/spacing/radius from app/tokens.css; each swatch's fill
+   is the catalog's `var(--teach-bg-<id>)` passed in as `--swatch-bg`. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-8);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tab,
+.noneTab {
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  border: var(--line);
+  background: var(--paper);
+  color: var(--ink-600, var(--ink-700));
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.tab:hover,
+.noneTab:hover {
+  background: var(--ink-50);
+}
+
+.tabActive {
+  background: var(--ink-900);
+  color: var(--paper);
+  border-color: var(--ink-900);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--r-8);
+}
+
+.swatch {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--r-8);
+  border: 1.5px solid var(--ink-150);
+  background: var(--swatch-bg, var(--paper));
+  cursor: pointer;
+  padding: 0;
+  /* keep the tiled pattern/gradient scale readable in a small swatch */
+  background-size: inherit;
+}
+
+.swatch:hover {
+  border-color: var(--ink-400);
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.swatchActive {
+  border-color: var(--ink-900);
+  box-shadow: 0 0 0 2px var(--ink-900);
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

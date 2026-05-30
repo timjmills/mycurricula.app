@@ -1,0 +1,123 @@
+/* TextWidget.module.css — interactive big-text display (Phase 3 widget library).
+   Token-only colour/radii. A centred, wrapping text block that fills the tile
+   and scrolls internally when long; the four size steps (s/m/l/xl) clamp against
+   viewport height so the same content reads well in a small grid cell or large
+   focus mode. The editor mirrors the display's metrics for a seamless swap. */
+
+.body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Size stepper (corner) ────────────────────────────────────────────── */
+.stepper {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+}
+
+.stepBtn {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border: var(--line);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  color: var(--ink-700);
+  cursor: pointer;
+}
+
+.stepBtn:hover:not(:disabled) {
+  background: var(--ink-50);
+}
+
+.stepBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Shared display + editor metrics ──────────────────────────────────── */
+.display,
+.editor {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: clamp(8px, 3vh, 28px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.18;
+  color: var(--ink-900);
+  overflow: auto;
+  word-break: break-word;
+}
+
+.display {
+  border: none;
+  background: transparent;
+  cursor: text;
+  border-radius: var(--r-12);
+}
+
+.display:hover {
+  background: var(--ink-50);
+}
+
+.display:focus-visible {
+  outline: 2px solid var(--c);
+  outline-offset: -2px;
+}
+
+.displayInner {
+  display: block;
+  max-width: 100%;
+}
+
+.empty .displayInner {
+  color: var(--ink-300);
+  font-weight: 600;
+}
+
+.editor {
+  resize: none;
+  border: 2px solid var(--c);
+  border-radius: var(--r-12);
+  background: var(--paper);
+  /* Override flex centring — a textarea needs block-level text flow. */
+  display: block;
+  text-align: center;
+}
+
+.editor:focus {
+  outline: none;
+}
+
+/* ── Size steps (clamp against viewport height) ───────────────────────── */
+.size_s {
+  font-size: clamp(15px, 3vh, 24px);
+}
+
+.size_m {
+  font-size: clamp(20px, 5vh, 40px);
+}
+
+.size_l {
+  font-size: clamp(26px, 8vh, 68px);
+}
+
+.size_xl {
+  font-size: clamp(34px, 12vh, 104px);
+}

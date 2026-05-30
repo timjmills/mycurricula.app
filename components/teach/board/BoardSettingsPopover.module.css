@@ -68,6 +68,14 @@
   margin-bottom: -6px;
 }
 
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-8);
+  padding-top: var(--r-8);
+  border-top: var(--line);
+}
+
 .renameRow {
   display: flex;
   gap: var(--r-8);

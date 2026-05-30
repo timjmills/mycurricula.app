@@ -1,0 +1,191 @@
+/* ScoreboardWidget.module.css — interactive team scoreboard (Teach Phase 3).
+   Tokens only. Team cards lay out in an auto-fit grid so 2 teams read big and
+   6 stay usable; the leading team gets a --teach-go ring + trophy. +1/−1 are
+   ≥44px primary controls. The grid scrolls internally if the tile is short. */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-8);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.teams {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6px;
+  overflow: auto;
+}
+
+/* ── A single team card ─────────────────────────────────────────────────── */
+.team {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  min-width: 0;
+}
+
+.teamLeader {
+  border-color: var(--teach-go);
+  box-shadow: inset 0 0 0 1px var(--teach-go);
+}
+
+.teamHead {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.trophy {
+  flex: none;
+  display: inline-flex;
+  color: var(--teach-go);
+}
+
+.labelInput {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 4px;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-700);
+  font-size: 12px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.labelInput:hover {
+  border-bottom-color: var(--line);
+}
+
+.labelInput:focus {
+  outline: none;
+  border-bottom-color: var(--c);
+}
+
+.removeBtn {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--r-6);
+  background: transparent;
+  color: var(--ink-400);
+  cursor: pointer;
+}
+
+.removeBtn:hover {
+  background: var(--ink-100);
+  color: var(--tag-red);
+}
+
+.score {
+  text-align: center;
+  font-size: clamp(26px, 7vw, 40px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--cd);
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreBtns {
+  display: flex;
+  gap: 4px;
+}
+
+.plus,
+.minus {
+  flex: 1;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--r-6);
+  cursor: pointer;
+  transition:
+    filter 120ms ease,
+    background 120ms ease;
+}
+
+.plus {
+  background: var(--c);
+  color: var(--paper);
+}
+
+.plus:hover {
+  filter: brightness(1.06);
+}
+
+.minus {
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.minus:hover:not(:disabled) {
+  background: var(--ink-150);
+}
+
+.minus:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Board-level actions ────────────────────────────────────────────────── */
+.actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+
+.actionBtn {
+  flex: 1;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  color: var(--ink-700);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.actionBtn:hover:not(:disabled) {
+  border-color: var(--c);
+  color: var(--cd);
+}
+
+.actionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plus,
+  .minus,
+  .actionBtn {
+    transition: none;
+  }
+}

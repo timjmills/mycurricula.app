@@ -176,9 +176,113 @@ function defaultBoardSet(masterLessonId: string): Board[] {
         W({ type: "poll", title: "Quick Check", col: 1, row: 2 }),
       ],
     }),
-    B({ masterLessonId, title: "Guided Practice", order: 2 }),
-    B({ masterLessonId, title: "Centers", order: 3 }),
-    B({ masterLessonId, title: "Exit Ticket", order: 4 }),
+    // Guided Practice → live classroom-management tools (Phase 3 library),
+    // shown on a soft pattern background so the background feature is visible.
+    {
+      ...B({
+        masterLessonId,
+        title: "Guided Practice",
+        order: 2,
+        widgets: [
+          W({ type: "timer", title: "Work Time", col: 0, row: 0 }),
+          W({
+            type: "traffic",
+            title: "Noise Level",
+            col: 1,
+            row: 0,
+            config: { active: "green" },
+          }),
+          W({
+            type: "work_symbols",
+            title: "Work Mode",
+            col: 2,
+            row: 0,
+            config: { mode: "partner" },
+          }),
+          W({
+            type: "soundlevel",
+            title: "Sound Meter",
+            col: 0,
+            row: 1,
+          }),
+          W({
+            type: "scoreboard",
+            title: "Team Points",
+            col: 1,
+            row: 1,
+            colSpan: 2,
+          }),
+        ],
+      }),
+      background: "pattern-3",
+    },
+    // Centers → engagement tools on a gentle gradient.
+    {
+      ...B({
+        masterLessonId,
+        title: "Centers",
+        order: 3,
+        widgets: [
+          W({
+            type: "dice",
+            title: "Roll to Move",
+            col: 0,
+            row: 0,
+            config: { count: 2 },
+          }),
+          W({
+            type: "stopwatch",
+            title: "Rotation Timer",
+            col: 1,
+            row: 0,
+          }),
+          W({
+            type: "names",
+            title: "Pick a Helper",
+            col: 2,
+            row: 0,
+            config: { slotCount: 6 },
+          }),
+          W({
+            type: "text",
+            title: "Center Instructions",
+            col: 0,
+            row: 1,
+            colSpan: 3,
+            config: {
+              text: "Read pages 24–26, then answer in your journal.",
+              size: "l",
+            },
+          }),
+        ],
+      }),
+      background: "gradient-3",
+    },
+    // Exit Ticket → quick check + countdown to the bell.
+    B({
+      masterLessonId,
+      title: "Exit Ticket",
+      order: 4,
+      widgets: [
+        W({
+          type: "poll",
+          title: "How do you feel?",
+          col: 0,
+          row: 0,
+          config: {
+            kind: "smiley",
+            question: "How well did you understand today?",
+          },
+        }),
+        W({
+          type: "countdown",
+          title: "Until the Bell",
+          col: 1,
+          row: 0,
+          config: { label: "Pack up" },
+        }),
+      ],
+    }),
   ];
 }
 

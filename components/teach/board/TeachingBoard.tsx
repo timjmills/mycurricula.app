@@ -16,6 +16,7 @@ import { useDroppable } from "@dnd-kit/core";
 import type { SubjectId, Board, Widget } from "@/lib/types";
 import type { TeachWorkspaceState, BoardCellTarget } from "@/lib/teach/types";
 import { BOARD_LAYOUT_GRID, boardCellDroppableId } from "@/lib/teach/types";
+import { boardBackgroundCss } from "@/lib/teach/backgrounds";
 import type { TeachWorkspaceAction } from "../TeachWorkspace";
 import { WidgetShell } from "./WidgetShell";
 import { BoardEmptyState } from "./BoardEmptyState";
@@ -113,10 +114,18 @@ export function TeachingBoard({
 }: TeachingBoardProps): ReactNode {
   const { cols, rows } = BOARD_LAYOUT_GRID[state.layout];
 
+  // Board background (T-Phase3): a colour/pattern/gradient from the catalog,
+  // applied behind the widget grid. Undefined → the default paper surface (the
+  // CSS fallback in board.module.css's .canvas).
+  const bgCss = boardBackgroundCss(board?.background);
+  const canvasStyle: CSSProperties | undefined = bgCss
+    ? { background: bgCss }
+    : undefined;
+
   // Empty board (T9) → the "add your first widget" CTA.
   if (board && widgets.length === 0) {
     return (
-      <div className={styles.canvas}>
+      <div className={styles.canvas} style={canvasStyle}>
         <BoardEmptyState
           boardTitle={board.title}
           onPick={(target) => onAddWidget?.(target)}
@@ -149,7 +158,7 @@ export function TeachingBoard({
     : null;
 
   return (
-    <div className={styles.canvas}>
+    <div className={styles.canvas} style={canvasStyle}>
       <div
         className={`${styles.grid} ${styles.gridAnimated}`}
         style={gridStyle}

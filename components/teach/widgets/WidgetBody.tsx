@@ -18,6 +18,15 @@ import { YouTubeWidget } from "./YouTubeWidget";
 import { EmbedWidget } from "./EmbedWidget";
 import { PollWidget } from "./PollWidget";
 import { NamesWidget } from "./NamesWidget";
+import { StopwatchWidget } from "./StopwatchWidget";
+import { ClockWidget } from "./ClockWidget";
+import { CountdownWidget } from "./CountdownWidget";
+import { DiceWidget } from "./DiceWidget";
+import { ScoreboardWidget } from "./ScoreboardWidget";
+import { TrafficLightWidget } from "./TrafficLightWidget";
+import { WorkSymbolsWidget } from "./WorkSymbolsWidget";
+import { SoundLevelWidget } from "./SoundLevelWidget";
+import { TextWidget } from "./TextWidget";
 import { widgetMeta } from "./catalog";
 import { TeachIcon } from "./icons";
 import styles from "./widgets.module.css";
@@ -58,6 +67,24 @@ export function WidgetBody({
       return <PollWidget {...props} />;
     case "names":
       return <NamesWidget {...props} />;
+    case "stopwatch":
+      return <StopwatchWidget {...props} />;
+    case "clock":
+      return <ClockWidget {...props} />;
+    case "countdown":
+      return <CountdownWidget {...props} />;
+    case "dice":
+      return <DiceWidget {...props} />;
+    case "scoreboard":
+      return <ScoreboardWidget {...props} />;
+    case "traffic":
+      return <TrafficLightWidget {...props} />;
+    case "work_symbols":
+      return <WorkSymbolsWidget {...props} />;
+    case "soundlevel":
+      return <SoundLevelWidget {...props} />;
+    case "text":
+      return <TextWidget {...props} />;
     default: {
       // Exhaustiveness guard + graceful fallback for an unknown type.
       const meta = widgetMeta(widget.type);

@@ -1,13 +1,19 @@
-// AgendaWidget — the lesson-phase agenda checklist, display-only
-// (docs/teach-view-plan.md §4.5). Renders `config.items` (an array of
-// {label, time, done}) or the default five-phase set. The "done" check uses the
-// subject accent via `.cp-subj`. No interactivity in v1 (ticking off items is
-// the Phase 3 interactive library).
+// AgendaWidget — an INTERACTIVE lesson-phase agenda checklist (Phase 3 widget
+// library; replaces the v1 display-only stub). Renders `config.items` (an array
+// of {label, time?, done?}) or a sensible default phase set, each as a ≥44px
+// tappable row. Tapping toggles "done" — the check fills with the subject accent
+// and the label strikes through. Done-state persists by row index via
+// useWidgetState so a half-worked agenda survives a reload. config.items still
+// seeds the initial done-flags, so a preset agenda starts where it left off.
 
+"use client";
+
+import { useCallback, useMemo } from "react";
 import type { ReactNode } from "react";
-import type { WidgetBodyProps } from "./types";
+import { useWidgetState } from "@/lib/teach/use-widget-state";
 import { TeachIcon } from "./icons";
-import styles from "./widgets.module.css";
+import type { WidgetBodyProps } from "./types";
+import styles from "./AgendaWidget.module.css";
 
 interface AgendaItem {
   label: string;
@@ -16,13 +22,14 @@ interface AgendaItem {
 }
 
 const DEFAULT_ITEMS: AgendaItem[] = [
-  { label: "Warm-Up", time: "8 min", done: true },
+  { label: "Warm-Up", time: "8 min" },
   { label: "Mini Lesson", time: "12 min" },
   { label: "Guided Practice", time: "15 min" },
   { label: "Centers", time: "20 min" },
   { label: "Exit Ticket", time: "5 min" },
 ];
 
+/** Parse `config.items` into the validated AgendaItem[] (or the default set). */
 function readItems(config: Record<string, unknown>): AgendaItem[] {
   const raw = config.items;
   if (Array.isArray(raw)) {
@@ -41,34 +48,102 @@ function readItems(config: Record<string, unknown>): AgendaItem[] {
   return DEFAULT_ITEMS;
 }
 
+/** Durable slice — done-flags keyed by stable row index ("0","1",…). */
+interface AgendaPersisted extends Record<string, unknown> {
+  done: Record<string, boolean>;
+}
+
+/** Validate a stored done-map (drop non-boolean values defensively). */
+function readDoneMap(raw: unknown): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [k, v] of Object.entries(raw)) {
+      if (v === true) out[k] = true;
+    }
+  }
+  return out;
+}
+
 export function AgendaWidget({
   widget,
   subjectId,
 }: WidgetBodyProps): ReactNode {
-  const items = readItems(widget.config);
+  const items = useMemo(() => readItems(widget.config), [widget.config]);
+
+  // Seed initial done-flags from config so a preset agenda restores its ticks.
+  const initial = useMemo<AgendaPersisted>(() => {
+    const done: Record<string, boolean> = {};
+    items.forEach((it, i) => {
+      if (it.done) done[String(i)] = true;
+    });
+    return { done };
+  }, [items]);
+
+  const { state, setState } = useWidgetState<AgendaPersisted>(
+    widget.id,
+    initial,
+  );
+  const doneMap = readDoneMap(state.done);
+
+  const toggle = useCallback(
+    (index: number): void => {
+      const key = String(index);
+      setState((prev) => {
+        const prevDone = readDoneMap(prev.done);
+        const next = { ...prevDone };
+        if (next[key]) {
+          delete next[key];
+        } else {
+          next[key] = true;
+        }
+        return { ...prev, done: next };
+      });
+    },
+    [setState],
+  );
+
+  const doneCount = items.reduce(
+    (n, _it, i) => n + (doneMap[String(i)] ? 1 : 0),
+    0,
+  );
 
   return (
-    <div className={`cp-subj ${subjectId} ${styles.body} ${styles.agenda}`}>
-      {items.map((it, i) => (
-        <div key={`${it.label}-${i}`} className={styles.agendaRow}>
-          <span
-            className={`${styles.agendaBox} ${it.done ? styles.agendaBoxDone : ""}`}
-          >
-            {it.done ? <TeachIcon name="check" size={10} /> : null}
-          </span>
-          <span style={{ color: "var(--ink-400)", display: "inline-flex" }}>
-            <TeachIcon name="users" size={13} />
-          </span>
-          <span
-            className={`${styles.agendaLabel} ${it.done ? styles.agendaLabelDone : ""}`}
-          >
-            {it.label}
-          </span>
-          {it.time ? (
-            <span className={styles.agendaTime}>{it.time}</span>
-          ) : null}
-        </div>
-      ))}
+    <div className={`cp-subj ${subjectId} ${styles.body}`}>
+      <div className={styles.list}>
+        {items.map((it, i) => {
+          const isDone = !!doneMap[String(i)];
+          return (
+            <button
+              key={`${it.label}-${i}`}
+              type="button"
+              className={styles.row}
+              onClick={() => toggle(i)}
+              aria-pressed={isDone}
+              title={
+                isDone
+                  ? `Mark "${it.label}" as not done yet`
+                  : `Mark "${it.label}" as done`
+              }
+            >
+              <span
+                className={`${styles.box} ${isDone ? styles.boxDone : ""}`}
+                aria-hidden="true"
+              >
+                {isDone ? <TeachIcon name="check" size={13} /> : null}
+              </span>
+              <span
+                className={`${styles.label} ${isDone ? styles.labelDone : ""}`}
+              >
+                {it.label}
+              </span>
+              {it.time ? <span className={styles.time}>{it.time}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+      <div className={styles.progress} aria-live="polite">
+        {doneCount} of {items.length} done
+      </div>
     </div>
   );
 }
