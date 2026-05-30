@@ -1,0 +1,94 @@
+/* CalmCornerWidget.module.css — token-only, em-sized. Default green/green.
+   The breathing ring gently pulses, but only with motion allowed. */
+
+.breathe {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  padding: 1.3em 1em;
+}
+
+.ring {
+  width: 3.2em;
+  height: 3.2em;
+  border-radius: 50%;
+  border: 0.3em solid var(--w-chip);
+  box-shadow: 0 0 0 0.4em var(--w-soft);
+}
+
+.breatheLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: 0.95em;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--w-accent);
+}
+
+.prompt {
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--w-ink);
+  margin: 0.95em 0;
+}
+
+.moods {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5em;
+}
+
+.moodBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.7em 0.4em;
+  border: 0.13em solid transparent;
+  background: var(--w-card);
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 2.75em;
+}
+
+.moodBtn:focus-visible {
+  outline: 0.15em solid var(--w-accent);
+  outline-offset: 0.15em;
+}
+
+.moodOn {
+  background: var(--w-soft);
+}
+
+.moodLabel {
+  font-size: 0.78em;
+  font-weight: 700;
+  color: var(--w-ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ring {
+    animation: breathe 5s ease-in-out infinite;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(0.85);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@media (max-width: 26em) {
+  .moods {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
