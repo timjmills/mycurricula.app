@@ -1,12 +1,37 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { Plus_Jakarta_Sans, Quicksand, Caveat } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider, DEFAULT_STYLE, DEFAULT_PALETTE } from "@/lib/theme";
 import { LabelsProvider } from "@/lib/labels";
 
 // GeistSans/GeistMono expose `--font-geist-sans` / `--font-geist-mono`,
 // which globals.css and the ported tokens.css reference for --font-sans/mono.
+//
+// The Teach widget visual system (5.31) adds three optional faces the
+// appearance editor offers: Plus Jakarta Sans (primary widget font), Quicksand
+// (Rounded), and Caveat (Marker / whiteboard hand). Each exposes a CSS var
+// (--font-jakarta / --font-quicksand / --font-caveat) that tokens.css maps to
+// the --wf-font-* options. `display: "swap"` keeps first paint fast.
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-jakarta",
+  display: "swap",
+});
+const quicksand = Quicksand({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-quicksand",
+  display: "swap",
+});
+const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-caveat",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   // Root metadata is rendered server-side and cannot read per-team
@@ -36,7 +61,7 @@ export default function RootLayout({
       suppressHydrationWarning
       data-style={DEFAULT_STYLE}
       data-palette={DEFAULT_PALETTE}
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${jakarta.variable} ${quicksand.variable} ${caveat.variable} h-full antialiased`}
     >
       <body
         suppressHydrationWarning

@@ -411,6 +411,100 @@
     #2b3346 22px 44px
   );
 
+  /* ── Teach widget visual system (5.31 Boards & Widgets redesign) ────────
+     The pastel-paper widget system from the 5.31 design handoff. Six colour
+     families + three neutrals, each exposing -bg / -chip / -accent / -soft /
+     -line and a -grad gradient (near-white top → family tint). A themeable
+     widget reads these via the --w-* contract (see lib/teach/widget-theme.ts);
+     the appearance editor lets a board theme + per-widget overrides repaint
+     them. Hex lives HERE only — components reference the vars. Exact values
+     ported from the handoff's widgets530.css. Distinct from the older
+     --board-tint-* / --teach-bg-* sets (those drive tile tints + the fullscreen
+     backdrop picker; these drive the new themeable widget surfaces). */
+  --wf-yellow-bg: #fdf5da;
+  --wf-yellow-chip: #f6df84;
+  --wf-yellow-accent: #d99c08;
+  --wf-yellow-soft: #fbeec3;
+  --wf-yellow-line: #f0e3b0;
+  --wf-yellow-grad: linear-gradient(165deg, #fffdf3 0%, #fbf1cf 100%);
+  --wf-green-bg: #eaf6ed;
+  --wf-green-chip: #bce6c6;
+  --wf-green-accent: #1fa85a;
+  --wf-green-soft: #d9f0df;
+  --wf-green-line: #cde9d4;
+  --wf-green-grad: linear-gradient(165deg, #f7fcf9 0%, #e4f3e9 100%);
+  --wf-pink-bg: #fce5ee;
+  --wf-pink-chip: #f7bcd4;
+  --wf-pink-accent: #e84e93;
+  --wf-pink-soft: #fad3e3;
+  --wf-pink-line: #f3c9da;
+  --wf-pink-grad: linear-gradient(165deg, #fef5f9 0%, #fbe0e9 100%);
+  --wf-purple-bg: #f0ecfc;
+  --wf-purple-chip: #d6cbf7;
+  --wf-purple-accent: #7c5cf6;
+  --wf-purple-soft: #e5dcfb;
+  --wf-purple-line: #ddd3f5;
+  --wf-purple-grad: linear-gradient(165deg, #faf8fe 0%, #ede8fb 100%);
+  --wf-orange-bg: #fdeede;
+  --wf-orange-chip: #fbd2ac;
+  --wf-orange-accent: #f2802b;
+  --wf-orange-soft: #fbddc1;
+  --wf-orange-line: #f7d8bc;
+  --wf-orange-grad: linear-gradient(165deg, #fffbf5 0%, #fce8d6 100%);
+  --wf-blue-bg: #e9f1fe;
+  --wf-blue-chip: #c1d9fb;
+  --wf-blue-accent: #2e6be6;
+  --wf-blue-soft: #d8e7fd;
+  --wf-blue-line: #cfe0fb;
+  --wf-blue-grad: linear-gradient(165deg, #f6faff 0%, #e4edfe 100%);
+  /* Neutral theme options (appearance editor): slate / cloud(white) / dark(night) */
+  --wf-slate-bg: #eef0f4;
+  --wf-slate-chip: #e1e5ec;
+  --wf-slate-accent: #5b6478;
+  --wf-slate-soft: #eef0f4;
+  --wf-slate-line: #dde1e8;
+  --wf-slate-grad: linear-gradient(165deg, #f8f9fb 0%, #e9ecf1 100%);
+  --wf-cloud-bg: #f6f7f9;
+  --wf-cloud-chip: #eef0f4;
+  --wf-cloud-accent: #3b4456;
+  --wf-cloud-soft: #f5f7f9;
+  --wf-cloud-line: #e9ebf0;
+  --wf-cloud-grad: linear-gradient(165deg, #ffffff 0%, #f3f5f8 100%);
+  --wf-dark-bg: #1c2333;
+  --wf-dark-chip: #3a435c;
+  --wf-dark-accent: #9db4e8;
+  --wf-dark-soft: #2b3346;
+  --wf-dark-line: #39425a;
+  --wf-dark-grad: linear-gradient(165deg, #262e42 0%, #171d2c 100%);
+  --wf-ink-accent: #101729;
+
+  /* Widget-system fonts (the appearance editor's 5 font options). The actual
+     faces load via next/font in app/layout.tsx, exposing the --font-* vars
+     below; this maps the handoff's keys to those vars with safe fallbacks. */
+  --wf-font-jakarta: var(
+    --font-jakarta,
+    "Plus Jakarta Sans",
+    ui-sans-serif,
+    system-ui,
+    sans-serif
+  );
+  --wf-font-rounded: var(--font-quicksand, "Quicksand", system-ui, sans-serif);
+  --wf-font-serif: Georgia, "Times New Roman", serif;
+  --wf-font-hand: var(--font-caveat, "Caveat", cursive);
+  --wf-font-mono: ui-monospace, Menlo, monospace;
+
+  /* Widget-system radii + shadows (handoff ladder; namespaced to avoid clashing
+     with the existing --r-* / --shadow-* sets). */
+  --wf-r-card: 22px;
+  --wf-r-inner: 16px;
+  --wf-r-button: 14px;
+  --wf-r-chip: 11px;
+  --wf-shadow-card:
+    0 1px 2px rgba(16, 23, 41, 0.04), 0 6px 20px rgba(16, 23, 41, 0.05);
+  --wf-shadow-inner:
+    0 1px 2px rgba(16, 23, 41, 0.05), 0 2px 8px rgba(16, 23, 41, 0.04);
+  --wf-shadow-pop: 0 18px 60px rgba(16, 23, 41, 0.22);
+
   /* ── Spacing / radii ──────────────────────────────────────────────── */
   --r-2: 2px;
   --r-4: 4px;

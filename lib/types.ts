@@ -333,13 +333,117 @@ export interface BoardTag {
 }
 
 /** A widget's anchor + span within the board's CSS grid. Coordinates are
- *  0-based column/row; `colSpan`/`rowSpan` default to 1 (a single cell). */
+ *  0-based column/row; `colSpan`/`rowSpan` default to 1 (a single cell).
+ *
+ *  LEGACY (pre-5.31): the original Teach board used a fixed CSS grid. The 5.31
+ *  redesign moves to a free-form canvas (`CanvasPosition`). This type is kept
+ *  for the migration mapper + any board still on the grid model; new boards use
+ *  `CanvasPosition`. */
 export interface WidgetGridPosition {
   col: number;
   row: number;
   colSpan: number;
   rowSpan: number;
 }
+
+// ── Teach widget appearance system (5.31 Boards & Widgets redesign) ──────────
+
+/** A background family key — one of the six pastel families plus the three
+ *  neutrals offered in the appearance editor. Maps to the `--wf-<key>-*` tokens
+ *  in app/tokens.css. */
+export type WidgetBgKey =
+  | "yellow"
+  | "green"
+  | "pink"
+  | "purple"
+  | "orange"
+  | "blue"
+  | "slate"
+  | "cloud"
+  | "dark";
+
+/** An accent key — the eight accent dots in the appearance editor. `ink` maps
+ *  to the neutral ink accent; the rest reuse the family accents. */
+export type WidgetAccentKey =
+  | "blue"
+  | "green"
+  | "purple"
+  | "orange"
+  | "pink"
+  | "yellow"
+  | "slate"
+  | "ink";
+
+/** Text-colour key (Dark / Slate / White). */
+export type WidgetTextKey = "ink" | "slate" | "white";
+
+/** Font key for the appearance editor's five options. */
+export type WidgetFontKey = "jakarta" | "rounded" | "serif" | "hand" | "mono";
+
+/** A partial appearance override. Every field is optional; an empty object
+ *  means "inherit". The effective theme is
+ *  `merge(widgetDefault, boardTheme, widgetOverride)` (see
+ *  lib/teach/widget-theme.ts), so a board theme overrides each widget's default
+ *  and a per-widget override beats the board theme. Display-only structure —
+ *  safe to persist; carries no student data. */
+export interface ThemeOverride {
+  bg?: WidgetBgKey;
+  accent?: WidgetAccentKey;
+  text?: WidgetTextKey;
+  /** Text-size scale, 0.8–1.4 (drives `--w-scale`; widgets size in `em`). */
+  size?: number;
+  /** Corner radius in px, 6–30 (drives `--w-radius`). */
+  radius?: number;
+  font?: WidgetFontKey;
+}
+
+/** A widget's absolute placement on the free-form board canvas (5.31). `x`/`y`
+ *  are px from the canvas top-left; `w` is the px width (height flows from
+ *  content). The editor clamps `w` to 230–640 and keeps `x`/`y` ≥ 0. */
+export interface CanvasPosition {
+  x: number;
+  y: number;
+  w: number;
+}
+
+// ── Board Repeat — REAL schedule/lesson/day/week/subject links (5.31) ────────
+
+/** The dimension a single repeat rule binds to. A repeat makes ONE board
+ *  surface in many real contexts (it is not independent copies — editing the
+ *  board changes every occurrence). */
+export type RepeatKind =
+  | "weekday"
+  | "time"
+  | "daily"
+  | "weekly"
+  | "subject"
+  | "slot"
+  | "lesson";
+
+/** One repeat rule. Carries REAL planner-entity references (not cosmetic
+ *  labels), resolved through the planner's own selectors so the link is live:
+ *  - `weekdays` → 0-based indices into the CONFIGURED school week
+ *  - `slotId`   → a real schedule-slot / period id (e.g. "mon-1");
+ *                 NOTE: slots are per-weekday templates today (no week binding /
+ *                 rotation), so a slot repeat surfaces by weekday+time until the
+ *                 per-teacher schedule backend lands (documented gap).
+ *  - `lessonId` → a real master lesson id (the same id boards already key on)
+ *  - `subjectId`→ one of the eight locked subjects
+ *  - `week`     → a real curriculum week number
+ *  `label` is the derived display string (e.g. "Mon/Wed/Fri", "Daily"). */
+export interface RepeatRule {
+  kind: RepeatKind;
+  weekdays?: number[];
+  slotId?: string;
+  lessonId?: string;
+  subjectId?: SubjectId;
+  week?: number;
+  label: string;
+}
+
+/** A board's repeat schedule: one or more real-link rules, or null when the
+ *  board does not repeat. */
+export type RepeatSchedule = RepeatRule[] | null;
 
 /** One widget tile on a board.
  *
@@ -353,7 +457,15 @@ export interface Widget {
   type: WidgetType;
   /** Display title shown in the widget header (e.g. "Today's Objective"). */
   title: string;
+  /** LEGACY grid placement (pre-5.31). Retained for migration + grid boards;
+   *  free-form boards use `canvas` instead. */
   position: WidgetGridPosition;
+  /** Free-form canvas placement (5.31). When present, the widget is positioned
+   *  absolutely on the board canvas and `position` (grid) is ignored. */
+  canvas?: CanvasPosition;
+  /** Per-widget appearance override (5.31). Empty/absent → inherit the board
+   *  theme. Beats the board theme; the board theme beats the widget default. */
+  appearance?: ThemeOverride;
   /** Order within the board, independent of grid anchor — used to keep a
    *  stable sequence when the layout reflows. */
   displayOrder: number;
@@ -366,6 +478,19 @@ export interface Widget {
   persistence: WidgetPersistence;
   /** Grade this widget's board belongs to (denormalized for query speed). */
   gradeLevelId: string;
+}
+
+/** One page of a board (5.31 multi-page boards). A board holds one or more
+ *  pages; the editor page-tab bar and the fullscreen `‹ N ›` nav cycle these.
+ *  Pages share the board's `boardTheme`; each owns its own widget set. */
+export interface BoardPage {
+  id: string;
+  /** Page order within the board (0-based). */
+  order: number;
+  /** Optional page label (defaults to "Page N" when absent). */
+  title?: string;
+  /** Widgets placed on this page (free-form canvas). */
+  widgets: Widget[];
 }
 
 /** A teaching board — one phase of a lesson (Warm-Up, Mini Lesson, …). Keyed
@@ -407,6 +532,21 @@ export interface Board {
   /** For a duplicated / pulled / published copy: the board it was copied from
    *  (provenance only; null for an original). */
   sourceBoardId?: string | null;
+  /** Multi-page boards (5.31). When present, `pages` is the authoritative widget
+   *  container and `widgets` mirrors page-0 for backward compatibility. A board
+   *  with no `pages` is treated as a single implicit page built from `widgets`. */
+  pages?: BoardPage[];
+  /** Board-wide appearance theme (5.31). Each widget's effective theme is
+   *  merge(widgetDefault, boardTheme, widget.appearance). Empty/absent → every
+   *  widget uses its own default. */
+  boardTheme?: ThemeOverride;
+  /** Repeat schedule — REAL schedule/lesson/day/week/subject links (5.31). One
+   *  board surfacing in many contexts; editing it changes every occurrence.
+   *  Null/absent → the board does not repeat. */
+  repeat?: RepeatSchedule;
+  /** LEGACY flat widget list (pre-5.31, and the page-0 mirror for new boards).
+   *  Free-form multi-page boards read from `pages`; this stays populated for
+   *  back-compat with grid-era consumers. */
   widgets: Widget[];
   gradeLevelId: string;
   createdAt: string;
