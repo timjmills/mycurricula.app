@@ -1,0 +1,24 @@
+/* module-registry.module.css — the "coming in a later wave" placeholder body
+   rendered by not-yet-built Teach modules. Token-driven (color + type from
+   tokens.css), raw-px spacing per the surrounding Teach CSS-module idiom
+   (TeachShell.module.css). A calm centered note, not a debug stub. */
+
+.comingSoon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px 16px;
+  min-height: 8rem;
+  text-align: center;
+  color: var(--ink-500);
+  font-size: var(--t-12);
+  line-height: 1.4;
+}
+
+.comingSoonLabel {
+  font-weight: 700;
+  color: var(--ink-700);
+  font-size: var(--t-13);
+}

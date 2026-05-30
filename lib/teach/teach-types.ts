@@ -176,6 +176,74 @@ export type ModuleId =
  *  context-scoped but any icon can be dragged to the other side. */
 export type RailSide = "left" | "right";
 
+// ── Live workspace layout (Wave 1) ─────────────────────────────────────────
+// The shapes above (TeachWorkspaceLayout, FloatingWindow) mirror the eventual
+// Supabase row for Phase-1B persistence. The shapes below are the LIVE,
+// client-side layout the Wave-1 `useTeachWorkspace` hook owns + persists to
+// localStorage today. They are intentionally leaner than the DB row: v1 has
+// no floating windows, no per-lesson board memory, no preset prefs — just the
+// two panels and two rails the teacher arranges. When Supabase lands, the hook
+// maps this live shape onto the `TeachWorkspaceLayout` row; keeping them
+// separate now means the UI-facing API doesn't churn when the backend wires in.
+
+/** Which of the two dockable panels a control targets. Distinct from
+ *  `RailSide` only by intent — a panel side and its same-side rail share the
+ *  "left"/"right" key, so the union is identical, but naming the panel concept
+ *  separately keeps callsites self-documenting. */
+export type PanelSide = "left" | "right";
+
+/** One dockable panel's live state: which module tabs it hosts, which is
+ *  active, whether it's collapsed to a strip, and its teacher-tuned width. */
+export interface PanelState {
+  /** Module tabs docked in this panel, in display order. */
+  tabs: ModuleId[];
+  /** The currently-shown tab. Always a member of `tabs`. */
+  activeTab: ModuleId;
+  /** Collapsed to a thin strip (body hidden) when true. */
+  collapsed: boolean;
+  /** Panel width in px (clamped to PANEL_WIDTH_MIN…PANEL_WIDTH_MAX). */
+  width: number;
+}
+
+/** The teacher's live Teach workspace arrangement: two panels + two icon
+ *  rails. Rails hold the module icons not currently docked as a tab. */
+export interface WorkspaceLayout {
+  left: PanelState;
+  right: PanelState;
+  /** Module icons parked on the far-left rail, in display order. */
+  leftRail: ModuleId[];
+  /** Module icons parked on the far-right rail, in display order. */
+  rightRail: ModuleId[];
+}
+
+/** Panel width clamp (px). Min keeps a panel usable; max keeps the center
+ *  board from being squeezed out on a typical projector/desktop width. */
+export const PANEL_WIDTH_MIN = 240;
+export const PANEL_WIDTH_MAX = 560;
+
+/** The seeded arrangement a teacher sees before they rearrange anything.
+ *  Left panel carries the lesson-context modules (Lessons / Lesson / Notes);
+ *  right panel carries the working surfaces (Resources / Chat / To-do). The
+ *  remaining modules (Boards / Groups / Class / Tools) seed the rails so they
+ *  are reachable via the "+" picker / drag without crowding the panels. Frozen
+ *  so no mutator can corrupt the template; the hook clones before use. */
+export const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayout = {
+  left: {
+    tabs: ["lessons", "lesson", "notes"],
+    activeTab: "lessons",
+    collapsed: false,
+    width: 320,
+  },
+  right: {
+    tabs: ["resources", "chat", "todo"],
+    activeTab: "resources",
+    collapsed: false,
+    width: 340,
+  },
+  leftRail: ["boards", "groups"],
+  rightRail: ["class", "tools"],
+};
+
 /** Where a module is docked (spec §9 `panel_dock`). `"float"` is reserved
  *  for the v2 floating-window system (plan §0 "Explicitly deferred"); v1
  *  uses only `left` / `right` / `collapsed`, but the column is modeled now

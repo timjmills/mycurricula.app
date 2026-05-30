@@ -1,20 +1,21 @@
-/* TeachShell.module.css — the Teach view's 5-zone shell (Wave 0 skeleton).
+/* TeachShell.module.css — the Teach view's 5-zone workspace shell (Wave 1).
    All color / type / spacing come from tokens.css via var(--…).
 
-   Layout: a single CSS-grid row of five zones, left → right —
-     [far-left rail] [left panel] [center board] [right panel] [far-right rail]
-   The center board is the only flexible track (minmax(0, 1fr)); the rails are
-   fixed-width slim strips and the side panels have a sensible default width.
+   Layout: a single CSS-grid row of seven tracks, left → right —
+     [rail] [left panel] [splitter] [board] [splitter] [right panel] [rail]
+   The grid template is computed in TeachShell.tsx from the live panel widths
+   (collapsed panels become a 32px strip; the splitter tracks drop out when a
+   panel is collapsed). The center board is the only flexible track
+   (minmax(0, 1fr)); the rails are fixed 52px strips and the panels carry the
+   teacher's persisted widths.
 
-   Wave 0 is a SKELETON: each zone shows a labeled placeholder so the structure
-   is visible. Resize/collapse/tabs/widgets arrive in later waves.
-
-   ── <900px fallback (Wave 0 decision) ──────────────────────────────────────
+   ── <900px fallback (Wave 0 decision, kept) ────────────────────────────────
    Below ~900px we collapse to a STACKED single-panel view: only the center
    board shows, with a short note that the rails/panels are available on a
    larger screen. This keeps Teach reachable on tablet/phone rather than
    redirecting away. Implemented purely in CSS via the media query at the
-   bottom of this file. */
+   bottom of this file; the panels/rails stay mounted (state survives) but are
+   hidden at that tier. */
 
 /* ── Shell chrome suppression ──────────────────────────────────────────────
  * Global rules that hide the planner shell's filter panel, right panel, and
@@ -25,8 +26,7 @@
  * highlights) and the Personal/Team banner (inherited from the route group). */
 
 /* ── Page root ─────────────────────────────────────────────────────────────
-   Fills the main content area (which fills the viewport once the shell's
-   side panels + rails are suppressed). A column flex so a future sub-bar
+   Fills the main content area. Column flex so a future sub-bar
    (TeachTopControls, Wave 2) can sit above the zone grid. */
 .page {
   display: flex;
@@ -38,78 +38,55 @@
 }
 
 /* ── Zone grid ─────────────────────────────────────────────────────────────
-   The five zones as grid columns. Rails are slim fixed strips; side panels
-   carry the spec's default widths (left ~280px, right ~320px — spec §2); the
-   center board is the only flexible track. `minmax(0, 1fr)` lets the center
-   shrink so wide panels never force document-level horizontal scroll. */
+   The seven tracks. The template is set inline from TeachShell.tsx; this
+   rule just establishes the grid + flex growth. */
 .zones {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns:
-    var(--teach-rail-w)
-    var(--teach-left-w)
-    minmax(0, 1fr)
-    var(--teach-right-w)
-    var(--teach-rail-w);
   gap: 0;
 }
 
-/* Local layout constants expressed as custom properties so the media-query
-   fallback can flip them without restating the grid template. */
-.page {
-  --teach-rail-w: 52px;
-  --teach-left-w: 280px;
-  --teach-right-w: 320px;
-}
-
-/* ── Zone shells ───────────────────────────────────────────────────────────
-   Each zone is a bordered placeholder in Wave 0. A hairline separates
-   adjacent zones; the labels make the structure legible. Later waves replace
-   the placeholder body with real panels/board/rails. */
-.zone {
+/* ── Panel zone wrapper ────────────────────────────────────────────────────
+   Each side panel sits in a wrapper carrying the data-teach-zone hook the
+   splitter math resolves against. The wrapper is a pass-through that lets the
+   <TeachPanel> fill the grid track with a hairline on its outer edge so it
+   reads as a distinct surface from the rail beside it. */
+.panelZone {
   display: flex;
-  flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: var(--paper);
+  overflow: hidden;
+  border-left: var(--line);
   border-right: var(--line);
-  overflow: auto;
 }
 
-/* The far-right rail has no trailing separator. */
-.zone:last-child {
-  border-right: none;
-}
-
-/* Rails read as slim chrome strips — a faint fill distinguishes them from
-   the paper panels/board between them. */
-.rail {
-  background: var(--ink-50);
-  align-items: center;
-}
-
-/* The center board sits on a slightly tinted surface so it reads as the
-   focal workspace even while empty. */
-.center {
-  background: var(--ink-50);
-}
-
-/* ── Placeholder content ───────────────────────────────────────────────────
-   A centered label naming the zone, plus an optional sub-note. Replaced with
-   real content in later waves. */
-.placeholder {
-  flex: 1;
+/* ── Center board ──────────────────────────────────────────────────────────
+   The focal workspace. Wave 1 renders a placeholder; Wave 3 fills it with
+   the widget grid. position:relative so the overflow menu can pin to its
+   top-right corner. */
+.board {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  background: var(--ink-50);
+  overflow: auto;
+}
+
+.boardPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 6px;
   padding: 16px 10px;
   text-align: center;
 }
 
-.placeholderLabel {
+.boardLabel {
   font-size: var(--t-12);
   font-weight: 700;
   letter-spacing: 0.4px;
@@ -117,18 +94,71 @@
   color: var(--ink-400);
 }
 
-.placeholderNote {
+.boardNote {
   font-size: var(--t-11);
   color: var(--ink-300);
   max-width: 22ch;
   line-height: 1.4;
 }
 
-/* Rail placeholder labels read vertically so they fit the slim strip. */
-.rail .placeholderLabel {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  letter-spacing: 1px;
+/* ── Workspace overflow menu ────────────────────────────────────────────────
+   Pinned to the board's top-right corner. position:relative on the slot so
+   the popover anchors below the button. */
+.overflowSlot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+}
+
+.overflowWrap {
+  position: relative;
+}
+
+.overflowBtn {
+  color: var(--ink-500);
+  background: var(--paper);
+  border: var(--line);
+  border-radius: var(--r-6);
+}
+
+.overflowMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 200px;
+  padding: 4px;
+  background: var(--paper);
+  border: var(--line);
+  border-radius: var(--r-8);
+  box-shadow: var(--shadow-popover);
+}
+
+.overflowItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-6);
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.overflowItem:hover {
+  background: var(--ink-100);
+}
+
+.overflowItem:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
 }
 
 /* ── Present-mode note (Wave 0 stub) ───────────────────────────────────────
@@ -160,24 +190,23 @@
 /* ── <900px stacked single-panel fallback (Wave 0 decision) ────────────────
    Below ~900px the 5-zone grid is unusable (rails + two panels + a board
    would force horizontal scroll). We collapse to a single column showing
-   only the center board, and reveal the explanatory note above it. The rails
-   and side panels are hidden (their content remains reachable from the rest
-   of the app at larger widths). */
+   only the center board, hide the rails + panels + splitters, and reveal the
+   explanatory note above it. The hidden zones stay mounted so their state
+   survives a resize back to desktop. */
 @media (max-width: 900px) {
   .zones {
-    grid-template-columns: minmax(0, 1fr);
+    /* Override the inline grid-template: a single board column. The inline
+       style sets grid-template-columns; this !important wins for the
+       fallback so the seven-track template doesn't leak through. */
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
-  /* Hide every zone except the center board. */
-  .rail,
-  .left,
-  .right {
+  /* Hide every track except the board. The splitter (role="separator") and
+     the rails (nav) and the panel zones all drop out. */
+  .panelZone,
+  .zones > [role="separator"],
+  .zones > nav {
     display: none;
-  }
-
-  /* The center board fills the single column; drop its trailing border. */
-  .center {
-    border-right: none;
   }
 
   .fallbackNote {
@@ -186,10 +215,10 @@
 }
 
 /* ── Reduced motion ────────────────────────────────────────────────────────
-   No transitions in the Wave 0 skeleton; this block reserves the contract
-   for later waves so the file is the single home for motion gating. */
+   Local transitions are short (~120ms hovers). Gate them so reduced-motion
+   teachers get instant state changes. */
 @media (prefers-reduced-motion: reduce) {
-  .page * {
-    transition: none !important;
+  .overflowItem {
+    transition: none;
   }
 }
