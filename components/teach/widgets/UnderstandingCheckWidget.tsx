@@ -61,7 +61,11 @@ export function UnderstandingCheckWidget({
       typeof c[k] === "number" && (c[k] as number) >= 0
         ? Math.floor(c[k] as number)
         : d;
-    return { got: num("got", 18), almost: num("almost", 7), need: num("need", 3) };
+    return {
+      got: num("got", 18),
+      almost: num("almost", 7),
+      need: num("need", 3),
+    };
   }, [widget.config]);
 
   const { state, setState, reset } = useWidgetState<Counts>(widget.id, initial);

@@ -51,7 +51,11 @@ function readJobs(config: Record<string, unknown>): Job[] {
               ? o.initial[0]!.toUpperCase()
               : null;
           if (job) {
-            return { job, initial: initial ?? "?", icon: ICONS[i % ICONS.length] ?? "flag" };
+            return {
+              job,
+              initial: initial ?? "?",
+              icon: ICONS[i % ICONS.length] ?? "flag",
+            };
           }
         }
         return null;

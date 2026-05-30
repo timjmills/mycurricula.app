@@ -224,7 +224,9 @@ const KIT_PATHS: Record<KitIconName, ReactNode> = {
       <path d="M12 14v7M8 21h8" />
     </g>
   ),
-  star: <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" />,
+  star: (
+    <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" />
+  ),
   pause: (
     <g>
       <rect x="6" y="5" width="4" height="14" rx="1" />
@@ -299,7 +301,11 @@ export interface AvatarProps {
 
 /** Initial-on-tint stand-in for a student photo. Renders the first character
  *  only — by contract callers pass single-letter initials, so no name leaks. */
-export function Avatar({ label = "", hue, size = 2.2 }: AvatarProps): ReactNode {
+export function Avatar({
+  label = "",
+  hue,
+  size = 2.2,
+}: AvatarProps): ReactNode {
   const H = hue == null ? hueFor(label) : hue;
   const style: CSSProperties = {
     width: `${size}em`,

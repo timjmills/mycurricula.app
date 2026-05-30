@@ -33,11 +33,41 @@ const DISPOSITIONS: Record<string, { tone: Tone; icon: KitIconName }> = {
 
 // Seeded with INITIALS only (privacy §11.4).
 const FALLBACK: ParkedQ[] = [
-  { initial: "C", q: "Why do we need parentheses in that step?", tag: "Answered", tone: "green", icon: "check" },
-  { initial: "A", q: "Can you show another example using decimals?", tag: "Discuss Later", tone: "amber", icon: "clock" },
-  { initial: "D", q: "How does this connect to real life?", tag: "Teach Next", tone: "purple", icon: "book" },
-  { initial: "L", q: "What happens if the variable is negative?", tag: "Discuss Later", tone: "amber", icon: "clock" },
-  { initial: "B", q: "Is there a shortcut for solving this?", tag: "Teach Next", tone: "purple", icon: "book" },
+  {
+    initial: "C",
+    q: "Why do we need parentheses in that step?",
+    tag: "Answered",
+    tone: "green",
+    icon: "check",
+  },
+  {
+    initial: "A",
+    q: "Can you show another example using decimals?",
+    tag: "Discuss Later",
+    tone: "amber",
+    icon: "clock",
+  },
+  {
+    initial: "D",
+    q: "How does this connect to real life?",
+    tag: "Teach Next",
+    tone: "purple",
+    icon: "book",
+  },
+  {
+    initial: "L",
+    q: "What happens if the variable is negative?",
+    tag: "Discuss Later",
+    tone: "amber",
+    icon: "clock",
+  },
+  {
+    initial: "B",
+    q: "Is there a shortcut for solving this?",
+    tag: "Teach Next",
+    tone: "purple",
+    icon: "book",
+  },
 ];
 
 function readQuestions(config: Record<string, unknown>): ParkedQ[] {

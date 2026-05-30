@@ -23,7 +23,11 @@
 
 import type { ReactNode } from "react";
 import type { Board, BoardTag } from "@/lib/types";
-import { tagDisplayLabel, tagKey, TAG_KIND_LABEL } from "@/lib/teach/board-tags";
+import {
+  tagDisplayLabel,
+  tagKey,
+  TAG_KIND_LABEL,
+} from "@/lib/teach/board-tags";
 import { Button, Tooltip } from "@/components/ui";
 import { TeachIcon } from "@/components/teach/widgets";
 import { ExternalIcon, CopyLinkIcon, MoreIcon } from "../right/icons";
@@ -255,7 +259,11 @@ export function BoardLibraryCard({
                 Delete
               </Button>
             </Tooltip>
-            <Button size="sm" variant="ghost" onClick={() => onCancelDelete?.()}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onCancelDelete?.()}
+            >
               Cancel
             </Button>
           </div>
@@ -305,7 +313,10 @@ export function BoardLibraryCard({
               </span>
               Share
             </button>
-            <Tooltip required content={`Delete "${board.title}" from My Boards`}>
+            <Tooltip
+              required
+              content={`Delete "${board.title}" from My Boards`}
+            >
               <button
                 type="button"
                 className={styles.action}

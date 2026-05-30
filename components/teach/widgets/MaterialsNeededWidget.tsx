@@ -43,10 +43,14 @@ function readMaterials(config: Record<string, unknown>): Material[] {
         const name =
           typeof m === "string"
             ? m
-            : m && typeof m === "object" && typeof (m as Record<string, unknown>).name === "string"
+            : m &&
+                typeof m === "object" &&
+                typeof (m as Record<string, unknown>).name === "string"
               ? ((m as Record<string, unknown>).name as string)
               : null;
-        return name ? { icon: ICONS[i % ICONS.length] ?? "boxIco", name } : null;
+        return name
+          ? { icon: ICONS[i % ICONS.length] ?? "boxIco", name }
+          : null;
       })
       .filter((m): m is Material => m !== null);
     if (items.length > 0) return items;

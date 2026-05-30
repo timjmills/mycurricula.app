@@ -40,7 +40,9 @@ function readSteps(config: Record<string, unknown>): Step[] {
         const text =
           typeof s === "string"
             ? s
-            : s && typeof s === "object" && typeof (s as Record<string, unknown>).text === "string"
+            : s &&
+                typeof s === "object" &&
+                typeof (s as Record<string, unknown>).text === "string"
               ? ((s as Record<string, unknown>).text as string)
               : null;
         return text ? { icon: ICONS[i % ICONS.length] ?? "book", text } : null;

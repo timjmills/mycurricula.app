@@ -51,7 +51,9 @@ function readItems(
         const text =
           typeof m === "string"
             ? m
-            : m && typeof m === "object" && typeof (m as Record<string, unknown>).text === "string"
+            : m &&
+                typeof m === "object" &&
+                typeof (m as Record<string, unknown>).text === "string"
               ? ((m as Record<string, unknown>).text as string)
               : null;
         return text

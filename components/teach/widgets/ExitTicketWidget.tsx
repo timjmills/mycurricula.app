@@ -40,7 +40,9 @@ function readOptions(config: Record<string, unknown>): Option[] {
         const text =
           typeof o === "string"
             ? o
-            : o && typeof o === "object" && typeof (o as Record<string, unknown>).text === "string"
+            : o &&
+                typeof o === "object" &&
+                typeof (o as Record<string, unknown>).text === "string"
               ? ((o as Record<string, unknown>).text as string)
               : null;
         return text ? { text, icon: ICONS[i % ICONS.length] ?? "bulb" } : null;

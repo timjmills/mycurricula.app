@@ -77,7 +77,11 @@ interface CategoryNav {
   match: readonly string[];
 }
 
-const BROWSE_NAV: ReadonlyArray<{ id: BrowseId; label: string; icon: TeachIconName }> = [
+const BROWSE_NAV: ReadonlyArray<{
+  id: BrowseId;
+  label: string;
+  icon: TeachIconName;
+}> = [
   { id: "all", label: "All Widgets", icon: "grid" },
   { id: "favorites", label: "Favorites", icon: "star" },
   { id: "recent", label: "Recently Used", icon: "timer" },
@@ -86,12 +90,37 @@ const BROWSE_NAV: ReadonlyArray<{ id: BrowseId; label: string; icon: TeachIconNa
 
 const CATEGORY_NAV: readonly CategoryNav[] = [
   // TODO(lead): re-bin catalog `category` to these six ids; then `match` === [id].
-  { id: "lesson", label: "Lesson", icon: "notes", match: ["display", "content"] },
-  { id: "management", label: "Management", icon: "check", match: ["classroom"] },
-  { id: "assessment", label: "Assessment", icon: "target", match: ["engagement"] },
+  {
+    id: "lesson",
+    label: "Lesson",
+    icon: "notes",
+    match: ["display", "content"],
+  },
+  {
+    id: "management",
+    label: "Management",
+    icon: "check",
+    match: ["classroom"],
+  },
+  {
+    id: "assessment",
+    label: "Assessment",
+    icon: "target",
+    match: ["engagement"],
+  },
   { id: "language", label: "Language", icon: "text", match: ["language"] },
-  { id: "wellbeing", label: "Well-Being", icon: "star", match: ["wellbeing", "sel"] },
-  { id: "utilities", label: "Utilities", icon: "timer", match: ["timing", "utility"] },
+  {
+    id: "wellbeing",
+    label: "Well-Being",
+    icon: "star",
+    match: ["wellbeing", "sel"],
+  },
+  {
+    id: "utilities",
+    label: "Utilities",
+    icon: "timer",
+    match: ["timing", "utility"],
+  },
 ];
 
 const CATEGORY_BY_ID: Record<string, CategoryNav> = Object.fromEntries(
@@ -138,10 +167,7 @@ export function WidgetLibrary({
   // Favorites are local to the browser until the backend lands.
   const [favorites, setFavorites] = useState<Set<WidgetType>>(() => new Set());
 
-  const added = useMemo(
-    () => new Set(addedTypes ?? []),
-    [addedTypes],
-  );
+  const added = useMemo(() => new Set(addedTypes ?? []), [addedTypes]);
 
   const toggleFavorite = useCallback((type: WidgetType): void => {
     setFavorites((prev) => {
@@ -238,7 +264,8 @@ export function WidgetLibrary({
           </span>
           <p className={styles.promoTitle}>Customize your board</p>
           <p className={styles.promoBody}>
-            Add the widgets you use the most to build the perfect classroom flow.
+            Add the widgets you use the most to build the perfect classroom
+            flow.
           </p>
         </div>
       </aside>

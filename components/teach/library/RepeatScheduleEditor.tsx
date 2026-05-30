@@ -271,8 +271,9 @@ export function RepeatScheduleEditor({
           <TeachIcon name="rotate" size={16} />
         </span>
         <span>
-          Repeat surfaces <strong>this one board</strong> everywhere you schedule
-          it. The links are live — editing the board updates every occurrence.
+          Repeat surfaces <strong>this one board</strong> everywhere you
+          schedule it. The links are live — editing the board updates every
+          occurrence.
         </span>
       </p>
 

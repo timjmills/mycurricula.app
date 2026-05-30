@@ -40,7 +40,9 @@ function readSteps(config: Record<string, unknown>): Step[] {
         const text =
           typeof s === "string"
             ? s
-            : s && typeof s === "object" && typeof (s as Record<string, unknown>).text === "string"
+            : s &&
+                typeof s === "object" &&
+                typeof (s as Record<string, unknown>).text === "string"
               ? ((s as Record<string, unknown>).text as string)
               : null;
         return text ? { icon: ICONS[i % ICONS.length] ?? "bell", text } : null;
@@ -63,7 +65,11 @@ function readString(
 export function TransitionWidget({ widget }: WidgetBodyProps): ReactNode {
   const steps = readSteps(widget.config);
   const title = readString(widget.config, "title", "Transitioning to Centers");
-  const tagline = readString(widget.config, "tagline", "Let's move with purpose!");
+  const tagline = readString(
+    widget.config,
+    "tagline",
+    "Let's move with purpose!",
+  );
   const time = readString(widget.config, "time", "02:45");
   const voice = readString(widget.config, "voice", "Level 1 – Whisper");
 

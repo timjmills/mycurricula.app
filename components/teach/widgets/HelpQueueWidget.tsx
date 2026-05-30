@@ -39,11 +39,12 @@ const FALLBACK: Entry[] = [
 const TONES: readonly Tone[] = ["red", "amber", "blue", "purple", "green"];
 
 /** The three serve states a row cycles through on tap. */
-const STATUS: ReadonlyArray<{ label: string; icon: KitIconName; tone: Tone }> = [
-  { label: "Waiting", icon: "clock", tone: "gray" },
-  { label: "Helping now", icon: "user", tone: "purple" },
-  { label: "Done", icon: "check", tone: "green" },
-];
+const STATUS: ReadonlyArray<{ label: string; icon: KitIconName; tone: Tone }> =
+  [
+    { label: "Waiting", icon: "clock", tone: "gray" },
+    { label: "Helping now", icon: "user", tone: "purple" },
+    { label: "Done", icon: "check", tone: "green" },
+  ];
 
 /** Structure-only persisted slice — one status index per queue position. */
 interface QueueState extends Record<string, unknown> {
