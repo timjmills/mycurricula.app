@@ -21,44 +21,14 @@
 import type { Dispatch, KeyboardEvent, ReactNode } from "react";
 import { useCallback } from "react";
 import type { TeachWorkspaceAction } from "../TeachWorkspace";
-import type { BoardLayout, TeachWorkspaceState } from "@/lib/teach/types";
-import { BOARD_LAYOUT_GRID } from "@/lib/teach/types";
+import type { TeachWorkspaceState } from "@/lib/teach/types";
 import type { Board, SubjectId } from "@/lib/types";
-import { FutureControl, ToggleGroup, Tooltip } from "@/components/ui";
+import { FutureControl, Tooltip } from "@/components/ui";
 import styles from "./TeachChrome.module.css";
 
-// ── Layout toolbar options ───────────────────────────────────────────────────
-// Driven by BOARD_LAYOUT_GRID keys (the single geometry source) so a new layout
-// added there flows through here without a hard-coded list. Human label maps
-// the enum to the prototype's "1up / 2×2 / …" copy.
-
-const LAYOUT_LABEL: Record<BoardLayout, string> = {
-  "1up": "1up",
-  "2up": "2up",
-  "3up": "3up",
-  "2x2": "2×2",
-  "2x3": "2×3",
-  "3x3": "3×3",
-};
-
-const LAYOUT_TOOLTIP: Record<BoardLayout, string> = {
-  "1up": "One widget full-bleed — best for projecting a single resource",
-  "2up": "Two widgets side-by-side",
-  "3up": "Three widgets in a row",
-  "2x2": "Four widgets in a 2-by-2 grid",
-  "2x3": "Six widgets in a 3-wide, 2-tall grid",
-  "3x3": "Nine widgets in a 3-by-3 grid",
-};
-
-const LAYOUT_OPTIONS = (Object.keys(BOARD_LAYOUT_GRID) as BoardLayout[]).map(
-  (key) => ({
-    value: key,
-    label: LAYOUT_LABEL[key],
-    ariaLabel: `${LAYOUT_LABEL[key]} layout`,
-    title: LAYOUT_TOOLTIP[key],
-    tooltipId: `teach-layout-${key}`,
-  }),
-);
+// The fixed-grid layout toolbar (1up / 2×2 / …) was retired with the move to the
+// free-form canvas editor (5.31): a board's widgets are now positioned freely,
+// so there is no grid arrangement to pick. Page management lives in the editor.
 
 /** Id of the center board region — the board-tab strip is a `role="tablist"`
  *  whose tabs control this panel (audit A4). The center <main> in
@@ -93,6 +63,10 @@ export interface TeachSubBarProps {
    *  the actual `requestFullscreen()` / `exitFullscreen()` is the caller's so
    *  the API lives with the element it targets. Optional. */
   onToggleFullscreen?: (next: boolean) => void;
+  /** Open the Board Library overlay (Team/Personal browse). Optional. */
+  onOpenBoardLibrary?: () => void;
+  /** Open the Widget Library overlay (browse + add a widget). Optional. */
+  onOpenWidgetLibrary?: () => void;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -107,12 +81,9 @@ export function TeachSubBar({
   onAddBoard,
   onBoardSettings,
   onToggleFullscreen,
+  onOpenBoardLibrary,
+  onOpenWidgetLibrary,
 }: TeachSubBarProps): ReactNode {
-  const handleLayout = useCallback(
-    (layout: BoardLayout) => dispatch({ type: "setLayout", layout }),
-    [dispatch],
-  );
-
   const handlePresent = useCallback(
     () => dispatch({ type: "setPresent", present: true }),
     [dispatch],
@@ -235,15 +206,40 @@ export function TeachSubBar({
 
       <div className={styles.spacer} aria-hidden="true" />
 
-      {/* Layout toolbar — 1up…3×3, driven by BOARD_LAYOUT_GRID keys. */}
-      <ToggleGroup<BoardLayout>
-        options={LAYOUT_OPTIONS}
-        value={state.layout}
-        onChange={handleLayout}
-        variant="subtle"
-        size="sm"
-        ariaLabel="Board layout"
-      />
+      {/* Library entries — browse/add boards + widgets (5.31). */}
+      {onOpenWidgetLibrary ? (
+        <Tooltip
+          content="Browse the full widget library and add one to this board"
+          side="bottom"
+          tooltipId="teach-widget-library"
+        >
+          <button
+            type="button"
+            className={styles.contextChip}
+            onClick={onOpenWidgetLibrary}
+            aria-label="Open widget library"
+          >
+            <PlusIcon />
+            Widgets
+          </button>
+        </Tooltip>
+      ) : null}
+      {onOpenBoardLibrary ? (
+        <Tooltip
+          content="Open the board library — browse your boards and the team's, and reuse them"
+          side="bottom"
+          tooltipId="teach-board-library"
+        >
+          <button
+            type="button"
+            className={styles.contextChip}
+            onClick={onOpenBoardLibrary}
+            aria-label="Open board library"
+          >
+            Library
+          </button>
+        </Tooltip>
+      ) : null}
 
       {/* ⚙ board settings. */}
       <Tooltip

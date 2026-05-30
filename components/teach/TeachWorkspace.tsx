@@ -89,7 +89,8 @@ import {
   type ResourceItem,
 } from "./board/editor";
 import { BoardFullscreen } from "./board/fullscreen";
-import { widgetMeta } from "@/components/teach/widgets";
+import { BoardLibraryModule, WidgetLibrary } from "./library";
+import { TeachIcon, widgetMeta } from "@/components/teach/widgets";
 import { BoardCanvasResource, ResourceViewerToolbar } from "./canvas";
 import {
   AnnotationLayer,
@@ -256,6 +257,10 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   const [settingsWidget, setSettingsWidget] = useState<Widget | null>(null);
   // Help / shortcuts overlay (audit B2) — the top-bar Help button opens it.
   const [helpOpen, setHelpOpen] = useState(false);
+  // Board / Widget Library overlay (5.31) — opened from the sub-bar. Null = none.
+  const [libraryOverlay, setLibraryOverlay] = useState<
+    "boards" | "widgets" | null
+  >(null);
   // Active drag payload, surfaced through the DragOverlay ghost.
   const [activeDrag, setActiveDrag] = useState<TeachDragData | null>(null);
 
@@ -1084,6 +1089,10 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                   activeBoard ? () => setBoardSettingsOpen(true) : undefined
                 }
                 onToggleFullscreen={toggleFullscreen}
+                onOpenBoardLibrary={() => setLibraryOverlay("boards")}
+                onOpenWidgetLibrary={
+                  activeBoard ? () => setLibraryOverlay("widgets") : undefined
+                }
               />
             </div>
           </>
@@ -1298,6 +1307,66 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
 
         {/* Help + shortcuts overlay (audit B2) — opened by the top-bar Help. */}
         <TeachHelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+        {/* Board / Widget Library overlays (5.31) — opened from the sub-bar. */}
+        {libraryOverlay ? (
+          <div
+            className={styles.libraryOverlay}
+            role="dialog"
+            aria-modal="true"
+            aria-label={
+              libraryOverlay === "boards" ? "Board library" : "Widget library"
+            }
+          >
+            <div className={styles.libraryPanel}>
+              <div className={styles.libraryHead}>
+                <h2 className={styles.libraryTitle}>
+                  {libraryOverlay === "boards"
+                    ? "Board Library"
+                    : "Widget Library"}
+                </h2>
+                <button
+                  type="button"
+                  className={styles.libraryClose}
+                  onClick={() => setLibraryOverlay(null)}
+                  aria-label="Close library"
+                >
+                  <TeachIcon name="x" size={20} />
+                </button>
+              </div>
+              <div className={styles.libraryBody}>
+                {libraryOverlay === "boards" ? (
+                  <BoardLibraryModule
+                    gradeLevelId={activeBoard?.gradeLevelId ?? "g5"}
+                    onOpenBoard={(board) => {
+                      dispatch({
+                        type: "selectLesson",
+                        lessonId: board.masterLessonId,
+                      });
+                      dispatch({ type: "selectBoard", boardId: board.id });
+                      setLibraryOverlay(null);
+                    }}
+                  />
+                ) : (
+                  <WidgetLibrary
+                    addedTypes={widgets.map((w) => w.type)}
+                    onAddWidget={(type) => {
+                      if (resolvedPageId) {
+                        handleEditorIntent({
+                          type: "addWidget",
+                          pageId: resolvedPageId,
+                          widgetType: type,
+                          canvas: { x: 64, y: 64, w: 320 },
+                        });
+                      }
+                      setLibraryOverlay(null);
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* DragOverlay ghost — a lightweight label for the active payload. */}
