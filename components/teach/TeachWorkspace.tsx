@@ -42,10 +42,12 @@ import { useTeachViewport } from "@/lib/use-teach-viewport";
 import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { lessonResources } from "@/lib/lesson-resources";
+import { shoutboxForDay } from "@/lib/mock";
 import { toTeachResource } from "@/lib/teach/toTeachResource";
 import { ME } from "@/lib/mock/teachers";
 import { teach } from "@/lib/teach/queries";
 import {
+  BOARD_LAYOUT_GRID,
   parseBoardCellDroppableId,
   type BoardCellTarget,
   type BoardLayout,
@@ -59,6 +61,7 @@ import type { Board, SubjectId, TeachResource, Widget } from "@/lib/types";
 import {
   PresentBar,
   TeachFooter,
+  TeachHelpOverlay,
   TeachSubBar,
   TeachTopBar,
   TEACH_CENTER_PANEL_ID,
@@ -66,7 +69,12 @@ import {
 } from "./chrome";
 import { TeachLeftPanel, TeachLeftRail } from "./left";
 import { TeachRightPanel, TeachRightRail } from "./right";
-import { TeachingBoard, WidgetPicker } from "./board";
+import {
+  TeachingBoard,
+  WidgetPicker,
+  BoardSettingsPopover,
+  WidgetSettingsPopover,
+} from "./board";
 import { BoardCanvasResource, ResourceViewerToolbar } from "./canvas";
 import {
   AnnotationLayer,
@@ -89,6 +97,14 @@ export interface TeachWorkspaceProps {
 // The default seeded lesson with the rich board mix, so a deep-link-less open
 // lands on a populated preview (Wave-2 wiring requirement 1).
 const DEFAULT_LESSON_ID = "m-12-0";
+
+// Sandbox (lesson-less) board scope. Sandbox boards still need a real,
+// repo-backed board to build on (plan §4a / §4.4 "Add your first widget"), so
+// they hang off a stable sentinel lesson id. Nothing reaches a *planner* lesson
+// until the teacher pins/saves the sandbox (BoardsModule §4a flows); this id is
+// purely the repository key for the ephemeral set. Distinct per-mount is NOT
+// wanted — keeping it stable lets the same sandbox set survive tab switches.
+const SANDBOX_LESSON_ID = "sandbox";
 
 // ── Central state reducer ───────────────────────────────────────────────────
 // The full action surface a zone agent dispatches against. Kept minimal +
@@ -212,6 +228,13 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   const [pickerTarget, setPickerTarget] = useState<BoardCellTarget | null>(
     null,
   );
+  // Board-settings popover (audit G1) — open when truthy. Holds nothing; it
+  // reads the live `activeBoard` at mount, so a board switch closes it.
+  const [boardSettingsOpen, setBoardSettingsOpen] = useState(false);
+  // Per-widget settings popover (audit G2) — the widget being configured.
+  const [settingsWidget, setSettingsWidget] = useState<Widget | null>(null);
+  // Help / shortcuts overlay (audit B2) — the top-bar Help button opens it.
+  const [helpOpen, setHelpOpen] = useState(false);
   // Active drag payload, surfaced through the DragOverlay ghost.
   const [activeDrag, setActiveDrag] = useState<TeachDragData | null>(null);
 
@@ -303,20 +326,26 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
 
   // ── Load boards for the active lesson ──────────────────────────────────────
   const activeLessonId = state.activeLessonId;
-  // Latest active lesson id, mirrored into a ref so an in-flight async
-  // `reloadBoards` can detect a lesson switch (or sandbox transition →
-  // activeLessonId null) that landed while its fetch was pending, and bail
-  // before writing the OLD lesson's boards into the NEW lesson's state.
-  const activeLessonIdRef = useRef(activeLessonId);
-  activeLessonIdRef.current = activeLessonId;
+  // The repository key the board set hangs off: the active lesson when one is
+  // selected, or the sandbox sentinel while building lesson-less (plan §4a).
+  // Sandbox boards are repo-backed (so the teacher can actually build) but never
+  // touch a planner lesson until pinned/saved.
+  const boardScopeLessonId: string | null = state.sandbox
+    ? SANDBOX_LESSON_ID
+    : activeLessonId;
+  // Latest scope id, mirrored into a ref so an in-flight async `reloadBoards`
+  // can detect a lesson switch (or sandbox transition) that landed while its
+  // fetch was pending, and bail before writing the OLD set into the NEW state.
+  const boardScopeLessonIdRef = useRef(boardScopeLessonId);
+  boardScopeLessonIdRef.current = boardScopeLessonId;
   useEffect(() => {
-    if (activeLessonId == null) {
+    if (boardScopeLessonId == null) {
       setBoards([]);
       return;
     }
     let alive = true;
     void teach
-      .listBoardsForLesson(activeLessonId, ownerId)
+      .listBoardsForLesson(boardScopeLessonId, ownerId)
       .then((next) => {
         if (alive) setBoards(next);
       })
@@ -326,20 +355,20 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     return () => {
       alive = false;
     };
-  }, [activeLessonId, ownerId]);
+  }, [boardScopeLessonId, ownerId]);
 
-  // Re-fetch the active lesson's boards (used after a mutating repo call).
-  // Captures the lesson id at call time and re-checks the live ref before
+  // Re-fetch the active set's boards (used after a mutating repo call).
+  // Captures the scope id at call time and re-checks the live ref before
   // committing, so a lesson switch / sandbox entry mid-fetch can't write stale
-  // boards into the freshly-selected lesson.
+  // boards into the freshly-selected scope.
   const reloadBoards = useCallback(async (): Promise<Board[]> => {
-    const requestedLessonId = activeLessonId;
-    if (requestedLessonId == null) return [];
-    const next = await teach.listBoardsForLesson(requestedLessonId, ownerId);
-    if (activeLessonIdRef.current !== requestedLessonId) return next;
+    const requested = boardScopeLessonId;
+    if (requested == null) return [];
+    const next = await teach.listBoardsForLesson(requested, ownerId);
+    if (boardScopeLessonIdRef.current !== requested) return next;
     setBoards(next);
     return next;
-  }, [activeLessonId, ownerId]);
+  }, [boardScopeLessonId, ownerId]);
 
   // Select the first board once a set loads and nothing is selected yet.
   useEffect(() => {
@@ -347,6 +376,13 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
       dispatch({ type: "selectBoard", boardId: boards[0].id });
     }
   }, [boards, state.activeBoardId]);
+
+  // Close the settings popovers when the active board changes so they never
+  // operate on a board the teacher has navigated away from.
+  useEffect(() => {
+    setBoardSettingsOpen(false);
+    setSettingsWidget(null);
+  }, [state.activeBoardId]);
 
   // ── Resource deep-link resolution (?resource=<id>) ─────────────────────────
   // The server seeds `centerMode: "resource"` from `?resource=`, but the canvas
@@ -384,7 +420,12 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     () => boards.find((b) => b.id === state.activeBoardId) ?? boards[0] ?? null,
     [boards, state.activeBoardId],
   );
-  const widgets: Widget[] = activeBoard?.widgets ?? [];
+  // Memoized so callbacks depending on `widgets` (embed-at-empty-cell, B8)
+  // don't see a fresh array identity on every render.
+  const widgets: Widget[] = useMemo(
+    () => activeBoard?.widgets ?? [],
+    [activeBoard],
+  );
 
   const subject: SubjectId | undefined = useMemo(
     () => lessons.find((l) => l.id === activeLessonId)?.subject,
@@ -562,6 +603,12 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     [reloadBoards],
   );
 
+  // Open the per-widget settings popover (audit G2). The cog on each WidgetShell
+  // routes here so it is honestly functional rather than a dead control.
+  const handleWidgetSettings = useCallback((widget: Widget): void => {
+    setSettingsWidget(widget);
+  }, []);
+
   // ── Embed a resource onto the active board (explicit T8 path) ──────────────
   const embedResourceAtCell = useCallback(
     async (resource: TeachResource, target: BoardCellTarget): Promise<void> => {
@@ -591,14 +638,27 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   const handleEmbedResource = useCallback(
     (resource: TeachResource): void => {
       if (!activeBoard) return;
-      // Land it at the first cell of the active board (explicit button path).
-      void embedResourceAtCell(resource, {
-        boardId: activeBoard.id,
-        col: 0,
-        row: 0,
-      });
+      // Audit B8: land it on the first EMPTY cell, not always (0,0) — embedding
+      // onto an occupied first cell would stack widgets. Scan the current
+      // layout's grid in row-major order for a cell no widget anchors to;
+      // fall back to (0,0) if the grid is full (the new widget overflows the
+      // grid but is still placed deterministically rather than lost).
+      const { cols, rows } = BOARD_LAYOUT_GRID[state.layout];
+      const occupied = new Set(
+        widgets.map((w) => `${w.position.col}:${w.position.row}`),
+      );
+      let target: BoardCellTarget = { boardId: activeBoard.id, col: 0, row: 0 };
+      outer: for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          if (!occupied.has(`${col}:${row}`)) {
+            target = { boardId: activeBoard.id, col, row };
+            break outer;
+          }
+        }
+      }
+      void embedResourceAtCell(resource, target);
     },
-    [activeBoard, embedResourceAtCell],
+    [activeBoard, widgets, state.layout, embedResourceAtCell],
   );
 
   // ── DnD drop resolution ────────────────────────────────────────────────────
@@ -696,6 +756,18 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     [workspace.layout.iconRailRightOrder, isModuleId],
   );
 
+  // ── Chat unread indicator (audit B5) ───────────────────────────────────────
+  // Surface a small unread count on the Chat rail icon/tab when Chat isn't the
+  // focused right module. Derived from the SAME day-scoped mock the Daily
+  // <Shoutbox> seeds from (messages not authored by the active teacher), so the
+  // two surfaces agree. Cleared (shown as 0) while Chat is the active module.
+  const chatFocused = !state.rightCollapsed && rightActiveModule === "chat";
+  const chatUnread = useMemo(() => {
+    if (chatFocused) return 0;
+    return shoutboxForDay(week, selectedDay).filter((m) => m.author !== ME.id)
+      .length;
+  }, [chatFocused, week, selectedDay]);
+
   const leftWidth = state.leftCollapsed
     ? undefined
     : workspace.layout.panelWidths.left;
@@ -758,6 +830,7 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                 gradeLabel={currentUser.curriculumLabel}
                 avatarInitials={avatarInitials}
                 teacherName={currentUser.name}
+                onOpenHelp={() => setHelpOpen(true)}
               />
             </header>
             <div className={styles.subBarSlot}>
@@ -769,6 +842,9 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                 weekLabel={`Week ${week}`}
                 subjectLabel={subject ? subject : "Subject"}
                 onAddBoard={() => void handleAddBoard()}
+                onBoardSettings={
+                  activeBoard ? () => setBoardSettingsOpen(true) : undefined
+                }
                 onToggleFullscreen={toggleFullscreen}
               />
             </div>
@@ -797,6 +873,12 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
               activeModuleId={leftActiveModule}
               onActiveModuleChange={setLeftActiveModule}
               width={leftWidth}
+              // Single source of truth (audit A1-left): the Boards module reads
+              // TeachWorkspace.boards + reloadBoards, never its own fetch, so the
+              // sub-bar pills, footer count, and center board stay in lockstep.
+              boards={boards}
+              boardsGradeLevelId={activeBoard?.gradeLevelId ?? "g5"}
+              reloadBoards={reloadBoards}
             />
           ) : null}
 
@@ -860,6 +942,7 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                 subjectId={subject}
                 onAddWidget={handleAddWidget}
                 onTogglePin={(w) => void handleTogglePin(w)}
+                onSettings={handleWidgetSettings}
                 onRemove={(w) => void handleRemoveWidget(w)}
               />
             )}
@@ -893,6 +976,7 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                 setRightActiveModule(id);
                 openRightPanel();
               }}
+              badges={{ chat: chatUnread }}
             />
           ) : null}
 
@@ -946,6 +1030,27 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
             }}
           />
         ) : null}
+
+        {/* Board-settings popover (audit G1) — rename / reorder hint / reset. */}
+        {boardSettingsOpen && activeBoard ? (
+          <BoardSettingsPopover
+            board={activeBoard}
+            onClose={() => setBoardSettingsOpen(false)}
+            reloadBoards={reloadBoards}
+          />
+        ) : null}
+
+        {/* Per-widget settings popover (audit G2). */}
+        {settingsWidget ? (
+          <WidgetSettingsPopover
+            widget={settingsWidget}
+            onClose={() => setSettingsWidget(null)}
+            reloadBoards={reloadBoards}
+          />
+        ) : null}
+
+        {/* Help + shortcuts overlay (audit B2) — opened by the top-bar Help. */}
+        <TeachHelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
       </div>
 
       {/* DragOverlay ghost — a lightweight label for the active payload. */}

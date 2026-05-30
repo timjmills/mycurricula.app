@@ -167,13 +167,31 @@ export function useTeachShortcuts({
     }
 
     // ── ⌘P — enter Present mode ─────────────────────────────────────────────
-    if (lower === "p") {
+    // Plain ⌘P only. ⌘⇧P is spec'd as Pop-Out (plan §7, T11) — a Phase 2 "Soon"
+    // feature — so it must NOT slam into Present. The `!e.shiftKey` guard keeps
+    // the two distinct.
+    if (lower === "p" && !e.shiftKey) {
       e.preventDefault();
       dispatchRef.current({ type: "setPresent", present: true });
       return;
     }
 
+    // ── ⌘⇧P — Pop-Out (plan §7, T11) ────────────────────────────────────────
+    // Deferred to Phase 2 (detached second-monitor board with cross-window
+    // postMessage sync). Until that lands this is a graceful no-op: we consume
+    // the chord so it does not fall through to any later branch or trigger
+    // Present, but do nothing. The hook receives no `onPopOut` handler today, so
+    // there is nothing to call — wire one here when Pop-Out ships.
+    if (lower === "p" && e.shiftKey) {
+      e.preventDefault();
+      return;
+    }
+
     // ── ⌘/ — open the layout switcher (fallback: cycle layout) ──────────────
+    // Documented behavior (audit A2) is a layout-switcher popover, but the hook
+    // is not supplied an `onOpenLayoutSwitcher` handler at the current call site,
+    // so that popover is deferred. The cycle-to-next-layout fallback below keeps
+    // the chord functional in the meantime; remove it once the popover is wired.
     if (key === "/") {
       e.preventDefault();
       if (openLayoutRef.current) {
@@ -209,6 +227,16 @@ export function useTeachShortcuts({
       focusModuleRef.current?.("todo");
       return;
     }
+
+    // ── Arrow keys — move between widget cells when the grid is focused ──────
+    // TODO(plan §7.6): arrow-key cell navigation needs a grid-focus model + an
+    // onMoveCell callback from TeachWorkspace — deferred, see
+    // docs/teach-view-plan.md "Deferred" section. The hook receives no cell
+    // layout (cell positions / focused-cell coords) and no focus-move callback,
+    // so real navigation cannot be implemented here without changing the call
+    // site. We intentionally do NOT handle arrow keys (no preventDefault, no
+    // dispatch) so they keep falling through to the tablist roving-arrow nav in
+    // the sub-bar/panels rather than being swallowed by a faked implementation.
   }, []);
 
   useEffect(() => {

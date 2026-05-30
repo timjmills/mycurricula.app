@@ -65,6 +65,8 @@ interface RailIconProps {
   moduleId: TeachModuleId;
   meta: RightModuleMeta;
   active: boolean;
+  /** Unread/attention count surfaced as a small badge (0 = none). */
+  badge?: number;
   onActivate: (moduleId: TeachModuleId) => void;
 }
 
@@ -72,6 +74,7 @@ function RailIcon({
   moduleId,
   meta,
   active,
+  badge = 0,
   onActivate,
 }: RailIconProps): ReactNode {
   const dragData: TeachRailIconDragData = { kind: "rail-icon", moduleId };
@@ -94,10 +97,19 @@ function RailIcon({
           type="button"
           className={`${styles.iconBtn} ${active ? styles.iconBtnActive : ""}`}
           aria-pressed={active}
-          aria-label={`${meta.label} — open this module`}
+          aria-label={
+            badge > 0
+              ? `${meta.label} — open this module (${badge} unread)`
+              : `${meta.label} — open this module`
+          }
           onClick={() => onActivate(moduleId)}
         >
           {meta.icon}
+          {badge > 0 ? (
+            <span className={styles.badge} aria-hidden="true">
+              {badge > 99 ? "99+" : badge}
+            </span>
+          ) : null}
           {/* Drag grip — sole drag activator; surfaces on hover/focus so the
               icon reads as a clean tap target at rest. */}
           <span
@@ -127,6 +139,8 @@ export interface TeachRightRailProps {
   activeModuleId: TeachModuleId | null;
   /** Open/focus a module — expands the panel if collapsed and focuses the tab. */
   onActivateModule: (moduleId: TeachModuleId) => void;
+  /** Per-module attention badges (e.g. chat unread, audit B5). 0/absent = none. */
+  badges?: Partial<Record<TeachModuleId, number>>;
 }
 
 // ── TeachRightRail ───────────────────────────────────────────────────────────
@@ -135,6 +149,7 @@ export function TeachRightRail({
   order,
   activeModuleId,
   onActivateModule,
+  badges,
 }: TeachRightRailProps): ReactNode {
   return (
     <nav
@@ -151,6 +166,7 @@ export function TeachRightRail({
             moduleId={id}
             meta={meta}
             active={activeModuleId === id}
+            badge={badges?.[id]}
             onActivate={onActivateModule}
           />
         );

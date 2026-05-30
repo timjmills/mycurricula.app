@@ -20,7 +20,7 @@
 // module never reads/writes the local-only groups store; names live solely in
 // lib/teach/use-teach-groups.ts.
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import {
   DndContext,
   type DragEndEvent,
@@ -37,7 +37,7 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Tooltip } from "@/components/ui";
+import { Button, FutureControl, Tooltip } from "@/components/ui";
 import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { useConsequenceToast } from "@/lib/consequence-toast";
@@ -59,6 +59,19 @@ export interface BoardsModuleProps {
   sandbox: boolean;
   /** Dispatch onto the central workspace reducer. */
   dispatch: (action: TeachWorkspaceAction) => void;
+  // ── Single source of truth (audit A1-left) ─────────────────────────────────
+  // The board set is OWNED by TeachWorkspace and threaded down here, so the
+  // sub-bar pills, footer count, center board, and this module never disagree.
+  // This module no longer self-fetches; it mutates through the repo and then
+  // calls `reloadBoards` so every surface updates together.
+  /** The active lesson's board set (from TeachWorkspace.boards). */
+  boards: readonly Board[];
+  /** True while TeachWorkspace's first board load is in flight. */
+  loading?: boolean;
+  /** Grade level to seed new boards with (active board's grade). */
+  gradeLevelId?: string;
+  /** Re-read the active set after a mutating repo call (returns the fresh set). */
+  reloadBoards: () => Promise<Board[]>;
 }
 
 // ── A sortable board thumbnail row ─────────────────────────────────────────────
@@ -144,40 +157,21 @@ export function BoardsModule({
   activeBoardId,
   sandbox,
   dispatch,
+  boards,
+  loading = false,
+  gradeLevelId,
+  reloadBoards,
 }: BoardsModuleProps): ReactNode {
   const { lessons } = usePlanner();
   const { setSelectedLessonId } = useAppState();
   const { showConsequence } = useConsequenceToast();
 
-  const [boards, setBoards] = useState<Board[]>([]);
-  const [loading, setLoading] = useState(false);
   // Two-step confirm gate for the destructive push-to-team displacement.
   const [confirmPush, setConfirmPush] = useState(false);
   // Sandbox "pin to lesson" picker visibility.
   const [pinning, setPinning] = useState(false);
 
   const ownerId = ME.id;
-
-  // Load the board set for the active lesson through the repository seam.
-  useEffect(() => {
-    let active = true;
-    if (!activeLessonId) {
-      setBoards([]);
-      return;
-    }
-    setLoading(true);
-    teach
-      .listBoardsForLesson(activeLessonId, ownerId)
-      .then((next) => {
-        if (active) setBoards(next);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [activeLessonId, ownerId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -196,14 +190,15 @@ export function BoardsModule({
     const oldIndex = boards.findIndex((b) => b.id === active.id);
     const newIndex = boards.findIndex((b) => b.id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
-    const next = arrayMove(boards, oldIndex, newIndex);
-    setBoards(next); // optimistic
-    const persisted = await teach.reorderBoards(
+    // Persist the new order through the repo, then reload TeachWorkspace's set
+    // so the pills, footer count, and center board all re-sequence together.
+    const next = arrayMove([...boards], oldIndex, newIndex);
+    await teach.reorderBoards(
       activeLessonId,
       ownerId,
       next.map((b) => b.id),
     );
-    setBoards(persisted);
+    await reloadBoards();
   }
 
   async function handleAddBoard(): Promise<void> {
@@ -215,10 +210,9 @@ export function BoardsModule({
       title: `Board ${boards.length + 1}`,
       displayOrderWithinLesson: boards.length,
       templateId: null,
-      gradeLevelId: boards[0]?.gradeLevelId ?? "g5",
+      gradeLevelId: gradeLevelId ?? boards[0]?.gradeLevelId ?? "g5",
     });
-    const next = [...boards, created];
-    setBoards(next);
+    await reloadBoards();
     dispatch({ type: "selectBoard", boardId: created.id });
   }
 
@@ -237,27 +231,89 @@ export function BoardsModule({
       // No automatic rollback wired in v1 (the previous team set was displaced
       // server-side); the toast still surfaces the consequence per CLAUDE.md §4.
     });
-    // Re-read so the strip reflects the new canonical state.
-    const next = await teach.listBoardsForLesson(activeLessonId, ownerId);
-    setBoards(next);
+    // Re-read TeachWorkspace's set so every surface reflects the new state.
+    await reloadBoards();
   }
 
   // ── Sandbox persistence (§4a) ─────────────────────────────────────────────
-  // v1 surfaces the two save paths; actual board attachment runs through the
-  // repository once a lesson exists. "Save to new lesson" hands off to the
-  // planner add-lesson flow at integration; here we expose the entry points.
-  function handleSaveToNewLesson(): void {
-    // The add-lesson flow lives in the planner store; Wave 2 wires the handoff.
-    // We dispatch out of sandbox so the workspace can route to the add flow.
-    dispatch({ type: "exitSandbox" });
+  // The sandbox boards are repo-backed (they hang off the SANDBOX_LESSON_ID
+  // sentinel in TeachWorkspace), so persisting them is a real copy through the
+  // repository — nothing is silently discarded.
+  //
+  // Pending pin target: when the chosen lesson already has a personal set we
+  // surface a displacement confirm (§13.1, personal-scoped) before overwriting.
+  const [pendingPin, setPendingPin] = useState<{
+    lessonId: string;
+    title: string;
+  } | null>(null);
+
+  /** Copy the current sandbox boards (passed in via `boards`) onto a target
+   *  lesson as the teacher's PERSONAL set, replacing any existing personal set
+   *  for that lesson. Returns the id of the first created board (to select). */
+  async function copySandboxBoardsToLesson(
+    lessonId: string,
+  ): Promise<string | null> {
+    // Remove any existing PERSONAL set for the target lesson so we don't stack
+    // two personal sets (the repo enforces one personal set per teacher, §13.1).
+    const existing = await teach.listBoardsForLesson(lessonId, ownerId);
+    const existingPersonal = existing.filter(
+      (b) => b.scope === "personal" && b.ownerId === ownerId,
+    );
+    for (const b of existingPersonal) {
+      await teach.deleteBoard(b.id);
+    }
+    // Re-create each sandbox board (and its widgets) on the target lesson.
+    let firstId: string | null = null;
+    for (let i = 0; i < boards.length; i += 1) {
+      const src = boards[i];
+      const created = await teach.createBoard({
+        masterLessonId: lessonId,
+        ownerId,
+        scope: "personal",
+        title: src.title,
+        displayOrderWithinLesson: i,
+        templateId: src.templateId ?? null,
+        gradeLevelId: src.gradeLevelId,
+        // Widgets carry STRUCTURE only (§11.4); copy them onto the new board.
+        widgets: src.widgets.map((w) => ({
+          ...w,
+          position: { ...w.position },
+        })),
+      });
+      if (firstId == null) firstId = created.id;
+    }
+    return firstId;
   }
 
-  function handlePinToLesson(lessonId: string): void {
+  /** Finalize a pin: copy boards onto the lesson, exit sandbox, select it. */
+  async function finalizePin(lessonId: string): Promise<void> {
     setPinning(false);
-    // Attach the sandbox boards as this lesson's personal set, then select it.
+    setPendingPin(null);
+    const firstBoardId = await copySandboxBoardsToLesson(lessonId);
+    // Leave sandbox and land on the lesson; TeachWorkspace re-loads its boards.
+    dispatch({ type: "exitSandbox" });
     dispatch({ type: "selectLesson", lessonId });
     setSelectedLessonId(lessonId);
-    dispatch({ type: "setSandboxDirty", dirty: false });
+    if (firstBoardId) dispatch({ type: "selectBoard", boardId: firstBoardId });
+    showConsequence({
+      message:
+        "Your sandbox boards are now your personal set for this lesson — any earlier personal boards for it were replaced.",
+    });
+  }
+
+  async function handlePinToLesson(lessonId: string): Promise<void> {
+    // Warn before overwriting an existing personal set for the chosen lesson.
+    const existing = await teach.listBoardsForLesson(lessonId, ownerId);
+    const hasPersonal = existing.some(
+      (b) => b.scope === "personal" && b.ownerId === ownerId,
+    );
+    if (hasPersonal) {
+      const title =
+        lessons.find((l) => l.id === lessonId)?.title ?? "this lesson";
+      setPendingPin({ lessonId, title });
+      return;
+    }
+    await finalizePin(lessonId);
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -272,27 +328,55 @@ export function BoardsModule({
           a new lesson, or pinning them to an existing one.
         </p>
         <div className={styles.boardActions}>
+          {/* Save-to-new-lesson needs a "create blank lesson" planner API that
+              isn't safely reachable in v1 (only duplicateLesson exists), so it
+              is honestly marked "Soon" rather than silently discarding work.
+              Pin-to-existing-lesson is the working persistence path below. */}
+          <FutureControl
+            label="Save to new lesson"
+            leadingIcon={<PlusIcon size={13} />}
+            tooltip="Create a new lesson from these boards — coming after beta. For now, pin them to an existing lesson to keep them."
+            tooltipSide="top"
+          />
           <Button
             size="sm"
             variant="secondary"
-            leadingIcon={<PlusIcon size={13} />}
-            onClick={handleSaveToNewLesson}
-            tooltip="Create a new lesson and attach these boards to it"
-          >
-            Save to new lesson
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
             leadingIcon={<PinIcon size={13} />}
             onClick={() => setPinning((v) => !v)}
+            disabled={boards.length === 0}
             tooltip="Attach these boards to an existing lesson as your personal set"
           >
             Pin to lesson
           </Button>
         </div>
 
-        {pinning ? (
+        {pendingPin ? (
+          <div
+            className={styles.boardActions}
+            style={{ marginTop: "var(--r-8)" }}
+          >
+            <Tooltip
+              required
+              side="top"
+              content={`Replace your personal boards for "${pendingPin.title}" with these sandbox boards`}
+            >
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => void finalizePin(pendingPin.lessonId)}
+              >
+                Replace personal boards
+              </Button>
+            </Tooltip>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setPendingPin(null)}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : pinning ? (
           <div style={{ marginTop: "var(--r-8)" }}>
             <div className={styles.metaLabel}>Pin to which lesson?</div>
             {lessons
@@ -303,7 +387,7 @@ export function BoardsModule({
                   key={l.id}
                   type="button"
                   className={styles.lessonRow}
-                  onClick={() => handlePinToLesson(l.id)}
+                  onClick={() => void handlePinToLesson(l.id)}
                   title="Attach the sandbox boards to this lesson (replaces your personal set for it)"
                 >
                   <span className={styles.lessonRowTitle}>{l.title}</span>

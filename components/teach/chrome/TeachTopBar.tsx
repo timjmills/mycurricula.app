@@ -18,7 +18,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { VIEWS } from "@/components/shell/top-bar";
-import { Tooltip } from "@/components/ui";
+import { FutureControl, Tooltip } from "@/components/ui";
 import styles from "./TeachChrome.module.css";
 
 // ── Props ──────────────────────────────────────────────────────────────────
@@ -32,15 +32,7 @@ export interface TeachTopBarProps {
   avatarInitials: string;
   /** Optional teacher display name (avatar tooltip / aria). */
   teacherName?: string;
-  /** Open the global search surface. Optional — wired in integration. */
-  onSearch?: () => void;
-  /** The round "+" quick-add. Optional. */
-  onQuickAdd?: () => void;
-  /** Open the notifications inbox. Optional. */
-  onOpenNotifications?: () => void;
-  /** Unread notification count for the bell badge. */
-  notificationCount?: number;
-  /** Open help / shortcuts. Optional. */
+  /** Open help / shortcuts overlay. Optional but wired in v1. */
   onOpenHelp?: () => void;
 }
 
@@ -50,10 +42,6 @@ export function TeachTopBar({
   gradeLabel,
   avatarInitials,
   teacherName,
-  onSearch,
-  onQuickAdd,
-  onOpenNotifications,
-  notificationCount = 0,
   onOpenHelp,
 }: TeachTopBarProps): ReactNode {
   return (
@@ -123,65 +111,31 @@ export function TeachTopBar({
       <div className={styles.spacer} aria-hidden="true" />
 
       <div className={styles.rightCluster}>
-        {/* Search pill. */}
-        <Tooltip
-          content="Search lessons, standards, and resources to teach"
-          side="bottom"
-          tooltipId="teach-search"
-        >
-          <button
-            type="button"
-            className={styles.searchPill}
-            onClick={onSearch}
-            aria-label="Search MyCurricula"
-          >
-            <SearchIcon />
-            <span className={styles.searchPillLabel}>Search MyCurricula</span>
-          </button>
-        </Tooltip>
+        {/* Search — not wired in v1. Rendered as an honest "Soon" affordance
+            (audit B2) instead of a live pill that does nothing on click. */}
+        <FutureControl
+          variant="ghost"
+          leadingIcon={<SearchIcon />}
+          label="Search"
+          tooltip="Search lessons, standards, and resources — coming after beta"
+        />
 
-        {/* Round quick-add. */}
-        <Tooltip
-          content="Quick add — start a new board, lesson, or resource"
-          side="bottom"
-          tooltipId="teach-quick-add"
-        >
-          <button
-            type="button"
-            className={`${styles.addRound} cp-subj math`}
-            onClick={onQuickAdd}
-            aria-label="Quick add"
-          >
-            <PlusIcon />
-          </button>
-        </Tooltip>
+        {/* Quick-add — not wired in v1. Honest "Soon" icon affordance. */}
+        <FutureControl
+          variant="icon-only"
+          leadingIcon={<PlusIcon />}
+          tooltip="Quick add a board, lesson, or resource — coming after beta"
+        />
 
-        {/* Notifications bell. */}
-        <Tooltip
-          content="Team activity — mentions, board shares, and shoutbox replies"
-          side="bottom"
-          tooltipId="teach-bell"
-        >
-          <button
-            type="button"
-            className={styles.iconBtn}
-            onClick={onOpenNotifications}
-            aria-label={
-              notificationCount > 0
-                ? `Notifications (${notificationCount} unread)`
-                : "Notifications"
-            }
-          >
-            <BellIcon />
-            {notificationCount > 0 ? (
-              <span className={styles.bellBadge} aria-hidden="true">
-                {notificationCount > 99 ? "99+" : notificationCount}
-              </span>
-            ) : null}
-          </button>
-        </Tooltip>
+        {/* Notifications — not wired in v1. Honest "Soon" icon affordance; the
+            unread badge is hidden until there's a real feed to count. */}
+        <FutureControl
+          variant="icon-only"
+          leadingIcon={<BellIcon />}
+          tooltip="Team activity — mentions, board shares, and replies — coming after beta"
+        />
 
-        {/* Help. */}
+        {/* Help — LIVE (audit B2). Opens the Teach shortcuts/help overlay. */}
         <Tooltip
           content="Keyboard shortcuts and a quick guide to the Teach workspace"
           side="bottom"

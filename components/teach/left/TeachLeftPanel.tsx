@@ -37,6 +37,7 @@ import type { TeachModuleId } from "@/lib/use-teach-workspace";
 import type { UseTeachWorkspaceResult } from "@/lib/use-teach-workspace";
 import type { TeachWorkspaceState } from "@/lib/teach/types";
 import type { TeachWorkspaceAction } from "@/components/teach/TeachWorkspace";
+import type { Board } from "@/lib/types";
 import { LEFT_MODULE_META, isLeftModuleId } from "./modules-meta";
 import { moduleIcon, CloseIcon } from "./icons";
 import {
@@ -66,6 +67,17 @@ export interface TeachLeftPanelProps {
   onActiveModuleChange: (moduleId: TeachModuleId) => void;
   /** Pixel width (undefined when collapsed — parent hides the panel then). */
   width?: number;
+  // ── Boards: single source of truth (audit A1-left) ─────────────────────────
+  // The board set is owned by TeachWorkspace and threaded down so the Boards
+  // module, sub-bar pills, footer count, and center board never disagree.
+  /** Active lesson's board set (from TeachWorkspace.boards). */
+  boards: readonly Board[];
+  /** True while TeachWorkspace's first board load is in flight. */
+  boardsLoading?: boolean;
+  /** Grade level for new boards (active board's grade). */
+  boardsGradeLevelId?: string;
+  /** Re-read the active set after a mutating repo call. */
+  reloadBoards: () => Promise<Board[]>;
 }
 
 // ── A sortable tab ─────────────────────────────────────────────────────────────
@@ -151,14 +163,14 @@ function PanelTab({
       </button>
       <button
         type="button"
-        aria-label={`Move ${meta.label} off the panel`}
+        aria-label={`Send ${meta.label} to the back of the panel`}
         className={styles.tabClose}
         style={{ border: "none", background: "transparent", cursor: "pointer" }}
         onClick={(e) => {
           e.stopPropagation();
           onClose();
         }}
-        title={`Move ${meta.label} off the panel (back to the rail)`}
+        title={`Send ${meta.label} to the back of the panel (still on the left rail)`}
       >
         <CloseIcon size={11} />
       </button>
@@ -172,10 +184,18 @@ function ModuleBody({
   moduleId,
   state,
   dispatch,
+  boards,
+  boardsLoading,
+  boardsGradeLevelId,
+  reloadBoards,
 }: {
   moduleId: TeachModuleId;
   state: TeachWorkspaceState;
   dispatch: (action: TeachWorkspaceAction) => void;
+  boards: readonly Board[];
+  boardsLoading?: boolean;
+  boardsGradeLevelId?: string;
+  reloadBoards: () => Promise<Board[]>;
 }): ReactNode {
   switch (moduleId) {
     case "lessons":
@@ -194,6 +214,10 @@ function ModuleBody({
           activeBoardId={state.activeBoardId}
           sandbox={state.sandbox}
           dispatch={dispatch}
+          boards={boards}
+          loading={boardsLoading}
+          gradeLevelId={boardsGradeLevelId}
+          reloadBoards={reloadBoards}
         />
       );
     case "notes":
@@ -218,6 +242,10 @@ export function TeachLeftPanel({
   activeModuleId,
   onActiveModuleChange,
   width,
+  boards,
+  boardsLoading,
+  boardsGradeLevelId,
+  reloadBoards,
 }: TeachLeftPanelProps): ReactNode {
   // Tabs = the modules docked to the left, in their persisted order.
   const tabIds = useMemo(
@@ -249,12 +277,20 @@ export function TeachLeftPanel({
   }
 
   function handleCloseTab(moduleId: TeachModuleId): void {
-    // Closing a tab docks the module to the rail. With no dedicated "hidden"
-    // bucket for Teach modules, we move it to the RIGHT dock so it leaves the
-    // left panel but stays reachable. (Dragging it back is Phase 2 parity;
-    // for v1 the rail still lists it via the right zone.)
-    workspace.moveRailIcon(moduleId, "right", 0);
-    // Defer to the effect above to re-pick a valid active tab.
+    // Audit G6 fix: NEVER dock a left module to the RIGHT panel — the right
+    // panel only renders resources/chat/todo, so a left module moved there
+    // vanishes (no icon, blank body) and becomes unreachable until localStorage
+    // is cleared. Instead, closing a left tab moves it to the END of the LEFT
+    // order so it leaves the active-tab position but stays a left-rail icon AND
+    // a (de-prioritised) left tab — always re-openable in-session from the left
+    // rail. The effect above re-picks a valid active tab. Don't close the last
+    // remaining tab into nothing.
+    if (tabIds.length <= 1) return;
+    workspace.moveRailIcon(moduleId, "left", tabIds.length - 1);
+    if (activeModuleId === moduleId) {
+      const fallback = tabIds.find((id) => id !== moduleId);
+      if (fallback) onActiveModuleChange(fallback);
+    }
   }
 
   const effectiveActive = tabIds.includes(activeModuleId)
@@ -337,6 +373,10 @@ export function TeachLeftPanel({
             moduleId={effectiveActive}
             state={state}
             dispatch={dispatch}
+            boards={boards}
+            boardsLoading={boardsLoading}
+            boardsGradeLevelId={boardsGradeLevelId}
+            reloadBoards={reloadBoards}
           />
         ) : (
           <p className={styles.muted}>

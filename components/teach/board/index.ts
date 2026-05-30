@@ -16,3 +16,9 @@ export type { BoardEmptyStateProps } from "./BoardEmptyState";
 
 export { FocusMode } from "./FocusMode";
 export type { FocusModeProps } from "./FocusMode";
+
+export { BoardSettingsPopover } from "./BoardSettingsPopover";
+export type { BoardSettingsPopoverProps } from "./BoardSettingsPopover";
+
+export { WidgetSettingsPopover } from "./WidgetSettingsPopover";
+export type { WidgetSettingsPopoverProps } from "./WidgetSettingsPopover";

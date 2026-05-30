@@ -1,0 +1,119 @@
+/* TeachHelpOverlay — Teach help + shortcuts dialog (audit B2). Tokens-only. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 26, 0.35);
+  z-index: 70;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh var(--r-12) var(--r-12);
+}
+
+.panel {
+  width: min(460px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-12);
+  background: var(--paper);
+  border-radius: 16px;
+  box-shadow: 0 30px 60px rgba(20, 20, 26, 0.35);
+  padding: 18px;
+}
+
+.panel:focus-visible {
+  outline: 2px solid var(--c, var(--tag-blue));
+  outline-offset: 2px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--r-8);
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink-900);
+  margin: 0;
+}
+
+.closeBtn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink-500);
+  font-size: 15px;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.intro {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-700);
+  margin: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--r-12);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.keys {
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 0 auto;
+  min-width: 92px;
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-700);
+  background: var(--ink-50);
+  border: var(--line);
+  border-radius: var(--r-6);
+}
+
+.rowLabel {
+  font-size: 13px;
+  color: var(--ink-900);
+}

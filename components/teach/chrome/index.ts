@@ -18,3 +18,6 @@ export type { TeachFooterProps, TeachFooterModule } from "./TeachFooter";
 
 export { PresentBar } from "./PresentBar";
 export type { PresentBarProps } from "./PresentBar";
+
+export { TeachHelpOverlay } from "./TeachHelpOverlay";
+export type { TeachHelpOverlayProps } from "./TeachHelpOverlay";

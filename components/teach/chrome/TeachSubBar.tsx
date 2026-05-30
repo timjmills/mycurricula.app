@@ -85,10 +85,6 @@ export interface TeachSubBarProps {
   weekLabel?: string;
   /** Subject label for the Subject ▾ chip (e.g. "Math"). */
   subjectLabel?: string;
-  /** Open the week jumper. Optional. */
-  onPickWeek?: () => void;
-  /** Open the subject picker. Optional. */
-  onPickSubject?: () => void;
   /** Add a new board to the active lesson. Optional. */
   onAddBoard?: () => void;
   /** Open board settings (⚙). Optional. */
@@ -108,8 +104,6 @@ export function TeachSubBar({
   subject = "math",
   weekLabel = "This week",
   subjectLabel = "Subject",
-  onPickWeek,
-  onPickSubject,
   onAddBoard,
   onBoardSettings,
   onToggleFullscreen,
@@ -162,39 +156,23 @@ export function TeachSubBar({
 
   return (
     <div className={styles.subBar}>
-      {/* Week ▾ */}
-      <Tooltip
-        content="Switch which week's lessons you're teaching from"
-        side="bottom"
-        tooltipId="teach-week-chip"
-      >
-        <button
-          type="button"
-          className={styles.contextChip}
-          onClick={onPickWeek}
-          aria-label={`${weekLabel} — change week`}
-        >
-          {weekLabel}
-          <ChevronDownIcon />
-        </button>
-      </Tooltip>
+      {/* Week ▾ — the week/subject jumpers are not wired in v1 (audit B3).
+          Rendered as honest disabled "Soon" chips (the active week/subject are
+          still shown as live context) rather than dead dropdown buttons. */}
+      <FutureControl
+        variant="ghost"
+        label={weekLabel}
+        trailingIcon={<ChevronDownIcon />}
+        tooltip="Switch which week you're teaching from — coming after beta"
+      />
 
-      {/* Subject ▾ */}
-      <Tooltip
-        content="Filter the board strip to one subject's lessons"
-        side="bottom"
-        tooltipId="teach-subject-chip"
-      >
-        <button
-          type="button"
-          className={styles.contextChip}
-          onClick={onPickSubject}
-          aria-label={`${subjectLabel} — change subject`}
-        >
-          {subjectLabel}
-          <ChevronDownIcon />
-        </button>
-      </Tooltip>
+      {/* Subject ▾ — Soon (audit B3). */}
+      <FutureControl
+        variant="ghost"
+        label={subjectLabel}
+        trailingIcon={<ChevronDownIcon />}
+        tooltip="Filter the board strip to one subject — coming after beta"
+      />
 
       {/* Board tab strip — subject-tinted active pill via .cp-subj. */}
       <div
@@ -241,6 +219,8 @@ export function TeachSubBar({
           side="bottom"
           tooltipId="teach-add-board"
         >
+          {/* No chevron (audit G7): Add Board is a direct action, not a menu —
+              a dropdown caret would imply options that don't exist. */}
           <button
             type="button"
             className={styles.addBoard}
@@ -249,7 +229,6 @@ export function TeachSubBar({
           >
             <PlusIcon />
             Add Board
-            <ChevronDownIcon />
           </button>
         </Tooltip>
       </div>
