@@ -136,17 +136,29 @@ then the seed (dev only). Apply order:
 
 ```sh
 # 1. Authenticate the CLI once.
-supabase login
+npx supabase login
 
-# 2. Link this repo to your project (ref = the <ref> in the Project URL).
-supabase link --project-ref YOUR-PROJECT-REF
+# 2. Link this repo to the mycurricula cloud project (prompts for DB password).
+npx supabase link --project-ref xuukfpvonsbvvbspsrsl
 
-# 3. Push every migration in supabase/migrations/ in order.
-supabase db push
+# 3. Push every migration in supabase/migrations/ in order (all 6).
+npx supabase db push
 
-# 4. (Dev only) load the seed graph.
+# 4. REQUIRED — load the seed graph. `db push` does NOT run seed.sql, and the
+#    school / active Grade 5 / school-year / subjects rows it creates are needed
+#    by both the importer AND first-login teacher provisioning. Get the
+#    connection string from Dashboard → Settings → Database → Connection string.
 psql "YOUR-DB-CONNECTION-STRING" -f supabase/seed.sql
+
+# 5. Load the real lessons/units/standards (needs SUPABASE_SERVICE_ROLE_KEY in
+#    .env.local). Idempotent — safe to re-run.
+node scripts/import-mock-planner.mjs
 ```
+
+> **seed.sql caveat:** it uses fixed-UUID plain `insert`s with NO `on conflict`,
+> so it ERRORS if those rows already exist. Run it once against a fresh project.
+> If your project already has a school/grade, skip the seed and instead ensure a
+> school + active grade + the 8 subjects exist, then run the importer.
 
 `supabase db reset` (local stack only) re-runs every migration **and** the seed
 from scratch — handy locally, destructive against a shared DB.
