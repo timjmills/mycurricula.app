@@ -11,6 +11,15 @@ name: Deploy to Cloudflare
 #   • CLOUDFLARE_ACCOUNT_ID         — 009d3815b362e176031f124202abbcf9
 #   • NEXT_PUBLIC_SUPABASE_URL      — https://xuukfpvonsbvvbspsrsl.supabase.co
 #   • NEXT_PUBLIC_SUPABASE_ANON_KEY — Public anon key from Supabase dashboard
+#   • NEXT_PUBLIC_GOOGLE_CLIENT_ID  — Google OAuth Web client ID
+#                                     (…apps.googleusercontent.com). Baked into
+#                                     the bundle at build time; without it the
+#                                     login page shows "Google sign-in isn't
+#                                     configured yet".
+#   • NEXT_PUBLIC_TEACH_USE_SUPABASE   — "1" to persist Teach boards to Postgres
+#                                        (optional; omit/empty = mock).
+#   • NEXT_PUBLIC_PLANNER_USE_SUPABASE — "1" to persist lessons/units/resources
+#                                        (optional; omit/empty = mock).
 #
 # Worker runtime secrets (R2_*, SUPABASE_SERVICE_ROLE_KEY, CLAUDE_BYPASS_TOKEN)
 # are already set on the Worker via `wrangler secret put` and the deploy
@@ -57,6 +66,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # NEXT_PUBLIC_* values are inlined by `next build`, so they MUST be
+          # present here (in CI), not just on the Cloudflare Worker. Empty/unset
+          # falls back to the safe default (login shows "not configured" /
+          # planner+teach stay on mock).
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+          NEXT_PUBLIC_TEACH_USE_SUPABASE: ${{ secrets.NEXT_PUBLIC_TEACH_USE_SUPABASE }}
+          NEXT_PUBLIC_PLANNER_USE_SUPABASE: ${{ secrets.NEXT_PUBLIC_PLANNER_USE_SUPABASE }}
 
       - name: Summary
         if: always()
