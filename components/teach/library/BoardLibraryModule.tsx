@@ -63,10 +63,12 @@ import styles from "./BoardLibrary.module.css";
 type Tab = "mine" | "team";
 
 // ── Sidebar: "My Library" scopes ─────────────────────────────────────────────
-// Presentational sub-scopes within a segment. `all` is the default; the others
-// are presented but only `all` constrains the list today (the Favorites /
-// Recent / Archived axes land with the backend). Surfacing them now matches the
-// handoff IA without faking data.
+// Sub-scopes within a segment. Each one that has backing data on the `Board`
+// shape constrains the visible grid (see `boardMatchesScope`); the axes the data
+// layer doesn't track yet (`favorites`, `archived`) honestly resolve to an empty
+// set so the control still does something visible instead of silently showing
+// the full, wrong list. Surfacing them now matches the handoff IA without faking
+// data — when the backend adds a favorite/archive flag they light up for free.
 
 type LibraryScope =
   | "all"
@@ -75,6 +77,9 @@ type LibraryScope =
   | "shared"
   | "myboards"
   | "archived";
+
+// How "recent" is bounded — the N most-recently-updated boards in the segment.
+const RECENT_LIMIT = 12;
 
 const LIBRARY_SCOPES: ReadonlyArray<{
   id: LibraryScope;
@@ -135,6 +140,42 @@ function boardMatchesUse(board: Board, use: UseFilter): boolean {
   return (board.tags ?? []).some((t) => t.kind === use.match);
 }
 
+/** Whether a board passes a "My Library" scope (per-board predicate; the
+ *  ordering/limit scopes like `recent` are applied to the whole list separately
+ *  in `applyScope`). `favorites`/`archived` have no backing field on the Board
+ *  shape yet, so they intentionally match nothing — an honest empty set rather
+ *  than a silent no-op. */
+function boardMatchesScope(board: Board, scope: LibraryScope): boolean {
+  switch (scope) {
+    case "all":
+    case "recent":
+      // `recent` filters nothing per-board; it only re-orders + caps the list.
+      return true;
+    case "shared":
+      // Boards published to the grade's Team Library.
+      return board.libraryVisibility === "team";
+    case "myboards":
+      // A teacher's own (owned) boards, excluding the shared team set.
+      return board.ownerId != null && board.libraryVisibility !== "team";
+    case "favorites":
+    case "archived":
+      // No favorite/archive flag on the Board shape yet — match nothing.
+      return false;
+    default:
+      return true;
+  }
+}
+
+/** Apply a scope's list-level transform (ordering + limit for `recent`); the
+ *  per-board predicate has already run in the caller. */
+function applyScope(list: Board[], scope: LibraryScope): Board[] {
+  if (scope !== "recent") return list;
+  return list
+    .slice()
+    .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+    .slice(0, RECENT_LIMIT);
+}
+
 // ── BoardLibraryModule ───────────────────────────────────────────────────────
 
 export function BoardLibraryModule({
@@ -183,10 +224,13 @@ export function BoardLibraryModule({
   }, [tab, ownerId, gradeLevelId]);
 
   useEffect(() => {
-    // Reset transient UI when the segment changes, then load.
+    // Reset transient UI when the segment changes, then load. Scope is reset to
+    // "all" so a `myboards`/`shared` selection doesn't carry into a segment
+    // where it would silently constrain (or empty) the list.
     setConfirmingDeleteId(null);
     setRepeatingBoard(null);
     setCapNotice(false);
+    setScope("all");
     void refresh();
   }, [refresh]);
 
@@ -220,7 +264,7 @@ export function BoardLibraryModule({
     });
   }, [filterPills]);
 
-  // ── Derived: visible boards (search + use filter + AND tag filters) ───────
+  // ── Derived: visible boards (scope + search + use filter + AND tag filters) ─
   const visible = useMemo<Board[]>(() => {
     const q = query.trim().toLowerCase();
     const activeTags = filterPills.filter((t) =>
@@ -229,7 +273,8 @@ export function BoardLibraryModule({
     const use = activeUse
       ? (USE_FILTERS.find((u) => u.id === activeUse) ?? null)
       : null;
-    return boards.filter((board) => {
+    const filtered = boards.filter((board) => {
+      if (!boardMatchesScope(board, scope)) return false;
       if (q && !board.title.toLowerCase().includes(q)) return false;
       if (use && !boardMatchesUse(board, use)) return false;
       for (const tag of activeTags) {
@@ -237,7 +282,8 @@ export function BoardLibraryModule({
       }
       return true;
     });
-  }, [boards, query, filterPills, activeFilters, activeUse]);
+    return applyScope(filtered, scope);
+  }, [boards, scope, query, filterPills, activeFilters, activeUse]);
 
   // ── Derived: the Team Library strip (always the team set, capped to 4) ────
   const [teamStrip, setTeamStrip] = useState<Board[]>([]);
@@ -299,6 +345,8 @@ export function BoardLibraryModule({
     async (board: Board): Promise<void> => {
       setConfirmingDeleteId(null);
       await teach.deleteBoard(board.id);
+      // Deleting frees a slot, so a stale "at the limit" notice no longer holds.
+      setCapNotice(false);
       await refresh();
     },
     [refresh],
@@ -513,7 +561,11 @@ export function BoardLibraryModule({
                 ? tab === "mine"
                   ? "No boards yet. Build one on a lesson, then it shows up here."
                   : "Your team hasn't shared any boards yet."
-                : "No boards match your search and filters."}
+                : scope === "favorites"
+                  ? "No favorite boards yet — star a board to keep it here."
+                  : scope === "archived"
+                    ? "No archived boards."
+                    : "No boards match your search and filters."}
             </p>
           ) : (
             <div className={styles.grid}>

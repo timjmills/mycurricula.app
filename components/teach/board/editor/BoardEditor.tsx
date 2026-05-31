@@ -176,6 +176,8 @@ interface PlacedProps {
   onResizeStart: (e: ReactPointerEvent, id: string) => void;
   /** Keyboard width nudge (±step px), clamped + committed by the parent. */
   onResizeStep: (id: string, delta: number) => void;
+  /** Keyboard position nudge (±dx, ±dy px), clamped + committed by the parent. */
+  onMoveStep: (id: string, dx: number, dy: number) => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
 }
@@ -191,6 +193,7 @@ function Placed({
   onDragStart,
   onResizeStart,
   onResizeStep,
+  onMoveStep,
   onDuplicate,
   onDelete,
 }: PlacedProps): ReactNode {
@@ -212,6 +215,22 @@ function Placed({
         e.preventDefault();
         onDelete(widget.id);
       }
+    } else if (
+      selected &&
+      (e.key === "ArrowLeft" ||
+        e.key === "ArrowRight" ||
+        e.key === "ArrowUp" ||
+        e.key === "ArrowDown")
+    ) {
+      // Arrow keys nudge the selected widget's position (10px, or 1px with
+      // Shift for fine placement). The resize handle has its own focus target
+      // and consumes Arrow keys for width — so these never collide.
+      e.preventDefault();
+      const step = e.shiftKey ? 1 : 10;
+      const dx =
+        e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+      const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+      onMoveStep(widget.id, dx, dy);
     }
   };
 
@@ -839,6 +858,24 @@ export function BoardEditor({
                     pageId: activePage.id,
                     widgetId: id,
                     w: next,
+                  });
+                }}
+                onMoveStep={(id, dx, dy) => {
+                  const tw = widgets.find((x) => x.id === id);
+                  if (!tw) return;
+                  const cur = liveCanvas(tw, geomDraft);
+                  const nx = Math.max(0, cur.x + dx);
+                  const ny = Math.max(0, cur.y + dy);
+                  setGeomDraft((d) => ({
+                    ...d,
+                    [id]: { ...d[id], x: nx, y: ny },
+                  }));
+                  emit({
+                    type: "moveWidget",
+                    pageId: activePage.id,
+                    widgetId: id,
+                    x: nx,
+                    y: ny,
                   });
                 }}
                 onDuplicate={(id) =>

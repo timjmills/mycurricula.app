@@ -170,10 +170,19 @@ export function WidgetLibrary({
   );
 
   // ── Derived: the visible card grid ────────────────────────────────────────
+  // Browse scopes that constrain the grid:
+  //   • favorites  → starred widgets (local state)
+  //   • recent     → widgets already on the board (`addedTypes` — the only real
+  //                  recency signal available client-side until the backend
+  //                  tracks usage)
+  //   • suggested  → no backing data yet → honest empty set (see the tuned empty
+  //                  message below) rather than silently showing every widget.
   const visible = useMemo<WidgetMeta[]>(() => {
     const q = query.trim().toLowerCase();
     return WIDGET_CATALOG.filter((meta) => {
       if (browse === "favorites" && !favorites.has(meta.type)) return false;
+      if (browse === "recent" && !added.has(meta.type)) return false;
+      if (browse === "suggested") return false;
       if (category !== "all" && !matchesCategory(meta, category)) return false;
       if (q) {
         const hay = `${meta.label} ${meta.kicker}`.toLowerCase();
@@ -181,7 +190,7 @@ export function WidgetLibrary({
       }
       return true;
     });
-  }, [query, browse, category, favorites]);
+  }, [query, browse, category, favorites, added]);
 
   const selectBrowse = useCallback((id: BrowseId): void => {
     setBrowse(id);
@@ -360,7 +369,15 @@ export function WidgetLibrary({
 
         {/* Widget card grid */}
         {visible.length === 0 ? (
-          <p className={styles.empty}>No widgets match your search.</p>
+          <p className={styles.empty}>
+            {browse === "recent"
+              ? "No widgets used yet — add one and it shows up here."
+              : browse === "suggested"
+                ? "Suggestions arrive once the board learns what you use."
+                : browse === "favorites"
+                  ? "No favorites yet — tap the star on a widget to add it here."
+                  : "No widgets match your search."}
+          </p>
         ) : (
           <div className={styles.grid}>
             {visible.map((meta) => {

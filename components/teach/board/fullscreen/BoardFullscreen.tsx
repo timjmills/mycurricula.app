@@ -268,13 +268,23 @@ export function BoardFullscreen({
 
   // Sticky / text-drop on the bare board (sticky drops a sticky-note widget;
   // the text tool itself is handled by the annotation layer, not here).
-  const handleRootPointerDown = useCallback(() => {
-    if (tool === "sticky") {
+  const handleRootPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (tool !== "sticky") return;
+      // Only drop when the pointer lands on the bare board — never when it lands
+      // on the chrome (markup panel, favorites bar, page nav, popups, top
+      // buttons). Without this guard, tapping any control while sticky-mode is
+      // active would spuriously drop a widget under the chrome.
+      const target = e.target as HTMLElement;
+      if (target.closest("button, input, textarea, [role='dialog'], a")) {
+        return;
+      }
       // "text" is the closest widget type for a sticky note today; the lead's
       // repo applies the yellow sticky appearance when wiring onAddWidget.
       addWidget("text");
-    }
-  }, [tool, addWidget]);
+    },
+    [tool, addWidget],
+  );
 
   // ── Esc exits + focus trap ─────────────────────────────────────────────────
   const handleKeyDown = useCallback(
@@ -407,13 +417,6 @@ export function BoardFullscreen({
           }}
         >
           <Glyph name="expand" />
-        </button>
-        <button
-          type="button"
-          className={styles.chromeBtn}
-          aria-label="More board options"
-        >
-          <Glyph name="moreV" />
         </button>
       </div>
 
