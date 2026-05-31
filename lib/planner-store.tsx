@@ -61,6 +61,7 @@ import { LESSONS } from "@/lib/mock";
 import { ME } from "@/lib/mock/teachers";
 import { plannerClient } from "@/lib/planner/client";
 import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
+import { useConsequenceToast } from "@/lib/consequence-toast";
 import {
   LESSON_TEMPLATE_BY_ID,
   DEFAULT_LESSON_TEMPLATE_ID,
@@ -1401,6 +1402,14 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
 
+  // Surface a best-effort signal when a background persist write fails. Reuses
+  // the app's ConsequenceToast (a no-op outside its provider, so this never
+  // crashes in tests/stories). The reducer remains the source of truth for the
+  // session; this just makes a dropped write visible instead of silent.
+  const { showConsequence } = useConsequenceToast();
+  const showConsequenceRef = useRef(showConsequence);
+  showConsequenceRef.current = showConsequence;
+
   // ── Backend hydration (planner Supabase seam) ──────────────────────────
   // When NEXT_PUBLIC_PLANNER_USE_SUPABASE=1, replace the mock-seeded document
   // with real lessons + sections from the backend on mount. With the flag OFF
@@ -1438,6 +1447,14 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const { history, lastChange } = state;
   const { past, present, future } = history;
 
+  // Latest `present` doc, for the section-mutator persist tees that must read
+  // the CURRENT sections to compute the array they ship to the source's
+  // `setSections` (the source contract exposes setSections / add / remove only,
+  // so reorder/edit/add/remove-section all tee a full setSections of the next
+  // array). Updated each render; the reducer stays the in-session authority.
+  const presentRef = useRef(present);
+  presentRef.current = present;
+
   // ── Selectors ────────────────────────────────────────────────────────
 
   const getLesson = useCallback(
@@ -1453,11 +1470,12 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
 
   // ── Optimistic persistence tee (planner Supabase seam) ─────────────────
   // Mutators dispatch to the reducer FIRST (snappy optimistic UI), then fire a
-  // best-effort write through plannerClient. With the backend flag OFF,
-  // plannerClient delegates to the in-memory mock (a harmless no-op echo), so
-  // this is inert for the prototype. Errors are swallowed here; a follow-up adds
-  // a reconcile-on-error toast (the reducer remains the source of truth for the
-  // session). Fire-and-forget — never blocks the UI thread.
+  // best-effort write through plannerClient. With the backend flag OFF
+  // (!isPlannerSupabaseConfigured), this returns immediately — flag-OFF
+  // behaviour is byte-identical to dispatch-only. With the flag ON the write
+  // routes to the Supabase source under RLS. The reducer remains the source of
+  // truth for the session; a failed write no longer vanishes silently — it logs
+  // and raises a transient toast so the teacher knows the change didn't save.
   const persist = useCallback(
     <M extends keyof typeof plannerClient>(
       method: M,
@@ -1467,8 +1485,13 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       const fn = plannerClient[method] as (
         ...a: Parameters<(typeof plannerClient)[M]>
       ) => Promise<unknown>;
-      void fn.apply(plannerClient, args).catch(() => {
-        // Best-effort; reducer state stands. Reconcile toast is a follow-up.
+      void fn.apply(plannerClient, args).catch((err: unknown) => {
+        // Best-effort; reducer state stands for the session. Surface the failure
+        // instead of swallowing it so a dropped write is visible.
+        console.error(`[planner] persist ${String(method)} failed:`, err);
+        showConsequenceRef.current({
+          message: "Couldn't save that change — it'll stay until you reload.",
+        });
       });
     },
     [],
@@ -1574,23 +1597,44 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [],
   );
 
+  // Persist the post-mutation section array for a lesson by re-deriving it
+  // through the pure reducer from the CURRENT (pre-dispatch) doc, then teeing a
+  // full `setSections` to the source. The source contract exposes only
+  // setSections / addSectionResource / removeSectionResource, so every section
+  // shape change (reorder / edit / add / remove / duplicate / resource edit /
+  // resource move) is persisted as a full setSections of the next array — the
+  // section table is the source of truth for heading/body/order. Inert when the
+  // backend flag is off (persist() returns immediately).
+  const persistSectionsAfter = useCallback(
+    (action: PlannerAction, lessonId: string) => {
+      if (!isPlannerSupabaseConfigured()) return;
+      const nextDoc = applyDocAction(presentRef.current, action);
+      const next = ensureSections(nextDoc.sections, lessonId);
+      persist("setSections", lessonId, next, ME.id);
+    },
+    [persist],
+  );
+
   const setSections = useCallback(
     (lessonId: string, next: LessonSectionContent[]) => {
       dispatchRef.current({ type: "setSections", lessonId, next });
+      persist("setSections", lessonId, next, ME.id);
     },
-    [],
+    [persist],
   );
 
   const reorderSections = useCallback(
     (lessonId: string, activeId: string, overId: string) => {
-      dispatchRef.current({
+      const action: PlannerAction = {
         type: "reorderSections",
         lessonId,
         activeId,
         overId,
-      });
+      };
+      dispatchRef.current(action);
+      persistSectionsAfter(action, lessonId);
     },
-    [],
+    [persistSectionsAfter],
   );
 
   const editSection = useCallback(
@@ -1600,31 +1644,53 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       patch: Partial<LessonSectionContent>,
       coalesce?: { key: string; ts: number },
     ) => {
-      dispatchRef.current({
+      const action: PlannerAction = {
         type: "editSection",
         lessonId,
         sectionId,
         patch,
         coalesceKey: coalesce?.key ?? `section:${lessonId}:${sectionId}:patch`,
         coalesceTs: coalesce?.ts ?? Date.now(),
-      });
+      };
+      dispatchRef.current(action);
+      persistSectionsAfter(action, lessonId);
     },
-    [],
+    [persistSectionsAfter],
   );
 
-  const addSection = useCallback((lessonId: string, heading?: string) => {
-    dispatchRef.current({ type: "addSection", lessonId, heading });
-  }, []);
+  const addSection = useCallback(
+    (lessonId: string, heading?: string) => {
+      const action: PlannerAction = { type: "addSection", lessonId, heading };
+      dispatchRef.current(action);
+      persistSectionsAfter(action, lessonId);
+    },
+    [persistSectionsAfter],
+  );
 
-  const removeSection = useCallback((lessonId: string, sectionId: string) => {
-    dispatchRef.current({ type: "removeSection", lessonId, sectionId });
-  }, []);
+  const removeSection = useCallback(
+    (lessonId: string, sectionId: string) => {
+      const action: PlannerAction = {
+        type: "removeSection",
+        lessonId,
+        sectionId,
+      };
+      dispatchRef.current(action);
+      persistSectionsAfter(action, lessonId);
+    },
+    [persistSectionsAfter],
+  );
 
   const duplicateSection = useCallback(
     (lessonId: string, sectionId: string) => {
-      dispatchRef.current({ type: "duplicateSection", lessonId, sectionId });
+      const action: PlannerAction = {
+        type: "duplicateSection",
+        lessonId,
+        sectionId,
+      };
+      dispatchRef.current(action);
+      persistSectionsAfter(action, lessonId);
     },
-    [],
+    [persistSectionsAfter],
   );
 
   const addSectionResource = useCallback(
@@ -1642,8 +1708,19 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         sectionId,
         resource,
       });
+      // Direct contract match: the source mints/strips the resource id, so a
+      // bare LessonResource is the right shape to ship.
+      const { id: _omit, ...bare } = resource;
+      void _omit;
+      persist(
+        "addSectionResource",
+        lessonId,
+        sectionId,
+        bare as LessonResource,
+        ME.id,
+      );
     },
-    [],
+    [persist],
   );
 
   const editSectionResource = useCallback(
@@ -1653,7 +1730,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       resourceId: string,
       patch: Partial<SectionResource>,
     ) => {
-      dispatchRef.current({
+      const action: PlannerAction = {
         type: "editSectionResource",
         lessonId,
         sectionId,
@@ -1661,9 +1738,13 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         patch,
         coalesceKey: `editResource:${lessonId}:${sectionId}:${resourceId}`,
         coalesceTs: Date.now(),
-      });
+      };
+      dispatchRef.current(action);
+      // No direct source method for editing a resource in place — persist the
+      // whole next section array.
+      persistSectionsAfter(action, lessonId);
     },
-    [],
+    [persistSectionsAfter],
   );
 
   const removeSectionResource = useCallback(
@@ -1674,8 +1755,10 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         sectionId,
         resourceId,
       });
+      // Direct contract match.
+      persist("removeSectionResource", lessonId, sectionId, resourceId, ME.id);
     },
-    [],
+    [persist],
   );
 
   const moveSectionResource = useCallback(
@@ -1685,15 +1768,18 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       targetSectionId: string,
       resource: SectionResource,
     ) => {
-      dispatchRef.current({
+      const action: PlannerAction = {
         type: "moveSectionResource",
         lessonId,
         sourceSectionId,
         targetSectionId,
         resource,
-      });
+      };
+      dispatchRef.current(action);
+      // Cross-section move has no direct source method — persist the next array.
+      persistSectionsAfter(action, lessonId);
     },
-    [],
+    [persistSectionsAfter],
   );
 
   const toggleSectionWebsite = useCallback(

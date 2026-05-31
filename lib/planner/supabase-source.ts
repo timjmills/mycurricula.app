@@ -40,28 +40,23 @@
 //   per-request reverse index maps the uuids a query returns back to the slugs
 //   the domain types expect.
 //
-// SCHEMA GAPS (reported to the lead — NOT patched here; B is single-file and
-// must not edit SQL):
-//   1. SECTIONS — `getSections` / `setSections` / `addSectionResource` /
-//      `removeSectionResource` operate on the per-lesson SECTION model
-//      (`LessonSectionContent`, lib/lesson-flow.ts). The schema has NO
-//      lesson-section table: a lesson's sections are a frontend construct
-//      instantiated from a lesson-flow template, and only the FLAT lesson-level
-//      `resources` jsonb is persisted. This source therefore derives a single
-//      synthetic section on read (carrying the lesson's resources) and, on a
-//      section mutation, writes the union of all section resources back to the
-//      lesson's `resources` jsonb (forking in personal mode). Section
-//      headings/bodies/order do NOT persist until a lesson_sections table lands.
-//   2. SUBJECT/UNIT GRADE for createLesson — a new personal lesson needs a
-//      `unit_id` + `subject_id` (NOT NULL on the copies table) and a
-//      `master_core_lesson_event_id` (also NOT NULL). The contract's
-//      `createLesson` creates a teacher's OWN lesson with no backing master,
-//      but `personal_core_lesson_event_copies.master_core_lesson_event_id` is
-//      NOT NULL with an FK. There is no "personal-only lesson" table in this
-//      schema (the spec's `extra_lesson_events` is date-keyed, not
-//      week/day-keyed, and is a different entity). `createLesson` therefore
-//      throws a descriptive error flagging the gap rather than silently
-//      corrupting the fork model.
+// SCHEMA NOTES (migration 20260601120000_planner_sections_personal.sql closed
+// the first two gaps; the third remains derived):
+//   1. SECTIONS — `lesson_sections` now persists a lesson's editable sections
+//      (heading / prompt / body / ordered resources, polymorphic owner). This
+//      source writes ONLY owner-scoped personal rows (owner_id = auth.uid(),
+//      owner_kind = personal_copy for a master-backed lesson, personal_authored
+//      for a teacher-authored one) — it NEVER writes a team/master section
+//      (owner_id null), which sidesteps the latent grade-wide write-policy gap
+//      the security review flagged. `getSections` reads the teacher's rows and
+//      falls back to a single synthetic section (from the lesson's flat
+//      resources) when none exist yet, preserving the prior empty state. The
+//      flat lesson-level `resources` jsonb is kept mirrored for flat readers.
+//   2. createLesson — `personal_authored_lessons` is the home for a teacher's
+//      OWN week/day-keyed lesson with no backing master. `createLesson` inserts
+//      an owner-scoped row (owner = auth.uid(), grade resolved, subject/unit
+//      slugs mapped to uuids); `listLessons` UNIONs the grade's authored rows so
+//      created lessons appear. Matches the mock source's createLesson semantics.
 //   3. PERSONAL MOVE/ORDER metadata — the FLAT `Lesson.moved` ("same-week" /
 //      "across-weeks") is DERIVED here by comparing the personal copy's
 //      week/day to its master; the schema has no explicit "moved" column.
@@ -78,7 +73,7 @@ import type {
   Unit,
 } from "../types";
 import { SUBJECTS } from "../mock/subjects";
-import type { LessonSectionContent } from "../lesson-flow";
+import type { LessonSectionContent, SectionResource } from "../lesson-flow";
 import {
   type LessonMoveTarget,
   type LessonPatch,
@@ -128,9 +123,7 @@ async function resolveGradeLevelId(
 /** Resolve the authed teacher's own id (auth.uid()) server-side, ignoring any
  *  client-passed ownerId (which may be a mock slug like "lh"). Returns null when
  *  signed out. */
-async function resolveAuthOwner(
-  client: ServerClient,
-): Promise<string | null> {
+async function resolveAuthOwner(client: ServerClient): Promise<string | null> {
   const { data, error } = await client.auth.getUser();
   if (error || !data?.user) return null;
   return data.user.id;
@@ -286,6 +279,50 @@ interface StandardRow {
   description: string | null;
 }
 
+/** A `lesson_sections` row (the editable section content, any owner kind). The
+ *  planner source ALWAYS writes owner-scoped personal rows from here (owner_id =
+ *  the resolved auth uid) — never a team/master section (owner_id null), which
+ *  would exercise the broader RLS write path. See the SECURITY note in the
+ *  section-mutation helpers. */
+interface LessonSectionRow {
+  id: string;
+  owner_kind: LessonOwnerKind;
+  owner_lesson_id: string;
+  owner_id: string | null;
+  grade_level_id: string;
+  template_section_id: string | null;
+  heading: string;
+  prompt: string;
+  body: string;
+  resources: unknown; // jsonb: SectionResource[]
+  display_order: number;
+}
+
+/** A `personal_authored_lessons` row (a teacher's OWN week/day-keyed lesson with
+ *  no master to fork). Mirrors the master event's content columns. */
+interface PersonalAuthoredRow {
+  id: string;
+  owner_id: string;
+  grade_level_id: string;
+  unit_id: string | null;
+  subject_id: string;
+  week_number: number;
+  day_of_week: Weekday;
+  title: string;
+  directions: string | null;
+  learning_objectives: unknown;
+  notes: string | null;
+  resources: unknown;
+  standards: string[];
+  display_order_within_day: number;
+  status: string | null;
+  reason_not_done: string | null;
+  deleted_at: string | null;
+}
+
+/** The polymorphic owner kind for a `lesson_sections` row (migration enum). */
+type LessonOwnerKind = "master" | "personal_copy" | "personal_authored";
+
 // Column lists kept in one place so reads stay consistent.
 const MASTER_COLS =
   "id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, deleted_at";
@@ -296,6 +333,10 @@ const UNIT_COLS = "id, grade_level_id, subject_id, name, start_week, end_week";
 const SUBJECT_COLS =
   "id, grade_level_id, name, color, parent_id, display_order";
 const STANDARD_COLS = "id, code, description";
+const LESSON_SECTION_COLS =
+  "id, owner_kind, owner_lesson_id, owner_id, grade_level_id, template_section_id, heading, prompt, body, resources, display_order";
+const PERSONAL_AUTHORED_COLS =
+  "id, owner_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, status, reason_not_done, deleted_at";
 
 // ── jsonb helpers ─────────────────────────────────────────────────────────────
 
@@ -327,6 +368,34 @@ function jsonToResources(raw: unknown): LessonResource[] {
       typeof (r as { type?: unknown }).type === "string" &&
       typeof (r as { label?: unknown }).label === "string",
   );
+}
+
+/** Coerce a jsonb `resources` value (a section's inline resources, which carry
+ *  an `id`) to a typed `SectionResource[]`. Defensive: filters to objects with a
+ *  string `type` + `label`, minting an id where the stored shape lacks one. */
+function jsonToSectionResources(
+  raw: unknown,
+  lessonId: string,
+  sectionId: string,
+): SectionResource[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SectionResource[] = [];
+  raw.forEach((r, i) => {
+    if (
+      typeof r === "object" &&
+      r !== null &&
+      typeof (r as { type?: unknown }).type === "string" &&
+      typeof (r as { label?: unknown }).label === "string"
+    ) {
+      const rec = r as Record<string, unknown>;
+      const id =
+        typeof rec.id === "string" && rec.id.length > 0
+          ? rec.id
+          : `${lessonId}-${sectionId}-r${i}`;
+      out.push({ ...(rec as unknown as LessonResource), id });
+    }
+  });
+  return out;
 }
 
 // ── Standards uuid[] ↔ slug code[] bridge ─────────────────────────────────────
@@ -593,7 +662,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
     for (const c of complRows) complByMaster.set(c.core_lesson_event_id, c);
 
     // 4. Resolve personal-over-master and map each to a FLAT Lesson.
-    return masterRows.map((master) => {
+    const masterDerived = masterRows.map((master) => {
       const copy = copyByMaster.get(master.id);
       const compl = complByMaster.get(master.id);
       const status = compl ? statusFromDb(compl.status) : "not_done";
@@ -623,6 +692,35 @@ export const plannerSupabaseSource: PlannerDataSource = {
         moved: copy ? deriveMoved(master, copy) : null,
       });
     });
+
+    // 5. UNION the teacher's own personal-authored lessons for the grade
+    //    (owner-scoped; created via `createLesson`). These have no master to
+    //    fork — they are personal by definition. RLS limits to auth.uid()'s
+    //    rows; the explicit owner filter keeps the read owner-scoped.
+    if (!owner) return masterDerived;
+    const authoredRes = await client
+      .from("personal_authored_lessons")
+      .select(PERSONAL_AUTHORED_COLS)
+      .eq("owner_id", owner)
+      .eq("grade_level_id", grade)
+      .is("deleted_at", null)
+      .order("week_number", { ascending: true })
+      .order("display_order_within_day", { ascending: true });
+    const authoredRows = unwrap(
+      authoredRes,
+      "list personal-authored lessons",
+    ) as PersonalAuthoredRow[];
+
+    const authoredDerived = authoredRows.map((row) =>
+      authoredRowToLesson(
+        row,
+        uuidToSubjectId.get(row.subject_id) ?? "math",
+        row.unit_id ? (uuidToUnitSlug.get(row.unit_id) ?? row.unit_id) : "",
+        standards,
+      ),
+    );
+
+    return [...masterDerived, ...authoredDerived];
   },
 
   async listUnits(gradeLevelId) {
@@ -682,24 +780,35 @@ export const plannerSupabaseSource: PlannerDataSource = {
   },
 
   async getSections(lessonId) {
-    // SCHEMA GAP (see header note 1): no lesson-section table. A lesson's
-    // sections are a frontend template instantiation; only the flat lesson-level
-    // `resources` jsonb persists. We expose a single synthetic section carrying
-    // the lesson's resources so the Teach/section UI has a real container to
-    // read. Headings/bodies/order do not persist until a lesson_sections table
-    // lands. Reading the master row (the contract's `lessonId` is the master id).
+    // `lesson_sections` is the source of truth for a lesson's editable sections
+    // (heading/prompt/body/ordered resources). We read THIS teacher's
+    // owner-scoped rows for the lesson (RLS already limits to auth.uid()'s rows;
+    // the explicit `owner_id` filter excludes any team/master section the source
+    // never authors). When the teacher has no persisted sections yet we keep
+    // today's empty-state behaviour: synthesize a single section from the
+    // lesson's flat `resources` jsonb so the Teach/section UI always has a real
+    // container to read.
     const client = await sb();
-    const res = await client
-      .from("master_core_lesson_events")
-      .select("id, resources")
-      .eq("id", lessonId)
-      .maybeSingle();
-    const row = unwrapMaybe(res, "get sections (load lesson)") as {
-      id: string;
-      resources: unknown;
-    } | null;
-    if (!row) throw new Error(`Lesson not found: ${lessonId}`);
-    const resources = jsonToResources(row.resources);
+    const owner = await resolveAuthOwner(client);
+
+    if (owner) {
+      const secRes = await client
+        .from("lesson_sections")
+        .select(LESSON_SECTION_COLS)
+        .eq("owner_lesson_id", lessonId)
+        .eq("owner_id", owner)
+        .order("display_order", { ascending: true });
+      const rows = unwrap(secRes, "get sections") as LessonSectionRow[];
+      if (rows.length > 0) {
+        return rows.map((row) => sectionRowToContent(row, lessonId));
+      }
+    }
+
+    // Empty state: derive a single synthetic section from the lesson's resources
+    // (personal copy where one exists, else master, else personal-authored).
+    const resources = owner
+      ? await readResources(client, lessonId, owner)
+      : await readResourcesAnonymous(client, lessonId);
     const section: LessonSectionContent = {
       id: `${lessonId}-s0`,
       templateSectionId: null,
@@ -789,19 +898,63 @@ export const plannerSupabaseSource: PlannerDataSource = {
     return reloadLesson(client, lessonId, ownerId);
   },
 
-  async createLesson(input, ownerId) {
-    // SCHEMA GAP (see header note 2): a teacher's OWN week/day-keyed lesson with
-    // no backing master has no table in this schema —
-    // `personal_core_lesson_event_copies` requires a NOT-NULL
-    // `master_core_lesson_event_id` (+ FK), and `extra_lesson_events` is
-    // date-keyed, not week/day-keyed. Creating one would either corrupt the fork
-    // model (a copy with no master) or land in the wrong entity. Throw loudly
-    // rather than silently mis-persist.
-    void input;
-    void ownerId;
-    throw new Error(
-      "Planner repository createLesson is unavailable: the schema has no week/day-keyed personal-lesson table (personal_core_lesson_event_copies requires a master FK; extra_lesson_events is date-keyed). Add a personal-lesson table before wiring teacher-authored lessons.",
-    );
+  async createLesson(input, clientOwnerId) {
+    // A teacher's OWN week/day-keyed lesson with no backing master now persists
+    // to `personal_authored_lessons` (migration 20260601120000). Owner-scoped:
+    // owner = the resolved auth uid (NOT the client-passed slug); grade resolved
+    // server-side; subject/unit slugs mapped to uuids. Mirrors the mock source's
+    // createLesson semantics (fresh personal lesson, empty content, not_done).
+    const client = await sb();
+    const owner = await resolveAuthOwner(client);
+    if (!owner) {
+      throw new Error(
+        "Planner repository createLesson failed: no authenticated teacher.",
+      );
+    }
+    void clientOwnerId; // client-passed owner is never trusted (may be a slug).
+
+    const grade = await resolveGradeLevelId(client, input.gradeLevelId);
+    if (!grade) {
+      throw new Error(
+        "Planner repository createLesson failed: caller has no grade assignment.",
+      );
+    }
+
+    const subjectId = await resolveSubjectId(client, grade, input.subject);
+    if (!subjectId) {
+      throw new Error(
+        `Planner repository createLesson failed: subject not found for grade: ${input.subject}`,
+      );
+    }
+    const unitId = resolveUnitId(input.unit);
+
+    const insert = {
+      owner_id: owner,
+      grade_level_id: grade,
+      unit_id: unitId,
+      subject_id: subjectId,
+      week_number: input.week,
+      day_of_week: dayIndexToWeekday(input.day),
+      title: input.title,
+      directions: null,
+      learning_objectives: [],
+      notes: null,
+      resources: [],
+      standards: [],
+      display_order_within_day: 0,
+      status: "not_done",
+      reason_not_done: null,
+    };
+
+    const res = await client
+      .from("personal_authored_lessons")
+      .insert(insert)
+      .select(PERSONAL_AUTHORED_COLS)
+      .single();
+    const row = unwrap(res, "create lesson") as PersonalAuthoredRow;
+
+    const standardsIndex = await loadStandardsIndex(client, grade);
+    return authoredRowToLesson(row, input.subject, input.unit, standardsIndex);
   },
 
   async softDeleteLesson(lessonId, ownerId) {
@@ -822,49 +975,143 @@ export const plannerSupabaseSource: PlannerDataSource = {
   },
 
   // ── Section + resource mutations ──────────────────────────────────────────
-  async setSections(lessonId, sections, ownerId) {
-    // SCHEMA GAP (header note 1): persist only the UNION of section resources
-    // back to the lesson's flat `resources` jsonb (forking in personal mode).
-    // Section headings/bodies/order do not persist. We strip the runtime
-    // section-resource `id` so the stored shape matches the lesson `resources`
-    // jsonb contract.
+  //
+  // SECURITY: every write below is OWNER-SCOPED — owner_id is the resolved auth
+  // uid and the owner_kind reflects how the lesson is owned (personal_copy /
+  // personal_authored). This source NEVER writes a team/master section
+  // (owner_id null), which would otherwise let a teacher insert a grade-wide
+  // section pointing at any lesson in their grade (the latent `lesson_sections`
+  // write-policy gap flagged by the security review). Keeping every row
+  // owner-gated sidesteps that path entirely.
+  async setSections(lessonId, sections, clientOwnerId) {
     const client = await sb();
+    const owner = await resolveAuthOwner(client);
+    if (!owner) {
+      throw new Error(
+        "Planner repository setSections failed: no authenticated teacher.",
+      );
+    }
+    void clientOwnerId;
+    const { ownerKind, gradeLevelId } = await resolveSectionOwner(
+      client,
+      lessonId,
+      owner,
+    );
+
+    // Replace the teacher's section set for this lesson: delete their existing
+    // owner-scoped rows, then insert the new ordered set. (A full replace keeps
+    // heading/body/order/resources authoritative for the section table.)
+    const del = await client
+      .from("lesson_sections")
+      .delete()
+      .eq("owner_lesson_id", lessonId)
+      .eq("owner_id", owner);
+    if (del.error) {
+      throw new Error(
+        `Planner repository setSections (clear) failed: ${del.error.message}`,
+      );
+    }
+
+    if (sections.length > 0) {
+      const rows = sections.map((section, i) => ({
+        owner_kind: ownerKind,
+        owner_lesson_id: lessonId,
+        owner_id: owner,
+        grade_level_id: gradeLevelId,
+        template_section_id: isUuid(section.templateSectionId)
+          ? section.templateSectionId
+          : null,
+        heading: section.heading,
+        prompt: section.prompt,
+        body: section.body,
+        resources: section.resources,
+        display_order: i,
+      }));
+      const ins = await client.from("lesson_sections").insert(rows);
+      if (ins.error) {
+        throw new Error(
+          `Planner repository setSections (insert) failed: ${ins.error.message}`,
+        );
+      }
+    }
+
+    // Mirror the UNION of section resources back to the lesson's flat
+    // `resources` jsonb so flat-resource readers (weekly card / daily detail)
+    // stay in sync. The section table is now the source of truth for
+    // heading/body/order; the flat mirror is a denormalized convenience.
     const merged = flattenSectionResources(sections);
-    await forkAndPatch(client, lessonId, ownerId, () => ({
-      resources: merged,
-    }));
+    await patchLessonResources(client, lessonId, owner, ownerKind, merged);
+
     return this.getSections(lessonId);
   },
 
-  async addSectionResource(lessonId, sectionId, resource, ownerId) {
-    // SCHEMA GAP (header note 1): with one synthetic section, "add to a section"
-    // appends to the lesson's flat resources. `sectionId` is accepted for
-    // contract parity but every resource lives on the single implicit section.
-    void sectionId;
+  async addSectionResource(lessonId, sectionId, resource, clientOwnerId) {
     const client = await sb();
-    const current = await readResources(client, lessonId, ownerId);
-    const next = [...current, stripResourceRuntimeId(resource)];
-    await forkAndPatch(client, lessonId, ownerId, () => ({ resources: next }));
-    return this.getSections(lessonId);
+    const owner = await resolveAuthOwner(client);
+    if (!owner) {
+      throw new Error(
+        "Planner repository addSectionResource failed: no authenticated teacher.",
+      );
+    }
+    void clientOwnerId;
+    const { ownerKind, gradeLevelId } = await resolveSectionOwner(
+      client,
+      lessonId,
+      owner,
+    );
+
+    const sections = await ensurePersistedSections(
+      client,
+      lessonId,
+      owner,
+      ownerKind,
+      gradeLevelId,
+    );
+    const target =
+      sections.find((s) => s.id === sectionId) ?? sections[0] ?? null;
+    if (!target) {
+      throw new Error(
+        `Planner repository addSectionResource failed: no section to add to for lesson ${lessonId}.`,
+      );
+    }
+    const added: SectionResource = {
+      ...stripResourceRuntimeId(resource),
+      id: `${lessonId}-${target.id}-r${target.resources.length}`,
+    };
+    const next = sections.map((s) =>
+      s.id === target.id ? { ...s, resources: [...s.resources, added] } : s,
+    );
+    return this.setSections(lessonId, next, owner);
   },
 
-  async removeSectionResource(lessonId, sectionId, resourceId, ownerId) {
-    // SCHEMA GAP (header note 1): the synthetic section assigns each resource a
-    // derived id `${lessonId}-r<index>`; removing by that id drops the matching
-    // index from the flat resources array.
-    void sectionId;
+  async removeSectionResource(lessonId, sectionId, resourceId, clientOwnerId) {
     const client = await sb();
-    const current = await readResources(client, lessonId, ownerId);
-    const prefix = `${lessonId}-r`;
-    const idx = resourceId.startsWith(prefix)
-      ? Number.parseInt(resourceId.slice(prefix.length), 10)
-      : -1;
-    const next =
-      idx >= 0 && idx < current.length
-        ? current.filter((_, i) => i !== idx)
-        : current;
-    await forkAndPatch(client, lessonId, ownerId, () => ({ resources: next }));
-    return this.getSections(lessonId);
+    const owner = await resolveAuthOwner(client);
+    if (!owner) {
+      throw new Error(
+        "Planner repository removeSectionResource failed: no authenticated teacher.",
+      );
+    }
+    void clientOwnerId;
+    const { ownerKind, gradeLevelId } = await resolveSectionOwner(
+      client,
+      lessonId,
+      owner,
+    );
+
+    const sections = await ensurePersistedSections(
+      client,
+      lessonId,
+      owner,
+      ownerKind,
+      gradeLevelId,
+    );
+    const next = sections.map((s) =>
+      s.id === sectionId
+        ? { ...s, resources: s.resources.filter((r) => r.id !== resourceId) }
+        : s,
+    );
+    return this.setSections(lessonId, next, owner);
   },
 };
 
@@ -1070,17 +1317,239 @@ async function reloadLesson(
   });
 }
 
+/** Load a teacher's personal-authored lesson by id (owner-scoped), or null. */
+async function loadAuthored(
+  client: ServerClient,
+  lessonId: string,
+  ownerId: string,
+): Promise<PersonalAuthoredRow | null> {
+  const res = await client
+    .from("personal_authored_lessons")
+    .select(PERSONAL_AUTHORED_COLS)
+    .eq("id", lessonId)
+    .eq("owner_id", ownerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  return unwrapMaybe(res, "load authored lesson") as PersonalAuthoredRow | null;
+}
+
 /** Read the effective resources for a lesson (personal copy where one exists,
- *  else master) as a typed array. */
+ *  else master, else the teacher's personal-authored lesson) as a typed array.
+ *  Owner-scoped: only the auth uid's copy / authored rows are consulted. */
 async function readResources(
   client: ServerClient,
   lessonId: string,
   ownerId: string,
 ): Promise<LessonResource[]> {
+  const authored = await loadAuthored(client, lessonId, ownerId);
+  if (authored) return jsonToResources(authored.resources);
   const copy = await loadCopy(client, lessonId, ownerId);
   if (copy) return jsonToResources(copy.resources);
-  const master = await loadMaster(client, lessonId);
-  return jsonToResources(master.resources);
+  const master = await loadMasterMaybe(client, lessonId);
+  return master ? jsonToResources(master.resources) : [];
+}
+
+/** Read a lesson's master resources when no teacher is resolved (signed-out
+ *  empty-state read). Returns an empty array if the lesson isn't a master row. */
+async function readResourcesAnonymous(
+  client: ServerClient,
+  lessonId: string,
+): Promise<LessonResource[]> {
+  const master = await loadMasterMaybe(client, lessonId);
+  return master ? jsonToResources(master.resources) : [];
+}
+
+/** Load a master row by id, returning null (not throwing) when absent — used by
+ *  the section paths where the lesson may instead be a personal-authored row. */
+async function loadMasterMaybe(
+  client: ServerClient,
+  lessonId: string,
+): Promise<MasterEventRow | null> {
+  const res = await client
+    .from("master_core_lesson_events")
+    .select(MASTER_COLS)
+    .eq("id", lessonId)
+    .maybeSingle();
+  return unwrapMaybe(
+    res,
+    "load master lesson (maybe)",
+  ) as MasterEventRow | null;
+}
+
+/** Map a `lesson_sections` row → the frontend `LessonSectionContent`. */
+function sectionRowToContent(
+  row: LessonSectionRow,
+  lessonId: string,
+): LessonSectionContent {
+  return {
+    id: row.id,
+    templateSectionId: row.template_section_id,
+    heading: row.heading,
+    prompt: row.prompt,
+    body: row.body,
+    resources: jsonToSectionResources(row.resources, lessonId, row.id),
+  };
+}
+
+/** Resolve how a lesson is owned (for the polymorphic `lesson_sections.owner_kind`)
+ *  and the grade to denormalize onto its sections. Owner-scoped: a
+ *  personal-authored lesson (owner = auth uid) → 'personal_authored'; otherwise
+ *  the lesson is a master event and the teacher's sections fork it as
+ *  'personal_copy'. We NEVER write owner_kind 'master' / owner_id null here. */
+async function resolveSectionOwner(
+  client: ServerClient,
+  lessonId: string,
+  ownerId: string,
+): Promise<{ ownerKind: LessonOwnerKind; gradeLevelId: string }> {
+  const authored = await loadAuthored(client, lessonId, ownerId);
+  if (authored) {
+    return {
+      ownerKind: "personal_authored",
+      gradeLevelId: authored.grade_level_id,
+    };
+  }
+  const master = await loadMasterMaybe(client, lessonId);
+  if (!master) throw new Error(`Lesson not found: ${lessonId}`);
+  // Derive the grade from the master lesson's unit.
+  const unitRes = await client
+    .from("units")
+    .select("id, grade_level_id")
+    .eq("id", master.unit_id)
+    .maybeSingle();
+  const unitRow = unwrapMaybe(unitRes, "resolve section owner grade") as {
+    id: string;
+    grade_level_id: string;
+  } | null;
+  if (!unitRow) throw new Error(`Unit not found for lesson: ${lessonId}`);
+  return { ownerKind: "personal_copy", gradeLevelId: unitRow.grade_level_id };
+}
+
+/** Read the teacher's persisted owner-scoped sections for a lesson, or — when
+ *  none exist yet — synthesize the empty-state single section from the lesson's
+ *  effective resources so a resource add/remove has a real container. */
+async function ensurePersistedSections(
+  client: ServerClient,
+  lessonId: string,
+  ownerId: string,
+  ownerKind: LessonOwnerKind,
+  gradeLevelId: string,
+): Promise<LessonSectionContent[]> {
+  void ownerKind;
+  void gradeLevelId;
+  const secRes = await client
+    .from("lesson_sections")
+    .select(LESSON_SECTION_COLS)
+    .eq("owner_lesson_id", lessonId)
+    .eq("owner_id", ownerId)
+    .order("display_order", { ascending: true });
+  const rows = unwrap(secRes, "ensure sections") as LessonSectionRow[];
+  if (rows.length > 0) {
+    return rows.map((row) => sectionRowToContent(row, lessonId));
+  }
+  const resources = await readResources(client, lessonId, ownerId);
+  return [
+    {
+      id: `${lessonId}-s0`,
+      templateSectionId: null,
+      heading: "Lesson",
+      prompt: "",
+      body: "",
+      resources: resources.map((r, i) => ({
+        ...r,
+        id: `${lessonId}-s0-r${i}`,
+      })),
+    },
+  ];
+}
+
+/** Mirror a resource union onto the lesson's flat `resources` jsonb. For a
+ *  personal-authored lesson the row is updated in place (owner-scoped); for a
+ *  master-backed lesson the write forks a personal copy (never mutates master).
+ *  Resource runtime ids are stripped to match the flat lesson-resources shape. */
+async function patchLessonResources(
+  client: ServerClient,
+  lessonId: string,
+  ownerId: string,
+  ownerKind: LessonOwnerKind,
+  resources: LessonResource[],
+): Promise<void> {
+  if (ownerKind === "personal_authored") {
+    const res = await client
+      .from("personal_authored_lessons")
+      .update({ resources })
+      .eq("id", lessonId)
+      .eq("owner_id", ownerId);
+    if (res.error) {
+      throw new Error(
+        `Planner repository mirror authored resources failed: ${res.error.message}`,
+      );
+    }
+    return;
+  }
+  await forkAndPatch(client, lessonId, ownerId, () => ({ resources }));
+}
+
+/** Resolve a subject SLUG (the locked SubjectId, e.g. "math") to its uuid PK for
+ *  a grade. Loads the grade's subject rows and matches on the resolved slug. */
+async function resolveSubjectId(
+  client: ServerClient,
+  gradeLevelId: string,
+  subject: SubjectId,
+): Promise<string | null> {
+  if (isUuid(subject)) return subject;
+  const { rows, uuidToSubjectId } = await loadSubjectIndex(
+    client,
+    gradeLevelId,
+  );
+  for (const row of rows) {
+    if (uuidToSubjectId.get(row.id) === subject) return row.id;
+  }
+  return null;
+}
+
+/** Resolve a unit identifier (uuid-as-slug from the read path, or a mock slug)
+ *  to a unit uuid. Returns null when unresolvable — the column is nullable. */
+function resolveUnitId(unit: string | null | undefined): string | null {
+  if (!unit) return null;
+  if (isUuid(unit)) return unit;
+  return slugToUuid("unit", unit);
+}
+
+/** Map a `personal_authored_lessons` row → the FLAT domain `Lesson`. The
+ *  authored lesson is always personal (isPersonal=true) and has no master to be
+ *  "moved" relative to, so `moved` is null. */
+function authoredRowToLesson(
+  row: PersonalAuthoredRow,
+  subject: SubjectId,
+  unit: string,
+  standards: { uuidToCode: Map<string, string> },
+): Lesson {
+  const status: LessonStatus =
+    row.status === "done" ||
+    row.status === "skipped" ||
+    row.status === "partial"
+      ? row.status
+      : row.status === "carried_over"
+        ? "carried"
+        : "not_done";
+  return buildLesson({
+    id: row.id,
+    subject,
+    unit,
+    week: row.week_number,
+    day: weekdayToDayIndex(row.day_of_week),
+    title: row.title,
+    objective: objectivesToObjective(row.learning_objectives),
+    directions: row.directions ?? "",
+    notes: row.notes ?? "",
+    resources: jsonToResources(row.resources),
+    standards: standardUuidsToCodes(row.standards, standards.uuidToCode),
+    status,
+    reasonNotDone: row.reason_not_done ?? "",
+    isPersonal: true,
+    modified: false,
+    moved: null,
+  });
 }
 
 /** Strip a section resource's runtime `id` so the persisted shape matches the
