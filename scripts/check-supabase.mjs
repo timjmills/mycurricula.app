@@ -104,8 +104,10 @@ console.log(`${DIM}Checking ${envPath}${RESET}\n`);
 // keys; either way well above these floors.
 const REQUIRED = [
   { name: "NEXT_PUBLIC_SUPABASE_URL", minLen: 20, kind: "url" },
-  { name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", minLen: 40, kind: "key" },
-  { name: "SUPABASE_SERVICE_ROLE_KEY", minLen: 40, kind: "key" },
+  // New-format keys (sb_publishable_… / sb_secret_…) are shorter than the legacy
+  // JWTs; this floor stays below either real length but above an obvious cut-off.
+  { name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", minLen: 20, kind: "key" },
+  { name: "SUPABASE_SERVICE_ROLE_KEY", minLen: 20, kind: "key" },
 ];
 
 // Optional-but-recommended: warn (not fail) when missing/dummy.
