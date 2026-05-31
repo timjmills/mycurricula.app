@@ -324,3 +324,16 @@ The remaining UI step is pointing the client mutation callsites
 (`components/teach/TeachWorkspace.tsx`) at the `actions.ts` server actions
 instead of the mock `teach` seam — the actions are 1:1 with the
 `TeachDataSource` methods the workspace already calls.
+
+## Note: manual SQL paste limits (2026-06-01)
+
+When applying SQL via the dashboard SQL Editor, very long pastes can be silently
+truncated by some browsers/network filters, so a big multi-row INSERT may run
+incomplete (or not at all) with no error. Mitigations:
+- Apply migrations one file at a time; data in small chunks (≤10 rows), each
+  followed by a separate `select count(*)` to confirm it landed.
+- Prefer the CLI (`supabase db push`) or the node importer
+  (`scripts/import-mock-planner.mjs`) for bulk data — neither has a paste limit.
+- The placeholder lesson set exists ONLY to verify the pipeline; a partial load
+  (e.g. 15 of 39) is sufficient to confirm login → planner → persist works. Real
+  curriculum loads via the importer/upload path, never manual paste.
