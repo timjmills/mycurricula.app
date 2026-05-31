@@ -31,6 +31,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
   useRef,
@@ -57,6 +58,9 @@ import {
 import type { CellLayout } from "@/lib/cell-layout";
 import { cellKey, isTrivialLayout } from "@/lib/cell-layout";
 import { LESSONS } from "@/lib/mock";
+import { ME } from "@/lib/mock/teachers";
+import { plannerClient } from "@/lib/planner/client";
+import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
 import {
   LESSON_TEMPLATE_BY_ID,
   DEFAULT_LESSON_TEMPLATE_ID,
@@ -295,6 +299,9 @@ type ToggleSectionWebsiteAction = {
 
 type UndoAction = { type: "undo" };
 type RedoAction = { type: "redo" };
+/** Replace the whole document with a backend-hydrated one (planner Supabase
+ *  seam). Resets undo/redo history — a hydrate is not an undoable edit. */
+type HydrateAction = { type: "hydrate"; doc: PlannerDoc };
 
 type PlannerAction =
   | MoveLessonAction
@@ -321,7 +328,8 @@ type PlannerAction =
   | MoveSectionResourceAction
   | ToggleSectionWebsiteAction
   | UndoAction
-  | RedoAction;
+  | RedoAction
+  | HydrateAction;
 
 // ── Human labels for undo/redo tooltips ──────────────────────────────────
 
@@ -1007,6 +1015,20 @@ function historyReducer(
     };
   }
 
+  // ── Hydrate ──────────────────────────────────────────────────────────
+  // Replace the whole document with the backend-loaded one and RESET history
+  // (a hydrate isn't an undoable edit). Used only by the planner Supabase seam
+  // on initial load; with the backend flag off this action never fires.
+  if (action.type === "hydrate") {
+    return {
+      ...state,
+      history: { past: [], present: action.doc, future: [] },
+      lastCoalesceKey: null,
+      lastCoalesceTs: 0,
+      lastChange: null,
+    };
+  }
+
   // ── Content mutations ────────────────────────────────────────────────
   const label = labelFor(action);
   const nextDoc = applyDocAction(state.history.present, action);
@@ -1379,6 +1401,40 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
 
+  // ── Backend hydration (planner Supabase seam) ──────────────────────────
+  // When NEXT_PUBLIC_PLANNER_USE_SUPABASE=1, replace the mock-seeded document
+  // with real lessons + sections from the backend on mount. With the flag OFF
+  // this effect is a no-op and the store renders the mock fixtures exactly as
+  // before. Hydration resets undo/redo (a load is not an undoable edit). Errors
+  // are swallowed → the mock document stays visible rather than a blank planner.
+  useEffect(() => {
+    if (!isPlannerSupabaseConfigured()) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const lessons = await plannerClient.listLessons("g5", ME.id);
+        if (!alive || lessons.length === 0) return;
+        // Build the per-lesson sections map from the backend.
+        const sections: PlannerDoc["sections"] = {};
+        await Promise.all(
+          lessons.map(async (l) => {
+            sections[l.id] = await plannerClient.getSections(l.id);
+          }),
+        );
+        if (!alive) return;
+        dispatchRef.current({
+          type: "hydrate",
+          doc: { lessons, sections, cellLayouts: {} },
+        });
+      } catch {
+        // Keep the mock document on any backend/auth error.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const { history, lastChange } = state;
   const { past, present, future } = history;
 
@@ -1395,6 +1451,29 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [present.sections],
   );
 
+  // ── Optimistic persistence tee (planner Supabase seam) ─────────────────
+  // Mutators dispatch to the reducer FIRST (snappy optimistic UI), then fire a
+  // best-effort write through plannerClient. With the backend flag OFF,
+  // plannerClient delegates to the in-memory mock (a harmless no-op echo), so
+  // this is inert for the prototype. Errors are swallowed here; a follow-up adds
+  // a reconcile-on-error toast (the reducer remains the source of truth for the
+  // session). Fire-and-forget — never blocks the UI thread.
+  const persist = useCallback(
+    <M extends keyof typeof plannerClient>(
+      method: M,
+      ...args: Parameters<(typeof plannerClient)[M]>
+    ): void => {
+      if (!isPlannerSupabaseConfigured()) return;
+      const fn = plannerClient[method] as (
+        ...a: Parameters<(typeof plannerClient)[M]>
+      ) => Promise<unknown>;
+      void fn.apply(plannerClient, args).catch(() => {
+        // Best-effort; reducer state stands. Reconcile toast is a follow-up.
+      });
+    },
+    [],
+  );
+
   // ── Mutation callbacks ────────────────────────────────────────────────
 
   const moveLesson = useCallback(
@@ -1403,13 +1482,25 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       patch: { day?: number; subject?: SubjectId; week?: number },
     ) => {
       dispatchRef.current({ type: "moveLesson", id, patch });
+      if (patch.week != null || patch.day != null) {
+        persist(
+          "moveLesson",
+          id,
+          { week: patch.week ?? 0, day: patch.day ?? 0 },
+          ME.id,
+        );
+      }
     },
-    [],
+    [persist],
   );
 
-  const setLessonStatus = useCallback((id: string, status: LessonStatus) => {
-    dispatchRef.current({ type: "setLessonStatus", id, status });
-  }, []);
+  const setLessonStatus = useCallback(
+    (id: string, status: LessonStatus) => {
+      dispatchRef.current({ type: "setLessonStatus", id, status });
+      persist("setLessonStatus", id, status, ME.id);
+    },
+    [persist],
+  );
 
   const editLesson = useCallback(
     (
@@ -1424,8 +1515,11 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         coalesceKey: coalesce?.key ?? `lesson:${id}:patch`,
         coalesceTs: coalesce?.ts ?? Date.now(),
       });
+      // Only the content fields the source's LessonPatch accepts are teed; the
+      // source decides whether the edit forks (personal mode).
+      persist("updateLesson", id, patch, ME.id);
     },
-    [],
+    [persist],
   );
 
   const duplicateLesson = useCallback((id: string) => {
