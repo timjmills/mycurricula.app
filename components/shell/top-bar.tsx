@@ -102,12 +102,6 @@ export const VIEWS: ViewDef[] = [
       "Today's lessons in detail — schedule, lesson cards, and the day's notes",
   },
   {
-    label: "Teach",
-    href: "/teach",
-    tooltip:
-      "Full-screen Teaching View for live class delivery — boards, timers, and resources on the projector",
-  },
-  {
     label: "Weekly",
     href: "/weekly",
     tooltip:
