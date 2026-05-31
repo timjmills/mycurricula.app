@@ -48,15 +48,13 @@ import type {
   Board,
   BoardPage,
   SubjectId,
+  ThemeOverride,
   Widget,
   WidgetType,
 } from "@/lib/types";
 import type { BoardTool } from "@/lib/teach/types";
-import {
-  DEFAULT_WIDGET_THEME,
-  effective,
-  themeVars,
-} from "@/lib/teach/widget-theme";
+import { effective, themeVars } from "@/lib/teach/widget-theme";
+import { widgetDefaultTheme } from "@/lib/teach/widget-defaults";
 import { useBoardAnnotations } from "@/lib/use-board-annotations";
 import { AnnotationLayer } from "@/components/teach/annotation";
 import { WidgetBody } from "@/components/teach/widgets";
@@ -368,7 +366,12 @@ export function BoardFullscreen({
       {/* ── Placed widgets (read-only) ── */}
       <div className={styles.widgetLayer} aria-hidden={false}>
         {activePage?.widgets.map((w) => (
-          <PlacedWidget key={w.id} widget={w} subjectId={subjectId} />
+          <PlacedWidget
+            key={w.id}
+            widget={w}
+            boardTheme={board.boardTheme}
+            subjectId={subjectId}
+          />
         ))}
       </div>
 
@@ -716,15 +719,24 @@ export function BoardFullscreen({
 
 interface PlacedWidgetProps {
   widget: Widget;
+  boardTheme?: ThemeOverride;
   subjectId?: SubjectId;
 }
 
 /** One read-only widget at its stored canvas coords, wrapped in the themed
  *  `.tw` tile (same effective-theme resolution as the editor: widget default →
  *  board theme → per-widget override). */
-function PlacedWidget({ widget, subjectId }: PlacedWidgetProps): ReactNode {
+function PlacedWidget({
+  widget,
+  boardTheme,
+  subjectId,
+}: PlacedWidgetProps): ReactNode {
   const canvas = widget.canvas;
-  const eff = effective(DEFAULT_WIDGET_THEME, null, widget.appearance);
+  const eff = effective(
+    widgetDefaultTheme(widget.type),
+    boardTheme ?? null,
+    widget.appearance,
+  );
   const wrapStyle: CSSProperties = {
     left: canvas?.x ?? 0,
     top: canvas?.y ?? 0,

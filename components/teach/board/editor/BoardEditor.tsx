@@ -44,12 +44,12 @@ import type {
 } from "@/lib/types";
 import {
   BOARD_BASE_THEME,
-  DEFAULT_WIDGET_THEME,
   clean,
   effective,
   themeVars,
   type EffectiveTheme,
 } from "@/lib/teach/widget-theme";
+import { widgetDefaultTheme } from "@/lib/teach/widget-defaults";
 import { WidgetBody, widgetMeta, TeachIcon } from "@/components/teach/widgets";
 import { AppearancePanel, type ThemeProp } from "./AppearancePanel";
 import styles from "./editor.module.css";
@@ -163,12 +163,6 @@ function liveCanvas(w: Widget, draft: GeomDraft): CanvasPosition {
 
 const clampW = (w: number) => Math.min(MAX_W, Math.max(MIN_W, w));
 
-/** A widget's default theme. Per-type defaults aren't in the frozen contract
- *  (the widget bodies own them), so we resolve from the shared fallback. */
-function widgetDefaultTheme(): EffectiveTheme {
-  return DEFAULT_WIDGET_THEME;
-}
-
 // ── One placed widget on the canvas ─────────────────────────────────────────
 interface PlacedProps {
   widget: Widget;
@@ -200,7 +194,11 @@ function Placed({
   onDuplicate,
   onDelete,
 }: PlacedProps): ReactNode {
-  const eff = effective(widgetDefaultTheme(), boardTheme, widget.appearance);
+  const eff = effective(
+    widgetDefaultTheme(widget.type),
+    boardTheme,
+    widget.appearance,
+  );
   const twStyle = themeVars(eff) as CSSProperties;
   const label = widgetMeta(widget.type).label;
 
@@ -671,7 +669,7 @@ export function BoardEditor({
   // The effective theme reflected in the panel.
   const panelEff: EffectiveTheme = selectedWidget
     ? effective(
-        widgetDefaultTheme(),
+        widgetDefaultTheme(selectedWidget.type),
         board.boardTheme,
         selectedWidget.appearance,
       )

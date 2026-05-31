@@ -30,6 +30,7 @@ import {
   TEAM_LIBRARY_BOARDS,
 } from "../mock/boards";
 import { boardMatchesContext, type BoardContext } from "./board-tags";
+import { ensureCanvas } from "./board-migrate";
 import { BoardCapError, MAX_BOARDS_PER_TEACHER } from "./limits";
 import type { TeachDataSource } from "./queries";
 
@@ -46,11 +47,16 @@ function nextId(prefix: string): string {
 }
 
 function cloneWidget(w: Widget): Widget {
+  // Guarantee a free-form canvas position: grid-era fixture widgets carry only a
+  // legacy grid `position`, so derive a canvas from it when absent (5.31). Without
+  // this every legacy widget would fall back to the editor's single default
+  // coordinate and stack on top of one another.
+  const c = ensureCanvas(w);
   return {
-    ...w,
-    position: { ...w.position },
-    canvas: w.canvas ? { ...w.canvas } : undefined,
-    appearance: w.appearance ? { ...w.appearance } : undefined,
+    ...c,
+    position: { ...c.position },
+    canvas: c.canvas ? { ...c.canvas } : undefined,
+    appearance: c.appearance ? { ...c.appearance } : undefined,
   };
 }
 
