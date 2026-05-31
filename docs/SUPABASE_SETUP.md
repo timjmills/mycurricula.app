@@ -116,7 +116,15 @@ then the seed (dev only). Apply order:
    (`boards`, `widgets`, `board_templates`, `teach_workspace_layouts`,
    `board_annotations`), their enums, triggers, and RLS, plus two presentation
    columns on `resources` (`default_render_target`, `tags`).
-4. `supabase/seed.sql` — **dev only.** Demo school → active Grade 5 → 2025–2026
+4. `supabase/migrations/20260531120000_teach_freeform.sql` — the **5.31 redesign**
+   columns (additive): `widgets.canvas` + `widgets.appearance`; and on `boards`
+   `pages`, `board_theme`, `repeat`, `tags`, `background`, `whiteboard`,
+   `ephemeral`, `library_visibility`, `published_by`, `source_board_id` (+ a
+   library-visibility check + indexes). Required for the free-form canvas,
+   multi-page boards, themes, real-link repeat, and the board library to persist.
+   Verified: all four migrations apply cleanly via `supabase start`, and a board
+   exercising every new column round-trips through the REST API + SQL.
+5. `supabase/seed.sql` — **dev only.** Demo school → active Grade 5 → 2025–2026
    school year → the 8 locked subjects. It does NOT seed teachers (a
    `teachers` row references `auth.users(id)`; create a test teacher via Supabase
    Auth/Studio first, then insert a matching `teachers` row keyed to that auth
@@ -150,7 +158,8 @@ Dashboard → **SQL Editor**. Paste-and-run each file **in this exact order**:
 1. `supabase/migrations/20260518102823_initial_schema.sql`
 2. `supabase/migrations/20260527120000_resources_embed_fields.sql`
 3. `supabase/migrations/20260530090000_teach_view.sql`
-4. `supabase/seed.sql` _(dev only — fresh database; errors if rows already exist)_
+4. `supabase/migrations/20260531120000_teach_freeform.sql`
+5. `supabase/seed.sql` _(dev only — fresh database; errors if rows already exist)_
 5. `docs/claude-bypass.sql` _(only if using the Claude bypass — see §5)_
 
 Each migration is idempotent-ish only within a fresh DB; if a run half-fails,
@@ -263,18 +272,43 @@ https://…/weekly` returns the page; check `public.claude_access_log` for an
 
 ## 7. Turning the backend on in code
 
-Today every view reads `lib/mock/`. The documented switch points (do these when
-the schema is live and verified):
+The Teach backend is built. The pieces:
 
-- **Teach view:** `lib/teach/queries.ts` exports
-  `export const teach: TeachDataSource = mockTeachSource;`. Swapping
-  `mockTeachSource` for a `supabaseTeachSource` is the one-line cutover (the
-  Supabase implementation is the Phase 4 deliverable; the interface + tables are
-  already aligned — see the schema/interface cross-check kept current against
-  `20260530090000_teach_view.sql`).
-- **Auth/session:** already wired via `middleware.ts` + `lib/supabase/*` — it
-  activates the moment the env vars point at a real project.
+- **`lib/teach/supabase-source.ts`** — a `TeachDataSource` backed by Supabase
+  (row↔domain mapping, `ensureCanvas` on read, `BoardCapError`, structure-only
+  privacy). It is **server-only** (RLS + `next/headers`), so it cannot be
+  imported by a client component.
+- **`lib/teach/actions.ts`** (`"use server"`) — the bridge. Client components
+  reach the Supabase source through these server actions; each picks Supabase
+  when configured (`isSupabaseConfigured()` in `queries.ts`), else the mock.
+- **`lib/teach/queries.ts`** — the **client-safe** seam. `export const teach`
+  stays the in-memory mock (so the prototype renders without a backend and the
+  client bundle never pulls in `next/headers`). `isSupabaseConfigured()` is the
+  single auditable switch the server layer reads.
+- **Auth/session:** wired via `middleware.ts` + `lib/supabase/*`; activates the
+  moment the env vars point at a real project.
 
-Until those cutovers land, filling in the env vars enables **auth** (the SSO gate
+**To run against a real backend (verified flow):**
 
-- Claude bypass) while the data surfaces continue to read mock fixtures.
+1. Set the three `NEXT_PUBLIC_SUPABASE_URL` / `..._ANON_KEY` /
+   `SUPABASE_SERVICE_ROLE_KEY` vars to a real project (or a local stack).
+2. For a **local** stack at `127.0.0.1:54321`, also set `TEACH_USE_SUPABASE=1`
+   (the seam treats localhost as "unconfigured" by default so CI/migration-test
+   runs stay on the mock; this flag opts a real local stack in).
+3. Apply all migrations + seed (§3), provision a teacher (an `auth.users` row +
+   a matching `teachers` row — the Claude bypass does this automatically, §5).
+
+**Verified local-stack quickstart** (Docker required):
+
+```bash
+supabase start -x edge-runtime   # applies all migrations + seed; edge-runtime
+                                 # is optional and skipped (rlimit-sensitive)
+supabase status -o env           # copy API URL + anon + service_role into .env.local
+# set TEACH_USE_SUPABASE=1 in .env.local, then `npm run dev`
+node scripts/check-supabase.mjs  # validates env + pings REST
+```
+
+The remaining UI step is pointing the client mutation callsites
+(`components/teach/TeachWorkspace.tsx`) at the `actions.ts` server actions
+instead of the mock `teach` seam — the actions are 1:1 with the
+`TeachDataSource` methods the workspace already calls.
