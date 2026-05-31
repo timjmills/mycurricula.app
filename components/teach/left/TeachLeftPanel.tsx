@@ -38,8 +38,11 @@ import type { UseTeachWorkspaceResult } from "@/lib/use-teach-workspace";
 import type { TeachWorkspaceState } from "@/lib/teach/types";
 import type { TeachWorkspaceAction } from "@/components/teach/TeachWorkspace";
 import type { Board } from "@/lib/types";
+import { useDockedTools } from "@/lib/teach/use-docked-tools";
+import type { WidgetType } from "@/lib/types";
 import { LEFT_MODULE_META, isLeftModuleId } from "./modules-meta";
 import { moduleIcon, CloseIcon } from "./icons";
+import { PanelAddMenu } from "./PanelAddMenu";
 import {
   LessonCardModule,
   LessonListModule,
@@ -78,6 +81,10 @@ export interface TeachLeftPanelProps {
   boardsGradeLevelId?: string;
   /** Re-read the active set after a mutating repo call. */
   reloadBoards: () => Promise<Board[]>;
+  /** Open the Widget Library overlay from the panel-bar "+" menu. Optional —
+   *  when absent the "Browse widget library" entry is hidden. Wired by the
+   *  TeachWorkspace lead to the existing Widget Library overlay. */
+  onOpenWidgetLibrary?: () => void;
 }
 
 // ── A sortable tab ─────────────────────────────────────────────────────────────
@@ -246,7 +253,11 @@ export function TeachLeftPanel({
   boardsLoading,
   boardsGradeLevelId,
   reloadBoards,
+  onOpenWidgetLibrary,
 }: TeachLeftPanelProps): ReactNode {
+  // The docked tool-widget stack — the panel-bar "+" docks tools into it.
+  const dockedTools = useDockedTools();
+
   // Tabs = the modules docked to the left, in their persisted order.
   const tabIds = useMemo(
     () => workspace.layout.tabOrder.left as TeachModuleId[],
@@ -293,6 +304,19 @@ export function TeachLeftPanel({
     }
   }
 
+  // Panel-bar "+": dock the chosen tool-widget into the Tools stack, then make
+  // sure the teacher SEES it — ensure "tools" is a left tab (the panel already
+  // owns moveRailIcon for the left side) and focus it. Existing tab behaviour
+  // (order, close, roving) is untouched: we only append "tools" if it isn't
+  // already a left tab.
+  function handleAddTool(type: WidgetType): void {
+    dockedTools.add(type);
+    if (!tabIds.includes("tools")) {
+      workspace.moveRailIcon("tools", "left", tabIds.length);
+    }
+    onActiveModuleChange("tools");
+  }
+
   const effectiveActive = tabIds.includes(activeModuleId)
     ? activeModuleId
     : (tabIds[0] ?? null);
@@ -329,34 +353,45 @@ export function TeachLeftPanel({
       title="Left panel — lesson, boards, notes, groups, class, tools"
       aria-label="Teach left panel"
     >
-      <div
-        className={styles.tabHeader}
-        role="tablist"
-        aria-label="Left modules"
-        onKeyDown={handleTabKeyDown}
-      >
-        {/* Stable id → deterministic dnd-kit `DndDescribedBy-<id>` across
-            SSR/CSR (see TeachWorkspace's DndContext for the full rationale). */}
-        <DndContext
-          id="teach-left-tabs-dnd"
-          sensors={sensors}
-          onDragEnd={handleTabReorder}
+      <div className={styles.tabHeader}>
+        <div
+          className={styles.tabStrip}
+          role="tablist"
+          aria-label="Left modules"
+          onKeyDown={handleTabKeyDown}
         >
-          <SortableContext
-            items={tabIds}
-            strategy={horizontalListSortingStrategy}
+          {/* Stable id → deterministic dnd-kit `DndDescribedBy-<id>` across
+              SSR/CSR (see TeachWorkspace's DndContext for the full rationale). */}
+          <DndContext
+            id="teach-left-tabs-dnd"
+            sensors={sensors}
+            onDragEnd={handleTabReorder}
           >
-            {tabIds.map((id) => (
-              <PanelTab
-                key={id}
-                moduleId={id}
-                active={id === effectiveActive}
-                onFocus={() => onActiveModuleChange(id)}
-                onClose={() => handleCloseTab(id)}
-              />
-            ))}
-          </SortableContext>
-        </DndContext>
+            <SortableContext
+              items={tabIds}
+              strategy={horizontalListSortingStrategy}
+            >
+              {tabIds.map((id) => (
+                <PanelTab
+                  key={id}
+                  moduleId={id}
+                  active={id === effectiveActive}
+                  onFocus={() => onActiveModuleChange(id)}
+                  onClose={() => handleCloseTab(id)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+        </div>
+
+        {/* Panel-bar "+": dock a tool or open the widget library. Hidden until
+            hover/focus on desktop; always visible on touch. */}
+        <PanelAddMenu
+          side="left"
+          onAddTool={handleAddTool}
+          onOpenWidgetLibrary={onOpenWidgetLibrary}
+          triggerClassName={styles.addTrigger}
+        />
       </div>
 
       <div

@@ -1126,6 +1126,7 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
               boards={boards}
               boardsGradeLevelId={activeBoard?.gradeLevelId ?? "g5"}
               reloadBoards={reloadBoards}
+              onOpenWidgetLibrary={() => setLibraryOverlay("widgets")}
             />
           ) : null}
 
@@ -1220,6 +1221,7 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
               onEmbedResource={handleEmbedResource}
               week={week}
               day={selectedDay}
+              onOpenWidgetLibrary={() => setLibraryOverlay("widgets")}
             />
           ) : null}
 

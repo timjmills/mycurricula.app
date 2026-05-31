@@ -18,9 +18,36 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 8px 8px 8px 10px;
+  padding: 4px 6px 4px 8px;
   border-bottom: 1px solid var(--ink-150);
   flex: 0 0 auto;
+}
+
+/* ── Panel-bar "+" hover-reveal ──────────────────────────────────────────────
+   Desktop: hidden until the panel is hovered or holds focus, then it fades in.
+   Touch (no hover / coarse pointer): ALWAYS visible. Reduced motion: no fade. */
+.addTrigger {
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+
+.panel:hover .addTrigger,
+.panel:focus-within .addTrigger,
+.addTrigger:focus-visible,
+.addTrigger[aria-expanded="true"] {
+  opacity: 1;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .addTrigger {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .addTrigger {
+    transition: none;
+  }
 }
 
 .tabs {

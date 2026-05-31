@@ -102,15 +102,55 @@
   overflow: hidden;
 }
 
-/* Thin tab header strip across the top of the panel. */
+/* Thin tab header strip across the top of the panel. Tightened to hug the tabs
+   (no dead bar): the "+" trigger occupies the right side. The tab strip scrolls
+   horizontally on its own so the "+" stays reachable. */
 .tabHeader {
   flex: none;
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: var(--r-6) var(--r-8);
+  padding: var(--r-4) var(--r-6);
   border-bottom: var(--line);
+}
+
+/* The horizontally-scrolling tab strip — keeps overflow off the header so the
+   "+" trigger never scrolls out of view. */
+.tabStrip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
+}
+
+/* ── Panel-bar "+" hover-reveal ──────────────────────────────────────────────
+   Desktop: the "+" is hidden until the panel is hovered or holds focus, then it
+   fades in. Touch (no hover / coarse pointer): ALWAYS visible. Reduced motion:
+   no fade — instant show/hide. */
+.addTrigger {
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+
+.panel:hover .addTrigger,
+.panel:focus-within .addTrigger,
+.addTrigger:focus-visible,
+.addTrigger[aria-expanded="true"] {
+  opacity: 1;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .addTrigger {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .addTrigger {
+    transition: none;
+  }
 }
 
 .tab {
