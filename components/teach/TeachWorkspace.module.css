@@ -6,7 +6,16 @@
 .root {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* The Teach shell is a FIXED-HEIGHT, non-document-scrolling surface: the
+     five zones (chrome bars · rails · panels · center) each manage their own
+     internal scroll, and the center is the only thing that scrolls. Binding the
+     shell to the viewport height (`100dvh`, tracking the mobile dynamic
+     viewport) is what makes that work — without it, `height: 100%` resolves
+     against the `min-h-full` body and collapses to content height, letting the
+     whole page (rails included) scroll at the document level. With `100dvh` the
+     left/right icon rails + panels stay put (their roots carry `overflow-y:
+     auto` / `height: 100%`) while only the board/canvas center scrolls. */
+  height: 100dvh;
   min-height: 0;
   /* Document-level horizontal-scroll guard (CLAUDE.md §4 hard rule): the Teach
      view is non-scrolling at the document level — the board scrolls inside its

@@ -20,6 +20,12 @@ import type {
 } from "../types";
 import type { BoardContext } from "./board-tags";
 import { mockTeachSource } from "./mock-source";
+// NOTE: `supabaseTeachSource` (./supabase-source) is SERVER-ONLY — it imports
+// lib/supabase/server.ts (`next/headers`), which cannot be bundled into a
+// client component. `queries.ts` is imported by client components (e.g.
+// TeachWorkspace), so it must NOT statically import the Supabase source. The
+// Supabase backend is reached through the server-action layer in
+// `lib/teach/actions.ts` (see `teachServerSource`), not this client-safe seam.
 
 // The cap + error live in a leaf module to avoid a runtime circular import
 // (this file → mock-source → this file). Re-exported here so the documented
@@ -193,7 +199,39 @@ export interface TeachDataSource {
 }
 
 /**
- * The active data source. v1 is the in-memory mock; Phase 4 swaps this single
- * binding for `supabaseTeachSource` and nothing else in the UI changes.
+ * Decide which `TeachDataSource` backs the seam.
+ *
+ * Supabase is selected when its env is genuinely configured: the public URL
+ * must be present AND must not be the local dummy/placeholder value used in
+ * dev + CI (where `supabase db reset` runs against `127.0.0.1`/`localhost`
+ * with throwaway keys, and the Teach tables are designed-but-unwired). In
+ * every other case — no URL, or a localhost placeholder — we fall back to the
+ * in-memory mock so the prototype keeps rendering against `lib/mock/`.
+ *
+ * Keeping the decision in one documented function makes the backend a single,
+ * auditable switch (plan §11.3): once a real Supabase project URL is set in
+ * the deploy env, the Supabase source takes over with no other code change.
+ */
+/**
+ * True when a real Supabase project is configured (used by the SERVER-side
+ * action layer to decide whether to hit Supabase or fall back to the mock).
+ * Kept here as the single auditable switch. `TEACH_USE_SUPABASE=1` opts a local
+ * stack (127.0.0.1:54321) in for end-to-end verification without changing the
+ * CI-safe default (CI runs throwaway localhost keys with the tables unwired).
+ */
+export function isSupabaseConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url || url.length === 0) return false;
+  if (process.env.TEACH_USE_SUPABASE === "1") return true;
+  if (url.includes("localhost") || url.includes("127.0.0.1")) return false;
+  return true;
+}
+
+/**
+ * The active CLIENT-SIDE data source. Always the in-memory mock: the Supabase
+ * backend is server-only (RLS + `next/headers`), so client components read
+ * through this seam and persist through the server actions in
+ * `lib/teach/actions.ts`. Swapping the client to call those actions is the
+ * remaining wiring step; the seam keeps the prototype rendering meanwhile.
  */
 export const teach: TeachDataSource = mockTeachSource;

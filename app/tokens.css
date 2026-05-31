@@ -513,6 +513,18 @@
   --r-12: 12px;
   --r-pill: 999px;
 
+  /* ── Chrome geometry + stacking ───────────────────────────────────────
+     Shared layout constants for the app chrome. `--topbar-h` is the sticky
+     planner top bar's height (keep in sync with top-bar.module.css `.bar`).
+     The docked side rails/panels use it as their sticky `top:` offset and
+     as the subtrahend for their self-contained viewport-tall height, so the
+     center scrolls while the bars stay put. The z-scale keeps the sticky
+     rails above page content but below the top bar + master banner. */
+  --topbar-h: 52px;
+  --z-rail: 20;
+  --z-topbar: 30;
+  --z-banner: 40;
+
   --line: 1px solid var(--ink-150);
   --line-strong: 1px solid var(--ink-200);
 
