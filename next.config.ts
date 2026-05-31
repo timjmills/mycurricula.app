@@ -17,6 +17,19 @@ const r2Host = process.env.R2_PUBLIC_HOST ?? "*.r2.cloudflarestorage.com";
 // ── Content-Security-Policy ─────────────────────────────────────────────────
 // Locks down where embeds + media may load from. New embed providers are
 // added by extending the relevant directive (usually `frame-src`).
+//
+// Google Identity Services (the "Continue with Google" sign-in button) needs
+// four Google endpoints allow-listed — these are Google's officially
+// documented GSI CSP sources
+// (https://developers.google.com/identity/gsi/web/guides/csp). Without them
+// the page's own CSP refuses the sign-in flow:
+//   • script-src  — loads the GSI client library (/gsi/client).
+//   • style-src   — GSI injects an external stylesheet (/gsi/style); note
+//                   that 'unsafe-inline' does NOT cover an external <link>
+//                   stylesheet host, so the origin must be named explicitly.
+//   • frame-src   — GSI renders the button + account picker in iframes
+//                   under /gsi/ (e.g. /gsi/button, /gsi/select).
+//   • connect-src — GSI makes XHR status/log calls under /gsi/.
 const csp = [
   "default-src 'self'",
   // Next.js requires unsafe-inline (runtime + Next/font), and unsafe-eval
@@ -24,13 +37,13 @@ const csp = [
   // static.cloudflareinsights.com is the Cloudflare Web Analytics beacon
   // the Worker host injects automatically when observability is on; CSP
   // must allow it or every page console-errors on script load.
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com",
-  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com https://accounts.google.com/gsi/client",
+  "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
   "font-src 'self' data:",
   `img-src 'self' data: blob: https://${r2Host} https://img.youtube.com https://i.vimeocdn.com https://*.googleusercontent.com https://*.ggpht.com https://upload.wikimedia.org`,
   `media-src 'self' blob: https://${r2Host}`,
-  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://docs.google.com https://drive.google.com",
-  `connect-src 'self' https://${supabaseHost} https://${r2Host}`,
+  "frame-src 'self' https://accounts.google.com/gsi/ https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://docs.google.com https://drive.google.com",
+  `connect-src 'self' https://accounts.google.com/gsi/ https://${supabaseHost} https://${r2Host}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
