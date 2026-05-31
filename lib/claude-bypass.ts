@@ -50,6 +50,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getAdminClient } from "@/lib/supabase/admin";
+import { ensureTeacherRecord } from "@/lib/supabase/ensure-teacher";
 
 // ── Config ───────────────────────────────────────────────────────────────
 
@@ -207,10 +208,16 @@ async function audit(entry: AuditEntry): Promise<void> {
 
 // ── Provision + session-mint ────────────────────────────────────────────
 
+/** The auth-user fields the bypass needs downstream (teacher provisioning). */
+interface BypassUser {
+  id: string;
+  email: string;
+}
+
 /** Look up the Claude-access user; create it if missing (when allowed).
- *  Returns the user object, or throws if provisioning is disabled and
- *  the user does not exist. */
-async function ensureUser(email: string): Promise<void> {
+ *  Returns the auth user (id + email), or throws if provisioning is
+ *  disabled and the user does not exist. */
+async function ensureUser(email: string): Promise<BypassUser> {
   const admin = getAdminClient();
   // listUsers is the only stable way to find a user by email on the
   // admin client. The page size of 1000 covers any school deployment.
@@ -222,7 +229,7 @@ async function ensureUser(email: string): Promise<void> {
   const existing = list.users.find(
     (u) => u.email?.toLowerCase() === email.toLowerCase(),
   );
-  if (existing) return;
+  if (existing) return { id: existing.id, email: existing.email ?? email };
 
   if (process.env.CLAUDE_BYPASS_PROVISION === "0") {
     throw new Error(
@@ -230,11 +237,18 @@ async function ensureUser(email: string): Promise<void> {
     );
   }
 
-  const { error: createErr } = await admin.auth.admin.createUser({
-    email,
-    email_confirm: true,
-  });
+  const { data: created, error: createErr } = await admin.auth.admin.createUser(
+    {
+      email,
+      email_confirm: true,
+    },
+  );
   if (createErr) throw createErr;
+  const newUser = created?.user;
+  if (!newUser?.id) {
+    throw new Error("createUser returned no user id");
+  }
+  return { id: newUser.id, email: newUser.email ?? email };
 }
 
 /** Mint a Supabase session for the Claude-access user and write the
@@ -258,8 +272,9 @@ async function mintSession(
   const email = process.env.CLAUDE_USER_EMAIL;
   if (!email) return { ok: false, reason: "CLAUDE_USER_EMAIL not set" };
 
+  let bypassUser: BypassUser;
   try {
-    await ensureUser(email);
+    bypassUser = await ensureUser(email);
   } catch (err) {
     return {
       ok: false,
@@ -268,6 +283,23 @@ async function mintSession(
   }
 
   const admin = getAdminClient();
+
+  // Provision the teacher + grade-assignment rows so RLS-gated reads/writes
+  // work for the bypass user (ultraplan §6). Gated behind the same provisioning
+  // flag as auth-user creation: CLAUDE_BYPASS_PROVISION="0" disables it. Failure
+  // is non-fatal — the session still mints; the user just sees denied data until
+  // a later request provisions successfully.
+  if (process.env.CLAUDE_BYPASS_PROVISION !== "0") {
+    const provision = await ensureTeacherRecord(admin, bypassUser);
+    if (!provision.ok) {
+      void audit({
+        ok: false,
+        pathname: request.nextUrl.pathname,
+        userAgent: request.headers.get("user-agent"),
+        reason: `teacher_provision: ${provision.reason ?? "unknown"}`,
+      });
+    }
+  }
   const { data: linkData, error: linkErr } =
     await admin.auth.admin.generateLink({
       type: "magiclink",
