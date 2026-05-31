@@ -439,6 +439,21 @@ function resolveOwnerId(ownerId: string): string {
   return ownerId;
 }
 
+/** RFC-4122 UUID shape. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Assert a value is a bare UUID before it is interpolated into a PostgREST
+ *  filter string (e.g. `.or(...)`), so a crafted id can't inject filter syntax
+ *  (commas / parens / `.eq.`). RLS still scopes every row, but this keeps the
+ *  query well-formed + the predicate exactly as intended. */
+function assertUuid(value: string, label: string): string {
+  if (!UUID_RE.test(value)) {
+    throw new Error(`${label} must be a UUID (got an unexpected value)`);
+  }
+  return value;
+}
+
 // ── Implementation ────────────────────────────────────────────────────────────
 
 export const supabaseTeachSource: TeachDataSource = {
@@ -637,7 +652,9 @@ export const supabaseTeachSource: TeachDataSource = {
   // ── Templates ─────────────────────────────────────────────────────────────
   async listBoardTemplates(ownerId) {
     const client = await sb();
-    const owner = resolveOwnerId(ownerId);
+    // Validate as a UUID before interpolating into the PostgREST `.or()` filter
+    // (defense-in-depth against filter injection; RLS already scopes rows).
+    const owner = assertUuid(resolveOwnerId(ownerId), "ownerId");
     // RLS already limits rows to (personal owner-only) ∪ (team in readable
     // grade); the explicit filter narrows personal rows to this owner.
     const res = await client

@@ -43,6 +43,17 @@ export async function teachDispatch<M extends keyof TeachDataSource>(
   args: Parameters<TeachDataSource[M]>,
 ): Promise<Awaited<ReturnType<TeachDataSource[M]>>> {
   const src = source();
+  // SECURITY: `method` crosses the "use server" boundary as a runtime string
+  // (the TS `keyof` generic is erased), so a client could post any value.
+  // Only dispatch to an OWN, callable property of the source — never an
+  // inherited/prototype member (`__proto__`, `constructor`, …). Rejects
+  // anything else loudly rather than letting `fn.apply` behave unexpectedly.
+  if (
+    !Object.prototype.hasOwnProperty.call(src, method) ||
+    typeof src[method] !== "function"
+  ) {
+    throw new Error(`teachDispatch: unknown method "${String(method)}"`);
+  }
   const fn = src[method] as (
     ...a: Parameters<TeachDataSource[M]>
   ) => Promise<Awaited<ReturnType<TeachDataSource[M]>>>;
