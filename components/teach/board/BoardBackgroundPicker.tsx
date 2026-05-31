@@ -17,7 +17,7 @@ import {
   boardBackgroundCss,
   type BoardBackgroundCategory,
 } from "@/lib/teach/backgrounds";
-import { teach } from "@/lib/teach/queries";
+import { teachClient as teach } from "@/lib/teach/client";
 import type { Board } from "@/lib/types";
 import styles from "./BoardBackgroundPicker.module.css";
 

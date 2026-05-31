@@ -42,11 +42,8 @@ import type {
   RepeatSchedule,
 } from "@/lib/types";
 import { ME, TEACHER_BY_ID } from "@/lib/mock/teachers";
-import {
-  teach,
-  MAX_BOARDS_PER_TEACHER,
-  BoardCapError,
-} from "@/lib/teach/queries";
+import { teachClient as teach } from "@/lib/teach/client";
+import { MAX_BOARDS_PER_TEACHER, BoardCapError } from "@/lib/teach/queries";
 import {
   boardHasTag,
   tagDisplayLabel,

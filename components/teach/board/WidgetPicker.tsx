@@ -13,7 +13,7 @@
 
 import type { ChangeEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { teach } from "@/lib/teach/queries";
+import { teachClient as teach } from "@/lib/teach/client";
 import type { Widget, WidgetType } from "@/lib/types";
 import type { BoardCellTarget } from "@/lib/teach/types";
 import {

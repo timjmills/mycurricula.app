@@ -24,7 +24,7 @@ import {
   dedupeTags,
   makeTag,
 } from "@/lib/teach/board-tags";
-import { teach } from "@/lib/teach/queries";
+import { teachClient as teach } from "@/lib/teach/client";
 import type { Board, BoardTag, BoardTagKind } from "@/lib/types";
 import { BoardTagChips } from "./BoardTagChips";
 import styles from "./BoardTags.module.css";

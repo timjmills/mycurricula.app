@@ -42,7 +42,7 @@ import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { useConsequenceToast } from "@/lib/consequence-toast";
 import { ME } from "@/lib/mock";
-import { teach } from "@/lib/teach/queries";
+import { teachClient as teach } from "@/lib/teach/client";
 import type { Board } from "@/lib/types";
 import type { TeachWorkspaceAction } from "@/components/teach/TeachWorkspace";
 import { PlusIcon, ShareIcon, PinIcon } from "../icons";

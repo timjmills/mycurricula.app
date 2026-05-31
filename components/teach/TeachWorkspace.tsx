@@ -45,7 +45,7 @@ import { lessonResources } from "@/lib/lesson-resources";
 import { shoutboxForDay } from "@/lib/mock";
 import { toTeachResource } from "@/lib/teach/toTeachResource";
 import { ME } from "@/lib/mock/teachers";
-import { teach } from "@/lib/teach/queries";
+import { teachClient as teach } from "@/lib/teach/client";
 import {
   BOARD_LAYOUT_GRID,
   parseBoardCellDroppableId,

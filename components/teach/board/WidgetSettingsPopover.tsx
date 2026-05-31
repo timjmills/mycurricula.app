@@ -14,7 +14,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui";
-import { teach } from "@/lib/teach/queries";
+import { teachClient as teach } from "@/lib/teach/client";
 import type { Board, Widget } from "@/lib/types";
 import { useFocusTrap } from "./useFocusTrap";
 import styles from "./BoardSettingsPopover.module.css";

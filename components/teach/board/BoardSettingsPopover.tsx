@@ -19,7 +19,7 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Tooltip } from "@/components/ui";
 import { useConsequenceToast } from "@/lib/consequence-toast";
-import { teach } from "@/lib/teach/queries";
+import { teachClient as teach } from "@/lib/teach/client";
 import type { Board } from "@/lib/types";
 import { useFocusTrap } from "./useFocusTrap";
 import { BoardBackgroundPicker } from "./BoardBackgroundPicker";
