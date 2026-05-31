@@ -1,0 +1,58 @@
+/* AnnotationLayer.module.css — the projector-glass canvas overlay (plan §5.2).
+   Locked to the board box; tokens only. */
+
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  /* Default: transparent to pointers so the underlying iframe/image is
+     interactive (select tool). A draw tool flips data-interactive. */
+  pointer-events: none;
+  touch-action: none;
+}
+
+.layer[data-interactive="true"] {
+  pointer-events: auto;
+}
+
+/* Tool cursors — clarify the active mode without extra chrome. */
+.layer[data-interactive="true"][data-tool="pen"],
+.layer[data-interactive="true"][data-tool="highlighter"],
+.layer[data-interactive="true"][data-tool="rect"],
+.layer[data-interactive="true"][data-tool="line"],
+.layer[data-interactive="true"][data-tool="arrow"] {
+  cursor: crosshair;
+}
+.layer[data-interactive="true"][data-tool="eraser"] {
+  cursor: cell;
+}
+.layer[data-interactive="true"][data-tool="text"] {
+  cursor: text;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Text-tool floating input. */
+.textInput {
+  position: absolute;
+  min-width: 120px;
+  min-height: 32px;
+  padding: 2px 4px;
+  margin: 0;
+  border: 1px dashed var(--ink-400);
+  border-radius: var(--r-4);
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+  resize: none;
+  outline: none;
+  z-index: 3;
+}

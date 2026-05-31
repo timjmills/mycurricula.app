@@ -23,8 +23,17 @@
   padding: 8px 0;
   background: var(--paper);
   border-left: 1px solid var(--ink-150);
-  position: relative;
-  z-index: 1;
+  /* Sticky docked rail — mirrors GlobalRail: stays put under the top bar while
+     the routed <main> scrolls at the document level. `align-self: flex-start`
+     keeps the parent flex row's `stretch` from sizing it to the full scroll
+     height (which would defeat sticky); the rail owns a viewport-tall height
+     and scrolls its icon stack internally if it overflows. */
+  position: sticky;
+  top: var(--topbar-h, 52px);
+  align-self: flex-start;
+  height: calc(100dvh - var(--topbar-h, 52px));
+  z-index: var(--z-rail, 20);
+  overflow-y: auto;
 }
 
 /* When the rail is empty, render a quiet "drop here" guide so teachers

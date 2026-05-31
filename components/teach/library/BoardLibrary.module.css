@@ -1,0 +1,767 @@
+/* BoardLibrary.module.css — the Teach "Board Library" surface (5.31 handoff,
+ * screenshot 3). A top row (segment toggle · search · usage meter), a sidebar
+ * (My Library + Filter by Use), a reflowing board-card grid, an explainer +
+ * Team Library strip, and a dismissible Tips bar.
+ *
+ * Tokens only (CLAUDE.md §4): colour / type / radius / spacing reference
+ * app/tokens.css; the tag-tone bridge lives in BoardLibraryCard.
+ *
+ * Responsive: full-screen on desktop AND usable inside a ~300–340px side panel.
+ * The sidebar sits beside the main on wide layouts and collapses to a scrolling
+ * row above it on narrow ones; the card grid reflows 4→2→1 columns. No
+ * document-level horizontal scroll at any tier. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  height: 100%;
+}
+
+/* ── Top row ───────────────────────────────────────────────────────────────── */
+.topRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.segments {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--ink-50);
+  border-radius: 12px;
+  flex: 0 0 auto;
+}
+
+.segment {
+  min-height: 40px;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-400);
+  font-size: var(--t-14);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.segment:hover {
+  color: var(--ink-700);
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.segmentActive {
+  background: var(--paper);
+  color: var(--wf-blue-accent);
+  box-shadow: var(--wf-shadow-inner);
+}
+
+.searchRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  display: inline-flex;
+  color: var(--ink-400);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 14px 11px 38px;
+  border: 1px solid var(--ink-150);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink-900);
+  font-size: var(--t-14);
+  font-family: inherit;
+}
+
+.searchInput::placeholder {
+  color: var(--ink-400);
+}
+
+.searchInput:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.meter {
+  flex: 0 0 auto;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meterLabel {
+  color: var(--ink-500);
+  font-size: var(--t-13);
+  font-weight: 600;
+}
+
+.meterLabel strong {
+  color: var(--ink-900);
+  font-weight: 800;
+}
+
+.meterFull {
+  color: var(--tag-red-fg);
+}
+
+.meterTrack {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ink-100);
+  overflow: hidden;
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--wf-blue-accent);
+}
+
+.meterFillFull {
+  background: var(--tag-red-fg);
+}
+
+/* ── Shell: sidebar + main ─────────────────────────────────────────────────── */
+.shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 18px;
+  overflow: hidden;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────────── */
+.sidebar {
+  flex: 0 0 auto;
+  width: 234px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 16px;
+  border-right: 1px solid var(--ink-150);
+  overflow-y: auto;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 14px;
+}
+
+.navHeading {
+  margin: 0 0 6px;
+  padding: 0 12px;
+  color: var(--ink-400);
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--ink-700);
+  font-size: var(--t-14);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.navItem:hover {
+  background: var(--ink-50);
+}
+
+.navItem:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.navIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--ink-400);
+}
+
+.navItemActive {
+  background: var(--wf-blue-soft);
+  color: var(--wf-blue-accent);
+  font-weight: 700;
+}
+
+.navItemActive .navIcon {
+  color: var(--wf-blue-accent);
+}
+
+/* Colour-keyed "Filter by Use" icons (handoff colour key). Tokens only. */
+.use_lesson .navIcon {
+  color: var(--tag-green-fg);
+}
+.use_phase .navIcon {
+  color: var(--wf-green-accent);
+}
+.use_free .navIcon {
+  color: var(--wf-purple-accent);
+}
+.use_day .navIcon {
+  color: var(--wf-orange-accent);
+}
+.use_week .navIcon {
+  color: var(--wf-blue-accent);
+}
+.use_subject .navIcon {
+  color: var(--tag-red-fg);
+}
+.use_slot .navIcon {
+  color: var(--tag-amber-fg);
+}
+.use_whiteboard .navIcon {
+  color: var(--wf-purple-accent);
+}
+
+/* Usage card at the foot of the sidebar */
+.usageCard {
+  margin-top: auto;
+  padding: 16px;
+  border: 1px solid var(--ink-150);
+  border-radius: 16px;
+  background: var(--ink-50);
+}
+
+.usageText {
+  margin: 0 0 6px;
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 600;
+}
+
+.usageText strong {
+  color: var(--ink-900);
+  font-weight: 800;
+}
+
+.usageSub {
+  margin: 0 0 10px;
+  color: var(--ink-400);
+  font-size: var(--t-12);
+  font-weight: 600;
+}
+
+/* ── Main ──────────────────────────────────────────────────────────────────── */
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+/* ── Tag-value filter pills ────────────────────────────────────────────────── */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 1.5px solid var(--ink-150);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink-500);
+  font-size: var(--t-13);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filterPill:hover {
+  border-color: var(--ink-300);
+}
+
+.filterPill:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.filterPillActive {
+  background: var(--wf-blue-accent);
+  border-color: var(--wf-blue-accent);
+  color: var(--paper);
+}
+
+.filterKind {
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  opacity: 0.7;
+}
+
+.capNotice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: var(--tag-red-bg);
+  color: var(--tag-red-fg);
+  font-size: var(--t-13);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.empty {
+  margin: 16px 0;
+  color: var(--ink-400);
+  font-size: var(--t-14);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ── Board card grid ───────────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border: 1px solid var(--ink-150);
+  border-radius: 18px;
+  background: var(--paper);
+  box-shadow: var(--wf-shadow-card);
+}
+
+/* Kind-keyed structural preview */
+.preview {
+  height: 110px;
+  margin-bottom: 13px;
+  padding: 10px;
+  border-radius: 13px;
+  background: var(--wf-blue-grad);
+}
+
+.previewBox {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 10px 12px;
+  border: 2px solid var(--wf-blue-accent);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.previewTitle {
+  color: var(--wf-blue-accent);
+  font-size: var(--t-13);
+  font-weight: 800;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewIcon {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: var(--wf-blue-accent);
+}
+
+.cardTitle {
+  margin: 0 0 10px;
+  color: var(--ink-900);
+  font-size: var(--t-16);
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+/* ── Tag chips ─────────────────────────────────────────────────────────────── */
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.tagChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 11px;
+  border-radius: 8px;
+  font-size: var(--t-12);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* ── Repeats + owner line ──────────────────────────────────────────────────── */
+.metaLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 18px;
+  margin-bottom: 12px;
+}
+
+.repeats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--wf-blue-accent);
+  font-size: var(--t-12);
+  font-weight: 600;
+}
+
+.owner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--ink-400);
+  font-size: var(--t-12);
+  font-weight: 600;
+}
+
+/* ── Card actions ──────────────────────────────────────────────────────────── */
+.actions {
+  display: flex;
+  border-top: 1px solid var(--ink-150);
+  padding-top: 10px;
+}
+
+.action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+  min-height: 44px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-700);
+  font-size: var(--t-11);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action:hover {
+  color: var(--ink-900);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+  border-radius: 8px;
+}
+
+.actionIcon {
+  display: inline-flex;
+  color: var(--ink-400);
+}
+
+.action:hover .actionIcon {
+  color: var(--ink-700);
+}
+
+/* Delete two-step confirm */
+.confirmRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid var(--ink-150);
+  padding-top: 10px;
+}
+
+.confirmText {
+  flex: 1;
+  min-width: 0;
+  color: var(--tag-red-fg);
+  font-size: var(--t-12);
+  font-weight: 700;
+}
+
+/* ── Repeat editor panel ───────────────────────────────────────────────────── */
+.repeatPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--wf-blue-line);
+  border-radius: 14px;
+  background: var(--wf-blue-soft);
+}
+
+.repeatHead {
+  margin: 0;
+  color: var(--ink-700);
+  font-size: var(--t-14);
+  font-weight: 700;
+}
+
+.repeatHead strong {
+  color: var(--wf-blue-accent);
+}
+
+/* ── Explainer + Team Library footer ───────────────────────────────────────── */
+.footerGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 20px;
+}
+
+.explainer {
+  padding: 20px 22px;
+  border: 1px solid var(--wf-blue-line);
+  border-radius: 18px;
+  background: var(--wf-blue-grad);
+}
+
+.explainerTitle {
+  margin: 0 0 6px;
+  color: var(--wf-blue-accent);
+  font-size: var(--t-16);
+  font-weight: 800;
+}
+
+.explainerBody {
+  margin: 0;
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.teamLibrary {
+  padding: 20px 22px;
+  border: 1px solid var(--ink-150);
+  border-radius: 18px;
+  background: var(--ink-50);
+}
+
+.teamLibraryHead {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.teamLibraryTitle {
+  color: var(--wf-purple-accent);
+  font-size: var(--t-16);
+  font-weight: 800;
+}
+
+.teamLibrarySub {
+  margin: 0 0 14px;
+  color: var(--ink-400);
+  font-size: var(--t-13);
+  font-weight: 500;
+}
+
+.teamStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.teamCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 44px;
+  padding: 13px 14px;
+  border: 1px solid var(--ink-150);
+  border-radius: 13px;
+  background: var(--paper);
+  text-align: left;
+  cursor: pointer;
+}
+
+.teamCard:hover {
+  box-shadow: var(--wf-shadow-card);
+}
+
+.teamCard:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.teamCardTitle {
+  color: var(--ink-900);
+  font-size: var(--t-13);
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamCardBy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-400);
+  font-size: var(--t-11);
+  font-weight: 600;
+}
+
+.teamEmpty {
+  margin: 0;
+  color: var(--ink-400);
+  font-size: var(--t-13);
+}
+
+/* ── Tips bar ──────────────────────────────────────────────────────────────── */
+.tips {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 18px;
+  border-top: 1px solid var(--ink-150);
+  border-radius: 12px;
+  background: var(--wf-blue-soft);
+  color: var(--ink-700);
+}
+
+.tipsIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--wf-blue-accent);
+}
+
+.tipsText {
+  flex: 1;
+  font-size: var(--t-13);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.tipsText strong {
+  color: var(--ink-900);
+  font-weight: 700;
+}
+
+.tipsClose {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-400);
+  cursor: pointer;
+}
+
+.tipsClose:hover {
+  color: var(--ink-900);
+  background: var(--ink-100);
+}
+
+.tipsClose:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .shell {
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+    padding-right: 0;
+    padding-bottom: 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--ink-150);
+    overflow-x: auto;
+  }
+
+  .navGroup {
+    flex: 1 1 auto;
+    margin-bottom: 4px;
+  }
+
+  .usageCard {
+    display: none;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .footerGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .teamStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .meter {
+    flex: 1 1 100%;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .teamStrip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .segment {
+    flex: 1;
+  }
+
+  .segments {
+    flex: 1 1 100%;
+  }
+}

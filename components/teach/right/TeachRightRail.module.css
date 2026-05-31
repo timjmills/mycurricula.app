@@ -1,0 +1,132 @@
+/* TeachRightRail.module.css — the 64px right icon rail. Tokens only
+ * (CLAUDE.md §4). Mirrors the prototype RightRail: stacked icon + label,
+ * active = filled bg. */
+
+.rail {
+  width: 64px;
+  flex: 0 0 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  background: var(--paper);
+  border-left: 1px solid var(--ink-150);
+  overflow-y: auto;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.dragging {
+  opacity: 0.5;
+}
+
+/* The icon button is ≥44px tall (36px box + label) — the grip lives inside. */
+.iconBtn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+/* Unread/attention badge (audit B5) — a small count pip top-right of the icon. */
+.badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--paper);
+  background: var(--urgent, #e5484d);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.iconBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.iconBtnActive {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+.iconBtnActive:hover {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+/* Drag grip — surfaces on hover/focus over the icon. It is the sole drag
+ * activator (carries dnd listeners). touch-action: none so a touch-drag on the
+ * grip starts a reorder rather than scrolling the rail. */
+.grip {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  color: var(--ink-400);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+  opacity: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.grip:active {
+  cursor: grabbing;
+}
+
+.item:hover .grip,
+.iconBtn:focus-visible + .label .grip,
+.item:focus-within .grip {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  /* Touch: keep the grip discoverable since there is no hover. */
+  .grip {
+    opacity: 1;
+  }
+}
+
+.label {
+  font-size: var(--t-10);
+  font-weight: 600;
+  color: var(--ink-400);
+  line-height: 1;
+}
+
+.labelActive {
+  color: var(--ink-900);
+}

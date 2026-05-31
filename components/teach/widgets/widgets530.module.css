@@ -1,0 +1,157 @@
+/* widgets530.module.css — shared styles for the 5.31 widget set (Lesson
+   Essentials + Routines/Management + Assessment/Support). Token-only: every
+   colour/radius/shadow/font is a `var(--token)`. Inside the lead's `.tw`
+   wrapper these bodies consume the themeable `--w-*` vars (grad/soft/chip/line/
+   card/accent/ink/radius/font/scale); semantic status colours (Pill/FootNote
+   tones, the understanding-check summary bars) come from the `--tone-*` vars
+   defined below, composed from the existing `--tag-*` / `--wf-*` token families
+   — never a raw hex. All internal sizing is in `em` so `--w-scale` rescales the
+   whole widget and the bodies stay responsive without magic px widths. */
+
+/* ── Semantic tone palette (bg/fg pairs) ─────────────────────────────────
+   The handoff's TONE map (red/pink/amber/green/blue/purple/orange/gray) for
+   Pills + FootNotes + summary bars. Mapped onto existing global tokens so no
+   new hex is introduced. Scoped to `.tones` so a widget root opts in. */
+.tones {
+  --tone-red-bg: var(--tag-red-bg);
+  --tone-red-fg: var(--tag-red-fg);
+  --tone-red-solid: var(--tag-red);
+
+  --tone-pink-bg: var(--wf-pink-soft);
+  --tone-pink-fg: var(--wf-pink-accent);
+  --tone-pink-solid: var(--wf-pink-accent);
+
+  --tone-amber-bg: var(--wf-yellow-soft);
+  --tone-amber-fg: var(--wf-yellow-accent);
+  --tone-amber-solid: var(--wf-yellow-accent);
+
+  --tone-green-bg: var(--wf-green-soft);
+  --tone-green-fg: var(--wf-green-accent);
+  --tone-green-solid: var(--wf-green-accent);
+
+  --tone-blue-bg: var(--wf-blue-soft);
+  --tone-blue-fg: var(--wf-blue-accent);
+  --tone-blue-solid: var(--wf-blue-accent);
+
+  --tone-purple-bg: var(--wf-purple-soft);
+  --tone-purple-fg: var(--wf-purple-accent);
+  --tone-purple-solid: var(--wf-purple-accent);
+
+  --tone-orange-bg: var(--wf-orange-soft);
+  --tone-orange-fg: var(--wf-orange-accent);
+  --tone-orange-solid: var(--wf-orange-accent);
+
+  --tone-gray-bg: var(--wf-slate-soft);
+  --tone-gray-fg: var(--wf-slate-accent);
+  --tone-gray-solid: var(--wf-slate-accent);
+}
+
+/* ── Widget root ─────────────────────────────────────────────────────────
+   The body fills the `.tw` tile. The wrapper already paints the gradient bg,
+   radius and padding; the body just lays out its content column. */
+.body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+}
+
+/* ── WHead (compact uppercase label) ───────────────────────────────────── */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  margin-bottom: 1em;
+}
+
+.headLabel {
+  font-size: 0.8em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--w-ink);
+  opacity: 0.55;
+}
+
+/* ── Inner card (the handoff `.sub`) ───────────────────────────────────── */
+.card {
+  background: var(--w-card);
+  border-radius: 0.85em;
+  box-shadow: var(--wf-shadow-inner);
+}
+
+/* ── Chip (rounded-square icon tile) ───────────────────────────────────── */
+.chip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 0.75em;
+  background: var(--w-chip);
+  color: var(--w-accent);
+}
+
+/* ── Avatar (initials-on-tint, privacy-safe) ───────────────────────────── */
+.avatar {
+  border-radius: 50%;
+  border: 0.13em solid var(--w-card);
+  box-shadow: var(--wf-shadow-inner);
+  display: grid;
+  place-items: center;
+  flex: none;
+  overflow: hidden;
+  font-weight: 800;
+}
+
+/* ── Pill (status) ─────────────────────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.35em 0.8em;
+  border-radius: var(--r-pill);
+  font-size: 0.82em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pillIcon {
+  display: grid;
+  place-items: center;
+}
+
+/* ── StepNum (numbered circle) ─────────────────────────────────────────── */
+.step {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  color: var(--paper);
+  font-weight: 800;
+}
+
+/* ── FootNote (encouragement bar) ──────────────────────────────────────── */
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.8em 1em;
+  border-radius: 0.85em;
+  font-size: 0.9em;
+  font-weight: 600;
+  margin-top: 0.95em;
+}
+
+.footIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+/* ── Face (mood SVG on tint) ───────────────────────────────────────────── */
+.face {
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+}

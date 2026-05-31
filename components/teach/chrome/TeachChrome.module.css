@@ -1,0 +1,542 @@
+/* TeachChrome.module.css — shared styling for the Teach chrome zones
+   (TeachTopBar, TeachSubBar, TeachFooter, PresentBar). Colour / type /
+   spacing come from app/tokens.css — never a hard-coded hex here
+   (CLAUDE.md §4). The shell geometry (bar heights, the body grid) lives in
+   TeachWorkspace.module.css; this file owns only the chrome internals. */
+
+/* ── Top bar ──────────────────────────────────────────────────────────── */
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: var(--r-12);
+  width: 100%;
+  min-width: 0;
+  /* Internal horizontal scroll: when the bar's non-shrinking right cluster
+     can't fit (narrow phones), the bar scrolls inside itself instead of
+     widening the document (the slot clips it — TeachWorkspace.module.css).
+     CLAUDE.md §4 allows internal element scroll; the document must not move. */
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.wordmark {
+  font-size: var(--t-18);
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: var(--ink-900);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Grade ▾ chip — free-text curriculum label, not a grade enum. */
+.gradeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-700);
+  white-space: nowrap;
+}
+
+.viewSwitcher {
+  display: flex;
+  align-items: center;
+  gap: var(--r-4);
+  min-width: 0;
+}
+
+.viewTab {
+  padding: 6px 14px;
+  border-radius: var(--r-8);
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-700);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 120ms ease-out;
+}
+.viewTab:hover {
+  background: var(--ink-100);
+}
+.viewTabActive {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+.viewTabActive:hover {
+  background: var(--ink-900);
+}
+.viewTabSoon {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Right cluster of the top bar. */
+.rightCluster {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  flex: none;
+}
+
+/* Pill search affordance (display-only entry — search is owned elsewhere). */
+.searchPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  min-height: 36px;
+  background: var(--ink-100);
+  border: none;
+  border-radius: var(--r-8);
+  color: var(--ink-400);
+  font-size: var(--t-12);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.searchPill:hover {
+  background: var(--ink-150);
+}
+.searchPillLabel {
+  /* Hidden on narrow widths — leaves an icon-only target. */
+}
+
+/* Round + button. */
+.addRound {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--c, var(--math));
+  color: var(--paper);
+  cursor: pointer;
+}
+.addRound:hover {
+  filter: brightness(0.95);
+}
+
+/* Bell / help icon buttons. */
+.iconBtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--ink-700);
+  cursor: pointer;
+}
+.iconBtn:hover {
+  background: var(--ink-100);
+}
+.bellBadge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--catchup);
+  color: var(--paper);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* Avatar. */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-pill);
+  background: var(--ink-900);
+  color: var(--paper);
+  font-size: var(--t-11);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+/* ── Sub bar ──────────────────────────────────────────────────────────── */
+
+.subBar {
+  display: flex;
+  align-items: center;
+  gap: var(--r-12);
+  width: 100%;
+  min-width: 0;
+  /* Internal horizontal scroll: the layout toolbar (1up…3×3) + action cluster
+     (Present / Full Screen / Pop-Out / Duplicate) are fixed-width, non-shrinking
+     `flex: none` clusters that exceed a phone/tablet viewport. The bar scrolls
+     inside itself (the sub-bar slot clips it — TeachWorkspace.module.css) so the
+     document never gains horizontal scroll. CLAUDE.md §4: internal scroll OK. */
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* Week ▾ / Subject ▾ context chips. */
+.contextChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  min-height: 30px;
+  border: var(--line);
+  border-radius: var(--r-6);
+  background: var(--paper);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-900);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.contextChip:hover {
+  background: var(--ink-50);
+}
+
+/* Board tab strip — scrolls internally; never the document. */
+.boardStrip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 1px;
+}
+
+.boardTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  min-height: 30px;
+  border-radius: var(--r-pill);
+  border: var(--line);
+  background: transparent;
+  color: var(--ink-900);
+  font-size: var(--t-12);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.boardTab:hover {
+  background: var(--ink-50);
+}
+/* Active board tab — subject-tinted via .cp-subj on the strip root. */
+.boardTabActive {
+  background: var(--cl, var(--math-light));
+  color: var(--cd, var(--math-deep));
+  border-color: var(--c, var(--math));
+}
+.boardTabActive:hover {
+  background: var(--cl, var(--math-light));
+}
+
+.boardNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-pill);
+  background: var(--ink-100);
+  color: var(--ink-700);
+  font-size: var(--t-10);
+  font-weight: 800;
+}
+.boardTabActive .boardNum {
+  background: var(--c, var(--math));
+  color: var(--paper);
+}
+
+.addBoard {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  min-height: 30px;
+  border-radius: var(--r-pill);
+  border: 1px dashed var(--ink-300);
+  background: transparent;
+  color: var(--ink-700);
+  font-size: var(--t-12);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.addBoard:hover {
+  background: var(--ink-50);
+}
+
+/* Action cluster (Present / Full Screen / Pop-Out / Duplicate). */
+.actionCluster {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  flex: none;
+}
+
+/* Gear board-settings button reuses .iconBtn geometry but smaller padding. */
+.gearBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: var(--line);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  color: var(--ink-700);
+  cursor: pointer;
+}
+.gearBtn:hover {
+  background: var(--ink-50);
+}
+
+/* Sandbox badge — "Sandbox · not saved". */
+.sandboxBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--important-bg, var(--ink-100));
+  color: var(--important, var(--ink-700));
+  font-size: var(--t-11);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sandboxDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: currentColor;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--r-12);
+  width: 100%;
+  min-width: 0;
+  /* Internal horizontal scroll for the same reason as the top/sub bars: the
+     footer's nowrap groups (board counter, module dots, saved chip, shortcuts)
+     scroll inside the bar rather than widening the document. */
+  overflow-x: auto;
+  scrollbar-width: thin;
+  font-size: var(--t-11);
+  color: var(--ink-700);
+}
+
+.footerGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.panelsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--ink-700);
+  font-size: var(--t-11);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--r-6);
+}
+.panelsToggle:hover {
+  background: var(--ink-100);
+}
+
+.moduleDot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--r-pill);
+  background: var(--done);
+}
+
+.footerStrong {
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.footerSep {
+  color: var(--ink-300);
+}
+
+.footerSpacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.savedChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.shortcutsLabel {
+  color: var(--ink-400);
+  white-space: nowrap;
+}
+
+.kbd {
+  background: var(--ink-100);
+  padding: 1px 5px;
+  border-radius: var(--r-2);
+  font-size: var(--t-10);
+}
+
+/* ── Present bar ──────────────────────────────────────────────────────── */
+
+.presentBar {
+  display: flex;
+  align-items: center;
+  gap: var(--r-12);
+  height: 44px;
+  flex: none;
+  min-width: 0;
+  /* Internal horizontal scroll: the present strip's nav buttons + exit chip are
+     nowrap; scroll inside the bar rather than widening the document. */
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: 0 var(--r-12);
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+.presentBadge {
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 3px 9px;
+  border-radius: var(--r-4);
+  background: var(--c, var(--math));
+  color: var(--paper);
+}
+
+.presentTitle {
+  font-size: var(--t-13);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.presentSpacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.presentCounter {
+  font-size: var(--t-12);
+  color: var(--ink-300);
+  white-space: nowrap;
+}
+
+.presentNavBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--paper) 30%, transparent);
+  border-radius: var(--r-6);
+  background: transparent;
+  color: var(--paper);
+  font-size: var(--t-12);
+  font-weight: 600;
+  cursor: pointer;
+}
+.presentNavBtn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--paper) 14%, transparent);
+}
+.presentNavBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.presentExit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid color-mix(in srgb, var(--paper) 30%, transparent);
+  border-radius: var(--r-6);
+  background: transparent;
+  color: var(--paper);
+  font-size: var(--t-12);
+  font-weight: 600;
+  cursor: pointer;
+}
+.presentExit:hover {
+  background: color-mix(in srgb, var(--paper) 14%, transparent);
+}
+.presentExit .kbd {
+  background: color-mix(in srgb, var(--paper) 18%, transparent);
+  color: var(--paper);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  /* Hide the view switcher labels-heavy strip on tablet to recover width;
+     navigation stays reachable via the planner shell elsewhere. */
+  .searchPillLabel {
+    display: none;
+  }
+  .shortcutsLabel,
+  .footer .kbd {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .viewSwitcher {
+    display: none;
+  }
+  /* Touch targets ≥44px on phone/tablet. */
+  .iconBtn,
+  .addRound {
+    width: 44px;
+    height: 44px;
+  }
+  .gearBtn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (max-width: 600px) {
+  .contextChip,
+  .gradeChip {
+    display: none;
+  }
+}

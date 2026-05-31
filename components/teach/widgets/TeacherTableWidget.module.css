@@ -1,0 +1,47 @@
+/* TeacherTableWidget.module.css — token-only, em-sized. Default green/green. */
+
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 0.9em;
+  padding: 0.9em 1em;
+}
+
+.chip {
+  width: 3.4em;
+  height: 3.4em;
+  border-radius: 0.9em;
+}
+
+.heroMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  min-width: 0;
+}
+
+.group {
+  font-size: 1.05em;
+  font-weight: 800;
+  color: var(--w-ink);
+}
+
+.atTable {
+  font-size: 0.8em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--w-ink);
+  opacity: 0.55;
+  margin: 0.95em 0 0.6em;
+}
+
+.avatars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
+.avatar {
+  display: inline-flex;
+}

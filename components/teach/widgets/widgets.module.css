@@ -1,0 +1,23 @@
+/* widgets.module.css — the shared dispatch fallback styles only. The per-widget
+   bodies that used to live here were restyled into the 5.31 system (each now owns
+   a co-located `*.module.css` consuming the `--w-*` themeable vars). This file is
+   now scoped to the generic fallback that `WidgetBody.tsx` renders for an
+   unmapped widget type. Token-only, em-sized. */
+
+/* ── Generic / fallback body (used by WidgetBody for unmapped types) ────── */
+.fallback {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  color: var(--ink-400);
+  text-align: center;
+}
+
+.fallbackLabel {
+  font-size: 0.85em;
+  font-weight: 600;
+}

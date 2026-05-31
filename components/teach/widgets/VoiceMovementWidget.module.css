@@ -1,0 +1,40 @@
+/* VoiceMovementWidget.module.css — token-only, em-sized. Default purple/purple. */
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7em;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.9em;
+  padding: 0.85em 1em;
+}
+
+.rowChip {
+  width: 2.9em;
+  height: 2.9em;
+  border-radius: 0.75em;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.rowMain {
+  min-width: 0;
+}
+
+.rowCat {
+  font-size: 0.75em;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+}
+
+.rowVal {
+  font-size: 1.1em;
+  font-weight: 800;
+  margin-top: 0.05em;
+  color: var(--w-ink);
+}

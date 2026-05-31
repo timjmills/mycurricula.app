@@ -1,0 +1,535 @@
+/* board.module.css — the Teaching Board grid, widget shell chrome, picker,
+   empty state, and focus mode (docs/teach-view-plan.md §4). Colour/spacing/
+   radius come from app/tokens.css — never a hard-coded hex. */
+
+/* ── Board canvas ────────────────────────────────────────────────────── */
+.canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--paper);
+  border-radius: var(--r-12);
+}
+
+.grid {
+  display: grid;
+  gap: var(--r-12);
+  padding: var(--r-12);
+  height: 100%;
+  min-height: 0;
+  /* grid-template-columns/rows are set inline from BOARD_LAYOUT_GRID. */
+}
+
+/* Layout switch animation (~200ms) — guarded for reduced motion below. */
+.gridAnimated {
+  transition:
+    grid-template-columns 200ms ease-out,
+    grid-template-rows 200ms ease-out;
+}
+
+/* ── Widget tile shell ───────────────────────────────────────────────── */
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--tile-bg, var(--paper));
+  border: var(--line);
+  border-radius: var(--r-12);
+  box-shadow: 0 1px 2px rgba(20, 20, 26, 0.04);
+}
+
+.tileDragging {
+  opacity: 0.5;
+}
+
+.tileHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 6px;
+  color: var(--ink-500);
+  flex: none;
+}
+
+.kicker {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--ink-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.headerSpacer {
+  flex: 1;
+}
+
+/* Hover/focus chrome — hidden until the tile is hovered or focus-within, and
+   hidden entirely in Present mode (set via the `present` prop → no chrome). */
+.chrome {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.tile:hover .chrome,
+.tile:focus-within .chrome {
+  opacity: 1;
+}
+
+.chromeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-6);
+  border: none;
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+}
+
+.chromeBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.chromeBtnActive {
+  color: var(--ink-900);
+}
+
+/* Touch devices have no hover, so the hover-revealed widget chrome would be
+   unreachable (audit B4). Surface it persistently and grow the hit area to the
+   44px touch minimum on hover-less pointers. */
+@media (hover: none) {
+  .chrome {
+    opacity: 1;
+  }
+
+  .chromeBtn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+.dragHandle {
+  cursor: grab;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.tileBody {
+  flex: 1;
+  min-height: 0;
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Empty cell (dashed +, droppable) ────────────────────────────────── */
+.emptyCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--r-8);
+  min-height: 80px;
+  min-width: 0;
+  border: 1.5px dashed var(--ink-300);
+  border-radius: var(--r-12);
+  background: transparent;
+  color: var(--ink-400);
+  cursor: pointer;
+}
+
+.emptyCell:hover {
+  border-color: var(--ink-400);
+  color: var(--ink-500);
+  background: var(--ink-50);
+}
+
+.emptyCellOver {
+  border-color: var(--c, var(--tag-blue));
+  border-style: dashed;
+  background: color-mix(in srgb, var(--tag-blue) 8%, transparent);
+  color: var(--ink-700);
+}
+
+.emptyPlus {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-pill);
+  background: var(--ink-100);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyLabel {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ── Board empty state (T9) ──────────────────────────────────────────── */
+.emptyBoard {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--r-12);
+}
+
+.emptyBoardCard {
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--r-12);
+  text-align: center;
+  padding: 36px 30px;
+  border: 1.5px dashed var(--ink-300);
+  border-radius: 18px;
+  background: var(--paper);
+}
+
+.emptyBoardIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--board-tint-sky);
+  color: var(--math-deep);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyBoardTitle {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink-900);
+}
+
+.emptyBoardText {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-500);
+}
+
+.emptyBoardPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  border: none;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: var(--pill-bg, var(--ink-100));
+  color: var(--pill-fg, var(--ink-700));
+}
+
+.pill:hover {
+  filter: brightness(0.96);
+}
+
+/* ── Widget picker (T5) ──────────────────────────────────────────────── */
+.pickerScrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 26, 0.35);
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10vh var(--r-12) var(--r-12);
+}
+
+.picker {
+  width: min(540px, 100%);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-radius: 16px;
+  box-shadow: 0 30px 60px rgba(20, 20, 26, 0.35);
+  padding: 18px;
+  overflow: hidden;
+}
+
+.pickerHead {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  margin-bottom: var(--r-12);
+}
+
+.pickerTitle {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink-900);
+}
+
+.pickerCellBadge {
+  padding: 4px 10px;
+  border: var(--line);
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-500);
+}
+
+.pickerSearch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  background: var(--ink-50);
+  border: var(--line);
+  border-radius: var(--r-8);
+  color: var(--ink-500);
+  margin-bottom: var(--r-12);
+}
+
+.pickerSearchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-900);
+}
+
+.pickerBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-12);
+}
+
+.pickerCategory {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--ink-400);
+  margin-bottom: var(--r-8);
+}
+
+.pickerGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--r-8);
+}
+
+.pickerTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 6px;
+  border: none;
+  border-radius: var(--r-12);
+  cursor: pointer;
+  background: var(--tile-bg, var(--ink-100));
+  color: var(--ink-700);
+  min-height: 44px;
+}
+
+.pickerTile:hover {
+  filter: brightness(0.97);
+}
+
+.pickerTile:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.pickerTileLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.pickerEmpty {
+  padding: var(--r-12);
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ink-400);
+}
+
+/* ── Focus mode (T7) ─────────────────────────────────────────────────── */
+.focusScrim {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-12);
+  padding: var(--r-12);
+  background: var(--paper);
+}
+
+.focusHead {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  flex: none;
+}
+
+.focusBadge {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--paper);
+  background: var(--ink-900);
+  padding: 3px 9px;
+  border-radius: var(--r-4);
+}
+
+.focusHint {
+  font-size: 12px;
+  color: var(--ink-500);
+}
+
+.focusKey {
+  background: var(--ink-100);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10.5px;
+}
+
+.focusBtn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-8);
+  border: var(--line);
+  background: var(--paper);
+  color: var(--ink-500);
+  cursor: pointer;
+}
+
+.focusBtn:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+.focusStage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.focusCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 6px 20px rgba(20, 20, 26, 0.08);
+  background: var(--tile-bg, var(--paper));
+  overflow: hidden;
+}
+
+.focusCardHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.focusCardKicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--ink-500);
+}
+
+.focusCardBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Responsive: board-grid caps (plan §10 / audit B1) ───────────────────
+   The grid-template + each child's grid-column/row are set inline from JS
+   (BOARD_LAYOUT_GRID), so the only way to clamp the effective layout in CSS
+   is to override both the container template AND the inline per-child
+   placement with author `!important` rules (author-important beats a
+   non-important inline declaration). We re-flow the children with
+   grid-auto-flow so any authored 2×2 / 3×3 placement collapses cleanly into
+   the capped column count instead of pointing at columns that no longer
+   exist. Children are the bare widget/empty-cell wrapper divs — targeted via
+   the `.grid > *`-equivalent child combinator (`.grid > div`), which keeps a
+   local class in the selector (CSS-module-safe; no bare `*`). */
+
+/* Tablet (≤900px): cap to 2 columns regardless of chosen layout. */
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: none !important;
+    grid-auto-rows: minmax(160px, 1fr) !important;
+    grid-auto-flow: row !important;
+  }
+
+  .grid > div {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    min-height: 160px;
+  }
+}
+
+/* Phone (≤480px): force a single column; widgets stack and stay tappable. */
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-auto-rows: minmax(180px, auto) !important;
+  }
+
+  .grid > div {
+    min-height: 180px;
+  }
+
+  /* Empty add cells keep a comfortable ≥44px touch target when stacked. */
+  .emptyCell {
+    min-height: 120px;
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .gridAnimated,
+  .chrome {
+    transition: none !important;
+  }
+}

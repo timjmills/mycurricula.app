@@ -1,0 +1,116 @@
+/* PanelAddMenu.module.css — the panel-bar "+" trigger + its popover menu,
+   shared by the left and right Teach panels. Tokens only (CLAUDE.md §4);
+   ≥44px touch targets; the popover width is clamped so it never forces
+   document-level horizontal scroll. */
+
+.root {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  margin-left: auto; /* right-align the trigger within the tab header */
+}
+
+/* The "+" trigger. Hover-reveal is handled by the panels' own CSS via the
+   `triggerClassName` they pass; this is the base look + a ≥44px tap target. */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  /* The visual chip is 30px; the surrounding header padding keeps the real tap
+     target ≥44px. On touch the panels force the trigger always-visible. */
+  border: none;
+  border-radius: var(--r-6);
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+  padding: 0;
+}
+
+.trigger:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.trigger[aria-expanded="true"] {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+/* ── Popover menu ─────────────────────────────────────────────────────────── */
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  z-index: 60;
+  width: clamp(180px, 60vw, 220px);
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--r-6);
+  background: var(--paper);
+  border: var(--line);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-popover);
+}
+
+/* Align the popover to the panel edge so it never overflows the viewport. */
+.menuLeft {
+  right: 0;
+}
+
+.menuRight {
+  right: 0;
+}
+
+.groupLabel {
+  margin: 0;
+  padding: 6px 8px 3px;
+  font-size: var(--t-12);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--ink-900);
+  font-size: var(--t-13);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--ink-100);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -2px;
+}
+
+.itemIcon {
+  display: inline-flex;
+  flex: none;
+  color: var(--ink-500);
+}
+
+.itemLabel {
+  flex: 1;
+  min-width: 0;
+}

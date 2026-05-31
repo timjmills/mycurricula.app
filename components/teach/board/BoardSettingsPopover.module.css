@@ -1,0 +1,131 @@
+/* BoardSettingsPopover — the ⚙ board-settings dialog (audit G1, plan §9/§13.5).
+   Tokens-only; mirrors the WidgetPicker scrim/dialog treatment so the two
+   centered overlays read as one family. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 26, 0.35);
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh var(--r-12) var(--r-12);
+}
+
+.panel {
+  width: min(420px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-12);
+  background: var(--paper);
+  border-radius: 16px;
+  box-shadow: 0 30px 60px rgba(20, 20, 26, 0.35);
+  padding: 18px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--r-8);
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink-900);
+  margin: 0;
+}
+
+.closeBtn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink-500);
+  font-size: 15px;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeBtn:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-700);
+  margin-bottom: -6px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-8);
+  padding-top: var(--r-8);
+  border-top: var(--line);
+}
+
+.renameRow {
+  display: flex;
+  gap: var(--r-8);
+  align-items: center;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: var(--line);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  color: var(--ink-900);
+  font: inherit;
+  font-size: 13px;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--c, var(--tag-blue));
+  outline-offset: 1px;
+}
+
+.hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-500);
+  margin: 0;
+}
+
+.dangerZone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-8);
+  padding: var(--r-12);
+  border: 1px solid var(--urgent, #e5484d);
+  border-radius: var(--r-12);
+  background: color-mix(in srgb, var(--urgent, #e5484d) 5%, transparent);
+}
+
+.dangerLabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--urgent, #e5484d);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.dangerRow {
+  display: flex;
+  gap: var(--r-8);
+  align-items: center;
+}

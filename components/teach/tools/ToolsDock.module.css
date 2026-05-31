@@ -1,0 +1,297 @@
+/* ToolsDock.module.css — the dockable-tools side panel: a bounded, fixed-width
+   column that holds tool-widget tiles in a vertical stack. The stack scrolls
+   INTERNALLY so the document never scrolls sideways. Tokens-only — no raw hex,
+   no px font sizes. */
+
+.dock {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* Bounded width so a narrow column reads well; the host panel can constrain
+     further. Caps so the dock never forces document horizontal scroll. */
+  min-width: 0;
+  max-width: 320px;
+  height: 100%;
+  min-height: 0;
+  background: var(--paper);
+  border-left: var(--line);
+  font-family: var(--font-sans);
+  color: var(--ink-900);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 12px;
+  border-bottom: var(--line);
+  flex: 0 0 auto;
+}
+.headTitle {
+  font-size: var(--t-14);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clearBtn {
+  appearance: none;
+  border: var(--line);
+  background: var(--paper);
+  color: var(--ink-500);
+  font: inherit;
+  font-size: var(--t-12);
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-8);
+  cursor: pointer;
+}
+.clearBtn:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+/* ── Add-tool button + picker ───────────────────────────────────────────── */
+.addWrap {
+  position: relative;
+}
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  appearance: none;
+  border: var(--line-strong);
+  background: var(--ink-900);
+  color: var(--paper);
+  font: inherit;
+  font-size: var(--t-13);
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-8);
+  cursor: pointer;
+}
+.addBtn:hover {
+  background: var(--ink-700);
+}
+.addBtnText {
+  white-space: nowrap;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: 16rem;
+  max-width: min(16rem, calc(100vw - 24px));
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--paper);
+  border: var(--line);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-popover);
+  padding: 8px;
+}
+.menuLabel {
+  margin: 0 0 6px;
+  padding: 0 6px;
+  font-size: var(--t-12);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-400);
+}
+.menuList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-900);
+  font: inherit;
+  font-size: var(--t-13);
+  text-align: left;
+  min-height: 44px;
+  padding: 0 8px;
+  border-radius: var(--r-8);
+  cursor: pointer;
+}
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: var(--ink-50);
+  outline: none;
+}
+.menuItemIcon {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+  border-radius: var(--r-8);
+  background: var(--ink-50);
+  color: var(--ink-700);
+}
+.menuItemLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── The docked stack ───────────────────────────────────────────────────── */
+.stack {
+  list-style: none;
+  margin: 0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Internal scroll — the document never scrolls sideways. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.tile {
+  min-width: 0;
+}
+.tileInner {
+  display: flex;
+  flex-direction: column;
+  border: var(--line);
+  border-radius: var(--r-12);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+/* Tile header row: label + remove. */
+.tileHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border-bottom: var(--line);
+  background: var(--ink-50);
+}
+.tileLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 600;
+}
+.tileLabelText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.removeBtn {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-500);
+  border-radius: var(--r-8);
+  cursor: pointer;
+}
+.removeBtn:hover,
+.removeBtn:focus-visible {
+  background: var(--ink-100);
+  color: var(--ink-900);
+  outline: none;
+}
+
+/* The themed widget wrapper — recreates the handoff `.tw` tile (gradient bg,
+   radius, padding) purely from the `--w-*` vars themeVars() supplies. Sizes are
+   em-based so the body reads in a narrow column. */
+.tw {
+  position: relative;
+  background: var(--w-grad);
+  color: var(--w-ink, var(--ink-900));
+  /* Square the top so the tile header sits flush; round only the bottom. */
+  border-radius: 0 0 var(--r-12) var(--r-12);
+  font-family: var(--w-font, var(--font-sans));
+  /* Slightly smaller base so widgets fit the ~280–320px column; --w-scale still
+     rescales the whole body. */
+  font-size: calc(var(--t-14) * var(--w-scale, 1));
+  line-height: 1.4;
+  padding: 1.25em;
+  overflow: hidden;
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+.empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  color: var(--ink-400);
+}
+.emptyText {
+  margin: 0;
+  max-width: 22ch;
+  font-size: var(--t-13);
+  color: var(--ink-500);
+}
+.emptyAdd {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  appearance: none;
+  border: var(--line-strong);
+  background: var(--ink-900);
+  color: var(--paper);
+  font: inherit;
+  font-size: var(--t-13);
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-8);
+  cursor: pointer;
+}
+.emptyAdd:hover {
+  background: var(--ink-700);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .clearBtn,
+  .addBtn,
+  .menuItem,
+  .removeBtn,
+  .emptyAdd {
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+  }
+}

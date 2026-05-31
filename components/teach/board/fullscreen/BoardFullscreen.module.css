@@ -1,0 +1,541 @@
+/* BoardFullscreen.module.css — full-viewport "present" board (5.31 handoff
+   §5, boardfull.jsx). Token-only: every colour / radius / shadow / font is a
+   `var(--token)` and every font-size is a `--t-*` token. The one documented
+   exception lives in BoardFullscreen.tsx (the backdrop-gradient constants
+   block); nothing in this file hard-codes a colour. */
+
+/* ── Root surface ─────────────────────────────────────────────────────────
+   Fixed, full-bleed. The backdrop image/size are set inline (the active
+   preset's gradient). No document-level horizontal scroll: overflow hidden. */
+.root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: var(--ink-900);
+  /* Backdrop colour/gradient is applied inline from the active preset. */
+}
+
+/* Tool cursors clarify the active markup mode. */
+.root[data-tool="pen"],
+.root[data-tool="highlighter"] {
+  cursor: crosshair;
+}
+.root[data-tool="eraser"] {
+  cursor: cell;
+}
+.root[data-tool="text"],
+.root[data-tool="sticky"] {
+  cursor: copy;
+}
+
+/* ── Placed widgets layer ──────────────────────────────────────────────────
+   Read-only placement in present mode: widgets are positioned absolutely from
+   each page's canvas coords. Sits below the annotation layer + chrome. */
+.widgetLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.placed {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* The themed widget wrapper — recreates the handoff `.tw` tile (gradient bg,
+   radius, padding) purely from the `--w-*` vars themeVars() supplies. */
+.tw {
+  position: relative;
+  background: var(--w-grad);
+  color: var(--w-ink, var(--ink-900));
+  border-radius: var(--w-radius, 22px);
+  font-family: var(--w-font, var(--font-sans));
+  font-size: calc(var(--t-16) * var(--w-scale, 1));
+  line-height: 1.4;
+  box-shadow:
+    var(--shadow-card),
+    inset 0 0 0 1px var(--ink-100);
+  padding: 1.5em;
+  overflow: hidden;
+}
+
+/* ── Chrome buttons (top corners) ──────────────────────────────────────────
+   ≥44px touch targets. */
+.chromeBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-12);
+  background: var(--paper);
+  color: var(--ink-500);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-popover);
+  border: var(--line);
+  cursor: pointer;
+}
+.chromeBtn:hover {
+  background: var(--ink-50);
+}
+.chromeBtnActive {
+  background: var(--wf-purple-accent);
+  color: var(--paper);
+}
+
+.topLeft {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 6;
+}
+.topRight {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  gap: 10px;
+  z-index: 6;
+}
+
+/* ── Markup tools panel (docks left / right) ───────────────────────────────
+   Vertically centred against the edge; flips side via the move button. */
+.panel {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 10px 8px;
+  box-shadow: var(--shadow-popover);
+  z-index: 6;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.panelLeft {
+  left: 18px;
+}
+.panelRight {
+  right: 18px;
+}
+
+.panelMove {
+  width: 44px;
+  height: 36px;
+  border-radius: var(--r-8);
+  display: grid;
+  place-items: center;
+  color: var(--ink-400);
+  background: transparent;
+  cursor: pointer;
+}
+.panelMove:hover {
+  background: var(--ink-50);
+}
+
+.panelDivider {
+  width: 30px;
+  height: 1px;
+  background: var(--ink-150);
+  margin: 2px 0;
+  flex: none;
+}
+
+/* Markup tool buttons — ≥44px touch target. */
+.tool {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-12);
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--ink-500);
+  cursor: pointer;
+}
+.tool:hover {
+  background: var(--ink-50);
+}
+.toolActive {
+  background: var(--wf-purple-accent);
+  color: var(--paper);
+}
+.toolActive:hover {
+  background: var(--wf-purple-accent);
+}
+
+/* Color dots — two columns. */
+.colorGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 2px 0;
+}
+.colorDot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--paper);
+  box-shadow: 0 0 0 1px var(--ink-200);
+  cursor: pointer;
+  padding: 0;
+}
+.colorDotActive {
+  box-shadow: 0 0 0 2px var(--wf-purple-accent);
+}
+
+.panelAction {
+  width: 44px;
+  height: 40px;
+  border-radius: var(--r-8);
+  display: grid;
+  place-items: center;
+  color: var(--ink-500);
+  background: transparent;
+  cursor: pointer;
+}
+.panelAction:hover:not(:disabled) {
+  background: var(--ink-50);
+}
+.panelAction:disabled {
+  color: var(--ink-300);
+  cursor: not-allowed;
+}
+
+/* ── Favorites bar (bottom-centre) ─────────────────────────────────────────
+   Scrolls internally on narrow widths so it never forces a document-level
+   horizontal scroll. */
+.favBar {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow-popover);
+  z-index: 6;
+  max-width: min(calc(100vw - 32px), 920px);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.bgBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-12);
+  display: grid;
+  place-items: center;
+  color: var(--ink-500);
+  background: transparent;
+  cursor: pointer;
+  flex: none;
+}
+.bgBtn:hover {
+  background: var(--ink-50);
+}
+.bgBtnActive {
+  background: var(--ink-100);
+}
+
+.favLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 4px;
+  color: var(--wf-yellow-accent);
+  flex: none;
+}
+.favLabelText {
+  font-size: var(--t-12);
+  font-weight: 800;
+  color: var(--ink-500);
+}
+
+.favSep {
+  width: 1px;
+  height: 30px;
+  background: var(--ink-150);
+  flex: none;
+}
+
+.favChip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 9px;
+  border-radius: var(--r-12);
+  color: var(--ink-500);
+  background: transparent;
+  cursor: pointer;
+  min-width: 54px;
+  flex: none;
+}
+.favChip:hover {
+  background: var(--ink-50);
+}
+.favChipLabel {
+  font-size: var(--t-12);
+  font-weight: 700;
+}
+
+.libBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: var(--r-12);
+  background: var(--wf-purple-accent);
+  color: var(--paper);
+  font-size: var(--t-14);
+  font-weight: 700;
+  cursor: pointer;
+  flex: none;
+  min-height: 44px;
+}
+.libBtn:hover {
+  filter: brightness(1.05);
+}
+
+/* ── Background picker + library popup ──────────────────────────────────── */
+.popup {
+  position: absolute;
+  left: 50%;
+  bottom: 104px;
+  transform: translateX(-50%);
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: var(--shadow-popover);
+  z-index: 7;
+}
+.bgPopup {
+  width: min(540px, 92vw);
+}
+.libPopup {
+  width: min(680px, 94vw);
+  max-height: 70vh;
+  overflow: auto;
+  padding: 20px;
+  border-radius: 20px;
+}
+
+.popupTitle {
+  font-size: var(--t-14);
+  font-weight: 800;
+  margin: 0 0 12px;
+}
+
+.bgGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+@media (max-width: 600px) {
+  .bgGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.bgSwatch {
+  text-align: center;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.bgSwatchChip {
+  height: 44px;
+  border-radius: var(--r-12);
+  border: 1px solid var(--ink-150);
+  margin-bottom: 5px;
+}
+.bgSwatchChipActive {
+  border: 2px solid var(--wf-blue-accent);
+}
+.bgSwatchLabel {
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink-500);
+}
+
+.libHeader {
+  display: flex;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+.libTitle {
+  font-size: var(--t-18);
+  font-weight: 800;
+}
+.libSearch {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 13px;
+  border-radius: var(--r-12);
+  border: var(--line);
+  color: var(--ink-400);
+  background: var(--paper);
+  font-size: var(--t-14);
+  min-height: 44px;
+}
+.libSearchInput {
+  border: 0;
+  outline: none;
+  background: transparent;
+  flex: 1;
+  font: inherit;
+  color: var(--ink-900);
+}
+.libClose {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-8);
+  display: grid;
+  place-items: center;
+  color: var(--ink-400);
+  background: transparent;
+  cursor: pointer;
+}
+.libClose:hover {
+  background: var(--ink-50);
+}
+
+.libGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .libGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .libGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.libCard {
+  position: relative;
+  border: var(--line);
+  border-radius: var(--r-12);
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: var(--paper);
+  cursor: pointer;
+}
+.libCard:hover {
+  background: var(--ink-50);
+}
+.libStar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: var(--ink-300);
+}
+.libStarFav {
+  color: var(--wf-yellow-accent);
+}
+.libIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-12);
+  background: var(--ink-100);
+  color: var(--ink-500);
+  display: grid;
+  place-items: center;
+}
+.libCardLabel {
+  font-size: var(--t-12);
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
+}
+.libEmpty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--ink-400);
+  font-size: var(--t-13);
+  padding: 24px 0;
+}
+
+/* ── Page nav (bottom-right) ───────────────────────────────────────────── */
+.pageNav {
+  position: absolute;
+  right: 24px;
+  bottom: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--paper);
+  border-radius: var(--r-12);
+  padding: 6px;
+  box-shadow: var(--shadow-popover);
+  z-index: 6;
+}
+.pageBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-8);
+  display: grid;
+  place-items: center;
+  color: var(--ink-500);
+  background: transparent;
+  cursor: pointer;
+}
+.pageBtn:hover:not(:disabled) {
+  background: var(--ink-50);
+}
+.pageBtn:disabled {
+  color: var(--ink-300);
+  cursor: not-allowed;
+}
+.pageCount {
+  min-width: 40px;
+  height: 44px;
+  border-radius: var(--r-8);
+  background: var(--ink-100);
+  display: grid;
+  place-items: center;
+  font-size: var(--t-14);
+  font-weight: 800;
+  padding: 0 10px;
+}
+
+/* ── Responsive: tighten chrome on phone so it doesn't crowd content ─────── */
+@media (max-width: 600px) {
+  .panel {
+    gap: 2px;
+    padding: 8px 6px;
+  }
+  .favBar {
+    bottom: 12px;
+    max-width: calc(100vw - 16px);
+  }
+  .pageNav {
+    bottom: 78px;
+    right: 12px;
+  }
+}
+
+/* Reduced motion: no hover-driven transitions/filters that read as motion. */
+@media (prefers-reduced-motion: reduce) {
+  .libBtn:hover {
+    filter: none;
+  }
+}

@@ -1,0 +1,91 @@
+/* ClockWidget.module.css — live analog + digital wall clock (Phase 3 widget
+   library). Token-only colour/spacing/radii. The face fills the available tile
+   height (small grid cell or large focus mode) and the digital readout scales
+   with the viewport. Pref toggles fade in on hover/focus so the face reads
+   cleanly; the second-hand sweep is gated behind prefers-reduced-motion. */
+
+.body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--r-8);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Pref toggles (hover/focus reveal) ───────────────────────────────── */
+.toggles {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.body:hover .toggles,
+.body:focus-within .toggles {
+  opacity: 1;
+}
+
+.toggle {
+  min-width: 44px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: var(--line);
+  border-radius: var(--r-pill);
+  background: var(--paper);
+  color: var(--ink-500);
+  font-size: 0.786em;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  background: var(--ink-50);
+}
+
+.toggleOn {
+  background: var(--w-soft);
+  border-color: var(--w-accent);
+  color: var(--w-accent);
+}
+
+/* ── Analog face ─────────────────────────────────────────────────────── */
+.face {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.dial {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+/* ── Digital readout ─────────────────────────────────────────────────── */
+.digital {
+  flex: none;
+  font-size: clamp(18px, 4.5vh, 40px);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggles {
+    transition: none;
+  }
+}

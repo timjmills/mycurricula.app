@@ -1,0 +1,42 @@
+/* DiscussionProtocolWidget.module.css — token-only, em-sized. Default blue/blue. */
+
+.title {
+  font-size: 1.1em;
+  font-weight: 800;
+  color: var(--w-ink);
+  margin-bottom: 0.8em;
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65em;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  padding: 0.8em 1em;
+  flex-wrap: wrap;
+}
+
+.icon {
+  color: var(--w-accent);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.text {
+  font-size: 0.95em;
+  font-weight: 700;
+  color: var(--w-ink);
+  min-width: 0;
+  flex: 1;
+}
+
+.hint {
+  flex: none;
+  margin-left: auto;
+}

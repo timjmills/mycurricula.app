@@ -1,0 +1,92 @@
+/* ModelWidget.module.css — restyled into the 5.31 system. Token-only, em-sized.
+   Bar fill/outline use the themeable accent. */
+
+.heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  font-size: 0.95em;
+  font-weight: 700;
+  color: var(--w-ink);
+  margin-bottom: 0.8em;
+}
+
+.bars {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7em;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  min-height: 0;
+}
+
+.colFrac {
+  text-align: center;
+}
+
+.bar {
+  display: flex;
+  flex: 1;
+  min-height: 2.5em;
+  border: 0.12em solid var(--w-accent);
+  border-radius: 0.4em;
+  overflow: hidden;
+}
+
+.barPart {
+  flex: 1;
+  border-right: 0.12em solid var(--w-accent);
+}
+
+.barPart:last-child {
+  border-right: none;
+}
+
+.barPartFilled {
+  background: var(--w-soft);
+}
+
+.fracRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  font-size: 1.1em;
+  font-weight: 700;
+  color: var(--w-ink);
+  margin-top: 0.7em;
+}
+
+.fracRowItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.fracEq {
+  opacity: 0.5;
+}
+
+.frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 0.15em;
+}
+
+.fracBig {
+  font-size: 1.15em;
+}
+
+.fracBar {
+  width: 100%;
+  border-top: 0.1em solid currentColor;
+  margin: 0.07em 0;
+}

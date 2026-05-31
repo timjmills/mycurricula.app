@@ -1,0 +1,119 @@
+/* WorkSymbolsWidget.module.css — interactive work-mode selector (Phase 3 widget
+   library). Token-only colour/radii. A big subject-tinted banner sits over a
+   wrapping grid of ≥44px mode buttons; the active button reads as "filled" with
+   the subject accent. Fills the tile at both small + large sizes. */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-8);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Current-mode banner ─────────────────────────────────────────────── */
+.banner {
+  flex: 1;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 18px);
+  padding: clamp(8px, 2vh, 18px);
+  border-radius: var(--r-12);
+  background: var(--ink-50);
+  border: var(--line);
+  text-align: center;
+}
+
+.bannerActive {
+  background: var(--w-soft);
+  border-color: var(--w-accent);
+  color: var(--w-accent);
+}
+
+.bannerGlyph {
+  flex: none;
+  display: inline-flex;
+  color: var(--w-accent);
+}
+
+.bannerGlyph svg {
+  width: clamp(40px, 9vh, 88px);
+  height: clamp(40px, 9vh, 88px);
+}
+
+.bannerLabel {
+  font-size: clamp(22px, 5.5vh, 56px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--w-accent);
+}
+
+.bannerEmpty {
+  font-size: 0.929em;
+  font-weight: 700;
+  color: var(--ink-400);
+}
+
+/* ── Mode buttons ────────────────────────────────────────────────────── */
+.grid {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.modeBtn {
+  flex: 1 1 auto;
+  min-width: 64px;
+  min-height: 44px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 8px;
+  border: var(--line);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  color: var(--ink-700);
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.modeBtn:hover {
+  background: var(--ink-50);
+}
+
+.modeBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+.modeBtnOn {
+  background: var(--w-soft);
+  border-color: var(--w-accent);
+  color: var(--w-accent);
+}
+
+.modeGlyph {
+  display: inline-flex;
+}
+
+.modeLabel {
+  font-size: 0.786em;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modeBtn {
+    transition: none;
+  }
+}

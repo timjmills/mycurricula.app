@@ -26,8 +26,23 @@
   border-right: 1px solid var(--ink-150);
   /* Quiet drop in case the rail sits over content with no shadow underlying
      it — keeps the boundary present without screaming. */
-  position: relative;
-  z-index: 1;
+  /* ── Sticky docked rail ──────────────────────────────────────────────
+     The planner shell scrolls at the document level (the routed <main> grows
+     with content). To keep this icon nav visible while the page scrolls, the
+     rail is a sticky island: it sticks just under the sticky top bar
+     (`top: var(--topbar-h)`) and owns a self-contained viewport-tall height
+     so a tall icon stack scrolls INSIDE the rail (`overflow-y: auto`) instead
+     of pushing the document. `align-self: flex-start` stops the parent flex
+     row's default `stretch` from sizing the rail to the full scroll height,
+     which would defeat the sticky. `100dvh` tracks the mobile dynamic
+     viewport. At ≤480px the rail is `display: none` (below), so sticky is
+     moot there. */
+  position: sticky;
+  top: var(--topbar-h, 52px);
+  align-self: flex-start;
+  height: calc(100dvh - var(--topbar-h, 52px));
+  z-index: var(--z-rail, 20);
+  overflow-y: auto;
 }
 
 /* ── Top group ────────────────────────────────────────────────────────── */

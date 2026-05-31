@@ -8,6 +8,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getAdminClient } from "@/lib/supabase/admin";
+import { ensureTeacherRecord } from "@/lib/supabase/ensure-teacher";
 
 /** Post-login landing route when no `?next=` was preserved. */
 const DEFAULT_NEXT = "/weekly";
@@ -27,9 +29,27 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data: exchanged, error } =
+      await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
+      // Idempotently provision the teacher + grade-assignment rows so RLS-gated
+      // queries succeed for this user (ultraplan §6). The SSO path ALWAYS
+      // ensures the teacher record (unlike the bypass, which gates on a flag).
+      // Failure is non-fatal — login still proceeds; the user sees denied data
+      // until a later request provisions successfully.
+      const authUser = exchanged?.user;
+      if (authUser?.id) {
+        try {
+          await ensureTeacherRecord(getAdminClient(), {
+            id: authUser.id,
+            email: authUser.email,
+          });
+        } catch {
+          // Admin client unconfigured or transient failure — never block login.
+        }
+      }
+
       // Behind a load balancer the public host arrives on x-forwarded-host;
       // use it so the redirect lands on the deployed domain, not localhost.
       const forwardedHost = request.headers.get("x-forwarded-host");

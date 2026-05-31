@@ -14,6 +14,7 @@ export * from "./todos";
 export * from "./shoutbox";
 export * from "./schedule";
 export * from "./calendar";
+export * from "./boards";
 
 /** Day labels for the weekly grid. The school week runs Sunday–Thursday. */
 export const WEEK_DAYS: readonly string[] = [

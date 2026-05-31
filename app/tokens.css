@@ -173,6 +173,338 @@
   --hlp-red: #fcc7d0;
   --hlp-cheese: #fcdcc7;
 
+  /* ── Teach board widget tints ─────────────────────────────────────── */
+  /* Soft pastel washes for widget-tile backgrounds on the Teaching Board
+     (docs/teach-view-plan.md §9). Consistent with the --tag-*-bg family:
+     light, low-saturation surfaces that keep dark ink legible at AA. Used
+     only as informational tile backgrounds — never decoration. */
+  --board-tint-yellow: #fdf6c7;
+  --board-tint-mint: #d6f5e3;
+  --board-tint-sky: #d9ecfd;
+  --board-tint-pink: #fce0ef;
+  --board-tint-lavender: #e8e2fb;
+  --board-tint-peach: #fde6d3;
+
+  /* Teaching-board interactive-widget semantics (Teach Phase 3). Vivid,
+     projector-legible signal colours for the traffic light, work symbols,
+     timer alarm, and sound-level meter. Distinct from the muted --tag-* set. */
+  --traffic-red: #e5404a;
+  --traffic-amber: #f5a623;
+  --traffic-green: #34b96a;
+  --traffic-off: #d4d8e0;
+  --teach-alarm: #e5404a;
+  --teach-go: #34b96a;
+
+  /* ── Teaching-board backgrounds (Teach Phase 3, plan §4.2) ──────────────
+     The classroomscreen-style board background picker: 15 solid colours, 15
+     repeating patterns, and 15 seamless repeating gradients. Each is a single
+     `background` shorthand value (colour, or image + size so it tiles), so a
+     board applies one with `background: var(--teach-bg-<id>)`. Every widget
+     tile sits on `--paper`, so dark ink stays AA-legible over any background.
+     Hex lives here (the token source) — components only reference the vars.
+
+     Supporting hue palette (soft, low-saturation) used by the solids,
+     patterns, and gradients so the family stays harmonious. */
+  --teach-hue-slate: #e3e8ef;
+  --teach-hue-rose: #f6dfe6;
+  --teach-hue-amber: #f8ead0;
+  --teach-hue-lime: #e4f0d4;
+  --teach-hue-teal: #d4efe9;
+  --teach-hue-sky: #d8e9f7;
+  --teach-hue-indigo: #e0e2f5;
+  --teach-hue-violet: #e9e1f3;
+  --teach-hue-ink: #cbd3df;
+
+  /* 15 solid colours — calm, projector-friendly fills. */
+  --teach-bg-solid-1: #ffffff;
+  --teach-bg-solid-2: #f6f7f9;
+  --teach-bg-solid-3: #eef2f7;
+  --teach-bg-solid-4: #fdf6e3;
+  --teach-bg-solid-5: #fcefe8;
+  --teach-bg-solid-6: #fde7ee;
+  --teach-bg-solid-7: #f2e9fb;
+  --teach-bg-solid-8: #e7ecfb;
+  --teach-bg-solid-9: #e2f0fb;
+  --teach-bg-solid-10: #e0f3ee;
+  --teach-bg-solid-11: #eaf4dd;
+  --teach-bg-solid-12: #fbf3d6;
+  --teach-bg-solid-13: #2b3245;
+  --teach-bg-solid-14: #1f2937;
+  --teach-bg-solid-15: #11161f;
+
+  /* 15 repeating patterns — subtle, tileable (size in the shorthand). */
+  --teach-bg-pattern-1:
+    radial-gradient(circle, var(--teach-hue-ink) 1.4px, transparent 1.6px) 0 0 /
+      22px 22px,
+    var(--paper);
+  --teach-bg-pattern-2:
+    radial-gradient(circle, var(--teach-hue-sky) 2px, transparent 2.2px) 0 0 /
+      28px 28px,
+    #f4f8fc;
+  --teach-bg-pattern-3:
+    linear-gradient(var(--teach-hue-slate) 1px, transparent 1px) 0 0 / 26px 26px,
+    linear-gradient(90deg, var(--teach-hue-slate) 1px, transparent 1px) 0 0 /
+      26px 26px,
+    var(--paper);
+  --teach-bg-pattern-4:
+    linear-gradient(var(--teach-hue-sky) 1px, transparent 1px) 0 0 / 26px 26px,
+    #f6fafe;
+  --teach-bg-pattern-5:
+    repeating-linear-gradient(
+      45deg,
+      var(--teach-hue-slate) 0 2px,
+      transparent 2px 14px
+    ),
+    var(--paper);
+  --teach-bg-pattern-6:
+    repeating-linear-gradient(
+      -45deg,
+      var(--teach-hue-rose) 0 2px,
+      transparent 2px 14px
+    ),
+    #fdf6f8;
+  --teach-bg-pattern-7:
+    repeating-linear-gradient(
+      0deg,
+      var(--teach-hue-amber) 0 12px,
+      transparent 12px 24px
+    ),
+    #fffaf0;
+  --teach-bg-pattern-8:
+    repeating-linear-gradient(
+      90deg,
+      var(--teach-hue-teal) 0 12px,
+      transparent 12px 24px
+    ),
+    #f1faf7;
+  --teach-bg-pattern-9:
+    repeating-linear-gradient(
+      45deg,
+      var(--teach-hue-lime) 0 10px,
+      transparent 10px 20px
+    ),
+    #f8fcf0;
+  --teach-bg-pattern-10:
+    radial-gradient(
+        circle at 50% 50%,
+        var(--teach-hue-violet) 0 6px,
+        transparent 7px
+      )
+      0 0 / 30px 30px,
+    #f8f5fc;
+  --teach-bg-pattern-11:
+    radial-gradient(
+        circle at 0 0,
+        var(--teach-hue-indigo) 0 8px,
+        transparent 9px
+      )
+      0 0 / 26px 26px,
+    #f3f4fc;
+  --teach-bg-pattern-12:
+    conic-gradient(
+        from 45deg,
+        var(--teach-hue-slate) 0 25%,
+        transparent 0 50%,
+        var(--teach-hue-slate) 0 75%,
+        transparent 0
+      )
+      0 0 / 28px 28px,
+    var(--paper);
+  --teach-bg-pattern-13:
+    repeating-linear-gradient(
+      45deg,
+      var(--teach-hue-sky) 0 1px,
+      transparent 1px 16px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      var(--teach-hue-sky) 0 1px,
+      transparent 1px 16px
+    ),
+    #f6fafe;
+  --teach-bg-pattern-14:
+    radial-gradient(circle, var(--teach-hue-amber) 1.6px, transparent 1.8px) 0
+      0 / 18px 18px,
+    radial-gradient(circle, var(--teach-hue-amber) 1.6px, transparent 1.8px) 9px
+      9px / 18px 18px,
+    #fffaf0;
+  --teach-bg-pattern-15:
+    repeating-linear-gradient(
+      135deg,
+      var(--teach-hue-violet) 0 3px,
+      transparent 3px 10px
+    ),
+    #f8f5fc;
+
+  /* 15 seamless repeating gradients — tileable bands / weaves / rays. */
+  --teach-bg-gradient-1: repeating-linear-gradient(
+    135deg,
+    #eaf1fb 0 24px,
+    #f4f8fd 24px 48px
+  );
+  --teach-bg-gradient-2: repeating-linear-gradient(
+    45deg,
+    #fdeef3 0 22px,
+    #fbf4f7 22px 44px
+  );
+  --teach-bg-gradient-3: repeating-linear-gradient(
+    90deg,
+    #eef7f1 0 26px,
+    #f6fbf8 26px 52px
+  );
+  --teach-bg-gradient-4: repeating-linear-gradient(
+    0deg,
+    #fff6e2 0 24px,
+    #fffaf0 24px 48px
+  );
+  --teach-bg-gradient-5: repeating-linear-gradient(
+    60deg,
+    #f0ecfb 0 20px,
+    #f7f4fc 20px 40px
+  );
+  --teach-bg-gradient-6: repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      #eef2f8 0deg 18deg,
+      #f7f9fc 18deg 36deg
+    )
+    0 0 / 64px 64px;
+  --teach-bg-gradient-7: repeating-conic-gradient(
+      #f6eef8 0% 25%,
+      #fbf6fc 0% 50%
+    )
+    0 0 / 40px 40px;
+  --teach-bg-gradient-8:
+    repeating-linear-gradient(45deg, #e9f1fa 0 16px, transparent 16px 32px),
+    repeating-linear-gradient(-45deg, #e9f1fa 0 16px, #f5f9fd 16px 32px);
+  --teach-bg-gradient-9: repeating-radial-gradient(
+    circle at 50% 50%,
+    #e7f3ef 0 14px,
+    #f3faf7 14px 28px
+  );
+  --teach-bg-gradient-10: repeating-radial-gradient(
+    circle at 0 0,
+    #eef0fb 0 18px,
+    #f6f7fd 18px 36px
+  );
+  --teach-bg-gradient-11: repeating-linear-gradient(
+    135deg,
+    #fdeede 0 20px,
+    #fef6ec 20px 40px
+  );
+  --teach-bg-gradient-12: repeating-linear-gradient(
+    90deg,
+    #f3eefb 0 14px,
+    #faf6fd 14px 28px
+  );
+  --teach-bg-gradient-13:
+    repeating-linear-gradient(0deg, #e9f2f0 0 18px, transparent 18px 36px),
+    repeating-linear-gradient(90deg, #e9f2f0 0 18px, #f4faf8 18px 36px);
+  --teach-bg-gradient-14: repeating-conic-gradient(
+      from 45deg at 50% 50%,
+      #2d3447 0deg 20deg,
+      #353d52 20deg 40deg
+    )
+    0 0 / 72px 72px;
+  --teach-bg-gradient-15: repeating-linear-gradient(
+    45deg,
+    #232a3a 0 22px,
+    #2b3346 22px 44px
+  );
+
+  /* ── Teach widget visual system (5.31 Boards & Widgets redesign) ────────
+     The pastel-paper widget system from the 5.31 design handoff. Six colour
+     families + three neutrals, each exposing -bg / -chip / -accent / -soft /
+     -line and a -grad gradient (near-white top → family tint). A themeable
+     widget reads these via the --w-* contract (see lib/teach/widget-theme.ts);
+     the appearance editor lets a board theme + per-widget overrides repaint
+     them. Hex lives HERE only — components reference the vars. Exact values
+     ported from the handoff's widgets530.css. Distinct from the older
+     --board-tint-* / --teach-bg-* sets (those drive tile tints + the fullscreen
+     backdrop picker; these drive the new themeable widget surfaces). */
+  --wf-yellow-bg: #fdf5da;
+  --wf-yellow-chip: #f6df84;
+  --wf-yellow-accent: #d99c08;
+  --wf-yellow-soft: #fbeec3;
+  --wf-yellow-line: #f0e3b0;
+  --wf-yellow-grad: linear-gradient(165deg, #fffdf3 0%, #fbf1cf 100%);
+  --wf-green-bg: #eaf6ed;
+  --wf-green-chip: #bce6c6;
+  --wf-green-accent: #1fa85a;
+  --wf-green-soft: #d9f0df;
+  --wf-green-line: #cde9d4;
+  --wf-green-grad: linear-gradient(165deg, #f7fcf9 0%, #e4f3e9 100%);
+  --wf-pink-bg: #fce5ee;
+  --wf-pink-chip: #f7bcd4;
+  --wf-pink-accent: #e84e93;
+  --wf-pink-soft: #fad3e3;
+  --wf-pink-line: #f3c9da;
+  --wf-pink-grad: linear-gradient(165deg, #fef5f9 0%, #fbe0e9 100%);
+  --wf-purple-bg: #f0ecfc;
+  --wf-purple-chip: #d6cbf7;
+  --wf-purple-accent: #7c5cf6;
+  --wf-purple-soft: #e5dcfb;
+  --wf-purple-line: #ddd3f5;
+  --wf-purple-grad: linear-gradient(165deg, #faf8fe 0%, #ede8fb 100%);
+  --wf-orange-bg: #fdeede;
+  --wf-orange-chip: #fbd2ac;
+  --wf-orange-accent: #f2802b;
+  --wf-orange-soft: #fbddc1;
+  --wf-orange-line: #f7d8bc;
+  --wf-orange-grad: linear-gradient(165deg, #fffbf5 0%, #fce8d6 100%);
+  --wf-blue-bg: #e9f1fe;
+  --wf-blue-chip: #c1d9fb;
+  --wf-blue-accent: #2e6be6;
+  --wf-blue-soft: #d8e7fd;
+  --wf-blue-line: #cfe0fb;
+  --wf-blue-grad: linear-gradient(165deg, #f6faff 0%, #e4edfe 100%);
+  /* Neutral theme options (appearance editor): slate / cloud(white) / dark(night) */
+  --wf-slate-bg: #eef0f4;
+  --wf-slate-chip: #e1e5ec;
+  --wf-slate-accent: #5b6478;
+  --wf-slate-soft: #eef0f4;
+  --wf-slate-line: #dde1e8;
+  --wf-slate-grad: linear-gradient(165deg, #f8f9fb 0%, #e9ecf1 100%);
+  --wf-cloud-bg: #f6f7f9;
+  --wf-cloud-chip: #eef0f4;
+  --wf-cloud-accent: #3b4456;
+  --wf-cloud-soft: #f5f7f9;
+  --wf-cloud-line: #e9ebf0;
+  --wf-cloud-grad: linear-gradient(165deg, #ffffff 0%, #f3f5f8 100%);
+  --wf-dark-bg: #1c2333;
+  --wf-dark-chip: #3a435c;
+  --wf-dark-accent: #9db4e8;
+  --wf-dark-soft: #2b3346;
+  --wf-dark-line: #39425a;
+  --wf-dark-grad: linear-gradient(165deg, #262e42 0%, #171d2c 100%);
+  --wf-ink-accent: #101729;
+
+  /* Widget-system fonts (the appearance editor's 5 font options). The actual
+     faces load via next/font in app/layout.tsx, exposing the --font-* vars
+     below; this maps the handoff's keys to those vars with safe fallbacks. */
+  --wf-font-jakarta: var(
+    --font-jakarta,
+    "Plus Jakarta Sans",
+    ui-sans-serif,
+    system-ui,
+    sans-serif
+  );
+  --wf-font-rounded: var(--font-quicksand, "Quicksand", system-ui, sans-serif);
+  --wf-font-serif: Georgia, "Times New Roman", serif;
+  --wf-font-hand: var(--font-caveat, "Caveat", cursive);
+  --wf-font-mono: ui-monospace, Menlo, monospace;
+
+  /* Widget-system radii + shadows (handoff ladder; namespaced to avoid clashing
+     with the existing --r-* / --shadow-* sets). */
+  --wf-r-card: 22px;
+  --wf-r-inner: 16px;
+  --wf-r-button: 14px;
+  --wf-r-chip: 11px;
+  --wf-shadow-card:
+    0 1px 2px rgba(16, 23, 41, 0.04), 0 6px 20px rgba(16, 23, 41, 0.05);
+  --wf-shadow-inner:
+    0 1px 2px rgba(16, 23, 41, 0.05), 0 2px 8px rgba(16, 23, 41, 0.04);
+  --wf-shadow-pop: 0 18px 60px rgba(16, 23, 41, 0.22);
+
   /* ── Spacing / radii ──────────────────────────────────────────────── */
   --r-2: 2px;
   --r-4: 4px;
@@ -180,6 +512,18 @@
   --r-8: 8px;
   --r-12: 12px;
   --r-pill: 999px;
+
+  /* ── Chrome geometry + stacking ───────────────────────────────────────
+     Shared layout constants for the app chrome. `--topbar-h` is the sticky
+     planner top bar's height (keep in sync with top-bar.module.css `.bar`).
+     The docked side rails/panels use it as their sticky `top:` offset and
+     as the subtrahend for their self-contained viewport-tall height, so the
+     center scrolls while the bars stay put. The z-scale keeps the sticky
+     rails above page content but below the top bar + master banner. */
+  --topbar-h: 52px;
+  --z-rail: 20;
+  --z-topbar: 30;
+  --z-banner: 40;
 
   --line: 1px solid var(--ink-150);
   --line-strong: 1px solid var(--ink-200);

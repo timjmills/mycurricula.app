@@ -1,0 +1,111 @@
+/* StopwatchWidget.module.css — count-up stopwatch + lap list (Phase 3 widget
+   library). Token-only colour/spacing/radii. The digits scale between a small
+   grid tile and large focus mode; the lap list scrolls internally so the body
+   never page-scrolls. No animation here, so no reduced-motion guard is needed. */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-8);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.digits {
+  flex: none;
+  text-align: center;
+  font-size: clamp(40px, 10vh, 100px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+}
+
+.primaryBtn {
+  flex: 1;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--w-accent);
+  color: var(--paper);
+  font-size: 0.929em;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primaryBtn:hover {
+  filter: brightness(0.95);
+}
+
+.iconBtn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--line);
+  border-radius: var(--r-pill);
+  background: var(--paper);
+  color: var(--ink-700);
+  cursor: pointer;
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--ink-50);
+}
+
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Lap list (scrollable, newest first) ─────────────────────────────── */
+.laps {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--line);
+}
+
+.lapRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--r-12);
+  padding: 6px 2px;
+  border-bottom: var(--line);
+  font-size: 0.857em;
+  font-variant-numeric: tabular-nums;
+}
+
+.lapIndex {
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.lapSplit {
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.lapTotal {
+  color: var(--ink-400);
+}

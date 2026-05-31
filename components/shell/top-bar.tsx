@@ -102,12 +102,6 @@ export const VIEWS: ViewDef[] = [
       "Today's lessons in detail — schedule, lesson cards, and the day's notes",
   },
   {
-    label: "Teach",
-    href: "/teach",
-    tooltip:
-      "Full-screen Teaching View for live class delivery — boards, timers, and resources on the projector",
-  },
-  {
     label: "Weekly",
     href: "/weekly",
     tooltip:
@@ -124,6 +118,12 @@ export const VIEWS: ViewDef[] = [
     href: "/subject",
     tooltip:
       "The full year of units and lessons per subject, with the standards each covers",
+  },
+  {
+    label: "Teach",
+    href: "/teach",
+    tooltip:
+      "Go live: open the in-class teaching workspace — boards, resources, and annotation for delivering this lesson",
   },
 ];
 export type { ViewDef };

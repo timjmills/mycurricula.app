@@ -179,9 +179,13 @@ export const LESSONS: Lesson[] = [
       "Number-talk routine: pairs find three equivalent fractions for 3/4, share strategies, then class consolidates the visual model on the board.",
     notes:
       "If they struggle, fall back to the strip diagrams from Lesson 22. Maya's class skipped this in October — extend by 5min.",
-    // Resources seeded per spec §7 / §4.2 — the first four populate the
-    // 2×2 thumbnail grid in Section 1 (Standards); the remaining three flow
-    // into the "More resources" sub-list. Exact labels per the spec.
+    // Resources seeded per spec §7 / §4.2 — this lesson is the default Teach
+    // board target, so its set is deliberately RICH and varied: every Teach
+    // center-canvas render branch is represented with a real, embeddable URL
+    // (YouTube video, Google Slides, hosted image, hosted PDF) plus one plain
+    // web link that exercises the "can't display → open in new tab" fallback.
+    // The first four populate the 2×2 thumbnail grid in Section 1; the rest
+    // flow into the "More resources" sub-list.
     resources: [
       {
         type: "youtube",
@@ -189,13 +193,35 @@ export const LESSONS: Lesson[] = [
         url: "https://www.youtube.com/watch?v=8E5K2dnyFOY",
         provider: "youtube",
         thumbnailUrl: "https://img.youtube.com/vi/8E5K2dnyFOY/hqdefault.jpg",
-      }, // Card 1 — play icon
-      { type: "link", label: "What is a Fraction?" }, // Card 2 — paperclip
-      { type: "doc", label: "Fractions Overview" }, // Card 3 — document
-      { type: "link", label: "Khan Academy" }, // Card 4 — paperclip
-      { type: "pdf", label: "Fraction Wall Poster" }, // More — PDF
-      { type: "doc", label: "Anchor Chart Template" }, // More — DOCX
-      { type: "pdf", label: "Fraction Examples Sheet" }, // More — PDF
+      }, // Card 1 — YouTube video embed branch
+      {
+        type: "slides",
+        label: "Equivalent Fractions Deck",
+        url: "https://docs.google.com/presentation/d/1aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcd/edit",
+        provider: "gslides",
+      }, // Card 2 — Google Slides embed branch
+      {
+        type: "image",
+        label: "Fraction Wall Diagram",
+        url: "https://upload.wikimedia.org/wikipedia/commons/4/45/Equivalent_fractions.svg",
+        provider: "image",
+        thumbnailUrl:
+          "https://upload.wikimedia.org/wikipedia/commons/4/45/Equivalent_fractions.svg",
+      }, // Card 3 — image branch
+      {
+        type: "pdf",
+        label: "Fraction Wall Poster",
+        url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+        provider: "pdf",
+      }, // Card 4 — PDF iframe branch
+      {
+        type: "link",
+        label: "Khan Academy — Equivalent Fractions",
+        url: "https://www.khanacademy.org/math/arithmetic/fraction-arithmetic",
+        provider: "website",
+      }, // More — generic link (open-in-new-tab fallback)
+      { type: "doc", label: "Anchor Chart Template" }, // More — placeholder (no URL)
+      { type: "pdf", label: "Fraction Examples Sheet" }, // More — placeholder (no URL)
     ],
     standards: ["5.NF.B.3", "5.NF.A.1"],
   }),

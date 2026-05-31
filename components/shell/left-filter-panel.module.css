@@ -16,6 +16,17 @@
   border-right: var(--line);
   flex: 0 0 auto;
   overflow: hidden;
+  /* Sticky docked panel — stays put under the top bar while the routed
+     <main> scrolls at the document level. `align-self: flex-start` stops the
+     parent flex row's `stretch` from sizing it to the full scroll height
+     (which would defeat sticky); the panel owns a viewport-tall height and its
+     `.body` scrolls internally. Hidden entirely at ≤900px (below), where the
+     planner is single-column, so sticky is moot there. */
+  position: sticky;
+  top: var(--topbar-h, 52px);
+  align-self: flex-start;
+  height: calc(100dvh - var(--topbar-h, 52px));
+  z-index: var(--z-rail, 20);
   /* Slide open/close — ~250 ms matches the planning doc motion budget. */
   transition:
     width 0.2s ease,

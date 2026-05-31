@@ -1,0 +1,69 @@
+/* MiniWhiteboardWidget.module.css — token-only, em-sized. Default blue/blue. */
+
+.prompt {
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--w-ink);
+  margin-bottom: 0.8em;
+}
+
+.surface {
+  position: relative;
+  min-height: 7em;
+  border-radius: 0.85em;
+  background: var(--w-card);
+  border: 0.13em dashed var(--w-line);
+  box-shadow: var(--wf-shadow-inner);
+  display: grid;
+  place-items: center;
+}
+
+.markerIcon {
+  color: var(--w-accent);
+  opacity: 0.35;
+}
+
+.tools {
+  display: flex;
+  gap: 0.5em;
+  margin-top: 0.8em;
+}
+
+.tool {
+  flex: 1;
+  min-height: 2.75em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  padding: 0 0.6em;
+  border: 0.13em solid transparent;
+  border-radius: var(--r-pill);
+  background: var(--w-chip);
+  color: var(--w-ink);
+  font-size: 0.85em;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.tool:focus-visible {
+  outline: 0.15em solid var(--w-accent);
+  outline-offset: 0.15em;
+}
+
+.toolOn {
+  background: var(--w-soft);
+  color: var(--w-accent);
+}
+
+.toolLabel {
+  white-space: nowrap;
+}
+
+@media (max-width: 24em) {
+  .toolLabel {
+    display: none;
+  }
+}

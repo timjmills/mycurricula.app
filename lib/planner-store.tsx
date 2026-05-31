@@ -31,6 +31,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
   useRef,
@@ -38,7 +39,12 @@ import {
 import type { ReactNode } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 
-import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
+import type {
+  Lesson,
+  LessonResource,
+  LessonStatus,
+  SubjectId,
+} from "@/lib/types";
 import type { LessonSectionContent, SectionResource } from "@/lib/lesson-flow";
 import {
   nextInstructionalDay,
@@ -52,6 +58,9 @@ import {
 import type { CellLayout } from "@/lib/cell-layout";
 import { cellKey, isTrivialLayout } from "@/lib/cell-layout";
 import { LESSONS } from "@/lib/mock";
+import { ME } from "@/lib/mock/teachers";
+import { plannerClient } from "@/lib/planner/client";
+import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
 import {
   LESSON_TEMPLATE_BY_ID,
   DEFAULT_LESSON_TEMPLATE_ID,
@@ -290,6 +299,9 @@ type ToggleSectionWebsiteAction = {
 
 type UndoAction = { type: "undo" };
 type RedoAction = { type: "redo" };
+/** Replace the whole document with a backend-hydrated one (planner Supabase
+ *  seam). Resets undo/redo history — a hydrate is not an undoable edit. */
+type HydrateAction = { type: "hydrate"; doc: PlannerDoc };
 
 type PlannerAction =
   | MoveLessonAction
@@ -316,7 +328,8 @@ type PlannerAction =
   | MoveSectionResourceAction
   | ToggleSectionWebsiteAction
   | UndoAction
-  | RedoAction;
+  | RedoAction
+  | HydrateAction;
 
 // ── Human labels for undo/redo tooltips ──────────────────────────────────
 
@@ -377,22 +390,35 @@ function labelFor(action: PlannerAction): string {
 
 /** Build the initial section content for a lesson.
  *  Uses the default template; falls back to a single blank section if the
- *  template registry is missing or misconfigured. */
-function buildInitialSections(): LessonSectionContent[] {
+ *  template registry is missing or misconfigured. The lesson's own
+ *  `resources` (the fixture lesson-level array) are threaded through so the
+ *  Teach Resources panel + canvas — which read a lesson's resources off its
+ *  sections via `getSections(lessonId)` — see real resources. Lazily-added
+ *  lessons pass no resources and seed empty sections, as before. */
+function buildInitialSections(
+  resources: LessonResource[] = [],
+): LessonSectionContent[] {
   const template = LESSON_TEMPLATE_BY_ID[DEFAULT_LESSON_TEMPLATE_ID];
   if (!template) {
-    return [newLessonSection()];
+    const section = newLessonSection();
+    section.resources = resources.map((r) => ({
+      ...newSectionResource(r.type, r.label),
+      ...r,
+    }));
+    return [section];
   }
-  return instantiateSections(template);
+  return instantiateSections(template, resources);
 }
 
-/** Seed sections for every lesson in the initial fixture. */
+/** Seed sections for every lesson in the initial fixture. Each lesson's
+ *  fixture `resources` flow onto its sections (round-robin) so the Teach
+ *  surface has real resources to render. */
 function seedSections(
   lessons: Lesson[],
 ): Record<string, LessonSectionContent[]> {
   const result: Record<string, LessonSectionContent[]> = {};
   for (const lesson of lessons) {
-    result[lesson.id] = buildInitialSections();
+    result[lesson.id] = buildInitialSections(lesson.resources);
   }
   return result;
 }
@@ -810,10 +836,13 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
 
     case "addSectionResource": {
       const current = ensureSections(doc.sections, action.lessonId);
-      const seed = newSectionResource(action.resource.type, action.resource.label);
+      const seed = newSectionResource(
+        action.resource.type,
+        action.resource.label,
+      );
       const resource: SectionResource = {
-        ...seed,                       // gives us a fresh id
-        ...action.resource,            // caller's fields win — type, label, url, etc.
+        ...seed, // gives us a fresh id
+        ...action.resource, // caller's fields win — type, label, url, etc.
         id: action.resource.id ?? seed.id,
       };
       return {
@@ -983,6 +1012,20 @@ function historyReducer(
         kind: "redo",
         lessonIds: changedIds,
       },
+    };
+  }
+
+  // ── Hydrate ──────────────────────────────────────────────────────────
+  // Replace the whole document with the backend-loaded one and RESET history
+  // (a hydrate isn't an undoable edit). Used only by the planner Supabase seam
+  // on initial load; with the backend flag off this action never fires.
+  if (action.type === "hydrate") {
+    return {
+      ...state,
+      history: { past: [], present: action.doc, future: [] },
+      lastCoalesceKey: null,
+      lastCoalesceTs: 0,
+      lastChange: null,
     };
   }
 
@@ -1358,6 +1401,40 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
 
+  // ── Backend hydration (planner Supabase seam) ──────────────────────────
+  // When NEXT_PUBLIC_PLANNER_USE_SUPABASE=1, replace the mock-seeded document
+  // with real lessons + sections from the backend on mount. With the flag OFF
+  // this effect is a no-op and the store renders the mock fixtures exactly as
+  // before. Hydration resets undo/redo (a load is not an undoable edit). Errors
+  // are swallowed → the mock document stays visible rather than a blank planner.
+  useEffect(() => {
+    if (!isPlannerSupabaseConfigured()) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const lessons = await plannerClient.listLessons("g5", ME.id);
+        if (!alive || lessons.length === 0) return;
+        // Build the per-lesson sections map from the backend.
+        const sections: PlannerDoc["sections"] = {};
+        await Promise.all(
+          lessons.map(async (l) => {
+            sections[l.id] = await plannerClient.getSections(l.id);
+          }),
+        );
+        if (!alive) return;
+        dispatchRef.current({
+          type: "hydrate",
+          doc: { lessons, sections, cellLayouts: {} },
+        });
+      } catch {
+        // Keep the mock document on any backend/auth error.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const { history, lastChange } = state;
   const { past, present, future } = history;
 
@@ -1374,6 +1451,29 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [present.sections],
   );
 
+  // ── Optimistic persistence tee (planner Supabase seam) ─────────────────
+  // Mutators dispatch to the reducer FIRST (snappy optimistic UI), then fire a
+  // best-effort write through plannerClient. With the backend flag OFF,
+  // plannerClient delegates to the in-memory mock (a harmless no-op echo), so
+  // this is inert for the prototype. Errors are swallowed here; a follow-up adds
+  // a reconcile-on-error toast (the reducer remains the source of truth for the
+  // session). Fire-and-forget — never blocks the UI thread.
+  const persist = useCallback(
+    <M extends keyof typeof plannerClient>(
+      method: M,
+      ...args: Parameters<(typeof plannerClient)[M]>
+    ): void => {
+      if (!isPlannerSupabaseConfigured()) return;
+      const fn = plannerClient[method] as (
+        ...a: Parameters<(typeof plannerClient)[M]>
+      ) => Promise<unknown>;
+      void fn.apply(plannerClient, args).catch(() => {
+        // Best-effort; reducer state stands. Reconcile toast is a follow-up.
+      });
+    },
+    [],
+  );
+
   // ── Mutation callbacks ────────────────────────────────────────────────
 
   const moveLesson = useCallback(
@@ -1382,13 +1482,25 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       patch: { day?: number; subject?: SubjectId; week?: number },
     ) => {
       dispatchRef.current({ type: "moveLesson", id, patch });
+      if (patch.week != null || patch.day != null) {
+        persist(
+          "moveLesson",
+          id,
+          { week: patch.week ?? 0, day: patch.day ?? 0 },
+          ME.id,
+        );
+      }
     },
-    [],
+    [persist],
   );
 
-  const setLessonStatus = useCallback((id: string, status: LessonStatus) => {
-    dispatchRef.current({ type: "setLessonStatus", id, status });
-  }, []);
+  const setLessonStatus = useCallback(
+    (id: string, status: LessonStatus) => {
+      dispatchRef.current({ type: "setLessonStatus", id, status });
+      persist("setLessonStatus", id, status, ME.id);
+    },
+    [persist],
+  );
 
   const editLesson = useCallback(
     (
@@ -1403,8 +1515,11 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         coalesceKey: coalesce?.key ?? `lesson:${id}:patch`,
         coalesceTs: coalesce?.ts ?? Date.now(),
       });
+      // Only the content fields the source's LessonPatch accepts are teed; the
+      // source decides whether the edit forks (personal mode).
+      persist("updateLesson", id, patch, ME.id);
     },
-    [],
+    [persist],
   );
 
   const duplicateLesson = useCallback((id: string) => {

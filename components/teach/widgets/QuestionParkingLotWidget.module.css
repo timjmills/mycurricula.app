@@ -1,0 +1,61 @@
+/* QuestionParkingLotWidget.module.css — token-only, em-sized. Default pink/pink. */
+
+.list {
+  padding: 0.25em 1em;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
+  padding: 0.8em 0;
+}
+
+.bordered {
+  border-bottom: 1px solid var(--w-line);
+}
+
+.qMark {
+  width: 2em;
+  height: 2em;
+  border-radius: 50%;
+  background: var(--w-soft);
+  color: var(--w-accent);
+  display: grid;
+  place-items: center;
+  flex: none;
+  font-weight: 800;
+  font-size: 1em;
+}
+
+.initial {
+  font-size: 0.9em;
+  font-weight: 700;
+  min-width: 1.4em;
+  flex: none;
+  color: var(--w-ink);
+}
+
+.question {
+  font-size: 0.88em;
+  font-weight: 500;
+  color: var(--w-ink);
+  opacity: 0.85;
+  flex: 1;
+  min-width: 0;
+}
+
+.tagIcon {
+  display: grid;
+  place-items: center;
+}
+
+@media (max-width: 480px) {
+  .row {
+    flex-wrap: wrap;
+  }
+  .question {
+    flex-basis: 100%;
+    order: 3;
+  }
+}

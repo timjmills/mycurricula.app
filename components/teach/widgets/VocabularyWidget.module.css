@@ -1,0 +1,43 @@
+/* VocabularyWidget.module.css — token-only, em-sized. Default blue/blue. */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65em;
+}
+
+.term {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8em;
+  padding: 0.85em 1em;
+}
+
+.bookIcon {
+  color: var(--w-accent);
+  display: grid;
+  place-items: center;
+  flex: none;
+  margin-top: 0.1em;
+}
+
+.termMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+  min-width: 0;
+}
+
+.word {
+  font-size: 1.02em;
+  font-weight: 800;
+  color: var(--w-ink);
+}
+
+.def {
+  font-size: 0.9em;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--w-ink);
+  opacity: 0.8;
+}

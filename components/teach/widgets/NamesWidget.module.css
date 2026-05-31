@@ -1,0 +1,210 @@
+/* NamesWidget.module.css — interactive name-picker (Teach Phase 3). Tokens
+   only; subject accent arrives via the `.cp-subj` wrapper (--c / --cl / --cd).
+   The picked name lands with a brief subject-tinted pop, gated behind
+   prefers-reduced-motion. */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-8);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--r-8);
+  padding: var(--r-12);
+  text-align: center;
+  font-size: 0.893em;
+  font-weight: 600;
+  color: var(--ink-400);
+}
+
+/* The big picked / flashing name. Fills available vertical space. */
+.pick {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: clamp(22px, 6vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--ink-700);
+  overflow: hidden;
+  text-wrap: balance;
+}
+
+.pickSpin {
+  color: var(--ink-400);
+}
+
+.pickLanded {
+  color: var(--w-accent);
+  animation: namePop 220ms ease-out;
+}
+
+@keyframes namePop {
+  0% {
+    transform: scale(0.86);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.controls {
+  display: flex;
+}
+
+.shuffleBtn {
+  flex: 1;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--r-8);
+  padding: 0 var(--r-12);
+  border: none;
+  border-radius: var(--r-8);
+  background: var(--w-accent);
+  color: var(--paper);
+  font-size: 1em;
+  font-weight: 800;
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+
+.shuffleBtn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.shuffleBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.optionsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--r-8);
+  font-size: 0.821em;
+}
+
+/* Pill-style switch — the whole row is the ≥44px tappable control. */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--ink-700);
+  font-size: 0.821em;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toggleTrack {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: var(--r-pill);
+  background: var(--ink-150);
+  transition: background 140ms ease;
+  flex: none;
+}
+
+.toggleOn .toggleTrack {
+  background: var(--w-accent);
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-pill);
+  background: var(--paper);
+  transition: transform 140ms ease;
+}
+
+.toggleOn .toggleKnob {
+  transform: translateX(12px);
+}
+
+.remaining {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--r-8);
+  color: var(--ink-500);
+  font-weight: 700;
+}
+
+.resetLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 28px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--w-accent);
+  font-size: 0.786em;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.resetLink:hover {
+  text-decoration: underline;
+}
+
+.roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  max-height: 30%;
+  overflow: auto;
+}
+
+.chip {
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  background: var(--w-soft);
+  color: var(--w-accent);
+  font-size: 0.786em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.chipUsed {
+  background: var(--ink-100);
+  color: var(--ink-300);
+  text-decoration: line-through;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pickLanded {
+    animation: none;
+  }
+  .toggleTrack,
+  .toggleKnob,
+  .shuffleBtn {
+    transition: none;
+  }
+}

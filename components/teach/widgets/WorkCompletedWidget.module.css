@@ -1,0 +1,65 @@
+/* WorkCompletedWidget.module.css — token-only, em-sized. Default orange/orange.
+   The matrix can scroll horizontally inside its own card on a narrow tile
+   (acceptable internal scroll); the document never scrolls sideways. */
+
+.matrix {
+  padding: 0.4em 0.7em 0.5em;
+  overflow-x: auto;
+}
+
+.gridRow {
+  display: grid;
+  grid-template-columns: 1.3fr repeat(4, minmax(2.4em, 1fr));
+  align-items: center;
+  padding: 0.6em 0.25em;
+}
+
+.headerRow {
+  border-bottom: 1px solid var(--w-line);
+}
+
+.bordered {
+  border-bottom: 1px solid var(--w-line);
+}
+
+.colHead {
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--w-ink);
+  opacity: 0.6;
+}
+
+.subjHead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2em;
+}
+
+.subjName {
+  font-size: 0.78em;
+  font-weight: 700;
+}
+
+.student {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.studentLabel {
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--w-ink);
+}
+
+.cell {
+  display: grid;
+  place-items: center;
+}
+
+.pending {
+  color: var(--w-accent);
+  display: grid;
+  place-items: center;
+}

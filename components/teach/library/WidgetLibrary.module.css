@@ -1,0 +1,523 @@
+/* WidgetLibrary.module.css — the Widget Library browser (5.31 handoff,
+ * screenshot 2). Sidebar + main with a gold favorites band and a reflowing
+ * widget-card grid. Tokens only (CLAUDE.md §4).
+ *
+ * Responsive: 4-col grid on desktop → 2-col tablet → 1-col phone / narrow panel.
+ * The sidebar sits beside the main on wide layouts and stacks above it (as a
+ * horizontally-scrolling nav) on narrow ones. No document-level horizontal
+ * scroll at any tier. */
+
+.root {
+  display: flex;
+  gap: 16px;
+  min-height: 0;
+  height: 100%;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────────── */
+.sidebar {
+  flex: 0 0 auto;
+  width: 226px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 16px;
+  border-right: 1px solid var(--ink-150);
+  overflow-y: auto;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 14px;
+}
+
+.navHeading {
+  margin: 0 0 6px;
+  padding: 0 12px;
+  color: var(--ink-400);
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-700);
+  font-size: var(--t-14);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.navItem:hover {
+  background: var(--ink-50);
+}
+
+.navItem:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.navIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--ink-400);
+}
+
+.navItemActive {
+  background: var(--wf-purple-soft);
+  color: var(--wf-purple-accent);
+  font-weight: 700;
+}
+
+.navItemActive .navIcon {
+  color: var(--wf-purple-accent);
+}
+
+/* Promo card */
+.promo {
+  margin-top: auto;
+  padding: 16px;
+  border: 1px solid var(--wf-purple-line);
+  border-radius: 14px;
+  background: var(--wf-purple-grad);
+  text-align: center;
+}
+
+.promoIcon {
+  display: inline-flex;
+  color: var(--wf-purple-accent);
+  margin-bottom: 6px;
+}
+
+.promoTitle {
+  margin: 0 0 4px;
+  color: var(--wf-purple-accent);
+  font-size: var(--t-14);
+  font-weight: 800;
+}
+
+.promoBody {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: var(--t-12);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+/* ── Main ──────────────────────────────────────────────────────────────────── */
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.searchRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  display: inline-flex;
+  color: var(--ink-400);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 14px 11px 38px;
+  border: 1px solid var(--ink-150);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink-900);
+  font-size: var(--t-14);
+  font-family: inherit;
+}
+
+.searchInput::placeholder {
+  color: var(--ink-400);
+}
+
+.searchInput:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* Filter pills */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 7px 15px;
+  border: none;
+  border-radius: 10px;
+  background: var(--ink-50);
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filterPill:hover {
+  background: var(--ink-100);
+}
+
+.filterPill:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.filterPillActive {
+  background: var(--wf-purple-accent);
+  color: var(--paper);
+}
+
+.filterPillFav {
+  background: var(--wf-yellow-chip);
+  color: var(--wf-yellow-accent);
+}
+
+.filterPillFavActive {
+  background: var(--wf-yellow-accent);
+  color: var(--paper);
+}
+
+/* ── Favorites band ────────────────────────────────────────────────────────── */
+.favBand {
+  padding: 16px 18px;
+  border: 1px solid var(--wf-yellow-line);
+  border-radius: 16px;
+  background: var(--wf-yellow-grad);
+}
+
+.favBandHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.favBandTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink-900);
+  font-size: var(--t-14);
+  font-weight: 800;
+}
+
+.favStarLit {
+  display: inline-flex;
+  color: var(--wf-yellow-accent);
+}
+
+.manageFavs {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  min-height: 36px;
+  padding: 7px 13px;
+  border: none;
+  border-radius: 11px;
+  background: var(--paper);
+  box-shadow: var(--wf-shadow-inner);
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.manageFavs:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.favChips {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.favChip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 16px 12px;
+  border: none;
+  border-radius: 13px;
+  background: var(--paper);
+  box-shadow: var(--wf-shadow-inner);
+  cursor: pointer;
+}
+
+.favChip:hover {
+  box-shadow: var(--wf-shadow-card);
+}
+
+.favChip:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.favChipIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+}
+
+.favChipLabel {
+  color: var(--ink-900);
+  font-size: var(--t-12);
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.favEmpty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: var(--t-13);
+  font-weight: 500;
+}
+
+/* ── Widget card grid ──────────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.empty {
+  margin: 16px 0;
+  color: var(--ink-400);
+  font-size: var(--t-14);
+  text-align: center;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--ink-150);
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: var(--wf-shadow-card);
+}
+
+.cardAdded {
+  border: 1.5px solid var(--wf-green-accent);
+  background: var(--wf-yellow-grad);
+}
+
+.favToggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.favToggle:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.favToggleStar {
+  display: inline-flex;
+  color: var(--ink-300);
+}
+
+.favToggleStarOn {
+  color: var(--wf-yellow-accent);
+}
+
+.preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 78px;
+  padding: 16px 14px;
+  border-radius: 12px;
+  margin-bottom: 13px;
+}
+
+.previewIcon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  flex: 0 0 auto;
+}
+
+.previewLines {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+}
+
+.previewLine {
+  height: 7px;
+  width: 80%;
+  border-radius: 9px;
+}
+
+.previewLineShort {
+  width: 55%;
+  opacity: 0.7;
+}
+
+.cardTitle {
+  margin: 0 0 3px;
+  color: var(--ink-900);
+  font-size: var(--t-16);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.cardDesc {
+  margin: 0 0 14px;
+  color: var(--ink-500);
+  font-size: var(--t-13);
+  font-weight: 500;
+  line-height: 1.4;
+  min-height: 36px;
+}
+
+.cardFoot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 9px 22px;
+  border: 1.5px solid var(--wf-blue-line);
+  border-radius: 11px;
+  background: var(--paper);
+  color: var(--wf-blue-accent);
+  font-size: var(--t-14);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  background: var(--wf-blue-soft);
+}
+
+.addBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.addedTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--wf-green-accent);
+  font-size: var(--t-14);
+  font-weight: 800;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .root {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+    padding-right: 0;
+    padding-bottom: 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--ink-150);
+    overflow-x: auto;
+  }
+
+  .navGroup {
+    flex: 1 1 auto;
+    margin-bottom: 4px;
+  }
+
+  .promo {
+    display: none;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .favChips {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .favChips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filterPill {
+    min-height: 44px;
+  }
+}

@@ -1,0 +1,207 @@
+/* PollWidget.module.css — interactive teacher-tally poll (Teach Phase 3).
+   Tokens only; the percentage fill is subject-tinted via the `.cp-subj`
+   wrapper (--c / --cl / --cd). Each option row is a ≥44px tap-to-count
+   control with a small −1; the list scrolls internally if it overflows. */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-8);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--r-8);
+}
+
+.question {
+  font-size: 0.964em;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--ink-700);
+  text-wrap: balance;
+}
+
+.resetBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--paper);
+  color: var(--ink-500);
+  font-size: 0.786em;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.resetBtn:hover:not(:disabled) {
+  border-color: var(--w-accent);
+  color: var(--w-accent);
+}
+
+.resetBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Option rows ────────────────────────────────────────────────────────── */
+.options {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+}
+
+.option {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+/* The whole label + bar is the primary tap-to-count target (≥44px). */
+.tally {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.tally:hover {
+  border-color: var(--w-accent);
+  background: var(--w-soft);
+}
+
+.tally:active {
+  filter: brightness(0.98);
+}
+
+.optHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--r-8);
+  font-size: 0.893em;
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.optLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.smiley {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--w-accent);
+}
+
+.optCount {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  color: var(--w-accent);
+}
+
+.optPct {
+  font-size: 0.75em;
+  font-weight: 700;
+  color: var(--ink-400);
+}
+
+.track {
+  display: block;
+  width: 100%;
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--ink-100);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--w-accent);
+  transition: width 220ms ease;
+}
+
+/* The −1 corrector — secondary, but still a comfortable tap. */
+.minus {
+  flex: none;
+  width: 36px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  color: var(--ink-500);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.minus:hover:not(:disabled) {
+  border-color: var(--tag-red);
+  color: var(--tag-red);
+}
+
+.minus:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.total {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.821em;
+  font-weight: 700;
+  color: var(--ink-500);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill,
+  .tally,
+  .minus,
+  .resetBtn {
+    transition: none;
+  }
+}

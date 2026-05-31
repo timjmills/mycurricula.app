@@ -1,0 +1,821 @@
+/* TeachLeft.module.css — the left-zone rail + collapsible panel + module
+   bodies (docs/teach-view-plan.md §3.1, §4.1, §6). Wave 1 Agent B.
+
+   HARD RULE (CLAUDE.md §4): colour / type / spacing tokens come from
+   app/tokens.css only — never a hard-coded hex here. Subject colour comes
+   through the `.cp-subj.<id>` bridge (the `--c` / `--cl` / `--cd` vars). */
+
+/* ── Left icon rail (64px) ──────────────────────────────────────────────── */
+.rail {
+  flex: none;
+  width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--r-4);
+  padding: var(--r-12) 0;
+  background: var(--paper);
+  border-right: var(--line);
+  overflow-y: auto;
+}
+
+/* One rail entry: icon button + tiny label, stacked. */
+.railItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+}
+
+.railBtn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border: none;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--ink-700);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  /* ≥44px tap target via the surrounding padding/label even though the
+     visual chip is 40px — the label row pads the item to >=44px tall. */
+}
+
+.railBtn:hover {
+  background: var(--ink-100);
+}
+
+.railBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.railBtnActive {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+.railBtnActive:hover {
+  background: var(--ink-900);
+}
+
+/* Inner accent bar on the active icon (left edge). */
+.railBtnActive::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: var(--r-pill);
+  background: var(--ink-900);
+}
+
+.railLabel {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--ink-400);
+  text-align: center;
+  line-height: 1.1;
+}
+
+.railLabelActive {
+  color: var(--ink-900);
+}
+
+.railDragging {
+  opacity: 0.4;
+}
+
+/* ── Panel shell ─────────────────────────────────────────────────────────── */
+.panel {
+  flex: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-right: var(--line);
+  overflow: hidden;
+}
+
+/* Thin tab header strip across the top of the panel. Tightened to hug the tabs
+   (no dead bar): the "+" trigger occupies the right side. The tab strip scrolls
+   horizontally on its own so the "+" stays reachable. */
+.tabHeader {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: var(--r-4) var(--r-6);
+  border-bottom: var(--line);
+}
+
+/* The horizontally-scrolling tab strip — keeps overflow off the header so the
+   "+" trigger never scrolls out of view. */
+.tabStrip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* ── Panel-bar "+" hover-reveal ──────────────────────────────────────────────
+   Desktop: the "+" is hidden until the panel is hovered or holds focus, then it
+   fades in. Touch (no hover / coarse pointer): ALWAYS visible. Reduced motion:
+   no fade — instant show/hide. */
+.addTrigger {
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+
+.panel:hover .addTrigger,
+.panel:focus-within .addTrigger,
+.addTrigger:focus-visible,
+.addTrigger[aria-expanded="true"] {
+  opacity: 1;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .addTrigger {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .addTrigger {
+    transition: none;
+  }
+}
+
+.tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: none;
+  border-radius: var(--r-6);
+  background: transparent;
+  color: var(--ink-500);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.tabActive {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.tabDragging {
+  opacity: 0.4;
+}
+
+.tabClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-pill);
+  color: var(--ink-400);
+}
+
+.tabClose:hover {
+  color: var(--ink-900);
+}
+
+.panelBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--r-12);
+}
+
+/* ── Responsive: panel → overlay drawer / bottom sheet (plan §10 / audit B2) ─
+   On desktop the panel is an inline flex column. Below 900px two fixed-px
+   panels either side would squeeze the center to nothing or force
+   document-level horizontal scroll (CLAUDE.md §4 hard rule). So at tablet and
+   phone tiers we lift the panel OUT of the flex flow into a fixed overlay that
+   slides over the board, leaving the center full-width underneath.
+
+   The panel carries an inline `style={{ width }}` (fixed px from the persisted
+   layout); author `!important` overrides it at these tiers. A click-scrim +
+   tap-to-dismiss needs a TSX sibling element (documented under "CSS-only
+   limits — needs TSX" in docs/teach-a11y-responsive-notes.md); the rail icon
+   already toggles collapse, so the drawer remains dismissible without it. */
+
+/* Tablet (≤900px): overlay drawer pinned to the left edge, just right of the
+   64px rail, sliding over the board. Caps its own width so it never exceeds
+   the viewport. */
+@media (max-width: 900px) {
+  .panel {
+    position: fixed;
+    left: 64px;
+    top: 0;
+    bottom: 0;
+    z-index: 45;
+    width: min(360px, calc(100vw - 64px)) !important;
+    box-shadow: var(--shadow-2, 0 8px 28px rgba(20, 20, 26, 0.22));
+    animation: leftDrawerIn 200ms ease-out;
+  }
+}
+
+/* Phone (≤480px): full-height drawer covering the viewport MINUS the 64px
+   rail, so the rail icon stays visible and tappable to dismiss the drawer
+   (the only CSS-only close affordance — there is no scrim sibling; see the
+   "CSS-only limits — needs TSX" note in docs/teach-a11y-responsive-notes.md).
+   Acts as the single-column bottom-sheet-equivalent overlay. */
+@media (max-width: 480px) {
+  .panel {
+    left: 64px;
+    width: calc(100vw - 64px) !important;
+    animation: leftDrawerInPhone 220ms ease-out;
+  }
+}
+
+@keyframes leftDrawerIn {
+  from {
+    transform: translateX(-12px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes leftDrawerInPhone {
+  from {
+    transform: translateX(-105%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Reduced motion: no slide. */
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none !important;
+  }
+}
+
+/* ── Generic module section header ───────────────────────────────────────── */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--r-6);
+  margin-bottom: var(--r-8);
+}
+
+.sectionTitle {
+  flex: 1;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+/* ── Lesson card module ──────────────────────────────────────────────────── */
+.lessonCard {
+  border: var(--line);
+  border-radius: var(--r-12);
+  padding: 12px 14px;
+}
+
+.lessonCardHead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: var(--r-8);
+}
+
+.subjChip {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: var(--r-6);
+  background: var(--cl, var(--ink-100));
+  color: var(--cd, var(--ink-700));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.lessonCardTitle {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink-900);
+  line-height: 1.25;
+}
+
+.metaLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  margin-bottom: 3px;
+}
+
+.lessonText {
+  font-size: 12.5px;
+  color: var(--ink-700);
+  line-height: 1.5;
+  margin-bottom: var(--r-12);
+}
+
+/* ── Lesson list module ──────────────────────────────────────────────────── */
+.lessonRow {
+  width: 100%;
+  text-align: left;
+  background: var(--paper);
+  border: var(--line);
+  border-radius: var(--r-8);
+  padding: 9px 11px;
+  margin-bottom: var(--r-6);
+  cursor: pointer;
+  display: block;
+}
+
+.lessonRow:hover {
+  border-color: var(--ink-300);
+}
+
+.lessonRow:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.lessonRowActive {
+  border: 1.5px solid var(--c, var(--ink-900));
+  box-shadow: var(--shadow-card);
+}
+
+.lessonRowHead {
+  display: flex;
+  align-items: center;
+  gap: var(--r-6);
+}
+
+.lessonRowSubj {
+  flex: 1;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--cd, var(--ink-700));
+}
+
+.lessonRowSubjDot {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 5px;
+  background: var(--cl, var(--ink-100));
+  color: var(--cd, var(--ink-700));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.lessonRowTitle {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-900);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+.lessonRowMeta {
+  font-size: 10.5px;
+  color: var(--ink-400);
+  margin-top: 2px;
+}
+
+/* ── Boards module (thumbnails) ──────────────────────────────────────────── */
+.boardRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  padding: 5px 8px;
+  margin-bottom: var(--r-4);
+  border: var(--line);
+  border-radius: var(--r-6);
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.boardRow:hover {
+  border-color: var(--ink-300);
+}
+
+.boardRow:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.boardRowActive {
+  border: 1.5px solid var(--ink-900);
+}
+
+.boardNum {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: var(--r-pill);
+  background: var(--ink-100);
+  color: var(--ink-700);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 800;
+}
+
+.boardNumActive {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+.boardLabel {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-900);
+}
+
+.boardLabelActive {
+  font-weight: 700;
+}
+
+/* Mini board thumbnail — a 2-cell sketch tinted from board tints. */
+.boardThumb {
+  width: 38px;
+  height: 22px;
+  flex: none;
+  background: var(--ink-100);
+  border-radius: 3px;
+  display: grid;
+  grid-auto-flow: column;
+  gap: 2px;
+  padding: 2px;
+}
+
+.boardThumbCell {
+  border-radius: 1px;
+  background: var(--board-tint-sky);
+}
+
+.boardThumbCellAlt {
+  background: var(--board-tint-yellow);
+}
+
+.boardThumbEmpty {
+  background: var(--ink-100);
+}
+
+.boardActions {
+  display: flex;
+  gap: var(--r-6);
+  margin-top: var(--r-8);
+}
+
+.boardDragging {
+  opacity: 0.4;
+}
+
+/* ── Shared add / dashed CTA buttons ─────────────────────────────────────── */
+.addBtn {
+  width: 100%;
+  padding: 7px 11px;
+  margin-top: var(--r-4);
+  background: var(--paper);
+  border: 1px dashed var(--ink-300);
+  border-radius: var(--r-6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-700);
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  border-color: var(--ink-500);
+  background: var(--ink-50);
+}
+
+.addBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.openLink {
+  width: 100%;
+  padding: 7px 11px;
+  background: var(--paper);
+  border: var(--line);
+  border-radius: var(--r-6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-900);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.openLink:hover {
+  background: var(--ink-50);
+}
+
+.openLink:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* ── Notes / Groups / Class / Tools list rows ────────────────────────────── */
+.noteRow {
+  border: var(--line);
+  border-left-width: 3px;
+  border-radius: var(--r-8);
+  padding: 9px 11px;
+  margin-bottom: var(--r-6);
+}
+
+.noteRowUrgent {
+  border-left-color: var(--urgent);
+}
+
+.noteRowImportant {
+  border-left-color: var(--ink-700);
+}
+
+.noteRowFyi {
+  border-left-color: var(--ink-300);
+}
+
+.noteMeta {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  margin-bottom: 3px;
+}
+
+.noteBody {
+  font-size: 12.5px;
+  color: var(--ink-700);
+  line-height: 1.45;
+}
+
+/* Generic local-list row (groups, students, tools). */
+.listRow {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  padding: 8px 10px;
+  margin-bottom: var(--r-4);
+  border: var(--line);
+  border-radius: var(--r-8);
+  background: var(--paper);
+}
+
+.listRowLabel {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--ink-900);
+  min-width: 0;
+}
+
+.listRowMeta {
+  font-size: 11px;
+  color: var(--ink-400);
+}
+
+.textInput {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: var(--line);
+  border-radius: var(--r-6);
+  font-size: 12.5px;
+  color: var(--ink-900);
+  background: var(--paper);
+}
+
+.textInput:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.inlineRow {
+  display: flex;
+  gap: var(--r-6);
+  margin-bottom: var(--r-8);
+}
+
+/* Privacy banner shown atop the Groups/Class modules. */
+.privacyNote {
+  font-size: 11px;
+  color: var(--ink-500);
+  background: var(--ink-50);
+  border: var(--line);
+  border-radius: var(--r-6);
+  padding: 7px 9px;
+  margin-bottom: var(--r-12);
+  line-height: 1.4;
+}
+
+/* Empty / muted helper text. */
+.muted {
+  font-size: 12px;
+  color: var(--ink-400);
+  line-height: 1.5;
+}
+
+/* ── Group membership (assignment) ───────────────────────────────────────── */
+/* One group block: header row (name + count + remove) above a member area. */
+.groupBlock {
+  border: var(--line);
+  border-radius: var(--r-8);
+  padding: 9px 10px;
+  margin-bottom: var(--r-8);
+  background: var(--paper);
+}
+
+.groupBlockHead {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  margin-bottom: var(--r-8);
+}
+
+.groupBlockName {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-900);
+  min-width: 0;
+}
+
+.groupBlockMeta {
+  font-size: 11px;
+  color: var(--ink-400);
+}
+
+/* Member chip wrap. */
+.memberChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--r-6);
+  margin-bottom: var(--r-8);
+}
+
+/* A removable member chip — name + ✕. ≥44px tap target via padding. */
+.memberChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 6px 5px 10px;
+  border: var(--line);
+  border-radius: var(--r-pill);
+  background: var(--ink-50);
+  font-size: 11.5px;
+  color: var(--ink-900);
+  max-width: 100%;
+}
+
+.memberChipName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberChipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-400);
+  cursor: pointer;
+  padding: 0;
+}
+
+.memberChipRemove:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.memberChipRemove:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+/* Empty-group helper. */
+.memberEmpty {
+  font-size: 11.5px;
+  color: var(--ink-400);
+  margin-bottom: var(--r-8);
+}
+
+/* Add-student select control row. */
+.addStudentRow {
+  display: flex;
+  gap: var(--r-6);
+  align-items: center;
+}
+
+.addStudentSelect {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: var(--line);
+  border-radius: var(--r-6);
+  font-size: 12px;
+  color: var(--ink-900);
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.addStudentSelect:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.addStudentSelect:disabled {
+  color: var(--ink-400);
+  cursor: not-allowed;
+}
+
+/* Tool picker tiles. */
+.toolTile {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  padding: 9px 11px;
+  margin-bottom: var(--r-6);
+  border: var(--line);
+  border-radius: var(--r-8);
+  background: var(--paper);
+}
+
+.toolTileLabel {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.sandboxBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  background: var(--board-tint-yellow);
+  border-radius: var(--r-pill);
+  padding: 3px 8px;
+  margin-bottom: var(--r-8);
+}

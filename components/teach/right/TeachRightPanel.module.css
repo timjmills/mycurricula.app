@@ -1,0 +1,187 @@
+/* TeachRightPanel.module.css — the collapsible right panel (tab header + module
+ * body). Tokens only (CLAUDE.md §4). White card matching the surrounding shell;
+ * the rail (TeachRightRail) owns the 64px strip beside it. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--paper);
+  border-left: 1px solid var(--ink-150);
+  overflow: hidden;
+}
+
+/* ── Thin tab header ─────────────────────────────────────────────────────── */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 8px;
+  border-bottom: 1px solid var(--ink-150);
+  flex: 0 0 auto;
+}
+
+/* ── Panel-bar "+" hover-reveal ──────────────────────────────────────────────
+   Desktop: hidden until the panel is hovered or holds focus, then it fades in.
+   Touch (no hover / coarse pointer): ALWAYS visible. Reduced motion: no fade. */
+.addTrigger {
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+
+.panel:hover .addTrigger,
+.panel:focus-within .addTrigger,
+.addTrigger:focus-visible,
+.addTrigger[aria-expanded="true"] {
+  opacity: 1;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .addTrigger {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .addTrigger {
+    transition: none;
+  }
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  min-height: 32px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-500);
+  font-size: var(--t-12);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 1px;
+}
+
+.tabActive {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.tabIcon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tabLabel {
+  line-height: 1;
+}
+
+.collapseBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  color: var(--ink-500);
+  flex: 0 0 auto;
+}
+
+/* ── Module body ─────────────────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+/* ── Responsive: panel → overlay drawer / bottom sheet (plan §10 / audit B2) ─
+   Mirror of the left panel's treatment (TeachLeft.module.css), pinned to the
+   RIGHT edge. On desktop the panel is an inline flex column. Below 900px the
+   two fixed-px side panels would squeeze the center to nothing or force
+   document-level horizontal scroll (CLAUDE.md §4 hard rule). So at tablet and
+   phone tiers we lift the panel OUT of the flex flow into a fixed overlay that
+   slides over the board from the right, leaving the center full-width
+   underneath.
+
+   The panel carries an inline `style={{ width }}` (fixed px from the persisted
+   layout); author `!important` overrides it at these tiers. A tap-to-dismiss
+   scrim needs a TSX sibling (documented under "CSS-only limits — needs TSX" in
+   docs/teach-a11y-responsive-notes.md); the right rail icon already toggles
+   collapse, so the drawer stays dismissible without it. */
+
+/* Tablet (≤900px): overlay drawer pinned to the right edge, just left of the
+   64px right rail, sliding over the board. Caps its own width so it never
+   exceeds the viewport. */
+@media (max-width: 900px) {
+  .panel {
+    position: fixed;
+    right: 64px;
+    top: 0;
+    bottom: 0;
+    z-index: 45;
+    width: min(360px, calc(100vw - 64px)) !important;
+    box-shadow: var(--shadow-2, 0 8px 28px rgba(20, 20, 26, 0.22));
+    animation: rightDrawerIn 200ms ease-out;
+  }
+}
+
+/* Phone (≤480px): full-height drawer covering the viewport MINUS the 64px
+   right rail, so the rail icon stays visible and tappable to dismiss the
+   drawer (the only CSS-only close affordance — there is no scrim sibling; see
+   the "CSS-only limits — needs TSX" note in
+   docs/teach-a11y-responsive-notes.md). */
+@media (max-width: 480px) {
+  .panel {
+    right: 64px;
+    width: calc(100vw - 64px) !important;
+    animation: rightDrawerInPhone 220ms ease-out;
+  }
+}
+
+@keyframes rightDrawerIn {
+  from {
+    transform: translateX(12px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes rightDrawerInPhone {
+  from {
+    transform: translateX(105%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Reduced motion: no slide. */
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none !important;
+  }
+}

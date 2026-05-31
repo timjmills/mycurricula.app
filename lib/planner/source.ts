@@ -1,0 +1,141 @@
+// lib/planner/source.ts — the PLANNER data-source contract (Wave A, the frozen
+// boundary). Mirrors the Teach seam (lib/teach/queries.ts): one async interface
+// that both the in-memory mock and the Supabase-backed implementation satisfy,
+// so the planner store hydrates + persists through one shape and the backend is
+// a single auditable switch.
+//
+// SCOPE: lessons + units + subjects + standards + per-lesson sections/resources.
+// Grade-scoped + owner/RLS-scoped on every read (multi-grade-ready — no single-
+// grade assumption). PRIVACY (§11.4): planner rows carry STRUCTURE only, never
+// student names.
+//
+// FORKING (CLAUDE.md §2): the source owns lazy personal forks — an edit in
+// personal mode writes a personal copy row; reads resolve personal over master.
+// The reducer store stays unaware; its `isPersonal`/`modified`/`pendingMaster`
+// flags map to/from the copies table inside the source.
+
+import type {
+  Lesson,
+  LessonStatus,
+  LessonResource,
+  StandardsMap,
+  Subject,
+  Unit,
+} from "../types";
+import type { LessonSectionContent } from "../lesson-flow";
+
+/** Identity for a lesson move (mirrors the reducer's moveLesson args). */
+export interface LessonMoveTarget {
+  week: number;
+  /** Day index, 0 = Sunday … 4 = Thursday (configured-week relative). */
+  day: number;
+}
+
+/** The fields a lesson edit can patch. A subset of `Lesson` — the content +
+ *  flags the reducer mutates. The source decides whether the patch forks. */
+export type LessonPatch = Partial<
+  Pick<
+    Lesson,
+    | "title"
+    | "objective"
+    | "preview"
+    | "directions"
+    | "notes"
+    | "resources"
+    | "standards"
+    | "time"
+    | "status"
+    | "reasonNotDone"
+    | "tasks"
+  >
+>;
+
+/**
+ * The planner repository contract. Every method is async so the mock and the
+ * Supabase implementation share one signature — the store awaits both
+ * identically.
+ */
+export interface PlannerDataSource {
+  // ── Reads (hydrate the document) ───────────────────────────────────────────
+  /** All lessons a teacher sees for a grade: personal forks resolved over
+   *  master, soft-deletes excluded (plan §4.3). */
+  listLessons(gradeLevelId: string, ownerId: string): Promise<Lesson[]>;
+  /** Units for a grade, in display order. */
+  listUnits(gradeLevelId: string): Promise<Unit[]>;
+  /** The 8 locked subjects for a grade. */
+  listSubjects(gradeLevelId: string): Promise<Subject[]>;
+  /** Standards (code → description) for a grade's assigned frameworks. */
+  listStandards(gradeLevelId: string): Promise<StandardsMap>;
+  /** The editable section content for one lesson (heading/body/resources). */
+  getSections(lessonId: string): Promise<LessonSectionContent[]>;
+
+  // ── Lesson mutations (the reducer commits through these) ───────────────────
+  /** Patch a lesson's content/flags. In personal mode this lazily forks
+   *  (writes a personal copy); in master mode it edits the master. */
+  updateLesson(
+    lessonId: string,
+    patch: LessonPatch,
+    ownerId: string,
+  ): Promise<Lesson>;
+  /** Move a lesson to a new week/day slot. */
+  moveLesson(
+    lessonId: string,
+    target: LessonMoveTarget,
+    ownerId: string,
+  ): Promise<Lesson>;
+  /** Set completion status. Completion NEVER forks (CLAUDE.md §2). */
+  setLessonStatus(
+    lessonId: string,
+    status: LessonStatus,
+    ownerId: string,
+  ): Promise<Lesson>;
+  /** Create a teacher's own (personal) lesson in a slot. */
+  createLesson(
+    input: {
+      gradeLevelId: string;
+      subject: Lesson["subject"];
+      unit: string;
+      week: number;
+      day: number;
+      title: string;
+    },
+    ownerId: string,
+  ): Promise<Lesson>;
+  /** Soft-delete a lesson (30-day window, §4.6). */
+  softDeleteLesson(lessonId: string, ownerId: string): Promise<void>;
+
+  // ── Section + resource mutations ───────────────────────────────────────────
+  /** Replace a lesson's full section list (reorder / bulk edit). */
+  setSections(
+    lessonId: string,
+    sections: LessonSectionContent[],
+    ownerId: string,
+  ): Promise<LessonSectionContent[]>;
+  /** Add a resource to a section. */
+  addSectionResource(
+    lessonId: string,
+    sectionId: string,
+    resource: LessonResource,
+    ownerId: string,
+  ): Promise<LessonSectionContent[]>;
+  /** Remove a resource from a section. */
+  removeSectionResource(
+    lessonId: string,
+    sectionId: string,
+    resourceId: string,
+    ownerId: string,
+  ): Promise<LessonSectionContent[]>;
+}
+
+/**
+ * True when the planner should persist to Supabase. Defaults OFF: the prototype
+ * renders against the in-memory mock. Opt in with
+ * `NEXT_PUBLIC_PLANNER_USE_SUPABASE=1` (set alongside a real Supabase project,
+ * or a local stack). Kept separate from the Teach flag so each surface can be
+ * cut over independently.
+ */
+export function isPlannerSupabaseConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url || url.length === 0) return false;
+  return process.env.NEXT_PUBLIC_PLANNER_USE_SUPABASE === "1";
+}
