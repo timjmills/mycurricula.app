@@ -690,9 +690,12 @@ export const mockTeachSource: TeachDataSource = {
   async listPages(boardId) {
     const board = boards.find((b) => b.id === boardId);
     if (!board) throw new Error(`Board not found: ${boardId}`);
+    // ensureCanvas guarantees a free-form position for any widget added through
+    // a grid-era path (e.g. right-panel resource embed via upsertWidget) so it
+    // never stacks at the editor's default coordinate.
     return pagesOf(board).map((p) => ({
       ...p,
-      widgets: p.widgets.map((w) => ({ ...w })),
+      widgets: p.widgets.map((w) => ({ ...ensureCanvas(w) })),
     }));
   },
 
