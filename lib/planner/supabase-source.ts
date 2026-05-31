@@ -97,6 +97,45 @@ async function sb(): Promise<ServerClient> {
   return createClient();
 }
 
+/** RFC-4122 UUID shape. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUuid = (v: string | null | undefined): v is string =>
+  typeof v === "string" && UUID_RE.test(v);
+
+/**
+ * Resolve the grade-level UUID to scope a read by. The CLIENT may pass a mock
+ * slug (e.g. "g5") or nothing — never trusted. When the passed value is a real
+ * UUID we use it (still RLS-gated); otherwise we resolve the CALLER's actual
+ * grade from their `teacher_grade_assignments` row under RLS. Returns null when
+ * the caller has no grade (signed out / unprovisioned) — callers treat that as
+ * "no data" rather than querying with a bad id.
+ */
+async function resolveGradeLevelId(
+  client: ServerClient,
+  passed: string | null | undefined,
+): Promise<string | null> {
+  if (isUuid(passed)) return passed;
+  const { data, error } = await client
+    .from("teacher_grade_assignments")
+    .select("grade_level_id")
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return (data.grade_level_id as string) ?? null;
+}
+
+/** Resolve the authed teacher's own id (auth.uid()) server-side, ignoring any
+ *  client-passed ownerId (which may be a mock slug like "lh"). Returns null when
+ *  signed out. */
+async function resolveAuthOwner(
+  client: ServerClient,
+): Promise<string | null> {
+  const { data, error } = await client.auth.getUser();
+  if (error || !data?.user) return null;
+  return data.user.id;
+}
+
 /** Wrap a supabase-js `{ data, error }` envelope: throw a descriptive Error on
  *  `error`, otherwise return `data`. Centralises the error-handling contract so
  *  every call site stays terse and no error is silently swallowed. */
@@ -493,14 +532,20 @@ export const plannerSupabaseSource: PlannerDataSource = {
   async listLessons(gradeLevelId, ownerId) {
     const client = await sb();
 
+    // Resolve real ids server-side: the client may pass mock slugs ("g5"/"lh").
+    // grade ← the caller's assignment (or the passed UUID); owner ← auth.uid().
+    const grade = await resolveGradeLevelId(client, gradeLevelId);
+    const owner = (await resolveAuthOwner(client)) ?? ownerId;
+    if (!grade) return [];
+
     // 1. Resolve the grade's subjects + units (and their slug indexes), so we
     //    can scope master events to the grade (events carry unit_id/subject_id
     //    but not grade_level_id) and map back to domain slugs.
     const [{ uuidToSubjectId }, { rows: unitRows, uuidToUnitSlug }, standards] =
       await Promise.all([
-        loadSubjectIndex(client, gradeLevelId),
-        loadUnitIndex(client, gradeLevelId),
-        loadStandardsIndex(client, gradeLevelId),
+        loadSubjectIndex(client, grade),
+        loadUnitIndex(client, grade),
+        loadStandardsIndex(client, grade),
       ]);
     const gradeUnitIds = unitRows.map((u) => u.id);
     if (gradeUnitIds.length === 0) return [];
@@ -521,17 +566,18 @@ export const plannerSupabaseSource: PlannerDataSource = {
     const masterIds = masterRows.map((m) => m.id);
 
     // 3. This teacher's personal copies for those masters (the lazy fork), and
-    //    their completion rows. Both keyed by the MASTER event id.
+    //    their completion rows. Both keyed by the MASTER event id. RLS already
+    //    scopes to auth.uid(); `owner` is the resolved auth id.
     const [copyRes, complRes] = await Promise.all([
       client
         .from("personal_core_lesson_event_copies")
         .select(COPY_COLS)
-        .eq("teacher_id", ownerId)
+        .eq("teacher_id", owner)
         .in("master_core_lesson_event_id", masterIds),
       client
         .from("completion_status")
         .select(COMPLETION_COLS)
-        .eq("teacher_id", ownerId)
+        .eq("teacher_id", owner)
         .in("core_lesson_event_id", masterIds),
     ]);
     const copyRows = unwrap(
@@ -581,8 +627,10 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
   async listUnits(gradeLevelId) {
     const client = await sb();
-    const { rows, uuidToUnitSlug } = await loadUnitIndex(client, gradeLevelId);
-    const { uuidToSubjectId } = await loadSubjectIndex(client, gradeLevelId);
+    const grade = await resolveGradeLevelId(client, gradeLevelId);
+    if (!grade) return [];
+    const { rows, uuidToUnitSlug } = await loadUnitIndex(client, grade);
+    const { uuidToSubjectId } = await loadSubjectIndex(client, grade);
     return rows.map((row) => {
       const subject = uuidToSubjectId.get(row.subject_id) ?? "math";
       const weeks =
@@ -605,10 +653,9 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
   async listSubjects(gradeLevelId) {
     const client = await sb();
-    const { rows, uuidToSubjectId } = await loadSubjectIndex(
-      client,
-      gradeLevelId,
-    );
+    const grade = await resolveGradeLevelId(client, gradeLevelId);
+    if (!grade) return [];
+    const { rows, uuidToSubjectId } = await loadSubjectIndex(client, grade);
     // Map each DB subject row to the domain Subject, drawing the icon/cls from
     // the locked team-wide catalog (CLAUDE.md §4 — subject→swatch is locked).
     const catalogById = new Map(SUBJECTS.map((s) => [s.id, s]));
@@ -628,7 +675,9 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
   async listStandards(gradeLevelId) {
     const client = await sb();
-    const { map } = await loadStandardsIndex(client, gradeLevelId);
+    const grade = await resolveGradeLevelId(client, gradeLevelId);
+    if (!grade) return {};
+    const { map } = await loadStandardsIndex(client, grade);
     return map;
   },
 
@@ -663,11 +712,14 @@ export const plannerSupabaseSource: PlannerDataSource = {
   },
 
   // ── Lesson mutations ─────────────────────────────────────────────────────
-  async updateLesson(lessonId, patch, ownerId) {
+  async updateLesson(lessonId, patch, clientOwnerId) {
     // Personal mode: lazily fork. Status is handled by `setLessonStatus` (it
     // never forks), so a status-only patch is delegated there; any content key
     // forks the lesson.
     const client = await sb();
+    // The client may pass a mock slug ("lh"); writes are keyed + RLS-gated on
+    // the real auth uid. Resolve it server-side.
+    const ownerId = (await resolveAuthOwner(client)) ?? clientOwnerId;
     const contentKeys: (keyof LessonPatch)[] = [
       "title",
       "objective",
@@ -719,8 +771,9 @@ export const plannerSupabaseSource: PlannerDataSource = {
     return reloadLesson(client, lessonId, ownerId);
   },
 
-  async moveLesson(lessonId, target: LessonMoveTarget, ownerId) {
+  async moveLesson(lessonId, target: LessonMoveTarget, clientOwnerId) {
     const client = await sb();
+    const ownerId = (await resolveAuthOwner(client)) ?? clientOwnerId;
     await forkAndPatch(client, lessonId, ownerId, () => ({
       week_number: target.week,
       day_of_week: dayIndexToWeekday(target.day),
@@ -728,9 +781,10 @@ export const plannerSupabaseSource: PlannerDataSource = {
     return reloadLesson(client, lessonId, ownerId);
   },
 
-  async setLessonStatus(lessonId, status, ownerId) {
+  async setLessonStatus(lessonId, status, clientOwnerId) {
     // Completion NEVER forks (CLAUDE.md §2). Upsert the completion_status row.
     const client = await sb();
+    const ownerId = (await resolveAuthOwner(client)) ?? clientOwnerId;
     await writeStatus(client, lessonId, ownerId, status, undefined);
     return reloadLesson(client, lessonId, ownerId);
   },
