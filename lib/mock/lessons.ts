@@ -25,6 +25,14 @@ interface LessonInput {
   title: string;
   day: number;
   week?: number;
+  /**
+   * Unit id this lesson belongs to. The Year roadmap groups lessons by this
+   * field to draw one band per unit (see RoadmapView.tsx). When omitted the
+   * builder falls back to the subject's single "active" unit from
+   * UNITS[subject] so the original weeks-11–13 rows keep their prior
+   * behavior; the full-year tiling rows below pass an explicit per-unit id.
+   */
+  unit?: string;
   objective?: string;
   preview: string;
   directions?: string;
@@ -47,7 +55,7 @@ function L(o: LessonInput): Lesson {
   return {
     id: o.id,
     subject: o.subject,
-    unit: UNITS[o.subject].id,
+    unit: o.unit ?? UNITS[o.subject].id,
     title: o.title,
     objective: o.objective ?? "",
     preview: o.preview,
@@ -760,7 +768,222 @@ export const LESSONS: Lesson[] = [
     resources: [{ type: "image", label: "Pyramid diagrams" }],
     standards: [],
   }),
+
+  // ════════════════════════════════════════════════════════════════════════
+  // FULL-YEAR ROADMAP COVERAGE (weeks 1–36)
+  //
+  // The Year roadmap (RoadmapView.tsx) draws one band per unit id, spanning
+  // each unit's min→max lesson week. The hand-authored rows above only cover
+  // weeks 11–13, so the back half of the roadmap read as empty. The rows
+  // below tile every subject across all 36 academic weeks with contiguous,
+  // gap-free units of varied length (4–8 wks) so the roadmap shows a fully
+  // unitized year.
+  //
+  // Each subject's unit that overlaps weeks 11–13 reuses the subject's
+  // existing default unit id (UNITS[subject].id) so these rows MERGE with the
+  // hand-authored rows into a single band — no overlap, no double-counting.
+  // Every other unit gets a fresh sequential id (m-u#, r-u#, …).
+  //
+  // Status realism vs CURRENT_WEEK (12): units fully before the current week
+  // are "done", units straddling it are mixed (done / partial / not_done),
+  // units after it are "not_done". One lesson is seeded per spanned week (on
+  // a rotating school day, 0–4) so each unit's min→max week is fully covered.
+  //
+  // The generated rows are appended AFTER this literal (see the
+  // `LESSONS.push(...)` at the bottom of the file) rather than spread inline,
+  // because `buildYearCoverage()` reads the `YEAR_PLANS` / `HAND_AUTHORED_WEEKS`
+  // tables declared further down. Spreading here would call the generator
+  // during this array's initialization — before those `const` tables exist —
+  // and throw a temporal-dead-zone ReferenceError at module load.
+  // ════════════════════════════════════════════════════════════════════════
 ];
+
+// ── Full-year coverage generator ────────────────────────────────────────────
+//
+// Declarative plan: per subject, a list of units with an explicit week range,
+// a unit id, and a human name. `seedUnitId` (when set) reuses the subject's
+// existing default unit so the generated rows merge with the hand-authored
+// weeks-11–13 rows instead of drawing a second overlapping band. Weeks that
+// already carry hand-authored lessons are skipped here so we never duplicate
+// an existing (subject, week, day) slot or inflate a unit's lesson count.
+
+interface UnitPlan {
+  /** Unit id. Reuse the subject default for the band overlapping wks 11–13. */
+  id: string;
+  /** Display name (the roadmap synthesizes its own label, but Daily/Weekly
+   *  and other consumers read the lesson title — kept descriptive). */
+  name: string;
+  /** Inclusive 1-based start week. */
+  start: number;
+  /** Inclusive 1-based end week. */
+  end: number;
+}
+
+/** Weeks that already have hand-authored lessons, per subject — skipped by
+ *  the generator so it never duplicates an existing slot. Derived from the
+ *  literal rows above. */
+const HAND_AUTHORED_WEEKS: Record<SubjectId, ReadonlySet<number>> = {
+  math: new Set([11, 12, 13]),
+  reading: new Set([11, 12, 13]),
+  writing: new Set([11, 12, 13]),
+  grammar: new Set([11, 12, 13]),
+  spelling: new Set([12]),
+  ufli: new Set([11, 12, 13]),
+  explorers: new Set([12, 13]),
+  sel: new Set([12]),
+};
+
+/** Per-subject unit tiling across weeks 1–36. The unit whose range covers
+ *  weeks 11–13 reuses the subject's default unit id (UNITS[subject].id) so it
+ *  merges with the hand-authored rows. Spans vary 4–8 weeks so bands look
+ *  natural; together they are contiguous (start = prev.end + 1) and the last
+ *  unit ends on week 36. */
+const YEAR_PLANS: Record<SubjectId, UnitPlan[]> = {
+  math: [
+    { id: "m-u1", name: "Place Value & Decimals", start: 1, end: 6 },
+    { id: "m-u2", name: "Multiplication & Division", start: 7, end: 10 },
+    { id: UNITS.math.id, name: "Fractions", start: 11, end: 16 },
+    { id: "m-u4", name: "Decimal Operations", start: 17, end: 22 },
+    { id: "m-u5", name: "Geometry & Measurement", start: 23, end: 28 },
+    { id: "m-u6", name: "Data, Graphs & the Coordinate Plane", start: 29, end: 32 }, // prettier-ignore
+    { id: "m-u7", name: "Volume & Year-End Application", start: 33, end: 36 },
+  ],
+  reading: [
+    { id: "r-u1", name: "Launching Readers' Workshop", start: 1, end: 6 },
+    { id: UNITS.reading.id, name: "Realistic Fiction", start: 7, end: 14 },
+    { id: "r-u3", name: "Nonfiction & Research", start: 15, end: 20 },
+    { id: "r-u4", name: "Poetry & Figurative Language", start: 21, end: 25 },
+    { id: "r-u5", name: "Book Clubs & Comparative Themes", start: 26, end: 31 },
+    { id: "r-u6", name: "Drama, Performance & Reading Capstone", start: 32, end: 36 }, // prettier-ignore
+  ],
+  writing: [
+    { id: "w-u1", name: "Launching Writers' Workshop", start: 1, end: 5 },
+    { id: "w-u2", name: "Informational Writing", start: 6, end: 9 },
+    { id: UNITS.writing.id, name: "Personal Narrative", start: 10, end: 15 },
+    { id: "w-u4", name: "Opinion & Argument", start: 16, end: 21 },
+    { id: "w-u5", name: "Research Report", start: 22, end: 27 },
+    { id: "w-u6", name: "Literary Essay", start: 28, end: 32 },
+    { id: "w-u7", name: "Poetry & Multi-Genre Capstone", start: 33, end: 36 },
+  ],
+  grammar: [
+    { id: "g-u1", name: "Parts of Speech", start: 1, end: 7 },
+    { id: UNITS.grammar.id, name: "Verb Tense & Agreement", start: 8, end: 14 },
+    { id: "g-u3", name: "Punctuation & Conventions", start: 15, end: 20 },
+    { id: "g-u4", name: "Clauses & Complex Sentences", start: 21, end: 26 },
+    { id: "g-u5", name: "Sentence Structure & Combining", start: 27, end: 31 },
+    { id: "g-u6", name: "Editing & Revision Mastery", start: 32, end: 36 },
+  ],
+  spelling: [
+    { id: "sp-u1", name: "Short & Long Vowel Patterns", start: 1, end: 5 },
+    { id: "sp-u2", name: "Consonant Blends & Digraphs", start: 6, end: 10 },
+    { id: UNITS.spelling.id, name: "Greek & Latin Roots", start: 11, end: 16 },
+    { id: "sp-u4", name: "Prefixes & Suffixes", start: 17, end: 22 },
+    { id: "sp-u5", name: "Homophones & Tricky Patterns", start: 23, end: 28 },
+    { id: "sp-u6", name: "Morphology & Word Study", start: 29, end: 32 },
+    { id: "sp-u7", name: "Year-End Spelling Review", start: 33, end: 36 },
+  ],
+  ufli: [
+    { id: "u-u1", name: "Closed Syllables & Blends", start: 1, end: 5 },
+    { id: "u-u2", name: "Silent-e & Vowel-Consonant-e", start: 6, end: 8 },
+    { id: UNITS.ufli.id, name: "Multisyllabic Words", start: 9, end: 14 },
+    { id: "u-u4", name: "Open Syllables & Vowel Teams", start: 15, end: 20 },
+    { id: "u-u5", name: "R-Controlled Vowels", start: 21, end: 26 },
+    { id: "u-u6", name: "Multisyllabic Decoding", start: 27, end: 31 },
+    { id: "u-u7", name: "Morphology & Fluency", start: 32, end: 36 },
+  ],
+  explorers: [
+    { id: "e-u1", name: "Map Skills & Early Humans", start: 1, end: 6 },
+    { id: UNITS.explorers.id, name: "Ancient Civilizations", start: 7, end: 14 }, // prettier-ignore
+    { id: "e-u3", name: "Exploration & Migration", start: 15, end: 20 },
+    { id: "e-u4", name: "Geography & Cultures", start: 21, end: 26 },
+    { id: "e-u5", name: "Economics & Community", start: 27, end: 31 },
+    { id: "e-u6", name: "Capstone Inquiry Project", start: 32, end: 36 },
+  ],
+  sel: [
+    { id: "s-u1", name: "Self-Awareness & Routines", start: 1, end: 5 },
+    { id: UNITS.sel.id, name: "Community & Belonging", start: 6, end: 13 },
+    { id: "s-u3", name: "Emotional Regulation", start: 14, end: 19 },
+    { id: "s-u4", name: "Empathy & Relationships", start: 20, end: 25 },
+    { id: "s-u5", name: "Growth Mindset & Goal-Setting", start: 26, end: 31 },
+    { id: "s-u6", name: "Reflection & Transition", start: 32, end: 36 },
+  ],
+};
+
+/** Short per-subject id prefix for generated lesson ids (kept distinct from
+ *  the hand-authored ids above, which use the same prefixes but a `-NN-`
+ *  week segment; generated ids use a `-yc-` segment to stay globally
+ *  unique). */
+const ID_PREFIX: Record<SubjectId, string> = {
+  math: "m",
+  reading: "r",
+  writing: "w",
+  grammar: "g",
+  spelling: "s",
+  ufli: "uf",
+  explorers: "e",
+  sel: "se",
+};
+
+/**
+ * Pick a realistic status for a generated lesson given its week vs the
+ * current week. Past weeks lean "done" (with an occasional "partial" so the
+ * roadmap shows some in-progress bands); the current week is mixed; future
+ * weeks are "not_done".
+ */
+function statusForWeek(week: number): LessonStatus {
+  if (week < CURRENT_WEEK) {
+    // Mostly done, every 4th week a "partial" for visual variety.
+    return week % 4 === 0 ? "partial" : "done";
+  }
+  if (week === CURRENT_WEEK) return "partial";
+  return "not_done";
+}
+
+/**
+ * Build one lesson per week of every planned unit, skipping weeks that
+ * already carry hand-authored lessons (so we never duplicate a slot or
+ * inflate a band's count). The day index rotates 0–4 across the unit so the
+ * generated lessons spread sensibly through the school week.
+ */
+function buildYearCoverage(): Lesson[] {
+  const out: Lesson[] = [];
+  (Object.keys(YEAR_PLANS) as SubjectId[]).forEach((subject) => {
+    const plans = YEAR_PLANS[subject];
+    const skip = HAND_AUTHORED_WEEKS[subject];
+    plans.forEach((plan, unitIdx) => {
+      let weekOffset = 0;
+      for (let week = plan.start; week <= plan.end; week++) {
+        if (skip.has(week)) {
+          weekOffset++;
+          continue;
+        }
+        const day = weekOffset % 5; // rotate Sun–Thu
+        weekOffset++;
+        out.push(
+          L({
+            id: `${ID_PREFIX[subject]}-yc-${week}-${day}`,
+            subject,
+            unit: plan.id,
+            week,
+            day,
+            title: `${plan.name} — Week ${week} lesson`,
+            objective: `I can work toward this week's ${plan.name} goal.`,
+            preview: `Planned ${plan.name} lesson for week ${week} (unit ${unitIdx + 1}).`,
+            status: statusForWeek(week),
+          }),
+        );
+      }
+    });
+  });
+  return out;
+}
+
+// Append the full-year coverage rows now that every table + helper above is
+// initialized. Placed at the very bottom of the module so it runs after the
+// `LESSONS` literal AND the generator's data tables — avoiding the
+// temporal-dead-zone error a `...buildYearCoverage()` spread inside the
+// literal would cause.
+LESSONS.push(...buildYearCoverage());
 
 /** All lessons for a given week, in day order. */
 export function lessonsForWeek(week: number): Lesson[] {

@@ -47,6 +47,26 @@ body:has([data-print-view]) [role="complementary"] {
   display: none !important;
 }
 
+/* ── Teach-view shell suppression ──────────────────────────────────────────
+ * The /teach route renders inside the (planner) group so it inherits auth,
+ * the Personal/Team banner, and the top bar (the top bar stays so the Teach
+ * tab can highlight). But Teach owns its own chrome — its own five zones with
+ * two side rails and two side panels — so it suppresses the planner's DEFAULT
+ * left filter panel, right panel, and the two icon rails. The [data-teach-view]
+ * attribute on the page root scopes these rules to the route, mirroring the
+ * [data-print-view] pattern above.
+ *
+ * The two icon rails (GlobalRail / RightIconRail) render as <nav> elements
+ * containing a [data-rail-side] list, so `nav:has([data-rail-side])` targets
+ * exactly those two without touching the top-bar's view-switcher <nav> (which
+ * has no [data-rail-side] descendant). The filter panel is the only <aside>;
+ * the right panel is the only [role="complementary"]. */
+body:has([data-teach-view]) aside,
+body:has([data-teach-view]) [role="complementary"],
+body:has([data-teach-view]) nav:has([data-rail-side]) {
+  display: none !important;
+}
+
 /* Paper output: hide all chrome elements in @media print. */
 @media print {
   header,
@@ -64,6 +84,156 @@ body:has([data-print-view]) [role="complementary"] {
     overflow: visible !important;
     min-height: auto !important;
     flex: none !important;
+  }
+}
+
+/* ── W5: Black-and-white print pattern fallback ────────────────────────
+ * When a teacher prints to a B&W laser printer (the school-office default),
+ * the subject-color stripe collapses to indistinguishable gray and lessons
+ * across subjects start to look identical. To preserve subject identity on
+ * paper we overlay a SHAPE pattern on the stripe — eight distinct hatch
+ * patterns, one per canonical subject. The patterns paint in a light gray
+ * (`var(--ink-400)`) for a faint-watermark look that doesn't overpower the
+ * stripe; subject identity is carried by the pattern SHAPE (angle / dash /
+ * density), not its darkness.
+ *
+ * Architecture:
+ *   - Each `.cp-subj.<id>` declares a `--subject-pattern` custom property
+ *     (a CSS image, typically `repeating-linear-gradient(...)`).
+ *   - The print pages mark each stripe element with `myc-print-stripe`
+ *     and wrap an ancestor in `.cp-subj <subject>` so the pattern cascades
+ *     down. The non-print stripe styling (subject color background) is
+ *     declared inline in the print page components and remains untouched
+ *     on screen; we only paint the pattern in `@media print`.
+ *   - Pattern stripe widens to 6px in print so the hatch is readable. The
+ *     screen stripe stays 3px for a clean preview.
+ *
+ * Patterns rely on SHAPE, not weight, to stay distinct:
+ *   - the eight subjects pick distinct line angles, dash patterns, and
+ *     densities so two subjects never look alike even as a faint tint.
+ *   - relative weight is preserved (explorers boldest, math/reading finest,
+ *     spelling cross-hatched) as a secondary cue.
+ *   - TRADE-OFF: the light-gray ink is a deliberate aesthetic choice. On a
+ *     low-quality B&W printer with aggressive toner thresholding a faint
+ *     1px gray line can wash out; if a school reports vanishing hatches,
+ *     darken `--ink-400` → `--ink-600`/`--ink-900` here.
+ *
+ * `print-color-adjust: exact` forces the browser to keep backgrounds
+ * during print (Chromium/Edge/Safari respect it; Firefox honors the
+ * legacy `-webkit-print-color-adjust` alias which we also set).
+ */
+@media print {
+  /* Pattern definitions keyed by subject. Tokens only — ink-400 is the
+     light-gray pattern ink (faint watermark), paper is the void between
+     lines so the underlying colored stripe shows through on color printers. */
+  .cp-subj.math {
+    /* Fine forward-slash diagonal (45°) — the most common subject gets the
+       canonical "math-grid" diagonal. Finest weight in the set. */
+    --subject-pattern: repeating-linear-gradient(
+      45deg,
+      var(--ink-400) 0 1px,
+      transparent 1px 6px
+    );
+  }
+  .cp-subj.reading {
+    /* Fine backslash diagonal (135°) — mirrors math's axis so the two
+       literacy-adjacent subjects read as opposite diagonals. */
+    --subject-pattern: repeating-linear-gradient(
+      135deg,
+      var(--ink-400) 0 1px,
+      transparent 1px 6px
+    );
+  }
+  .cp-subj.writing {
+    /* Fine vertical lines — a different axis class from math/reading. */
+    --subject-pattern: repeating-linear-gradient(
+      90deg,
+      var(--ink-400) 0 1px,
+      transparent 1px 5px
+    );
+  }
+  .cp-subj.grammar {
+    /* Fine horizontal rules — paired axis to writing's verticals. */
+    --subject-pattern: repeating-linear-gradient(
+      0deg,
+      var(--ink-400) 0 1px,
+      transparent 1px 5px
+    );
+  }
+  .cp-subj.spelling {
+    /* Cross-hatch (two diagonals composed) — the only 2-axis pattern, so it
+       reads as a mesh regardless of how faint it gets. */
+    --subject-pattern:
+      repeating-linear-gradient(
+        45deg,
+        var(--ink-400) 0 1px,
+        transparent 1px 6px
+      ),
+      repeating-linear-gradient(
+        135deg,
+        var(--ink-400) 0 1px,
+        transparent 1px 6px
+      );
+  }
+  .cp-subj.ufli {
+    /* Dashed backslash diagonal (135°). Deliberately OFF math's 45° axis so
+       the two don't collide on a narrow stripe; the broken dash rhythm keeps
+       it distinct from reading's continuous 135° lines (dashed vs solid). */
+    --subject-pattern: repeating-linear-gradient(
+      135deg,
+      var(--ink-400) 0 1px,
+      transparent 1px 4px,
+      var(--ink-400) 4px 5px,
+      transparent 5px 9px
+    );
+  }
+  .cp-subj.explorers {
+    /* Bold, low-frequency forward diagonal — the heaviest line + widest gap
+       in the set, so it stays the "boldest" identity even as a light tint. */
+    --subject-pattern: repeating-linear-gradient(
+      45deg,
+      var(--ink-400) 0 2px,
+      transparent 2px 9px
+    );
+  }
+  .cp-subj.sel {
+    /* Sparsest horizontal lines — quietest pattern for the least frequent
+       subject; wider gap than grammar so the two horizontals stay distinct. */
+    --subject-pattern: repeating-linear-gradient(
+      0deg,
+      var(--ink-400) 0 1px,
+      transparent 1px 8px
+    );
+  }
+
+  /* The stripe element on every print page. In screen mode this class is
+     a no-op (the screen stripe is styled by the print module). In print
+     mode it widens the stripe and overlays the subject pattern via a
+     ::after pseudo-element. We deliberately do NOT touch the element's own
+     `background` — the print pages set that inline (solid subject color for
+     normal stripes, a dashed gradient for *modified* lessons/units, which
+     is the three-tier "modified" cue from CLAUDE.md §2). Painting the hatch
+     with `background-image: … !important` here would clobber that inline
+     value and erase the modified cue on paper, so the hatch lives on the
+     pseudo-element instead: the element keeps its color/dash, the overlay
+     adds subject identity. Color printers see both layers; B&W printers
+     still get the distinguishing hatch. */
+  .myc-print-stripe {
+    width: 6px !important;
+    position: relative;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .myc-print-stripe::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--subject-pattern);
+    background-repeat: repeat;
+    background-size: auto;
+    pointer-events: none;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }
 

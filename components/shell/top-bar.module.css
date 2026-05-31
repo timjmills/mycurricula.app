@@ -265,25 +265,16 @@
   color: var(--core-mode);
 }
 
-/* ── View-mode pill wrapper (Grid | List) ───────────────────────────── */
-/* Wraps the ToggleGroup primitive. Hidden below 1024px (secondary chrome)
-   matching the old .viewModePill hide rule. The pill stays 2-way: Schedule
-   mode is controlled by inline pills inside the Weekly + Daily chrome, not
-   by this top-bar toggle. */
-.viewModePillWrap {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-}
+/* W4 chrome-relocation (Wave 2): the Grid | List | Schedule view-mode pill
+   (and its .viewModePillWrap) moved out of the top bar into each route's
+   local control bar (now the <ViewModeToggle> primitive). The wrapper rule
+   and its ≤1024px hide rule were removed with it. */
 
 /* Between 1025 and 1280px the bar is tight: the Schedule tab is now a LIVE
    route (no longer hidden as a "soon" tab below 1280px), so five live view
-   tabs show side-by-side AND the view-mode pill is still visible. Compress
-   the view-tab padding at this range so the extra live tab doesn't push
-   the bar into overflow. Above 1280px the bar has plenty of cushion and
-   the tabs breathe at the default padding. The pill itself is unchanged
-   from the pre-Schedule baseline (still Grid | List), so only the view
-   tabs need this defensive compression. */
+   tabs show side-by-side. Compress the view-tab padding at this range so the
+   extra live tab doesn't push the bar into overflow. Above 1280px the bar
+   has plenty of cushion and the tabs breathe at the default padding. */
 @media (min-width: 1025px) and (max-width: 1280px) {
   .viewTab {
     padding: 0 9px;
@@ -487,19 +478,18 @@
    byte-for-byte unchanged. Each breakpoint below only ADDS hide/narrow
    rules so non-essential chrome yields space to primary controls.
 
-   1024px: hide save indicator + view-mode pill (recovered ~120px).
+   1024px: hide save indicator (recovered ~120px).
     768px: also hide week label + undo/redo group (recovered ~160px more).
     540px: condense bar height to 44px; compress view-tab padding.
     480px: also hide grade label from wordmark.
    All changes are additive media queries; no base rule is touched. */
 
 @media (max-width: 1024px) {
-  /* Save indicator and view-mode pill are secondary chrome — drop them
-     first so the primary tab bar and action controls keep their width. */
+  /* Save indicator is secondary chrome — drop it first so the primary tab
+     bar and action controls keep their width. (The view-mode pill that used
+     to hide here moved into each route's local control bar — see the W4
+     chrome-relocation note above.) */
   .saveIndicator {
-    display: none;
-  }
-  .viewModePillWrap {
     display: none;
   }
 }

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PR #2 — w5 weekly view options · visual probe</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: #11151c; color: #e7edf3; }
+  header { padding: 20px 24px; border-bottom: 1px solid #2a313c; position: sticky; top: 0; background: #11151c; z-index: 1; }
+  header h1 { margin: 0 0 4px; font-size: 18px; }
+  header p { margin: 0; color: #9aa7b4; font-size: 13px; }
+  main { padding: 24px; display: grid; gap: 28px; }
+  .group h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: #9aa7b4; margin: 0 0 12px; }
+  .shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  figure { margin: 0; background: #1a1f28; border: 1px solid #2a313c; border-radius: 10px; overflow: hidden; }
+  figcaption { padding: 8px 12px; font-size: 12px; color: #c3cdd7; border-bottom: 1px solid #2a313c; display: flex; justify-content: space-between; }
+  figcaption .dim { color: #7f8c99; }
+  img { display: block; width: 100%; height: auto; background: #fff; cursor: zoom-in; }
+  a.open { color: #6db3ff; text-decoration: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PR #2 — w5 weekly view options · visual probe</h1>
+  <p>Responsive + print snapshots. Click any image to open full-size in a new tab.</p>
+</header>
+<main>
+  <section class="group">
+    <h2>Weekly view — responsive tiers</h2>
+    <div class="shots">
+      <figure><figcaption><span>weekly · phone</span><span class="dim">~400px</span></figcaption><a class="open" href="weekly__phone.png" target="_blank"><img src="weekly__phone.png" alt="weekly phone"></a></figure>
+      <figure><figcaption><span>weekly · tablet</span><span class="dim">~768px</span></figcaption><a class="open" href="weekly__tablet.png" target="_blank"><img src="weekly__tablet.png" alt="weekly tablet"></a></figure>
+      <figure><figcaption><span>weekly · desktop</span><span class="dim">~1280px</span></figcaption><a class="open" href="weekly__desktop.png" target="_blank"><img src="weekly__desktop.png" alt="weekly desktop"></a></figure>
+    </div>
+  </section>
+  <section class="group">
+    <h2>Daily view — responsive tiers</h2>
+    <div class="shots">
+      <figure><figcaption><span>daily · phone</span><span class="dim">~400px</span></figcaption><a class="open" href="daily__phone.png" target="_blank"><img src="daily__phone.png" alt="daily phone"></a></figure>
+      <figure><figcaption><span>daily · tablet</span><span class="dim">~768px</span></figcaption><a class="open" href="daily__tablet.png" target="_blank"><img src="daily__tablet.png" alt="daily tablet"></a></figure>
+      <figure><figcaption><span>daily · desktop</span><span class="dim">~1280px</span></figcaption><a class="open" href="daily__desktop.png" target="_blank"><img src="daily__desktop.png" alt="daily desktop"></a></figure>
+    </div>
+  </section>
+  <section class="group">
+    <h2>Print templates</h2>
+    <div class="shots">
+      <figure><figcaption><span>weekly · print</span><span class="dim">B&amp;W fallback</span></figcaption><a class="open" href="weekly-print__print.png" target="_blank"><img src="weekly-print__print.png" alt="weekly print"></a></figure>
+      <figure><figcaption><span>year · print</span><span class="dim">B&amp;W fallback</span></figcaption><a class="open" href="year-print__print.png" target="_blank"><img src="year-print__print.png" alt="year print"></a></figure>
+    </div>
+  </section>
+</main>
+</body>
+</html>

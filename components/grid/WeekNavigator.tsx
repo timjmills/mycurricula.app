@@ -9,6 +9,7 @@
 
 import type { ReactNode } from "react";
 import { Button, Tooltip } from "@/components/ui";
+import { CatchupChip } from "./CatchupChip";
 import styles from "./WeeklyGrid.module.css";
 
 interface WeekNavigatorProps {
@@ -22,6 +23,29 @@ interface WeekNavigatorProps {
   maxWeek: number;
   /** Step to an adjacent week. */
   onChange: (week: number) => void;
+  /**
+   * Opt the navigator into the compact catch-up chip beside the title.
+   * Defaults off so other surfaces that reuse this navigator (e.g. the
+   * weekly board) stay chip-free; the Weekly grid passes it `true`.
+   */
+  showCatchupChip?: boolean;
+  /**
+   * Optional far-right slot rendered AFTER the prev/next/today controls.
+   * The Weekly view hosts its Grid|List|Schedule toggle here so the toggle
+   * lives on the single shared week row and stays visible+functional in
+   * every canvas mode (grid, list, and schedule — the schedule timeline has
+   * no navigator of its own, so this lifted slot is the only place the
+   * toggle can persist across all three). Left unset elsewhere.
+   */
+  actions?: ReactNode;
+  /**
+   * Heading level for the "Week N" title. Defaults to `h2`. The Weekly view
+   * deleted its page-level title band, so this navigator is now that page's
+   * top heading — it passes `h1` to keep exactly one page-level `<h1>` in the
+   * a11y tree (WCAG 2.4.6 / 1.3.1). Surfaces that still sit under their own
+   * page `<h1>` keep the `h2` default.
+   */
+  headingLevel?: "h1" | "h2";
 }
 
 /** Sticky week navigator: eyebrow + title + prev/next/today controls. */
@@ -31,24 +55,39 @@ export function WeekNavigator({
   minWeek,
   maxWeek,
   onChange,
+  showCatchupChip = false,
+  actions,
+  headingLevel = "h2",
 }: WeekNavigatorProps): ReactNode {
   const isCurrent = week === currentWeek;
   const atStart = week <= minWeek;
   const atEnd = week >= maxWeek;
+  const Heading = headingLevel;
 
   return (
     <header className={styles.navbar}>
       <div className={styles.navTitleWrap}>
         <div className={styles.navEyebrow}>Weekly plan</div>
-        {/* h2 (not h1) — the page-level h1 lives in WeeklyShell's
-            PageHeader ("Weekly View") so the page has exactly one h1 in
-            the a11y tree. This week-navigator title is a section
-            heading underneath it. */}
-        <h2 className={styles.navTitle}>
+        {/* h2 — the Weekly view's title band was removed, so this "Week N"
+            heading is the view's top heading. Kept as h2 to sit under the
+            app-shell chrome rather than competing as a second page h1. */}
+        <Heading className={styles.navTitle}>
           Week {week}
           {isCurrent && <span className={styles.currentTag}>This week</span>}
-        </h2>
+        </Heading>
       </div>
+
+      {/* Compact catch-up chip — sits just after the week title and deep-links
+          to the /catch-up triage screen. Self-gates (renders nothing when the
+          feature is off or the week has zero uncovered lessons). */}
+      {showCatchupChip && <CatchupChip />}
+
+      {/* View controls (Grid|List|Schedule + scope) — right-aligned, grouped
+          with the prev/next/today nav at the trailing edge of the week row.
+          Stays visible in every canvas mode (the schedule timeline has no
+          navigator of its own). `.navActions` carries margin-left:auto to push
+          the whole trailing cluster right. */}
+      {actions && <div className={styles.navActions}>{actions}</div>}
 
       <div className={styles.navControls}>
         <Tooltip
@@ -96,6 +135,7 @@ export function WeekNavigator({
           </Button>
         </Tooltip>
       </div>
+
     </header>
   );
 }

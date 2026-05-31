@@ -9,5 +9,6 @@ export { RightPanel } from "./right-panel";
 export { GlobalRail } from "./GlobalRail";
 export { RightIconRail } from "./RightIconRail";
 export { RailsDndProvider } from "./RailsDndProvider";
+export { RailAddButton } from "./RailAddButton";
 export { GlobalShortcuts } from "./global-shortcuts";
 export { Clock } from "./Clock";

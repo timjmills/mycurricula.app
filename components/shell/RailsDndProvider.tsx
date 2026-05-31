@@ -121,6 +121,13 @@ export function RailsDndProvider({
 
   return (
     <DndContext
+      // Stable id so dnd-kit's internal `useUniqueId` (a MODULE-level
+      // counter, not React's useId) doesn't drift between the server and
+      // client renders. Without it the sortable rail icons' generated
+      // `aria-describedby="DndDescribedBy-<n>"` mismatches at hydration
+      // (server counts from one offset, client from another), tripping a
+      // React hydration warning. A fixed id pins the value on both sides.
+      id="rails-dnd"
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={(e) => {

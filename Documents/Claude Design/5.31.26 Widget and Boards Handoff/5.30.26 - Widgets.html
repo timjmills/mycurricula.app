@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>5.30.26 — Classroom Widgets</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  :root{
+    /* Type */
+    --font: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+    /* Ink / neutrals */
+    --ink:#101729;          /* near-black navy — titles, numbers */
+    --ink-soft:#37405a;     /* secondary text */
+    --ink-mute:#6b7280;     /* subtitles, uppercase labels */
+    --ink-faint:#9aa1ad;
+    --chrome:#abb1bd;       /* chrome icons */
+    --chrome-hover:#5b6270;
+    --line:#e9ebf0;
+    --paper:#ffffff;
+    --page:#f6f7f9;
+
+    /* Card system */
+    --r-card:22px;          /* outer widget radius */
+    --r-inner:16px;         /* inner sub-card radius */
+    --r-pill:999px;
+    --pad:22px;
+    --shadow-card:0 1px 2px rgba(16,23,41,.04), 0 6px 20px rgba(16,23,41,.05);
+    --shadow-inner:0 1px 2px rgba(16,23,41,.05), 0 2px 8px rgba(16,23,41,.04);
+    --shadow-pop:0 12px 40px rgba(16,23,41,.16);
+
+    /* ── Widget color families ─────────────────────────────── */
+    /* each: bg (card tint) · chip (icon chip) · accent (saturated) · soft (inner tint) */
+    --yellow-bg:#fdf5da;  --yellow-chip:#f6df84;  --yellow-accent:#d99c08;  --yellow-soft:#fbeec3;  --yellow-line:#f0e3b0;
+    --green-bg:#eaf6ed;   --green-chip:#bce6c6;   --green-accent:#1fa85a;   --green-soft:#d9f0df;   --green-line:#cde9d4;
+    --pink-bg:#fce5ee;    --pink-chip:#f7bcd4;    --pink-accent:#e84e93;    --pink-soft:#fad3e3;    --pink-line:#f3c9da;
+    --purple-bg:#f0ecfc;  --purple-chip:#d6cbf7;  --purple-accent:#7c5cf6;  --purple-soft:#e5dcfb;  --purple-line:#ddd3f5;
+    --orange-bg:#fdeede;  --orange-chip:#fbd2ac;  --orange-accent:#f2802b;  --orange-soft:#fbddc1;  --orange-line:#f7d8bc;
+    --blue-bg:#e9f1fe;    --blue-chip:#c1d9fb;    --blue-accent:#2e6be6;    --blue-soft:#d8e7fd;    --blue-line:#cfe0fb;
+
+    /* card gradients — near-white top fading into the family tint (matches mockups) */
+    --yellow-grad:linear-gradient(165deg,#fffdf3 0%,#fbf1cf 100%);
+    --green-grad: linear-gradient(165deg,#f7fcf9 0%,#e4f3e9 100%);
+    --pink-grad:  linear-gradient(165deg,#fef5f9 0%,#fbe0e9 100%);
+    --purple-grad:linear-gradient(165deg,#faf8fe 0%,#ede8fb 100%);
+    --orange-grad:linear-gradient(165deg,#fffbf5 0%,#fce8d6 100%);
+    --blue-grad:  linear-gradient(165deg,#f6faff 0%,#e4edfe 100%);
+  }
+
+  html,body{margin:0;padding:0;min-height:100%;font-family:var(--font);color:var(--ink);background:var(--page);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  *{box-sizing:border-box}
+  #root{min-height:100%}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input,select{font-family:inherit;color:inherit}
+
+  /* ── Page scaffolding ─────────────────────────────────────── */
+  .page{max-width:1480px;margin:0 auto;padding:30px 30px 80px}
+  .page-head{display:flex;align-items:baseline;gap:14px;margin:6px 4px 6px}
+  .page-head h1{margin:0;font-size:28px;font-weight:800;letter-spacing:-.6px}
+  .page-head .sub{font-size:13.5px;color:var(--ink-mute);font-weight:500}
+  .page-note{margin:0 4px 26px;font-size:13.5px;color:var(--ink-mute);font-weight:500;max-width:760px;line-height:1.55;text-wrap:pretty}
+
+  .section-label{display:flex;align-items:center;gap:12px;margin:38px 4px 18px}
+  .section-label .t{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
+  .section-label .ln{flex:1;height:1px;background:var(--line)}
+
+  /* ── Widget card primitives ───────────────────────────────── */
+  .w{position:relative;border-radius:var(--r-card);padding:var(--pad);box-shadow:var(--shadow-card), inset 0 0 0 1px rgba(16,23,41,.04);overflow:hidden;min-width:0}
+  .w-head{display:flex;align-items:center;gap:11px;margin-bottom:16px}
+  .w-label{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-mute)}
+  .w-chip{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none}
+  .w-title{font-size:18px;font-weight:800;letter-spacing:-.3px;line-height:1.15}
+  .w-sub{font-size:13px;font-weight:500;color:var(--ink-mute);margin-top:1px}
+  .w-titlewrap{display:flex;flex-direction:column;min-width:0}
+  .w-chrome{display:flex;align-items:center;gap:2px;margin-left:auto}
+  .w-chrome button{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--chrome);transition:background .12s,color .12s}
+  .w-chrome button:hover{background:rgba(16,23,41,.06);color:var(--ink-soft)}
+
+  .w-actionlink{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink-soft)}
+  .w-actionlink:hover{color:var(--ink)}
+
+  /* white inner sub-cards */
+  .sub{background:var(--paper);border-radius:var(--r-inner);box-shadow:var(--shadow-inner)}
+
+  /* generic pill button */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;border-radius:14px;padding:13px 20px;font-size:15px;transition:transform .08s,filter .12s}
+  .btn:active{transform:translateY(1px)}
+  .btn-solid{color:#fff}
+  .btn-ghost{background:var(--paper);box-shadow:var(--shadow-inner)}
+
+  svg{display:block}
+  .spin{animation:spin .5s ease}
+  @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  .pop{animation:pop .22s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes pop{0%{transform:scale(.7);opacity:.4}100%{transform:scale(1);opacity:1}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="widgets530-core.jsx"></script>
+<script type="text/babel" src="widgets530-dashboard.jsx"></script>
+<script type="text/babel" src="widgets530-expanded-a.jsx"></script>
+<script type="text/babel" src="widgets530-expanded-b.jsx"></script>
+<script type="text/babel" src="widgets530-panels.jsx"></script>
+<script type="text/babel" data-presets="react">
+  function App(){
+    const { Dashboard, ExpandedWidgets, FavoritesBar } = window;
+    return (
+      <div className="page">
+        <div className="page-head">
+          <h1>Classroom Widgets</h1>
+          <span className="sub">5.30.26 · refreshed widget visual system</span>
+        </div>
+        <p className="page-note">
+          A complete pass on the classroom-board widgets — soft pastel cards, friendly rounded type,
+          colored icon chips, and consistent header chrome. A favourites dock sits up top; below, the live
+          dashboard and the three full board panels with their own chrome.
+        </p>
+        <FavoritesBar />
+        <Dashboard />
+        <ExpandedWidgets />
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

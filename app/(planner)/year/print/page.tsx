@@ -227,8 +227,14 @@ export default function YearPrintPage(): ReactNode {
                             className={styles.subjectCell}
                             style={{ color: color.cd }}
                           >
+                            {/* myc-print-stripe is the W5 B&W hatch hook:
+                                under @media print it reads the
+                                --subject-pattern cascaded from the cp-subj
+                                class on the parent <tr> and paints a distinct
+                                per-subject hatch so the stripe survives a
+                                mono printer (see app/globals.css). */}
                             <span
-                              className={styles.subjectStripe}
+                              className={`${styles.subjectStripe} myc-print-stripe`}
                               aria-hidden="true"
                               style={{ background: color.stripe }}
                             />
@@ -247,8 +253,19 @@ export default function YearPrintPage(): ReactNode {
                                       key={b.unitId}
                                       className={styles.unitBlock}
                                     >
+                                      {/* myc-print-stripe is the W5 B&W hatch
+                                          hook: the unit belongs to this
+                                          subject row, so under @media print it
+                                          inherits the same --subject-pattern
+                                          from the cp-subj class on the parent
+                                          <tr> and prints a distinct per-subject
+                                          hatch on a mono printer (see
+                                          app/globals.css). The dashed modified
+                                          treatment only carries on color
+                                          output; B&W readers rely on the hatch
+                                          for subject identity. */}
                                       <span
-                                        className={styles.unitStripe}
+                                        className={`${styles.unitStripe} myc-print-stripe`}
                                         aria-hidden="true"
                                         style={
                                           b.modified

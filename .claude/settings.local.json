@@ -4,5 +4,8 @@
       "Bash(rmdir /s /q .next)",
       "Bash(npm run *)"
     ]
+  },
+  "enabledPlugins": {
+    "vercel@claude-plugins-official": true
   }
 }

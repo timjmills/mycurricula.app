@@ -32,6 +32,7 @@ import {
 } from "react";
 import { Button } from "@/components/ui";
 import type { RailIconId, RailSide } from "@/lib/use-rail-layout";
+import { RAIL_ICON_LABEL } from "./rail-icon-meta";
 
 interface RailContextMenuProps {
   /** The icon the menu was opened from. Drives the labels and disabled
@@ -47,20 +48,6 @@ interface RailContextMenuProps {
   onSelect: (toSide: RailSide) => void;
   onClose: () => void;
 }
-
-// Pretty-name for an icon — used in tooltip copy. Not a translation table;
-// just enough so the menu reads naturally on first hover. The Settings
-// page (Lane GC) will use a richer registry.
-const ICON_LABEL: Record<RailIconId, string> = {
-  today: "Today",
-  schedule: "Schedule",
-  todos: "To-dos",
-  comments: "Team Shoutbox",
-  resources: "Resources",
-  year: "Year overview",
-  voice: "Voice note",
-  settings: "Settings",
-};
 
 export function RailContextMenu({
   iconId,
@@ -109,7 +96,7 @@ export function RailContextMenu({
     [onClose, onSelect],
   );
 
-  const label = ICON_LABEL[iconId];
+  const label = RAIL_ICON_LABEL[iconId];
 
   return (
     <div

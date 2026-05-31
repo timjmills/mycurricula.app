@@ -90,6 +90,23 @@
   min-height: 120px;
 }
 
+/* ── Bottom-pinned slot ───────────────────────────────────────────────── */
+/* Mirrors GlobalRail's .bottom recipe — holds the "+" add-panel button
+   pinned to the very bottom of the rail. Because .list carries flex:1,
+   margin-top:auto here keeps the "+" at the bottom edge even when icons
+   are present. The hairline reads as a parallel surface to the left rail. */
+.bottom {
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid var(--ink-100);
+  width: calc(100% - 12px);
+  align-self: center;
+}
+
 /* ── Responsive: narrow viewports ─────────────────────────────────────── */
 /* Mirrors GlobalRail's responsive rule — at phone widths the rail hides
    so the canvas gets the full viewport. The teacher's arrangement is
