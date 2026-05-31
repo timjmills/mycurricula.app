@@ -39,6 +39,7 @@ const { STANDARDS } = await import("../lib/mock/standards.ts");
 const { LESSONS } = await import("../lib/mock/lessons.ts");
 
 const GRADE = "00000000-0000-0000-0000-0000000000b5"; // seeded Grade 5
+const SCHOOL_YEAR = "00000000-0000-0000-0000-0000000000c1"; // seeded 2025–2026
 const WEEKDAY = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
 const SUBJECT_ID = {
@@ -67,8 +68,8 @@ for (const u of Object.values(UNITS)) {
     String(u.weeks).match(/(\d+)\D+(\d+)/) || String(u.weeks).match(/(\d+)/);
   const startW = m ? Number(m[1]) : 1;
   const endW = m && m[2] ? Number(m[2]) : startW;
-  out += `insert into units (id, grade_level_id, subject_id, name, start_week, end_week)
-  values (${q(id)}, ${q(GRADE)}, ${q(SUBJECT_ID[u.subject])}, ${q(u.name)}, ${startW}, ${endW})
+  out += `insert into units (id, grade_level_id, subject_id, school_year_id, name, start_week, end_week)
+  values (${q(id)}, ${q(GRADE)}, ${q(SUBJECT_ID[u.subject])}, ${q(SCHOOL_YEAR)}, ${q(u.name)}, ${startW}, ${endW})
   on conflict (id) do nothing;\n`;
 }
 

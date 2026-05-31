@@ -2,29 +2,29 @@
 -- Generated from lib/mock by scripts/gen-planner-sql.mjs.
 
 -- Units
-insert into units (id, grade_level_id, subject_id, name, start_week, end_week)
-  values ('b6c5d38c-136b-5d79-aca7-c941a974da5f', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d1', 'Unit 3 · Fractions on a Number Line', 9, 14)
+insert into units (id, grade_level_id, subject_id, school_year_id, name, start_week, end_week)
+  values ('b6c5d38c-136b-5d79-aca7-c941a974da5f', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d1', '00000000-0000-0000-0000-0000000000c1', 'Unit 3 · Fractions on a Number Line', 9, 14)
   on conflict (id) do nothing;
-insert into units (id, grade_level_id, subject_id, name, start_week, end_week)
-  values ('ac3fb91e-f83d-504a-a2b7-f31871c14d71', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d2', 'Unit 2 · Realistic Fiction', 7, 12)
+insert into units (id, grade_level_id, subject_id, school_year_id, name, start_week, end_week)
+  values ('ac3fb91e-f83d-504a-a2b7-f31871c14d71', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d2', '00000000-0000-0000-0000-0000000000c1', 'Unit 2 · Realistic Fiction', 7, 12)
   on conflict (id) do nothing;
-insert into units (id, grade_level_id, subject_id, name, start_week, end_week)
-  values ('cd202763-bed9-5cab-a204-45e778301f39', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d3', 'Unit 3 · Personal Narrative', 10, 15)
+insert into units (id, grade_level_id, subject_id, school_year_id, name, start_week, end_week)
+  values ('cd202763-bed9-5cab-a204-45e778301f39', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d3', '00000000-0000-0000-0000-0000000000c1', 'Unit 3 · Personal Narrative', 10, 15)
   on conflict (id) do nothing;
-insert into units (id, grade_level_id, subject_id, name, start_week, end_week)
-  values ('2afe4da9-9c2b-5238-a362-9b1272a72426', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d4', 'Unit 2 · Verb Tense & Agreement', 8, 13)
+insert into units (id, grade_level_id, subject_id, school_year_id, name, start_week, end_week)
+  values ('2afe4da9-9c2b-5238-a362-9b1272a72426', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d4', '00000000-0000-0000-0000-0000000000c1', 'Unit 2 · Verb Tense & Agreement', 8, 13)
   on conflict (id) do nothing;
-insert into units (id, grade_level_id, subject_id, name, start_week, end_week)
-  values ('447a2ee3-40a2-598a-97b5-00d84ebe1b3c', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d5', 'List 12 · Greek Roots', 12, 12)
+insert into units (id, grade_level_id, subject_id, school_year_id, name, start_week, end_week)
+  values ('447a2ee3-40a2-598a-97b5-00d84ebe1b3c', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d5', '00000000-0000-0000-0000-0000000000c1', 'List 12 · Greek Roots', 12, 12)
   on conflict (id) do nothing;
-insert into units (id, grade_level_id, subject_id, name, start_week, end_week)
-  values ('e9c9b092-f6b7-54a9-b9c8-250c848a2cc9', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d6', 'Lessons 84–92 · Multisyllabic Words', 9, 14)
+insert into units (id, grade_level_id, subject_id, school_year_id, name, start_week, end_week)
+  values ('e9c9b092-f6b7-54a9-b9c8-250c848a2cc9', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d6', '00000000-0000-0000-0000-0000000000c1', 'Lessons 84–92 · Multisyllabic Words', 9, 14)
   on conflict (id) do nothing;
-insert into units (id, grade_level_id, subject_id, name, start_week, end_week)
-  values ('3b713686-18d7-5696-bcd8-a0fed28d5085', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d7', 'Unit 2 · Ancient Egypt', 8, 14)
+insert into units (id, grade_level_id, subject_id, school_year_id, name, start_week, end_week)
+  values ('3b713686-18d7-5696-bcd8-a0fed28d5085', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d7', '00000000-0000-0000-0000-0000000000c1', 'Unit 2 · Ancient Egypt', 8, 14)
   on conflict (id) do nothing;
-insert into units (id, grade_level_id, subject_id, name, start_week, end_week)
-  values ('e0a402e1-3504-5e7f-9a59-3c95bf94c731', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d8', 'Unit 2 · Conflict & Resolution', 9, 12)
+insert into units (id, grade_level_id, subject_id, school_year_id, name, start_week, end_week)
+  values ('e0a402e1-3504-5e7f-9a59-3c95bf94c731', '00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000005d8', '00000000-0000-0000-0000-0000000000c1', 'Unit 2 · Conflict & Resolution', 9, 12)
   on conflict (id) do nothing;
 
 -- Standards framework (CCSS) + grade assignment
