@@ -1,0 +1,93 @@
+name: Preview deploy (no overwrite)
+
+# Branch PREVIEW deploy. Unlike deploy.yml (which promotes to the production
+# Worker serving mycurricula.app), this uploads the current branch as a
+# Cloudflare Worker *version* via `wrangler versions upload`. A version upload
+# does NOT become the active deployment and does NOT touch the custom-domain
+# route — production (mycurricula.app) keeps serving whatever is already live.
+# Cloudflare returns a unique Preview URL (…workers.dev) for the uploaded
+# version, which this workflow surfaces in the run summary.
+#
+# Trigger: Actions tab → "Preview deploy (no overwrite)" → Run workflow →
+# pick the branch. Reuses the same secrets as deploy.yml.
+#
+# Auth on the preview URL: Google OAuth redirect URIs won't include the
+# workers.dev preview host, so use the Claude bypass to reach the planner:
+#   https://<preview-url>/auth/claude-login?token=<CLAUDE_BYPASS_TOKEN>&next=/weekly
+# (CLAUDE_BYPASS_TOKEN is already a Worker runtime secret, shared across
+# versions.) The two prototype routes also sit behind auth, so reach them as
+# /prototypes/timeline and /prototypes/workspace once the bypass cookie is set.
+
+on:
+  # Push to THIS preview branch auto-runs the no-overwrite version upload.
+  # (Scoped to the one branch so it doesn't fire for unrelated work. A push
+  # event runs the workflow from the branch's own file, so it works without
+  # the workflow existing on the default branch.)
+  push:
+    branches:
+      - claude/friendly-ride-zExL7
+  workflow_dispatch:
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build the OpenNext Worker bundle (does not deploy).
+      - name: Build (OpenNext → Cloudflare)
+        run: npm run build:cf
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+          NEXT_PUBLIC_TEACH_USE_SUPABASE: ${{ secrets.NEXT_PUBLIC_TEACH_USE_SUPABASE }}
+          NEXT_PUBLIC_PLANNER_USE_SUPABASE: ${{ secrets.NEXT_PUBLIC_PLANNER_USE_SUPABASE }}
+
+      # Upload as a non-active version. Captures the Preview URL from wrangler's
+      # output and writes it to the job summary. Does NOT promote to production
+      # and does NOT modify the mycurricula.app route.
+      - name: Upload preview version
+        id: preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          npx wrangler versions upload \
+            --message "v1.3 redesign preview — ${{ github.ref_name }} @ ${{ github.sha }}" \
+            2>&1 | tee /tmp/wrangler-preview.log
+          URL="$(grep -oE 'https://[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev' /tmp/wrangler-preview.log | head -1)"
+          echo "preview_url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Preview deploy ${{ job.status }}"
+            echo ""
+            echo "- Branch: \`${{ github.ref_name }}\`"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Preview URL: ${{ steps.preview.outputs.preview_url || 'see “Upload preview version” logs' }}"
+            echo "- Production (\`mycurricula.app\`) is **unchanged** — this is a non-active version upload."
+            echo ""
+            echo "Planner is behind auth; reach it on the preview via the Claude bypass:"
+            echo '`<preview-url>/auth/claude-login?token=<CLAUDE_BYPASS_TOKEN>&next=/weekly`'
+          } >> "$GITHUB_STEP_SUMMARY"
