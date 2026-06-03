@@ -18,7 +18,7 @@ import type { SubjectId } from "./types";
 /** Which of the two saturation variants a teacher views. */
 export type PaletteType = "normal" | "highlight";
 
-/** One paired swatch in the 20-color pool. */
+/** One paired swatch in the subject-color pool. */
 export interface PaletteSwatch {
   id: string;
   name: string;
@@ -28,6 +28,19 @@ export interface PaletteSwatch {
   highlight: string;
   /** Text-on-color hex (~700–800). AA on either fill. */
   deep: string;
+  /**
+   * v1.3 soft tint — the pastel fill used for chips, lanes and card fills
+   * (the "--ct" in the cascade). When present, resolveSubjectColor uses this
+   * as the fill instead of mixing one from `normal`. Legacy 20-swatches omit
+   * it and fall back to a computed mix.
+   */
+  tint?: string;
+  /**
+   * v1.3 bright accent — the more-saturated outline/stripe/dot/tile color
+   * (the "--c" in the cascade) used under the Highlight palette. Legacy
+   * swatches omit it and reuse `highlight`.
+   */
+  bright?: string;
 }
 
 /** Resolved color tokens for a subject under the active palette type. */
@@ -85,25 +98,54 @@ export const PALETTE_20: readonly PaletteSwatch[] = [
   { id: "charcoal", name: "Charcoal", normal: "#1C2535", highlight: "#9CA3B5", deep: "#080D17" }, // prettier-ignore
 ] as const;
 
-/** Swatch lookup by id. */
+// ── The v1.3 subject scale — 15 muted slots (White Rose register) ────────
+// The active brand palette. Each slot carries the muted `solid` (normal), the
+// `bright` accent (outline/stripe/dot under Highlight), the soft `tint` fill,
+// and the `ink` text (deep). Values mirror app/tokens.css `--subj-N*` exactly.
+// These are the "15 options" a teacher can assign; the 8 locked subjects map
+// onto them by default (see DEFAULT_SUBJECT_MAPPING).
+export const SUBJECT_SWATCHES: readonly PaletteSwatch[] = [
+  { id: "subj-1",  name: "Gold",       normal: "#DCC674", bright: "#E8BB17", tint: "#F4EFDF", deep: "#7A671F", highlight: "#E8BB17" }, // prettier-ignore
+  { id: "subj-2",  name: "Apricot",    normal: "#DCA574", bright: "#E87917", tint: "#F4E9DF", deep: "#7A491F", highlight: "#E87917" }, // prettier-ignore
+  { id: "subj-3",  name: "Coral",      normal: "#DC8274", bright: "#E83317", tint: "#F4E2DF", deep: "#7A2B1F", highlight: "#E83317" }, // prettier-ignore
+  { id: "subj-4",  name: "Rose",       normal: "#CF778D", bright: "#E8174B", tint: "#F2E1E5", deep: "#7A1F36", highlight: "#E8174B" }, // prettier-ignore
+  { id: "subj-5",  name: "Pink",       normal: "#CF77AF", bright: "#E8179B", tint: "#F2E1EC", deep: "#7A1F59", highlight: "#E8179B" }, // prettier-ignore
+  { id: "subj-6",  name: "Magenta",    normal: "#C77AC7", bright: "#D147D1", tint: "#F0E2F0", deep: "#752475", highlight: "#D147D1" }, // prettier-ignore
+  { id: "subj-7",  name: "Purple",     normal: "#AB7AC7", bright: "#9F47D1", tint: "#EBE2F0", deep: "#572475", highlight: "#9F47D1" }, // prettier-ignore
+  { id: "subj-8",  name: "Violet",     normal: "#917AC7", bright: "#7147D1", tint: "#E6E2F0", deep: "#3C2475", highlight: "#7147D1" }, // prettier-ignore
+  { id: "subj-9",  name: "Periwinkle", normal: "#7A7FC7", bright: "#4751D1", tint: "#E2E3F0", deep: "#242975", highlight: "#4751D1" }, // prettier-ignore
+  { id: "subj-10", name: "Blue",       normal: "#7A9EC7", bright: "#4788D1", tint: "#E2E9F0", deep: "#244A75", highlight: "#4788D1" }, // prettier-ignore
+  { id: "subj-11", name: "Cyan",       normal: "#7AB8C7", bright: "#47B6D1", tint: "#E2EEF0", deep: "#246575", highlight: "#47B6D1" }, // prettier-ignore
+  { id: "subj-12", name: "Teal",       normal: "#7AC7B8", bright: "#47D1B6", tint: "#E2F0EE", deep: "#247565", highlight: "#47D1B6" }, // prettier-ignore
+  { id: "subj-13", name: "Green",      normal: "#7AC79B", bright: "#47D183", tint: "#E2F0E8", deep: "#247547", highlight: "#47D183" }, // prettier-ignore
+  { id: "subj-14", name: "Leaf",       normal: "#7AC77A", bright: "#47D147", tint: "#E2F0E2", deep: "#257425", highlight: "#47D147" }, // prettier-ignore
+  { id: "subj-15", name: "Lime",       normal: "#9AC77A", bright: "#81D147", tint: "#E8F0E2", deep: "#467524", highlight: "#81D147" }, // prettier-ignore
+] as const;
+
+/** Swatch lookup by id — both the v1.3 15-slot scale and the legacy 20-pool
+ *  resolve here, so saved mappings referencing either keep working. v1.3
+ *  slots are listed first so a duplicate id (there are none today) would
+ *  prefer the brand scale. */
 export const PALETTE_BY_ID: Record<string, PaletteSwatch> = Object.fromEntries(
-  PALETTE_20.map((s) => [s.id, s]),
+  [...SUBJECT_SWATCHES, ...PALETTE_20].map((s) => [s.id, s]),
 );
 
 /** Subject → swatch id mapping. */
 export type SubjectMapping = Record<SubjectId, string>;
 
-// Default subject → swatch assignment. Picks the closest match to the
-// tokens.css palette so the Quiet/Normal view keeps its established look.
+// Default subject → swatch assignment (v1.3). The 8 locked subjects map onto
+// the muted 15-slot brand scale per the design kit's data.js:
+//   math→1  reading→10  writing→2  grammar→7  spelling→5  ufli→3
+//   explorers→13  sel→9
 export const DEFAULT_SUBJECT_MAPPING: SubjectMapping = {
-  math: "ocean",
-  reading: "leaf",
-  writing: "violet",
-  grammar: "teal",
-  spelling: "blush",
-  ufli: "coral",
-  explorers: "amber",
-  sel: "slate",
+  math: "subj-1",
+  reading: "subj-10",
+  writing: "subj-2",
+  grammar: "subj-7",
+  spelling: "subj-5",
+  ufli: "subj-3",
+  explorers: "subj-13",
+  sel: "subj-9",
 };
 
 /**
@@ -117,37 +159,32 @@ export function resolveSubjectColor(
   mapping: SubjectMapping = DEFAULT_SUBJECT_MAPPING,
 ): SubjectColor {
   const swatchId = mapping[subjectId] ?? DEFAULT_SUBJECT_MAPPING[subjectId];
-  const swatch = PALETTE_BY_ID[swatchId] ?? PALETTE_BY_ID.ocean;
+  const swatch = PALETTE_BY_ID[swatchId] ?? PALETTE_BY_ID["subj-1"];
 
-  if (type === "highlight") {
-    // HIGHLIGHT — highlighter-marker aesthetic. Card fills use a subtle
-    // vertical gradient from the highlight hue to a softer mix.
-    const gradient = `linear-gradient(180deg, ${swatch.highlight} 0%, color-mix(in oklch, ${swatch.highlight} 65%, #fff) 100%)`;
-    return {
-      c: swatch.highlight,
-      cl: swatch.highlight,
-      cd: swatch.deep,
-      tile: swatch.highlight,
-      deep: swatch.deep,
-      bg: gradient,
-      bgSolid: swatch.highlight,
-      stripe: swatch.deep, // deep tone reads against the highlight fill
-      gradient,
-    };
-  }
+  // v1.3 cascade recipe: a SOFT TINT is always the fill (--ct / --cl); the
+  // bright/solid accent lives only on the outline, stripe, dot and icon tile
+  // (--c). Text stays dark `ink` (--cd) for legibility — color never moves
+  // into the words. The Highlight palette uses the brighter accent; Normal
+  // uses the muted solid.
+  //
+  // `tint` is explicit on the v1.3 15-slot scale; legacy 20-pool swatches
+  // omit it, so we mix a soft fill from `normal` to keep them usable.
+  const tint = swatch.tint ?? `color-mix(in oklch, ${swatch.normal} 18%, #fff)`;
+  const accent =
+    type === "highlight" ? (swatch.bright ?? swatch.highlight) : swatch.normal;
 
-  // NORMAL — darker, confident school palette. Card fills still get a
-  // soft vertical gradient so cards never feel flat.
-  const gradient = `linear-gradient(180deg, color-mix(in oklch, ${swatch.normal} 18%, #fff) 0%, color-mix(in oklch, ${swatch.normal} 8%, #fff) 100%)`;
+  // Card background — a soft vertical wash of the tint so fills never read flat.
+  const gradient = `linear-gradient(180deg, ${tint} 0%, color-mix(in oklch, ${tint} 55%, #fff) 100%)`;
+
   return {
-    c: swatch.normal,
-    cl: `color-mix(in oklch, ${swatch.normal} 22%, #fff)`,
+    c: accent,
+    cl: tint,
     cd: swatch.deep,
-    tile: `color-mix(in oklch, ${swatch.normal} 35%, #fff)`,
+    tile: tint,
     deep: swatch.deep,
     bg: gradient,
-    bgSolid: `color-mix(in oklch, ${swatch.normal} 14%, #fff)`,
-    stripe: swatch.normal,
+    bgSolid: tint,
+    stripe: accent,
     gradient,
   };
 }

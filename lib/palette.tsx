@@ -61,14 +61,19 @@ export function PaletteCssBridge(): ReactNode {
   const css = useMemo(() => {
     return SUBJECTS.map((s) => {
       const swatchId = mapping[s.id] ?? DEFAULT_SUBJECT_MAPPING[s.id];
-      const swatch = PALETTE_BY_ID[swatchId] ?? PALETTE_BY_ID.ocean;
-      const c = type === "highlight" ? swatch.highlight : swatch.normal;
-      const cl =
+      const swatch = PALETTE_BY_ID[swatchId] ?? PALETTE_BY_ID["subj-1"];
+      // v1.3 recipe (mirror resolveSubjectColor): the soft tint is the fill
+      // (--cl), the bright/solid accent is the outline/stripe/dot (--c), and
+      // text stays dark ink (--cd). Highlight palette → bright accent; Normal
+      // → muted solid. Legacy swatches fall back to highlight + a mixed tint.
+      const tint =
+        swatch.tint ?? `color-mix(in oklch, ${swatch.normal} 18%, #fff)`;
+      const c =
         type === "highlight"
-          ? swatch.highlight
-          : `color-mix(in oklch, ${swatch.normal} 22%, #fff)`;
+          ? (swatch.bright ?? swatch.highlight)
+          : swatch.normal;
       const cd = swatch.deep;
-      return `.cp-subj.${s.id} { --c: ${c}; --cl: ${cl}; --cd: ${cd}; }`;
+      return `.cp-subj.${s.id} { --c: ${c}; --cl: ${tint}; --cd: ${cd}; }`;
     }).join("\n");
   }, [type, mapping]);
   return <style>{css}</style>;

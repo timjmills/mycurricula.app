@@ -18,15 +18,48 @@
 
 html,
 body {
-  background: var(--ink-50);
-  color: var(--ink-900);
+  background: var(--canvas);
+  color: var(--ink);
 }
 
+/* v1.3 page-level atmospheric mesh — three very low-opacity radial glows
+   (honey top-left, violet top-right, green bottom-right) over the warm cream
+   canvas. Painted as the body's own fixed background (not a pseudo-element)
+   so it sits behind all content with no stacking/z-index fragility across the
+   app's many internal scroll containers, and stays put while content scrolls.
+   Solid surfaces (cards, panels, the Teach board) paint over it; the mesh
+   shows through in canvas gutters. Barely-there, never busy. */
 body {
   font-family: var(--font-sans);
   font-size: var(--t-13);
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(
+      38% 30% at 10% 2%,
+      rgba(244, 183, 64, 0.13),
+      transparent 60%
+    ),
+    radial-gradient(
+      34% 26% at 94% 6%,
+      rgba(139, 92, 246, 0.1),
+      transparent 60%
+    ),
+    radial-gradient(
+      40% 34% at 90% 98%,
+      rgba(122, 199, 155, 0.1),
+      transparent 60%
+    ),
+    var(--canvas);
+  background-attachment: fixed;
+}
+
+/* Reduced-data / print: drop the mesh so paper output stays clean (the
+   @media print block below also forces a white body). */
+@media (prefers-reduced-motion: reduce) {
+  body {
+    background-attachment: scroll;
+  }
 }
 
 /* ── BIG-3: Print-view shell suppression ──────────────────────────────────

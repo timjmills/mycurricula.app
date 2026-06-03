@@ -1,19 +1,42 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { Plus_Jakarta_Sans, Quicksand, Caveat } from "next/font/google";
+import {
+  Plus_Jakarta_Sans,
+  Poppins,
+  DM_Sans,
+  Quicksand,
+  Caveat,
+} from "next/font/google";
 import "./globals.css";
 import { ThemeProvider, DEFAULT_STYLE, DEFAULT_PALETTE } from "@/lib/theme";
 import { LabelsProvider } from "@/lib/labels";
 
-// GeistSans/GeistMono expose `--font-geist-sans` / `--font-geist-mono`,
-// which globals.css and the ported tokens.css reference for --font-sans/mono.
-//
-// The Teach widget visual system (5.31) adds three optional faces the
-// appearance editor offers: Plus Jakarta Sans (primary widget font), Quicksand
-// (Rounded), and Caveat (Marker / whiteboard hand). Each exposes a CSS var
+// ── v1.3 brand type system (Curricula Design System) ──────────────────────
+// Display + H1 use Poppins (geometric, friendly); smaller headings, card
+// titles and the wordmark use DM Sans (neutral, modern); UI/body/data use
+// Plus Jakarta Sans (clean, professional). Each face exposes a CSS var that
+// tokens.css maps to --font-display / --font-display-sm / --font-logo /
+// --font-sans. Fonts come from Google Fonts (the official v1.3 delivery);
+// `display: "swap"` keeps first paint fast.
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-poppins",
+  display: "swap",
+});
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-dm-sans",
+  display: "swap",
+});
+
+// Plus Jakarta Sans is the body/UI face for the whole app (and the Teach
+// widget system's default). Quicksand (Rounded) and Caveat (Marker) remain
+// the widget appearance editor's optional faces. Each exposes a CSS var
 // (--font-jakarta / --font-quicksand / --font-caveat) that tokens.css maps to
-// the --wf-font-* options. `display: "swap"` keeps first paint fast.
+// --font-sans and the --wf-font-* options.
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
@@ -61,7 +84,7 @@ export default function RootLayout({
       suppressHydrationWarning
       data-style={DEFAULT_STYLE}
       data-palette={DEFAULT_PALETTE}
-      className={`${GeistSans.variable} ${GeistMono.variable} ${jakarta.variable} ${quicksand.variable} ${caveat.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${poppins.variable} ${dmSans.variable} ${jakarta.variable} ${quicksand.variable} ${caveat.variable} h-full antialiased`}
     >
       <body
         suppressHydrationWarning
