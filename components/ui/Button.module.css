@@ -50,45 +50,50 @@
 
 /* ── Sizes ───────────────────────────────────────────────────────────── */
 
-/* sm: 32px visual, 8px h-padding, t-12 */
+/* v1.3: text buttons are pill-shaped at every size, weight 700. */
+
+/* sm: 32px visual, 13px h-padding, t-12 */
 .sm {
   height: 32px;
-  padding: 0 8px;
+  padding: 0 13px;
   font-size: var(--t-12);
-  font-weight: 500;
-  border-radius: var(--r-8);
+  font-weight: 700;
+  border-radius: var(--r-pill);
 }
 
-/* md: 40px visual, 12–14px h-padding, t-13. Default. */
+/* md: 40px visual, 18px h-padding, t-13. Default. */
 .md {
   height: 40px;
-  padding: 0 14px;
+  padding: 0 18px;
   font-size: var(--t-13);
-  font-weight: 500;
-  border-radius: var(--r-8);
+  font-weight: 700;
+  border-radius: var(--r-pill);
 }
 
-/* lg: 48px visual, 16–20px h-padding, t-14. Primary CTAs. */
+/* lg: 48px visual, 24px h-padding, t-14. Primary CTAs. */
 .lg {
   height: 48px;
-  padding: 0 20px;
+  padding: 0 24px;
   font-size: var(--t-14);
-  font-weight: 600;
-  border-radius: var(--r-8);
+  font-weight: 700;
+  border-radius: var(--r-pill);
 }
 
-/* icon overrides: square proportions regardless of size */
+/* icon overrides: square (rounded) proportions, not a pill, regardless of size */
 .icon.sm {
   width: 32px;
   padding: 0;
+  border-radius: var(--r-sm);
 }
 .icon.md {
   width: 40px;
   padding: 0;
+  border-radius: var(--r-md);
 }
 .icon.lg {
   width: 48px;
   padding: 0;
+  border-radius: var(--r-md);
 }
 
 /* ── Hit-area inflation — phone / tablet (≤900px) ────────────────────── */
@@ -116,59 +121,79 @@
 
 /* ── Variants ────────────────────────────────────────────────────────── */
 
-/* primary — filled ink-900, paper text. Dominant action. */
+/* primary — filled indigo brand, white text, brand glow. Dominant action. */
 .primary {
-  background: var(--ink-900);
-  color: var(--paper);
+  background: var(--brand-500);
+  color: #fff;
   border: 1px solid transparent;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--sh-brand);
 }
 
 .primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--ink-900) 88%, white);
-  box-shadow: var(--shadow-card-hover);
+  background: var(--brand-600);
+  box-shadow: 0 16px 30px -10px rgba(59, 108, 246, 0.55);
   transform: translateY(-1px);
 }
 
 .primary:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: var(--shadow-card);
+  transform: translateY(1px);
+  box-shadow: var(--sh-brand);
 }
 
-/* secondary — white body, ink-200 border, ink-900 text. Default. */
+/* honey — gradient marketing CTA, dark text, honey glow. The warm "welcome". */
+.honey {
+  background: var(--grad-honey);
+  color: #3a2a05;
+  border: 1px solid transparent;
+  box-shadow: var(--sh-honey);
+}
+
+.honey:hover:not(:disabled) {
+  filter: brightness(1.03);
+  box-shadow: 0 16px 30px -10px rgba(233, 165, 38, 0.6);
+  transform: translateY(-1px);
+}
+
+.honey:active:not(:disabled) {
+  transform: translateY(1px);
+  filter: none;
+  box-shadow: var(--sh-honey);
+}
+
+/* secondary — white body, warm border, ink-soft text. Default. */
 .secondary {
-  background: var(--paper);
-  color: var(--ink-900);
-  border: 1px solid var(--ink-200);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  color: var(--ink-soft);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-xs);
 }
 
 .secondary:hover:not(:disabled) {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
-  box-shadow: var(--shadow-card-hover);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
+  box-shadow: var(--sh-sm);
   transform: translateY(-1px);
 }
 
 .secondary:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: var(--shadow-card);
+  transform: translateY(1px);
+  box-shadow: var(--sh-xs);
 }
 
-/* ghost — transparent body, ink-700 text. Hover fills ink-100. */
+/* ghost — transparent body, ink-soft text. Hover fills hairline. */
 .ghost {
   background: transparent;
-  color: var(--ink-700);
+  color: var(--ink-soft);
   border: 1px solid transparent;
 }
 
 .ghost:hover:not(:disabled) {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--ink);
 }
 
 .ghost:active:not(:disabled) {
-  background: var(--ink-150);
+  background: var(--border);
 }
 
 /* icon — square ghost-style for icon-only triggers */

@@ -7,7 +7,7 @@
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--ink-50);
+  background: var(--canvas);
   /* The planner shell's <main> already scrolls; keeping the screen as a
      flex column lets the body region grow without producing a second
      scroll bar. */
@@ -31,8 +31,8 @@
 
 .header {
   padding: 16px 24px 12px;
-  background: var(--paper);
-  border-bottom: 1px solid var(--ink-100);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .headerInner {
@@ -60,10 +60,11 @@
 
 .title {
   margin: 4px 0 0;
+  font-family: var(--font-display);
   font-size: var(--t-22);
-  font-weight: 600;
+  font-weight: 800;
   letter-spacing: -0.4px;
-  color: var(--ink-900);
+  color: var(--ink);
   line-height: 1.2;
 }
 
@@ -71,7 +72,7 @@
   margin: 4px 0 0;
   font-size: var(--t-13);
   font-weight: 400;
-  color: var(--ink-500);
+  color: var(--body);
   line-height: 1.4;
   max-width: 56ch;
 }
@@ -102,10 +103,11 @@
 }
 
 .coveragePct {
+  font-family: var(--font-display);
   font-size: var(--t-28);
-  font-weight: 600;
+  font-weight: 800;
   letter-spacing: -0.6px;
-  color: var(--ink-900);
+  color: var(--ink);
   line-height: 1;
 }
 
@@ -132,7 +134,7 @@
   margin-top: 12px;
   height: 6px;
   border-radius: var(--r-pill);
-  background: var(--ink-100);
+  background: var(--idle-tint);
   overflow: hidden;
   display: flex;
 }
@@ -147,8 +149,8 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--paper);
-  border-bottom: 1px solid var(--ink-100);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   padding: 8px 24px;
   display: flex;
   align-items: center;
@@ -181,7 +183,7 @@
 .filterDivider {
   width: 1px;
   height: 18px;
-  background: var(--ink-200);
+  background: var(--border);
   flex-shrink: 0;
 }
 
@@ -194,10 +196,10 @@
 .scopeChip {
   font: inherit;
   font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-700);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--r-pill);
   padding: 4px 12px;
   cursor: pointer;
@@ -210,17 +212,19 @@
 }
 
 .scopeChip:hover {
-  background: var(--ink-50);
+  background: var(--surface-warm);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .scopeChip[data-active] {
-  background: var(--ink-900);
-  color: var(--paper);
-  border-color: var(--ink-900);
+  background: var(--brand-500);
+  color: #fff;
+  border-color: transparent;
 }
 
 .scopeChip:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -229,10 +233,10 @@
 .statusChip {
   font: inherit;
   font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--chip-color, var(--ink-500));
-  background: var(--chip-bg, var(--paper));
-  border: 1px solid var(--chip-border, var(--ink-200));
+  font-weight: 700;
+  color: var(--chip-color, var(--ink-soft));
+  background: var(--chip-bg, var(--surface));
+  border: 1px solid var(--chip-border, var(--border));
   border-radius: var(--r-pill);
   padding: 4px 12px 4px 8px;
   cursor: pointer;
@@ -248,11 +252,11 @@
 }
 
 .statusChip:hover {
-  background: var(--ink-50);
+  background: var(--surface-warm);
 }
 
 .statusChip:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -284,17 +288,17 @@
 .groupBySelect {
   font: inherit;
   font-size: var(--t-12);
-  color: var(--ink-900);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-4);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
   padding: 4px 8px;
   cursor: pointer;
   min-height: 32px;
 }
 
 .groupBySelect:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -321,9 +325,9 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
 }
 
 .groupStripe {
@@ -336,12 +340,12 @@
 .groupLabel {
   font-size: var(--t-13);
   font-weight: 600;
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .groupCount {
   font-size: var(--t-11);
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 /* ── Rows wrapper — 1px gap reveals the ink-150 divider line ───── */
@@ -350,9 +354,9 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  background: var(--ink-150);
-  border-radius: var(--r-6);
-  border: 1px solid var(--ink-150);
+  background: var(--border);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
   overflow: hidden;
 }
 

@@ -5,7 +5,7 @@
   flex-direction: column;
   min-height: 100%;
   padding: 16px 14px 28px;
-  background: linear-gradient(180deg, var(--ink-50) 0%, var(--ink-100) 100%);
+  background: linear-gradient(180deg, var(--canvas) 0%, var(--ink-100) 100%);
   gap: 14px;
 }
 
@@ -17,16 +17,17 @@
 
 .title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--t-20);
   font-weight: 800;
-  color: var(--ink-900);
+  color: var(--ink);
   letter-spacing: -0.4px;
 }
 
 .subtitle {
   margin: 0;
   font-size: var(--t-13);
-  color: var(--ink-500);
+  color: var(--body);
 }
 
 .list {

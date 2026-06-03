@@ -23,11 +23,11 @@
   display: inline-flex;
   align-items: center;
   gap: 2px; /* 2px gap between chips inside the tray */
-  padding: 3px; /* 3px internal padding so chips don't touch the tray edge */
-  border-radius: var(--r-8);
-  background: var(--ink-100);
-  /* A faint border grounds the tray without drawing attention */
-  border: 1px solid var(--ink-150);
+  padding: 4px; /* internal padding so chips don't touch the tray edge */
+  border-radius: var(--r-pill); /* v1.3: pill segmented track */
+  background: var(--hairline);
+  /* A faint warm border grounds the tray without drawing attention */
+  border: 1px solid var(--border);
   position: relative;
 }
 
@@ -37,27 +37,27 @@
    lg equivalent — the tray grows to fit. */
 .md .option {
   height: 34px;
-  padding: 0 12px;
+  padding: 0 16px;
   font-size: var(--t-13);
-  font-weight: 500;
-  border-radius: var(--r-6);
+  font-weight: 700;
+  border-radius: var(--r-pill);
 }
 
 .md .option.active {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* sm: compact. Visual height ~26px inside a 32px tray. */
 .sm .option {
   height: 26px;
-  padding: 0 8px;
+  padding: 0 12px;
   font-size: var(--t-12);
-  font-weight: 500;
-  border-radius: var(--r-6);
+  font-weight: 700;
+  border-radius: var(--r-pill);
 }
 
 .sm .option.active {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* ── Touch-target inflation — phone / tablet (≤900px) ───────────────── */
@@ -125,42 +125,40 @@
 
 .subtle .inactive {
   background: transparent;
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .subtle .inactive:hover {
-  color: var(--ink-700);
-  background: color-mix(in srgb, var(--ink-100) 60%, transparent);
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
 }
 
+/* v1.3 segmented: active chip = white surface + indigo text + soft lift. */
 .subtle .active {
-  background: var(--paper);
-  color: var(--ink-900);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  color: var(--brand-600);
+  box-shadow: var(--sh-xs);
 }
 
 /* ── Prominent variant ───────────────────────────────────────────────── */
-/* Active chip: ink-900 fill, paper text — bold, assertive, no ambiguity.
-   Inactive: transparent, ink-500. The ink-900 active reads immediately
-   as "this mode is in force." */
+/* v1.3: the active chip lifts on a white surface with indigo text — the same
+   recipe as subtle but slightly stronger lift. (Used for primary mode
+   switches like Personal/Team; the brand-blue active reads as "in force.") */
 
 .prominent .inactive {
   background: transparent;
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .prominent .inactive:hover {
-  color: var(--ink-700);
-  background: color-mix(in srgb, var(--ink-100) 60%, transparent);
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
 }
 
 .prominent .active {
-  background: var(--ink-900);
-  color: var(--paper);
-  /* Slight shadow to lift the chip off the tray surface */
-  box-shadow:
-    0 1px 3px color-mix(in srgb, var(--ink-900) 20%, transparent),
-    0 1px 2px color-mix(in srgb, var(--ink-900) 12%, transparent);
+  background: var(--surface);
+  color: var(--brand-600);
+  box-shadow: var(--sh-sm);
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────── */

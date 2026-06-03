@@ -16,15 +16,16 @@
 }
 
 .heading {
+  font-family: var(--font-display-sm);
   font-size: var(--t-18);
-  font-weight: 600;
+  font-weight: 800;
   letter-spacing: -0.3px;
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .sub {
   font-size: var(--t-13);
-  color: var(--ink-500);
+  color: var(--body);
 }
 
 .link {
@@ -33,26 +34,28 @@
   align-items: center;
   padding: 8px 16px;
   font-size: var(--t-13);
-  font-weight: 500;
-  color: var(--ink-700);
+  font-weight: 700;
+  color: var(--ink-soft);
   text-decoration: none;
-  border: 1px solid var(--ink-200);
+  border: 1px solid var(--border);
   border-radius: var(--r-pill);
-  background: var(--paper);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
   /* Inflate the hit target on phone/tablet without growing the chip. */
   min-height: 44px;
   transition:
     background 120ms ease,
-    border-color 120ms ease;
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
 .link:hover {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .link:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 

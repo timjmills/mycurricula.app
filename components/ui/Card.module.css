@@ -22,8 +22,8 @@
 .card {
   position: relative;
   background: var(--paper);
-  border-radius: var(--r-12);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--r-md); /* v1.3: 14px — soft, rounded */
+  box-shadow: var(--sh-sm);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -49,8 +49,8 @@ button.card {
 
 /* Hover lift — only applies when the root is an interactive button */
 button.card:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--sh-md);
 }
 
 @media (prefers-reduced-motion: reduce) {

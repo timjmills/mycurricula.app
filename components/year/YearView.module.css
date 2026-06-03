@@ -4,9 +4,9 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  /* Soft neutral surface behind the cards — ink-50 → ink-100 gradient adds
+  /* Warm cream canvas behind the cards — ink-50 → ink-100 gradient adds
      gentle depth without competing with the lane card subject colors. */
-  background: linear-gradient(180deg, var(--ink-50) 0%, var(--ink-100) 100%);
+  background: linear-gradient(180deg, var(--canvas) 0%, var(--ink-100) 100%);
 }
 
 /* ── Page header ─────────────────────────────────────────────────────── */
@@ -16,8 +16,8 @@
   align-items: flex-start;
   gap: 16px;
   padding: 22px 24px 14px;
-  background: var(--paper);
-  border-bottom: 1px solid var(--ink-150);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .pageHeaderLeft {
@@ -26,9 +26,10 @@
 
 .pageTitle {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--t-24);
   font-weight: 800;
-  color: var(--ink-900);
+  color: var(--ink);
   letter-spacing: -0.5px;
   line-height: 1.1;
 }
@@ -36,7 +37,7 @@
 .pageSubtitle {
   margin: 4px 0 0;
   font-size: var(--t-13);
-  color: var(--ink-500);
+  color: var(--body);
   font-weight: 400;
 }
 
@@ -52,43 +53,49 @@
   align-items: center;
   gap: 7px;
   padding: 8px 14px;
-  border-radius: var(--r-8);
-  background: var(--paper);
-  color: var(--ink-700);
-  border: 1px solid var(--ink-150);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-soft);
+  border: 1px solid var(--border);
   font-size: var(--t-13);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.1px;
   cursor: pointer;
   min-height: 44px;
+  box-shadow: var(--sh-xs);
   transition:
     background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
     box-shadow 120ms ease;
 }
 
 .actionBtn:hover {
-  background: var(--ink-50);
-  box-shadow: var(--shadow-card);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
+  box-shadow: var(--sh-sm);
 }
 
-/* Primary variant — used for "+ Add unit". Filled ink-900 background so
-   it reads as the dominant action in the header cluster. Hover deepens
-   slightly without changing height (keeps the row alignment stable). */
+/* Primary variant — used for "+ Add unit". Filled indigo brand so it reads
+   as the dominant action in the header cluster, lifted by the brand glow.
+   Hover deepens to brand-600 without changing height (keeps the row
+   alignment stable). */
 .actionBtnPrimary {
-  background: var(--ink-900);
-  color: var(--paper);
-  border-color: var(--ink-900);
+  background: var(--brand-500);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: var(--sh-brand);
 }
 
 .actionBtnPrimary:hover {
-  background: color-mix(in srgb, var(--ink-900) 88%, var(--ink-700));
-  color: var(--paper);
-  border-color: var(--ink-900);
-  box-shadow: var(--shadow-card-hover);
+  background: var(--brand-600);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: var(--sh-brand);
 }
 
 .actionBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -103,7 +110,9 @@
 
 .actionBtn:disabled:hover,
 .actionBtn[aria-disabled="true"]:hover {
-  background: var(--paper);
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--ink-soft);
   box-shadow: none;
 }
 
@@ -158,10 +167,10 @@
 /* ── Bottom stat strip ───────────────────────────────────────────────── */
 
 .statStrip {
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-12);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
   padding: 16px 22px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -177,9 +186,9 @@
 .statIcon {
   width: 44px;
   height: 44px;
-  border-radius: var(--r-12);
-  background: var(--ink-100);
-  color: var(--ink-700);
+  border-radius: var(--r-md);
+  background: var(--brand-50);
+  color: var(--brand-600);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -188,20 +197,21 @@
 
 .statLabel {
   font-size: var(--t-12);
-  color: var(--ink-500);
+  color: var(--muted);
   font-weight: 500;
 }
 
 .statValue {
+  font-family: var(--font-display-sm);
   font-size: var(--t-18);
-  font-weight: 700;
-  color: var(--ink-900);
+  font-weight: 800;
+  color: var(--ink);
   letter-spacing: -0.3px;
 }
 
 .statCaption {
   font-size: var(--t-10);
-  color: var(--ink-400);
+  color: var(--faint);
   margin-top: 1px;
 }
 

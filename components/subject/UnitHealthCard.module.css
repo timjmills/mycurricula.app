@@ -7,11 +7,11 @@
 /* ── Card shell ─────────────────────────────────────────────────────── */
 .card {
   position: relative;
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-12);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
   padding: 14px 16px 14px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--sh-sm);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -30,7 +30,7 @@
   right: 0;
   height: 4px;
   background: var(--c);
-  border-radius: var(--r-12) var(--r-12) 0 0;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────── */
@@ -62,9 +62,10 @@
 }
 
 .unitName {
+  font-family: var(--font-display-sm);
   font-size: var(--t-14);
-  font-weight: 700;
-  color: var(--ink-900);
+  font-weight: 800;
+  color: var(--ink);
   letter-spacing: -0.2px;
   line-height: 1.25;
   white-space: nowrap;
@@ -118,7 +119,7 @@
 .progressTrack {
   flex: 1;
   height: 6px;
-  background: var(--ink-100);
+  background: var(--c-progress-track, var(--ink-100));
   border-radius: 999px;
   overflow: hidden;
 }
@@ -177,11 +178,11 @@
 .statItemValue {
   font-size: var(--t-13);
   font-weight: 700;
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .statItemDenom {
-  color: var(--ink-400);
+  color: var(--muted);
   font-weight: 500;
 }
 
@@ -274,13 +275,13 @@
 .editTextarea {
   width: 100%;
   border: 1px solid var(--c);
-  border-radius: var(--r-6);
+  border-radius: var(--r-md);
   padding: 7px 10px;
   font-size: var(--t-12);
   font-family: var(--font-sans);
   line-height: 1.5;
-  color: var(--ink-900);
-  background: var(--paper);
+  color: var(--ink);
+  background: var(--surface);
   resize: vertical;
   outline: none;
 }

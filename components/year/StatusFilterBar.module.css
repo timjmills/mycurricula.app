@@ -6,9 +6,10 @@
   flex-wrap: wrap;
   gap: 8px;
   padding: 10px 16px;
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-12);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-xs);
 }
 
 /* ── Pill ────────────────────────────────────────────────────────────── */
@@ -20,11 +21,11 @@
   padding: 6px 14px;
   border-radius: var(--r-pill);
   /* Default (inactive) state */
-  background: var(--pill-bg, var(--paper));
-  color: var(--pill-color, var(--ink-700));
-  border: 1px solid var(--pill-border, var(--ink-150));
+  background: var(--pill-bg, var(--surface));
+  color: var(--pill-color, var(--ink-soft));
+  border: 1px solid var(--pill-border, var(--border));
   font-size: var(--t-13);
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   min-height: 36px;
   transition:
@@ -35,14 +36,14 @@
 }
 
 .pill:hover {
-  background: var(--ink-50);
+  background: var(--surface-warm);
 }
 
 /* When aria-pressed="true" the --pill-* vars override the defaults via
    the inline style; this selector provides an extra affordance for
    keyboard focus so the ring is clearly visible. */
 .pill:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -76,11 +77,11 @@
 }
 
 .clearBtn:hover {
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .clearBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
   border-radius: var(--r-4);
 }

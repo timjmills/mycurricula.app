@@ -47,10 +47,10 @@
   position: relative;
   width: min(560px, 100%);
   max-height: calc(100vh - 48px);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-12);
-  box-shadow: var(--shadow-popover);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-lg);
   display: flex;
   flex-direction: column;
   z-index: 1001;
@@ -91,9 +91,10 @@
 
 .title {
   margin: 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-18);
-  font-weight: 700;
-  color: var(--ink-900);
+  font-weight: 800;
+  color: var(--ink);
   letter-spacing: -0.2px;
   line-height: 1.2;
 }
@@ -101,7 +102,7 @@
 .subtitle {
   margin: 4px 0 0;
   font-size: var(--t-12);
-  color: var(--ink-500);
+  color: var(--muted);
   font-weight: 400;
 }
 
@@ -126,12 +127,12 @@
 }
 
 .closeBtn:hover {
-  background: var(--ink-50);
-  color: var(--ink-700);
+  background: var(--surface-warm);
+  color: var(--ink-soft);
 }
 
 .closeBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -182,10 +183,10 @@
   height: 40px;
   padding: 0 10px;
   font-size: var(--t-13);
-  color: var(--ink-900);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-6);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   outline: none;
   width: 100%;
   box-sizing: border-box;
@@ -197,12 +198,12 @@
 
 .input:focus,
 .select:focus {
-  border-color: var(--ink-700);
-  box-shadow: 0 0 0 3px var(--ink-100);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 3px var(--brand-50);
 }
 
 .input::placeholder {
-  color: var(--ink-300);
+  color: var(--faint);
 }
 
 .input[aria-invalid="true"] {
@@ -233,9 +234,9 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink-400);
-  background: var(--ink-50);
-  border: 1px solid var(--ink-150);
+  color: var(--muted);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
   border-radius: var(--r-4);
   padding: 1px 6px;
   margin-left: 6px;
@@ -262,10 +263,10 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ink-500);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-6);
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   cursor: pointer;
   user-select: none;
   transition:
@@ -275,30 +276,32 @@
 }
 
 .dayChip:hover:not(.dayChipDisabled) {
-  background: var(--ink-50);
-  color: var(--ink-700);
+  background: var(--surface-warm);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .dayChipActive {
-  background: var(--ink-900);
-  color: var(--paper);
-  border-color: var(--ink-900);
+  background: var(--brand-500);
+  color: #fff;
+  border-color: transparent;
 }
 
 .dayChipActive:hover {
-  background: var(--ink-900);
-  color: var(--paper);
+  background: var(--brand-600);
+  color: #fff;
+  border-color: transparent;
 }
 
 .dayChipDisabled {
   opacity: 0.4;
   cursor: not-allowed;
-  background: var(--ink-50);
-  color: var(--ink-300);
+  background: var(--surface-warm);
+  color: var(--faint);
 }
 
 .dayChip:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -321,8 +324,8 @@
   gap: 8px;
   justify-content: flex-end;
   padding: 12px 24px 16px;
-  border-top: 1px solid var(--ink-100);
-  background: var(--ink-50);
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-warm);
 }
 
 .btnCancel,
@@ -330,34 +333,38 @@
   min-height: 44px;
   padding: 0 16px;
   font-size: var(--t-13);
-  font-weight: 600;
-  border-radius: var(--r-6);
+  font-weight: 700;
+  border-radius: var(--r-pill);
   cursor: pointer;
   border: 1px solid transparent;
   transition:
     background 120ms ease,
     color 120ms ease,
-    border-color 120ms ease;
+    border-color 120ms ease,
+    box-shadow 120ms ease;
   font-family: inherit;
 }
 
 .btnCancel {
-  background: var(--paper);
-  border-color: var(--ink-200);
-  color: var(--ink-700);
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--ink-soft);
+  box-shadow: var(--sh-xs);
 }
 
 .btnCancel:hover {
-  background: var(--ink-100);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .btnSave {
-  background: var(--ink-900);
-  color: var(--paper);
+  background: var(--brand-500);
+  color: #fff;
+  box-shadow: var(--sh-brand);
 }
 
 .btnSave:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--ink-900) 88%, var(--ink-700));
+  background: var(--brand-600);
 }
 
 .btnSave:disabled,
@@ -368,7 +375,7 @@
 
 .btnCancel:focus-visible,
 .btnSave:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 

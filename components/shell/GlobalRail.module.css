@@ -129,14 +129,14 @@
 }
 
 .buttonActive {
-  background: var(--ink-100);
-  color: var(--ink-900);
-  border-color: var(--ink-150);
+  background: var(--brand-50);
+  color: var(--brand-700);
+  border-color: var(--brand-100);
 }
 
 .buttonActive:hover {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--brand-100);
+  color: var(--brand-700);
 }
 
 /* The icon sits in a centered slot — the SVG inside picks up `color` via

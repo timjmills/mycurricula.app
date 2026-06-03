@@ -7,12 +7,12 @@
 
 .section {
   /* Subtle subject-tinted card wash — cp-subj cascade resolves var(--cl)
-     to the subject's light tone. Mixing into paper keeps the chrome
+     to the subject's light tone. Mixing into the surface keeps the chrome
      readable in both Quiet and Vivid themes. */
-  background: color-mix(in srgb, var(--cl) 18%, var(--paper));
-  border: 1px solid color-mix(in srgb, var(--cd) 16%, var(--ink-150));
-  border-radius: 14px;
-  box-shadow: var(--shadow-card);
+  background: color-mix(in srgb, var(--cl) 18%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--cd) 16%, var(--border));
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
   margin-bottom: 16px;
   /* Clip the chrome's rounded corners cleanly. The inner scroll wrap
      owns the horizontal pan; the section itself does not scroll. */
@@ -43,7 +43,7 @@
   position: sticky;
   left: 0;
   z-index: 2;
-  background: var(--paper);
+  background: var(--surface);
 }
 
 /* Timeline column — holds the bg grid lines + absolute-positioned unit
@@ -64,19 +64,19 @@
 
 .bgLine {
   height: 100%;
-  /* Translucent paper so the section's subject wash shows through faintly
+  /* Translucent surface so the section's subject wash shows through faintly
      in the empty gaps between unit bars — keeps the subject tint visible
      even where there's no instruction scheduled. */
-  background: color-mix(in srgb, var(--paper) 88%, transparent);
-  border-right: 1px solid var(--ink-150);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-right: 1px solid var(--hairline);
 }
 
 .weekBorder {
-  border-right: 1px solid var(--ink-200);
+  border-right: 1px solid var(--border);
 }
 
 .bgLineToday {
-  background: var(--fyi-bg);
+  background: var(--progress-tint);
 }
 
 /* Responsive: tighten the section spacing on phone so the stack of

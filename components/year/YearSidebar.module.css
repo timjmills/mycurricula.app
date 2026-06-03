@@ -7,9 +7,9 @@
   width: 56px;
   flex-shrink: 0;
   padding: 12px 6px;
-  border-right: 1px solid var(--ink-150);
-  /* Soft neutral — matches the page background so the sidebar blends in. */
-  background: var(--ink-50);
+  border-right: 1px solid var(--border);
+  /* Warm cream — matches the page background so the sidebar blends in. */
+  background: var(--canvas);
 }
 
 /* Icon-only nav item. All entries are <button disabled>; the tooltip
@@ -20,9 +20,9 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  border-radius: var(--r-8);
+  border-radius: var(--r-md);
   background: transparent;
-  color: var(--ink-500);
+  color: var(--muted);
   border: 0;
   padding: 0;
   cursor: not-allowed;
@@ -34,12 +34,12 @@
 
 .navItem:hover {
   opacity: 1;
-  background: var(--ink-100);
-  color: var(--ink-700);
+  background: var(--surface);
+  color: var(--brand-600);
 }
 
 .navItem:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -60,7 +60,7 @@
     gap: 4px;
     padding: 6px 10px;
     border-right: none;
-    border-bottom: 1px solid var(--ink-150);
+    border-bottom: 1px solid var(--border);
     overflow-x: auto;
     overflow-y: hidden;
     flex-shrink: 0;

@@ -76,13 +76,13 @@
   /* Solid subject-light fill — matches the Weekly card var(--cl) recipe exactly. */
   background: var(--cl);
 
-  /* 1px subject border */
-  border: 1px solid var(--c-border);
+  /* 1.5px subject outline (v1.3 cascade chip) */
+  border: 1.5px solid var(--c);
   /* Left accent edge — full subject saturation */
   border-left: 4px solid var(--c);
 
-  border-radius: var(--r-12);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-sm);
 
   /* Touch target: min 60px height (≥ 44px requirement) */
   min-height: 60px;
@@ -108,7 +108,7 @@
 .barClickable:hover {
   /* Lift the bar 1px; the transform combines with the centring translateY */
   transform: translateY(calc(-50% - 1px));
-  box-shadow: var(--shadow-card-hover);
+  box-shadow: var(--sh-md);
 }
 
 .barClickable:focus-visible {
@@ -127,16 +127,17 @@
 /* ── U# tile ────────────────────────────────────────────────────────────── */
 
 .tile {
-  /* 28×28 rounded square */
+  /* 28×28 rounded square — solid subject fill, white numeral (v1.3 uchip) */
   width: 28px;
   height: 28px;
   flex-shrink: 0;
-  border-radius: var(--r-6);
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  color: var(--c-deep);
+  border-radius: var(--r-sm);
+  background: var(--c);
+  border: 1px solid transparent;
+  color: #fff;
+  font-family: var(--font-display-sm);
   font-size: var(--t-11);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   display: inline-flex;
@@ -155,9 +156,10 @@
 }
 
 .title {
+  font-family: var(--font-display-sm);
   font-size: var(--t-15, 15px);
-  font-weight: 700;
-  color: var(--c-deep);
+  font-weight: 800;
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -169,7 +171,7 @@
 .meta {
   font-size: var(--t-12);
   font-weight: 500;
-  color: var(--ink-700);
+  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -225,13 +227,13 @@
 /* Upcoming lesson: outline only */
 .dot_upcoming {
   background: transparent;
-  border-color: var(--ink-200);
+  border-color: var(--idle);
 }
 
 .pct {
   font-size: var(--t-13);
   font-weight: 700;
-  color: var(--ink-900);
+  color: var(--ink);
   letter-spacing: -0.1px;
   white-space: nowrap;
 }

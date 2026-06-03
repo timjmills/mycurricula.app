@@ -42,7 +42,7 @@
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--ink-400);
+  color: var(--muted);
   pointer-events: none;
 }
 
@@ -50,25 +50,27 @@
   width: 100%;
   height: 32px;
   padding: 0 10px 0 30px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-200);
-  background: var(--ink-50);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-warm);
   font-size: var(--t-13);
-  color: var(--ink-900);
+  color: var(--ink);
   outline: none;
   font-family: inherit;
   transition:
     border-color 120ms ease,
-    background 120ms ease;
+    background 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .searchInput::placeholder {
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .searchInput:focus {
-  border-color: var(--ink-400);
-  background: var(--paper);
+  border-color: var(--brand-400);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--brand-50);
 }
 
 .sortWrap {
@@ -125,7 +127,7 @@
 }
 
 .rowAlt {
-  background: var(--ink-50);
+  background: var(--surface-warm);
 }
 
 /* Actionable row (has a URL or a lesson to jump to). Cursor changes
@@ -139,19 +141,19 @@
 
 .rowAction:hover,
 .rowAction:focus-visible {
-  background: var(--ink-100);
+  background: var(--hairline);
 }
 
 .rowAction:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
 /* When the alt-row tint is applied AND the row is actionable, hover
-   uses a slightly heavier ink-150 so the change is still readable. */
+   uses a slightly heavier border tone so the change is still readable. */
 .rowAction.rowAlt:hover,
 .rowAction.rowAlt:focus-visible {
-  background: var(--ink-150);
+  background: var(--border);
 }
 
 .typeIcon {
@@ -167,8 +169,8 @@
 .typeBadge {
   font-size: var(--t-10);
   font-weight: 600;
-  color: var(--ink-500);
-  background: var(--ink-100);
+  color: var(--muted);
+  background: var(--hairline);
   padding: 1px 6px;
   border-radius: var(--r-4);
   flex: 0 0 auto;
@@ -179,7 +181,7 @@
 .resourceLabel {
   flex: 1;
   font-size: var(--t-13);
-  color: var(--ink-900);
+  color: var(--ink);
   font-weight: 500;
   min-width: 0;
   white-space: nowrap;

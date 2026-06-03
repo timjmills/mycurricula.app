@@ -14,7 +14,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  background: var(--paper);
+  background: var(--surface);
 }
 
 /* ── Two-column body ────────────────────────────────────────────────── */
@@ -28,8 +28,8 @@
 
 /* ── Subject switcher sidebar ───────────────────────────────────────── */
 .sidebar {
-  border-right: 1px solid var(--ink-150);
-  background: var(--ink-50);
+  border-right: 1px solid var(--border);
+  background: var(--canvas);
   padding: 14px 10px;
   overflow-y: auto;
 }
@@ -62,13 +62,13 @@
 }
 
 .subjectBtn:hover {
-  background: var(--paper);
-  border-color: var(--ink-150);
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 .subjectBtnActive {
-  background: var(--paper);
-  border-color: var(--ink-200);
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 .subjectBtnStripe {
@@ -82,7 +82,7 @@
 .subjectBtnName {
   flex: 1;
   font-size: var(--t-13);
-  color: var(--ink-900);
+  color: var(--ink);
   font-weight: 500;
   min-width: 0;
   white-space: nowrap;
@@ -147,10 +147,10 @@
   font: inherit;
   font-size: var(--t-13);
   font-weight: 500;
-  color: var(--ink-900);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-6);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   cursor: pointer;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -160,8 +160,8 @@
 }
 
 .mobilePickerSelect:hover {
-  border-color: var(--ink-300);
-  background: var(--ink-50);
+  border-color: var(--brand-300);
+  background: var(--surface);
 }
 
 .mobilePickerSelect:focus-visible {
@@ -192,8 +192,8 @@
 /* ── Subject header ─────────────────────────────────────────────────── */
 .header {
   padding: 20px 24px 14px;
-  border-bottom: 1px solid var(--ink-100);
-  background: var(--paper);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
   flex: 0 0 auto;
 }
 
@@ -217,12 +217,13 @@
 }
 
 .headerTitle {
+  font-family: var(--font-display);
   font-size: var(--t-26);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: -0.5px;
   margin-top: 4px;
   margin-bottom: 2px;
-  color: var(--ink-900);
+  color: var(--ink);
   line-height: 1.15;
 }
 
@@ -266,9 +267,10 @@
 }
 
 .sectionTitle {
+  font-family: var(--font-display-sm);
   font-size: var(--t-18);
-  font-weight: 700;
-  color: var(--ink-900);
+  font-weight: 800;
+  color: var(--ink);
   margin-top: 2px;
   letter-spacing: -0.3px;
 }
@@ -313,10 +315,10 @@
   padding: 4px 12px;
   border-radius: 999px;
   font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-600);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
+  font-weight: 600;
+  color: var(--body);
+  background: var(--surface);
+  border: 1px solid var(--border);
   cursor: pointer;
   transition:
     background 0.1s ease,
@@ -326,8 +328,9 @@
 }
 
 .chip:hover {
-  border-color: var(--ink-300);
-  background: var(--ink-50);
+  border-color: var(--brand-300);
+  background: var(--surface-warm);
+  color: var(--brand-600);
 }
 
 .chipActive {
@@ -345,7 +348,7 @@
 .filterSep {
   width: 1px;
   height: 20px;
-  background: var(--ink-150);
+  background: var(--border);
   margin: 0 2px;
 }
 
@@ -376,11 +379,11 @@
   gap: 10px;
   width: 100%;
   padding: 10px 12px;
-  border-radius: var(--r-6);
+  border-radius: var(--r-md);
   cursor: pointer;
   user-select: none;
-  border: 1px solid var(--ink-100);
-  background: var(--ink-50);
+  border: 1px solid var(--border);
+  background: var(--surface-warm);
   text-align: left;
   font: inherit;
   transition:
@@ -420,7 +423,7 @@
   font-size: var(--t-14);
   font-weight: 600;
   flex: 1;
-  color: var(--ink-900);
+  color: var(--ink);
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -448,22 +451,24 @@
 
 .groupExpandBtn {
   font-size: var(--t-11);
-  color: var(--ink-500);
+  color: var(--ink-soft);
   padding: 2px 8px;
-  border: 1px solid var(--ink-200);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--paper);
+  background: var(--surface);
   cursor: pointer;
   flex: 0 0 auto;
+  box-shadow: var(--sh-xs);
   transition:
     background 0.1s ease,
-    border-color 0.1s ease;
+    border-color 0.1s ease,
+    color 0.1s ease;
   min-height: 32px;
 }
 
 .groupExpandBtn:hover {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 /* ── Group body ─────────────────────────────────────────────────────── */
@@ -484,7 +489,7 @@
 }
 
 .lessonItem {
-  border-bottom: 1px solid var(--ink-100);
+  border-bottom: 1px solid var(--hairline);
   position: relative;
 }
 
@@ -524,12 +529,12 @@
 }
 
 .lessonRow:hover {
-  background: var(--ink-50);
+  background: var(--surface-warm);
 }
 
 .lessonRowChevron {
   display: inline-flex;
-  color: var(--ink-300);
+  color: var(--faint);
   transition: transform 0.15s ease;
   flex: 0 0 auto;
 }
@@ -564,9 +569,9 @@
   width: 14px;
   height: 14px;
   border-radius: 3px;
-  border: 1.5px solid var(--ink-300);
+  border: 1.5px solid var(--idle);
   flex: 0 0 auto;
-  color: var(--paper);
+  color: #fff;
   background: transparent;
 }
 
@@ -581,21 +586,21 @@
 }
 
 .checkSkipped {
-  background: var(--ink-300);
-  border-color: var(--ink-300);
+  background: var(--idle);
+  border-color: var(--idle);
 }
 
 .lessonTitle {
   flex: 1;
   font-size: var(--t-13);
-  color: var(--ink-900);
+  color: var(--ink);
   text-wrap: pretty;
   min-width: 0;
 }
 
 .lessonTitleDone {
   text-decoration: line-through;
-  text-decoration-color: var(--ink-300);
+  text-decoration-color: var(--faint);
 }
 
 .personalPill {
@@ -635,9 +640,9 @@
   font-size: var(--t-10);
   font-family: var(--font-mono);
   padding: 1px 5px;
-  border: 1px solid var(--ink-200);
+  border: 1px solid var(--border);
   border-radius: var(--r-2);
-  color: var(--ink-500);
+  color: var(--muted);
   flex: 0 0 auto;
 }
 
@@ -652,9 +657,9 @@
 .lessonDetail {
   padding: 6px 10px 10px 38px;
   font-size: var(--t-12);
-  color: var(--ink-700);
+  color: var(--ink-soft);
   line-height: 1.5;
-  background: var(--ink-50);
+  background: var(--surface-warm);
 }
 
 .lessonDirections {
@@ -671,9 +676,9 @@
 .lessonStdChip {
   font-size: var(--t-10);
   font-family: var(--font-mono);
-  color: var(--ink-700);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
   padding: 1px 5px;
   border-radius: var(--r-4);
 }
@@ -711,7 +716,7 @@
 
   .sidebar {
     border-right: none;
-    border-bottom: 1px solid var(--ink-150);
+    border-bottom: 1px solid var(--border);
     padding: 10px;
     overflow-x: auto;
     overflow-y: hidden;
@@ -764,8 +769,8 @@
   .mobilePicker {
     display: block;
     padding: 10px 12px;
-    background: var(--ink-50);
-    border-bottom: 1px solid var(--ink-150);
+    background: var(--canvas);
+    border-bottom: 1px solid var(--border);
   }
 
   .groupBody {

@@ -252,15 +252,22 @@ export function TopBar(): ReactNode {
         <Link
           href="/weekly"
           className={styles.wordmark}
-          aria-label="MyCurricula home"
+          aria-label="mycurricula.app home"
           title="Built for teachers, by teachers — click to return to your Weekly planner home"
         >
-          <span className={styles.wordmarkApp}>MyCurricula</span>
-          {currentUser.curriculumLabel && (
-            <span className={styles.wordmarkGrade}>
-              {currentUser.curriculumLabel}
+          <span className={styles.wordmarkGlyph} aria-hidden="true">
+            <BookGlyph />
+          </span>
+          <span className={styles.wordmarkLabel}>
+            <span className={styles.wordmarkApp}>
+              mycurricula<span className={styles.wordmarkTld}>.app</span>
             </span>
-          )}
+            {currentUser.curriculumLabel && (
+              <span className={styles.wordmarkGrade}>
+                {currentUser.curriculumLabel}
+              </span>
+            )}
+          </span>
         </Link>
       </Tooltip>
 
@@ -367,6 +374,50 @@ export function TopBar(): ReactNode {
             </Tooltip>
           );
         })}
+      </nav>
+
+      {/* ── TEMPORARY: Year Overview prototype previews ───────────────────
+          Two interactive design directions (Timeline · Curriculy and
+          Workspace · EduPlan) surfaced as quick links so the team can
+          compare them in-app. These are throwaway buttons — remove this
+          block (and app/prototypes/*) once a direction is chosen. */}
+      <nav
+        className={styles.protoNav}
+        aria-label="Year Overview prototype previews"
+        data-tabs-divider="true"
+      >
+        <Tooltip
+          content="Prototype A — Year Overview as a Timeline (expand-under-row + lesson drawer). Temporary preview."
+          side="bottom"
+        >
+          <Link
+            href="/prototypes/timeline"
+            className={`${styles.protoTab} ${
+              pathname.startsWith("/prototypes/timeline")
+                ? styles.protoTabActive
+                : ""
+            }`}
+            title="Prototype A — Timeline (temporary preview)"
+          >
+            Proto · Timeline
+          </Link>
+        </Tooltip>
+        <Tooltip
+          content="Prototype B — Year Overview as a responsive multi-panel Workspace. Temporary preview."
+          side="bottom"
+        >
+          <Link
+            href="/prototypes/workspace"
+            className={`${styles.protoTab} ${
+              pathname.startsWith("/prototypes/workspace")
+                ? styles.protoTabActive
+                : ""
+            }`}
+            title="Prototype B — Workspace (temporary preview)"
+          >
+            Proto · Workspace
+          </Link>
+        </Tooltip>
       </nav>
 
       {/* Paired with the divider above the switcher — same data attribute
@@ -884,6 +935,30 @@ function ProfileAvatar({ user }: { user: CurrentUser }): ReactNode {
 
 // ── SVG icons ────────────────────────────────────────────────────────────
 // All icons are inline SVG, aria-hidden, 18×18 grid.
+
+// Open-book brand glyph — drawn white to sit in the honey-gradient wordmark
+// tile (v1.3 logo lockup). Two pages, rounded.
+function BookGlyph(): ReactNode {
+  return (
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z"
+        fill="#fff"
+      />
+      <path
+        d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13V4Z"
+        fill="#3A2A05"
+        opacity=".5"
+      />
+    </svg>
+  );
+}
 
 function PanelLeftIcon(): ReactNode {
   return (

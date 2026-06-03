@@ -39,8 +39,9 @@
 
 /* Lifted from WeeklyGrid.module.css L283–L288. */
 .subjectName {
+  font-family: var(--font-display-sm);
   font-size: var(--t-13);
-  font-weight: 600;
+  font-weight: 800;
   letter-spacing: -0.1px;
   min-width: 0;
   /* The Weekly grid's sticky column is narrow; truncate if the name overflows

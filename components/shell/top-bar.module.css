@@ -20,8 +20,11 @@
   /* QW-3: padding-right ≥ 16px so the rightmost control never clips. */
   padding: 0 16px;
   height: 52px;
-  background: var(--paper);
-  border-bottom: var(--line);
+  /* v1.3: translucent warm-cream chrome that floats over content */
+  background: color-mix(in srgb, var(--canvas) 82%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 30;
@@ -47,34 +50,63 @@
 /* ── Wordmark ───────────────────────────────────────────────────────── */
 .wordmark {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: 9px;
   flex: 0 0 auto;
   text-decoration: none;
   color: inherit;
   margin-right: 4px;
 }
 
+/* Brand glyph — open-book mark in a honey-gradient rounded tile with a soft
+   honey glow (v1.3 logo lockup). */
+.wordmarkGlyph {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--grad-honey);
+  box-shadow: var(--sh-honey);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #fff;
+}
+
+.wordmarkLabel {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+/* "mycurricula" in DM Sans 800 ink + ".app" in honey (v1.3 wordmark). */
 .wordmarkApp {
+  font-family: var(--font-logo);
   font-size: var(--t-16);
-  font-weight: 700;
-  color: var(--ink-900);
+  font-weight: 800;
+  color: var(--ink);
   letter-spacing: -0.4px;
   white-space: nowrap;
 }
 
+.wordmarkTld {
+  color: var(--honey-600);
+}
+
 .wordmarkGrade {
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-400);
+  font-size: var(--t-10);
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   white-space: nowrap;
+  margin-top: 2px;
 }
 
 /* ── Divider ────────────────────────────────────────────────────────── */
 .divider {
   width: 1px;
   height: 22px;
-  background: var(--ink-150);
+  background: var(--border);
   flex: 0 0 auto;
   margin: 0 2px;
 }
@@ -84,9 +116,9 @@
 /* Active state: panel is open. Layered on top of Button's icon variant to
    signal the "pressed/open" state without touching the primitive stylesheet. */
 .iconActive {
-  background: var(--ink-100) !important;
-  border-color: var(--ink-200) !important;
-  color: var(--ink-900) !important;
+  background: var(--brand-50) !important;
+  border-color: var(--brand-200) !important;
+  color: var(--brand-700) !important;
 }
 
 /* ── Sign-out submit button ───────────────────────────────────────────────── */
@@ -135,47 +167,48 @@
   flex: 0 0 auto;
 }
 
-/* Live-route tab */
+/* Live-route tab — v1.3 pill, indigo active */
 .viewTab {
   display: inline-flex;
   align-items: center;
+  gap: 7px;
   height: 32px;
-  padding: 0 12px;
-  border-radius: var(--r-6);
+  padding: 0 14px;
+  border-radius: var(--r-pill);
   border: 1px solid transparent;
   background: transparent;
   font-size: var(--t-13);
-  font-weight: 500;
-  color: var(--ink-500);
+  font-weight: 700;
+  color: var(--muted);
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
   transition:
-    background 0.1s ease,
-    color 0.1s ease,
-    border-color 0.1s ease;
+    background 0.14s ease,
+    color 0.14s ease,
+    border-color 0.14s ease;
 }
 
 .viewTab:hover {
-  background: var(--ink-50);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 .viewTab:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
-/* Active/current route */
+/* Active/current route — soft brand pill */
 .viewTabActive {
-  background: var(--ink-900);
-  color: var(--paper);
-  border-color: var(--ink-900);
+  background: var(--brand-50);
+  color: var(--brand-700);
+  border-color: transparent;
 }
 
 .viewTabActive:hover {
-  background: var(--ink-700);
-  color: var(--paper);
+  background: var(--brand-100);
+  color: var(--brand-700);
 }
 
 /* Disabled soon-tab — POLISH-003/TOPBAR-002/QW-4.
@@ -207,6 +240,62 @@
   /* Inherit the tab's muted color — opacity on the parent already tones it. */
   color: currentColor;
   margin-left: 5px;
+}
+
+/* ── TEMP: prototype-preview buttons ─────────────────────────────────────
+   Honey-tinted dashed pills so they read as deliberately temporary chrome,
+   distinct from the live indigo view tabs. Remove with the JSX block + the
+   app/prototypes/* routes once a Year Overview direction is chosen. They
+   collapse with the tab strip at ≤768px (data-tabs-divider hide rule). */
+.protoNav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.protoTab {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: var(--r-pill);
+  border: 1px dashed var(--honey-300);
+  background: var(--honey-50);
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--honey-600);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.protoTab:hover {
+  background: var(--honey-100);
+  border-color: var(--honey-400);
+}
+
+.protoTab:focus-visible {
+  outline: 2px solid var(--honey-500);
+  outline-offset: 2px;
+}
+
+.protoTabActive {
+  background: var(--grad-honey);
+  border-style: solid;
+  border-color: transparent;
+  color: #3a2a05;
+}
+
+/* Hide the temp prototype buttons when the tab strip collapses (≤768px),
+   matching the view-switcher hide so the bar stays clean on tablet/phone. */
+@media (max-width: 1024px) {
+  .protoNav {
+    display: none;
+  }
 }
 
 /* ── Week label — passive context heading (POLISH-011) ──────────────── */
@@ -305,26 +394,28 @@
 
 .searchInput {
   width: 100%;
-  height: 32px;
-  padding: 0 10px 0 30px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-200);
-  background: var(--ink-50);
+  height: 34px;
+  padding: 0 12px 0 32px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-warm);
   font-size: var(--t-13);
-  color: var(--ink-900);
+  color: var(--ink);
   outline: none;
   transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
+    border-color 0.14s ease,
+    background 0.14s ease,
+    box-shadow 0.14s ease;
 }
 
 .searchInput::placeholder {
-  color: var(--ink-400);
+  color: var(--faint);
 }
 
 .searchInput:focus {
-  border-color: var(--ink-400);
-  background: var(--paper);
+  border-color: var(--brand-400);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px var(--brand-50);
 }
 
 /* ── Badge wrapper — for comments button ───────────────────────────── */
@@ -357,19 +448,25 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: var(--ink-150);
-  color: var(--ink-700);
+  /* v1.3: dawn-gradient circle with white initials when no photo. */
+  background: var(--grad-dawn);
+  color: #fff;
+  font-family: var(--font-display-sm);
   font-size: var(--t-12);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.2px;
   text-decoration: none;
   flex: 0 0 auto;
+  border: 2px solid var(--surface);
+  box-shadow: var(--sh-xs);
   /* Clips the profile photo to the circle. */
   overflow: hidden;
-  transition: background 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 /* Google profile photo — fills the circular avatar. */
@@ -380,11 +477,12 @@
 }
 
 .avatar:hover {
-  background: var(--ink-200);
+  transform: translateY(-1px);
+  box-shadow: var(--sh-sm);
 }
 
 .avatar:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 

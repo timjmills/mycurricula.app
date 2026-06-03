@@ -233,17 +233,17 @@
   outline-offset: 2px;
 }
 
-/* Active state — chip is toggled on. */
+/* Active state — chip is toggled on. v1.3: the functional indigo. */
 .chipActive {
-  background: var(--ink-900);
-  border-color: var(--ink-900);
-  color: var(--paper);
+  background: var(--brand-500);
+  border-color: var(--brand-500);
+  color: #fff;
 }
 
 .chipActive:hover {
-  background: var(--ink-700);
-  border-color: var(--ink-700);
-  color: var(--paper);
+  background: var(--brand-600);
+  border-color: var(--brand-600);
+  color: #fff;
 }
 
 /* Color dot inside subject chips — driven by inline style. */
@@ -313,9 +313,9 @@
 }
 
 .unitCheckActive {
-  background: var(--ink-900);
-  border-color: var(--ink-900);
-  color: var(--paper);
+  background: var(--brand-500);
+  border-color: var(--brand-500);
+  color: #fff;
 }
 
 .unitWeeks {
@@ -378,8 +378,8 @@
 }
 
 .standardCodeActive {
-  background: var(--ink-900);
-  color: var(--paper);
+  background: var(--brand-500);
+  color: #fff;
 }
 
 .standardDesc {

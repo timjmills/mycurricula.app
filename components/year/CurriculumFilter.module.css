@@ -7,10 +7,10 @@
   position: fixed;
   z-index: var(--z-popover, 400);
   min-width: 224px;
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-12);
-  box-shadow: var(--shadow-card-hover);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-lg);
   /* Hidden before position is computed — panel starts off-screen. */
   opacity: 0;
   /* No transition when reduced-motion is set — see media block below. */
@@ -71,7 +71,7 @@
 }
 
 .itemLabel:hover {
-  background: var(--ink-50);
+  background: var(--surface-warm);
 }
 
 /* ── Subject monogram tile ───────────────────────────────────────────── */
@@ -109,7 +109,7 @@
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: var(--ink-900);
+  accent-color: var(--brand-500);
   flex-shrink: 0;
 }
 

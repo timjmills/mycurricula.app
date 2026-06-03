@@ -67,14 +67,14 @@
 
 .title {
   font-size: var(--t-13);
-  font-weight: 500;
-  color: var(--ink-900);
+  font-weight: 600;
+  color: var(--ink);
   line-height: 1.3;
 }
 
 .preview {
   font-size: var(--t-12);
-  color: var(--ink-500);
+  color: var(--body);
   line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -110,7 +110,7 @@
 }
 
 .addNote:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -122,16 +122,16 @@
   width: 100%;
   padding: 8px 12px;
   font-size: var(--t-12);
-  color: var(--ink-900);
-  background: var(--paper);
+  color: var(--ink);
+  background: var(--surface);
   border: 1px dashed color-mix(in srgb, var(--catchup) 40%, transparent);
-  border-radius: var(--r-4);
+  border-radius: var(--r-md);
   resize: vertical;
   min-height: 48px;
 }
 
 .noteField:focus {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -158,7 +158,7 @@
 }
 
 .noteChip:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -197,8 +197,8 @@
 
 .standard {
   font-size: var(--t-10);
-  color: var(--ink-700);
-  background: var(--ink-100);
+  color: var(--ink-soft);
+  background: var(--hairline);
   padding: 2px 6px;
   border-radius: var(--r-2);
 }
@@ -208,7 +208,7 @@
   align-items: center;
   gap: 4px;
   font-size: var(--t-11);
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .actionsSpacer {
@@ -220,47 +220,52 @@
 .actionBtnPrimary {
   font: inherit;
   font-size: var(--t-11);
-  font-weight: 500;
-  color: var(--ink-700);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-4);
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
   padding: 8px 12px;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: var(--sh-xs);
   /* ≥44px hit target on phone/tablet via padding. */
   min-height: 32px;
   transition:
     background 120ms ease,
-    border-color 120ms ease;
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .actionBtn:hover,
-.actionBtnMuted:hover,
-.actionBtnPrimary:hover {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
+.actionBtnMuted:hover {
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .actionBtnMuted {
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
+/* Primary "Carry over" (reschedule) action — indigo brand fill + glow. */
 .actionBtnPrimary {
-  color: var(--catchup);
-  border-color: color-mix(in srgb, var(--catchup) 40%, white);
-  font-weight: 500;
+  color: #fff;
+  background: var(--brand-500);
+  border-color: transparent;
+  box-shadow: var(--sh-brand);
 }
 
 .actionBtnPrimary:hover {
-  background: color-mix(in srgb, var(--catchup) 8%, white);
-  border-color: color-mix(in srgb, var(--catchup) 60%, white);
+  background: var(--brand-600);
+  border-color: transparent;
+  color: #fff;
 }
 
 .actionLink {
   font: inherit;
   font-size: var(--t-11);
-  color: var(--ink-500);
+  color: var(--muted);
   background: transparent;
   border: 0;
   padding: 8px 12px;
@@ -271,7 +276,7 @@
 }
 
 .actionLink:hover {
-  color: var(--ink-900);
+  color: var(--brand-600);
   text-decoration: underline;
 }
 
@@ -279,7 +284,7 @@
 .actionBtnMuted:focus-visible,
 .actionBtnPrimary:focus-visible,
 .actionLink:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 

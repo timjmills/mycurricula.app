@@ -4,10 +4,10 @@
    All colors come from tokens or the cp-subj cascade — no hex literals. */
 
 .root {
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: 14px;
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
   overflow: clip;
 }
 
@@ -43,7 +43,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  background: var(--fyi-bg);
+  background: var(--progress-tint);
   pointer-events: none;
   z-index: 0;
 }
@@ -52,7 +52,7 @@
 .glyphRow {
   display: flex;
   height: 32px;
-  border-bottom: 1px solid var(--ink-100);
+  border-bottom: 1px solid var(--hairline);
   position: relative;
   z-index: 1;
 }
@@ -62,11 +62,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-left: 1px solid var(--ink-100);
+  border-left: 1px solid var(--hairline);
 }
 
 .glyphCell.monthBoundary {
-  border-left: 2px solid var(--ink-150);
+  border-left: 2px solid var(--border);
 }
 
 /* UNITS row — highlighter bars */
@@ -79,14 +79,14 @@
 .unitGridLine {
   flex: 0 0 auto;
   height: 100%;
-  /* Solid paper fill + right hairline — matches RoadmapView bgLine treatment. */
-  background: var(--paper);
-  border-right: 1px solid var(--ink-150);
+  /* Solid surface fill + right hairline — matches RoadmapView bgLine treatment. */
+  background: var(--surface);
+  border-right: 1px solid var(--hairline);
 }
 
 /* Month boundary — thicker right edge for visual month separation. */
 .unitGridLine.monthBoundary {
-  border-right: 1px solid var(--ink-200);
+  border-right: 1px solid var(--border);
 }
 
 /* Unit marker bar — absolutely positioned over the unit row.
@@ -98,19 +98,19 @@
   position: absolute;
   top: 8px;
   height: 60px;
-  border-radius: var(--r-8);
+  border-radius: var(--r-md);
   background: linear-gradient(
     180deg,
     var(--c-surface-strong) 0%,
     var(--c-surface) 100%
   );
   border-left: 4px solid var(--c);
-  border-top: 1px solid var(--c-border);
-  border-right: 1px solid var(--c-border);
-  border-bottom: 1px solid var(--c-border);
+  border-top: 1.5px solid var(--c);
+  border-right: 1.5px solid var(--c);
+  border-bottom: 1.5px solid var(--c);
   box-shadow:
     inset 0 1px 0 color-mix(in oklch, var(--paper) 60%, transparent),
-    var(--shadow-card);
+    var(--sh-sm);
   display: flex;
   align-items: center;
   padding: 0 10px 0 8px;
@@ -121,17 +121,18 @@
 .unitTile {
   width: 28px;
   height: 28px;
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--font-display-sm);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.3px;
   flex-shrink: 0;
-  background: var(--paper);
-  border: 1px solid var(--c-border);
-  color: var(--c-deep);
+  background: var(--c);
+  border: 1px solid transparent;
+  color: #fff;
 }
 
 .unitMeta {
@@ -151,8 +152,8 @@
   gap: 14px;
   padding: 10px 16px;
   align-items: center;
-  border-top: 1px solid var(--ink-100);
-  background: var(--ink-50);
+  border-top: 1px solid var(--border);
+  background: var(--surface-warm);
   flex-wrap: wrap;
 }
 
@@ -176,6 +177,6 @@
 .legendDivider {
   width: 1px;
   height: 16px;
-  background: var(--ink-150);
+  background: var(--border);
   flex-shrink: 0;
 }

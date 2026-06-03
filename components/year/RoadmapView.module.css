@@ -3,10 +3,10 @@
    YearView's shared horizontal scroll wrapper owns the panning behavior. */
 
 .root {
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: 14px;
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
   overflow: clip;
 }
 
@@ -48,26 +48,26 @@
 
 .bgLine {
   height: 100%;
-  /* Solid paper fill + right hairline separator — cleaner than transparent + border-left. */
-  background: var(--paper);
-  border-right: 1px solid var(--ink-150);
+  /* Solid surface fill + right hairline separator — cleaner than transparent + border-left. */
+  background: var(--surface);
+  border-right: 1px solid var(--hairline);
 }
 
 /* Month boundary — thicker right edge so month transitions read clearly. */
 .weekBorder {
-  border-right: 1px solid var(--ink-200);
+  border-right: 1px solid var(--border);
 }
 
-/* Today week column background — solid fyi-bg token overlays paper fill. */
+/* Today week column background — brand-blue progress tint overlays surface fill. */
 .bgLineToday {
-  background: var(--fyi-bg);
+  background: var(--progress-tint);
 }
 
 /* ── Legend row ─────────────────────────────────────────────────────────── */
 
 .legendRow {
-  border-top: 1px solid var(--ink-150);
-  background: var(--ink-50);
+  border-top: 1px solid var(--border);
+  background: var(--surface-warm);
   padding: 16px 22px;
   display: grid;
   grid-template-columns: 1fr 1fr 1.4fr;
@@ -106,13 +106,12 @@
 }
 
 .legendPill[data-status="completed"] {
-  /* No --done-bg token defined; mix done into paper to keep the swatch readable. */
-  background: color-mix(in oklch, var(--done) 14%, var(--paper));
+  background: var(--done-tint);
   color: var(--done);
 }
 .legendPill[data-status="in_progress"] {
-  background: var(--fyi-bg);
-  color: var(--fyi);
+  background: var(--progress-tint);
+  color: var(--brand-700);
 }
 .legendPill[data-status="modified"] {
   background: var(--important-bg);
@@ -123,7 +122,7 @@
   color: var(--catchup);
 }
 .legendPill[data-status="not_started"] {
-  background: var(--ink-100);
+  background: var(--idle-tint);
   color: var(--ink-500);
 }
 
@@ -163,8 +162,8 @@
 }
 
 .dotSample_upcoming {
-  background: var(--paper);
-  border-color: var(--ink-300);
+  background: var(--surface);
+  border-color: var(--idle);
 }
 
 /* ── Summary stats ──────────────────────────────────────────────────────── */
@@ -182,9 +181,10 @@
 }
 
 .smallStatValue {
+  font-family: var(--font-display-sm);
   font-size: var(--t-14);
-  font-weight: 700;
-  color: var(--ink-900);
+  font-weight: 800;
+  color: var(--ink);
   letter-spacing: -0.2px;
   line-height: 1;
 }

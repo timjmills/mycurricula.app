@@ -142,7 +142,7 @@
   background: var(--ink-50);
 }
 
-/* 2px left accent bar only on the active result. */
+/* 2px left accent bar only on the active result. v1.3: functional indigo. */
 .resultActive::before {
   content: "";
   position: absolute;
@@ -151,7 +151,7 @@
   bottom: 6px;
   width: 2px;
   border-radius: 2px;
-  background: var(--ink-700);
+  background: var(--brand-500);
 }
 
 /* ── Result icon ─────────────────────────────────────────────────────────── */

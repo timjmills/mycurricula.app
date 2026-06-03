@@ -5,10 +5,13 @@
 // No other code may recreate a button inline. Add a variant here instead.
 // Consumed from `components/ui/` — no deep imports needed.
 //
-// Variants:
-//   primary     — filled ink-900 background, paper text. The dominant action.
-//   secondary   — white background, ink-200 border, ink-900 text. (default)
-//   ghost       — transparent background, ink-700 text. Hover fills ink-100.
+// Variants (v1.3 — pill-shaped, indigo/honey brand):
+//   primary     — filled indigo (brand-500) background, white text, brand glow.
+//                 The dominant action.
+//   honey       — honey-gradient marketing CTA, dark text, honey glow. The
+//                 warm "welcome" action (Get started, Start planning).
+//   secondary   — white background, warm border, ink-soft text. (default)
+//   ghost       — transparent background, ink-soft text. Hover fills hairline.
 //   icon        — square ghost-style button for icon-only triggers (⋯, ✕ etc).
 //                 Requires `iconAriaLabel` for accessible naming.
 //   destructive — filled catchup-tinted background, paper text. Archive/Delete.
@@ -65,7 +68,13 @@ export interface ButtonProps extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "size"
 > {
-  variant?: "primary" | "secondary" | "ghost" | "icon" | "destructive";
+  variant?:
+    | "primary"
+    | "honey"
+    | "secondary"
+    | "ghost"
+    | "icon"
+    | "destructive";
   size?: "sm" | "md" | "lg";
   leadingIcon?: ReactNode;
   trailingIcon?: ReactNode;

@@ -11,14 +11,14 @@
   grid-template-columns: repeat(5, 1fr);
   gap: 0;
   padding: 14px 0 16px;
-  border-bottom: 1px solid var(--ink-100);
+  border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
 }
 
 /* ── Individual stat cell ───────────────────────────────────────────── */
 .cell {
   padding: 0 16px;
-  border-right: 1px solid var(--ink-100);
+  border-right: 1px solid var(--hairline);
 }
 
 .cell:last-child {
@@ -39,9 +39,10 @@
 }
 
 .cellValue {
+  font-family: var(--font-display-sm);
   font-size: var(--t-22);
-  font-weight: 700;
-  color: var(--ink-900);
+  font-weight: 800;
+  color: var(--ink);
   letter-spacing: -0.4px;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
@@ -50,14 +51,14 @@
 
 .cellCaption {
   font-size: var(--t-11);
-  color: var(--ink-400);
+  color: var(--faint);
   margin-top: 1px;
 }
 
 /* ── Progress bar (COMPLETE cell only) ──────────────────────────────── */
 .barTrack {
   height: 5px;
-  background: var(--ink-100);
+  background: var(--c-progress-track, var(--ink-100));
   border-radius: 999px;
   overflow: hidden;
   margin: 4px 0 2px;
@@ -90,7 +91,7 @@
   .cell:nth-child(4),
   .cell:nth-child(5) {
     border-right: none;
-    border-right: 1px solid var(--ink-100);
+    border-right: 1px solid var(--hairline);
   }
 
   .cell:nth-child(5) {

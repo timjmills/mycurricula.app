@@ -1,6 +1,7 @@
 /* TodayMarker — vertical column marker for the current week.
    Parent must be position:relative with a known height.
-   The root is absolutely positioned; --fyi serves as the "today" accent color. */
+   The root is absolutely positioned; --progress (brand blue) serves as the
+   "today" accent color in the v1.3 status layer. */
 
 .root {
   position: absolute;
@@ -19,14 +20,15 @@
 
 /* "TODAY" pill — sits at the top, just above the lane rows */
 .pill {
-  background: var(--fyi);
-  color: var(--paper);
+  background: var(--progress);
+  color: #fff;
+  font-family: var(--font-display-sm);
   font-size: var(--t-10);
   font-weight: 800;
   letter-spacing: 0.05em;
   padding: 2px 7px;
   border-radius: var(--r-pill);
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--fyi) 35%, transparent);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--progress) 35%, transparent);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -35,7 +37,7 @@
 .line {
   flex: 1;
   width: 1.5px;
-  background: var(--fyi);
+  background: var(--progress);
   opacity: 0.45;
 }
 
