@@ -15,6 +15,14 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": true,
+  // PREVIEW-ONLY: turns off the auth gate for this throwaway preview version so
+  // the redesign is browsable with no login (middleware reads this at runtime —
+  // see lib/supabase/middleware.ts). `vars` are versioned, so this rides ONLY
+  // on the uploaded preview version; production (wrangler.jsonc) has no such var
+  // and keeps Google SSO. The preview serves mock data only.
+  "vars": {
+    "PREVIEW_BYPASS": "1",
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS",
