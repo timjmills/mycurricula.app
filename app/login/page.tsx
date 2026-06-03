@@ -38,7 +38,10 @@ export default async function LoginPage({
             two halves of the idea — curriculum, then teaching + learning
             — sit visually parallel. */}
         <div className={styles.wordmark}>
-          <span className={styles.wordmarkApp}>MyCurricula</span>
+          <span className={styles.eyebrow}>For teaching teams</span>
+          <span className={styles.wordmarkApp}>
+            mycurricula<span className={styles.wordmarkTld}>.app</span>
+          </span>
           <p className={styles.motto}>Built for teachers, by teachers.</p>
           <p className={styles.mottoSecondary}>
             Connecting curriculum

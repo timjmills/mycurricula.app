@@ -25,26 +25,27 @@
   gap: 0;
 }
 
-/* Eyebrow — var(--t-11) weight 800 uppercase, muted ink-500 */
+/* Eyebrow — var(--t-11) weight 800 uppercase, muted */
 .eyebrow {
   display: block;
   font-size: var(--t-11);
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-500);
+  color: var(--muted);
   line-height: 1.3;
   margin-bottom: 4px;
 }
 
-/* Title — dominant H1, weight 800, tight tracking */
+/* Title — dominant page H1: Poppins display, weight 800, tight tracking */
 .title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--t-24);
   font-weight: 800;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.02em;
   line-height: 1.1;
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 /* Subtitle — muted secondary below the title */
@@ -52,7 +53,7 @@
   margin: 4px 0 0;
   font-size: var(--t-13);
   font-weight: 400;
-  color: var(--ink-500);
+  color: var(--muted);
   line-height: 1.4;
 }
 

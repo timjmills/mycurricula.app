@@ -18,9 +18,9 @@
 .noneTab {
   padding: 6px 12px;
   border-radius: var(--r-pill);
-  border: var(--line);
-  background: var(--paper);
-  color: var(--ink-600, var(--ink-700));
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -29,13 +29,21 @@
 
 .tab:hover,
 .noneTab:hover {
-  background: var(--ink-50);
+  background: var(--hairline);
+  color: var(--brand-600);
+  border-color: var(--brand-300);
 }
 
 .tabActive {
-  background: var(--ink-900);
-  color: var(--paper);
-  border-color: var(--ink-900);
+  background: var(--brand-50);
+  color: var(--brand-700);
+  border-color: var(--brand-200);
+}
+
+.tabActive:hover {
+  background: var(--brand-50);
+  color: var(--brand-700);
+  border-color: var(--brand-200);
 }
 
 .grid {
@@ -47,9 +55,9 @@
 .swatch {
   position: relative;
   aspect-ratio: 1 / 1;
-  border-radius: var(--r-8);
-  border: 1.5px solid var(--ink-150);
-  background: var(--swatch-bg, var(--paper));
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--border);
+  background: var(--swatch-bg, var(--surface));
   cursor: pointer;
   padding: 0;
   /* keep the tiled pattern/gradient scale readable in a small swatch */
@@ -57,17 +65,17 @@
 }
 
 .swatch:hover {
-  border-color: var(--ink-400);
+  border-color: var(--brand-300);
 }
 
 .swatch:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .swatchActive {
-  border-color: var(--ink-900);
-  box-shadow: 0 0 0 2px var(--ink-900);
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 2px var(--brand-500);
 }
 
 @media (max-width: 480px) {

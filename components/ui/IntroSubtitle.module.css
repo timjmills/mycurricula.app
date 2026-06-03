@@ -24,9 +24,9 @@
   gap: 12px;
   margin: 0 28px 12px;
   padding: 10px 14px;
-  border: 1px solid var(--ink-200);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--fyi) 8%, transparent);
+  border: 1px solid var(--brand-100);
+  border-radius: var(--r-md);
+  background: var(--brand-50);
 }
 
 .text {
@@ -35,7 +35,7 @@
   margin: 0;
   font-size: var(--t-13);
   font-style: italic;
-  color: var(--ink-500);
+  color: var(--ink-soft);
   line-height: 1.4;
 }
 
@@ -50,22 +50,22 @@
   background: transparent;
   padding: 6px 8px;
   font-size: var(--t-13);
-  font-weight: 600;
-  color: var(--fyi);
+  font-weight: 700;
+  color: var(--brand-600);
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .dismiss:hover,
 .dismiss:focus-visible {
-  background: color-mix(in srgb, var(--fyi) 14%, transparent);
+  background: var(--brand-100);
   outline: none;
 }
 
 .dismiss:focus-visible {
-  box-shadow: 0 0 0 2px var(--fyi);
+  box-shadow: 0 0 0 2px var(--brand-400);
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */

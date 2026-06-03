@@ -1,13 +1,13 @@
 "use client";
 
-// palette-reference.tsx — the 20-swatch palette reference (artboard A3).
+// palette-reference.tsx — the 15-swatch brand palette reference (artboard A3).
 //
 // A table of every swatch with its Normal twin, Highlight twin, and the
 // Deep text color. Static reference — it does not change with the active
 // palette type, since the point is to show both columns side by side.
 
 import type { ReactNode } from "react";
-import { PALETTE_20 } from "@/lib/palette";
+import { SUBJECT_SWATCHES } from "@/lib/palette";
 import { Tooltip } from "@/components/ui";
 import { SettingsCard } from "./settings-card";
 
@@ -58,10 +58,10 @@ function ChipWithHex({
 export function PaletteReference(): ReactNode {
   return (
     <SettingsCard
-      eyebrow="The 20-color paired palette"
+      eyebrow="The 15-color brand palette"
       title={
         <Tooltip
-          content="Read-only reference of the full 20-color palette. The Team Curriculum picks one swatch per subject; your Normal/Highlight palette preference decides which column you actually see in the planner."
+          content="Read-only reference of the full 15-color brand palette. The Team Curriculum picks one swatch per subject; your Normal/Highlight palette preference decides which column you actually see in the planner."
           side="bottom"
         >
           <span>Every swatch has a Normal and Highlight twin</span>
@@ -72,7 +72,7 @@ export function PaletteReference(): ReactNode {
       <div style={{ marginTop: 12, overflowX: "auto" }}>
         <div
           role="table"
-          aria-label="20-color paired palette reference"
+          aria-label="15-color brand palette reference"
           style={{
             display: "grid",
             gridTemplateColumns: "1.4fr 1fr 1fr 1fr",
@@ -94,7 +94,7 @@ export function PaletteReference(): ReactNode {
           </div>
 
           {/* One row per swatch */}
-          {PALETTE_20.map((s) => (
+          {SUBJECT_SWATCHES.map((s) => (
             <div key={s.id} role="row" style={{ display: "contents" }}>
               <div
                 role="cell"

@@ -18,7 +18,7 @@
   align-items: center;
   gap: 10px;
   padding-bottom: 10px;
-  border-bottom: 1px solid var(--ink-100);
+  border-bottom: 1px solid var(--hairline);
   margin-bottom: 12px;
 }
 
@@ -28,13 +28,14 @@
   gap: 6px;
   min-height: 30px;
   padding: 5px 12px 5px 8px;
-  border: 1px solid var(--ink-150);
-  background: var(--paper);
-  color: var(--ink-700);
-  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
+  border-radius: var(--r-pill);
   font-size: var(--t-12);
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: var(--sh-xs);
   /* Hit-pad to ≥44px without inflating the visible chip. */
   position: relative;
   transition:
@@ -50,22 +51,23 @@
 }
 
 .backBtn:hover {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
-  color: var(--ink-900);
+  background: var(--surface);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .backBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .title {
   margin: 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-16);
-  font-weight: 600;
-  color: var(--ink-900);
-  letter-spacing: -0.2px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
 }
 
 /* ── Section block ──────────────────────────────────────────────────────── */
@@ -81,16 +83,16 @@
 
 .section + .section {
   padding-top: 14px;
-  border-top: 1px solid var(--ink-100);
+  border-top: 1px solid var(--hairline);
 }
 
 .sectionLabel {
   margin: 0;
   font-size: var(--t-10);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-500);
-  font-weight: 600;
+  color: var(--muted);
+  font-weight: 800;
 }
 
 /* ── Tool grid (3 columns) ─────────────────────────────────────────────── */
@@ -132,12 +134,12 @@
      "where to tap" cue. */
   background: color-mix(
     in oklch,
-    var(--tileBg, var(--ink-50)) 55%,
-    var(--paper)
+    var(--tileBg, var(--surface-warm)) 55%,
+    var(--surface)
   );
-  border-radius: var(--r-8);
+  border-radius: var(--r-md);
   cursor: pointer;
-  color: var(--ink-900);
+  color: var(--ink);
   text-align: center;
   position: relative;
   transition:
@@ -165,11 +167,11 @@
 .tile:hover {
   background: color-mix(
     in oklch,
-    var(--tileBg, var(--ink-50)) 78%,
-    var(--paper)
+    var(--tileBg, var(--surface-warm)) 78%,
+    var(--surface)
   );
-  border-color: color-mix(in oklch, var(--ink-900) 7%, transparent);
-  box-shadow: 0 1px 2px color-mix(in oklch, var(--ink-900) 5%, transparent);
+  border-color: color-mix(in oklch, var(--ink) 7%, transparent);
+  box-shadow: var(--sh-xs);
 }
 
 .tile:active {
@@ -177,7 +179,7 @@
 }
 
 .tile:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -187,19 +189,18 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: 999px;
-  background: var(--tileIconBg, var(--ink-100));
-  color: var(--ink-900);
+  border-radius: var(--r-pill);
+  background: var(--tileIconBg, var(--hairline));
+  color: var(--ink);
   /* A whisper of inner ring gives the pill a subtle physical "button"
      feel without committing to a hard bevel. */
-  box-shadow: inset 0 0 0 1px
-    color-mix(in oklch, var(--ink-900) 5%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--ink) 5%, transparent);
 }
 
 .tileLabel {
   font-size: var(--t-12);
   font-weight: 600;
-  color: var(--ink-900);
+  color: var(--ink);
   line-height: 1.15;
   letter-spacing: 0.05px;
 }
@@ -211,31 +212,30 @@
 .tileStub {
   background: color-mix(
     in oklch,
-    var(--tileBg, var(--ink-50)) 30%,
-    var(--paper)
+    var(--tileBg, var(--surface-warm)) 30%,
+    var(--surface)
   );
 }
 
 .tileStub .tileLabel {
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .tileStub .tileIcon {
-  color: var(--ink-500);
+  color: var(--muted);
   background: color-mix(
     in oklch,
-    var(--tileIconBg, var(--ink-100)) 45%,
-    var(--paper)
+    var(--tileIconBg, var(--hairline)) 45%,
+    var(--surface)
   );
-  box-shadow: inset 0 0 0 1px
-    color-mix(in oklch, var(--ink-900) 3%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--ink) 3%, transparent);
 }
 
 .tileStub:hover {
   background: color-mix(
     in oklch,
-    var(--tileBg, var(--ink-50)) 45%,
-    var(--paper)
+    var(--tileBg, var(--surface-warm)) 45%,
+    var(--surface)
   );
 }
 
@@ -253,8 +253,8 @@
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  border-radius: 999px;
-  background: var(--ink-900);
+  border-radius: var(--r-pill);
+  background: var(--ink);
   color: var(--paper);
   line-height: 1.6;
   /* Hairline ring softens the pill against the pastel body and keeps it
@@ -263,11 +263,11 @@
 }
 
 .badgeSoon {
-  background: color-mix(in oklch, var(--ink-300) 50%, var(--paper));
-  color: var(--ink-500);
+  background: color-mix(in oklch, var(--faint) 50%, var(--surface));
+  color: var(--muted);
   font-weight: 600;
   letter-spacing: 0.3px;
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--ink-900) 5%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--ink) 5%, transparent);
 }
 
 /* ── Inline URL row (YouTube tile) ─────────────────────────────────────── */
@@ -277,35 +277,35 @@
   align-items: center;
   gap: 8px;
   padding: 8px;
-  background: var(--ink-50);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-6);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
 }
 
 .urlInput {
   flex: 1;
   min-width: 0;
   padding: 7px 10px;
-  border: 1px solid var(--ink-150);
-  background: var(--paper);
-  border-radius: var(--r-4);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r-xs);
   font-size: var(--t-13);
-  color: var(--ink-900);
+  color: var(--ink);
   outline: none;
   transition: border-color 140ms ease;
 }
 
 .urlInput:focus {
-  border-color: var(--ink-400);
+  border-color: var(--brand-300);
 }
 
 .inlineAddBtn {
   min-height: 32px;
   padding: 6px 12px;
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  color: var(--ink-900);
-  border-radius: var(--r-4);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: var(--r-xs);
   font-size: var(--t-12);
   font-weight: 600;
   cursor: pointer;
@@ -323,17 +323,17 @@
 }
 
 .inlineAddBtn:hover:not(:disabled) {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
+  background: var(--surface-warm);
+  border-color: var(--brand-300);
 }
 
 .inlineAddBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .inlineAddBtn:disabled {
-  color: var(--ink-400);
+  color: var(--muted);
   cursor: not-allowed;
 }
 
@@ -343,11 +343,11 @@
 .stubNotice {
   margin: 0;
   padding: 8px 10px;
-  background: var(--ink-50);
-  border: 1px dashed var(--ink-200);
-  border-radius: var(--r-6);
+  background: var(--surface-warm);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
   font-size: var(--t-12);
-  color: var(--ink-500);
+  color: var(--muted);
   font-style: italic;
 }
 

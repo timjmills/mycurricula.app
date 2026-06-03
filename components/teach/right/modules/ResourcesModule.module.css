@@ -28,22 +28,22 @@
 .searchInput {
   width: 100%;
   padding: 8px 10px 8px 30px;
-  border: 1px solid var(--ink-150);
-  border-radius: 8px;
-  background: var(--ink-50);
-  color: var(--ink-900);
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--surface-warm);
+  color: var(--ink);
   font-size: var(--t-13);
   font-family: inherit;
 }
 
 .searchInput::placeholder {
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .searchInput:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
-  background: var(--paper);
+  background: var(--surface);
 }
 
 .searchInput:disabled {
@@ -56,22 +56,22 @@
   display: inline-flex;
   gap: 2px;
   padding: 2px;
-  background: var(--ink-50);
-  border-radius: 8px;
+  background: var(--hairline);
+  border-radius: var(--r-8);
   width: fit-content;
 }
 
 .viewBtn {
   width: 30px;
   height: 28px;
-  border-radius: 6px;
-  color: var(--ink-500);
+  border-radius: var(--r-6);
+  color: var(--muted);
 }
 
 .viewBtnActive {
-  background: var(--paper);
-  color: var(--ink-900);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  color: var(--brand-600);
+  box-shadow: var(--sh-xs);
 }
 
 /* ── Filter chips ───────────────────────────────────────────────────────── */
@@ -84,27 +84,34 @@
 .chip {
   padding: 4px 11px;
   min-height: 26px;
-  border: 1px solid var(--ink-150);
-  border-radius: 999px;
-  background: var(--paper);
-  color: var(--ink-500);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--muted);
   font-size: var(--t-11);
   font-weight: 700;
   cursor: pointer;
 }
 
 .chip:hover {
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .chip:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
 .chipActive {
-  background: var(--fyi);
-  border-color: var(--fyi);
+  background: var(--brand-500);
+  border-color: var(--brand-500);
+  color: var(--paper);
+}
+
+.chipActive:hover {
+  background: var(--brand-600);
+  border-color: var(--brand-600);
   color: var(--paper);
 }
 
@@ -134,10 +141,10 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--ink-150);
-  border-radius: 9px;
-  background: var(--paper);
-  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
   overflow: hidden;
   cursor: grab;
   touch-action: none;
@@ -180,11 +187,11 @@
   z-index: 2;
   width: 28px;
   height: 28px;
-  border-radius: 7px;
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  color: var(--ink-500);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--body);
+  box-shadow: var(--sh-xs);
   opacity: 0;
   transition: opacity 0.12s ease-out;
 }
@@ -213,9 +220,9 @@
   align-items: center;
   gap: 9px;
   padding: 7px 9px;
-  border: 1px solid var(--ink-150);
-  border-radius: 8px;
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--surface);
   cursor: grab;
   touch-action: none;
 }
@@ -305,10 +312,10 @@
 .cardMenuBtn {
   width: 26px;
   height: 26px;
-  border-radius: 6px;
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  color: var(--ink-500);
+  border-radius: var(--r-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--body);
 }
 
 .menu {
@@ -318,10 +325,10 @@
   margin-top: 4px;
   min-width: 168px;
   padding: 5px;
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: 9px;
-  box-shadow: var(--shadow-popover);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
   z-index: 20;
 }
 
@@ -343,16 +350,16 @@
 }
 
 .menuItem:hover {
-  background: var(--ink-50);
+  background: var(--hairline);
 }
 
 .menuItem:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: -2px;
 }
 
 .menuItemAccent {
-  color: var(--fyi);
+  color: var(--brand-600);
 }
 
 /* ── Footer count ───────────────────────────────────────────────────────── */

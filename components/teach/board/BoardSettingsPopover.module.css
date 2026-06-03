@@ -5,7 +5,7 @@
 .scrim {
   position: fixed;
   inset: 0;
-  background: rgba(20, 20, 26, 0.35);
+  background: color-mix(in srgb, var(--ink) 35%, transparent);
   z-index: 60;
   display: flex;
   align-items: flex-start;
@@ -20,9 +20,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--r-12);
-  background: var(--paper);
-  border-radius: 16px;
-  box-shadow: 0 30px 60px rgba(20, 20, 26, 0.35);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-lg);
   padding: 18px;
 }
 
@@ -34,10 +35,11 @@
 }
 
 .title {
+  font-family: var(--font-display-sm);
   font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.01em;
-  color: var(--ink-900);
+  color: var(--ink);
   margin: 0;
 }
 
@@ -111,15 +113,15 @@
   flex-direction: column;
   gap: var(--r-8);
   padding: var(--r-12);
-  border: 1px solid var(--urgent, #e5484d);
-  border-radius: var(--r-12);
-  background: color-mix(in srgb, var(--urgent, #e5484d) 5%, transparent);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-md);
+  background: var(--danger-tint);
 }
 
 .dangerLabel {
   font-size: 12px;
   font-weight: 800;
-  color: var(--urgent, #e5484d);
+  color: var(--danger);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }

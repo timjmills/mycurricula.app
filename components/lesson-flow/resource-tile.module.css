@@ -45,16 +45,15 @@
 .frame {
   position: relative;
   aspect-ratio: 16 / 9;
-  border-radius: var(--r-6);
+  border-radius: var(--r-sm);
   overflow: hidden;
-  background: var(--cl, var(--ink-100));
-  border: 1px solid
-    color-mix(in oklch, var(--c, var(--ink-300)) 32%, transparent);
+  background: var(--cl, var(--hairline));
+  border: 1px solid color-mix(in oklch, var(--c, var(--faint)) 32%, transparent);
   /* The big icon sits centered above the artwork. */
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--cd, var(--ink-600));
+  color: var(--cd, var(--muted));
 }
 
 /* ── Per-type tints ──────────────────────────────────────────────────────
@@ -76,7 +75,7 @@
      • url      → mac-and-cheese peach (website, link). */
 
 .tile[data-frame="video"] .frame {
-  background: var(--ink-900);
+  background: var(--ink);
   border-color: color-mix(in oklch, var(--hl-red) 45%, transparent);
   color: var(--hl-red);
 }
@@ -84,25 +83,25 @@
 .tile[data-frame="slides"] .frame {
   background: var(--hlp-maya);
   border-color: color-mix(in oklch, var(--hl-maya) 38%, transparent);
-  color: color-mix(in oklch, var(--hl-maya) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-maya) 60%, var(--ink));
 }
 
 .tile[data-frame="document"] .frame {
   background: var(--hlp-red);
   border-color: color-mix(in oklch, var(--hl-red) 38%, transparent);
-  color: color-mix(in oklch, var(--hl-red) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-red) 60%, var(--ink));
 }
 
 .tile[data-frame="image"] .frame {
   background: var(--hlp-lime);
   border-color: color-mix(in oklch, var(--hl-lime) 38%, transparent);
-  color: color-mix(in oklch, var(--hl-lime) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-lime) 60%, var(--ink));
 }
 
 .tile[data-frame="url"] .frame {
   background: var(--hlp-cheese);
   border-color: color-mix(in oklch, var(--hl-cheese) 38%, transparent);
-  color: color-mix(in oklch, var(--hl-cheese) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-cheese) 60%, var(--ink));
 }
 
 /* ── Synthetic artwork SVG ───────────────────────────────────────────── */
@@ -140,9 +139,9 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-4);
-  border: 1px solid color-mix(in oklch, var(--ink-900) 12%, transparent);
-  background: color-mix(in oklch, var(--paper) 86%, transparent);
-  color: var(--ink-600);
+  border: 1px solid color-mix(in oklch, var(--ink) 12%, transparent);
+  background: color-mix(in oklch, var(--surface) 86%, transparent);
+  color: var(--ink-soft);
   cursor: pointer;
   z-index: 2;
   /* Expand the tap target to ≥44px without disturbing the 24px visual box. */
@@ -163,8 +162,8 @@
 }
 
 .collapseBtn:hover {
-  background: var(--paper);
-  color: var(--ink-900);
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .removeBtn:hover {
@@ -174,7 +173,7 @@
 
 .collapseBtn:focus-visible,
 .removeBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -199,7 +198,7 @@
   min-width: 0;
   font-size: var(--t-12);
   font-weight: 500;
-  color: var(--ink-800, var(--ink-900));
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -243,10 +242,10 @@
      without dominating the section. Width is fixed; the frame holds 16:9. */
   width: 168px;
   padding: 4px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-150);
-  background: var(--paper);
-  box-shadow: var(--shadow-popover);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--sh-lg);
   pointer-events: none;
   /* A quiet fade + tiny lift, as if surfacing from the link. One tasteful
      motion — no bounce. */
@@ -269,21 +268,20 @@
 .previewFrame {
   position: relative;
   aspect-ratio: 16 / 9;
-  border-radius: var(--r-6);
+  border-radius: var(--r-sm);
   overflow: hidden;
-  background: var(--cl, var(--ink-100));
-  border: 1px solid
-    color-mix(in oklch, var(--c, var(--ink-300)) 32%, transparent);
+  background: var(--cl, var(--hairline));
+  border: 1px solid color-mix(in oklch, var(--c, var(--faint)) 32%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--cd, var(--ink-600));
+  color: var(--cd, var(--muted));
 }
 
 /* Per-type tints — mirror the `.tile[data-frame="X"] .frame` block above so
    the hover/focus preview matches the tile it previews. */
 .previewFrame[data-frame="video"] {
-  background: var(--ink-900);
+  background: var(--ink);
   border-color: color-mix(in oklch, var(--hl-red) 45%, transparent);
   color: var(--hl-red);
 }
@@ -291,25 +289,25 @@
 .previewFrame[data-frame="slides"] {
   background: var(--hlp-maya);
   border-color: color-mix(in oklch, var(--hl-maya) 38%, transparent);
-  color: color-mix(in oklch, var(--hl-maya) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-maya) 60%, var(--ink));
 }
 
 .previewFrame[data-frame="document"] {
   background: var(--hlp-red);
   border-color: color-mix(in oklch, var(--hl-red) 38%, transparent);
-  color: color-mix(in oklch, var(--hl-red) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-red) 60%, var(--ink));
 }
 
 .previewFrame[data-frame="image"] {
   background: var(--hlp-lime);
   border-color: color-mix(in oklch, var(--hl-lime) 38%, transparent);
-  color: color-mix(in oklch, var(--hl-lime) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-lime) 60%, var(--ink));
 }
 
 .previewFrame[data-frame="url"] {
   background: var(--hlp-cheese);
   border-color: color-mix(in oklch, var(--hl-cheese) 38%, transparent);
-  color: color-mix(in oklch, var(--hl-cheese) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-cheese) 60%, var(--ink));
 }
 
 /* Centered glyph inside the popover frame, above the synthetic artwork. */

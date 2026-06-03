@@ -17,17 +17,18 @@
 
 /* ── Heading + helper text ──────────────────────────────────────────── */
 .heading {
+  font-family: var(--font-display);
   font-size: var(--t-22);
-  font-weight: 700;
-  color: var(--ink-900);
-  letter-spacing: -0.4px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
   line-height: 1.2;
   margin: 0 0 10px;
 }
 
 .helper {
   font-size: var(--t-14);
-  color: var(--ink-500);
+  color: var(--body);
   line-height: 1.5;
   margin: 0 0 28px;
   max-width: 580px;
@@ -57,14 +58,14 @@
   flex-direction: column;
   gap: 8px;
   padding: 14px 16px;
-  border-radius: var(--r-8);
-  border: 2px solid var(--ink-150);
-  background: var(--paper);
+  border-radius: var(--r-md);
+  border: 2px solid var(--border);
+  background: var(--surface);
   cursor: pointer;
   /* Minimum 44px is satisfied by content height; explicit min ensures
      single-section templates are still tall enough to tap. */
   min-height: 44px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--sh-xs);
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease,
@@ -75,27 +76,27 @@
 }
 
 .card:hover {
-  border-color: var(--ink-300);
-  background: var(--ink-50);
+  border-color: var(--brand-300);
+  box-shadow: var(--sh-sm);
 }
 
 .card:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
-/* Selected state: math-blue border + light math tint background. */
+/* Selected state: indigo brand border + soft brand tint background. */
 .cardSelected {
-  border-color: var(--math);
-  background: var(--math-light);
+  border-color: var(--brand-500);
+  background: var(--brand-50);
   box-shadow:
-    0 0 0 1px var(--math),
-    var(--shadow-card);
+    0 0 0 1px var(--brand-500),
+    var(--sh-xs);
 }
 
 .cardSelected:hover {
-  border-color: var(--math);
-  background: var(--math-light);
+  border-color: var(--brand-500);
+  background: var(--brand-50);
 }
 
 /* ── Card header: name row + check ─────────────────────────────────── */
@@ -119,7 +120,7 @@
 .name {
   font-size: var(--t-14);
   font-weight: 700;
-  color: var(--ink-900);
+  color: var(--ink);
   line-height: 1.3;
 }
 
@@ -134,8 +135,8 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 1.5px solid var(--ink-200);
-  background: var(--paper);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
   color: transparent;
   transition:
     background 0.15s ease,
@@ -144,15 +145,15 @@
 }
 
 .checkVisible {
-  background: var(--math);
-  border-color: var(--math);
-  color: var(--paper);
+  background: var(--brand-500);
+  border-color: var(--brand-500);
+  color: #fff;
 }
 
 /* ── Description ────────────────────────────────────────────────────── */
 .description {
   font-size: var(--t-13);
-  color: var(--ink-700);
+  color: var(--body);
   line-height: 1.4;
   margin: 0;
 }
@@ -174,7 +175,7 @@
   align-items: center;
   font-size: var(--t-11);
   font-weight: 500;
-  color: var(--ink-500);
+  color: var(--muted);
   white-space: nowrap;
   /* Reset Chip primitive padding so dots sit flush. */
   padding: 0;
@@ -186,30 +187,30 @@
 /* Separator dot between section chips */
 .chipDot {
   margin: 0 4px;
-  color: var(--ink-300);
+  color: var(--faint);
   font-size: var(--t-12);
   line-height: 1;
 }
 
 .cardSelected .sectionChip {
-  color: var(--math-deep);
+  color: var(--brand-700);
 }
 
 .cardSelected .chipDot {
-  color: var(--math);
+  color: var(--brand-400);
 }
 
 /* ── Fit line ───────────────────────────────────────────────────────── */
 .fit {
   font-size: var(--t-11);
-  color: var(--ink-400);
+  color: var(--muted);
   line-height: 1.4;
   margin: 0;
   font-style: italic;
 }
 
 .cardSelected .fit {
-  color: var(--math-deep);
+  color: var(--brand-700);
   opacity: 0.8;
 }
 
@@ -262,37 +263,37 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--ink-100);
-  color: var(--ink-500);
+  background: var(--brand-50);
+  color: var(--brand-700);
   font-size: var(--t-10);
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .cardSelected .sectionIndex {
-  background: var(--math);
-  color: var(--paper);
+  background: var(--brand-500);
+  color: #fff;
 }
 
 .sectionLabel {
   font-size: var(--t-13);
-  font-weight: 600;
-  color: var(--ink-700);
+  font-weight: 700;
+  color: var(--ink-soft);
   line-height: 1.3;
 }
 
 .cardSelected .sectionLabel {
-  color: var(--math-deep);
+  color: var(--brand-700);
 }
 
 /* The guiding placeholder text for each section */
 .sectionPrompt {
   font-size: var(--t-12);
-  color: var(--ink-400);
+  color: var(--muted);
   line-height: 1.45;
   margin: 0;
   padding-left: 26px; /* Aligns with sectionLabel after the number pill + gap */
 }
 
 .cardSelected .sectionPrompt {
-  color: var(--ink-500);
+  color: var(--body);
 }

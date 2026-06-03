@@ -211,8 +211,7 @@
 }
 
 .input[aria-invalid="true"]:focus {
-  box-shadow: 0 0 0 3px
-    color-mix(in srgb, var(--important) 20%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--important) 20%, transparent);
 }
 
 /* Override styling on number inputs for the weeks/lessons fields so the

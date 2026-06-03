@@ -8,8 +8,8 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: var(--paper);
-  border-radius: var(--r-12);
+  background: var(--surface);
+  border-radius: var(--r-lg);
 }
 
 .grid {
@@ -36,10 +36,10 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  background: var(--tile-bg, var(--paper));
-  border: var(--line);
-  border-radius: var(--r-12);
-  box-shadow: 0 1px 2px rgba(20, 20, 26, 0.04);
+  background: var(--tile-bg, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-xs);
 }
 
 .tileDragging {
@@ -145,31 +145,31 @@
   gap: var(--r-8);
   min-height: 80px;
   min-width: 0;
-  border: 1.5px dashed var(--ink-300);
-  border-radius: var(--r-12);
+  border: 1.5px dashed var(--faint);
+  border-radius: var(--r-lg);
   background: transparent;
-  color: var(--ink-400);
+  color: var(--muted);
   cursor: pointer;
 }
 
 .emptyCell:hover {
-  border-color: var(--ink-400);
-  color: var(--ink-500);
-  background: var(--ink-50);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
+  background: var(--brand-50);
 }
 
 .emptyCellOver {
-  border-color: var(--c, var(--tag-blue));
+  border-color: var(--c, var(--brand-500));
   border-style: dashed;
-  background: color-mix(in srgb, var(--tag-blue) 8%, transparent);
-  color: var(--ink-700);
+  background: color-mix(in srgb, var(--brand-500) 8%, transparent);
+  color: var(--ink-soft);
 }
 
 .emptyPlus {
   width: 32px;
   height: 32px;
   border-radius: var(--r-pill);
-  background: var(--ink-100);
+  background: var(--hairline);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -198,15 +198,15 @@
   gap: var(--r-12);
   text-align: center;
   padding: 36px 30px;
-  border: 1.5px dashed var(--ink-300);
-  border-radius: 18px;
-  background: var(--paper);
+  border: 1.5px dashed var(--faint);
+  border-radius: var(--r-xl);
+  background: var(--surface);
 }
 
 .emptyBoardIcon {
   width: 56px;
   height: 56px;
-  border-radius: 14px;
+  border-radius: var(--r-md);
   background: var(--board-tint-sky);
   color: var(--math-deep);
   display: inline-flex;
@@ -215,16 +215,17 @@
 }
 
 .emptyBoardTitle {
+  font-family: var(--font-display-sm);
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.01em;
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .emptyBoardText {
   font-size: 13px;
   line-height: 1.55;
-  color: var(--ink-500);
+  color: var(--body);
 }
 
 .emptyBoardPills {
@@ -257,7 +258,7 @@
 .pickerScrim {
   position: fixed;
   inset: 0;
-  background: rgba(20, 20, 26, 0.35);
+  background: color-mix(in srgb, var(--ink) 35%, transparent);
   z-index: 60;
   display: flex;
   align-items: flex-start;
@@ -270,9 +271,10 @@
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  background: var(--paper);
-  border-radius: 16px;
-  box-shadow: 0 30px 60px rgba(20, 20, 26, 0.35);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-lg);
   padding: 18px;
   overflow: hidden;
 }
@@ -285,19 +287,20 @@
 }
 
 .pickerTitle {
+  font-family: var(--font-display-sm);
   font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.01em;
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .pickerCellBadge {
   padding: 4px 10px;
-  border: var(--line);
-  border-radius: 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
   font-size: 11px;
   font-weight: 600;
-  color: var(--ink-500);
+  color: var(--body);
 }
 
 .pickerSearch {
@@ -305,10 +308,10 @@
   align-items: center;
   gap: 7px;
   padding: 8px 12px;
-  background: var(--ink-50);
-  border: var(--line);
-  border-radius: var(--r-8);
-  color: var(--ink-500);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--muted);
   margin-bottom: var(--r-12);
 }
 
@@ -319,7 +322,7 @@
   outline: none;
   font: inherit;
   font-size: 12.5px;
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .pickerBody {
@@ -352,10 +355,10 @@
   gap: 5px;
   padding: 12px 6px;
   border: none;
-  border-radius: var(--r-12);
+  border-radius: var(--r-md);
   cursor: pointer;
-  background: var(--tile-bg, var(--ink-100));
-  color: var(--ink-700);
+  background: var(--tile-bg, var(--hairline));
+  color: var(--ink-soft);
   min-height: 44px;
 }
 
@@ -391,7 +394,7 @@
   flex-direction: column;
   gap: var(--r-12);
   padding: var(--r-12);
-  background: var(--paper);
+  background: var(--surface);
 }
 
 .focusHead {
@@ -431,15 +434,15 @@
   width: 32px;
   height: 32px;
   border-radius: var(--r-8);
-  border: var(--line);
-  background: var(--paper);
-  color: var(--ink-500);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--body);
   cursor: pointer;
 }
 
 .focusBtn:hover {
-  background: var(--ink-50);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--ink);
 }
 
 .focusStage {
@@ -452,11 +455,11 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  border: var(--line);
-  border-radius: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
   padding: 22px;
-  box-shadow: 0 6px 20px rgba(20, 20, 26, 0.08);
-  background: var(--tile-bg, var(--paper));
+  box-shadow: var(--sh-md);
+  background: var(--tile-bg, var(--surface));
   overflow: hidden;
 }
 

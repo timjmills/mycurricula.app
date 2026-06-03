@@ -41,6 +41,7 @@
   --t-20: 20px;
   --t-18: 18px;
   --t-16: 16px;
+  --t-15: 15px; /* day-name / drawer titles (v1.3) */
   --t-14: 14px; /* lesson titles */
   --t-13: 13px; /* body */
   --t-12: 12px;
@@ -54,7 +55,9 @@
      aliases below (--ink, --body, --canvas, --border …) are the names new
      work should reach for. */
   --ink-900: #1c1b2e; /* primary text — near-black violet */
+  --ink-800: #272636; /* (intermediate — some surfaces reference it) */
   --ink-700: #3a3950; /* secondary — ink-soft */
+  --ink-600: #494862; /* (intermediate — some surfaces reference it) */
   --ink-500: #57566b; /* tertiary / meta — body */
   --ink-400: #908fa3; /* muted */
   --ink-300: #bfbed0; /* faint */

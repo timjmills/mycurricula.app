@@ -16,10 +16,10 @@
   /* Inner padding stays comfortable on a wide rail but collapses smoothly
      to a tight gutter on a very narrow rail. */
   padding: 12px clamp(6px, 2vw, 12px);
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-8);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
   /* Allow the card to shrink below its content's intrinsic min-width when
      the rail is dragged narrow. */
   min-width: 0;
@@ -66,7 +66,7 @@
   flex-shrink: 0;
   border: none;
   background: transparent;
-  color: var(--ink-300);
+  color: var(--faint);
   border-radius: var(--r-4);
   cursor: grab;
   transition: color 0.1s;
@@ -80,7 +80,7 @@
 }
 
 .gripBtn:hover {
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .gripBtn:active {
@@ -88,7 +88,7 @@
 }
 
 .gripBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -109,7 +109,7 @@
   background: transparent;
   /* Match the grip on the same row — both tertiary chrome under the
      panel title, never competing with it. */
-  color: var(--ink-300);
+  color: var(--faint);
   border-radius: var(--r-4);
   cursor: pointer;
   transition: color 0.12s ease;
@@ -122,11 +122,11 @@
 }
 
 .collapseBtn:hover {
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .collapseBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -161,12 +161,13 @@
 .title {
   margin: 0;
   min-width: 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-14);
-  font-weight: 700;
+  font-weight: 800;
   /* Tight tracking — matches the Resources + Shoutbox panel titles so the
      three rail cards share one consistent title rhythm. */
   letter-spacing: -0.2px;
-  color: var(--ink-900);
+  color: var(--ink);
   /* Long custom panel labels wrap rather than push the head wider. */
   overflow-wrap: anywhere;
 }
@@ -205,7 +206,7 @@
   align-items: center;
   gap: 7px;
   padding: 2px 2px;
-  border-bottom: 1px solid var(--ink-100);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .item:last-child {
@@ -228,7 +229,7 @@
 }
 
 .toggle:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
   border-radius: var(--r-4);
 }
@@ -243,15 +244,15 @@
   min-width: 0;
   font-size: var(--t-12);
   line-height: 1.4;
-  color: var(--ink-900);
+  color: var(--ink);
   /* Wrap long to-dos rather than truncate — the rail has the height. */
   overflow-wrap: anywhere;
 }
 
 .itemTitleDone {
-  color: var(--ink-400);
+  color: var(--muted);
   text-decoration: line-through;
-  text-decoration-color: var(--ink-300);
+  text-decoration-color: var(--faint);
 }
 
 /* Tag dots — tag color is the only color in the row besides the green
@@ -275,7 +276,7 @@
   font-weight: 600;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────── */
@@ -284,7 +285,7 @@
   margin: 0;
   padding: 6px 2px;
   font-size: var(--t-12);
-  color: var(--ink-400);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -303,16 +304,16 @@
   cursor: pointer;
   font-size: var(--t-12);
   font-weight: 500;
-  color: var(--ink-500);
+  color: var(--muted);
   transition: color 0.1s;
 }
 
 .addLink:hover {
-  color: var(--ink-900);
+  color: var(--brand-600);
 }
 
 .addLink:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
   border-radius: var(--r-4);
 }
@@ -331,22 +332,22 @@
   /* Slightly roomier so the dashed shell reads as a comfortable input,
      not a cramped chip. */
   padding: 6px 10px;
-  border: 1px dashed var(--ink-200);
-  border-radius: var(--r-6);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
   transition:
     border-color 0.12s ease,
     background 0.12s ease;
 }
 
 .composer:focus-within {
-  border-color: var(--ink-400);
+  border-color: var(--brand-300);
   border-style: solid;
-  background: var(--ink-50);
+  background: var(--surface-warm);
 }
 
 .composerIcon {
   display: inline-flex;
-  color: var(--ink-400);
+  color: var(--muted);
   flex-shrink: 0;
 }
 
@@ -357,26 +358,26 @@
   background: none;
   outline: none;
   font-size: var(--t-12);
-  color: var(--ink-900);
+  color: var(--ink);
   /* The composer's outer dashed border supplies the focus affordance;
      the input itself stays chromeless. Min-height to keep it tappable. */
   min-height: 28px;
 }
 
 .composerInput::placeholder {
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .composerAdd {
   flex-shrink: 0;
   padding: 5px 10px;
   min-height: 28px;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-4);
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
   font-size: var(--t-11);
   font-weight: 600;
-  color: var(--ink-700);
+  color: var(--ink-soft);
   cursor: pointer;
   transition:
     background 0.1s,
@@ -385,12 +386,13 @@
 }
 
 .composerAdd:hover:not(:disabled) {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
+  background: var(--surface-warm);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .composerAdd:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 

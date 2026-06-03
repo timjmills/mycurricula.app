@@ -16,7 +16,7 @@
   height: 100%;
   min-height: 0;
   overflow-y: auto;
-  background: var(--paper);
+  background: var(--surface);
   padding: 16px 20px 28px;
 }
 
@@ -32,7 +32,7 @@
 .kicker {
   font-size: var(--t-10);
   font-weight: 700;
-  color: var(--ink-400);
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.07em;
 }
@@ -45,16 +45,17 @@
 }
 
 .heading {
+  font-family: var(--font-display);
   font-size: var(--t-22);
   font-weight: 700;
-  color: var(--ink-900);
+  color: var(--ink);
   letter-spacing: -0.02em;
   margin: 0;
 }
 
 .hint {
   font-size: var(--t-11);
-  color: var(--ink-400);
+  color: var(--muted);
   white-space: nowrap;
 }
 
@@ -70,19 +71,20 @@
   gap: 8px;
   margin-bottom: 8px;
   padding-bottom: 6px;
-  border-bottom: 1px solid var(--ink-100);
+  border-bottom: 2px solid var(--hairline);
 }
 
 .dayName {
+  font-family: var(--font-display-sm);
   font-size: var(--t-14);
-  font-weight: 700;
-  color: var(--ink-900);
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
 }
 
 .lessonCount {
   font-size: var(--t-11);
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 /* ── Lesson rows stack ───────────────────────────────────────────────── */
@@ -97,7 +99,7 @@
 
 .emptyDay {
   font-size: var(--t-12);
-  color: var(--ink-300);
+  color: var(--faint);
   padding: 8px 12px;
   font-style: italic;
 }

@@ -35,8 +35,8 @@
   background: var(--catchup);
   color: var(--paper);
   padding: 1px 6px;
-  border-radius: var(--r-2);
+  border-radius: var(--r-pill);
   font-size: var(--t-10);
-  font-weight: 600;
+  font-weight: 800;
   letter-spacing: 0.04em;
 }

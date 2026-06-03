@@ -58,9 +58,7 @@ export function SettingsCard({
                   : "Personal — changes only affect your view"
               }
               aria-label={
-                scope === "team"
-                  ? "Team Curriculum scope"
-                  : "Personal scope"
+                scope === "team" ? "Team Curriculum scope" : "Personal scope"
               }
             >
               {scope === "team" ? "Team" : "Personal"}

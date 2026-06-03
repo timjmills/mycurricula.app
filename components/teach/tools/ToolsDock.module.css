@@ -13,10 +13,10 @@
   max-width: 320px;
   height: 100%;
   min-height: 0;
-  background: var(--paper);
-  border-left: var(--line);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
   font-family: var(--font-sans);
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
@@ -30,8 +30,9 @@
   flex: 0 0 auto;
 }
 .headTitle {
+  font-family: var(--font-display-sm);
   font-size: var(--t-14);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.01em;
 }
 .headActions {
@@ -42,20 +43,20 @@
 
 .clearBtn {
   appearance: none;
-  border: var(--line);
-  background: var(--paper);
-  color: var(--ink-500);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--body);
   font: inherit;
   font-size: var(--t-12);
   font-weight: 600;
   min-height: 44px;
   padding: 0 12px;
-  border-radius: var(--r-8);
+  border-radius: var(--r-md);
   cursor: pointer;
 }
 .clearBtn:hover {
-  background: var(--ink-50);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--ink);
 }
 
 /* ── Add-tool button + picker ───────────────────────────────────────────── */
@@ -67,19 +68,20 @@
   align-items: center;
   gap: 6px;
   appearance: none;
-  border: var(--line-strong);
-  background: var(--ink-900);
+  border: 1px solid transparent;
+  background: var(--brand-500);
   color: var(--paper);
   font: inherit;
   font-size: var(--t-13);
-  font-weight: 600;
+  font-weight: 700;
   min-height: 44px;
   padding: 0 12px;
-  border-radius: var(--r-8);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-brand);
   cursor: pointer;
 }
 .addBtn:hover {
-  background: var(--ink-700);
+  background: var(--brand-600);
 }
 .addBtnText {
   white-space: nowrap;
@@ -94,10 +96,10 @@
   max-width: min(16rem, calc(100vw - 24px));
   max-height: 60vh;
   overflow-y: auto;
-  background: var(--paper);
-  border: var(--line);
-  border-radius: var(--r-12);
-  box-shadow: var(--shadow-popover);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
   padding: 8px;
 }
 .menuLabel {
@@ -136,7 +138,7 @@
 }
 .menuItem:hover,
 .menuItem:focus-visible {
-  background: var(--ink-50);
+  background: var(--hairline);
   outline: none;
 }
 .menuItemIcon {
@@ -146,8 +148,8 @@
   height: 1.75rem;
   flex: 0 0 auto;
   border-radius: var(--r-8);
-  background: var(--ink-50);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 .menuItemLabel {
   min-width: 0;
@@ -176,10 +178,10 @@
 .tileInner {
   display: flex;
   flex-direction: column;
-  border: var(--line);
-  border-radius: var(--r-12);
-  background: var(--paper);
-  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
   overflow: hidden;
 }
 
@@ -190,8 +192,8 @@
   justify-content: space-between;
   gap: 8px;
   padding: 6px 6px 6px 12px;
-  border-bottom: var(--line);
-  background: var(--ink-50);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-warm);
 }
 .tileLabel {
   display: inline-flex;
@@ -236,7 +238,7 @@
   background: var(--w-grad);
   color: var(--w-ink, var(--ink-900));
   /* Square the top so the tile header sits flush; round only the bottom. */
-  border-radius: 0 0 var(--r-12) var(--r-12);
+  border-radius: 0 0 var(--r-md) var(--r-md);
   font-family: var(--w-font, var(--font-sans));
   /* Slightly smaller base so widgets fit the ~280–320px column; --w-scale still
      rescales the whole body. */
@@ -269,19 +271,20 @@
   align-items: center;
   gap: 6px;
   appearance: none;
-  border: var(--line-strong);
-  background: var(--ink-900);
+  border: 1px solid transparent;
+  background: var(--brand-500);
   color: var(--paper);
   font: inherit;
   font-size: var(--t-13);
-  font-weight: 600;
+  font-weight: 700;
   min-height: 44px;
   padding: 0 16px;
-  border-radius: var(--r-8);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-brand);
   cursor: pointer;
 }
 .emptyAdd:hover {
-  background: var(--ink-700);
+  background: var(--brand-600);
 }
 
 @media (prefers-reduced-motion: no-preference) {

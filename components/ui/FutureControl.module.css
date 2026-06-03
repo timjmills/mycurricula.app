@@ -8,10 +8,10 @@
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  border: 1px dashed var(--ink-300);
-  border-radius: var(--r-6);
+  border: 1px dashed var(--faint);
+  border-radius: var(--r-sm);
   background: transparent;
-  color: var(--ink-500);
+  color: var(--muted);
   font: inherit;
   font-size: var(--t-12);
   line-height: 1;

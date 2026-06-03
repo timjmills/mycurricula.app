@@ -1,7 +1,8 @@
 /* login/page.module.css — sign-in screen layout.
  *
- * A single centered card on a plain neutral ground, matching the calm
- * onboarding aesthetic. Color, type, and radius come from tokens only.
+ * A single centered white card on the warm cream canvas, lifted by a
+ * barely-there v1.3 atmospheric mesh (honey / violet / green). Color,
+ * type, and radius come from tokens only.
  */
 
 .page {
@@ -11,7 +12,25 @@
   align-items: center;
   justify-content: center;
   padding: 32px 24px;
-  background: var(--ink-50);
+  background: var(--canvas);
+  /* Barely-there atmospheric mesh — honey top-left, violet top-right, green
+     bottom-right — the v1.3 warm welcome behind the sign-in card. */
+  background-image:
+    radial-gradient(
+      40% 44% at 8% 0%,
+      rgba(244, 183, 64, 0.18),
+      transparent 60%
+    ),
+    radial-gradient(
+      38% 42% at 96% 4%,
+      rgba(139, 92, 246, 0.14),
+      transparent 62%
+    ),
+    radial-gradient(
+      46% 52% at 90% 100%,
+      rgba(122, 199, 155, 0.16),
+      transparent 62%
+    );
 }
 
 /* The centered sign-in card. */
@@ -23,10 +42,10 @@
   align-items: center;
   text-align: center;
   padding: 40px 36px;
-  border-radius: var(--r-12);
-  border: var(--line);
-  background: var(--paper);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--r-xl);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--sh-md);
 }
 
 /* ── Wordmark + brand mottos ───────────────────────────────────────
@@ -44,36 +63,60 @@
   align-items: center;
 }
 
+/* Honey eyebrow pill above the wordmark — the one uppercase style. */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 14px;
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--honey-600);
+  background: var(--honey-50);
+  border: 1px solid var(--honey-100);
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+}
+
 .wordmarkApp {
-  font-size: var(--t-22);
-  font-weight: 700;
-  letter-spacing: -0.6px;
-  color: var(--ink-900);
+  font-family: var(--font-logo);
+  font-size: var(--t-26);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+/* ".app" rendered in honey to echo the brand wordmark. */
+.wordmarkTld {
+  color: var(--honey-600);
 }
 
 .motto {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   font-size: var(--t-13);
   font-style: italic;
   font-weight: 500;
   letter-spacing: -0.1px;
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 .mottoSecondary {
   margin: 4px 0 0;
   font-size: var(--t-12);
   line-height: 1.4;
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 /* ── Copy ──────────────────────────────────────────────────────────── */
 .heading {
   margin: 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-18);
-  font-weight: 600;
-  letter-spacing: -0.2px;
-  color: var(--ink-900);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 /* ── Sign-in failure notice ────────────────────────────────────────── */
@@ -81,11 +124,11 @@
   width: 100%;
   margin: 20px 0 0;
   padding: 9px 12px;
-  border-radius: var(--r-6);
+  border-radius: var(--r-md);
   background: var(--core-mode-bg);
   color: var(--core-mode-deep);
   font-size: var(--t-12);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* ── Action ────────────────────────────────────────────────────────── */
@@ -98,5 +141,5 @@
   margin: 18px 0 0;
   font-size: var(--t-11);
   line-height: 1.5;
-  color: var(--ink-400);
+  color: var(--muted);
 }

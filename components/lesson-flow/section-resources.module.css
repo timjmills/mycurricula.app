@@ -28,9 +28,9 @@
   flex-direction: column;
   gap: 10px;
   padding: 14px;
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-12, 12px);
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
   min-width: 0;
 }
 
@@ -47,7 +47,7 @@
   border: none;
   background: transparent;
   border-radius: var(--r-4);
-  color: var(--ink-500);
+  color: var(--muted);
   cursor: pointer;
   /* Inflate the hit-area without enlarging the visible box. */
   padding: 10px;
@@ -59,12 +59,12 @@
 }
 
 .toggleBtn:hover {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--ink);
 }
 
 .toggleBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -89,7 +89,7 @@
   /* Spec letter-spacing: 0.6 — applied as ems so it scales with the size. */
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 /* ── Primary 2×2 grid ─────────────────────────────────────────────────── */
@@ -123,7 +123,7 @@
   border-radius: 10px;
   /* The big icon and title both read in ink-900 — the pastel fills are light
      enough that ink-900 hits WCAG AA on all four. */
-  color: var(--ink-900);
+  color: var(--ink);
   /* Background is set inline via style={{ background: '#…' }} per slot. */
 }
 
@@ -133,7 +133,7 @@
   /* Match the icon color to the slot's deepest hue isn't possible without
      hard-coding per-slot — instead we use a uniform ink-700 that reads
      legibly on all four pastels (#f3e8ff / #ccfbf1 / #dcfce7 / #fed7aa). */
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 .primaryCardTitle {
@@ -142,7 +142,7 @@
   font-size: var(--t-12);
   font-weight: 600;
   line-height: 1.25;
-  color: var(--ink-900);
+  color: var(--ink);
   /* 2-line ellipsis (-webkit-line-clamp). Truncate at 2 lines per spec. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -190,7 +190,7 @@
 }
 
 .expandedAddBtn:disabled {
-  color: var(--ink-300);
+  color: var(--faint);
   cursor: not-allowed;
 }
 
@@ -207,7 +207,7 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 /* Stacked rows — icon + title (flex:1) + type pill. */
@@ -233,7 +233,7 @@
   align-items: center;
   flex: 0 0 auto;
   /* Neutral gray per spec §4.2. */
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .moreRowTitle {
@@ -242,7 +242,7 @@
   /* 12.5px → use --t-12 (rounded sensibly). */
   font-size: var(--t-12);
   font-weight: 500;
-  color: var(--ink-900);
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -264,7 +264,7 @@
   font-size: var(--t-11);
   font-weight: 500;
   font-family: inherit;
-  color: var(--ink-500);
+  color: var(--muted);
   cursor: pointer;
   transition:
     color 0.12s ease,
@@ -272,12 +272,12 @@
 }
 
 .showMoreBtn:hover {
-  color: var(--ink-700);
-  background: var(--ink-100);
+  color: var(--ink-soft);
+  background: var(--hairline);
 }
 
 .showMoreBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -295,7 +295,7 @@
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 .miniHeaderLabel {
@@ -304,14 +304,14 @@
   min-width: 0;
   font-size: var(--t-12);
   font-weight: 600;
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 /* Empty-state message when a section's minimized view has no resources. */
 .miniEmpty {
   margin: 0;
   font-size: var(--t-12);
-  color: var(--ink-400);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -331,7 +331,7 @@
   /* Spec: row vertical padding 8px. */
   padding: 8px 0;
   min-width: 0;
-  border-bottom: 1px solid var(--ink-100);
+  border-bottom: 1px solid var(--hairline);
 }
 
 /* The last row has no divider — the dashed border belongs to the footer. */
@@ -370,7 +370,7 @@
 .miniRowIconSquare[data-kind="link"] {
   background: #f3f4f6;
   /* Spec doesn't list a stroke color for link — use a neutral mid ink. */
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 /* Two-line title + URL-preview stack in the middle. */
@@ -386,7 +386,7 @@
   /* 12.5px → --t-12 (rounded sensibly). */
   font-size: var(--t-12);
   font-weight: 500;
-  color: var(--ink-900);
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -395,7 +395,7 @@
 .miniRowSubtitle {
   /* 10.5px → use --t-10 (rounded sensibly — the closest token). */
   font-size: var(--t-10);
-  color: var(--ink-500);
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -413,7 +413,7 @@
   margin-top: 0;
   padding: 10px 12px;
   border: none;
-  border-top: 1px dashed var(--ink-150);
+  border-top: 1px dashed var(--border);
   background: transparent;
   border-radius: 0;
   font-size: var(--t-12);
@@ -437,7 +437,7 @@
 }
 
 .miniAddBtn:disabled {
-  color: var(--ink-300);
+  color: var(--faint);
   cursor: not-allowed;
 }
 

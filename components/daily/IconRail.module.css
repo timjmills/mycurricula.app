@@ -14,8 +14,8 @@
   flex-direction: column;
   align-items: center;
   padding: 8px 0;
-  background: var(--paper);
-  border-right: 1px solid var(--ink-150);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
   /* Quiet drop in case the rail sits over content with no shadow underlying
      it — keeps the boundary present without screaming. */
   position: relative;
@@ -50,7 +50,7 @@
   align-items: center;
   /* A short hairline above the gear so the visual separation between the
      navigation buttons and the settings affordance is unambiguous. */
-  border-top: 1px solid var(--ink-100);
+  border-top: 1px solid var(--hairline);
   width: calc(100% - 12px);
   align-self: center;
 }
@@ -70,8 +70,8 @@
   padding: 0;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--r-6);
-  color: var(--ink-500);
+  border-radius: var(--r-md);
+  color: var(--muted);
   cursor: pointer;
   transition:
     background 0.12s,
@@ -80,24 +80,25 @@
 }
 
 .button:hover {
-  background: var(--ink-50);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--brand-600);
 }
 
 .button:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .buttonActive {
-  background: var(--ink-100);
-  color: var(--ink-900);
-  border-color: var(--ink-150);
+  background: var(--brand-500);
+  color: var(--paper);
+  border-color: transparent;
+  box-shadow: var(--sh-brand);
 }
 
 .buttonActive:hover {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--brand-600);
+  color: var(--paper);
 }
 
 /* The icon sits in a centered slot — the SVG inside picks up `color` via
@@ -130,9 +131,9 @@
   line-height: 1;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--ink-400);
-  background: var(--ink-100);
-  border: 1px solid var(--ink-150);
+  color: var(--muted);
+  background: var(--hairline);
+  border: 1px solid var(--border);
   border-radius: var(--r-4);
   padding: 1px 3px;
   /* Keep it above the icon slot. */
@@ -149,12 +150,12 @@
 .buttonAdd {
   position: relative;
   /* Slightly warmer idle tint to suggest mutative intent. */
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .buttonAdd:hover {
-  color: var(--ink-700);
-  background: var(--ink-50);
+  color: var(--brand-600);
+  background: var(--hairline);
 }
 
 /* The single-letter badge ("L" / "E") that disambiguates the two add buttons. */
@@ -165,7 +166,7 @@
   font-size: 9px;
   line-height: 1;
   font-weight: 700;
-  color: var(--ink-500);
+  color: var(--muted);
   pointer-events: none;
   user-select: none;
 }

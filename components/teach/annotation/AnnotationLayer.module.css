@@ -45,9 +45,9 @@
   min-height: 32px;
   padding: 2px 4px;
   margin: 0;
-  border: 1px dashed var(--ink-400);
+  border: 1px dashed var(--muted);
   border-radius: var(--r-4);
-  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
   font-family: var(--font-sans);
   font-size: 22px;
   font-weight: 600;

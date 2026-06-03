@@ -12,7 +12,7 @@
   position: sticky;
   top: -1px;
   z-index: 2;
-  background: var(--paper);
+  background: var(--surface);
   /* Artboard padding "0 2px 6px" → "0 4px 8px" (round to scale). */
   padding: 0 4px 8px;
   /* Artboard reserved 22px of paddingTop on the grid for the strip; we
@@ -25,16 +25,16 @@
   align-items: center;
   gap: 6px;
   font-size: var(--t-11);
-  font-weight: 500;
+  font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ink-500);
-  border-bottom: 2px solid var(--ink-100);
+  color: var(--muted);
+  border-bottom: 2px solid var(--hairline);
 }
 
 .headerToday {
   color: var(--catchup);
-  font-weight: 600;
+  font-weight: 800;
   border-bottom-color: var(--catchup);
 }
 
@@ -49,8 +49,8 @@
 }
 
 .dateNum {
-  color: var(--ink-400);
-  font-weight: 400;
+  color: var(--muted);
+  font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
 }
@@ -59,8 +59,8 @@
 
 .body {
   position: relative;
-  background: var(--ink-50);
-  border-radius: var(--r-4);
+  background: var(--surface-warm);
+  border-radius: var(--r-sm);
   overflow: hidden;
 }
 
@@ -68,7 +68,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  border-top: 1px solid color-mix(in srgb, var(--ink-100) 60%, transparent);
+  border-top: 1px solid var(--hairline);
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
@@ -80,7 +80,7 @@
   right: 0;
   transform: translateY(-50%);
   text-align: center;
-  color: var(--ink-400);
+  color: var(--muted);
   font-size: var(--t-11);
   font-style: italic;
   pointer-events: none;

@@ -28,7 +28,7 @@
   position: fixed;
   inset: 0;
   z-index: 400;
-  background: rgba(20, 22, 32, 0.38);
+  background: color-mix(in srgb, var(--ink-900) 38%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -39,10 +39,10 @@
 
 @keyframes backdropIn {
   from {
-    background: rgba(20, 22, 32, 0);
+    background: color-mix(in srgb, var(--ink-900) 0%, transparent);
   }
   to {
-    background: rgba(20, 22, 32, 0.38);
+    background: color-mix(in srgb, var(--ink-900) 38%, transparent);
   }
 }
 
@@ -50,10 +50,10 @@
 /* White card, shadow-popover, gently rounded. Max-width keeps the layout
    compact on large monitors — this is an interstitial, not a full modal. */
 .panel {
-  background: var(--paper);
-  border-radius: var(--r-12);
-  box-shadow: var(--shadow-popover);
-  border: 1px solid var(--ink-150);
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-lg);
+  border: 1px solid var(--border);
   width: 100%;
   max-width: 480px;
   padding: 28px 28px 20px;
@@ -86,10 +86,11 @@
 
 .heading {
   margin: 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-18);
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.2;
-  color: var(--ink-900);
+  color: var(--ink);
   letter-spacing: -0.2px;
 }
 
@@ -97,20 +98,20 @@
 .lessonLine {
   margin: 0;
   font-size: var(--t-13);
-  color: var(--ink-500);
+  color: var(--body);
   line-height: 1.4;
 }
 
 .lessonLabel {
   font-weight: 600;
-  color: var(--ink-400);
+  color: var(--muted);
   font-size: var(--t-12);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .lessonTitle {
-  color: var(--ink-700);
+  color: var(--ink-soft);
   font-weight: 500;
 }
 
@@ -118,7 +119,7 @@
 .prompt {
   margin: 0;
   font-size: var(--t-14);
-  color: var(--ink-700);
+  color: var(--ink-soft);
   line-height: 1.4;
   /* Negative gap compensation: pull the prompt closer to the heading block. */
   margin-top: -8px;
@@ -151,9 +152,9 @@
   align-items: flex-start;
   gap: 10px;
   padding: 18px 16px 16px;
-  border-radius: var(--r-8);
-  border: 2px solid var(--ink-150);
-  background: var(--ink-50);
+  border-radius: var(--r-lg);
+  border: 2px solid var(--border);
+  background: var(--surface-warm);
   cursor: pointer;
   text-align: left;
   min-height: 44px; /* WCAG 2.5.5 — real height is taller in practice */
@@ -168,9 +169,9 @@
 }
 
 .choiceBtn:hover {
-  background: var(--paper);
-  border-color: var(--ink-300);
-  box-shadow: 0 2px 10px rgba(20, 22, 32, 0.08);
+  background: var(--surface);
+  border-color: var(--brand-300);
+  box-shadow: var(--sh-sm);
   transform: translateY(-1px);
 }
 
@@ -181,29 +182,29 @@
 
 .choiceBtn:focus-visible {
   /* Double-ring pattern matching the rest of the design system. */
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
-  border-color: var(--ink-400);
+  border-color: var(--brand-300);
 }
 
 /* ── Personalized variant ────────────────────────────────────────────────── */
 /* Neutral-tinted: paper/ink family. Reads as the safe, default choice. */
 .choiceBtnPersonal .choiceIcon {
-  color: var(--ink-500);
-  background: var(--ink-100);
-  border: 1px solid var(--ink-200);
+  color: var(--brand-600);
+  background: var(--brand-50);
+  border: 1px solid var(--brand-100);
 }
 
 .choiceBtnPersonal .choiceTitle {
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .choiceBtnPersonal:hover {
-  border-color: var(--ink-400);
+  border-color: var(--brand-300);
 }
 
 .choiceBtnPersonal:focus-visible {
-  outline-color: var(--ink-900);
+  outline-color: var(--brand-500);
 }
 
 /* ── Core variant ────────────────────────────────────────────────────────── */
@@ -249,7 +250,7 @@
   justify-content: center;
   width: 48px;
   height: 48px;
-  border-radius: var(--r-8);
+  border-radius: var(--r-md);
   flex-shrink: 0;
   transition:
     background 0.15s ease,
@@ -274,7 +275,7 @@
   font-size: var(--t-12);
   font-weight: 400;
   line-height: 1.45;
-  color: var(--ink-500);
+  color: var(--body);
   text-wrap: pretty;
 }
 
@@ -304,7 +305,7 @@
   align-items: center;
   justify-content: center;
   padding-top: 4px;
-  border-top: 1px solid var(--ink-100);
+  border-top: 1px solid var(--hairline);
 }
 
 /* Ghost "Cancel" button — low visual weight, clearly below the two primary
@@ -312,12 +313,12 @@
 .cancelBtn {
   font-family: var(--font-sans);
   font-size: var(--t-13);
-  font-weight: 500;
-  color: var(--ink-500);
+  font-weight: 600;
+  color: var(--body);
   background: transparent;
   border: none;
   padding: 8px 16px;
-  border-radius: var(--r-6);
+  border-radius: var(--r-pill);
   cursor: pointer;
   min-height: 44px;
   transition:
@@ -326,14 +327,14 @@
 }
 
 .cancelBtn:hover {
-  background: var(--ink-50);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 .cancelBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────────── */

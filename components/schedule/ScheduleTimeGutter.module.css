@@ -9,7 +9,7 @@
   right: 8px;
   /* Center the label on its hour gridline. */
   transform: translateY(-50%);
-  color: var(--ink-400);
+  color: var(--muted);
   font-size: var(--t-10);
   font-variant-numeric: tabular-nums;
   display: inline-flex;
@@ -18,9 +18,9 @@
 }
 
 .hour {
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .meridiem {
-  color: var(--ink-300);
+  color: var(--faint);
 }

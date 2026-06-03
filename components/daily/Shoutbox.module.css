@@ -17,10 +17,10 @@
   /* Padding scales from a tight gutter on a thin rail to a comfortable
      12px on a wide rail. */
   padding: 12px clamp(6px, 2vw, 12px);
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-8);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
   /* Allow the card to shrink inside the resizable right rail. */
   min-width: 0;
   /* Fill the rail's slot when a fixed height has been set on it. Inert
@@ -63,7 +63,7 @@
   flex-shrink: 0;
   border: none;
   background: transparent;
-  color: var(--ink-300);
+  color: var(--faint);
   border-radius: var(--r-4);
   cursor: grab;
   transition: color 0.1s;
@@ -77,7 +77,7 @@
 }
 
 .gripBtn:hover {
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .gripBtn:active {
@@ -85,7 +85,7 @@
 }
 
 .gripBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -109,7 +109,7 @@
   background: transparent;
   /* Match the grip on the same row — both tertiary chrome under the
      panel title, never competing with it. */
-  color: var(--ink-300);
+  color: var(--faint);
   border-radius: var(--r-4);
   cursor: pointer;
   transition: color 0.12s ease;
@@ -122,11 +122,11 @@
 }
 
 .collapseBtn:hover {
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .collapseBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -178,12 +178,13 @@
 .title {
   margin: 0;
   min-width: 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-14);
-  font-weight: 700;
+  font-weight: 800;
   /* Tight tracking — matches the Resources + To-do panel titles so the
      three rail cards share one consistent title rhythm. */
   letter-spacing: -0.2px;
-  color: var(--ink-900);
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 
@@ -227,7 +228,7 @@
   margin: 0;
   padding: 6px 2px;
   font-size: var(--t-12);
-  color: var(--ink-400);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -265,8 +266,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--ink-150);
-  color: var(--ink-700);
+  background: var(--border);
+  color: var(--ink-soft);
   font-size: var(--t-11);
   font-weight: 700;
   letter-spacing: 0.2px;
@@ -293,12 +294,12 @@
 .author {
   font-size: var(--t-12);
   font-weight: 700;
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .time {
   font-size: var(--t-10);
-  color: var(--ink-400);
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -309,12 +310,12 @@
   align-self: flex-start;
   max-width: 100%;
   padding: 7px 11px;
-  border-radius: var(--r-8);
-  background: var(--ink-50);
-  border: 1px solid var(--ink-100);
+  border-radius: var(--r-md);
+  background: var(--surface-warm);
+  border: 1px solid var(--hairline);
   font-size: var(--t-12);
   line-height: 1.45;
-  color: var(--ink-800, var(--ink-700));
+  color: var(--ink-soft);
   overflow-wrap: anywhere;
 }
 
@@ -330,17 +331,17 @@
   /* A touch more horizontal room before the icon cluster so the pill
      reads as a comfortable input, not a tight chip. */
   padding: 4px 4px 4px 14px;
-  border: 1px solid var(--ink-200);
-  border-radius: 999px;
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
   transition:
     border-color 0.12s ease,
     box-shadow 0.12s ease;
 }
 
 .composer:focus-within {
-  border-color: var(--ink-400);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ink-900) 4%, transparent);
+  border-color: var(--brand-300);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--brand-500) 12%, transparent);
 }
 
 .composerInput {
@@ -352,11 +353,11 @@
   background: none;
   outline: none;
   font-size: var(--t-12);
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .composerInput::placeholder {
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .composerActions {
@@ -378,9 +379,9 @@
   justify-content: center;
   padding: 0;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: transparent;
-  color: var(--ink-500);
+  color: var(--muted);
   cursor: pointer;
   transition:
     background 0.1s,
@@ -388,12 +389,12 @@
 }
 
 .iconBtn:hover {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--ink);
 }
 
 .iconBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -413,8 +414,8 @@
 .sendBtn:disabled {
   opacity: 0.5;
   cursor: default;
-  background: var(--ink-100);
-  color: var(--ink-400);
+  background: var(--hairline);
+  color: var(--muted);
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────── */

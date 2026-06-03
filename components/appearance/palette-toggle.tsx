@@ -10,7 +10,7 @@
 import type { ReactNode } from "react";
 import { useTheme } from "@/lib/theme";
 import type { ThemePalette } from "@/lib/theme";
-import { PALETTE_20 } from "@/lib/palette";
+import { SUBJECT_SWATCHES } from "@/lib/palette";
 import { Tooltip } from "@/components/ui";
 import { SettingsCard, RadioDot } from "./settings-card";
 
@@ -18,11 +18,11 @@ interface PaletteOption {
   id: ThemePalette;
   label: string;
   desc: string;
-  /** Six sample swatch hexes from the 20-color pool. */
+  /** Six sample swatch hexes from the 15-color brand palette. */
   swatches: string[];
 }
 
-// First six swatches of the pool, one row per variant — as in artboard A2.
+// First six brand swatches, one row per variant — as in artboard A2.
 interface PaletteOptionFull extends PaletteOption {
   tooltip: string;
 }
@@ -32,7 +32,7 @@ const PALETTE_OPTIONS: readonly PaletteOptionFull[] = [
     id: "normal",
     label: "Normal",
     desc: "Confident, slightly darker. Like a school workbook.",
-    swatches: PALETTE_20.slice(0, 6).map((s) => s.normal),
+    swatches: SUBJECT_SWATCHES.slice(0, 6).map((s) => s.normal),
     tooltip:
       "Switch your palette to Normal — slightly muted, workbook-style colors. The hue stays exactly the same across your team; only YOUR saturation changes.",
   },
@@ -40,7 +40,7 @@ const PALETTE_OPTIONS: readonly PaletteOptionFull[] = [
     id: "highlight",
     label: "Highlight",
     desc: "Highlighter-marker bright. Electric, distinct.",
-    swatches: PALETTE_20.slice(0, 6).map((s) => s.highlight),
+    swatches: SUBJECT_SWATCHES.slice(0, 6).map((s) => s.highlight),
     tooltip:
       "Switch your palette to Highlight — brighter, marker-style colors that pop on the grid. The hue stays the same across your team; only YOUR saturation changes.",
   },
@@ -91,10 +91,10 @@ export function PaletteToggle(): ReactNode {
                   padding: "12px 14px",
                   minHeight: 44,
                   borderRadius: 10,
-                  background: selected ? "var(--ink-100)" : "var(--paper)",
+                  background: selected ? "var(--brand-50)" : "var(--surface)",
                   border: selected
-                    ? "1.5px solid var(--ink-900)"
-                    : "1px solid var(--ink-150)",
+                    ? "1.5px solid var(--brand-500)"
+                    : "1px solid var(--border)",
                   textAlign: "left",
                   cursor: "pointer",
                 }}

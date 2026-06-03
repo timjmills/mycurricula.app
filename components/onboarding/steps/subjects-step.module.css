@@ -5,16 +5,18 @@
 /* ── Heading block ──────────────────────────────────────────────────────── */
 
 .heading {
+  font-family: var(--font-display);
   font-size: var(--t-24);
-  font-weight: 700;
-  color: var(--ink-900);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
   margin: 0 0 8px;
   line-height: 1.25;
 }
 
 .helper {
   font-size: var(--t-14);
-  color: var(--ink-500);
+  color: var(--body);
   margin: 0 0 28px;
   line-height: 1.5;
 }
@@ -36,24 +38,24 @@
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  background: var(--ink-50);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-8);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   transition: border-color 0.15s ease;
 }
 
 .row:focus-within {
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
 }
 
 /* Non-academic rows get a muted treatment — softer background and ink. */
 .rowNonAcademic {
-  background: var(--paper);
-  border-color: var(--ink-150);
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 .rowNonAcademic .nameInput {
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 /* ── Reorder handle / arrows ────────────────────────────────────────────── */
@@ -77,8 +79,8 @@
 .nameInput {
   width: 100%;
   font-size: var(--t-14);
-  font-weight: 600;
-  color: var(--ink-900);
+  font-weight: 700;
+  color: var(--ink);
   background: transparent;
   border: none;
   outline: none;
@@ -90,17 +92,17 @@
 }
 
 .nameInput:focus {
-  border-bottom-color: var(--ink-300);
+  border-bottom-color: var(--brand-400);
 }
 
 .nameInput:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
   border-radius: var(--r-4);
 }
 
 .nameInput::placeholder {
-  color: var(--ink-400);
+  color: var(--faint);
   font-weight: 400;
 }
 
@@ -115,10 +117,10 @@
 
 .colorLabel {
   font-size: var(--t-10);
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink-400);
+  color: var(--muted);
   margin-bottom: 2px;
 }
 
@@ -157,7 +159,7 @@
 }
 
 .swatch:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -185,10 +187,10 @@
 
 .planLabel {
   font-size: var(--t-10);
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink-400);
+  color: var(--muted);
   margin-bottom: 2px;
 }
 

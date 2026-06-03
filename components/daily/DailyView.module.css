@@ -19,7 +19,7 @@
   /* Neutral page bg so the lesson list column reads as a clean white card.
      The page itself no longer hosts a day-selector strip or a pinned
      day-header band — both fold into the column. */
-  background: var(--ink-50);
+  background: var(--canvas);
 }
 
 /* ── Page header (title + subtitle) ──────────────────────────────────────
@@ -27,8 +27,8 @@
    paper background and bottom hairline so the header reads as a top
    chrome band like Year's. Padding/typography are owned by PageHeader. */
 .dailyPageHeader {
-  background: var(--paper);
-  border-bottom: 1px solid var(--ink-150);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -54,8 +54,8 @@
   align-items: center;
   padding: 0 14px;
   height: 30px;
-  background: var(--paper);
-  border-bottom: 1px solid var(--ink-150);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .breadcrumbList {
@@ -66,11 +66,11 @@
   margin: 0;
   padding: 0;
   font-size: var(--t-12);
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .breadcrumbLink {
-  color: var(--ink-500);
+  color: var(--body);
   text-decoration: none;
   font-weight: 500;
   padding: 2px 4px;
@@ -79,16 +79,16 @@
 }
 
 .breadcrumbLink:hover {
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .breadcrumbLink:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .breadcrumbSep {
-  color: var(--ink-300);
+  color: var(--faint);
   font-size: var(--t-11);
   /* The separator is aria-hidden — it exists only for visual rhythm.
      Keyboard and screen-reader users navigate the link text directly. */
@@ -123,9 +123,9 @@
   min-height: 56px;
   padding: 6px 4px 8px;
   border: 1px solid transparent;
-  border-radius: var(--r-6);
+  border-radius: var(--r-sm);
   background: transparent;
-  color: var(--ink-500);
+  color: var(--muted);
   cursor: pointer;
   transition:
     background 0.12s,
@@ -134,17 +134,17 @@
 }
 
 .weekStripPill:hover {
-  background: var(--ink-50);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 .weekStripPill:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .weekStripPillActive {
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .weekStripPillActive:hover {
@@ -159,11 +159,11 @@
      read cleanly inside the pill. */
   letter-spacing: 0.6px;
   text-transform: uppercase;
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .weekStripPillActive .weekStripDayName {
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 /* Date-number container — a 30px circle that holds the day-of-month
@@ -182,7 +182,7 @@
 }
 
 .weekStripDateWrapActive {
-  background: var(--math);
+  background: var(--brand-500);
   color: var(--paper);
 }
 
@@ -274,17 +274,17 @@
 
 .holidayBannerLabel {
   font-size: var(--t-10);
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-500);
+  color: var(--muted);
   flex-shrink: 0;
 }
 
 .holidayBannerName {
   font-size: var(--t-13);
   font-weight: 600;
-  color: var(--ink-900);
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -331,7 +331,7 @@
 
 .noteItemBody {
   flex: 1;
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 /* ── In-column day header ─────────────────────────────────────────────── */
@@ -353,13 +353,14 @@
 
 .dayHeaderTitle {
   margin: 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-22);
   /* Heavier weight — this is the day's hero label for the lesson list
      column, paired with the smaller secondary tier (lessons label, etc.). */
-  font-weight: 700;
-  letter-spacing: -0.4px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   line-height: 1.1;
-  color: var(--ink-900);
+  color: var(--ink);
   align-self: center;
   flex-shrink: 0;
 }
@@ -383,16 +384,16 @@
 
 .dayHeaderProgressCount {
   font-size: var(--t-13);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.2px;
   font-variant-numeric: tabular-nums;
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .dayHeaderProgressOf {
   font-size: var(--t-12);
   font-weight: 400;
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .dayHeaderBar {
@@ -400,9 +401,9 @@
   gap: 2px;
   height: 5px;
   width: 100%;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   overflow: hidden;
-  background: var(--ink-100);
+  background: var(--hairline);
 }
 
 .dayHeaderBarSegment {
@@ -412,7 +413,7 @@
 
 .dayHeaderBarEmpty {
   flex: 1;
-  background: var(--ink-100);
+  background: var(--hairline);
 }
 
 /* ── Two-pane body ────────────────────────────────────────────────────── */
@@ -501,8 +502,8 @@
   flex: 0 0 320px;
   min-width: 0;
   min-height: 0;
-  border-left: 1px solid var(--ink-150);
-  background: var(--paper);
+  border-left: 1px solid var(--border);
+  background: var(--surface);
   overflow: auto;
 }
 
@@ -522,8 +523,8 @@
    banner → "Lessons" label row → scrollable lesson list. */
 
 .leftPane {
-  background: var(--paper);
-  border-right: 1px solid var(--ink-150);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -533,11 +534,11 @@
 .leftPaneEyebrow {
   padding: 14px 16px 6px;
   font-size: var(--t-11);
-  font-weight: 600;
+  font-weight: 800;
   /* Match the LESSONS / shared eyebrow tracking. */
-  letter-spacing: 0.7px;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-400);
+  color: var(--muted);
   flex-shrink: 0;
 }
 
@@ -556,11 +557,11 @@
 
 .lessonsLabel {
   font-size: var(--t-11);
-  font-weight: 600;
+  font-weight: 800;
   /* Match the WEEK / TODAY'S NOTES eyebrows for a consistent secondary tier. */
-  letter-spacing: 0.7px;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .lessonsLabelActions {
@@ -581,12 +582,12 @@
   padding-block: 13px;
   margin-block: -8px;
   box-sizing: content-box;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-4);
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
   font-size: var(--t-11);
-  font-weight: 500;
-  color: var(--ink-500);
+  font-weight: 600;
+  color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
   transition:
@@ -596,8 +597,8 @@
 }
 
 .collapseAllBtn:hover {
-  background: var(--ink-50);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 .collapseAllIcon {
@@ -627,9 +628,10 @@
   margin: -8px;
   box-sizing: content-box;
   border: none;
-  border-radius: var(--r-4);
-  background: var(--math);
+  border-radius: var(--r-sm);
+  background: var(--brand-500);
   color: var(--paper);
+  box-shadow: var(--sh-brand);
   cursor: pointer;
   transition:
     background 0.1s,
@@ -637,11 +639,11 @@
 }
 
 .addLessonBtn:hover:not(:disabled) {
-  background: var(--math-deep);
+  background: var(--brand-600);
 }
 
 .addLessonBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -747,7 +749,7 @@
 }
 
 .lessonRow:hover {
-  background: color-mix(in oklch, var(--paper) 70%, var(--ink-100));
+  background: color-mix(in oklch, var(--surface) 70%, var(--hairline));
 }
 
 /* Selected state — quiet but unambiguous: a paper fill lifts the row off
@@ -755,13 +757,9 @@
    subject-tinted left edge stand-in reinforces the stripe without the
    row gaining a heavy colored full perimeter border. */
 .lessonRowSelected {
-  background: var(--paper) !important;
-  box-shadow: var(--shadow-card);
-  border-color: color-mix(
-    in oklch,
-    var(--c, var(--ink-200)) 35%,
-    var(--ink-150)
-  );
+  background: var(--surface) !important;
+  box-shadow: var(--sh-sm);
+  border-color: color-mix(in oklch, var(--c, var(--border)) 35%, var(--border));
 }
 
 /* While this row is the dnd-kit source, dim it — its content rides the
@@ -772,9 +770,9 @@
 
 /* The floating DragOverlay ghost. */
 .lessonRowOverlay {
-  background: var(--paper);
-  box-shadow: var(--shadow-card);
-  border-color: var(--c, var(--ink-200));
+  background: var(--surface);
+  box-shadow: var(--sh-md);
+  border-color: var(--c, var(--border));
   cursor: grabbing;
 }
 
@@ -796,7 +794,7 @@
   padding: 0;
   background: none;
   border: none;
-  color: var(--ink-300);
+  color: var(--faint);
   cursor: grab;
   flex-shrink: 0;
   border-radius: var(--r-4);
@@ -805,7 +803,7 @@
 }
 
 .lessonDragHandle:hover {
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .lessonDragHandle:active {
@@ -818,7 +816,7 @@
   align-self: stretch;
   min-height: 22px;
   border-radius: 1px;
-  background: var(--c, var(--ink-300));
+  background: var(--c, var(--faint));
   flex-shrink: 0;
 }
 
@@ -861,7 +859,7 @@
      subordinate eyebrow to the lesson title rather than a peer. */
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: var(--c, var(--ink-500));
+  color: var(--c, var(--muted));
   flex-shrink: 0;
 }
 
@@ -869,7 +867,7 @@
   /* One step bigger than the subject eyebrow so the title leads the row. */
   font-size: var(--t-13);
   font-weight: 500;
-  color: var(--ink-900);
+  color: var(--ink);
   line-height: 1.35;
   letter-spacing: -0.05px;
   white-space: nowrap;
@@ -883,7 +881,7 @@
 
 .lessonTitleDone {
   text-decoration: line-through;
-  text-decoration-color: var(--ink-300);
+  text-decoration-color: var(--faint);
 }
 
 /* Personal fork indicator dot */
@@ -898,7 +896,7 @@
 .emptyList {
   padding: 24px 12px;
   text-align: center;
-  color: var(--ink-400);
+  color: var(--muted);
   font-size: var(--t-13);
 }
 
@@ -918,10 +916,10 @@
 
 .eventsSectionLabel {
   font-size: var(--t-11);
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .addEventBtn {
@@ -929,11 +927,11 @@
   align-items: center;
   gap: 5px;
   font-size: var(--t-12);
-  color: var(--ink-400);
+  color: var(--muted);
   cursor: pointer;
   padding: 3px 6px;
-  border-radius: var(--r-4);
-  border: 1px dashed var(--ink-200);
+  border-radius: var(--r-sm);
+  border: 1px dashed var(--border);
   width: 100%;
   margin-top: 2px;
   transition:
@@ -942,8 +940,8 @@
 }
 
 .addEventBtn:hover {
-  background: var(--ink-100);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 /* ── Right pane ───────────────────────────────────────────────────────── */
@@ -964,11 +962,11 @@
   flex-shrink: 0;
   padding: 9px 16px;
   border: none;
-  border-bottom: 1px solid var(--ink-100);
-  background: var(--ink-50);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-warm);
   font-size: var(--t-12);
   font-weight: 500;
-  color: var(--ink-700);
+  color: var(--ink-soft);
   cursor: pointer;
   text-align: left;
   width: 100%;
@@ -976,7 +974,7 @@
 }
 
 .backToList:hover {
-  background: var(--ink-100);
+  background: var(--hairline);
 }
 
 /* Quiet neutral empty state — shown when no lesson is selected. */
@@ -985,14 +983,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--paper);
+  background: var(--surface);
   padding: 24px;
 }
 
 .emptyDetailText {
   margin: 0;
   font-size: var(--t-13);
-  color: var(--ink-400);
+  color: var(--muted);
   text-align: center;
 }
 
@@ -1030,7 +1028,7 @@
 
   .leftPane {
     border-right: none;
-    border-bottom: 1px solid var(--ink-150);
+    border-bottom: 1px solid var(--border);
   }
 
   /* data-narrow-pane="list" → show the list, hide the center detail.
@@ -1056,7 +1054,7 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: var(--paper);
+    background: var(--surface);
   }
 
   /* Let the in-column day-header wrap when space is tight (the title can
@@ -1099,11 +1097,11 @@
    without competing with the column chrome on either side. */
 .splitter:hover,
 .splitter:focus-visible {
-  background: color-mix(in oklch, var(--paper) 55%, var(--ink-100));
+  background: color-mix(in oklch, var(--surface) 55%, var(--hairline));
 }
 
 .splitter:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: -3px;
   border-radius: var(--r-4);
 }
@@ -1114,8 +1112,8 @@
 .splitterGrip {
   width: 2px;
   height: 24px;
-  border-radius: 999px;
-  background: var(--ink-200);
+  border-radius: var(--r-pill);
+  background: var(--border);
   transition:
     background 0.12s ease,
     height 0.12s ease;
@@ -1125,7 +1123,7 @@
    restrained: we want a quiet handle, not a tall colored bar. */
 .splitter:hover .splitterGrip,
 .splitter:focus-visible .splitterGrip {
-  background: var(--ink-300);
+  background: var(--faint);
   height: 36px;
 }
 
@@ -1144,7 +1142,7 @@
 /* Hairline divider separating the lesson list from the planning panels. */
 .railDivider {
   height: 1px;
-  background: var(--ink-150);
+  background: var(--border);
   margin: 0 4px;
 }
 
@@ -1167,17 +1165,17 @@
 .railPanelTitle {
   margin: 0;
   font-size: var(--t-11);
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 /* Count / status text pushed to the right of the panel head. */
 .railPanelCount {
   margin-left: auto;
   font-size: var(--t-11);
-  color: var(--ink-400);
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1187,7 +1185,7 @@
   margin: 0;
   padding: 6px 2px;
   font-size: var(--t-12);
-  color: var(--ink-400);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -1207,7 +1205,7 @@
   align-items: center;
   gap: 7px;
   padding: 2px 2px;
-  border-bottom: 1px solid var(--ink-100);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .todoItem:last-child {
@@ -1239,15 +1237,15 @@
   min-width: 0;
   font-size: var(--t-12);
   line-height: 1.4;
-  color: var(--ink-900);
+  color: var(--ink);
   /* Wrap long to-dos rather than truncate — the rail has the height. */
   overflow-wrap: anywhere;
 }
 
 .todoTitleDone {
-  color: var(--ink-400);
+  color: var(--muted);
   text-decoration: line-through;
-  text-decoration-color: var(--ink-300);
+  text-decoration-color: var(--faint);
 }
 
 /* Tag dots — tag color is the only color in the panel; it is information. */
@@ -1270,7 +1268,7 @@
   font-weight: 500;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 /* ── Quick-add composer (to-dos) ──────────────────────────────────────── */
@@ -1281,19 +1279,19 @@
   gap: 6px;
   margin-top: 2px;
   padding: 4px 6px;
-  border: 1px dashed var(--ink-200);
-  border-radius: var(--r-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
   transition: border-color 0.1s;
 }
 
 .todoComposer:focus-within {
-  border-color: var(--ink-400);
+  border-color: var(--brand-300);
   border-style: solid;
 }
 
 .todoComposerIcon {
   display: inline-flex;
-  color: var(--ink-400);
+  color: var(--muted);
   flex-shrink: 0;
 }
 
@@ -1304,11 +1302,11 @@
   background: none;
   outline: none;
   font-size: var(--t-12);
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .todoInput::placeholder {
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 /* Compact submit button shared visual pattern with the shoutbox send. */
@@ -1316,12 +1314,12 @@
 .shoutSendBtn {
   flex-shrink: 0;
   padding: 4px 9px;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-4);
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
   font-size: var(--t-11);
-  font-weight: 500;
-  color: var(--ink-700);
+  font-weight: 600;
+  color: var(--ink-soft);
   cursor: pointer;
   transition:
     background 0.1s,
@@ -1331,8 +1329,9 @@
 
 .todoAddBtn:hover:not(:disabled),
 .shoutSendBtn:hover:not(:disabled) {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
+  background: var(--surface-warm);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .todoAddBtn:disabled,
@@ -1365,9 +1364,9 @@
   margin: 0;
   padding: 8px 9px;
   list-style: none;
-  background: var(--ink-50);
-  border: 1px solid var(--ink-100);
-  border-radius: var(--r-6);
+  background: var(--surface-warm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
 }
 
 .shoutItem {
@@ -1385,8 +1384,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--ink-150);
-  color: var(--ink-700);
+  background: var(--border);
+  color: var(--ink-soft);
   font-size: var(--t-10);
   font-weight: 600;
   letter-spacing: 0.2px;
@@ -1406,12 +1405,12 @@
 .shoutAuthor {
   font-size: var(--t-12);
   font-weight: 600;
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .shoutTime {
   font-size: var(--t-10);
-  color: var(--ink-400);
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1419,7 +1418,7 @@
   margin-top: 1px;
   font-size: var(--t-12);
   line-height: 1.45;
-  color: var(--ink-700);
+  color: var(--ink-soft);
   overflow-wrap: anywhere;
 }
 
@@ -1436,21 +1435,21 @@
   flex: 1;
   min-width: 0;
   padding: 7px 11px;
-  border: 1px solid var(--ink-200);
-  border-radius: 999px;
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
   outline: none;
   font-size: var(--t-12);
-  color: var(--ink-900);
+  color: var(--ink);
   transition: border-color 0.1s;
 }
 
 .shoutInput::placeholder {
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .shoutInput:focus-visible {
-  border-color: var(--ink-400);
+  border-color: var(--brand-300);
 }
 
 /* ── Resources panel (right rail) ─────────────────────────────────────── */
@@ -1481,8 +1480,8 @@
   align-items: center;
   gap: 2px;
   padding: 2px;
-  background: var(--ink-100);
-  border-radius: var(--r-6);
+  background: var(--hairline);
+  border-radius: var(--r-sm);
   /* Sit on its own line below the panel head; comfortable spacing above
      the body below it. */
   margin: 2px 0 4px;
@@ -1497,11 +1496,11 @@
   min-width: 0;
   padding: 5px 9px;
   border: none;
-  border-radius: var(--r-4);
+  border-radius: var(--r-xs);
   background: transparent;
   font-size: var(--t-11);
-  font-weight: 500;
-  color: var(--ink-500);
+  font-weight: 600;
+  color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
   transition:
@@ -1510,18 +1509,18 @@
 }
 
 .resourceTab:hover {
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 .resourceTabActive {
-  background: var(--paper);
-  color: var(--ink-900);
-  font-weight: 600;
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  color: var(--brand-600);
+  font-weight: 700;
+  box-shadow: var(--sh-xs);
 }
 
 .resourceTabActive:hover {
-  color: var(--ink-900);
+  color: var(--brand-600);
 }
 
 /* ── Grid / list mode toggle ──────────────────────────────────────────── */
@@ -1534,9 +1533,9 @@
   align-items: center;
   margin-left: 6px;
   padding: 2px;
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-4);
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
 }
 
 .modeToggleBtn {
@@ -1555,7 +1554,7 @@
   border: none;
   border-radius: var(--r-2);
   background: transparent;
-  color: var(--ink-500);
+  color: var(--muted);
   cursor: pointer;
   transition:
     background 0.1s,
@@ -1563,16 +1562,16 @@
 }
 
 .modeToggleBtn:hover {
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .modeToggleBtnActive {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--ink);
 }
 
 .modeToggleBtnActive:hover {
-  background: var(--ink-100);
+  background: var(--hairline);
 }
 
 /* ── Resource thumbnail grid (mode = "grid") ─────────────────────────── */
@@ -1623,32 +1622,32 @@
      a separate hit area. */
   min-height: 36px;
   padding: 6px 8px;
-  background: var(--paper);
-  border: 1px solid var(--ink-100);
-  border-radius: var(--r-4);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
   margin-bottom: 4px;
   cursor: pointer;
   text-align: left;
   font: inherit;
-  color: var(--ink-900);
+  color: var(--ink);
   transition:
     background 0.1s,
     border-color 0.1s;
 }
 
 .resourceRow:hover {
-  background: var(--ink-50);
-  border-color: var(--ink-200);
+  background: var(--surface-warm);
+  border-color: var(--border);
 }
 
 .resourceRow:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .resourceRowIcon {
   display: inline-flex;
-  color: var(--ink-500);
+  color: var(--muted);
   flex-shrink: 0;
 }
 
@@ -1657,7 +1656,7 @@
   min-width: 0;
   font-size: var(--t-12);
   line-height: 1.3;
-  color: var(--ink-900);
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1669,7 +1668,7 @@
   font-weight: 500;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 /* ── Column reorder: per-column wrapper + grip + drag ghost ──────────── */
@@ -1744,7 +1743,7 @@
   padding: 4px;
   border: none;
   background: transparent;
-  color: var(--ink-300);
+  color: var(--faint);
   cursor: grab;
   z-index: 2;
   border-radius: var(--r-4);
@@ -1778,8 +1777,8 @@
 .columnDragGrip:focus-visible {
   opacity: 1;
   transform: scale(1);
-  color: var(--ink-500);
-  background: color-mix(in oklch, var(--paper) 70%, var(--ink-100));
+  color: var(--muted);
+  background: color-mix(in oklch, var(--surface) 70%, var(--hairline));
 }
 
 .columnDragGrip:active {
@@ -1787,7 +1786,7 @@
 }
 
 .columnDragGrip:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -1816,12 +1815,10 @@
   width: auto;
   max-width: min(280px, calc(100vw - 28px));
   padding: 10px 14px;
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-8);
-  box-shadow:
-    0 6px 16px color-mix(in oklch, var(--ink-900) 18%, transparent),
-    0 1px 2px color-mix(in oklch, var(--ink-900) 8%, transparent);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-md);
   /* A faint tilt sells the lift without animation cost — matches the
      right-rail dragGhost idiom in RightRail.module.css. */
   transform: rotate(-0.5deg);
@@ -1834,7 +1831,7 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  color: var(--ink-500);
+  color: var(--muted);
   flex-shrink: 0;
 }
 
@@ -1842,7 +1839,7 @@
   font-size: var(--t-13);
   font-weight: 700;
   letter-spacing: -0.1px;
-  color: var(--ink-900);
+  color: var(--ink);
   min-width: 0;
   overflow-wrap: anywhere;
 }

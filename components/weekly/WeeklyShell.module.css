@@ -30,7 +30,7 @@
   min-height: 0;
   /* Neutral page bg — the grid + the rail each carry their own paper
      fills, so the surface they sit on stays quiet. */
-  background: var(--ink-50);
+  background: var(--canvas);
 }
 
 /* ── Body row: icon rail (fixed) + resizable body ─────────────────────── */
@@ -107,8 +107,8 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: var(--ink-50);
-  border-left: 1px solid var(--ink-150);
+  background: var(--canvas);
+  border-left: 1px solid var(--border);
 }
 
 /* Collapsed stub — clip overflow so nothing from the unmounted rail
@@ -135,8 +135,8 @@
   padding: 4px;
   background: transparent;
   border: none;
-  border-radius: var(--r-4);
-  color: var(--ink-400);
+  border-radius: var(--r-sm);
+  color: var(--muted);
   cursor: pointer;
   flex-shrink: 0;
   transition:
@@ -145,14 +145,14 @@
 }
 
 .railToggleBtn:hover {
-  color: var(--ink-700);
-  background: var(--ink-100);
+  color: var(--ink-soft);
+  background: var(--hairline);
 }
 
 .railToggleBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: -2px;
-  border-radius: var(--r-4);
+  border-radius: var(--r-sm);
 }
 
 /* ── Screen-reader-only live region ───────────────────────────────────
@@ -205,8 +205,8 @@
 
 /* The rail variant stacks toggle + content; content gets flex: 1. */
 .railColumnWithGrip {
-  background: var(--ink-50);
-  border-left: 1px solid var(--ink-150);
+  background: var(--canvas);
+  border-left: 1px solid var(--border);
 }
 
 /* Direct child of columnWithGrip fills the available height so inner
@@ -235,8 +235,8 @@
   padding: 10px;
   background: transparent;
   border: none;
-  border-radius: var(--r-4);
-  color: var(--ink-300);
+  border-radius: var(--r-sm);
+  color: var(--faint);
   cursor: grab;
   touch-action: none;
   z-index: 10;
@@ -266,8 +266,8 @@
 .columnDragGrip:focus-visible {
   opacity: 1;
   transform: scale(1);
-  color: var(--ink-500);
-  background: color-mix(in oklch, var(--paper) 70%, var(--ink-100));
+  color: var(--body);
+  background: color-mix(in oklch, var(--surface) 70%, var(--hairline));
 }
 
 .columnDragGrip:active {
@@ -275,7 +275,7 @@
 }
 
 .columnDragGrip:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -300,12 +300,10 @@
   width: auto;
   max-width: min(280px, calc(100vw - 28px));
   padding: 8px 14px 8px 10px;
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-8);
-  box-shadow:
-    0 4px 16px color-mix(in oklch, var(--ink-900) 12%, transparent),
-    0 1px 4px color-mix(in oklch, var(--ink-900) 8%, transparent);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-md);
   /* Slight tilt mirrors the right-rail dragGhost idiom in
      RightRail.module.css. */
   transform: rotate(-0.5deg);
@@ -318,7 +316,7 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  color: var(--ink-500);
+  color: var(--body);
   flex-shrink: 0;
 }
 
@@ -326,7 +324,7 @@
   font-size: var(--t-13);
   font-weight: 700;
   letter-spacing: -0.1px;
-  color: var(--ink-900);
+  color: var(--ink);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -395,7 +393,7 @@
     width: auto;
     visibility: visible;
     border-left: none;
-    border-top: 1px solid var(--ink-150);
+    border-top: 1px solid var(--border);
   }
 }
 

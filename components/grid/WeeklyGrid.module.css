@@ -48,23 +48,25 @@
 }
 
 .navTitle {
+  font-family: var(--font-display-sm);
   font-size: var(--t-18);
-  font-weight: 600;
-  color: var(--ink-900);
-  letter-spacing: -0.3px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
   margin-top: 2px;
 }
 
 .navTitle .currentTag {
   margin-left: 8px;
   font-size: var(--t-11);
-  font-weight: 600;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--done);
-  background: color-mix(in oklch, var(--done) 12%, transparent);
-  padding: 2px 8px;
-  border-radius: 999px;
+  letter-spacing: 0.09em;
+  color: var(--honey-600);
+  background: var(--honey-50);
+  border: 1px solid var(--honey-100);
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
   vertical-align: 2px;
 }
 
@@ -97,18 +99,20 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-200);
-  color: var(--ink-700);
-  background: var(--paper);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  color: var(--ink-soft);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
   transition:
     background 0.12s ease,
-    border-color 0.12s ease;
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .navArrow:hover:not(:disabled) {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .navArrow:disabled {
@@ -119,27 +123,29 @@
 .navArrow:focus-visible,
 .navToday:focus-visible,
 .cellAdd:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .navToday {
   height: 44px;
   padding: 0 16px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  color: var(--ink-700);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
   font-size: var(--t-13);
-  font-weight: 500;
+  font-weight: 700;
+  box-shadow: var(--sh-xs);
   transition:
     background 0.12s ease,
-    border-color 0.12s ease;
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .navToday:hover:not(:disabled) {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .navToday:disabled {
@@ -209,7 +215,7 @@
 }
 
 .dayHeadToday {
-  color: var(--ink-900);
+  color: var(--brand-600);
 }
 
 .dayHeadDate {
@@ -303,13 +309,13 @@
 
 .todayPill {
   font-size: var(--t-10);
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--paper);
-  background: var(--ink-900);
+  color: var(--brand-700);
+  background: var(--brand-50);
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 
 /* ── Subject row header ─────────────────────────────────────────────── */
@@ -451,25 +457,23 @@
 
 /* ── DragOverlay floating chip (spec §7) ─────────────────────────────────
  *
- * The overlay card renders with: shadow 0 8px 24px rgba(0,0,0,0.12) +
- * 2px var(--fyi-bg) ring (closest token to purple-300) + scale 1.02 +
- * opacity 0.95.  The ring uses --fyi (information blue) as the closest
- * available token to the spec's "purple-300 ring" — the writing-light
- * swatch would also be acceptable; --fyi is more semantically neutral.
+ * The overlay card renders with: the v1.3 --sh-lg soft elevation + a 2px
+ * "light purple" ring (mid-opacity --writing) + scale 1.02 + opacity 0.95.
+ * The ring reads as the spec's "purple-300" lift without a dedicated token.
  */
 .overlayCard {
   /* Scale via transform so it doesn't displace layout. */
   transform: scale(1.02);
   transform-origin: top left;
   opacity: 0.95;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--sh-lg);
   /* 2px ring (spec §7: "purple-300 ring"). --writing (#6b46c1, purple-600) is
      the closest visible token; --writing-light (#ece5fa) is too pale to read
      as a ring at 2px. A mid-opacity writing color reads correctly as a
      "light purple" ring without needing a purple-300 token. */
   outline: 2px solid color-mix(in oklch, var(--writing) 60%, transparent);
   outline-offset: 0;
-  border-radius: var(--r-8);
+  border-radius: var(--r-md);
   pointer-events: none;
 }
 
@@ -500,17 +504,17 @@
   justify-content: center;
   gap: 8px;
   min-height: 76px;
-  border-radius: var(--r-8);
-  border: 1px dashed var(--ink-200);
+  border-radius: var(--r-md);
+  border: 1px dashed var(--border);
   background: transparent;
-  color: var(--ink-400);
+  color: var(--muted);
   transition:
     border-color 0.12s ease,
     background 0.12s ease;
 }
 
 .emptyCell:hover {
-  border-color: var(--cell-accent, var(--ink-300));
+  border-color: var(--cell-accent, var(--faint));
   background: color-mix(
     in oklch,
     var(--cell-accent, var(--ink-200)) 8%,
@@ -534,10 +538,11 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  color: var(--ink-500);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: var(--sh-xs);
   transition:
     background 0.12s ease,
     color 0.12s ease,
@@ -545,8 +550,8 @@
 }
 
 .cellAdd:hover {
-  background: var(--cell-accent, var(--ink-100));
-  border-color: var(--cell-accent, var(--ink-300));
+  background: var(--cell-accent, var(--brand-50));
+  border-color: var(--cell-accent, var(--brand-300));
   color: var(--paper);
 }
 
@@ -566,14 +571,14 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: var(--r-8);
-  background: var(--paper);
-  color: var(--ink-500);
-  border: 1px solid var(--ink-200);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
   /* Invisible and non-interactive at rest. */
   opacity: 0;
   pointer-events: none;
-  box-shadow: 0 1px 3px rgba(20, 22, 32, 0.12);
+  box-shadow: var(--sh-sm);
   transition:
     opacity 0.12s ease,
     background 0.12s ease,
@@ -589,13 +594,13 @@
 }
 
 .cellAddInline:hover {
-  background: var(--cell-accent, var(--ink-100));
-  border-color: var(--cell-accent, var(--ink-300));
+  background: var(--cell-accent, var(--brand-50));
+  border-color: var(--cell-accent, var(--brand-300));
   color: var(--paper);
 }
 
 .cellAddInline:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -637,10 +642,11 @@
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: var(--r-4);
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  color: var(--ink-500);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: var(--sh-xs);
   opacity: 0;
   pointer-events: none;
   transition:
@@ -656,12 +662,12 @@
 }
 
 .collapseBtn:hover {
-  background: var(--ink-100);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 .collapseBtn:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -829,10 +835,11 @@
   align-items: center;
   gap: 10px;
   padding: 6px 22px;
-  /* --fyi is the app's informational blue — neutral to subject meaning.
-     Using a subject color here would imply a subject identity (CLAUDE.md §4). */
-  background: color-mix(in oklch, var(--fyi) 8%, var(--paper));
-  border-bottom: 1px solid color-mix(in oklch, var(--fyi) 20%, transparent);
+  /* --brand-500 is the v1.3 functional indigo — subject-neutral by design
+     (no subject maps onto pure indigo). Using a subject color here would
+     imply a subject identity (CLAUDE.md §4). */
+  background: var(--brand-50);
+  border-bottom: 1px solid var(--brand-100);
   position: sticky;
   top: 0;
   z-index: 18;
@@ -842,8 +849,8 @@
 /* "N selected" counter — short weight-600 label. */
 .bulkCount {
   font-size: var(--t-13);
-  font-weight: 600;
-  color: var(--ink-900);
+  font-weight: 700;
+  color: var(--ink);
   flex-shrink: 0;
 }
 
@@ -851,7 +858,7 @@
 .bulkLabel {
   font-size: var(--t-13);
   font-weight: 500;
-  color: var(--ink-500);
+  color: var(--body);
   flex-shrink: 0;
 }
 
@@ -867,25 +874,27 @@
   display: inline-flex;
   align-items: center;
   height: 32px;
-  padding: 0 12px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  color: var(--ink-700);
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
   font-size: var(--t-12);
-  font-weight: 500;
+  font-weight: 700;
+  box-shadow: var(--sh-xs);
   transition:
     background 0.1s ease,
-    border-color 0.1s ease;
+    border-color 0.1s ease,
+    color 0.1s ease;
 }
 
 .bulkDayBtn:hover:not(:disabled) {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .bulkDayBtn:focus-visible {
-  outline: 2px solid var(--fyi);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -895,25 +904,25 @@
   display: inline-flex;
   align-items: center;
   height: 32px;
-  padding: 0 12px;
-  border-radius: var(--r-8);
+  padding: 0 14px;
+  border-radius: var(--r-pill);
   border: 1px solid transparent;
   background: transparent;
-  color: var(--ink-500);
+  color: var(--body);
   font-size: var(--t-12);
-  font-weight: 500;
+  font-weight: 600;
   transition:
     background 0.1s ease,
     color 0.1s ease;
 }
 
 .bulkClearBtn:hover {
-  background: var(--ink-100);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 .bulkClearBtn:focus-visible {
-  outline: 2px solid var(--fyi);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -921,11 +930,11 @@
    see which cards are in the selection. The ring is applied here (on the
    slot wrapper that carries data-bulk-selected) so weekly-lesson-card.tsx
    does not need a bulkSelected prop of its own for styling.
-   Token: --fyi (#1f6fb8) is the app's semantic "informational" blue —
+   Token: --brand-500 (#3B6CF6) is the v1.3 functional indigo —
    subject-neutral. Using a subject color here would make a Reading card look
    like a Math card during selection (CLAUDE.md §4: color carries meaning). */
 .cardSlot[data-bulk-selected="true"] {
-  outline: 2px solid var(--fyi);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
-  border-radius: var(--r-8);
+  border-radius: var(--r-md);
 }

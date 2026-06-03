@@ -22,17 +22,17 @@
 /* Static inline pill — no hover, no interaction. */
 
 .default {
-  background: var(--ink-100);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 /* ── filter variant ──────────────────────────────────────────────────────── */
 /* Clickable toggle pill — aria-pressed conveyed visually. */
 
 .filter {
-  background: var(--paper);
-  color: var(--ink-700);
-  border-color: var(--ink-200);
+  background: var(--surface);
+  color: var(--ink-soft);
+  border-color: var(--border);
   cursor: pointer;
   /* ≥44px touch target on phone/tablet via transparent padding inflation */
   min-height: 36px;
@@ -43,23 +43,25 @@
 }
 
 .filter:hover {
-  background: var(--ink-50);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 /* Active state (aria-pressed="true") */
 .filter[aria-pressed="true"] {
-  background: var(--ink-900);
-  color: var(--paper);
+  background: var(--brand-500);
+  color: #fff;
   border-color: transparent;
 }
 
-/* Active hover — subtle — keep dark bg, just signal interactivity */
+/* Active hover — keep brand bg, deepen for interactivity feedback */
 .filter[aria-pressed="true"]:hover {
-  background: var(--ink-700);
+  background: var(--brand-600);
+  color: #fff;
 }
 
 .filter:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -75,8 +77,8 @@
 /* ── removable variant ───────────────────────────────────────────────────── */
 
 .removable {
-  background: var(--ink-100);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--ink-soft);
   /* Extra right padding to give room for the × button */
   padding-right: 4px;
 }
@@ -90,7 +92,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  color: var(--ink-500);
+  color: var(--muted);
   cursor: pointer;
   flex-shrink: 0;
   transition:
@@ -99,12 +101,12 @@
 }
 
 .removeBtn:hover {
-  background: var(--ink-200);
-  color: var(--ink-900);
+  background: var(--border);
+  color: var(--ink);
 }
 
 .removeBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 

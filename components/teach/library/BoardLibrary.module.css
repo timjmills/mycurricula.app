@@ -31,8 +31,8 @@
   display: inline-flex;
   gap: 4px;
   padding: 4px;
-  background: var(--ink-50);
-  border-radius: 12px;
+  background: var(--hairline);
+  border-radius: var(--r-md);
   flex: 0 0 auto;
 }
 
@@ -40,16 +40,16 @@
   min-height: 40px;
   padding: 9px 18px;
   border: none;
-  border-radius: 9px;
+  border-radius: var(--r-sm);
   background: transparent;
-  color: var(--ink-400);
+  color: var(--muted);
   font-size: var(--t-14);
   font-weight: 700;
   cursor: pointer;
 }
 
 .segment:hover {
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 .segment:focus-visible {
@@ -83,20 +83,20 @@
   width: 100%;
   min-height: 44px;
   padding: 11px 14px 11px 38px;
-  border: 1px solid var(--ink-150);
-  border-radius: 12px;
-  background: var(--paper);
-  color: var(--ink-900);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
   font-size: var(--t-14);
   font-family: inherit;
 }
 
 .searchInput::placeholder {
-  color: var(--ink-400);
+  color: var(--muted);
 }
 
 .searchInput:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
@@ -159,7 +159,7 @@
   flex-direction: column;
   gap: 4px;
   padding-right: 16px;
-  border-right: 1px solid var(--ink-150);
+  border-right: 1px solid var(--border);
   overflow-y: auto;
 }
 
@@ -251,9 +251,9 @@
 .usageCard {
   margin-top: auto;
   padding: 16px;
-  border: 1px solid var(--ink-150);
-  border-radius: 16px;
-  background: var(--ink-50);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface-warm);
 }
 
 .usageText {
@@ -298,17 +298,17 @@
   gap: 5px;
   min-height: 36px;
   padding: 7px 14px;
-  border: 1.5px solid var(--ink-150);
-  border-radius: 10px;
-  background: var(--paper);
-  color: var(--ink-500);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--body);
   font-size: var(--t-13);
   font-weight: 700;
   cursor: pointer;
 }
 
 .filterPill:hover {
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
 }
 
 .filterPill:focus-visible {
@@ -362,9 +362,9 @@
   display: flex;
   flex-direction: column;
   padding: 14px;
-  border: 1px solid var(--ink-150);
-  border-radius: 18px;
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
   box-shadow: var(--wf-shadow-card);
 }
 
@@ -407,7 +407,8 @@
 
 .cardTitle {
   margin: 0 0 10px;
-  color: var(--ink-900);
+  font-family: var(--font-display-sm);
+  color: var(--ink);
   font-size: var(--t-16);
   font-weight: 800;
   line-height: 1.25;
@@ -552,7 +553,7 @@
 .explainer {
   padding: 20px 22px;
   border: 1px solid var(--wf-blue-line);
-  border-radius: 18px;
+  border-radius: var(--r-lg);
   background: var(--wf-blue-grad);
 }
 
@@ -573,9 +574,9 @@
 
 .teamLibrary {
   padding: 20px 22px;
-  border: 1px solid var(--ink-150);
-  border-radius: 18px;
-  background: var(--ink-50);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface-warm);
 }
 
 .teamLibraryHead {
@@ -609,9 +610,9 @@
   gap: 8px;
   min-height: 44px;
   padding: 13px 14px;
-  border: 1px solid var(--ink-150);
-  border-radius: 13px;
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
   text-align: left;
   cursor: pointer;
 }
@@ -655,10 +656,10 @@
   align-items: center;
   gap: 10px;
   padding: 13px 18px;
-  border-top: 1px solid var(--ink-150);
-  border-radius: 12px;
+  border-top: 1px solid var(--border);
+  border-radius: var(--r-md);
   background: var(--wf-blue-soft);
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 .tipsIcon {

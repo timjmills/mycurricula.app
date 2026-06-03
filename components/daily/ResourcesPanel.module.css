@@ -1,8 +1,8 @@
 /* ResourcesPanel.module.css — the Resources card at the top of the Daily
    right rail.
 
-   The panel is a WHITE CARD: var(--paper) fill, 1px var(--ink-150)
-   hairline border, var(--shadow-card) lift. Inside it stacks a head row
+   The panel is a WHITE CARD: var(--surface) fill, 1px var(--border)
+   hairline border, var(--sh-sm) lift. Inside it stacks a head row
    (title + count + grid/list toggle), a tab row (All / Slides / Handouts
    / Tools), and a body that is either a 2-column tile grid or a list of
    compact inline rows.
@@ -27,10 +27,10 @@
   flex-direction: column;
   gap: 10px;
   padding: 12px 12px 14px;
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-8);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
   height: 100%;
   min-height: 0;
   box-sizing: border-box;
@@ -74,7 +74,7 @@
   flex-shrink: 0;
   border: none;
   background: transparent;
-  color: var(--ink-300);
+  color: var(--faint);
   border-radius: var(--r-4);
   cursor: grab;
   transition: color 0.1s;
@@ -92,7 +92,7 @@
 }
 
 .gripBtn:hover {
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .gripBtn:active {
@@ -100,7 +100,7 @@
 }
 
 .gripBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -121,7 +121,7 @@
   flex-shrink: 0;
   border: none;
   background: transparent;
-  color: var(--ink-400);
+  color: var(--muted);
   border-radius: var(--r-4);
   cursor: pointer;
   position: relative;
@@ -136,11 +136,11 @@
 }
 
 .backBtn:hover {
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 .backBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -158,15 +158,16 @@
   width: 26px;
   height: 26px;
   flex: 0 0 auto;
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-6);
-  background: var(--paper);
-  color: var(--ink-700);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-soft);
   cursor: pointer;
   position: relative;
   /* Expand the touch target to ≥44px without changing the 26px visual
      box — mirrors the gripBtn pattern. */
   padding: 0;
+  box-shadow: var(--sh-xs);
   transition:
     background 0.12s,
     border-color 0.12s,
@@ -180,13 +181,13 @@
 }
 
 .addBtn:hover {
-  background: var(--ink-50);
-  border-color: var(--ink-200);
-  color: var(--ink-900);
+  background: var(--surface);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .addBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -197,11 +198,11 @@
    with the dropped files; cancelling clears the outline. Reduced-motion
    keeps the visual but drops the transition. */
 .panelDragOver {
-  border-color: color-mix(in oklch, var(--ink-900) 18%, transparent);
+  border-color: color-mix(in oklch, var(--brand-500) 35%, transparent);
   box-shadow:
-    var(--shadow-card),
-    0 0 0 2px color-mix(in oklch, var(--ink-900) 8%, transparent) inset;
-  background: color-mix(in oklch, var(--paper) 92%, var(--ink-100));
+    var(--sh-sm),
+    0 0 0 2px color-mix(in oklch, var(--brand-500) 14%, transparent) inset;
+  background: color-mix(in oklch, var(--surface) 92%, var(--brand-50));
 }
 
 /* ── Chevron collapse toggle (rail-driven) ──────────────────────────────── */
@@ -228,9 +229,9 @@
   flex-shrink: 0;
   border: none;
   background: transparent;
-  /* Quiet ink-300 to match the grip on the same row — both should read as
+  /* Quiet faint ink to match the grip on the same row — both should read as
      tertiary chrome under the title, not competing with it. */
-  color: var(--ink-300);
+  color: var(--faint);
   border-radius: var(--r-4);
   cursor: pointer;
   transition: color 0.12s ease;
@@ -243,11 +244,11 @@
 }
 
 .collapseBtn:hover {
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .collapseBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -292,12 +293,13 @@
 
 .title {
   margin: 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-14);
-  font-weight: 700;
+  font-weight: 800;
   /* Tight tracking on the bold panel-title tier — matches the
      editorial vocabulary used on the lesson-detail title hero. */
   letter-spacing: -0.2px;
-  color: var(--ink-900);
+  color: var(--ink);
   /* Truncate with ellipsis when the title is long — most relevant when
      showing "Resources · <lesson title>" in lesson-scoped mode. The full
      title is exposed as a `title` attribute on the h3 element. */
@@ -316,9 +318,9 @@
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  border-radius: 999px;
-  background: var(--ink-100);
-  color: var(--ink-600, var(--ink-700));
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+  color: var(--ink-soft);
   font-size: var(--t-11);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -334,9 +336,9 @@
   display: inline-flex;
   align-items: center;
   padding: 2px;
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-6);
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
 }
 
 .modeBtn {
@@ -352,7 +354,7 @@
   border: none;
   border-radius: var(--r-4);
   background: transparent;
-  color: var(--ink-400);
+  color: var(--muted);
   cursor: pointer;
   transition:
     background 0.1s,
@@ -360,20 +362,20 @@
 }
 
 .modeBtn:hover {
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .modeBtnActive {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--ink);
 }
 
 .modeBtnActive:hover {
-  background: var(--ink-100);
+  background: var(--hairline);
 }
 
 .modeBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -387,8 +389,8 @@
   align-items: center;
   gap: 2px;
   padding: 3px;
-  background: var(--ink-100);
-  border-radius: var(--r-6);
+  background: var(--hairline);
+  border-radius: var(--r-sm);
   overflow-x: auto;
 }
 
@@ -397,11 +399,11 @@
   min-width: 0;
   padding: 5px 9px;
   border: none;
-  border-radius: var(--r-4);
+  border-radius: var(--r-xs);
   background: transparent;
   font-size: var(--t-11);
-  font-weight: 500;
-  color: var(--ink-500);
+  font-weight: 600;
+  color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
   transition:
@@ -410,22 +412,22 @@
 }
 
 .tab:hover {
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 .tabActive {
-  background: var(--paper);
-  color: var(--ink-900);
-  font-weight: 600;
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  color: var(--brand-600);
+  font-weight: 700;
+  box-shadow: var(--sh-xs);
 }
 
 .tabActive:hover {
-  color: var(--ink-900);
+  color: var(--brand-600);
 }
 
 .tab:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -435,7 +437,7 @@
   margin: 0;
   padding: 8px 2px 4px;
   font-size: var(--t-12);
-  color: var(--ink-400);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -507,9 +509,9 @@
      paper chip with a hairline border so it reads on any subject tint or
      the dark video frame. */
   border-radius: var(--r-4);
-  border: 1px solid color-mix(in oklch, var(--ink-900) 12%, transparent);
-  background: color-mix(in oklch, var(--paper) 86%, transparent);
-  color: var(--ink-600, var(--ink-700));
+  border: 1px solid color-mix(in oklch, var(--ink) 12%, transparent);
+  background: color-mix(in oklch, var(--surface) 86%, transparent);
+  color: var(--ink-soft);
   cursor: pointer;
   z-index: 2;
   transition:
@@ -518,12 +520,12 @@
 }
 
 .tileMenuBtn:hover {
-  background: var(--paper);
-  color: var(--ink-900);
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .tileMenuBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -567,10 +569,10 @@
   gap: 6px;
   padding: 2px 2px 4px;
   font-size: var(--t-10);
-  font-weight: 600;
-  letter-spacing: 0.6px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .list {
@@ -605,12 +607,12 @@
   padding: 6px 8px;
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--ink-100);
-  border-radius: var(--r-4);
+  border-bottom: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
   cursor: pointer;
   text-align: left;
   font: inherit;
-  color: var(--ink-900);
+  color: var(--ink);
   transition:
     background 0.12s ease,
     box-shadow 0.12s ease,
@@ -622,16 +624,16 @@
 }
 
 .resourceRow:hover {
-  /* Subtle ink-50 fill + a 1px lift — telegraphs the row is a live
+  /* Subtle warm fill + a 1px lift — telegraphs the row is a live
      affordance without the heavy chip look the old style had. */
-  background: var(--ink-50);
-  box-shadow: 0 1px 2px color-mix(in oklch, var(--ink-900) 6%, transparent);
+  background: var(--surface-warm);
+  box-shadow: var(--sh-xs);
   transform: translateY(-1px);
-  border-radius: var(--r-6);
+  border-radius: var(--r-sm);
 }
 
 .resourceRow:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
   border-radius: var(--r-6);
 }
@@ -647,11 +649,11 @@
   width: 32px;
   height: 32px;
   flex-shrink: 0;
-  border-radius: var(--r-6);
+  border-radius: var(--r-xs);
   /* Per-type pastel fills set on .row<Type>. Default fallback for any
      type that didn't get a modifier — quiet ink chip. */
-  background: var(--ink-100);
-  color: var(--ink-600);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 /* ── Two-line text block ───────────────────────────────────────────────
@@ -669,7 +671,7 @@
   font-size: var(--t-13);
   font-weight: 600;
   line-height: 1.25;
-  color: var(--ink-900);
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -679,7 +681,7 @@
 .resourceRowUrl {
   font-size: var(--t-11);
   line-height: 1.25;
-  color: var(--ink-500);
+  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -706,8 +708,8 @@
   text-transform: uppercase;
   /* Default fallback (also covers any future type that doesn't get a
      row<Type> modifier). The per-type rules below override both. */
-  background: var(--ink-100);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 /* ── Per-type pastels: chip + pill share one declaration per type ──────
@@ -719,25 +721,25 @@
 .resourceRow.rowSlides .resourceRowChip,
 .resourceRow.rowSlides .resourceRowTag {
   background: var(--hlp-maya);
-  color: color-mix(in oklch, var(--hl-maya) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-maya) 60%, var(--ink));
 }
 
 .resourceRow.rowPdf .resourceRowChip,
 .resourceRow.rowPdf .resourceRowTag {
   background: var(--hlp-red);
-  color: color-mix(in oklch, var(--hl-red) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-red) 60%, var(--ink));
 }
 
 .resourceRow.rowDoc .resourceRowChip,
 .resourceRow.rowDoc .resourceRowTag {
   background: var(--hlp-aqua);
-  color: color-mix(in oklch, var(--hl-aqua) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-aqua) 60%, var(--ink));
 }
 
 .resourceRow.rowImage .resourceRowChip,
 .resourceRow.rowImage .resourceRowTag {
   background: var(--hlp-lime);
-  color: color-mix(in oklch, var(--hl-lime) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-lime) 60%, var(--ink));
 }
 
 .resourceRow.rowVideo .resourceRowChip,
@@ -745,7 +747,7 @@
   /* heliotrope is the actual purple token (--hl-violet is a hot-pink, so
      we don't use it for "Video"). */
   background: var(--hlp-heliotrope);
-  color: color-mix(in oklch, var(--hl-heliotrope) 55%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-heliotrope) 55%, var(--ink));
 }
 
 .resourceRow.rowWeb .resourceRowChip,
@@ -753,7 +755,7 @@
 .resourceRow.rowLink .resourceRowChip,
 .resourceRow.rowLink .resourceRowTag {
   background: var(--hlp-cheese);
-  color: color-mix(in oklch, var(--hl-cheese) 60%, var(--ink-900));
+  color: color-mix(in oklch, var(--hl-cheese) 60%, var(--ink));
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────── */

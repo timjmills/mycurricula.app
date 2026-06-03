@@ -9,9 +9,9 @@
   flex-direction: column;
   gap: 12px;
   padding: 12px;
-  border: 1px solid var(--ink-150);
-  border-radius: 12px;
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
 }
 
 /* ── Explainer ─────────────────────────────────────────────────────────────── */
@@ -84,8 +84,8 @@
   flex-direction: column;
   gap: 10px;
   padding: 11px;
-  border-radius: 10px;
-  background: var(--ink-50);
+  border-radius: var(--r-sm);
+  background: var(--surface-warm);
 }
 
 .field {
@@ -106,10 +106,10 @@
   width: 100%;
   min-height: 38px;
   padding: 8px 10px;
-  border: 1px solid var(--ink-150);
-  border-radius: 8px;
-  background: var(--paper);
-  color: var(--ink-900);
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink);
   font-size: var(--t-13);
   font-family: inherit;
   font-weight: 600;
@@ -117,7 +117,7 @@
 
 .select:focus-visible,
 .input:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
@@ -132,21 +132,21 @@
   min-width: 44px;
   min-height: 38px;
   padding: 6px 10px;
-  border: 1px solid var(--ink-150);
-  border-radius: 999px;
-  background: var(--paper);
-  color: var(--ink-500);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--body);
   font-size: var(--t-12);
   font-weight: 700;
   cursor: pointer;
 }
 
 .dayPill:hover {
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
 }
 
 .dayPill:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 

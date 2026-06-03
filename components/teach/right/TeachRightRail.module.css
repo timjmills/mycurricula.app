@@ -10,8 +10,8 @@
   align-items: center;
   gap: 12px;
   padding: 14px 0;
-  background: var(--paper);
-  border-left: 1px solid var(--ink-150);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border-left: 1px solid var(--border);
   overflow-y: auto;
 }
 
@@ -36,15 +36,16 @@
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: transparent;
-  color: var(--ink-500);
+  color: var(--body);
   cursor: pointer;
 }
 
 .iconBtn:hover {
-  background: var(--ink-50);
-  color: var(--ink-900);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+  color: var(--brand-600);
 }
 
 /* Unread/attention badge (audit B5) — a small count pip top-right of the icon. */
@@ -62,23 +63,24 @@
   font-weight: 800;
   line-height: 1;
   color: var(--paper);
-  background: var(--urgent, #e5484d);
-  border-radius: 999px;
+  background: var(--danger);
+  border-radius: var(--r-pill);
   pointer-events: none;
 }
 
 .iconBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .iconBtnActive {
-  background: var(--ink-900);
+  background: var(--brand-500);
   color: var(--paper);
+  box-shadow: var(--sh-brand);
 }
 
 .iconBtnActive:hover {
-  background: var(--ink-900);
+  background: var(--brand-500);
   color: var(--paper);
 }
 
@@ -95,9 +97,9 @@
   width: 16px;
   height: 16px;
   border-radius: 5px;
-  color: var(--ink-400);
-  background: var(--paper);
-  box-shadow: var(--shadow-card);
+  color: var(--muted);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
   opacity: 0;
   cursor: grab;
   touch-action: none;
@@ -123,10 +125,10 @@
 .label {
   font-size: var(--t-10);
   font-weight: 600;
-  color: var(--ink-400);
+  color: var(--muted);
   line-height: 1;
 }
 
 .labelActive {
-  color: var(--ink-900);
+  color: var(--brand-700);
 }

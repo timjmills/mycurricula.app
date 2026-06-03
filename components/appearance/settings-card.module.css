@@ -29,12 +29,17 @@
 }
 
 .eyebrow {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   font-size: var(--t-11);
-  color: var(--ink-400);
-  font-weight: 700;
+  color: var(--honey-600);
+  background: var(--honey-50);
+  border: 1px solid var(--honey-100);
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
 }
 
 /* W2-B7 scope chip — same vocabulary + same visual contract as the
@@ -57,23 +62,24 @@
 }
 
 .scopeChipPersonal {
-  background: var(--ink-100);
-  color: var(--ink-500);
-  border-color: var(--ink-200);
+  background: var(--hairline);
+  color: var(--body);
+  border-color: var(--border);
 }
 
 .title {
-  margin: 4px 0 0;
+  margin: 6px 0 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-15, var(--t-16));
-  font-weight: 700;
-  color: var(--ink-900);
-  letter-spacing: -0.2px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
 }
 
 .hint {
-  margin: 3px 0 0;
+  margin: 4px 0 0;
   font-size: var(--t-12);
-  color: var(--ink-500);
+  color: var(--muted);
   line-height: 1.55;
   text-wrap: pretty;
 }
@@ -89,21 +95,21 @@
   height: 18px;
   border-radius: 999px;
   flex: 0 0 auto;
-  border: 2px solid var(--ink-300);
-  background: var(--paper);
+  border: 2px solid var(--idle);
+  background: var(--surface);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .radioDotSelected {
-  border-color: var(--ink-900);
-  background: var(--ink-900);
+  border-color: var(--brand-500);
+  background: var(--brand-500);
 }
 
 .radioDotInner {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--paper);
+  background: #fff;
 }

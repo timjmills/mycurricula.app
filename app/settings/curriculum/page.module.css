@@ -29,15 +29,15 @@
 .fieldLabel {
   font-size: var(--t-11);
   font-weight: 700;
-  color: var(--ink-500);
+  color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.06em;
 }
 
 .fieldHint {
   margin: 4px 0 0;
   font-size: var(--t-12);
-  color: var(--ink-500);
+  color: var(--muted);
   line-height: 1.55;
   text-wrap: pretty;
   max-width: 64ch;
@@ -48,23 +48,27 @@
   padding: 0 12px;
   font-family: inherit;
   font-size: var(--t-13);
-  color: var(--ink-900);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-8);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   outline: none;
-  transition: border-color 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
   max-width: 480px;
 }
 
 .textInput:hover {
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
 }
 
 .textInput:focus-visible {
-  border-color: var(--ink-900);
-  outline: 2px solid var(--ink-900);
-  outline-offset: 1px;
+  background: var(--surface);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
+  outline: none;
 }
 
 /* ── Preset dropdown ────────────────────────────────────────────────── */
@@ -81,23 +85,24 @@
   padding: 0 12px;
   font-family: inherit;
   font-size: var(--t-13);
-  color: var(--ink-900);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-8);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   outline: none;
   cursor: pointer;
   max-width: 320px;
 }
 
 .select:hover {
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
 }
 
 .select:focus-visible {
-  border-color: var(--ink-900);
-  outline: 2px solid var(--ink-900);
-  outline-offset: 1px;
+  background: var(--surface);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
+  outline: none;
 }
 
 /* ── Months fieldset ───────────────────────────────────────────────── */
@@ -111,9 +116,9 @@
 .monthsLegend {
   font-size: var(--t-11);
   font-weight: 700;
-  color: var(--ink-500);
+  color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.06em;
   padding: 0;
   margin-bottom: 8px;
 }
@@ -162,11 +167,11 @@
   justify-content: center;
   min-height: 44px;
   padding: 0 10px;
-  border-radius: var(--r-8);
+  border-radius: var(--r-pill);
   font-family: inherit;
   font-size: var(--t-13);
-  font-weight: 600;
-  letter-spacing: 0.2px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   cursor: pointer;
   transition:
     background 120ms ease,
@@ -176,7 +181,7 @@
 }
 
 .monthChip:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -194,24 +199,25 @@
 }
 
 .monthChipOn {
-  background: var(--ink-900);
-  color: var(--paper);
-  border: 1px solid var(--ink-900);
+  background: var(--brand-500);
+  color: #fff;
+  border: 1px solid var(--brand-500);
+  box-shadow: var(--sh-brand);
 }
 
 .monthChipOn:hover {
-  background: color-mix(in srgb, var(--ink-900) 88%, var(--paper));
+  background: var(--brand-600);
 }
 
 .monthChipOff {
-  background: var(--paper);
-  color: var(--ink-700);
-  border: 1px solid var(--ink-200);
+  background: var(--surface);
+  color: var(--ink-soft);
+  border: 1px solid var(--border);
 }
 
 .monthChipOff:hover {
-  border-color: var(--ink-400);
-  background: var(--ink-50);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 /* ── Date range row (academic year start + end pickers) ─────────────
@@ -304,10 +310,10 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-8);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   overflow: hidden;
-  background: var(--paper);
+  background: var(--surface);
 }
 
 .holidayItem {
@@ -316,7 +322,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 12px 12px 16px;
-  border-top: 1px solid var(--ink-100);
+  border-top: 1px solid var(--hairline);
   /* Touch target ≥44px on phone — combined padding + Button hit-area
      inflation keeps the row clickable. */
   min-height: 56px;
@@ -351,14 +357,14 @@
 .holidayDate {
   font-size: var(--t-13);
   font-weight: 700;
-  color: var(--ink-900);
+  color: var(--ink);
   white-space: nowrap;
 }
 
 .holidayName {
   font-size: var(--t-13);
   font-weight: 500;
-  color: var(--ink-700);
+  color: var(--ink-soft);
   /* Single line on desktop with ellipsis; phone wraps to a new row
      entirely via the grid-template-areas rewrite above. */
   overflow: hidden;
@@ -369,7 +375,7 @@
 
 .holidayEmpty {
   font-size: var(--t-13);
-  color: var(--ink-500);
+  color: var(--muted);
   font-style: italic;
   padding: 16px;
   text-align: center;
@@ -380,7 +386,7 @@
 .placeholderBody {
   margin: 8px 0 0;
   font-size: var(--t-13);
-  color: var(--ink-500);
+  color: var(--muted);
   line-height: 1.55;
   text-wrap: pretty;
   max-width: 64ch;
@@ -396,11 +402,11 @@
   padding: 4px 10px;
   font-size: var(--t-11);
   font-weight: 600;
-  color: var(--ink-700);
-  background: var(--ink-50);
-  border: 1px solid var(--ink-150);
+  color: var(--ink-soft);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
   border-radius: var(--r-pill);
-  letter-spacing: 0.2px;
+  letter-spacing: 0.01em;
   cursor: help;
   white-space: nowrap;
 }
@@ -418,7 +424,7 @@
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--ink-400);
+  background: var(--muted);
 }
 
 /* ── Phone tighten — match Catch-up + Appearance pages ───────────── */

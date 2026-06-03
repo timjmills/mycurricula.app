@@ -9,16 +9,18 @@
 /* ── Heading + helper text ──────────────────────────────────────────────── */
 
 .heading {
+  font-family: var(--font-display);
   font-size: var(--t-26);
-  font-weight: 700;
-  color: var(--ink-900);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
   line-height: 1.2;
   margin: 0 0 8px;
 }
 
 .helper {
   font-size: var(--t-14);
-  color: var(--ink-500);
+  color: var(--body);
   line-height: 1.55;
   margin: 0 0 28px;
 }
@@ -28,10 +30,10 @@
 .fieldLabel {
   display: block;
   font-size: var(--t-12);
-  font-weight: 600;
-  letter-spacing: 0.4px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink-400);
+  color: var(--muted);
   margin-bottom: 6px;
 }
 
@@ -42,25 +44,29 @@
   padding: 11px 14px;
   font-size: var(--t-16);
   font-family: var(--font-sans);
-  color: var(--ink-900);
-  background: var(--paper);
-  border: 1.5px solid var(--ink-200);
-  border-radius: var(--r-8);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   outline: none;
-  transition: border-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .textInput::placeholder {
-  color: var(--ink-300);
+  color: var(--faint);
 }
 
 .textInput:focus {
-  border-color: var(--ink-500);
+  background: var(--surface);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
 }
 
 .textInput:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
+  outline: none;
 }
 
 /* ── Grade chip grid (GradeStep) ────────────────────────────────────────── */
@@ -79,11 +85,11 @@
   min-height: 44px;
   padding: 8px 16px;
   font-size: var(--t-14);
-  font-weight: 600;
-  color: var(--ink-700);
-  background: var(--paper);
-  border: 1.5px solid var(--ink-200);
-  border-radius: var(--r-8);
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
   cursor: pointer;
   transition:
     background 0.12s ease,
@@ -92,25 +98,25 @@
 }
 
 .chip:hover {
-  border-color: var(--ink-400);
-  background: var(--ink-50);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .chip:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .chipSelected {
-  color: var(--paper);
-  background: var(--ink-900);
-  border-color: var(--ink-900);
+  color: var(--brand-700);
+  background: var(--brand-50);
+  border-color: var(--brand-500);
 }
 
 .chipSelected:hover {
-  background: var(--ink-700);
-  border-color: var(--ink-700);
-  color: var(--paper);
+  background: var(--brand-50);
+  border-color: var(--brand-500);
+  color: var(--brand-700);
 }
 
 /* Multiple grades chip is wider, so give it a larger min-width. */
@@ -135,46 +141,48 @@
   min-height: 60px;
   padding: 13px 20px;
   flex: 1 1 180px;
-  background: var(--paper);
-  border: 1.5px solid var(--ink-200);
-  border-radius: var(--r-12);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-xs);
   cursor: pointer;
   text-align: left;
   transition:
     background 0.12s ease,
-    border-color 0.12s ease;
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 .presetBtn:hover {
-  border-color: var(--ink-400);
-  background: var(--ink-50);
+  border-color: var(--brand-300);
+  box-shadow: var(--sh-sm);
 }
 
 .presetBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .presetBtnSelected {
-  background: var(--ink-100);
-  border-color: var(--ink-900);
+  background: var(--brand-50);
+  border-color: var(--brand-500);
   border-width: 2px;
 }
 
 .presetBtnSelected:hover {
-  background: var(--ink-100);
-  border-color: var(--ink-900);
+  background: var(--brand-50);
+  border-color: var(--brand-500);
 }
 
 .presetLabel {
   font-size: var(--t-14);
-  font-weight: 600;
-  color: var(--ink-900);
+  font-weight: 700;
+  color: var(--ink);
 }
 
 .presetSub {
   font-size: var(--t-12);
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 /* ── Weekday toggles (SchoolWeekStep custom) ────────────────────────────── */
@@ -194,11 +202,11 @@
   min-height: 44px;
   padding: 8px 14px;
   font-size: var(--t-13);
-  font-weight: 600;
-  color: var(--ink-500);
-  background: var(--paper);
-  border: 1.5px solid var(--ink-200);
-  border-radius: var(--r-6);
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
   cursor: pointer;
   transition:
     background 0.12s ease,
@@ -207,26 +215,25 @@
 }
 
 .weekdayToggle:hover {
-  border-color: var(--ink-400);
-  background: var(--ink-50);
-  color: var(--ink-700);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .weekdayToggle:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .weekdayActive {
-  color: var(--paper);
-  background: var(--ink-900);
-  border-color: var(--ink-900);
+  color: var(--brand-700);
+  background: var(--brand-50);
+  border-color: var(--brand-500);
 }
 
 .weekdayActive:hover {
-  background: var(--ink-700);
-  border-color: var(--ink-700);
-  color: var(--paper);
+  background: var(--brand-50);
+  border-color: var(--brand-500);
+  color: var(--brand-700);
 }
 
 /* ── Date inputs (SchoolWeekStep) ───────────────────────────────────────── */
@@ -249,21 +256,25 @@
   padding: 11px 14px;
   font-size: var(--t-14);
   font-family: var(--font-sans);
-  color: var(--ink-900);
-  background: var(--paper);
-  border: 1.5px solid var(--ink-200);
-  border-radius: var(--r-8);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   outline: none;
-  transition: border-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .dateInput:focus {
-  border-color: var(--ink-500);
+  background: var(--surface);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
 }
 
 .dateInput:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
+  outline: none;
 }
 
 /* ── Rotation option cards (RotationStep) ───────────────────────────────── */
@@ -280,35 +291,37 @@
   gap: 14px;
   padding: 16px 18px;
   min-height: 68px;
-  background: var(--paper);
-  border: 1.5px solid var(--ink-200);
-  border-radius: var(--r-12);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-xs);
   cursor: pointer;
   text-align: left;
   transition:
     background 0.12s ease,
-    border-color 0.12s ease;
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 .optionCard:hover {
-  border-color: var(--ink-400);
-  background: var(--ink-50);
+  border-color: var(--brand-300);
+  box-shadow: var(--sh-sm);
 }
 
 .optionCard:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
 .optionCardSelected {
-  background: var(--ink-100);
-  border-color: var(--ink-900);
+  background: var(--brand-50);
+  border-color: var(--brand-500);
   border-width: 2px;
 }
 
 .optionCardSelected:hover {
-  background: var(--ink-100);
-  border-color: var(--ink-900);
+  background: var(--brand-50);
+  border-color: var(--brand-500);
 }
 
 .radioDot {
@@ -317,18 +330,18 @@
   height: 18px;
   margin-top: 1px;
   border-radius: 50%;
-  border: 2px solid var(--ink-300);
-  background: var(--paper);
+  border: 2px solid var(--idle);
+  background: var(--surface);
   transition:
     border-color 0.12s ease,
     background 0.12s ease;
 }
 
 .radioDotSelected {
-  border-color: var(--ink-900);
-  background: var(--ink-900);
+  border-color: var(--brand-500);
+  background: var(--brand-500);
   /* Inset white dot via box-shadow — no pseudo-element needed. */
-  box-shadow: inset 0 0 0 3px var(--paper);
+  box-shadow: inset 0 0 0 3px var(--surface);
 }
 
 .optionText {
@@ -338,15 +351,15 @@
 .optionLabel {
   display: block;
   font-size: var(--t-14);
-  font-weight: 600;
-  color: var(--ink-900);
+  font-weight: 700;
+  color: var(--ink);
   margin-bottom: 2px;
 }
 
 .optionDesc {
   display: block;
   font-size: var(--t-13);
-  color: var(--ink-500);
+  color: var(--muted);
   line-height: 1.45;
 }
 
@@ -364,27 +377,31 @@
   padding: 11px 14px;
   font-size: var(--t-16);
   font-family: var(--font-sans);
-  color: var(--ink-900);
-  background: var(--paper);
-  border: 1.5px solid var(--ink-200);
-  border-radius: var(--r-8);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   outline: none;
-  transition: border-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .numberInput:focus {
-  border-color: var(--ink-500);
+  background: var(--surface);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
 }
 
 .numberInput:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: 2px;
+  outline: none;
 }
 
 /* ── Divider within a step ──────────────────────────────────────────────── */
 
 .divider {
   height: 1px;
-  background: var(--ink-150);
+  background: var(--border);
   margin: 24px 0;
 }

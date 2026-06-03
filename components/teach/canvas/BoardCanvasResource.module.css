@@ -72,7 +72,7 @@
 .skeleton {
   position: absolute;
   inset: 0;
-  background: var(--ink-100, #f1f2f6);
+  background: var(--ink-100);
   overflow: hidden;
 }
 .skeletonShimmer {

@@ -7,23 +7,24 @@
 
 .heading {
   margin: 0 0 8px;
+  font-family: var(--font-display);
   font-size: var(--t-26);
-  font-weight: 700;
-  color: var(--ink-900);
-  letter-spacing: -0.4px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
   line-height: 1.2;
 }
 
 .helper {
   margin: 0 0 24px;
   font-size: var(--t-14);
-  color: var(--ink-500);
+  color: var(--body);
   line-height: 1.55;
 }
 
 .helper strong {
-  color: var(--ink-700);
-  font-weight: 600;
+  color: var(--ink-soft);
+  font-weight: 700;
 }
 
 /* Ordered list — numbers give a clear "period N" feel. */
@@ -45,9 +46,9 @@
   gap: 10px;
   padding: 9px 14px;
   min-height: 44px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-150);
-  background: var(--paper);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 /* Period number badge via counter. */
@@ -57,10 +58,10 @@
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: var(--ink-100);
-  color: var(--ink-500);
+  background: var(--brand-50);
+  color: var(--brand-700);
   font-size: var(--t-11);
-  font-weight: 700;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,8 +79,8 @@
 .name {
   flex: 1;
   font-size: var(--t-14);
-  font-weight: 600;
-  color: var(--ink-900);
+  font-weight: 700;
+  color: var(--ink);
 }
 
 /* Up/Down button cluster. */
@@ -96,6 +97,6 @@
 .note {
   margin: 16px 0 0;
   font-size: var(--t-12);
-  color: var(--ink-400);
+  color: var(--muted);
   line-height: 1.55;
 }

@@ -30,18 +30,18 @@
 }
 
 .trigger:hover {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--brand-600);
 }
 
 .trigger:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
 .trigger[aria-expanded="true"] {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--brand-50);
+  color: var(--brand-600);
 }
 
 /* ── Popover menu ─────────────────────────────────────────────────────────── */
@@ -53,10 +53,10 @@
   max-height: 60vh;
   overflow-y: auto;
   padding: var(--r-6);
-  background: var(--paper);
-  border: var(--line);
-  border-radius: var(--r-12);
-  box-shadow: var(--shadow-popover);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
 }
 
 /* Align the popover to the panel edge so it never overflows the viewport. */
@@ -96,11 +96,11 @@
 }
 
 .item:hover {
-  background: var(--ink-100);
+  background: var(--hairline);
 }
 
 .item:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: -2px;
 }
 

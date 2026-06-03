@@ -16,11 +16,11 @@
   flex-direction: column;
   min-width: 0;
   width: 100%;
-  border: var(--line);
+  border: 1px solid var(--border);
   border-radius: var(--wf-r-card);
   overflow: hidden;
-  background: var(--paper);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
 }
 
 /* ── Toolbar ────────────────────────────────────────────────────────────── */
@@ -55,6 +55,7 @@
   gap: var(--r-2);
 }
 .boardName {
+  font-family: var(--font-display-sm);
   font-size: var(--t-16);
   font-weight: 800;
   letter-spacing: -0.3px;
@@ -249,9 +250,9 @@
   gap: var(--r-4);
   padding: var(--r-4);
   border-radius: var(--wf-r-button);
-  background: var(--paper);
-  border: var(--line);
-  box-shadow: var(--shadow-popover);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-md);
   z-index: 6;
 }
 .toolBtn {
@@ -310,10 +311,10 @@
   max-height: 70vh;
   width: 100%;
   border-left: none;
-  border-top: var(--line);
+  border-top: 1px solid var(--border);
   border-top-left-radius: var(--wf-r-card);
   border-top-right-radius: var(--wf-r-card);
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--sh-lg);
   height: auto;
 }
 .sheetGrip {
@@ -346,7 +347,7 @@
   font-weight: 700;
   color: var(--paper);
   background: var(--wf-blue-accent);
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--sh-md);
 }
 
 /* Tier switch: desktop docks the panel and hides the FAB; tablet/phone hides
@@ -375,10 +376,10 @@
   right: 0;
   width: 240px;
   max-width: calc(100vw - 24px);
-  background: var(--paper);
-  border: var(--line);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--wf-r-button);
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--sh-lg);
   padding: var(--r-8);
   z-index: 40;
   max-height: 60vh;
@@ -426,9 +427,10 @@
   width: min(640px, 92vw);
   max-height: 88vh;
   overflow: auto;
-  background: var(--paper);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--wf-r-card);
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--sh-lg);
   padding: var(--r-12);
 }
 .modalHead {
@@ -437,6 +439,7 @@
   margin-bottom: var(--r-6);
 }
 .modalTitle {
+  font-family: var(--font-display-sm);
   font-size: var(--t-18);
   font-weight: 800;
 }
@@ -479,7 +482,7 @@
   background: var(--paper);
 }
 .resCard:hover {
-  box-shadow: var(--shadow-card-hover);
+  box-shadow: var(--sh-md);
 }
 .resThumb {
   aspect-ratio: 4 / 3;
@@ -516,6 +519,7 @@
   display: inline-flex;
 }
 .panelTitle {
+  font-family: var(--font-display-sm);
   font-size: var(--t-16);
   font-weight: 800;
 }
@@ -583,9 +587,9 @@
   border-radius: var(--r-8);
   font-size: var(--t-13);
   font-weight: 700;
-  border: 1.5px solid var(--line);
-  color: var(--ink-700);
-  background: var(--paper);
+  border: 1.5px solid var(--border);
+  color: var(--ink-soft);
+  background: var(--surface);
   cursor: pointer;
 }
 .fontBtnOn {

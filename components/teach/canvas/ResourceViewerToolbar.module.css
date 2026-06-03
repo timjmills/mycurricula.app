@@ -8,15 +8,15 @@
   flex: none;
   height: 44px;
   padding: 0 var(--r-12);
-  background: var(--paper);
-  border-bottom: var(--line);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   min-width: 0;
 }
 
 .filename {
   font-size: 13px;
   font-weight: 600;
-  color: var(--ink-900);
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

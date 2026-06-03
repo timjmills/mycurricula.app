@@ -13,14 +13,14 @@
   position: absolute;
   left: 4px;
   right: 4px;
-  border-radius: var(--r-4);
+  border-radius: var(--r-sm);
   padding: 4px 8px;
   overflow: hidden;
   text-align: left;
   /* Reset button defaults so the click target reads like a div visually. */
-  background: var(--paper);
+  background: var(--surface);
   border: none;
-  border-left: 3px solid var(--ink-200);
+  border-left: 3px solid var(--border);
   font: inherit;
   color: inherit;
   cursor: default;
@@ -31,26 +31,26 @@
 
 /* Academic blocks inherit --c / --cl / --cd from `.cp-subj.<id>`. */
 .academic {
-  background: color-mix(in srgb, var(--c) 8%, var(--paper));
+  background: var(--cl);
   border-left-color: var(--c);
   cursor: pointer;
 }
 
 .academic:hover,
 .academic:focus-visible {
-  background: color-mix(in srgb, var(--c) 12%, var(--paper));
+  background: color-mix(in srgb, var(--c) 16%, var(--surface));
   outline: none;
 }
 
 .academic:focus-visible {
   /* Focus ring overlays the natural border without shifting layout. */
   box-shadow:
-    0 0 0 2px var(--paper),
+    0 0 0 2px var(--surface),
     0 0 0 4px var(--c);
 }
 
 .nonAcademic {
-  background: var(--paper);
+  background: var(--surface);
   /* Slight desaturation matches the artboard's quieter feel for chores. */
   opacity: 0.92;
 }
@@ -58,7 +58,7 @@
 /* ── Content ───────────────────────────────────────────────────────────── */
 
 .eyebrow {
-  font-weight: 600;
+  font-weight: 800;
   line-height: 1.2;
   font-size: var(--t-10);
   letter-spacing: 0.04em;
@@ -66,16 +66,16 @@
 }
 
 .academic .eyebrow {
-  color: var(--c);
+  color: var(--cd);
 }
 
 .nonAcademic .eyebrow {
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 .secondary {
   margin-top: 2px;
-  color: var(--ink-700);
+  color: var(--ink-soft);
   font-weight: 500;
   font-size: var(--t-11);
   line-height: 1.25;
@@ -93,7 +93,7 @@
   right: 8px;
   bottom: 4px;
   font-size: var(--t-10);
-  color: var(--ink-400);
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 

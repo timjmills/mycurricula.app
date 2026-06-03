@@ -20,7 +20,7 @@
 
   /* Geometry per spec §4.4. */
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 
   /* Type per spec §4.4 — small uppercase tag. */
   font-size: 10px;

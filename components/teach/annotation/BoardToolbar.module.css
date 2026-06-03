@@ -7,8 +7,8 @@
   gap: var(--r-8);
   flex-wrap: wrap;
   padding: var(--r-8) var(--r-12);
-  background: var(--paper);
-  border-bottom: var(--line);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .tools {
@@ -19,7 +19,7 @@
   width: 1px;
   align-self: stretch;
   min-height: 24px;
-  background: var(--ink-150);
+  background: var(--border);
 }
 
 /* ── Colour swatches ──────────────────────────────────────────────────── */
@@ -33,7 +33,7 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-pill);
-  border: 2px solid var(--ink-200);
+  border: 2px solid var(--border);
   padding: 0;
   cursor: pointer;
   /* ≥44px hit area on touch via the padding trick. */
@@ -45,11 +45,11 @@
   inset: -10px;
 }
 .swatch:hover {
-  border-color: var(--ink-400);
+  border-color: var(--brand-300);
 }
 .swatchActive {
-  border-color: var(--ink-900);
-  outline: 2px solid var(--ink-900);
+  border-color: var(--paper);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
@@ -66,7 +66,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: var(--r-6);
+  border-radius: var(--r-8);
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
@@ -78,16 +78,20 @@
   inset: -6px;
 }
 .width:hover {
-  background: var(--ink-100);
+  background: var(--hairline);
 }
 .widthActive {
-  background: var(--ink-100);
-  border-color: var(--ink-200);
+  background: var(--brand-50);
+  border-color: var(--brand-200);
+  color: var(--brand-600);
+}
+.widthActive .widthDot {
+  background: var(--brand-600);
 }
 .widthDot {
   display: block;
   border-radius: var(--r-pill);
-  background: var(--ink-900);
+  background: var(--ink);
   min-width: 2px;
   min-height: 2px;
 }

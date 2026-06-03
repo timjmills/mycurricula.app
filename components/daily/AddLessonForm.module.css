@@ -27,10 +27,10 @@
   top: 50%;
   transform: translateY(-50%);
   width: 280px;
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-12);
-  box-shadow: var(--shadow-popover);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-lg);
   display: flex;
   flex-direction: column;
   z-index: 201;
@@ -60,13 +60,14 @@
   align-items: center;
   gap: 8px;
   padding: 12px 12px 8px;
-  border-bottom: 1px solid var(--ink-100);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .title {
+  font-family: var(--font-display-sm);
   font-size: var(--t-13);
-  font-weight: 600;
-  color: var(--ink-700);
+  font-weight: 800;
+  color: var(--ink);
   margin: 0;
   flex: 1;
   min-width: 0;
@@ -79,9 +80,9 @@
 .dayBadge {
   font-size: var(--t-11);
   font-weight: 500;
-  color: var(--ink-500);
-  background: var(--ink-50);
-  border: 1px solid var(--ink-100);
+  color: var(--muted);
+  background: var(--surface-warm);
+  border: 1px solid var(--hairline);
   border-radius: var(--r-4);
   padding: 1px 6px;
   white-space: nowrap;
@@ -99,19 +100,19 @@
   margin: -8px;
   background: transparent;
   border: none;
-  border-radius: var(--r-6);
-  color: var(--ink-400);
+  border-radius: var(--r-sm);
+  color: var(--muted);
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .closeBtn:hover {
-  background: var(--ink-50);
-  color: var(--ink-700);
+  background: var(--surface-warm);
+  color: var(--ink-soft);
 }
 
 .closeBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -132,8 +133,8 @@
 
 .label {
   font-size: var(--t-11);
-  font-weight: 500;
-  color: var(--ink-500);
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .input,
@@ -141,10 +142,10 @@
   height: 34px;
   padding: 0 8px;
   font-size: var(--t-13);
-  color: var(--ink-700);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-6);
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
   outline: none;
   width: 100%;
   box-sizing: border-box;
@@ -155,12 +156,12 @@
 
 .input:focus,
 .select:focus {
-  border-color: var(--ink-400);
-  box-shadow: 0 0 0 2px var(--ink-100);
+  border-color: var(--brand-300);
+  box-shadow: 0 0 0 2px var(--brand-50);
 }
 
 .input::placeholder {
-  color: var(--ink-300);
+  color: var(--faint);
 }
 
 /* ── Action row ───────────────────────────────────────────────────────── */
@@ -179,8 +180,8 @@
   height: 34px;
   padding: 0 14px;
   font-size: var(--t-13);
-  font-weight: 500;
-  border-radius: var(--r-6);
+  font-weight: 700;
+  border-radius: var(--r-pill);
   cursor: pointer;
   border: 1px solid transparent;
   transition:
@@ -190,23 +191,25 @@
 }
 
 .btnCancel {
-  background: transparent;
-  border-color: var(--ink-200);
-  color: var(--ink-500);
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--ink-soft);
+  box-shadow: var(--sh-xs);
 }
 
 .btnCancel:hover {
-  background: var(--ink-50);
-  border-color: var(--ink-200);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .btnSave {
-  background: var(--ink-700);
+  background: var(--brand-500);
   color: var(--paper);
+  box-shadow: var(--sh-brand);
 }
 
 .btnSave:hover:not(:disabled) {
-  background: var(--ink-900);
+  background: var(--brand-600);
 }
 
 .btnSave:disabled,
@@ -217,7 +220,7 @@
 
 .btnCancel:focus-visible,
 .btnSave:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 

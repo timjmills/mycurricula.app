@@ -7,7 +7,7 @@
 //     mapping team-wide. Read-only here; only the team lead can change
 //     them. Shown with a "Locked" banner.
 //   • Personal subjects — owned by the teacher (Morning Meeting, etc.).
-//     Editable: clicking "Change" opens the 20-swatch palette inline.
+//     Editable: clicking "Change" opens the 15-swatch brand palette inline.
 //
 // The eight mock SUBJECTS are all Core academic subjects, so this build
 // adds two illustrative personal subjects locally — they are not from the
@@ -18,7 +18,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTheme } from "@/lib/theme";
 import {
-  PALETTE_20,
+  SUBJECT_SWATCHES,
   PALETTE_BY_ID,
   DEFAULT_SUBJECT_MAPPING,
 } from "@/lib/palette";
@@ -43,10 +43,10 @@ const PERSONAL_SUBJECTS: readonly ColorableSubject[] = [
   { id: "afternoon-circle", name: "Afternoon Circle" },
 ] as const;
 
-// Starting swatches for the seeded personal subjects.
+// Starting swatches for the seeded personal subjects (v1.3 brand slots).
 const PERSONAL_DEFAULT_MAPPING: Record<string, string> = {
-  "morning-meeting": "lemon",
-  "afternoon-circle": "mint",
+  "morning-meeting": "subj-1",
+  "afternoon-circle": "subj-12",
 };
 
 // ToggleGroup options for the Team / Personal scope selector.
@@ -64,7 +64,7 @@ interface SubjectColorsProps {
 
 /** Resolve a swatch's display color for the active palette type. */
 function swatchColor(swatchId: string, type: ThemePalette): string {
-  const swatch = PALETTE_BY_ID[swatchId] ?? PALETTE_BY_ID.ocean;
+  const swatch = PALETTE_BY_ID[swatchId] ?? PALETTE_BY_ID["subj-1"];
   return type === "highlight" ? swatch.highlight : swatch.normal;
 }
 
@@ -95,7 +95,7 @@ export function SubjectColors({
         DEFAULT_SUBJECT_MAPPING[
           subjectId as keyof typeof DEFAULT_SUBJECT_MAPPING
         ])
-      : (personalMapping[subjectId] ?? "ocean");
+      : (personalMapping[subjectId] ?? "subj-1");
 
   const assignSwatch = (subjectId: string, swatchId: string): void => {
     if (scope === "team") {
@@ -177,7 +177,7 @@ export function SubjectColors({
       >
         {subjects.map((subject) => {
           const swatchId = swatchIdFor(subject.id);
-          const swatch = PALETTE_BY_ID[swatchId] ?? PALETTE_BY_ID.ocean;
+          const swatch = PALETTE_BY_ID[swatchId] ?? PALETTE_BY_ID["subj-1"];
           const editing = editingSubject === subject.id;
           return (
             <div
@@ -247,7 +247,7 @@ export function SubjectColors({
         })}
       </div>
 
-      {/* Inline 20-swatch picker — opens for the subject being edited. */}
+      {/* Inline 15-swatch picker — opens for the subject being edited. */}
       {editingSubject && editingName && (
         <div
           style={{
@@ -279,7 +279,7 @@ export function SubjectColors({
               gap: 8,
             }}
           >
-            {PALETTE_20.map((s) => {
+            {SUBJECT_SWATCHES.map((s) => {
               const active = swatchIdFor(editingSubject) === s.id;
               return (
                 // Tooltip wraps each swatch button — replaces the hand-rolled title="".
@@ -299,9 +299,9 @@ export function SubjectColors({
                       padding: 6,
                       minHeight: 44,
                       borderRadius: 8,
-                      background: active ? "var(--paper)" : "transparent",
+                      background: active ? "var(--brand-50)" : "transparent",
                       border: active
-                        ? "1.5px solid var(--ink-900)"
+                        ? "1.5px solid var(--brand-500)"
                         : "1.5px solid transparent",
                       cursor: "pointer",
                     }}
@@ -313,7 +313,9 @@ export function SubjectColors({
                         height: 32,
                         borderRadius: 8,
                         background: swatchColor(s.id, palette),
-                        boxShadow: active ? `0 0 0 2px ${s.deep}` : "none",
+                        boxShadow: active
+                          ? "0 0 0 2px var(--brand-500)"
+                          : "none",
                         border: `1px solid ${s.deep}26`,
                       }}
                     />

@@ -12,12 +12,12 @@
 .progress {
   width: 100%;
   height: 4px;
-  background: var(--ink-150);
+  background: var(--hairline);
   flex: 0 0 auto;
 }
 .progressFill {
   height: 100%;
-  background: var(--math);
+  background: var(--brand-500);
   transition: width 0.25s ease;
 }
 
@@ -44,10 +44,10 @@
    interactive control. */
 .stepCount {
   font-size: var(--t-11);
-  font-weight: 500;
-  letter-spacing: 0.6px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-400);
+  color: var(--muted);
   margin-bottom: 14px;
   outline: none;
 }
@@ -69,47 +69,48 @@
 
 .back {
   font-size: var(--t-13);
-  font-weight: 500;
-  color: var(--ink-500);
+  font-weight: 700;
+  color: var(--ink-soft);
   /* min-height: 44px satisfies the WCAG 2.5.5 touch-target minimum. */
   min-height: 44px;
   padding: 10px 14px;
-  border-radius: var(--r-6);
+  border-radius: var(--r-pill);
 }
 .back:hover {
-  color: var(--ink-900);
-  background: var(--ink-100);
+  color: var(--ink);
+  background: var(--hairline);
 }
 
 .skip {
   font-size: var(--t-13);
-  font-weight: 500;
-  color: var(--ink-500);
+  font-weight: 700;
+  color: var(--ink-soft);
   min-height: 44px;
   padding: 10px 14px;
-  border-radius: var(--r-6);
+  border-radius: var(--r-pill);
 }
 .skip:hover {
-  color: var(--ink-900);
-  background: var(--ink-100);
+  color: var(--ink);
+  background: var(--hairline);
 }
 
 .continue {
   font-size: var(--t-14);
-  font-weight: 600;
-  color: var(--paper);
-  background: var(--math);
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-500);
+  box-shadow: var(--sh-brand);
   min-height: 44px;
   padding: 11px 22px;
-  border-radius: var(--r-8);
+  border-radius: var(--r-pill);
 }
 .continue:hover {
-  background: var(--math-deep);
+  background: var(--brand-600);
 }
 
 .back:focus-visible,
 .skip:focus-visible,
 .continue:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }

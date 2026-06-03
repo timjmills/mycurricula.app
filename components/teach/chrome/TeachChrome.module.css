@@ -21,10 +21,11 @@
 }
 
 .wordmark {
+  font-family: var(--font-display-sm);
   font-size: var(--t-18);
   font-weight: 800;
-  letter-spacing: -0.4px;
-  color: var(--ink-900);
+  letter-spacing: -0.02em;
+  color: var(--ink);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -36,7 +37,7 @@
   gap: 3px;
   font-size: var(--t-12);
   font-weight: 600;
-  color: var(--ink-700);
+  color: var(--ink-soft);
   white-space: nowrap;
 }
 
@@ -49,23 +50,25 @@
 
 .viewTab {
   padding: 6px 14px;
-  border-radius: var(--r-8);
+  border-radius: var(--r-pill);
   font-size: var(--t-13);
-  font-weight: 600;
-  color: var(--ink-700);
+  font-weight: 700;
+  color: var(--muted);
   text-decoration: none;
   white-space: nowrap;
   transition: background-color 120ms ease-out;
 }
 .viewTab:hover {
-  background: var(--ink-100);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 .viewTabActive {
-  background: var(--ink-900);
-  color: var(--paper);
+  background: var(--brand-50);
+  color: var(--brand-700);
 }
 .viewTabActive:hover {
-  background: var(--ink-900);
+  background: var(--brand-50);
+  color: var(--brand-700);
 }
 .viewTabSoon {
   opacity: 0.5;
@@ -92,17 +95,18 @@
   gap: 7px;
   padding: 7px 11px;
   min-height: 36px;
-  background: var(--ink-100);
-  border: none;
-  border-radius: var(--r-8);
-  color: var(--ink-400);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  color: var(--muted);
   font-size: var(--t-12);
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
 }
 .searchPill:hover {
-  background: var(--ink-150);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 .searchPillLabel {
   /* Hidden on narrow widths — leaves an icon-only target. */
@@ -117,12 +121,13 @@
   height: 36px;
   border: none;
   border-radius: var(--r-pill);
-  background: var(--c, var(--math));
+  background: var(--brand-500);
   color: var(--paper);
+  box-shadow: var(--sh-brand);
   cursor: pointer;
 }
 .addRound:hover {
-  filter: brightness(0.95);
+  background: var(--brand-600);
 }
 
 /* Bell / help icon buttons. */
@@ -134,13 +139,15 @@
   width: 36px;
   height: 36px;
   border: none;
-  border-radius: var(--r-8);
+  border-radius: var(--r-md);
   background: transparent;
-  color: var(--ink-700);
+  color: var(--ink-soft);
   cursor: pointer;
 }
 .iconBtn:hover {
-  background: var(--ink-100);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+  color: var(--brand-600);
 }
 .bellBadge {
   position: absolute;
@@ -166,10 +173,13 @@
   width: 32px;
   height: 32px;
   border-radius: var(--r-pill);
-  background: var(--ink-900);
+  background: var(--grad-dawn);
   color: var(--paper);
+  font-family: var(--font-display-sm);
   font-size: var(--t-11);
   font-weight: 800;
+  box-shadow: var(--sh-xs);
+  border: 2px solid var(--paper);
   text-decoration: none;
 }
 
@@ -197,17 +207,17 @@
   gap: 5px;
   padding: 5px 10px;
   min-height: 30px;
-  border: var(--line);
-  border-radius: var(--r-6);
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
   font-size: var(--t-12);
   font-weight: 600;
-  color: var(--ink-900);
+  color: var(--ink);
   cursor: pointer;
   white-space: nowrap;
 }
 .contextChip:hover {
-  background: var(--ink-50);
+  background: var(--hairline);
 }
 
 /* Board tab strip — scrolls internally; never the document. */
@@ -228,16 +238,16 @@
   padding: 5px 12px;
   min-height: 30px;
   border-radius: var(--r-pill);
-  border: var(--line);
+  border: 1px solid var(--border);
   background: transparent;
-  color: var(--ink-900);
+  color: var(--ink);
   font-size: var(--t-12);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
 .boardTab:hover {
-  background: var(--ink-50);
+  background: var(--hairline);
 }
 /* Active board tab — subject-tinted via .cp-subj on the strip root. */
 .boardTabActive {
@@ -273,16 +283,18 @@
   padding: 5px 12px;
   min-height: 30px;
   border-radius: var(--r-pill);
-  border: 1px dashed var(--ink-300);
+  border: 1px dashed var(--faint);
   background: transparent;
-  color: var(--ink-700);
+  color: var(--ink-soft);
   font-size: var(--t-12);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
 .addBoard:hover {
-  background: var(--ink-50);
+  background: var(--hairline);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 /* Action cluster (Present / Full Screen / Pop-Out / Duplicate). */
@@ -300,14 +312,17 @@
   justify-content: center;
   width: 34px;
   height: 34px;
-  border: var(--line);
-  border-radius: var(--r-8);
-  background: var(--paper);
-  color: var(--ink-700);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink-soft);
+  box-shadow: var(--sh-xs);
   cursor: pointer;
 }
 .gearBtn:hover {
-  background: var(--ink-50);
+  background: var(--hairline);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 /* Sandbox badge — "Sandbox · not saved". */
@@ -368,7 +383,7 @@
   border-radius: var(--r-6);
 }
 .panelsToggle:hover {
-  background: var(--ink-100);
+  background: var(--hairline);
 }
 
 .moduleDot {

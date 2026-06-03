@@ -56,13 +56,14 @@
   align-items: center;
   gap: 6px;
   height: 44px;
-  padding: 0 14px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  color: var(--ink-700);
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
   font-size: var(--t-13);
-  font-weight: 500;
+  font-weight: 700;
+  box-shadow: var(--sh-xs);
   transition:
     background 0.12s ease,
     border-color 0.12s ease,
@@ -70,12 +71,12 @@
 }
 
 .moveModeBtn:hover:not(:disabled) {
-  background: var(--ink-50);
-  border-color: var(--ink-300);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .moveModeBtn:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
@@ -165,37 +166,42 @@
 }
 
 .dayName {
+  font-family: var(--font-display-sm);
   font-size: var(--t-14);
-  font-weight: 600;
-  color: var(--ink-500);
-  letter-spacing: -0.1px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
 }
 
 .dayNameShort {
   font-size: var(--t-12);
-  font-weight: 400;
-  color: var(--ink-400);
+  font-weight: 700;
+  color: var(--muted);
 }
 
-/* Today column: bolder typography on the header, accent underline. */
+/* Today column: brand-toned header + accent underline (v1.3 day-head recipe). */
+.dayHeaderToday {
+  border-bottom-color: var(--brand-300);
+}
+
 .dayHeaderToday .dayName {
-  color: var(--ink-900);
+  color: var(--brand-600);
 }
 
 .dayHeaderToday .dayNameShort {
-  color: var(--ink-600, var(--ink-500));
+  color: var(--brand-600);
 }
 
 /* Small "TODAY" pill in the today column header. */
 .todayPill {
   font-size: 9.5px;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--paper);
-  background: var(--ink-900);
+  color: var(--brand-700);
+  background: var(--brand-50);
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   align-self: center;
 }
 
@@ -241,12 +247,12 @@
   justify-content: center;
   gap: 8px;
   min-height: 80px;
-  border-radius: var(--r-8);
-  border: 1px dashed var(--ink-200);
-  background: transparent;
-  color: var(--ink-400);
+  border-radius: var(--r-md);
+  border: 1px dashed var(--border);
+  background: var(--surface-warm);
+  color: var(--muted);
   font-size: var(--t-12);
-  font-weight: 500;
+  font-weight: 700;
   transition:
     border-color 0.12s ease,
     background 0.12s ease;
@@ -296,7 +302,7 @@
 }
 
 .addLesson:focus-visible {
-  outline: 2px solid var(--math);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
   opacity: 1;
 }
@@ -313,7 +319,7 @@
 .dropIndicator {
   height: 2px;
   border-radius: 1px;
-  background: var(--math);
+  background: var(--brand-500);
   margin: -3px 4px;
   pointer-events: none;
 }

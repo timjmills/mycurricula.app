@@ -14,8 +14,8 @@
   align-items: center;
   gap: var(--r-4);
   padding: var(--r-12) 0;
-  background: var(--paper);
-  border-right: var(--line);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border-right: 1px solid var(--border);
   overflow-y: auto;
 }
 
@@ -34,9 +34,9 @@
   height: 40px;
   min-height: 40px;
   border: none;
-  border-radius: var(--r-8);
+  border-radius: var(--r-md);
   background: transparent;
-  color: var(--ink-700);
+  color: var(--ink-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -46,21 +46,25 @@
 }
 
 .railBtn:hover {
-  background: var(--ink-100);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+  color: var(--brand-600);
 }
 
 .railBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
 .railBtnActive {
-  background: var(--ink-900);
+  background: var(--brand-500);
   color: var(--paper);
+  box-shadow: var(--sh-brand);
 }
 
 .railBtnActive:hover {
-  background: var(--ink-900);
+  background: var(--brand-500);
+  color: var(--paper);
 }
 
 /* Inner accent bar on the active icon (left edge). */
@@ -72,19 +76,19 @@
   bottom: 8px;
   width: 3px;
   border-radius: var(--r-pill);
-  background: var(--ink-900);
+  background: var(--brand-500);
 }
 
 .railLabel {
   font-size: 9.5px;
   font-weight: 600;
-  color: var(--ink-400);
+  color: var(--muted);
   text-align: center;
   line-height: 1.1;
 }
 
 .railLabelActive {
-  color: var(--ink-900);
+  color: var(--brand-700);
 }
 
 .railDragging {
@@ -160,9 +164,9 @@
   gap: 5px;
   padding: 5px 9px;
   border: none;
-  border-radius: var(--r-6);
+  border-radius: var(--r-8);
   background: transparent;
-  color: var(--ink-500);
+  color: var(--muted);
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
@@ -170,18 +174,18 @@
 }
 
 .tab:hover {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--ink);
 }
 
 .tab:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
 .tabActive {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--brand-50);
+  color: var(--brand-700);
 }
 
 .tabDragging {
@@ -233,7 +237,7 @@
     bottom: 0;
     z-index: 45;
     width: min(360px, calc(100vw - 64px)) !important;
-    box-shadow: var(--shadow-2, 0 8px 28px rgba(20, 20, 26, 0.22));
+    box-shadow: var(--sh-lg);
     animation: leftDrawerIn 200ms ease-out;
   }
 }
@@ -297,8 +301,8 @@
 
 /* ── Lesson card module ──────────────────────────────────────────────────── */
 .lessonCard {
-  border: var(--line);
-  border-radius: var(--r-12);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   padding: 12px 14px;
 }
 
@@ -441,7 +445,7 @@
 }
 
 .boardRowActive {
-  border: 1.5px solid var(--ink-900);
+  border: 1.5px solid var(--brand-500);
 }
 
 .boardNum {
@@ -459,7 +463,7 @@
 }
 
 .boardNumActive {
-  background: var(--ink-900);
+  background: var(--brand-500);
   color: var(--paper);
 }
 

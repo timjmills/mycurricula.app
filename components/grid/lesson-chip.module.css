@@ -24,20 +24,20 @@
   /* Gap between stripe-pillar and content */
   gap: 0;
   /* Stripe is the 3px solid left border driven by --c */
-  border-left: 3px solid var(--c, var(--ink-300));
-  border-radius: var(--r-4);
+  border-left: 3px solid var(--c, var(--faint));
+  border-radius: var(--r-sm);
   overflow: hidden;
   /* Surface */
-  background: var(--paper);
-  border-top: 1px solid var(--ink-150);
-  border-right: 1px solid var(--ink-150);
-  border-bottom: 1px solid var(--ink-150);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  border-top: 1px solid var(--c-border, var(--border));
+  border-right: 1px solid var(--c-border, var(--border));
+  border-bottom: 1px solid var(--c-border, var(--border));
+  box-shadow: var(--sh-xs);
   /* Reset button appearance when rendered as a button */
   cursor: pointer;
   font-family: var(--font-sans);
   font-size: var(--t-12);
-  color: var(--ink-900);
+  color: var(--ink);
   text-align: left;
   /* Transitions — skip under reduced motion (tokens.css @media block) */
   transition:
@@ -52,35 +52,44 @@
   box-sizing: border-box;
 }
 
-/* Hover — brighten the fill slightly */
+/* Hover — brighten the fill slightly + lift (v1.3 chip recipe) */
 .chip:hover:not(.dragging) {
-  background: color-mix(in srgb, var(--cl, var(--ink-50)) 30%, var(--paper));
-  box-shadow: 0 2px 8px rgba(20, 22, 32, 0.1);
+  background: color-mix(
+    in srgb,
+    var(--cl, var(--hairline)) 30%,
+    var(--surface)
+  );
+  border-color: var(--c, var(--border));
+  box-shadow: var(--sh-sm);
 }
 
 /* Focus ring — keyboard accessible */
 .chip:focus-visible {
-  outline: 2px solid var(--c, var(--ink-700));
+  outline: 2px solid var(--c, var(--ink-soft));
   outline-offset: 1px;
 }
 
 /* Selected state — inset ring in subject color */
 .selected {
-  border-color: var(--c, var(--ink-700));
-  border-top-color: var(--c, var(--ink-700));
-  border-right-color: var(--c, var(--ink-700));
-  border-bottom-color: var(--c, var(--ink-700));
-  background: color-mix(in srgb, var(--cl, var(--ink-50)) 40%, var(--paper));
+  border-color: var(--c, var(--ink-soft));
+  border-top-color: var(--c, var(--ink-soft));
+  border-right-color: var(--c, var(--ink-soft));
+  border-bottom-color: var(--c, var(--ink-soft));
+  background: color-mix(
+    in srgb,
+    var(--cl, var(--hairline)) 40%,
+    var(--surface)
+  );
   box-shadow:
-    0 0 0 1px var(--c, var(--ink-700)) inset,
-    var(--shadow-card);
+    0 0 0 1px var(--c, var(--ink-soft)) inset,
+    var(--sh-xs);
 }
 
 /* Dragging state — elevated, rotated, slightly transparent */
 .dragging {
   opacity: 0.85;
   transform: rotate(-1.5deg) scale(1.02);
-  box-shadow: 0 8px 20px rgba(20, 22, 32, 0.18);
+  box-shadow: var(--sh-lg);
   z-index: 10;
 }
 
@@ -110,7 +119,7 @@
 /* not_done / other → outline only */
 .dotPending {
   background: transparent;
-  border: 1.5px solid var(--ink-300);
+  border: 1.5px solid var(--idle);
 }
 
 /* Lesson title — truncated to a single line */
@@ -119,7 +128,7 @@
   min-width: 0; /* allow flex truncation */
   font-size: var(--t-12);
   font-weight: 500;
-  color: var(--ink-900);
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

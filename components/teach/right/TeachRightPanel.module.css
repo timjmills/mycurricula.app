@@ -8,8 +8,8 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
-  background: var(--paper);
-  border-left: 1px solid var(--ink-150);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
   overflow: hidden;
 }
 
@@ -19,7 +19,7 @@
   align-items: center;
   gap: 4px;
   padding: 4px 6px 4px 8px;
-  border-bottom: 1px solid var(--ink-150);
+  border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
 }
 
@@ -66,9 +66,9 @@
   padding: 6px 9px;
   min-height: 32px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--r-8);
   background: transparent;
-  color: var(--ink-500);
+  color: var(--muted);
   font-size: var(--t-12);
   font-weight: 700;
   cursor: pointer;
@@ -76,18 +76,18 @@
 }
 
 .tab:hover {
-  background: var(--ink-50);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--ink);
 }
 
 .tab:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
 .tabActive {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--brand-50);
+  color: var(--brand-700);
 }
 
 .tabIcon {
@@ -141,7 +141,7 @@
     bottom: 0;
     z-index: 45;
     width: min(360px, calc(100vw - 64px)) !important;
-    box-shadow: var(--shadow-2, 0 8px 28px rgba(20, 20, 26, 0.22));
+    box-shadow: var(--sh-lg);
     animation: rightDrawerIn 200ms ease-out;
   }
 }

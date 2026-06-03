@@ -25,8 +25,27 @@
      the page. `min-width: 0` lets this flex item shrink to the viewport. */
   min-width: 0;
   overflow: hidden;
-  background: var(--ink-50);
-  color: var(--ink-900);
+  /* v1.3 warm radial backdrop — honey top-left, violet top-right, mint
+     bottom-right washes over the cream canvas (mirrors the kit's `.teach`
+     surface). Atmosphere only; every widget/panel sits on opaque --surface. */
+  background:
+    radial-gradient(
+      38% 30% at 8% 2%,
+      color-mix(in srgb, var(--honey-400) 14%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      34% 26% at 96% 4%,
+      color-mix(in srgb, var(--subj-8) 12%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      40% 34% at 92% 98%,
+      color-mix(in srgb, var(--subj-13) 12%, transparent),
+      transparent 60%
+    ),
+    var(--canvas);
+  color: var(--ink);
 }
 
 /* ── Chrome slots: the zone components own their own internal chrome, so the
@@ -67,7 +86,9 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--ink-50);
+  /* Transparent so the shell's warm radial backdrop shows through the gutter
+     around the board canvas (which paints its own opaque --surface). */
+  background: transparent;
   padding: var(--r-12);
   overflow: hidden;
 }
@@ -80,7 +101,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--r-8);
-  border-radius: var(--r-12);
+  border-radius: var(--r-lg);
   overflow: hidden;
 }
 
@@ -88,9 +109,9 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  border-radius: var(--r-12);
+  border-radius: var(--r-lg);
   overflow: hidden;
-  background: var(--paper);
+  background: var(--surface);
 }
 
 .resourceCanvas {
@@ -109,13 +130,13 @@
 /* The drag ghost shown in the DragOverlay portal. */
 .dragGhost {
   padding: var(--r-8) var(--r-12);
-  border-radius: var(--r-8);
-  background: var(--paper);
-  border: var(--line);
-  box-shadow: var(--shadow-2, 0 4px 12px rgba(0, 0, 0, 0.15));
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-md);
   font-size: var(--t-13);
   font-weight: 600;
-  color: var(--ink-900);
+  color: var(--ink);
   pointer-events: none;
 }
 
@@ -179,9 +200,10 @@
   flex-direction: column;
   width: min(1100px, 100%);
   height: min(820px, 100%);
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: var(--r-12);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-lg);
   overflow: hidden;
 }
 
@@ -191,14 +213,15 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px 18px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border);
 }
 
 .libraryTitle {
   margin: 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-18);
-  font-weight: 700;
-  color: var(--ink-900);
+  font-weight: 800;
+  color: var(--ink);
 }
 
 .libraryClose {
@@ -207,11 +230,17 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-8);
-  background: var(--ink-50);
-  color: var(--ink-900);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-warm);
+  color: var(--ink);
   cursor: pointer;
+}
+
+.libraryClose:hover {
+  background: var(--hairline);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .libraryBody {

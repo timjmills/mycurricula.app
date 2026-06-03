@@ -57,10 +57,10 @@
      dragged down to a thin strip). The inner column + body each carry
      their own min-width: 0 so the cascade reaches the text. */
   min-width: 0;
-  background: var(--paper);
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-150);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-sm);
   overflow: hidden;
   /* The lesson-detail panel renders at 80% scale so a whole lesson fits on
      screen at 100% browser zoom — the left sidebar and the day-header strip
@@ -118,19 +118,19 @@
   padding: 14px 20px;
   /* Flat subject-light fill — falls back to a neutral wash when no
      cp-subj wrapper is mounted. */
-  background: var(--cl, var(--ink-100));
+  background: var(--cl, var(--hairline));
   /* All text + icons inside the band read in the subject-deep ink,
      which clears AA against the light tint in every subject palette. */
-  color: var(--cd, var(--ink-700));
+  color: var(--cd, var(--ink-soft));
   /* 4px solid accent stripe on the left edge — the weekly-card stripe.
      `border-left` (rather than a ::before) keeps the stripe a real box-
      model edge so the inner padding measures from its inside face. */
-  border-left: 4px solid var(--c, var(--ink-400));
+  border-left: 4px solid var(--c, var(--muted));
   /* Hair-thin tinted seam at the bottom of the band — a 25%
      `var(--c)`-toward-transparent rule that seats the band against the
      white body without introducing a hard rule line. */
   border-bottom: 1px solid
-    color-mix(in oklch, var(--c, var(--ink-400)) 25%, transparent);
+    color-mix(in oklch, var(--c, var(--muted)) 25%, transparent);
   /* Prevent box-sizing from causing the border-left to push total width
      past the parent — border-box is already the global default but stated
      explicitly here for clarity given the clipping sensitivity. */
@@ -161,7 +161,7 @@
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  color: var(--c, var(--ink-500));
+  color: var(--c, var(--muted));
   /* Lock vertical alignment with the checkbox + subject name baseline. */
   line-height: 1;
 }
@@ -175,7 +175,7 @@
   width: 16px;
   height: 16px;
   border-radius: var(--r-4);
-  border: 1px solid var(--ink-300);
+  border: 1px solid var(--faint);
   /* Inherit the band's surface so the box sits on the light tint rather
      than punching a white hole through it. */
   background: transparent;
@@ -189,12 +189,13 @@
 .bandSubject {
   margin: 0;
   min-width: 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-22);
   font-weight: 800;
   letter-spacing: 0.6px;
   text-transform: uppercase;
   line-height: 1.05;
-  color: var(--cd, var(--ink-900));
+  color: var(--cd, var(--ink));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -212,7 +213,7 @@
   vertical-align: middle;
   padding: 1px 6px;
   border-radius: var(--r-4);
-  background: var(--cd, var(--ink-700));
+  background: var(--cd, var(--ink-soft));
   color: var(--paper);
 }
 
@@ -238,7 +239,7 @@
   font-size: var(--t-18);
   font-weight: 700;
   line-height: 1.2;
-  color: var(--cd, var(--ink-900));
+  color: var(--cd, var(--ink));
   /* Title is the FIRST to truncate when the band is squeezed — the left
      subject cluster and the right time+icons never yield. */
   white-space: nowrap;
@@ -289,7 +290,7 @@
   font-feature-settings: "tnum";
   letter-spacing: -0.5px;
   line-height: 1;
-  color: var(--cd, var(--ink-900));
+  color: var(--cd, var(--ink));
   white-space: nowrap;
 }
 
@@ -330,12 +331,12 @@
 
 .bandIconBtn:hover {
   opacity: 1;
-  background: color-mix(in srgb, var(--cd, var(--ink-700)) 10%, transparent);
+  background: color-mix(in srgb, var(--cd, var(--ink-soft)) 10%, transparent);
 }
 
 .bandIconBtn:focus-visible {
   opacity: 1;
-  outline: 2px solid var(--cd, var(--ink-900));
+  outline: 2px solid var(--cd, var(--ink));
   outline-offset: -2px;
 }
 
@@ -484,7 +485,7 @@
   background: transparent;
   border: none;
   border-radius: var(--r-4);
-  color: var(--ink-500);
+  color: var(--muted);
   cursor: pointer;
   opacity: 0;
   transition:
@@ -501,13 +502,13 @@
 }
 
 .editPencil:hover {
-  background: var(--ink-50);
-  color: var(--ink-900);
+  background: var(--surface-warm);
+  color: var(--ink);
 }
 
 .editPencil:focus-visible {
   opacity: 1;
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
@@ -528,11 +529,12 @@
 .title {
   margin: 0;
   min-width: 0;
+  font-family: var(--font-display-sm);
   font-size: var(--t-26);
-  font-weight: 700;
-  letter-spacing: -0.45px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   line-height: 1.16;
-  color: var(--ink-900);
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 
@@ -561,7 +563,7 @@
 /* Keyboard-focus affordance — the hover tint plus a focus ring so the
    edit affordance is discoverable without a mouse. */
 .editableText:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
   background: color-mix(in srgb, currentColor 7%, transparent);
 }
@@ -570,7 +572,7 @@
    double-click target so a teacher can add an objective to a lesson
    that lacks one. */
 .objectiveEmpty {
-  color: var(--ink-400);
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -610,15 +612,15 @@
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
-  color: var(--cd, var(--ink-700));
-  background: var(--cl, var(--ink-100));
+  color: var(--cd, var(--ink-soft));
+  background: var(--cl, var(--hairline));
   padding: 1px 6px;
   border-radius: var(--r-4);
   margin-right: 7px;
 }
 
 .objectiveText {
-  color: var(--ink-700);
+  color: var(--ink-soft);
 }
 
 /* ── Action row ──────────────────────────────────────────────────────────
@@ -665,21 +667,26 @@
   min-height: 44px;
   padding: 4px 10px 4px 8px;
   font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-700);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-6);
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-xs);
   cursor: pointer;
-  transition: background 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 
 .markDone:hover {
-  background: var(--ink-50);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .markDone:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
@@ -700,21 +707,26 @@
   min-height: 44px;
   padding: 4px 10px;
   font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-700);
-  background: var(--paper);
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-6);
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-xs);
   cursor: pointer;
-  transition: background 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 
 .actionBtn:hover {
-  background: var(--ink-50);
+  border-color: var(--brand-300);
+  color: var(--brand-600);
 }
 
 .actionBtn:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
@@ -729,10 +741,10 @@
   padding: 4px 8px;
   font-size: var(--t-12);
   font-weight: 500;
-  color: var(--ink-500);
+  color: var(--muted);
   background: transparent;
   border: none;
-  border-radius: var(--r-6);
+  border-radius: var(--r-pill);
   cursor: pointer;
   transition:
     background 0.12s,
@@ -740,12 +752,12 @@
 }
 
 .notesLink:hover {
-  background: var(--ink-50);
-  color: var(--ink-700);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 .notesLink:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
@@ -788,34 +800,35 @@
   gap: 7px;
   margin: 0 0 13px;
   padding: 3px min(9em, 28%) 4px 9px;
+  font-family: var(--font-display-sm);
   font-size: var(--t-14);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: -0.1px;
-  color: var(--cd, var(--ink-900));
-  border-radius: var(--r-4);
+  color: var(--cd, var(--ink));
+  border-radius: var(--r-xs);
   background:
     linear-gradient(
       to right,
-      var(--cl, var(--ink-100)) 0,
-      var(--cl, var(--ink-100)) calc(100% - min(8.4em, 26%)),
+      var(--cl, var(--hairline)) 0,
+      var(--cl, var(--hairline)) calc(100% - min(8.4em, 26%)),
       transparent 100%
     ),
     linear-gradient(
       to bottom,
       transparent 0,
-      color-mix(in oklch, var(--cd, var(--ink-300)) 7%, transparent) 100%
+      color-mix(in oklch, var(--cd, var(--faint)) 7%, transparent) 100%
     );
   box-shadow:
     inset 0 -2px 0 0
-      color-mix(in oklch, var(--cd, var(--ink-300)) 32%, transparent),
-    0 1px 4px color-mix(in oklch, var(--cd, var(--ink-300)) 12%, transparent);
+      color-mix(in oklch, var(--cd, var(--faint)) 32%, transparent),
+    0 1px 4px color-mix(in oklch, var(--cd, var(--faint)) 12%, transparent);
 }
 
 /* Small count suffix beside a heading — quieter than the heading itself. */
 .sectionCount {
   font-size: var(--t-12);
   font-weight: 500;
-  color: color-mix(in oklch, var(--cd, var(--ink-500)) 60%, transparent);
+  color: color-mix(in oklch, var(--cd, var(--muted)) 60%, transparent);
 }
 
 /* ── Teacher notes editor wrapper ───────────────────────────────────────
@@ -847,8 +860,8 @@
 .standardCode {
   font-size: var(--t-11);
   font-weight: 600;
-  color: var(--cd, var(--ink-700));
-  background: var(--cl, var(--ink-100));
+  color: var(--cd, var(--ink-soft));
+  background: var(--cl, var(--hairline));
   padding: 2px 6px;
   border-radius: var(--r-4);
   flex-shrink: 0;
@@ -860,7 +873,7 @@
   flex: 1 1 0;
   min-width: 0;
   font-size: var(--t-12);
-  color: var(--ink-700);
+  color: var(--ink-soft);
   line-height: 1.45;
   overflow-wrap: anywhere;
 }

@@ -121,19 +121,19 @@
   gap: 2px;
 }
 
-/* Active route inside the nav section — paint the row with the same dark
-   ink-900/paper recipe used by the desktop `.viewTabActive` tab so the
+/* Active route inside the nav section — paint the row with the same soft
+   indigo recipe used by the desktop `.viewTabActive` tab (v1.3) so the
    "current page" signal reads consistently across breakpoints. Scoped
    inside `.navSection` so the lighter `.rowActive` treatment used by the
    To-do / Comments rows (panel-open indicator) is untouched. */
 .navSection .rowActive {
-  background: var(--ink-900);
-  color: var(--paper);
+  background: var(--brand-50);
+  color: var(--brand-700);
 }
 
 .navSection .rowActive:hover {
-  background: var(--ink-700);
-  color: var(--paper);
+  background: var(--brand-100);
+  color: var(--brand-700);
 }
 
 /* ── Generic menu row — to-do, comments, sign-out ──────────────────────────

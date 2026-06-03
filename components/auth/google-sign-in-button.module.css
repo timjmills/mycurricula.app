@@ -39,10 +39,10 @@
   width: 100%;
   min-height: 48px;
   padding: 0 18px;
-  border-radius: var(--r-8);
-  border: 1px solid var(--ink-200);
-  background: var(--paper);
-  color: var(--ink-900);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
   opacity: 0.6;
   cursor: progress;
 }
@@ -65,8 +65,8 @@
 .status {
   margin: 10px 0 0;
   font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--ink-500);
+  font-weight: 600;
+  color: var(--muted);
   text-align: center;
 }
 

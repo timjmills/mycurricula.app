@@ -50,12 +50,12 @@
   position: relative;
   background: var(--w-grad);
   color: var(--w-ink, var(--ink-900));
-  border-radius: var(--w-radius, 22px);
+  border-radius: var(--w-radius, var(--wf-r-card));
   font-family: var(--w-font, var(--font-sans));
   font-size: calc(var(--t-16) * var(--w-scale, 1));
   line-height: 1.4;
   box-shadow:
-    var(--shadow-card),
+    var(--sh-sm),
     inset 0 0 0 1px var(--ink-100);
   padding: 1.5em;
   overflow: hidden;
@@ -66,17 +66,17 @@
 .chromeBtn {
   width: 48px;
   height: 48px;
-  border-radius: var(--r-12);
-  background: var(--paper);
-  color: var(--ink-500);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--body);
   display: grid;
   place-items: center;
-  box-shadow: var(--shadow-popover);
-  border: var(--line);
+  box-shadow: var(--sh-md);
+  border: 1px solid var(--border);
   cursor: pointer;
 }
 .chromeBtn:hover {
-  background: var(--ink-50);
+  background: var(--hairline);
 }
 .chromeBtnActive {
   background: var(--wf-purple-accent);
@@ -108,10 +108,11 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  background: var(--paper);
-  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
   padding: 10px 8px;
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--sh-lg);
   z-index: 6;
   max-height: 90vh;
   overflow-y: auto;
@@ -216,10 +217,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--paper);
-  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
   padding: 10px 12px;
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--sh-lg);
   z-index: 6;
   max-width: min(calc(100vw - 32px), 920px);
   overflow-x: auto;
@@ -310,10 +312,11 @@
   left: 50%;
   bottom: 104px;
   transform: translateX(-50%);
-  background: var(--paper);
-  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
   padding: 16px;
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--sh-lg);
   z-index: 7;
 }
 .bgPopup {
@@ -324,10 +327,11 @@
   max-height: 70vh;
   overflow: auto;
   padding: 20px;
-  border-radius: 20px;
+  border-radius: var(--r-xl);
 }
 
 .popupTitle {
+  font-family: var(--font-display-sm);
   font-size: var(--t-14);
   font-weight: 800;
   margin: 0 0 12px;
@@ -352,12 +356,12 @@
 }
 .bgSwatchChip {
   height: 44px;
-  border-radius: var(--r-12);
-  border: 1px solid var(--ink-150);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
   margin-bottom: 5px;
 }
 .bgSwatchChipActive {
-  border: 2px solid var(--wf-blue-accent);
+  border: 2px solid var(--brand-500);
 }
 .bgSwatchLabel {
   font-size: var(--t-12);
@@ -372,6 +376,7 @@
   gap: 12px;
 }
 .libTitle {
+  font-family: var(--font-display-sm);
   font-size: var(--t-18);
   font-weight: 800;
 }
@@ -429,18 +434,18 @@
 
 .libCard {
   position: relative;
-  border: var(--line);
-  border-radius: var(--r-12);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   padding: 16px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  background: var(--paper);
+  background: var(--surface);
   cursor: pointer;
 }
 .libCard:hover {
-  background: var(--ink-50);
+  background: var(--hairline);
 }
 .libStar {
   position: absolute;
@@ -482,10 +487,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--paper);
-  border-radius: var(--r-12);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   padding: 6px;
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--sh-lg);
   z-index: 6;
 }
 .pageBtn {

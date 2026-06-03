@@ -7,27 +7,29 @@
 
 .heading {
   margin: 0 0 8px;
+  font-family: var(--font-display);
   font-size: var(--t-28);
-  font-weight: 700;
-  color: var(--ink-900);
-  letter-spacing: -0.5px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.02em;
   line-height: 1.15;
 }
 
 .subheading {
   margin: 0 0 28px;
   font-size: var(--t-14);
-  color: var(--ink-500);
+  color: var(--body);
   line-height: 1.55;
 }
 
-/* Recap card — white box with a border, no shadow (quiet style). */
+/* Recap card — white surface with a hairline border and soft shadow. */
 .card {
   margin: 0 0 24px;
   padding: 0;
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-12);
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
   overflow: hidden;
 
   /* Definition-list reset — browsers don't agree on dl padding. */
@@ -54,10 +56,10 @@
 .dt {
   flex: 0 0 160px;
   font-size: var(--t-12);
-  font-weight: 600;
-  color: var(--ink-400);
+  font-weight: 700;
+  color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.06em;
   line-height: 1.4;
   /* Reset dt margin that some browsers apply. */
   margin: 0;
@@ -67,8 +69,8 @@
 .dd {
   flex: 1;
   font-size: var(--t-14);
-  font-weight: 500;
-  color: var(--ink-900);
+  font-weight: 600;
+  color: var(--ink);
   line-height: 1.5;
   /* Reset dd browser indent. */
   margin: 0;
@@ -79,12 +81,12 @@
 /* Secondary annotation inside the value — e.g. "(6 academic)". */
 .meta {
   font-weight: 400;
-  color: var(--ink-500);
+  color: var(--muted);
 }
 
 /* "None selected" presented more softly. */
 .none {
-  color: var(--ink-400);
+  color: var(--faint);
   font-weight: 400;
   font-style: italic;
 }
@@ -93,13 +95,13 @@
 .nudge {
   margin: 0;
   font-size: var(--t-14);
-  color: var(--ink-500);
+  color: var(--body);
   line-height: 1.55;
 }
 
 .nudge strong {
-  color: var(--ink-900);
-  font-weight: 600;
+  color: var(--ink);
+  font-weight: 700;
 }
 
 /* Responsive — on narrow viewports shrink the label column. */

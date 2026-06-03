@@ -66,10 +66,10 @@
   z-index: 30;
   width: 260px;
   max-width: 78vw;
-  background: var(--paper);
-  border: 1px solid var(--ink-150);
-  border-radius: var(--r-8);
-  box-shadow: var(--shadow-popover);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-md);
   padding: 9px 11px 11px;
   cursor: default;
   /* Open fade — suppressed under reduced motion (see media query below). */
@@ -129,7 +129,7 @@
   margin: -2px -3px -2px 0;
   border-radius: var(--r-4);
   background: transparent;
-  color: var(--ink-500);
+  color: var(--muted);
   cursor: pointer;
   flex: 0 0 auto;
   transition:
@@ -138,14 +138,14 @@
 }
 
 .panelClose:hover {
-  background: var(--ink-100);
-  color: var(--ink-900);
+  background: var(--hairline);
+  color: var(--ink);
 }
 
 .panelClose:focus-visible {
   outline: 2px solid var(--catchup);
   outline-offset: 1px;
-  color: var(--ink-900);
+  color: var(--ink);
 }
 
 /* ── Panel body — the reason text ────────────────────────────────────────── */
@@ -155,7 +155,7 @@
   margin: 0;
   font-size: var(--t-12);
   line-height: 1.5;
-  color: var(--ink-700);
+  color: var(--ink-soft);
   text-wrap: pretty;
 }
 
