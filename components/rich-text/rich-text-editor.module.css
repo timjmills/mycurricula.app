@@ -35,13 +35,13 @@
   flex-wrap: wrap;
   gap: 2px;
   padding: 4px 6px;
-  background: var(--ink-900);
+  background: var(--ink);
   /* White text for every button glyph. Set on the toolbar itself because
      `.cp-root button { color: inherit }` (tokens.css) out-specifies a
      class on the button, so buttons must inherit white from this parent. */
   color: var(--paper);
-  border-radius: var(--r-8);
-  box-shadow: var(--shadow-popover);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
   user-select: none;
   /* Cap width so the toolbar doesn't span the full page on wide screens */
   max-width: calc(100vw - 16px);
@@ -246,7 +246,7 @@
 
 .iconCaret {
   font-size: var(--t-10);
-  color: var(--ink-400);
+  color: var(--muted);
   line-height: 1;
   margin-top: 1px;
 }
@@ -280,9 +280,9 @@
   grid-template-columns: repeat(6, 1fr);
   gap: 4px;
   padding: 8px;
-  background: var(--ink-900);
-  border-radius: var(--r-8);
-  box-shadow: var(--shadow-popover);
+  background: var(--ink);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
   animation: tbReveal 0.12s ease both;
   /* Wide enough for 6 × (16 + 4) + padding */
   min-width: 148px;
@@ -375,7 +375,7 @@
   position: absolute;
   width: 1.5px;
   height: var(--t-14);
-  background: var(--ink-400);
+  background: var(--muted);
   border-radius: 1px;
 }
 
@@ -436,7 +436,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  color: var(--ink-300);
+  color: var(--faint);
   font-size: inherit;
   line-height: inherit;
   font-family: inherit;
@@ -457,7 +457,7 @@
   word-break: break-word;
   overflow-wrap: break-word;
   white-space: pre-wrap;
-  caret-color: var(--ink-900);
+  caret-color: var(--ink);
 }
 
 /* Focus ring on the editor wrapper when the inner div is focused.
@@ -470,7 +470,7 @@
 /* For keyboard-only nav: show a ring when the editable div is focused via
    keyboard. :focus-visible on contentEditable is supported in modern browsers. */
 .editor:focus-visible {
-  outline: 2px solid var(--ink-900);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
   border-radius: var(--r-2);
 }
