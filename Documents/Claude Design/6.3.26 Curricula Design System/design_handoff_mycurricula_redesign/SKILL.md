@@ -32,11 +32,12 @@ warmth. Plan a year by **subject → unit → week → lesson**. **Color is the 
 subject owns a hue that **cascades** down to its units, weeks and lessons; **status** (done /
 in-progress / not-started / needs-review) is a separate, more-saturated layer. **Indigo `#3B6CF6`**
 is the functional primary; **honey `#F4B740`** is the warm accent (and the `.app` in the wordmark).
-Headings are **Bricolage Grotesque**; UI/body is **Plus Jakarta Sans**. Surfaces are white on a
+Large display &amp; H1 are **Poppins**; smaller headings (H2/H3) are **DM Sans**; UI/body is **Plus
+Jakarta Sans**. The logo wordmark is **DM Sans**. Surfaces are white on a
 **warm cream canvas**, generous radii, soft cool shadows, pill buttons. Copy sounds like a fellow
 teacher: warm, brief, sentence case, no emoji.
 
 ## Gotchas
-- Fonts load from **Google Fonts** (Bricolage Grotesque + Plus Jakarta Sans) — the official delivery; no self-hosting needed.
+- Fonts load from **Google Fonts** (Poppins + DM Sans + Plus Jakarta Sans) — the official delivery; no self-hosting needed.
 - Icons are **Lucide**-style line icons — the system's current set; keep them unless the product ships its own.
 - Don't confuse this with the kid-facing **Quest** apps (Math/Reading/Grammar Quest) — different brand.

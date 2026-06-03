@@ -1,7 +1,7 @@
 # Planner UI kit — mycurricula.app
 
 A high-fidelity, interactive recreation of the **mycurricula.app teacher planner**, dressed in
-the **v1.3** visual language (warm canvas, Bricolage headings, indigo + honey, bright subject
+the **v1.3** visual language (warm canvas, Poppins/DM Sans headings, indigo + honey, bright subject
 cascade). It's a *reference build* — cosmetically faithful, intentionally light on real logic — so
 designers and engineers can lift components and screens straight into product work.
 
@@ -43,7 +43,7 @@ Teach.jsx       ← Teach board + widgets
 - **Icons are Lucide-style** line icons (see `icons.jsx`); swap in the real Lucide set in production.
 
 ## Caveats
-- Fonts load from **Google Fonts** (Bricolage Grotesque + Plus Jakarta Sans) — the official
+- Fonts load from **Google Fonts** (Poppins + DM Sans + Plus Jakarta Sans) — the official
   delivery for this system. No self-hosting needed; they're loaded via `../../colors_and_type.css`.
 - This is a visual/interaction reference, not production code — data is mocked and most actions are
   cosmetic.

@@ -6,7 +6,8 @@ html{scroll-behavior:smooth}
 body{margin:0;font-family:var(--font-sans);color:var(--body);background:var(--canvas);-webkit-font-smoothing:antialiased;line-height:1.6}
 svg{display:block}
 a{color:inherit}
-h1,h2,h3,h4{font-family:var(--font-display);color:var(--ink);margin:0;letter-spacing:-.02em;font-weight:800}
+h1,h2,h3,h4{font-family:var(--font-display-sm);color:var(--ink);margin:0;letter-spacing:-.02em;font-weight:800}
+h1{font-family:var(--font-display)}
 .mono{font-family:var(--font-mono)}
 
 /* page atmospheric mesh */
@@ -23,7 +24,7 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
 .side .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .side .brand .glyph{width:36px;height:36px;border-radius:11px;background:var(--grad-honey);display:grid;place-items:center;box-shadow:var(--sh-honey)}
 .side .brand .glyph svg{width:19px;height:19px}
-.side .brand b{font-family:var(--font-display);font-weight:800;font-size:16px;color:var(--ink)}
+.side .brand b{font-family:var(--font-logo);font-weight:800;font-size:16px;color:var(--ink)}
 .side .brand b .tld{color:var(--honey-600)}
 .side .ver{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 22px 46px}
 .side nav{display:flex;flex-direction:column;gap:1px}

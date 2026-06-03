@@ -128,11 +128,12 @@ The look, in rules. Tokens live in `colors_and_type.css`; this is the *why* and 
   `#1C1B2E`, not pure black. Borders are warm (`#ECEAE3`), cooling to `#E8EAF2` only next to brand color.
 
 ### Type
-- **Display & headings: Bricolage Grotesque** (700/800) — warm, slightly editorial, tight tracking
-  (−0.02 to −0.03em). **UI, body & data: Plus Jakarta Sans** (400–700) — clean and professional.
+- **Large display &amp; H1: Poppins** (600–800) — geometric, friendly, approachable. **Smaller headings
+  (H2, H3, card titles): DM Sans** (600–800) — neutral, modern. **UI, body &amp; data: Plus Jakarta Sans**
+  (400–700) — clean and professional.
 - **Labels/eyebrows** are the one uppercase style: 11px, 700, `+0.09em`, in muted or honey.
-- Display 44/H1 28/H2 22 are Bricolage; H3 18 and everything smaller is Jakarta. See the type scale
-  in `colors_and_type.css`.
+- Display 44 &amp; H1 28 are **Poppins**; H2 22 &amp; H3 18 are **DM Sans**; body/UI is **Plus Jakarta Sans**.
+  See the type scale in `colors_and_type.css` (`--font-display` = Poppins, `--font-display-sm` = DM Sans).
 
 ### Backgrounds
 - The app background is the flat **cream canvas**, lifted by a **page-level atmospheric mesh**:
@@ -201,8 +202,8 @@ The look, in rules. Tokens live in `colors_and_type.css`; this is the *why* and 
     drop it into `assets/icons/` and update this section.
 - **Brand glyph:** an **open-book / two-page** mark (see `assets/logo-glyph.svg`). In the wordmark it
   sits in a rounded tile with the **honey gradient** and a honey glow; on light it's the two-tone
-  indigo/honey version. Pair it with the wordmark **"Curricula"** in Bricolage 800 + a small uppercase
-  "Design System" / product label beneath.
+  indigo/honey version. Pair it with the wordmark **"mycurricula.app"** in **DM Sans 800** (the `.app`
+  set in honey) + a small uppercase product label beneath.
 - **Emoji:** **not used** in the teacher brand. **Unicode** is used only as typographic punctuation —
   the **middle dot `·`** as a label/detail separator and the arrow **`→`** in CTAs. Meaning is carried
   by color + line icon + word, never by emoji.

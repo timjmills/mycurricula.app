@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(rmdir /s /q .next)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git fetch *)",
+      "Bash(git rev-list *)",
+      "Bash(git check-ignore *)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git push *)"
     ]
   },
   "enabledPlugins": {

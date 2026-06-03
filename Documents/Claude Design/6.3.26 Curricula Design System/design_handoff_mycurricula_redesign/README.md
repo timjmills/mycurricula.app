@@ -41,7 +41,7 @@ intentional. Recreate the UI pixel-faithfully using the codebase's libraries. Ex
   Features (4-col) → How it works (4-col steps) → Teach-mode band (2-col) → Testimonial → Pricing
   (3-col) → CTA band → Footer.
 - **Key components:**
-  - **Hero:** honey eyebrow pill; H1 in Bricolage 800 ~60px; lead 19px; two CTAs (honey primary pill +
+  - **Hero:** honey eyebrow pill; H1 in **Poppins** 700 ~60px; lead 19px; two CTAs (honey primary pill +
     secondary). Background is the hero-mesh (peach→pink→violet→mint radial blend) over cream.
   - **Product peek:** window-chrome card (3 traffic dots) showing the Year Overview cascade — three
     subject lanes (Reading blue, Math gold, Science green) each with a tinted header + unit chips.
@@ -76,7 +76,7 @@ Interactive recreation of the seven core surfaces. Shell = optional team banner 
 - **Progressive selection — nothing auto-selected:** open unit → weeks appear (none highlighted) +
   hint → pick a week → days appear (none highlighted) → pick a day → **lesson drawer** slides in from
   the right.
-- **Lesson drawer (right):** subject-tinted; day/date, lesson title (Bricolage), subject/duration/
+- **Lesson drawer (right):** subject-tinted; day/date, lesson title (DM Sans), subject/duration/
   status badges, **Lesson overview**, **Activities** (numbered, timed), **Objectives** (checked),
   **Standards**, **Resources**, and a **Mark complete / Edit** footer. Closes via X, scrim, or Esc.
 - **Selected states** fill with the subject **tint** + accent border (unit, week, and day cards) —
@@ -131,9 +131,11 @@ Full set in **`colors_and_type.css`** (CSS custom properties). Summary:
   danger `#EF5A5A` (each with a `-tint`).
 - **Neutrals:** canvas `#FCFAF6`, surface `#FFFFFF`, surface-warm `#FFFDF8`, ink `#1C1B2E`, body
   `#57566B`, muted `#908FA3`, border `#ECEAE3`, hairline `#F4F2EC`.
-- **Type:** display/headings **Bricolage Grotesque** (700/800); UI/body/data **Plus Jakarta Sans**
-  (400–700). Scale: display 44 / H1 28 / H2 22 / H3 18 / body-L 16 / body 14 / small 13 / label 11
-  (uppercase, +0.09em). Delivered via Google Fonts.
+- **Type:** large display &amp; H1 **Poppins** (600–800); smaller headings (H2/H3, card titles) **DM Sans**
+  (600–800); UI/body/data **Plus Jakarta Sans** (400–700); logo wordmark **DM Sans**. Scale: display 44
+  / H1 28 (Poppins) / H2 22 / H3 18 (DM Sans) / body-L 16 / body 14 / small 13 / label 11 (uppercase,
+  +0.09em). Tokens: `--font-display` (Poppins), `--font-display-sm` (DM Sans), `--font-logo` (DM Sans),
+  `--font-sans` (Plus Jakarta Sans). Delivered via Google Fonts.
 - **Space:** 4px scale (`--s1`..`--s16` = 4,8,12,16,20,24,32,40,48,64).
 - **Radius:** sm 10 / md 14 / lg 18 / xl 24 / 2xl 32 / pill 999. Every button/badge/field is a pill.
 - **Elevation:** `--sh-xs/sm/md/lg` (soft, cool); `--sh-brand` / `--sh-honey` color glows for primary
@@ -148,7 +150,7 @@ Full set in **`colors_and_type.css`** (CSS custom properties). Summary:
   rounded tile. See the brand block in `Design System.html`.
 - **Icons:** **Lucide-style** line icons (~2px stroke, round caps, 24×24), delivered inline. The
   prototypes ship a small inline set; use the real **Lucide** package in production. No emoji.
-- **Fonts:** Google Fonts — Bricolage Grotesque + Plus Jakarta Sans.
+- **Fonts:** Google Fonts — Poppins + DM Sans + Plus Jakarta Sans.
 
 ## Screenshots
 Reference renders are in `screenshots/`:

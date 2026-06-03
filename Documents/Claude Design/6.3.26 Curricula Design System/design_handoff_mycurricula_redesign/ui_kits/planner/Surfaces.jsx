@@ -45,7 +45,7 @@ function Metric({ v, l, name, bg, fg }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       <span style={{ width: 40, height: 40, borderRadius: 12, background: bg, color: fg, display: "grid", placeItems: "center", flex: "0 0 auto" }}><Icon name={name} style={{ width: 19, height: 19 }} /></span>
-      <div><div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 22, color: "var(--ink)", lineHeight: 1 }}>{v}</div><div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, marginTop: 2 }}>{l}</div></div>
+      <div><div style={{ fontFamily: "var(--font-display-sm)", fontWeight: 800, fontSize: 22, color: "var(--ink)", lineHeight: 1 }}>{v}</div><div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, marginTop: 2 }}>{l}</div></div>
     </div>
   );
 }
@@ -54,7 +54,7 @@ function DailyLesson({ l, onClick }) {
   return (
     <div className={"lcard" + (l.modified ? " modified" : "")} style={{ ...window.sv(l.subject), padding: "15px 17px" }} onClick={onClick}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span style={{ width: 44, height: 44, borderRadius: 12, background: "var(--c)", color: "#fff", display: "grid", placeItems: "center", flex: "0 0 auto", fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 13 }}>{l.time}</span>
+        <span style={{ width: 44, height: 44, borderRadius: 12, background: "var(--c)", color: "#fff", display: "grid", placeItems: "center", flex: "0 0 auto", fontFamily: "var(--font-display-sm)", fontWeight: 800, fontSize: 13 }}>{l.time}</span>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div className="meta" style={{ marginBottom: 0 }}><span className="sd" />{s.name}{l.std && <span className="std" style={{ marginLeft: 8 }}>{l.std}</span>}</div>
           <h4 style={{ fontSize: 15, marginTop: 5 }}>{l.title}</h4>

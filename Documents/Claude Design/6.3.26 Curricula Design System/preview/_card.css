@@ -12,7 +12,7 @@ body{
   padding:20px;
 }
 .card-wrap{width:660px;}
-h1,h2,h3,h4{font-family:var(--font-display);color:var(--ink);margin:0;letter-spacing:-.02em;font-weight:800}
+h1,h2,h3,h4{font-family:var(--font-display-sm);color:var(--ink);margin:0;letter-spacing:-.02em;font-weight:800}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .col{display:flex;flex-direction:column;gap:12px}
 .mono{font-family:var(--font-mono)}
