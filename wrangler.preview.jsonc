@@ -1,0 +1,31 @@
+{
+  // PREVIEW-ONLY Cloudflare config — used by .github/workflows/preview-deploy.yml
+  // for `wrangler versions upload`. It targets the SAME Worker name as
+  // wrangler.jsonc ("mycurricula-app") so the uploaded version shares the
+  // production Worker's runtime secrets/bindings (incl. CLAUDE_BYPASS_TOKEN),
+  // but it deliberately OMITS the `routes` custom-domain binding so a version
+  // upload never tries to apply a trigger (which made the upload exit non-zero)
+  // and never touches the live mycurricula.app route. `workers_dev` + the
+  // default version preview URLs give the uploaded version its own
+  // *.workers.dev URL. This file is NOT used by the production deploy.yml.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mycurricula-app",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-05-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "r2_buckets": [
+    {
+      "binding": "LESSON_RESOURCES",
+      "bucket_name": "lesson-resources",
+    },
+  ],
+}

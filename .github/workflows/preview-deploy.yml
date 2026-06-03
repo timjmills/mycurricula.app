@@ -69,13 +69,20 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # Use the preview-only config (no custom-domain route → no trigger to
+        # apply → clean exit; same Worker name → shares prod runtime secrets).
+        # URL extraction is non-fatal so a missing match never red-X's a
+        # successful upload; the Worker Version ID is captured as a fallback.
         run: |
           set -o pipefail
-          npx wrangler versions upload \
+          npx wrangler versions upload --config wrangler.preview.jsonc \
             --message "v1.3 redesign preview — ${{ github.ref_name }} @ ${{ github.sha }}" \
-            2>&1 | tee /tmp/wrangler-preview.log
-          URL="$(grep -oE 'https://[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev' /tmp/wrangler-preview.log | head -1)"
+            2>&1 | tee /tmp/wrangler-preview.log || true
+          URL="$(grep -oiE 'https://[a-z0-9.-]+\.workers\.dev[a-z0-9/_-]*' /tmp/wrangler-preview.log | head -1 || true)"
+          VID="$(grep -oiE 'Worker Version ID: *[a-f0-9-]+' /tmp/wrangler-preview.log | head -1 | awk '{print $NF}' || true)"
           echo "preview_url=$URL" >> "$GITHUB_OUTPUT"
+          echo "version_id=$VID" >> "$GITHUB_OUTPUT"
+          if [ -n "$URL" ]; then echo "PREVIEW URL: $URL"; else echo "No preview URL found; version id=$VID"; fi
 
       - name: Summary
         if: always()
@@ -85,7 +92,8 @@ jobs:
             echo ""
             echo "- Branch: \`${{ github.ref_name }}\`"
             echo "- Commit: \`${{ github.sha }}\`"
-            echo "- Preview URL: ${{ steps.preview.outputs.preview_url || 'see “Upload preview version” logs' }}"
+            echo "- Preview URL: ${{ steps.preview.outputs.preview_url || 'not emitted — see note below + “Upload preview version” logs' }}"
+            echo "- Worker Version ID: \`${{ steps.preview.outputs.version_id }}\`"
             echo "- Production (\`mycurricula.app\`) is **unchanged** — this is a non-active version upload."
             echo ""
             echo "Planner is behind auth; reach it on the preview via the Claude bypass:"
