@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mycurricula.app — Design System</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="design-system.css">
+</head>
+<body>
+<div class="shell">
+
+  <!-- Side nav -->
+  <aside class="side">
+    <div class="brand">
+      <span class="glyph"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z" fill="#fff"/><path d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13z" fill="#3A2A05" opacity=".5"/></svg></span>
+      <b>mycurricula<span class="tld">.app</span></b>
+    </div>
+    <div class="ver">Design System · v1.3</div>
+    <nav>
+      <span class="navlabel">Foundations</span>
+      <a href="#color">Color</a>
+      <a href="#subjects">Subject cascade</a>
+      <a href="#type">Typography</a>
+      <a href="#space">Space &amp; radius</a>
+      <a href="#elevation">Elevation</a>
+      <span class="navlabel">Components</span>
+      <a href="#buttons">Buttons</a>
+      <a href="#inputs">Inputs</a>
+      <a href="#status">Status &amp; badges</a>
+      <a href="#controls">Controls</a>
+      <a href="#cascade">Cascade chips</a>
+      <a href="#cards">Cards &amp; metrics</a>
+      <span class="navlabel">Brand</span>
+      <a href="#icon">Iconography</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="dochead">
+      <span class="eyebrow">Curriculum planning, made warm</span>
+      <h1>mycurricula.app Design System</h1>
+      <p>The brand &amp; product design language — for teachers, by teachers. Dashboard clarity with landing-page warmth, where <b>color is the navigation</b>: every subject owns a hue that cascades to its units, weeks and lessons, and status stays a separate layer. Tokens live in <span class="mono">colors_and_type.css</span>.</p>
+    </header>
+
+    <!-- COLOR -->
+    <section id="color">
+      <div class="sechead"><h2>Color</h2><span class="tag">--brand · --honey · neutrals</span></div>
+      <p class="secsub">Two voices, one palette. <b>Indigo</b> does the work (actions, links, focus, in-progress); <b>Honey</b> does the welcome (marketing CTA, highlights, needs-review, and the <span class="mono">.app</span> in the wordmark). They never compete.</p>
+
+      <div class="block">
+        <div class="blocklabel">Brand · Indigo — functional primary (500 = #3B6CF6)</div>
+        <div class="ramp">
+          <div style="background:var(--brand-50);color:#2543B0">50</div><div style="background:var(--brand-100);color:#2543B0">100</div><div style="background:var(--brand-200);color:#2543B0">200</div><div style="background:var(--brand-300);color:#fff">300</div><div style="background:var(--brand-400);color:#fff">400</div><div style="background:var(--brand-500);color:#fff">500</div><div style="background:var(--brand-600);color:#fff">600</div><div style="background:var(--brand-700);color:#fff">700</div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="blocklabel">Accent · Honey — warm accent (400 = #F4B740)</div>
+        <div class="ramp">
+          <div style="background:var(--honey-50);color:#C9871A">50</div><div style="background:var(--honey-100);color:#C9871A">100</div><div style="background:var(--honey-200);color:#C9871A">200</div><div style="background:var(--honey-300);color:#7A5208">300</div><div style="background:var(--honey-400);color:#3A2A05">400</div><div style="background:var(--honey-500);color:#fff">500</div><div style="background:var(--honey-600);color:#fff">600</div><div style="background:#A06A12;color:#fff">700</div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="blocklabel">Warm neutrals — white surfaces on a cream canvas</div>
+        <div class="grid g8">
+          <div class="swatch"><div class="cc" style="background:var(--canvas);border-bottom:1px solid var(--border)"></div><div class="info"><div class="nm">Canvas</div><div class="hex">#FCFAF6</div></div></div>
+          <div class="swatch"><div class="cc" style="background:var(--surface);border-bottom:1px solid var(--border)"></div><div class="info"><div class="nm">Surface</div><div class="hex">#FFFFFF</div></div></div>
+          <div class="swatch"><div class="cc" style="background:var(--surface-warm);border-bottom:1px solid var(--border)"></div><div class="info"><div class="nm">Warm</div><div class="hex">#FFFDF8</div></div></div>
+          <div class="swatch"><div class="cc" style="background:var(--ink)"></div><div class="info"><div class="nm">Ink</div><div class="hex">#1C1B2E</div></div></div>
+          <div class="swatch"><div class="cc" style="background:var(--body)"></div><div class="info"><div class="nm">Body</div><div class="hex">#57566B</div></div></div>
+          <div class="swatch"><div class="cc" style="background:var(--muted)"></div><div class="info"><div class="nm">Muted</div><div class="hex">#908FA3</div></div></div>
+          <div class="swatch"><div class="cc" style="background:var(--border)"></div><div class="info"><div class="nm">Border</div><div class="hex">#ECEAE3</div></div></div>
+          <div class="swatch"><div class="cc" style="background:var(--hairline)"></div><div class="info"><div class="nm">Hairline</div><div class="hex">#F4F2EC</div></div></div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="blocklabel">Gradients — atmosphere, not decoration</div>
+        <div class="grid g6">
+          <div class="gradcard" style="background:var(--grad-hero)"><span>Hero mesh</span></div>
+          <div class="gradcard" style="background:var(--grad-honey)"><span>Honey CTA</span></div>
+          <div class="gradcard" style="background:var(--grad-brand)"><span>Brand soft</span></div>
+          <div class="gradcard" style="background:var(--grad-dawn)"><span>Dawn</span></div>
+          <div class="gradcard" style="background:var(--grad-mint)"><span>Mint</span></div>
+          <div class="gradcard" style="background:var(--ink)"><span style="background:rgba(255,255,255,.9)">Ink band</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SUBJECT CASCADE -->
+    <section id="subjects">
+      <div class="sechead"><h2>Subject cascade</h2><span class="tag">--subj-1…15</span></div>
+      <p class="secsub">Fifteen muted hues at a shared lightness so a dozen-plus subjects coexist without clashing. Each has a <b>solid</b> (headers/icons), a <b>tint</b> (fills/lanes), an <b>ink</b> (AA text on tint), and a <b>bright</b> variant (chip outlines, dots, icon tiles).</p>
+      <div class="grid g6" style="margin-bottom:18px">
+        <div class="palcard"><div class="head" style="background:var(--subj-1)"><span class="sw" style="background:var(--subj-1-tint)"></span><span class="num">1</span></div><div class="bd"><div class="nm">Math</div><div class="sub">#DCC674</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-2)"><span class="sw" style="background:var(--subj-2-tint)"></span><span class="num">2</span></div><div class="bd"><div class="nm">Writing</div><div class="sub">#DCA574</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-3)"><span class="sw" style="background:var(--subj-3-tint)"></span><span class="num">3</span></div><div class="bd"><div class="nm">Phonics</div><div class="sub">#DC8274</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-4)"><span class="sw" style="background:var(--subj-4-tint)"></span><span class="num">4</span></div><div class="bd"><div class="nm">Spelling</div><div class="sub">#CF778D</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-5)"><span class="sw" style="background:var(--subj-5-tint)"></span><span class="num">5</span></div><div class="bd"><div class="nm">Art</div><div class="sub">#CF77AF</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-6)"><span class="sw" style="background:var(--subj-6-tint)"></span><span class="num">6</span></div><div class="bd"><div class="nm">Music</div><div class="sub">#C77AC7</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-7)"><span class="sw" style="background:var(--subj-7-tint)"></span><span class="num">7</span></div><div class="bd"><div class="nm">Social</div><div class="sub">#AB7AC7</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-8)"><span class="sw" style="background:var(--subj-8-tint)"></span><span class="num">8</span></div><div class="bd"><div class="nm">World Lang</div><div class="sub">#917AC7</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-9)"><span class="sw" style="background:var(--subj-9-tint)"></span><span class="num">9</span></div><div class="bd"><div class="nm">SEL</div><div class="sub">#7A7FC7</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-10)"><span class="sw" style="background:var(--subj-10-tint)"></span><span class="num">10</span></div><div class="bd"><div class="nm">Reading</div><div class="sub">#7A9EC7</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-11)"><span class="sw" style="background:var(--subj-11-tint)"></span><span class="num">11</span></div><div class="bd"><div class="nm">Tech</div><div class="sub">#7AB8C7</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-12)"><span class="sw" style="background:var(--subj-12-tint)"></span><span class="num">12</span></div><div class="bd"><div class="nm">Health</div><div class="sub">#7AC7B8</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-13)"><span class="sw" style="background:var(--subj-13-tint)"></span><span class="num">13</span></div><div class="bd"><div class="nm">Science</div><div class="sub">#7AC79B</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-14)"><span class="sw" style="background:var(--subj-14-tint)"></span><span class="num">14</span></div><div class="bd"><div class="nm">PE</div><div class="sub">#7AC77A</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-15)"><span class="sw" style="background:var(--subj-15-tint)"></span><span class="num">15</span></div><div class="bd"><div class="nm">Library</div><div class="sub">#9AC77A</div></div></div>
+      </div>
+      <div class="note"><b>How it cascades:</b> a container sets <span class="mono">--c</span> (bright accent) and <span class="mono">--ct</span> (tint); chips inherit both. One line re-themes a whole lane — see the Cascade chips below.</div>
+    </section>
+
+    <!-- TYPE -->
+    <section id="type">
+      <div class="sechead"><h2>Typography</h2><span class="tag">Bricolage Grotesque · Plus Jakarta Sans</span></div>
+      <p class="secsub">Headings in <b>Bricolage Grotesque</b> (warm, editorial, tight tracking). UI, body &amp; data in <b>Plus Jakarta Sans</b> (clean, professional). The one uppercase style is the small label/eyebrow.</p>
+      <div class="specimen"><span class="ds-display">Plan the year</span><span class="lab">Display · Bricolage 800 · 44/1.0</span></div>
+      <div class="specimen"><span class="ds-h1">Unit 3 · Multiplication</span><span class="lab">H1 · Bricolage 800 · 28</span></div>
+      <div class="specimen"><span class="ds-h2">Week 3 overview</span><span class="lab">H2 · Bricolage 700 · 22</span></div>
+      <div class="specimen"><span class="ds-h3">Multiply by 2-digit numbers</span><span class="lab">H3 · Jakarta 700 · 18</span></div>
+      <div class="specimen"><span class="ds-body-l">Lesson body copy stays readable across long planning notes and descriptions.</span><span class="lab">Body L · Jakarta 400 · 16</span></div>
+      <div class="specimen"><span class="ds-body">Default UI text, table cells and secondary descriptions.</span><span class="lab">Body · Jakarta 400 · 14</span></div>
+      <div class="specimen"><span class="ds-small">Helper text, dates and metadata.</span><span class="lab">Small · Jakarta 500 · 13</span></div>
+      <div class="specimen"><span class="ds-label">Section label</span><span class="lab">Label · Jakarta 700 · 11 · +.09em</span></div>
+    </section>
+
+    <!-- SPACE -->
+    <section id="space">
+      <div class="sechead"><h2>Space &amp; radius</h2><span class="tag">--s* · --r-*</span></div>
+      <p class="secsub">A 4px space scale, and generous radii — pills for every button/badge/field — to keep a dense planner feeling soft.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px">
+        <div>
+          <div class="blocklabel">Spacing</div>
+          <div class="tok"><span class="name">--s1</span><span class="val">4px</span><span class="spacebar" style="width:4px"></span></div>
+          <div class="tok"><span class="name">--s2</span><span class="val">8px</span><span class="spacebar" style="width:8px"></span></div>
+          <div class="tok"><span class="name">--s3</span><span class="val">12px</span><span class="spacebar" style="width:12px"></span></div>
+          <div class="tok"><span class="name">--s4</span><span class="val">16px</span><span class="spacebar" style="width:16px"></span></div>
+          <div class="tok"><span class="name">--s6</span><span class="val">24px</span><span class="spacebar" style="width:24px"></span></div>
+          <div class="tok"><span class="name">--s8</span><span class="val">32px</span><span class="spacebar" style="width:32px"></span></div>
+          <div class="tok"><span class="name">--s12</span><span class="val">48px</span><span class="spacebar" style="width:48px"></span></div>
+          <div class="tok"><span class="name">--s16</span><span class="val">64px</span><span class="spacebar" style="width:64px"></span></div>
+        </div>
+        <div>
+          <div class="blocklabel">Radius</div>
+          <div class="tok"><span class="name">--r-sm</span><span class="val">10px</span><span class="radbox" style="border-radius:10px"></span></div>
+          <div class="tok"><span class="name">--r-md</span><span class="val">14px</span><span class="radbox" style="border-radius:14px"></span></div>
+          <div class="tok"><span class="name">--r-lg</span><span class="val">18px</span><span class="radbox" style="border-radius:18px"></span></div>
+          <div class="tok"><span class="name">--r-xl</span><span class="val">24px</span><span class="radbox" style="border-radius:24px"></span></div>
+          <div class="tok"><span class="name">--r-2xl</span><span class="val">32px</span><span class="radbox" style="border-radius:32px"></span></div>
+          <div class="tok"><span class="name">--r-pill</span><span class="val">999</span><span class="radbox" style="border-radius:999px;width:120px"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ELEVATION -->
+    <section id="elevation">
+      <div class="sechead"><h2>Elevation</h2><span class="tag">--sh-*</span></div>
+      <p class="secsub">Soft, low-contrast shadows that cast cool over the warm canvas. Color glows are rationed to primary buttons only.</p>
+      <div class="elev">
+        <div><div class="shadowbox" style="box-shadow:var(--sh-xs);margin:0 auto"></div><div class="cap">xs</div></div>
+        <div><div class="shadowbox" style="box-shadow:var(--sh-sm);margin:0 auto"></div><div class="cap">sm</div></div>
+        <div><div class="shadowbox" style="box-shadow:var(--sh-md);margin:0 auto"></div><div class="cap">md</div></div>
+        <div><div class="shadowbox" style="box-shadow:var(--sh-lg);margin:0 auto"></div><div class="cap">lg</div></div>
+        <div><div class="shadowbox" style="box-shadow:var(--sh-honey);background:var(--grad-honey);margin:0 auto"></div><div class="cap">honey glow</div></div>
+      </div>
+    </section>
+
+    <!-- BUTTONS -->
+    <section id="buttons">
+      <div class="sechead"><h2>Buttons</h2><span class="tag">pill · 4 variants</span></div>
+      <div class="block">
+        <div class="row">
+          <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>Add unit</button>
+          <button class="btn btn-honey">Get started</button>
+          <button class="btn btn-secondary">Export</button>
+          <button class="btn btn-ghost">Cancel</button>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn btn-primary btn-sm">Small</button>
+        <button class="btn btn-primary">Default</button>
+        <button class="btn btn-primary btn-lg">Large</button>
+      </div>
+    </section>
+
+    <!-- INPUTS -->
+    <section id="inputs">
+      <div class="sechead"><h2>Inputs</h2><span class="tag">warm fill · brand focus ring</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:680px">
+        <div class="field"><label>Unit title</label><input class="input" placeholder="e.g. Multiplication &amp; Division"></div>
+        <div class="field"><label>Search</label><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2" stroke-linecap="round"/></svg><input class="input" placeholder="Search units, lessons, standards…"></div></div>
+        <div class="field"><label>Subject</label><select class="input"><option>Math</option><option>Reading</option><option>Science</option></select></div>
+        <div class="field"><label>Focused</label><input class="input focus" value="Multiply by 2-digit numbers"></div>
+      </div>
+    </section>
+
+    <!-- STATUS -->
+    <section id="status">
+      <div class="sechead"><h2>Status &amp; badges</h2><span class="tag">semantic · separate from subject</span></div>
+      <p class="secsub">Status is its own, more-saturated layer so a marker always reads as progress — never as a subject.</p>
+      <div class="row" style="margin-bottom:18px">
+        <span class="badge badge-done"><span class="dot" style="background:var(--done)"></span>Completed</span>
+        <span class="badge badge-progress"><span class="dot" style="background:var(--progress)"></span>In progress</span>
+        <span class="badge badge-idle"><span class="dot" style="background:var(--idle)"></span>Not started</span>
+        <span class="badge badge-warn"><span class="dot" style="background:var(--warn)"></span>Needs review</span>
+      </div>
+      <div class="row" style="gap:26px">
+        <span class="status"><span class="ring done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 13 4 4 10-11" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Completed</span>
+        <span class="status"><span class="ring prog"></span>In progress</span>
+        <span class="status"><span class="ring idle"></span>Not started</span>
+      </div>
+    </section>
+
+    <!-- CONTROLS -->
+    <section id="controls">
+      <div class="sechead"><h2>Controls</h2><span class="tag">segmented · avatar</span></div>
+      <div class="row" style="gap:22px">
+        <div class="segment">
+          <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18" stroke-linecap="round"/></svg>Timeline</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg>Table</button>
+        </div>
+        <div class="segment"><button class="on">Personal</button><button>Team</button></div>
+        <div style="display:flex;align-items:center;gap:11px">
+          <span class="avatar">RM</span>
+          <div><div style="font-weight:700;color:var(--ink);font-size:14px;line-height:1.2">Ms. Rivera</div><div style="font-size:12px;color:var(--muted)">Grade 5 · Room 12</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CASCADE -->
+    <section id="cascade">
+      <div class="sechead"><h2>Cascade chips</h2><span class="tag">unit → week → lesson</span></div>
+      <p class="secsub">The signature object. Tint fill, bright colored outline, soft shadow, dark ink text — color lives in the outline, icon tile and dot, not the words. Set <span class="mono">--c</span> and <span class="mono">--ct</span> to re-theme.</p>
+      <div style="--c:var(--reading-bright);--ct:var(--reading-tint);display:flex;flex-direction:column;gap:10px;max-width:520px">
+        <div class="uchip active">
+          <span class="cic solid"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z" stroke-linejoin="round"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z" stroke-linejoin="round"/></svg></span>
+          <div><div class="u">Unit 3 · Inference</div><div class="t">6 weeks · 24 lessons</div></div>
+        </div>
+        <div class="row" style="gap:10px">
+          <div class="wchip"><span class="cic soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke-linecap="round"/></svg></span><div><div class="w">Week 3</div><div class="d">Mon – Fri</div></div></div>
+          <div class="wchip active"><span class="cic soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke-linecap="round"/></svg></span><div><div class="w">Week 4</div><div class="d">Mon – Fri</div></div></div>
+        </div>
+        <div class="row" style="gap:10px">
+          <div class="lchip"><span class="ld"></span><span class="ls">Drawing conclusions</span></div>
+          <div class="lchip"><span class="ld"></span><span class="ls">Text evidence</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CARDS -->
+    <section id="cards">
+      <div class="sechead"><h2>Cards &amp; metrics</h2><span class="tag">surface · subject card · metric</span></div>
+      <div class="row" style="align-items:stretch;gap:16px">
+        <div class="democard">
+          <h4>Default card</h4>
+          <p>White surface, 1px warm border, 18px radius, soft shadow, 24px padding. The default container — no colored left-borders, no gradients.</p>
+        </div>
+        <div class="subjcard">
+          <div class="ic" style="background:var(--math-tint);color:var(--math-ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M9 4v3M7 12h2m3 0h2m3 0h.01M7 16h2m3 0h2m3 0h.01" stroke-linecap="round"/></svg></div>
+          <h4>Math</h4><div class="sub">8 of 12 units · 67%</div>
+          <div class="bar"><i style="width:67%;background:var(--math)"></i></div>
+        </div>
+        <div style="display:flex;flex-direction:column;justify-content:center;gap:18px">
+          <div class="metric"><div class="mi" style="background:var(--brand-50);color:var(--brand-600)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3 8 4-16 3 8h4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><div class="mv">182</div><div class="ml">lessons planned</div></div></div>
+          <div class="metric"><div class="mi" style="background:var(--done-tint);color:var(--done)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 13 4 4 10-11" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><div class="mv">68%</div><div class="ml">year complete</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ICON -->
+    <section id="icon">
+      <div class="sechead"><h2>Iconography</h2><span class="tag">Lucide-style line icons</span></div>
+      <p class="secsub">Clean line icons — ~2px stroke, round caps &amp; joins, 24×24, unfilled. Delivered as inline SVG (no icon font). Glyphs inside colored chip tiles are white on solid, accent on soft. Emoji is not used; Unicode appears only as punctuation — the middle dot <span class="mono">·</span> and the arrow <span class="mono">→</span>.</p>
+      <div class="row" style="gap:16px;color:var(--ink-soft)">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6l-5 8a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-8V3M7 14h10"/></svg>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 1 0-12 0c0 6-2.5 8-2.5 8h17S18 15 18 9z"/><path d="M10.5 21a2 2 0 0 0 3 0"/></svg>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18M4 4v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4M12 16v4M9 21h6"/></svg>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>
+      </div>
+      <div class="foot">mycurricula.app · Design System v1.3 · Tokens in <span class="mono">colors_and_type.css</span> · See <span class="mono">README.md</span> for the full written spec, and <span class="mono">ui_kits/</span> + <span class="mono">prototypes/</span> for the system assembled.</div>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>

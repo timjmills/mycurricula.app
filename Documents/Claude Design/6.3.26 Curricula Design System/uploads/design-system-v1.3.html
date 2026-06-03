@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curricula Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   CURRICULA DESIGN SYSTEM  v1.3
+   Merge of a planning dashboard + a warm creative site.
+   This revision: blue brand (from v1) + the v1.1 muted subject scale,
+   cascade chips with brighter accent outlines, soft shadows, icon tiles and dark text, White Rose grade bands.
+   ============================================================ */
+
+:root{
+  /* ---- Brand / Indigo (functional primary, restored from v1) ---- */
+  --brand-50:#EEF3FF;  --brand-100:#DCE6FF; --brand-200:#BACCFF;
+  --brand-300:#8FA8FF; --brand-400:#6383FB; --brand-500:#3B6CF6;
+  --brand-600:#2E55DB; --brand-700:#2543B0;
+
+  /* ---- Honey / Amber (warm accent, marketing CTA) ---- */
+  --honey-50:#FFF8E7;  --honey-100:#FFEFC2; --honey-200:#FCE095;
+  --honey-300:#F8CC5C; --honey-400:#F4B740; --honey-500:#E9A526;
+  --honey-600:#C9871A;
+
+  /* ---- Subject scale: 15 muted hues (White Rose register) ----
+     Each = solid (headers/icons/accents) / tint (fills) / ink (text on tint). */
+  --subj-1:#DCC674;  --subj-1-tint:#F4EFDF;  --subj-1-ink:#7A671F;   /* gold     */
+  --subj-2:#DCA574;  --subj-2-tint:#F4E9DF;  --subj-2-ink:#7A491F;   /* apricot  */
+  --subj-3:#DC8274;  --subj-3-tint:#F4E2DF;  --subj-3-ink:#7A2B1F;   /* coral    */
+  --subj-4:#CF778D;  --subj-4-tint:#F2E1E5;  --subj-4-ink:#7A1F36;   /* rose     */
+  --subj-5:#CF77AF;  --subj-5-tint:#F2E1EC;  --subj-5-ink:#7A1F59;   /* pink     */
+  --subj-6:#C77AC7;  --subj-6-tint:#F0E2F0;  --subj-6-ink:#752475;   /* magenta  */
+  --subj-7:#AB7AC7;  --subj-7-tint:#EBE2F0;  --subj-7-ink:#572475;   /* purple   */
+  --subj-8:#917AC7;  --subj-8-tint:#E6E2F0;  --subj-8-ink:#3C2475;   /* violet   */
+  --subj-9:#7A7FC7;  --subj-9-tint:#E2E3F0;  --subj-9-ink:#242975;   /* periwinkle */
+  --subj-10:#7A9EC7; --subj-10-tint:#E2E9F0; --subj-10-ink:#244A75;  /* blue     */
+  --subj-11:#7AB8C7; --subj-11-tint:#E2EEF0; --subj-11-ink:#246575;  /* cyan     */
+  --subj-12:#7AC7B8; --subj-12-tint:#E2F0EE; --subj-12-ink:#247565;  /* teal     */
+  --subj-13:#7AC79B; --subj-13-tint:#E2F0E8; --subj-13-ink:#247547;  /* green    */
+  --subj-14:#7AC77A; --subj-14-tint:#E2F0E2; --subj-14-ink:#257425;  /* leaf     */
+  --subj-15:#9AC77A; --subj-15-tint:#E8F0E2; --subj-15-ink:#467524;  /* lime     */
+
+  /* ---- Bright chip accents (outlines, icon tiles, dots) ---- */
+  --subj-1-bright:#E8BB17; --subj-2-bright:#E87917; --subj-3-bright:#E83317;
+  --subj-4-bright:#E8174B; --subj-5-bright:#E8179B; --subj-6-bright:#D147D1;
+  --subj-7-bright:#9F47D1; --subj-8-bright:#7147D1; --subj-9-bright:#4751D1;
+  --subj-10-bright:#4788D1; --subj-11-bright:#47B6D1; --subj-12-bright:#47D1B6;
+  --subj-13-bright:#47D183; --subj-14-bright:#47D147; --subj-15-bright:#81D147;
+
+  /* core subject aliases map onto the scale (swap freely) */
+  --math:var(--subj-1);     --math-tint:var(--subj-1-tint);     --math-ink:var(--subj-1-ink);
+  --math-bright:var(--subj-1-bright); --reading-bright:var(--subj-10-bright); --science-bright:var(--subj-13-bright); --social-bright:var(--subj-7-bright);
+  --reading:var(--subj-10); --reading-tint:var(--subj-10-tint); --reading-ink:var(--subj-10-ink);
+  --science:var(--subj-13); --science-tint:var(--subj-13-tint); --science-ink:var(--subj-13-ink);
+  --social:var(--subj-7);   --social-tint:var(--subj-7-tint);   --social-ink:var(--subj-7-ink);
+
+  /* ---- Grade bands (White Rose years, from reference) ---- */
+  --gK:#F6C96A; --gK-tint:#FFF1C9;
+  --g1:#E86A5C; --g1-tint:#FADBD5;
+  --g2:#9AB88B; --g2-tint:#DDE8D3;
+  --g3:#7A9AC2; --g3-tint:#D5E1EF;
+  --g4:#C291B8; --g4-tint:#ECD7E7;
+  --g5:#8B7FC0; --g5-tint:#DCD7EE;
+
+  /* ---- Status (semantic, kept distinct from subject hues) ---- */
+  --done:#16A06B;     --done-tint:#E4F6EE;
+  --progress:#3B6CF6; --progress-tint:#EEF3FF;
+  --idle:#B6B5C6;     --idle-tint:#F1F0F4;
+  --warn:#E9A526;     --warn-tint:#FFF8E7;
+  --danger:#EF5A5A;   --danger-tint:#FDECEC;
+
+  /* ---- Neutrals (warm) ---- */
+  --canvas:#FCFAF6; --surface:#FFFFFF; --surface-warm:#FFFDF8;
+  --ink:#1C1B2E; --ink-soft:#3A3950; --body:#57566B;
+  --muted:#908FA3; --faint:#BFBED0;
+  --border:#ECEAE3; --border-cool:#E8EAF2; --hairline:#F4F2EC;
+
+  /* ---- Gradients ---- */
+  --grad-hero:linear-gradient(118deg,#FFE7C2 0%,#FDEAD9 26%,#F4E7FF 62%,#DCF5EC 100%);
+  --grad-brand:linear-gradient(135deg,#EEF3FF 0%,#F4E7FF 100%);
+  --grad-honey:linear-gradient(135deg,#F8CC5C 0%,#F4B740 100%);
+  --grad-dawn:linear-gradient(135deg,#FFD8A8 0%,#FFB3C7 50%,#C9B6FF 100%);
+  --grad-mint:linear-gradient(135deg,#BFF0DC 0%,#A8E3FF 100%);
+
+  /* ---- Radius ---- */
+  --r-xs:6px; --r-sm:10px; --r-md:14px; --r-lg:18px;
+  --r-xl:24px; --r-2xl:32px; --r-pill:999px;
+
+  /* ---- Elevation ---- */
+  --sh-xs:0 1px 2px rgba(28,27,46,.05);
+  --sh-sm:0 2px 6px rgba(28,27,46,.06);
+  --sh-md:0 10px 24px -10px rgba(28,27,46,.14);
+  --sh-lg:0 22px 48px -16px rgba(28,27,46,.20);
+  --sh-honey:0 12px 26px -10px rgba(233,165,38,.55);
+  --sh-brand:0 12px 26px -10px rgba(59,108,246,.45);
+
+  /* ---- Type ---- */
+  --font-display:'Bricolage Grotesque',ui-serif,Georgia,serif;
+  --font-sans:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif;
+
+  /* ---- Space (4px base) ---- */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px;
+  --s6:24px; --s8:32px; --s10:40px; --s12:48px; --s16:64px;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:var(--font-sans);color:var(--body);background:var(--canvas);-webkit-font-smoothing:antialiased;line-height:1.5}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(40% 30% at 12% 4%, rgba(244,183,64,.16), transparent 60%),
+    radial-gradient(36% 26% at 92% 8%, rgba(139,92,246,.12), transparent 60%),
+    radial-gradient(40% 34% at 88% 96%, rgba(122,199,155,.12), transparent 60%);}
+h1,h2,h3,h4{font-family:var(--font-display);color:var(--ink);margin:0;letter-spacing:-.02em;font-weight:800}
+p{margin:0}
+a{color:var(--brand-600);text-decoration:none}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82em;background:var(--hairline);color:var(--ink-soft);padding:.12em .42em;border-radius:6px;border:1px solid var(--border)}
+
+/* ---------- Layout shell ---------- */
+.shell{position:relative;z-index:1;display:grid;grid-template-columns:248px 1fr;max-width:1440px;margin:0 auto}
+.nav{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:var(--s8) var(--s5);border-right:1px solid var(--border);background:rgba(252,250,246,.72);backdrop-filter:blur(10px)}
+.brandmark{display:flex;align-items:center;gap:10px;margin-bottom:var(--s8)}
+.brandmark .glyph{width:38px;height:38px;border-radius:11px;background:var(--grad-honey);display:grid;place-items:center;box-shadow:var(--sh-honey);flex:0 0 auto}
+.brandmark .glyph svg{width:20px;height:20px}
+.brandmark b{font-family:var(--font-display);font-weight:800;font-size:18px;color:var(--ink);letter-spacing:-.02em}
+.brandmark span{display:block;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-top:-2px}
+.navsec{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:var(--s6) 0 var(--s2)}
+.navlink{display:block;padding:7px 11px;border-radius:10px;color:var(--ink-soft);font-weight:600;font-size:14px;margin-bottom:2px;transition:.16s}
+.navlink:hover{background:var(--surface);color:var(--brand-600);box-shadow:var(--sh-xs)}
+.main{padding:var(--s12) var(--s12) var(--s16);min-width:0}
+@media(max-width:920px){.shell{grid-template-columns:1fr}.nav{display:none}.main{padding:var(--s6)}}
+
+.section{margin-bottom:var(--s16);scroll-margin-top:24px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--honey-600);background:var(--honey-50);border:1px solid var(--honey-100);padding:5px 12px;border-radius:var(--r-pill)}
+.section>h2{font-size:28px;margin:14px 0 6px}
+.section>.lead{font-size:16px;color:var(--body);max-width:64ch;margin-bottom:var(--s8)}
+
+.grid{display:grid;gap:var(--s4)}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g5{grid-template-columns:repeat(5,1fr)}
+.g6{grid-template-columns:repeat(6,1fr)}
+@media(max-width:760px){.g3,.g4,.g5,.g6{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}}
+
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--s6);box-shadow:var(--sh-sm)}
+.subhead{font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--ink);margin-bottom:var(--s4);display:flex;align-items:center;gap:10px}
+.subhead .tag{font-family:var(--font-sans);font-size:11px;font-weight:700;color:var(--muted);background:var(--hairline);border:1px solid var(--border);padding:3px 9px;border-radius:var(--r-pill)}
+
+/* ---------- Cover ---------- */
+.cover{position:relative;overflow:hidden;border-radius:var(--r-2xl);background:var(--grad-hero);border:1px solid rgba(255,255,255,.6);box-shadow:var(--sh-lg);padding:56px 52px;margin-bottom:var(--s16)}
+.cover .blob{position:absolute;border-radius:50%;filter:blur(2px);opacity:.55;pointer-events:none}
+.cover .b1{width:120px;height:120px;background:#FF9E7D;top:-30px;right:160px}
+.cover .b2{width:80px;height:80px;background:#6383FB;top:60px;right:60px;opacity:.45}
+.cover .b3{width:64px;height:64px;background:#7AC79B;bottom:30px;right:220px;opacity:.45}
+.cover h1{font-size:clamp(34px,5vw,56px);line-height:1.02;max-width:14ch;color:var(--ink)}
+.cover h1 .hl{background:var(--grad-honey);-webkit-background-clip:text;background-clip:text;color:transparent}
+.cover p{font-size:17px;color:var(--ink-soft);max-width:52ch;margin-top:18px;font-weight:500}
+.cover .meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+.chip{font-size:13px;font-weight:600;color:var(--ink-soft);background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.9);padding:8px 14px;border-radius:var(--r-pill);backdrop-filter:blur(4px)}
+
+/* ---------- Color swatches / ramps ---------- */
+.swatch{border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:var(--surface);box-shadow:var(--sh-xs)}
+.swatch .chipcolor{height:74px}
+.swatch .info{padding:10px 12px}
+.swatch .nm{font-weight:700;font-size:13px;color:var(--ink)}
+.swatch .hex{font-size:12px;color:var(--muted);font-family:ui-monospace,monospace;text-transform:uppercase}
+.ramp{display:grid;grid-template-columns:repeat(8,1fr);border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);box-shadow:var(--sh-xs)}
+.ramp div{height:64px;display:flex;align-items:flex-end;padding:7px;font-size:10px;font-weight:700;font-family:ui-monospace,monospace}
+
+/* ---------- Palette cards (White Rose style) ---------- */
+.palcard{border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:#fff;box-shadow:var(--sh-xs);transition:.18s}
+.palcard:hover{transform:translateY(-3px);box-shadow:var(--sh-md)}
+.palcard .head{height:84px;position:relative;display:flex;align-items:flex-end;padding:12px}
+.palcard .head .num{font-family:var(--font-display);font-weight:800;font-size:38px;line-height:.8;color:#211F33}
+.palcard .head .sw{position:absolute;top:11px;right:11px;width:26px;height:26px;border-radius:8px;border:1px solid rgba(255,255,255,.65)}
+.palcard .body{padding:11px 13px 14px}
+.palcard .body .nm{font-weight:700;color:var(--ink);font-size:14px}
+.palcard .body .sub{font-size:11px;color:var(--muted);font-family:ui-monospace,monospace;margin-top:3px}
+.palcard .body .hex{font-size:11px;color:var(--faint);font-family:ui-monospace,monospace;margin-top:7px;letter-spacing:.01em}
+
+/* ---------- Gradient cards ---------- */
+.gradcard{height:120px;border-radius:var(--r-lg);border:1px solid rgba(255,255,255,.5);box-shadow:var(--sh-sm);display:flex;align-items:flex-end;padding:14px;position:relative;overflow:hidden}
+.gradcard span{font-size:12px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.75);padding:5px 10px;border-radius:var(--r-pill);backdrop-filter:blur(3px)}
+
+/* ---------- Typography ---------- */
+.specimen{border-bottom:1px solid var(--hairline);padding:14px 0;display:flex;align-items:baseline;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.specimen:last-child{border-bottom:0}
+.specimen .label{font-size:12px;color:var(--muted);font-family:ui-monospace,monospace;white-space:nowrap}
+.t-display{font-family:var(--font-display);font-weight:800;font-size:44px;line-height:1;color:var(--ink);letter-spacing:-.03em}
+.t-h1{font-family:var(--font-display);font-weight:800;font-size:28px;color:var(--ink)}
+.t-h2{font-family:var(--font-display);font-weight:700;font-size:22px;color:var(--ink)}
+.t-h3{font-family:var(--font-sans);font-weight:700;font-size:18px;color:var(--ink)}
+.t-bodyL{font-family:var(--font-sans);font-weight:400;font-size:16px;color:var(--body)}
+.t-body{font-family:var(--font-sans);font-weight:400;font-size:14px;color:var(--body)}
+.t-small{font-family:var(--font-sans);font-weight:500;font-size:13px;color:var(--body)}
+.t-label{font-family:var(--font-sans);font-weight:700;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+
+/* ---------- Buttons ---------- */
+.btn{font-family:var(--font-sans);font-weight:700;font-size:14px;border:1px solid transparent;border-radius:var(--r-pill);padding:11px 20px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:transform .14s ease, box-shadow .2s ease, background .2s ease;line-height:1}
+.btn:active{transform:translateY(1px)}
+.btn svg{width:16px;height:16px}
+.btn-primary{background:var(--brand-500);color:#fff;box-shadow:var(--sh-brand)}
+.btn-primary:hover{background:var(--brand-600);box-shadow:0 16px 30px -10px rgba(59,108,246,.55)}
+.btn-honey{background:var(--grad-honey);color:#3A2A05;box-shadow:var(--sh-honey)}
+.btn-honey:hover{filter:brightness(1.03);box-shadow:0 16px 30px -10px rgba(233,165,38,.6)}
+.btn-secondary{background:var(--surface);color:var(--ink-soft);border-color:var(--border);box-shadow:var(--sh-xs)}
+.btn-secondary:hover{border-color:var(--brand-300);color:var(--brand-600)}
+.btn-ghost{background:transparent;color:var(--ink-soft)}
+.btn-ghost:hover{background:var(--hairline)}
+.btn-sm{padding:8px 14px;font-size:13px}
+.btn-lg{padding:14px 26px;font-size:15px}
+.btnrow{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+
+/* ---------- Inputs ---------- */
+.field label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px}
+.input{width:100%;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--surface-warm);border:1px solid var(--border);border-radius:var(--r-md);padding:11px 14px;transition:.16s}
+.input::placeholder{color:var(--faint)}
+.input:focus{outline:none;border-color:var(--brand-400);background:#fff;box-shadow:0 0 0 4px var(--brand-50)}
+.search{position:relative}
+.search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--muted)}
+.search .input{padding-left:40px;border-radius:var(--r-pill)}
+
+/* ---------- Badges & status ---------- */
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 11px;border-radius:var(--r-pill);border:1px solid transparent}
+.dot{width:8px;height:8px;border-radius:50%}
+.badge-done{background:var(--done-tint);color:var(--science-ink);border-color:#C7EAD9}
+.badge-progress{background:var(--progress-tint);color:var(--brand-700);border-color:var(--brand-100)}
+.badge-idle{background:var(--idle-tint);color:#6A6979;border-color:#E4E3EA}
+.badge-warn{background:var(--warn-tint);color:var(--honey-600);border-color:var(--honey-100)}
+.status{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink-soft)}
+.ring{width:18px;height:18px;border-radius:50%;display:grid;place-items:center}
+.ring.done{background:var(--done);color:#fff}
+.ring.done svg{width:11px;height:11px}
+.ring.idle{border:2px solid var(--idle)}
+.ring.prog{border:2px solid var(--progress);position:relative}
+.ring.prog::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--progress)}
+
+/* ---------- Segmented / tabs ---------- */
+.segment{display:inline-flex;background:var(--hairline);border:1px solid var(--border);border-radius:var(--r-pill);padding:4px}
+.segment button{font-family:var(--font-sans);border:0;background:transparent;font-weight:700;font-size:13px;color:var(--muted);padding:7px 16px;border-radius:var(--r-pill);cursor:pointer;display:flex;align-items:center;gap:7px;transition:.16s}
+.segment button svg{width:14px;height:14px}
+.segment button.on{background:var(--surface);color:var(--brand-600);box-shadow:var(--sh-xs)}
+
+/* ---------- Avatar ---------- */
+.avatar{width:40px;height:40px;border-radius:50%;background:var(--grad-dawn);display:grid;place-items:center;font-weight:800;color:#fff;font-family:var(--font-display);box-shadow:var(--sh-xs);border:2px solid #fff}
+.userline{display:flex;align-items:center;gap:11px}
+.userline .nm{font-weight:700;color:var(--ink);font-size:14px;line-height:1.2}
+.userline .rl{font-size:12px;color:var(--muted)}
+
+/* ---------- Subject cards (functional) ---------- */
+.subjcard{border-radius:var(--r-lg);padding:16px;border:1px solid var(--border);background:var(--surface);box-shadow:var(--sh-xs);transition:.18s}
+.subjcard:hover{transform:translateY(-3px);box-shadow:var(--sh-md)}
+.subjcard .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;margin-bottom:12px}
+.subjcard .ic svg{width:22px;height:22px}
+.subjcard h4{font-family:var(--font-sans);font-size:15px;font-weight:700}
+.subjcard .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.subjcard .bar{height:6px;border-radius:var(--r-pill);background:var(--hairline);margin-top:14px;overflow:hidden}
+.subjcard .bar i{display:block;height:100%;border-radius:var(--r-pill)}
+
+/* ---------- COLOR CASCADE: chips read --c (bright accent) + --ct (tint); text is dark ink ---------- */
+.cic{flex:0 0 auto;display:grid;place-items:center;border-radius:12px}
+.cic svg{width:22px;height:22px}
+.cic.solid{background:var(--c,#999)} .cic.solid svg{color:#fff}
+.cic.soft{background:#EEEDE9} .cic.soft svg{color:var(--c,#999)}
+.tw{min-width:0}
+
+/* every chip: tint fill, bright colored outline, soft shadow, dark text */
+.uchip{display:flex;align-items:center;gap:13px;background:var(--ct,#eee);border:1.5px solid var(--c,#999);border-radius:var(--r-lg);padding:13px 16px;min-width:150px;box-shadow:0 4px 12px -5px rgba(28,27,46,.14);transition:.16s;cursor:pointer}
+.uchip:hover{transform:translateY(-2px);box-shadow:0 9px 20px -7px rgba(28,27,46,.20)}
+.uchip.active{border-width:2px;box-shadow:0 9px 22px -7px rgba(28,27,46,.22)}
+.uchip .cic{width:44px;height:44px}
+.uchip .u{font-size:14px;font-weight:800;color:var(--ink);line-height:1.15}
+.uchip .t{font-size:12.5px;color:var(--ink-soft);margin-top:2px}
+
+.wchip{display:flex;align-items:center;gap:11px;background:var(--ct,#eee);border:1.5px solid var(--c,#999);border-radius:var(--r-md);padding:10px 13px;min-width:150px;box-shadow:0 4px 12px -5px rgba(28,27,46,.14);transition:.16s}
+.wchip:hover{transform:translateY(-2px);box-shadow:0 9px 20px -7px rgba(28,27,46,.20)}
+.wchip.active{border-width:2px;box-shadow:0 9px 22px -7px rgba(28,27,46,.22)}
+.wchip .cic{width:38px;height:38px;border-radius:10px}
+.wchip .cic svg{width:18px;height:18px}
+.wchip .w{font-size:13px;font-weight:800;color:var(--ink)}
+.wchip .d{font-size:11.5px;color:var(--ink-soft);margin-top:1px}
+
+.lchip{display:flex;align-items:center;gap:10px;background:var(--ct,#eee);border:1.5px solid var(--c,#999);border-radius:var(--r-md);padding:10px 14px;box-shadow:0 4px 12px -5px rgba(28,27,46,.14);transition:.16s}
+.lchip:hover{transform:translateY(-2px);box-shadow:0 9px 20px -7px rgba(28,27,46,.20)}
+.lchip .dot{width:12px;height:12px;border-radius:50%;background:var(--c,#999);flex:0 0 auto}
+.lchip .ls{font-size:13px;font-weight:700;color:var(--ink)}
+
+/* subject pill (cascade header) */
+.subjpill{display:inline-flex;align-items:center;gap:10px;background:var(--ct,#eee);border:1.5px solid var(--c,#999);border-radius:var(--r-pill);padding:6px 16px 6px 7px;box-shadow:0 4px 12px -5px rgba(28,27,46,.14)}
+.subjpill .cic{width:30px;height:30px;border-radius:9px}
+.subjpill .cic svg{width:16px;height:16px}
+.subjpill .nm{font-size:14px;font-weight:800;color:var(--ink)}
+
+.line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.line:last-child{margin-bottom:0}
+.line .key{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);width:64px;flex:0 0 auto}
+
+/* compact variant for the dense planner shell (no icon tiles) */
+.dash .uchip{padding:9px 12px;border-radius:12px;min-width:0;gap:8px}
+.dash .uchip .u{font-size:12px}
+.dash .uchip .t{font-size:11px}
+
+/* ---------- Stat blocks ---------- */
+.metric{display:flex;align-items:center;gap:12px}
+.metric .mi{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:0 0 auto}
+.metric .mi svg{width:20px;height:20px}
+.metric .mv{font-family:var(--font-display);font-weight:800;font-size:22px;color:var(--ink);line-height:1}
+.metric .ml{font-size:12px;color:var(--muted);font-weight:600}
+
+/* ---------- Token chips ---------- */
+.tok{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--hairline)}
+.tok:last-child{border-bottom:0}
+.tok .name{font-family:ui-monospace,monospace;font-size:12px;color:var(--ink-soft);width:90px;font-weight:600}
+.tok .val{font-size:12px;color:var(--muted);width:54px}
+.tok .vis{flex:1;display:flex;align-items:center}
+.spacebar{height:14px;border-radius:4px;background:var(--brand-200)}
+.radbox{height:48px;width:80px;background:var(--grad-brand);border:1px solid var(--brand-200)}
+.shadowbox{width:120px;height:56px;background:var(--surface);border-radius:var(--r-lg);border:1px solid var(--border)}
+
+/* ---------- Pattern previews ---------- */
+.preview{border-radius:var(--r-xl);border:1px solid var(--border);overflow:hidden;box-shadow:var(--sh-md);background:var(--surface)}
+.previewbar{display:flex;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid var(--hairline);background:var(--surface-warm)}
+.previewbar .dots{display:flex;gap:6px}
+.previewbar .dots i{width:10px;height:10px;border-radius:50%}
+.previewbar .ttl{font-size:12px;color:var(--muted);font-weight:600;margin-left:8px}
+
+.dash{display:grid;grid-template-columns:170px 1fr;min-height:300px}
+.dash .side{background:var(--surface-warm);border-right:1px solid var(--hairline);padding:16px}
+.dash .side .item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:3px}
+.dash .side .item svg{width:16px;height:16px;color:var(--muted)}
+.dash .side .item.sel{background:var(--brand-50);color:var(--brand-700)}
+.dash .side .item.sel svg{color:var(--brand-600)}
+.dash .body{padding:18px 20px}
+.dash .row{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.dash .lane{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.dash .lane .lbl{width:78px;font-size:12px;font-weight:700;color:var(--ink-soft);display:flex;align-items:center;gap:6px}
+.dash .lane .lbl .sw{width:9px;height:9px;border-radius:3px}
+.dash .track{display:flex;gap:8px;overflow:hidden}
+
+.mhero{background:var(--grad-hero);padding:36px 32px;position:relative;overflow:hidden}
+.mhero h3{font-size:34px;line-height:1.05;max-width:12ch;color:var(--ink)}
+.mhero p{color:var(--ink-soft);max-width:36ch;margin-top:12px;font-weight:500;font-size:14px}
+.mhero .card3d{position:absolute;right:30px;top:40px;width:200px;height:130px;border-radius:16px;background:#fff;box-shadow:var(--sh-lg);transform:rotate(4deg);border:1px solid rgba(255,255,255,.8)}
+.mhero .card3d .ln{height:7px;border-radius:4px;background:var(--hairline);margin:14px 16px}
+.mhero .card3d .ln.a{width:60%;background:var(--brand-200)}
+.mhero .card3d .ln.b{width:80%}
+.mhero .card3d .ln.c{width:45%;background:var(--honey-200)}
+
+.foot{border-top:1px solid var(--border);margin-top:var(--s12);padding-top:var(--s6);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--muted)}
+
+.section,.cover{animation:rise .6s cubic-bezier(.2,.7,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Side nav -->
+  <aside class="nav">
+    <div class="brandmark">
+      <span class="glyph"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z" fill="#fff"/><path d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13V4Z" fill="#3A2A05" opacity=".55"/></svg></span>
+      <div><b>Curricula</b><span>Design System</span></div>
+    </div>
+    <div class="navsec">Foundations</div>
+    <a class="navlink" href="#color">Color</a>
+    <a class="navlink" href="#subjects">Subject scale</a>
+    <a class="navlink" href="#gradients">Gradients</a>
+    <a class="navlink" href="#type">Typography</a>
+    <a class="navlink" href="#space">Space &amp; radius</a>
+    <a class="navlink" href="#elevation">Elevation</a>
+    <div class="navsec">Components</div>
+    <a class="navlink" href="#buttons">Buttons</a>
+    <a class="navlink" href="#inputs">Inputs</a>
+    <a class="navlink" href="#status">Status &amp; badges</a>
+    <a class="navlink" href="#controls">Tabs &amp; avatar</a>
+    <a class="navlink" href="#cards">Cards &amp; cascade</a>
+    <a class="navlink" href="#metrics">Metrics</a>
+    <div class="navsec">Patterns</div>
+    <a class="navlink" href="#dashboard">Planner shell</a>
+    <a class="navlink" href="#marketing">Marketing hero</a>
+  </aside>
+
+  <main class="main">
+
+    <!-- Cover -->
+    <div class="cover">
+      <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+      <span class="eyebrow">Curriculum planning, made warm</span>
+      <h1 style="margin-top:18px">Structured like a planner,<br><span class="hl">friendly</span> like a fresh start.</h1>
+      <p>A design language that fuses the dense, color-coded clarity of a curriculum dashboard with the soft gradients and rounded forms of a modern creative site. Scales to a dozen-plus subjects, with color that flows down every unit, week and lesson.</p>
+      <div class="meta">
+        <span class="chip">Indigo + Honey</span>
+        <span class="chip">15 subject colors</span>
+        <span class="chip">Color cascade</span>
+        <span class="chip">Bricolage Grotesque / Plus Jakarta Sans</span>
+      </div>
+    </div>
+
+    <!-- COLOR -->
+    <section class="section" id="color">
+      <span class="eyebrow">Foundations</span>
+      <h2>Color</h2>
+      <p class="lead">Indigo is the functional primary for actions, links and focus, restored to the v1 blue. Honey is the warm accent for marketing moments and highlights. Neutrals run warm so white surfaces sit on a cream canvas.</p>
+
+      <div class="panel" style="margin-bottom:var(--s4)">
+        <div class="subhead">Brand &middot; Indigo <span class="tag">primary actions</span></div>
+        <div class="ramp" style="margin-bottom:6px">
+          <div style="background:var(--brand-50);color:#2543B0">50</div>
+          <div style="background:var(--brand-100);color:#2543B0">100</div>
+          <div style="background:var(--brand-200);color:#2543B0">200</div>
+          <div style="background:var(--brand-300);color:#fff">300</div>
+          <div style="background:var(--brand-400);color:#fff">400</div>
+          <div style="background:var(--brand-500);color:#fff">500</div>
+          <div style="background:var(--brand-600);color:#fff">600</div>
+          <div style="background:var(--brand-700);color:#fff">700</div>
+        </div>
+        <div class="t-label">500 = #3B6CF6 is the default brand step</div>
+      </div>
+
+      <div class="panel" style="margin-bottom:var(--s8)">
+        <div class="subhead">Accent &middot; Honey <span class="tag">warmth &amp; CTA</span></div>
+        <div class="ramp" style="margin-bottom:6px">
+          <div style="background:var(--honey-50);color:#C9871A">50</div>
+          <div style="background:var(--honey-100);color:#C9871A">100</div>
+          <div style="background:var(--honey-200);color:#C9871A">200</div>
+          <div style="background:var(--honey-300);color:#7A5208">300</div>
+          <div style="background:var(--honey-400);color:#3A2A05">400</div>
+          <div style="background:var(--honey-500);color:#fff">500</div>
+          <div style="background:var(--honey-600);color:#fff">600</div>
+          <div style="background:#A06A12;color:#fff">700</div>
+        </div>
+        <div class="t-label">400 = #F4B740 is the default accent step</div>
+      </div>
+
+      <div class="subhead">Neutrals &amp; surfaces</div>
+      <div class="grid g4">
+        <div class="swatch"><div class="chipcolor" style="background:var(--canvas);border-bottom:1px solid var(--border)"></div><div class="info"><div class="nm">Canvas</div><div class="hex">#FCFAF6</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:var(--surface);border-bottom:1px solid var(--border)"></div><div class="info"><div class="nm">Surface</div><div class="hex">#FFFFFF</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:var(--ink)"></div><div class="info"><div class="nm">Ink</div><div class="hex">#1C1B2E</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:var(--body)"></div><div class="info"><div class="nm">Body</div><div class="hex">#57566B</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:var(--muted)"></div><div class="info"><div class="nm">Muted</div><div class="hex">#908FA3</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:var(--border)"></div><div class="info"><div class="nm">Border</div><div class="hex">#ECEAE3</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:var(--hairline)"></div><div class="info"><div class="nm">Hairline</div><div class="hex">#F4F2EC</div></div></div>
+        <div class="swatch"><div class="chipcolor" style="background:var(--surface-warm);border-bottom:1px solid var(--border)"></div><div class="info"><div class="nm">Surface warm</div><div class="hex">#FFFDF8</div></div></div>
+      </div>
+    </section>
+
+    <!-- SUBJECT SCALE -->
+    <section class="section" id="subjects">
+      <span class="eyebrow">Foundations</span>
+      <h2>Subject scale</h2>
+      <p class="lead">The planner is navigated by color, so the palette scales to the 12 to 15 subjects a school might run. Colors are muted and harmonious in the style of the White Rose grade bands. Each slot carries a solid (headers, icons, accents), a tint (backgrounds, lanes) and an ink (text on tint). Assign any subject to any slot; the four named aliases are just defaults.</p>
+
+      <div class="subhead">Subject palette <span class="tag">15 slots</span></div>
+      <div class="grid g5" style="margin-bottom:var(--s8)">
+        <div class="palcard"><div class="head" style="background:var(--subj-1)"><span class="sw" style="background:var(--subj-1-tint)"></span><span class="num">1</span></div><div class="body"><div class="nm">Math</div><div class="sub">subj-1</div><div class="hex">#DCC674 &middot; #F4EFDF</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-2)"><span class="sw" style="background:var(--subj-2-tint)"></span><span class="num">2</span></div><div class="body"><div class="nm">Writing</div><div class="sub">subj-2</div><div class="hex">#DCA574 &middot; #F4E9DF</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-3)"><span class="sw" style="background:var(--subj-3-tint)"></span><span class="num">3</span></div><div class="body"><div class="nm">Phonics</div><div class="sub">subj-3</div><div class="hex">#DC8274 &middot; #F4E2DF</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-4)"><span class="sw" style="background:var(--subj-4-tint)"></span><span class="num">4</span></div><div class="body"><div class="nm">Spelling</div><div class="sub">subj-4</div><div class="hex">#CF778D &middot; #F2E1E5</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-5)"><span class="sw" style="background:var(--subj-5-tint)"></span><span class="num">5</span></div><div class="body"><div class="nm">Art</div><div class="sub">subj-5</div><div class="hex">#CF77AF &middot; #F2E1EC</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-6)"><span class="sw" style="background:var(--subj-6-tint)"></span><span class="num">6</span></div><div class="body"><div class="nm">Music</div><div class="sub">subj-6</div><div class="hex">#C77AC7 &middot; #F0E2F0</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-7)"><span class="sw" style="background:var(--subj-7-tint)"></span><span class="num">7</span></div><div class="body"><div class="nm">Social Studies</div><div class="sub">subj-7</div><div class="hex">#AB7AC7 &middot; #EBE2F0</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-8)"><span class="sw" style="background:var(--subj-8-tint)"></span><span class="num">8</span></div><div class="body"><div class="nm">World Language</div><div class="sub">subj-8</div><div class="hex">#917AC7 &middot; #E6E2F0</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-9)"><span class="sw" style="background:var(--subj-9-tint)"></span><span class="num">9</span></div><div class="body"><div class="nm">SEL</div><div class="sub">subj-9</div><div class="hex">#7A7FC7 &middot; #E2E3F0</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-10)"><span class="sw" style="background:var(--subj-10-tint)"></span><span class="num">10</span></div><div class="body"><div class="nm">Reading</div><div class="sub">subj-10</div><div class="hex">#7A9EC7 &middot; #E2E9F0</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-11)"><span class="sw" style="background:var(--subj-11-tint)"></span><span class="num">11</span></div><div class="body"><div class="nm">Technology</div><div class="sub">subj-11</div><div class="hex">#7AB8C7 &middot; #E2EEF0</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-12)"><span class="sw" style="background:var(--subj-12-tint)"></span><span class="num">12</span></div><div class="body"><div class="nm">Health</div><div class="sub">subj-12</div><div class="hex">#7AC7B8 &middot; #E2F0EE</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-13)"><span class="sw" style="background:var(--subj-13-tint)"></span><span class="num">13</span></div><div class="body"><div class="nm">Science</div><div class="sub">subj-13</div><div class="hex">#7AC79B &middot; #E2F0E8</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-14)"><span class="sw" style="background:var(--subj-14-tint)"></span><span class="num">14</span></div><div class="body"><div class="nm">PE</div><div class="sub">subj-14</div><div class="hex">#7AC77A &middot; #E2F0E2</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--subj-15)"><span class="sw" style="background:var(--subj-15-tint)"></span><span class="num">15</span></div><div class="body"><div class="nm">Library</div><div class="sub">subj-15</div><div class="hex">#9AC77A &middot; #E8F0E2</div></div></div>
+      </div>
+
+      <div class="subhead">Grade bands <span class="tag">White Rose years</span></div>
+      <div class="grid g6">
+        <div class="palcard"><div class="head" style="background:var(--gK)"><span class="sw" style="background:var(--gK-tint)"></span><span class="num">K</span></div><div class="body"><div class="nm">Kindergarten</div><div class="sub">WR Year 1</div><div class="hex">#F6C96A &middot; #FFF1C9</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--g1)"><span class="sw" style="background:var(--g1-tint)"></span><span class="num">1</span></div><div class="body"><div class="nm">Grade 1</div><div class="sub">WR Year 2</div><div class="hex">#E86A5C &middot; #FADBD5</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--g2)"><span class="sw" style="background:var(--g2-tint)"></span><span class="num">2</span></div><div class="body"><div class="nm">Grade 2</div><div class="sub">WR Year 3</div><div class="hex">#9AB88B &middot; #DDE8D3</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--g3)"><span class="sw" style="background:var(--g3-tint)"></span><span class="num">3</span></div><div class="body"><div class="nm">Grade 3</div><div class="sub">WR Year 4</div><div class="hex">#7A9AC2 &middot; #D5E1EF</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--g4)"><span class="sw" style="background:var(--g4-tint)"></span><span class="num">4</span></div><div class="body"><div class="nm">Grade 4</div><div class="sub">WR Year 5</div><div class="hex">#C291B8 &middot; #ECD7E7</div></div></div>
+        <div class="palcard"><div class="head" style="background:var(--g5)"><span class="sw" style="background:var(--g5-tint)"></span><span class="num">5</span></div><div class="body"><div class="nm">Grade 5</div><div class="sub">WR Year 6</div><div class="hex">#8B7FC0 &middot; #DCD7EE</div></div></div>
+      </div>
+    </section>
+
+    <!-- GRADIENTS -->
+    <section class="section" id="gradients">
+      <span class="eyebrow">Foundations</span>
+      <h2>Gradients</h2>
+      <p class="lead">Gradients are atmosphere, not decoration on every surface. The hero mesh is for empty states, onboarding and marketing. Honey and brand gradients belong on primary CTAs and feature tiles.</p>
+      <div class="grid g3">
+        <div class="gradcard" style="background:var(--grad-hero)"><span>Hero mesh</span></div>
+        <div class="gradcard" style="background:var(--grad-honey)"><span>Honey CTA</span></div>
+        <div class="gradcard" style="background:var(--grad-brand)"><span>Brand soft</span></div>
+        <div class="gradcard" style="background:var(--grad-dawn)"><span>Dawn (avatars)</span></div>
+        <div class="gradcard" style="background:var(--grad-mint)"><span>Mint (accents)</span></div>
+        <div class="gradcard" style="background:radial-gradient(120% 120% at 0% 0%,#FFE7C2,transparent 55%),radial-gradient(120% 120% at 100% 100%,#C9B6FF,transparent 55%),#FFFDF8"><span>Corner glow</span></div>
+      </div>
+    </section>
+
+    <!-- TYPOGRAPHY -->
+    <section class="section" id="type">
+      <span class="eyebrow">Foundations</span>
+      <h2>Typography</h2>
+      <p class="lead">Bricolage Grotesque carries display and headings with a warm, slightly editorial character. Plus Jakarta Sans handles UI, body and dense data with clean legibility.</p>
+      <div class="panel">
+        <div class="specimen"><span class="t-display">Plan the year</span><span class="label">Display / Bricolage 800 / 44px</span></div>
+        <div class="specimen"><span class="t-h1">Unit 3 &middot; Multiplication</span><span class="label">H1 / Bricolage 800 / 28px</span></div>
+        <div class="specimen"><span class="t-h2">Week 3 overview</span><span class="label">H2 / Bricolage 700 / 22px</span></div>
+        <div class="specimen"><span class="t-h3">Multiply by 2-digit numbers</span><span class="label">H3 / Jakarta 700 / 18px</span></div>
+        <div class="specimen"><span class="t-bodyL">Lesson body copy stays readable across long planning notes.</span><span class="label">Body L / Jakarta 400 / 16px</span></div>
+        <div class="specimen"><span class="t-body">Default UI text, table cells and secondary descriptions.</span><span class="label">Body / Jakarta 400 / 14px</span></div>
+        <div class="specimen"><span class="t-small">Helper text, dates and metadata.</span><span class="label">Small / Jakarta 500 / 13px</span></div>
+        <div class="specimen"><span class="t-label">Section label</span><span class="label">Label / Jakarta 700 / 11px / +.09em</span></div>
+      </div>
+    </section>
+
+    <!-- SPACE & RADIUS -->
+    <section class="section" id="space">
+      <span class="eyebrow">Foundations</span>
+      <h2>Space &amp; radius</h2>
+      <p class="lead">A 4px base scale keeps rhythm consistent. Radii run generous to carry the soft, rounded feel without losing the crispness a data UI needs.</p>
+      <div class="grid g2">
+        <div class="panel">
+          <div class="subhead">Spacing <span class="tag">4px base</span></div>
+          <div class="tok"><span class="name">--s1</span><span class="val">4px</span><span class="vis"><span class="spacebar" style="width:4px"></span></span></div>
+          <div class="tok"><span class="name">--s2</span><span class="val">8px</span><span class="vis"><span class="spacebar" style="width:8px"></span></span></div>
+          <div class="tok"><span class="name">--s3</span><span class="val">12px</span><span class="vis"><span class="spacebar" style="width:12px"></span></span></div>
+          <div class="tok"><span class="name">--s4</span><span class="val">16px</span><span class="vis"><span class="spacebar" style="width:16px"></span></span></div>
+          <div class="tok"><span class="name">--s6</span><span class="val">24px</span><span class="vis"><span class="spacebar" style="width:24px"></span></span></div>
+          <div class="tok"><span class="name">--s8</span><span class="val">32px</span><span class="vis"><span class="spacebar" style="width:32px"></span></span></div>
+          <div class="tok"><span class="name">--s12</span><span class="val">48px</span><span class="vis"><span class="spacebar" style="width:48px"></span></span></div>
+          <div class="tok"><span class="name">--s16</span><span class="val">64px</span><span class="vis"><span class="spacebar" style="width:64px"></span></span></div>
+        </div>
+        <div class="panel">
+          <div class="subhead">Radius</div>
+          <div class="tok"><span class="name">--r-sm</span><span class="val">10px</span><span class="vis"><span class="radbox" style="border-radius:10px"></span></span></div>
+          <div class="tok"><span class="name">--r-md</span><span class="val">14px</span><span class="vis"><span class="radbox" style="border-radius:14px"></span></span></div>
+          <div class="tok"><span class="name">--r-lg</span><span class="val">18px</span><span class="vis"><span class="radbox" style="border-radius:18px"></span></span></div>
+          <div class="tok"><span class="name">--r-xl</span><span class="val">24px</span><span class="vis"><span class="radbox" style="border-radius:24px"></span></span></div>
+          <div class="tok"><span class="name">--r-2xl</span><span class="val">32px</span><span class="vis"><span class="radbox" style="border-radius:32px"></span></span></div>
+          <div class="tok"><span class="name">--r-pill</span><span class="val">999px</span><span class="vis"><span class="radbox" style="border-radius:999px;width:120px"></span></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ELEVATION -->
+    <section class="section" id="elevation">
+      <span class="eyebrow">Foundations</span>
+      <h2>Elevation</h2>
+      <p class="lead">Shadows are soft and low-contrast, cast cool over the warm canvas. Color glows (brand, honey) are reserved for primary buttons so actions feel lifted.</p>
+      <div class="grid g5">
+        <div style="text-align:center"><div class="shadowbox" style="box-shadow:var(--sh-xs);margin:0 auto 8px"></div><div class="t-label">xs</div></div>
+        <div style="text-align:center"><div class="shadowbox" style="box-shadow:var(--sh-sm);margin:0 auto 8px"></div><div class="t-label">sm</div></div>
+        <div style="text-align:center"><div class="shadowbox" style="box-shadow:var(--sh-md);margin:0 auto 8px"></div><div class="t-label">md</div></div>
+        <div style="text-align:center"><div class="shadowbox" style="box-shadow:var(--sh-lg);margin:0 auto 8px"></div><div class="t-label">lg</div></div>
+        <div style="text-align:center"><div class="shadowbox" style="box-shadow:var(--sh-honey);margin:0 auto 8px;background:var(--grad-honey)"></div><div class="t-label">honey glow</div></div>
+      </div>
+    </section>
+
+    <!-- BUTTONS -->
+    <section class="section" id="buttons">
+      <span class="eyebrow">Components</span>
+      <h2>Buttons</h2>
+      <p class="lead">Pill-shaped throughout. The brand button is indigo blue, honey is the warm hero CTA, secondary and ghost carry lower-priority work.</p>
+      <div class="panel">
+        <div class="btnrow" style="margin-bottom:18px">
+          <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>Add Unit</button>
+          <button class="btn btn-honey">Get Started</button>
+          <button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 12h16" stroke-linecap="round"/><path d="M4 7h16M4 17h16" stroke-linecap="round" opacity=".4"/></svg>Export</button>
+          <button class="btn btn-ghost">Cancel</button>
+        </div>
+        <div class="btnrow">
+          <button class="btn btn-primary btn-sm">Small</button>
+          <button class="btn btn-primary">Default</button>
+          <button class="btn btn-primary btn-lg">Large</button>
+          <button class="btn btn-honey btn-lg">Start planning</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- INPUTS -->
+    <section class="section" id="inputs">
+      <span class="eyebrow">Components</span>
+      <h2>Inputs</h2>
+      <p class="lead">Inputs sit on the warm surface and brighten to white on focus, with a soft brand-tint focus ring instead of a hard outline. Search is pill-shaped to match the dashboard chrome.</p>
+      <div class="panel grid g2">
+        <div>
+          <div class="field" style="margin-bottom:16px"><label>Unit title</label><input class="input" placeholder="e.g. Multiplication &amp; Division"></div>
+          <div class="field"><label>Subject</label><select class="input"><option>Math</option><option>Reading</option><option>Science</option><option>Social Studies</option></select></div>
+        </div>
+        <div>
+          <div class="field" style="margin-bottom:16px"><label>Search</label><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2" stroke-linecap="round"/></svg><input class="input" placeholder="Search units, lessons, standards..."></div></div>
+          <div class="field"><label>Focused state</label><input class="input" value="Multiply by 2-Digit Numbers" style="border-color:var(--brand-400);box-shadow:0 0 0 4px var(--brand-50);background:#fff"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATUS -->
+    <section class="section" id="status">
+      <span class="eyebrow">Components</span>
+      <h2>Status &amp; badges</h2>
+      <p class="lead">Progress stays semantic and separate from subject color: completed is green, in progress is brand, not started is grey. The same chip therefore shows subject by hue and progress by its marker.</p>
+      <div class="grid g2">
+        <div class="panel">
+          <div class="subhead">Badges</div>
+          <div class="btnrow">
+            <span class="badge badge-done"><span class="dot" style="background:var(--done)"></span>Completed</span>
+            <span class="badge badge-progress"><span class="dot" style="background:var(--progress)"></span>In Progress</span>
+            <span class="badge badge-idle"><span class="dot" style="background:var(--idle)"></span>Not Started</span>
+            <span class="badge badge-warn"><span class="dot" style="background:var(--warn)"></span>Needs Review</span>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="subhead">Timeline rings</div>
+          <div class="btnrow" style="gap:22px">
+            <span class="status"><span class="ring done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 13 4 4 10-11" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Completed</span>
+            <span class="status"><span class="ring prog"></span>In Progress</span>
+            <span class="status"><span class="ring idle"></span>Not Started</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABS & AVATAR -->
+    <section class="section" id="controls">
+      <span class="eyebrow">Components</span>
+      <h2>Tabs &amp; avatar</h2>
+      <p class="lead">A segmented control switches views. Avatars use the warm dawn gradient with white initials when no photo exists.</p>
+      <div class="grid g2">
+        <div class="panel">
+          <div class="subhead">Segmented control</div>
+          <div class="segment">
+            <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h10M4 18h7" stroke-linecap="round"/></svg>Timeline</button>
+            <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 5v14"/></svg>Table</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="subhead">Avatar &amp; user</div>
+          <div class="userline"><span class="avatar">TH</span><div><div class="nm">Ms. Harper</div><div class="rl">Grade 5 Teacher</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CARDS & CASCADE -->
+    <section class="section" id="cards">
+      <span class="eyebrow">Components</span>
+      <h2>Cards &amp; cascade</h2>
+      <p class="lead">Subject cards summarize progress at a glance. Below them, the color cascade is the key pattern: a unit takes its subject color, and its weeks and lessons inherit it, so any column in the planner reads as one subject.</p>
+
+      <div class="subhead">Subject cards</div>
+      <div class="grid g4" style="margin-bottom:var(--s8)">
+        <div class="subjcard">
+          <div class="ic" style="background:var(--math-tint);color:var(--math-ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h3M8 17h3M15 12v5" stroke-linecap="round"/></svg></div>
+          <h4>Math</h4><div class="sub">6 units &middot; 40% complete</div>
+          <div class="bar"><i style="width:40%;background:var(--math)"></i></div>
+        </div>
+        <div class="subjcard">
+          <div class="ic" style="background:var(--reading-tint);color:var(--reading-ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5A2 2 0 0 1 6 4h6v15H6a2 2 0 0 0-2 1.2V5.5ZM20 5.5A2 2 0 0 0 18 4h-6v15h6a2 2 0 0 1 2 1.2V5.5Z"/></svg></div>
+          <h4>Reading</h4><div class="sub">6 units &middot; 60% complete</div>
+          <div class="bar"><i style="width:60%;background:var(--reading)"></i></div>
+        </div>
+        <div class="subjcard">
+          <div class="ic" style="background:var(--science-tint);color:var(--science-ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3" stroke-linejoin="round"/></svg></div>
+          <h4>Science</h4><div class="sub">6 units &middot; 75% complete</div>
+          <div class="bar"><i style="width:75%;background:var(--science)"></i></div>
+        </div>
+        <div class="subjcard">
+          <div class="ic" style="background:var(--social-tint);color:var(--social-ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.5 2.5 2.5 13 0 16M12 4c-2.5 2.5-2.5 13 0 16"/></svg></div>
+          <h4>Social Studies</h4><div class="sub">6 units &middot; 20% complete</div>
+          <div class="bar"><i style="width:20%;background:var(--social)"></i></div>
+        </div>
+      </div>
+
+      <div class="subhead">Color cascade <span class="tag">unit &rarr; weeks &rarr; lessons</span></div>
+      <p class="t-small" style="color:var(--body);max-width:66ch;margin-bottom:var(--s6)">Each panel sets one trio of variables: <code>--c</code> (a brighter accent for outlines, icon tiles and dots), <code>--ct</code> (the tint fill) and <code>--ck</code> (kept for any colored text). Every chip carries a colored outline and a soft shadow, with dark text for legibility. The active unit and week take a heavier outline.</p>
+      <div class="grid g2">
+        <div class="panel" style="--c:var(--subj-1-bright);--ct:var(--subj-1-tint);--ck:var(--subj-1-ink)">
+          <div class="line"><span class="key">Subject</span><span class="subjpill"><span class="cic soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h3M8 17h3M15 12v5" stroke-linecap="round"/></svg></span><span class="nm">Math</span></span></div>
+          <div class="line"><span class="key">Unit</span><div class="uchip active"><span class="cic solid"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 7v10l8 4 8-4V7l-8-4Z" stroke-linejoin="round"/><path d="m4 7 8 4 8-4M12 11v10" stroke-linejoin="round"/></svg></span><div class="tw"><div class="u">Unit 3</div><div class="t">Multiplication &amp; Division</div></div></div></div>
+          <div class="line"><span class="key">Weeks</span><div class="wchip"><span class="cic soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke-linecap="round"/></svg></span><div class="tw"><div class="w">Week 1</div><div class="d">Repeated addition</div></div></div><div class="wchip active"><span class="cic soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke-linecap="round"/></svg></span><div class="tw"><div class="w">Week 3</div><div class="d">2-digit &times;</div></div></div><div class="wchip"><span class="cic soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke-linecap="round"/></svg></span><div class="tw"><div class="w">Week 5</div><div class="d">Divide 1-digit</div></div></div></div>
+          <div class="line"><span class="key">Lessons</span><div class="lchip"><span class="dot"></span><span class="ls">Mon &middot; Model 2-digit</span></div><div class="lchip"><span class="dot"></span><span class="ls">Tue &middot; Partial products</span></div><div class="lchip"><span class="dot"></span><span class="ls">Wed &middot; Area model</span></div></div>
+        </div>
+        <div class="panel" style="--c:var(--subj-10-bright);--ct:var(--subj-10-tint);--ck:var(--subj-10-ink)">
+          <div class="line"><span class="key">Subject</span><span class="subjpill"><span class="cic soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5A2 2 0 0 1 6 4h6v15H6a2 2 0 0 0-2 1.2V5.5ZM20 5.5A2 2 0 0 0 18 4h-6v15h6a2 2 0 0 1 2 1.2V5.5Z"/></svg></span><span class="nm">Reading</span></span></div>
+          <div class="line"><span class="key">Unit</span><div class="uchip active"><span class="cic solid"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5A2 2 0 0 1 6 4h6v15H6a2 2 0 0 0-2 1.2V5.5ZM20 5.5A2 2 0 0 0 18 4h-6v15h6a2 2 0 0 1 2 1.2V5.5Z"/></svg></span><div class="tw"><div class="u">Unit 4</div><div class="t">Compare &amp; Contrast</div></div></div></div>
+          <div class="line"><span class="key">Weeks</span><div class="wchip"><span class="cic soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke-linecap="round"/></svg></span><div class="tw"><div class="w">Week 1</div><div class="d">Two texts</div></div></div><div class="wchip active"><span class="cic soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke-linecap="round"/></svg></span><div class="tw"><div class="w">Week 2</div><div class="d">Venn mapping</div></div></div><div class="wchip"><span class="cic soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke-linecap="round"/></svg></span><div class="tw"><div class="w">Week 3</div><div class="d">Synthesis</div></div></div></div>
+          <div class="line"><span class="key">Lessons</span><div class="lchip"><span class="dot"></span><span class="ls">Mon &middot; Shared read</span></div><div class="lchip"><span class="dot"></span><span class="ls">Tue &middot; Signal words</span></div><div class="lchip"><span class="dot"></span><span class="ls">Wed &middot; Compare essay</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- METRICS -->
+    <section class="section" id="metrics">
+      <span class="eyebrow">Components</span>
+      <h2>Metrics</h2>
+      <p class="lead">Summary metrics use a tinted icon tile, a display-weight number and a quiet label. They anchor footers and overview headers.</p>
+      <div class="panel">
+        <div class="grid g5">
+          <div class="metric"><span class="mi" style="background:var(--reading-tint);color:var(--reading-ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5A2 2 0 0 1 6 4h6v15H6a2 2 0 0 0-2 1.2V5.5ZM20 5.5A2 2 0 0 0 18 4h-6v15h6a2 2 0 0 1 2 1.2V5.5Z"/></svg></span><div><div class="mv">12</div><div class="ml">Subjects</div></div></div>
+          <div class="metric"><span class="mi" style="background:var(--math-tint);color:var(--math-ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg></span><div><div class="mv">72</div><div class="ml">Units</div></div></div>
+          <div class="metric"><span class="mi" style="background:var(--science-tint);color:var(--science-ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke-linecap="round"/></svg></span><div><div class="mv">360</div><div class="ml">Weeks</div></div></div>
+          <div class="metric"><span class="mi" style="background:var(--social-tint);color:var(--social-ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v5h5" stroke-linejoin="round"/></svg></span><div><div class="mv">1.8k</div><div class="ml">Lessons</div></div></div>
+          <div class="metric"><span class="mi" style="background:var(--honey-50);color:var(--honey-600)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="m8.5 12 2.5 2.5 4.5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><div class="mv">240</div><div class="ml">Assessments</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DASHBOARD PATTERN -->
+    <section class="section" id="dashboard">
+      <span class="eyebrow">Patterns</span>
+      <h2>Planner shell</h2>
+      <p class="lead">The components composed: a sidebar, a segmented header and color-coded subject lanes. Each lane sets its subject accent, so its unit chips carry a colored outline and shadow; the current Math unit uses a heavier outline.</p>
+      <div class="preview">
+        <div class="previewbar"><span class="dots"><i style="background:#DC8274"></i><i style="background:#DCC674"></i><i style="background:#7AC79B"></i></span><span class="ttl">Year Overview &middot; 2024-2025</span></div>
+        <div class="dash">
+          <div class="side">
+            <div class="item sel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h7" stroke-linecap="round"/></svg>Year Overview</div>
+            <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/></svg>By Subject</div>
+            <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4" stroke-linecap="round"/></svg>Calendar</div>
+            <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="m8.5 12 2.5 2.5 4.5-5" stroke-linecap="round"/></svg>Standards</div>
+          </div>
+          <div class="body">
+            <div class="row" style="justify-content:space-between">
+              <div><div class="t-h3" style="font-size:16px">Year Overview</div><div class="t-small" style="color:var(--muted)">2024-2025 School Year</div></div>
+              <div style="display:flex;gap:10px;align-items:center"><div class="segment"><button class="on">Timeline</button><button>Table</button></div><button class="btn btn-primary btn-sm">+ Add Unit</button></div>
+            </div>
+            <div class="lane" style="--c:var(--reading-bright);--ct:var(--reading-tint);--ck:var(--reading-ink)"><span class="lbl"><span class="sw" style="background:var(--c)"></span>Reading</span><div class="track"><div class="uchip"><div class="tw"><div class="u">Unit 4</div><div class="t">Compare</div></div></div><div class="uchip"><div class="tw"><div class="u">Unit 5</div><div class="t">Fact &amp; Opinion</div></div></div></div></div>
+            <div class="lane" style="--c:var(--math-bright);--ct:var(--math-tint);--ck:var(--math-ink)"><span class="lbl"><span class="sw" style="background:var(--c)"></span>Math</span><div class="track"><div class="uchip active"><div class="tw"><div class="u">Unit 3</div><div class="t">Multiplication</div></div></div><div class="uchip"><div class="tw"><div class="u">Unit 4</div><div class="t">Fractions</div></div></div></div></div>
+            <div class="lane" style="--c:var(--science-bright);--ct:var(--science-tint);--ck:var(--science-ink)"><span class="lbl"><span class="sw" style="background:var(--c)"></span>Science</span><div class="track"><div class="uchip"><div class="tw"><div class="u">Unit 3</div><div class="t">Rocks</div></div></div><div class="uchip"><div class="tw"><div class="u">Unit 4</div><div class="t">Forces</div></div></div></div></div>
+            <div class="lane" style="--c:var(--social-bright);--ct:var(--social-tint);--ck:var(--social-ink)"><span class="lbl"><span class="sw" style="background:var(--c)"></span>Social</span><div class="track"><div class="uchip"><div class="tw"><div class="u">Unit 3</div><div class="t">Regions</div></div></div><div class="uchip"><div class="tw"><div class="u">Unit 4</div><div class="t">Early People</div></div></div></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MARKETING PATTERN -->
+    <section class="section" id="marketing">
+      <span class="eyebrow">Patterns</span>
+      <h2>Marketing hero</h2>
+      <p class="lead">The same tokens dressed for the public site: the hero mesh, display type, honey CTA and a floating product card.</p>
+      <div class="preview">
+        <div class="mhero">
+          <span class="eyebrow">For teachers</span>
+          <h3 style="margin-top:14px">Plan to <span style="background:var(--grad-honey);-webkit-background-clip:text;background-clip:text;color:transparent">elevate</span> your year</h3>
+          <p>Beautiful, standards-aligned curriculum planning that feels as good as it works.</p>
+          <div class="btnrow" style="margin-top:20px"><button class="btn btn-honey">Get Started</button><button class="btn btn-secondary">See a demo</button></div>
+          <div class="card3d"><div class="ln a"></div><div class="ln b"></div><div class="ln c"></div><div class="ln b" style="width:70%"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="foot">
+      <span>Curricula Design System &middot; v1.3</span>
+      <span>Indigo + Honey &middot; 15 subjects &middot; Bricolage Grotesque / Plus Jakarta Sans</span>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('.segment').forEach(function(seg){
+    seg.addEventListener('click', function(e){
+      var b = e.target.closest('button'); if(!b) return;
+      seg.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
+      b.classList.add('on');
+    });
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll('.navlink'));
+  var map = {}; links.forEach(function(l){ map[l.getAttribute('href').slice(1)] = l; });
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(en){
+      if(en.isIntersecting){
+        links.forEach(function(l){ l.style.background=''; l.style.color=''; l.style.boxShadow=''; });
+        var l = map[en.target.id];
+        if(l){ l.style.background='var(--surface)'; l.style.color='var(--brand-600)'; l.style.boxShadow='var(--sh-xs)'; }
+      }
+    });
+  }, { rootMargin:'-20% 0px -70% 0px' });
+  document.querySelectorAll('section[id]').forEach(function(s){ io.observe(s); });
+</script>
+</body>
+</html>

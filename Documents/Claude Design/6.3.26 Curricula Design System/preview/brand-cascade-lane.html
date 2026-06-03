@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="_card.css">
+<style>
+  .lane{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .lane:last-child{margin-bottom:0}
+  .lane .lbl{width:88px;flex:0 0 auto;font-size:12px;font-weight:800;color:var(--ink-soft);display:flex;align-items:center;gap:7px}
+  .lane .lbl .sw{width:10px;height:10px;border-radius:3px}
+  .lane .track{display:flex;gap:8px;flex:1;min-width:0}
+  .mini{flex:0 0 auto;background:var(--ct);border:1.5px solid var(--c);border-radius:12px;padding:8px 12px;box-shadow:0 4px 12px -5px rgba(28,27,46,.14);display:flex;align-items:center;gap:8px}
+  .mini .ld{width:10px;height:10px;border-radius:50%;background:var(--c)}
+  .mini .lx{font-size:12px;font-weight:700;color:var(--ink)}
+</style>
+</head><body><div class="card-wrap">
+  <div class="lane" style="--c:var(--subj-1-bright);--ct:var(--subj-1-tint)">
+    <div class="lbl"><span class="sw" style="background:var(--subj-1)"></span>Math</div>
+    <div class="track"><div class="mini"><span class="ld"></span><span class="lx">Place value</span></div><div class="mini"><span class="ld"></span><span class="lx">Rounding</span></div><div class="mini"><span class="ld"></span><span class="lx">Multiply 2-digit</span></div></div>
+  </div>
+  <div class="lane" style="--c:var(--reading-bright);--ct:var(--reading-tint)">
+    <div class="lbl"><span class="sw" style="background:var(--reading)"></span>Reading</div>
+    <div class="track"><div class="mini"><span class="ld"></span><span class="lx">Inference</span></div><div class="mini"><span class="ld"></span><span class="lx">Text evidence</span></div></div>
+  </div>
+  <div class="lane" style="--c:var(--social-bright);--ct:var(--social-tint)">
+    <div class="lbl"><span class="sw" style="background:var(--social)"></span>Social</div>
+    <div class="track"><div class="mini"><span class="ld"></span><span class="lx">Early settlers</span></div><div class="mini"><span class="ld"></span><span class="lx">Map skills</span></div></div>
+  </div>
+  <div class="cap" style="margin-top:14px">A subject's hue cascades down its lane — color is the navigation</div>
+</div></body></html>
