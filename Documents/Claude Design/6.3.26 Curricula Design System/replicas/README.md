@@ -1,10 +1,12 @@
-# Live-page replicas — Year & Curriculum
+# Live-page replicas — Year, Curriculum, Daily & Teach
 
-Self-contained HTML snapshots of the **current live** Year and Curriculum
-(Subject) pages, for design iteration in Claude design (or any browser).
+Self-contained HTML snapshots of the **current live** pages, for design
+iteration in Claude design (or any browser).
 
 - `year.html` — the live `/year` (Timeline) view.
 - `curriculum.html` — the live `/subject/[slug]` (Workspace) view.
+- `daily.html` — the live `/daily` view (week strip + lesson detail + resources rail).
+- `teach.html` — the live `/teach` board (widgets, board theme, rails).
 
 ## What they are
 Each file is the **real rendered DOM** of the production page with **all CSS
