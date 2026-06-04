@@ -977,10 +977,11 @@
   }
 }
 
-/* Touch / coarse pointers (phone, tablet): the panel reveal/close buttons and
-   the right-panel pager arrows are tappable controls that sit below the 44px
-   minimum on desktop. Expand only their HIT AREA on coarse pointers per
-   CLAUDE.md §4; their glyph sizes and desktop appearance are untouched. */
+/* Touch / coarse pointers (phone, tablet): the panel reveal/close buttons, the
+   right-panel pager arrows, the lesson-detail tabs, and the panel back link are
+   tappable controls that sit below the 44px minimum on desktop. Expand only
+   their HIT AREA on coarse pointers per CLAUDE.md §4; their glyph/label sizes
+   and desktop appearance are untouched. */
 @media (hover: none), (pointer: coarse) {
   .topbtn,
   .pclose {
@@ -989,6 +990,17 @@
   }
   .rnav button {
     min-width: 44px;
+    min-height: 44px;
+  }
+  /* Lesson-detail tabs (.rtab) are ~28–32px tall on desktop. Pad the vertical
+     hit area to 44px without enlarging the type or shifting the underline
+     baseline (margin-bottom:-1px on the row keeps it aligned). */
+  .rtab {
+    min-height: 44px;
+  }
+  /* The "back" link in the right panel header is text-only (~18px). Give it a
+     44px tap target while keeping its inline layout and label size. */
+  .rback .b {
     min-height: 44px;
   }
 }
