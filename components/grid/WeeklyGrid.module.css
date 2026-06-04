@@ -1,7 +1,9 @@
 /* WeeklyGrid.module.css — layout + style-axis surfaces for the Weekly grid.
  *
- * The grid is a CSS Grid with one leading subject-label column and five
- * day columns (Sun–Thu). Token values come from app/tokens.css; the three
+ * The grid is a CSS Grid with one leading subject-label column and one day
+ * column per configured school day (`--day-count`, set inline from the
+ * configured school week; defaults to 5 for the Sun–Thu beta). Token values
+ * come from app/tokens.css; the three
  * card styles (quiet/calm/vivid) and palette types (normal/highlight) are
  * driven by `data-style` / `data-palette` on <html> — this file only
  * styles the grid chrome, never the Lesson Card itself.
@@ -170,9 +172,12 @@
 
 .grid {
   display: grid;
-  /* Leading subject-label column + 5 day columns. The min day width keeps
-     cards readable; below ~1180px the region scrolls rather than crushes. */
-  grid-template-columns: 132px repeat(5, minmax(190px, 1fr));
+  /* Leading subject-label column + one day column per configured school day.
+     `--day-count` is set inline from the configured school week (defaults to 5
+     for the Sun–Thu beta) so the grid never assumes a fixed 5-day week. The min
+     day width keeps cards readable; below the natural width the region scrolls
+     rather than crushes. */
+  grid-template-columns: 132px repeat(var(--day-count, 5), minmax(190px, 1fr));
   /* Tight gap — cells should read as a continuous grid, not floating tiles.
      Column gap keeps horizontal breathing room; row gap is collapsed to 0
      so subject rows read as tightly stacked bands rather than floating tiles. */
@@ -182,7 +187,10 @@
      behaviour — no `align-items: start`). Combined with each cell's fixed
      `min-height` (see .cell), every cell in a row settles to the same height,
      so the grid reads as a clean matrix with no ragged voids. */
-  min-width: 1082px;
+  /* 132px subject column + 190px per configured day column. Matches the old
+     fixed 1082px (132 + 5×190) for the Sun–Thu default and scales with the
+     configured day count. */
+  min-width: calc(132px + var(--day-count, 5) * 190px);
 }
 
 /* ── Day header row ─────────────────────────────────────────────────── */

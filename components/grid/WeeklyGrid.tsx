@@ -3,7 +3,7 @@
 // WeeklyGrid.tsx — the Weekly view: subjects × configurable-day grid.
 //
 // Layout (see WeeklyGrid.module.css):
-//   row 0      → corner cell + day header cells (one per WEEK_DAYS entry)
+//   row 0      → corner cell + day header cells (one per configured school day)
 //   rows 1..n  → one subject row each: subject-label cell + day cells
 //
 // Drag-and-drop uses @dnd-kit with the collapse-on-drag pattern (spec §3
@@ -70,14 +70,8 @@ import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { useTheme } from "@/lib/theme";
 import { useSubjectColor } from "@/lib/palette";
-import {
-  SUBJECTS,
-  UNITS,
-  CURRENT_WEEK,
-  WEEK_DAYS,
-  WEEK_DAYS_SHORT,
-  SUBJECT_BY_ID,
-} from "@/lib/mock";
+import { SUBJECTS, UNITS, CURRENT_WEEK, SUBJECT_BY_ID } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { useHolidaysByDay } from "@/lib/use-day-holiday";
 import type {
   ContextAction,
@@ -100,11 +94,18 @@ import { useGridNavigation } from "./useGridNavigation";
 import type { CellNavProps, CellPos } from "./useGridNavigation";
 import styles from "./WeeklyGrid.module.css";
 
-const DAY_COUNT = WEEK_DAYS.length;
-
 export function WeeklyGrid(): ReactNode {
   const { style } = useTheme();
   const labels = useLabels();
+
+  // ── Configured school week — the ONE ordered-week contract ─────────────────
+  // Day columns, the day COUNT, and weekday labels all derive from the team's
+  // configured school week (useOrderedWeekdays → useSchoolWeek), never a
+  // hard-coded Sun-first 5-day fixture. SSR-safe by inheritance (see
+  // lib/week-order.ts). `weekdays` is ordered; `.index` is the value a lesson's
+  // `day` field must equal to land in that column.
+  const weekdays = useOrderedWeekdays();
+  const DAY_COUNT = weekdays.length;
   const { week, search, filters, selectedLessonId, setSelectedLessonId } =
     useAppState();
   const prefersReducedMotion = useReducedMotion();
@@ -235,7 +236,7 @@ export function WeeklyGrid(): ReactNode {
       buckets[lesson.subject]?.[lesson.day].push(lesson);
     }
     return buckets;
-  }, [lessons, week, lessonMatchesQuery]);
+  }, [lessons, week, lessonMatchesQuery, DAY_COUNT]);
 
   const weekHasLessons = useMemo(
     () => lessons.some((l) => l.week === week),
@@ -255,7 +256,7 @@ export function WeeklyGrid(): ReactNode {
       }
     }
     return result;
-  }, [bySubjectDay]);
+  }, [bySubjectDay, DAY_COUNT]);
 
   // ── Keyboard navigation ────────────────────────────────────────────────────
   const expandCell = useCallback(
@@ -318,7 +319,7 @@ export function WeeklyGrid(): ReactNode {
     // Screen-reader position announcement.
     if (overId?.startsWith("cell:")) {
       const [, subjectId, dayStr] = overId.split(":");
-      const dayName = WEEK_DAYS[Number(dayStr)] ?? dayStr;
+      const dayName = weekdays[Number(dayStr)]?.longLabel ?? dayStr;
       const subj = SUBJECTS.find((s) => s.id === subjectId);
       setLiveAnnouncement(`Over ${subj?.name ?? subjectId}, ${dayName}.`);
     }
@@ -347,7 +348,7 @@ export function WeeklyGrid(): ReactNode {
       moveLesson(activeId, { day, subject: subjectId as SubjectId });
       // Announce drop.
       const [, tgtSubjectId, tgtDayStr] = overId.split(":");
-      const dayName = WEEK_DAYS[Number(tgtDayStr)] ?? tgtDayStr;
+      const dayName = weekdays[Number(tgtDayStr)]?.longLabel ?? tgtDayStr;
       const subj = SUBJECTS.find((s) => s.id === tgtSubjectId);
       setLiveAnnouncement(
         `Dropped in ${subj?.name ?? tgtSubjectId}, ${dayName}.`,
@@ -577,56 +578,66 @@ export function WeeklyGrid(): ReactNode {
             className={styles.grid}
             role="grid"
             aria-label={`Weekly plan, ${labels.week.toLowerCase()} ${week}`}
+            // Column template + min-width follow the configured day count so
+            // the grid renders exactly one column per school day (5 for the
+            // Sun–Thu beta default, but any count for Mon–Fri / custom weeks).
+            style={{ "--day-count": DAY_COUNT } as React.CSSProperties}
           >
             {/* ── Day header row — anchored chrome (spec §3.5) ── */}
             <div className={styles.cornerCell} role="presentation" />
-            {WEEK_DAYS.map((dayName, dayIdx) => {
-              const shortName = WEEK_DAYS_SHORT[dayIdx] ?? dayName;
-              const holiday = holidaysByDay.get(dayIdx) ?? null;
-              return (
-                <div
-                  key={dayName}
-                  role="columnheader"
-                  // A11Y-001 / POLISH-005: without an explicit label, the two
-                  // visible spans ("Sunday" + "Sun") concatenate in the
-                  // accessibility tree as "SundaySun". The label supplies a
-                  // natural-language form; the spans are aria-hidden so the
-                  // label is not double-announced.
-                  aria-label={
-                    holiday
-                      ? `${dayName} (${shortName}) — holiday: ${holiday.name}`
-                      : `${dayName} (${shortName})`
-                  }
-                  className={`${styles.dayHead} ${
-                    week === CURRENT_WEEK && dayIdx === 0
-                      ? styles.dayHeadToday
-                      : ""
-                  } ${holiday ? styles.dayHeadHoliday : ""}`}
-                >
-                  <span aria-hidden="true">{dayName}</span>
-                  <span aria-hidden="true" className={styles.dayHeadDate}>
-                    {shortName}
-                  </span>
-                  {/* Holiday pill — surfaces the holiday name at the very
-                      top of the affected column. CLAUDE.md §4 tooltip on
-                      the marker carries the explanatory copy that the
-                      pill itself only previews. */}
-                  {holiday && (
-                    <Tooltip
-                      content={`This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`}
-                      side="bottom"
-                    >
-                      <span
-                        className={styles.dayHeadHolidayPill}
-                        aria-label={`Holiday: ${holiday.name}`}
+            {weekdays.map(
+              ({
+                token,
+                index: dayIdx,
+                label: shortName,
+                longLabel: dayName,
+              }) => {
+                const holiday = holidaysByDay.get(dayIdx) ?? null;
+                return (
+                  <div
+                    key={token}
+                    role="columnheader"
+                    // A11Y-001 / POLISH-005: without an explicit label, the two
+                    // visible spans ("Sunday" + "Sun") concatenate in the
+                    // accessibility tree as "SundaySun". The label supplies a
+                    // natural-language form; the spans are aria-hidden so the
+                    // label is not double-announced.
+                    aria-label={
+                      holiday
+                        ? `${dayName} (${shortName}) — holiday: ${holiday.name}`
+                        : `${dayName} (${shortName})`
+                    }
+                    className={`${styles.dayHead} ${
+                      week === CURRENT_WEEK && dayIdx === 0
+                        ? styles.dayHeadToday
+                        : ""
+                    } ${holiday ? styles.dayHeadHoliday : ""}`}
+                  >
+                    <span aria-hidden="true">{dayName}</span>
+                    <span aria-hidden="true" className={styles.dayHeadDate}>
+                      {shortName}
+                    </span>
+                    {/* Holiday pill — surfaces the holiday name at the very
+                        top of the affected column. CLAUDE.md §4 tooltip on
+                        the marker carries the explanatory copy that the
+                        pill itself only previews. */}
+                    {holiday && (
+                      <Tooltip
+                        content={`This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`}
+                        side="bottom"
                       >
-                        {holiday.name}
-                      </span>
-                    </Tooltip>
-                  )}
-                </div>
-              );
-            })}
+                        <span
+                          className={styles.dayHeadHolidayPill}
+                          aria-label={`Holiday: ${holiday.name}`}
+                        >
+                          {holiday.name}
+                        </span>
+                      </Tooltip>
+                    )}
+                  </div>
+                );
+              },
+            )}
 
             {/* ── Holiday column overlays ─────────────────────────────────
                 One striped wash per holiday day, painted across every
@@ -667,6 +678,7 @@ export function WeeklyGrid(): ReactNode {
                 rowIndex={rowIdx}
                 subjectId={subject.id}
                 cells={bySubjectDay[subject.id]}
+                dayCount={DAY_COUNT}
                 style={style}
                 dragState={dragState}
                 density={density}
@@ -740,19 +752,26 @@ export function WeeklyGrid(): ReactNode {
             role="group"
             aria-label="Move to day"
           >
-            {WEEK_DAYS.map((dayName, dayIdx) => (
-              <Button
-                key={dayName}
-                variant="ghost"
-                size="sm"
-                className={styles.bulkDayBtn}
-                onClick={() => handleBulkMove(dayIdx)}
-                aria-label={`Move selected lessons to ${dayName}`}
-                tooltip={`Move every selected lesson to ${dayName} of this week`}
-              >
-                {WEEK_DAYS_SHORT[dayIdx] ?? dayName}
-              </Button>
-            ))}
+            {weekdays.map(
+              ({
+                token,
+                index: dayIdx,
+                label: shortName,
+                longLabel: dayName,
+              }) => (
+                <Button
+                  key={token}
+                  variant="ghost"
+                  size="sm"
+                  className={styles.bulkDayBtn}
+                  onClick={() => handleBulkMove(dayIdx)}
+                  aria-label={`Move selected lessons to ${dayName}`}
+                  tooltip={`Move every selected lesson to ${dayName} of this week`}
+                >
+                  {shortName}
+                </Button>
+              ),
+            )}
           </div>
 
           {/* Clear selection. */}
@@ -781,6 +800,8 @@ interface SubjectRowProps {
   rowIndex: number;
   subjectId: SubjectId;
   cells: Lesson[][];
+  /** Number of day columns — derived from the configured school week. */
+  dayCount: number;
   style: ReturnType<typeof useTheme>["style"];
   // viewMode is no longer threaded through the grid — the Grid/List axis is
   // resolved by WeeklyShell, which renders WeeklyGrid only in "grid" mode.
@@ -818,6 +839,7 @@ function SubjectRow({
   rowIndex,
   subjectId,
   cells,
+  dayCount,
   style,
   dragState,
   density,
@@ -859,7 +881,7 @@ function SubjectRow({
         </span>
       </div>
 
-      {Array.from({ length: DAY_COUNT }, (_, day) => (
+      {Array.from({ length: dayCount }, (_, day) => (
         <GridCell
           key={day}
           subjectId={subjectId}

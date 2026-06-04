@@ -6,7 +6,8 @@
 //   row 0       → WeekNavigator (sticky header with week prev/next/today)
 //   row 1       → Move-mode toolbar (sticky sub-header)
 //   row 2       → The board: one column per school-week day, derived from
-//                 WEEK_DAYS (never hard-coded as 5).
+//                 the configured school week (useOrderedWeekdays), never
+//                 hard-coded as 5.
 //
 // Each day column contains:
 //   – a sticky day header (full name + short label; today is highlighted)
@@ -42,7 +43,8 @@ import React, {
 import { Button } from "@/components/ui";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
-import { CURRENT_WEEK, WEEK_DAYS, WEEK_DAYS_SHORT } from "@/lib/mock";
+import { CURRENT_WEEK } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import type {
   ContextAction,
   ContextActionPayload,
@@ -128,8 +130,11 @@ export function WeeklyBoard(): ReactNode {
     [lessons],
   );
 
-  // DAY_COUNT is derived from the WEEK_DAYS fixture — never hard-coded.
-  const DAY_COUNT = WEEK_DAYS.length;
+  // Day columns derive from the team's configured school week (the one
+  // ordered-week contract) — never a hard-coded 5-day Sun-first fixture.
+  // See lib/week-order.ts. SSR-safe by inheritance from useSchoolWeek().
+  const weekdays = useOrderedWeekdays();
+  const DAY_COUNT = weekdays.length;
 
   // ── Lesson bucketing ─────────────────────────────────────────────────
   // byDay[dayIndex] → Lesson[] for the currently displayed week, all
@@ -376,42 +381,49 @@ export function WeeklyBoard(): ReactNode {
             </div>
           )}
 
-          {/* ── Day columns ── one per WEEK_DAYS entry. */}
+          {/* ── Day columns ── one per configured school-week day. */}
           {weekHasLessons &&
-            WEEK_DAYS.map((dayName, dayIdx) => (
-              <DayColumn
-                key={dayName}
-                dayIndex={dayIdx}
-                dayName={dayName}
-                dayNameShort={WEEK_DAYS_SHORT[dayIdx]}
-                isToday={week === CURRENT_WEEK && dayIdx === 0}
-                lessons={byDay[dayIdx] ?? []}
-                draggingId={draggingId}
-                dragOver={dragOverDay === dayIdx}
-                dropIndex={dropIndex}
-                expandedIds={expandedIds}
-                selectedId={selectedId}
-                compact={compact}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onDragOver={(insertAt) => {
-                  setDragOverDay(dayIdx);
-                  setDropIndex(insertAt);
-                }}
-                onDragLeave={() => {
-                  if (dragOverDay === dayIdx) {
-                    setDragOverDay(null);
-                    setDropIndex(null);
-                  }
-                }}
-                onDrop={(insertAt) => handleDrop(dayIdx, insertAt)}
-                onSelect={handleSelect}
-                onToggleComplete={handleToggleComplete}
-                onContextAction={handleContextAction}
-                onEditLesson={handleEditLesson}
-                onSaveTarget={handleSaveTarget}
-              />
-            ))}
+            weekdays.map(
+              ({
+                token,
+                index: dayIdx,
+                label: dayNameShort,
+                longLabel: dayName,
+              }) => (
+                <DayColumn
+                  key={token}
+                  dayIndex={dayIdx}
+                  dayName={dayName}
+                  dayNameShort={dayNameShort}
+                  isToday={week === CURRENT_WEEK && dayIdx === 0}
+                  lessons={byDay[dayIdx] ?? []}
+                  draggingId={draggingId}
+                  dragOver={dragOverDay === dayIdx}
+                  dropIndex={dropIndex}
+                  expandedIds={expandedIds}
+                  selectedId={selectedId}
+                  compact={compact}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(insertAt) => {
+                    setDragOverDay(dayIdx);
+                    setDropIndex(insertAt);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverDay === dayIdx) {
+                      setDragOverDay(null);
+                      setDropIndex(null);
+                    }
+                  }}
+                  onDrop={(insertAt) => handleDrop(dayIdx, insertAt)}
+                  onSelect={handleSelect}
+                  onToggleComplete={handleToggleComplete}
+                  onContextAction={handleContextAction}
+                  onEditLesson={handleEditLesson}
+                  onSaveTarget={handleSaveTarget}
+                />
+              ),
+            )}
         </div>
       </div>
     </div>

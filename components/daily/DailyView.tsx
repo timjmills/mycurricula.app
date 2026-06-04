@@ -118,13 +118,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
-import {
-  SUBJECT_BY_ID,
-  WEEK_DAYS,
-  WEEK_DAYS_SHORT,
-  dateNumberForWeekDay,
-  notesForDay,
-} from "@/lib/mock";
+import { SUBJECT_BY_ID, dateNumberForWeekDay, notesForDay } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { useDayHoliday, useHolidaysByDay } from "@/lib/use-day-holiday";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { useDndSensors } from "@/lib/collapse-on-drag";
@@ -137,12 +132,7 @@ import { RightRail } from "./RightRail";
 import { PaneSplitter } from "./PaneSplitter";
 import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
-import {
-  Button,
-  EmptyState,
-  PageHeader,
-  Tooltip,
-} from "@/components/ui";
+import { Button, EmptyState, PageHeader, Tooltip } from "@/components/ui";
 import { DailyList } from "@/components/list/DailyList";
 import { ScheduleDayPane } from "@/components/schedule";
 import { DailySchedulePill } from "./daily-schedule-pill";
@@ -864,8 +854,8 @@ function HolidayBanner({ week, day }: HolidayBannerProps): ReactNode {
 //
 // The week strip is the day selector for the Daily view — it replaces the
 // old standalone <DayBar> that lived in the page's top chrome. Days come
-// from the configured school week (WEEK_DAYS / WEEK_DAYS_SHORT), never a
-// hard-coded 5-day assumption.
+// from the configured school week (useOrderedWeekdays), never a hard-coded
+// 5-day assumption.
 
 /** Priority → color token for the per-day notes-indicator dot. */
 const PRIORITY_COLORS: Record<string, string> = {
@@ -889,98 +879,102 @@ function WeekStrip({ week, selectedDay, onSelect }: WeekStripProps): ReactNode {
   // indicator + the holiday name in the pill's tooltip. F#20 (Wave 1B
   // extension to /daily) — the visual idiom matches the WeeklyGrid day
   // header treatment.
-  const holidaysByDay = useHolidaysByDay(week, WEEK_DAYS.length);
+  // Day columns derive from the configured school week (never a hard-coded
+  // 5-day Sun-first fixture). See lib/week-order.ts.
+  const weekdays = useOrderedWeekdays();
+  const holidaysByDay = useHolidaysByDay(week, weekdays.length);
   return (
     <div
       className={styles.weekStrip}
       role="tablist"
       aria-label="Week — select a day"
     >
-      {WEEK_DAYS.map((dayName, i) => {
-        // Personal-only notes feed the priority dot (consistent with the
-        // notes banner in the same column).
-        const dayNotes = notesForDay(i).filter((n) => n.scope === "personal");
-        const topNote = dayNotes[0];
-        const holiday = holidaysByDay.get(i) ?? null;
-        const isActive = i === selectedDay;
-        const dateNumber = dateNumberForWeekDay(week, i);
-        const shortLabel = WEEK_DAYS_SHORT[i];
+      {weekdays.map(
+        ({ token, index: i, label: shortLabel, longLabel: dayName }) => {
+          // Personal-only notes feed the priority dot (consistent with the
+          // notes banner in the same column).
+          const dayNotes = notesForDay(i).filter((n) => n.scope === "personal");
+          const topNote = dayNotes[0];
+          const holiday = holidaysByDay.get(i) ?? null;
+          const isActive = i === selectedDay;
+          const dateNumber = dateNumberForWeekDay(week, i);
 
-        // Compose the pill label — keyboard-only users hear the holiday
-        // context too, since the tooltip is hover/focus-visible only.
-        const baseAriaLabel = `Select ${dayName} ${dateNumber} — Week ${week}`;
-        const ariaLabel = holiday
-          ? `${baseAriaLabel}. This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`
-          : baseAriaLabel;
+          // Compose the pill label — keyboard-only users hear the holiday
+          // context too, since the tooltip is hover/focus-visible only.
+          const baseAriaLabel = `Select ${dayName} ${dateNumber} — Week ${week}`;
+          const ariaLabel = holiday
+            ? `${baseAriaLabel}. This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`
+            : baseAriaLabel;
 
-        const pillButton = (
-          <button
-            key={dayName}
-            // Each pill gets an id so the lesson-pane body can reference it
-            // via aria-labelledby — keeps the original tablist contract.
-            id={`daily-tab-${i}`}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            aria-controls="daily-pane-body"
-            aria-label={ariaLabel}
-            className={`${styles.weekStripPill} ${
-              isActive ? styles.weekStripPillActive : ""
-            } ${holiday ? styles.weekStripPillHoliday : ""}`}
-            onClick={() => onSelect(i)}
-          >
-            <span className={styles.weekStripDayName}>{shortLabel}</span>
-            <span
-              className={`${styles.weekStripDateWrap} ${
-                isActive ? styles.weekStripDateWrapActive : ""
-              }`}
+          const pillButton = (
+            <button
+              key={token}
+              // Each pill gets an id so the lesson-pane body can reference it
+              // via aria-labelledby — keeps the original tablist contract.
+              id={`daily-tab-${i}`}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls="daily-pane-body"
+              aria-label={ariaLabel}
+              className={`${styles.weekStripPill} ${
+                isActive ? styles.weekStripPillActive : ""
+              } ${holiday ? styles.weekStripPillHoliday : ""}`}
+              onClick={() => onSelect(i)}
             >
-              <span className={styles.weekStripDate}>{dateNumber}</span>
-            </span>
-            {/* Priority dot for personal notes — only on non-selected days
+              <span className={styles.weekStripDayName}>{shortLabel}</span>
+              <span
+                className={`${styles.weekStripDateWrap} ${
+                  isActive ? styles.weekStripDateWrapActive : ""
+                }`}
+              >
+                <span className={styles.weekStripDate}>{dateNumber}</span>
+              </span>
+              {/* Priority dot for personal notes — only on non-selected days
                 (the selected day's notes appear in the notes banner just
                 below this strip, so a duplicate dot would be redundant). */}
-            {!isActive && topNote && (
-              <span
-                className={styles.weekStripNoteDot}
-                style={{ background: PRIORITY_COLORS[topNote.priority] }}
-                aria-hidden="true"
-              />
-            )}
-            {/* Holiday dot — a small ink dot pinned to the top-right of
+              {!isActive && topNote && (
+                <span
+                  className={styles.weekStripNoteDot}
+                  style={{ background: PRIORITY_COLORS[topNote.priority] }}
+                  aria-hidden="true"
+                />
+              )}
+              {/* Holiday dot — a small ink dot pinned to the top-right of
                 the pill. Subject-neutral (ink, not subject color and not
                 warning red) so it reads as "no instruction", matching the
                 UnitBar.module.css `.holiday` semantic. The note dot lives
                 bottom-center; the holiday dot lives top-right so the two
                 indicators never collide on the same pill. */}
-            {holiday && (
-              <span
-                className={styles.weekStripHolidayDot}
-                aria-hidden="true"
-                title={`Holiday: ${holiday.name}`}
-              />
-            )}
-          </button>
-        );
+              {holiday && (
+                <span
+                  className={styles.weekStripHolidayDot}
+                  aria-hidden="true"
+                  title={`Holiday: ${holiday.name}`}
+                />
+              )}
+            </button>
+          );
 
-        // CLAUDE.md §4 tooltip primitive — only wraps the pill when the
-        // day is a holiday so the un-marked days keep their existing
-        // bare-button activation rhythm. Tooltip portals the bubble to
-        // document.body, so the wrapping does NOT inject an extra column
-        // into the grid (the pill button itself remains the direct grid
-        // item that grid-auto-columns: 1fr sizes).
-        return holiday ? (
-          <Tooltip
-            key={dayName}
-            content={`This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`}
-            side="bottom"
-          >
-            {pillButton}
-          </Tooltip>
-        ) : (
-          pillButton
-        );
-      })}
+          // CLAUDE.md §4 tooltip primitive — only wraps the pill when the
+          // day is a holiday so the un-marked days keep their existing
+          // bare-button activation rhythm. Tooltip portals the bubble to
+          // document.body, so the wrapping does NOT inject an extra column
+          // into the grid (the pill button itself remains the direct grid
+          // item that grid-auto-columns: 1fr sizes).
+          return holiday ? (
+            <Tooltip
+              key={token}
+              content={`This day is marked as a holiday (${holiday.name}) — your team's curriculum says no school on this date.`}
+              side="bottom"
+            >
+              {pillButton}
+            </Tooltip>
+          ) : (
+            pillButton
+          );
+        },
+      )}
     </div>
   );
 }
@@ -1240,6 +1234,11 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
   // "Lesson" → "Activity", etc. Read once at the top of the component so the
   // nested column renderers below use the dynamic caption everywhere.
   const labels = useLabels();
+
+  // Configured school week — day labels (the in-column header + breadcrumb day
+  // segment) follow the team's configured week rather than a hard-coded
+  // Sun-first fixture. See lib/week-order.ts.
+  const weekdays = useOrderedWeekdays();
 
   // Lessons come from the planner store so completions, edits, and undo/redo
   // are immediately reflected in the left pane list and right pane detail.
@@ -1809,7 +1808,7 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
           {/* ── In-column day header (full day name + progress) ── */}
           <TodayDashboard
             dayLessons={dayLessons}
-            dayLabel={WEEK_DAYS[selectedDay]}
+            dayLabel={weekdays[selectedDay]?.longLabel ?? "Day"}
           />
 
           {/* ── Daily notes banner (when this day has personal notes) ─ */}
@@ -2048,7 +2047,7 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
 
   // ── Breadcrumb (BIG-7) ─────────────────────────────────────────────────
   // Week N / <Day> / <Subject> — each segment is a clickable link.
-  // Day label is derived from the configured school-week array (WEEK_DAYS)
+  // Day label is derived from the configured school week (useOrderedWeekdays)
   // so it respects the school's custom week, never a hard-coded weekday set.
   // Subject is drawn from the selected lesson; falls back to null so the
   // segment is omitted rather than showing a stale value when no lesson is
@@ -2136,7 +2135,7 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
             {/* Day segment — links to the same daily view; clicking re-confirms
                 the active day, which is a no-op when already on it. */}
             <Link href="/daily" className={styles.breadcrumbLink}>
-              {WEEK_DAYS[selectedDay] ?? "Day"}
+              {weekdays[selectedDay]?.longLabel ?? "Day"}
             </Link>
           </li>
           {breadcrumbSubject && (
@@ -2305,9 +2304,7 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
           and unmounts the toast. Position:fixed so it sits outside every
           overflow:hidden ancestor and floats above all other chrome. */}
       {reorderToastVisible && (
-        <ReorderTeachingToast
-          onDismiss={() => setReorderToastVisible(false)}
-        />
+        <ReorderTeachingToast onDismiss={() => setReorderToastVisible(false)} />
       )}
     </div>
   );
