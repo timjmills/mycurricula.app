@@ -107,6 +107,27 @@ interface HistoryState {
   future: HistoryEntry[];
 }
 
+// ── Hydration status ─────────────────────────────────────────────────────────
+
+/** Explicit load/empty/error lifecycle for the backend-sourced document.
+ *  Views read this off the planner value to render a loading or empty state
+ *  instead of an ambiguous blank during/after backend hydration.
+ *
+ *  • "idle"    — not applicable (flag OFF) OR not yet started.
+ *  • "loading" — the backend hydrate for the current owner is in flight (or the
+ *                owner changed and the prior doc no longer applies).
+ *  • "ready"   — a non-empty document is loaded for the current owner. This is
+ *                also the permanent state with the Supabase flag OFF.
+ *  • "empty"   — hydrate completed but the owner has no lessons (signed-out,
+ *                no grade, or a genuinely empty result).
+ *  • "error"   — the hydrate threw; the document is empty (never mock). */
+export type PlannerHydration =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "empty"
+  | "error";
+
 // ── lastChange signal ──────────────────────────────────────────────────────
 
 /** Describes what just changed so views can scroll affected items into view.
@@ -301,8 +322,19 @@ type ToggleSectionWebsiteAction = {
 type UndoAction = { type: "undo" };
 type RedoAction = { type: "redo" };
 /** Replace the whole document with a backend-hydrated one (planner Supabase
- *  seam). Resets undo/redo history — a hydrate is not an undoable edit. */
-type HydrateAction = { type: "hydrate"; doc: PlannerDoc };
+ *  seam). Resets undo/redo history — a hydrate is not an undoable edit.
+ *  `hydration` records the resulting lifecycle state and `owner` records which
+ *  auth owner the doc was hydrated for, so a later owner change can be detected
+ *  and treated as not-ready (preventing a stale-owner flash). */
+type HydrateAction = {
+  type: "hydrate";
+  doc: PlannerDoc;
+  hydration: PlannerHydration;
+  owner: string | null;
+};
+/** Update only the hydration lifecycle flag (e.g. flip to "loading" before an
+ *  async hydrate begins) without touching the document or history. */
+type SetHydrationAction = { type: "setHydration"; hydration: PlannerHydration };
 
 type PlannerAction =
   | MoveLessonAction
@@ -330,7 +362,8 @@ type PlannerAction =
   | ToggleSectionWebsiteAction
   | UndoAction
   | RedoAction
-  | HydrateAction;
+  | HydrateAction
+  | SetHydrationAction;
 
 // ── Human labels for undo/redo tooltips ──────────────────────────────────
 
@@ -468,9 +501,30 @@ const EMPTY_DOC: PlannerDoc = {
   cellLayouts: {},
 };
 
+/** The document the store paints on the FIRST server/client render, before any
+ *  backend hydrate runs. With the Supabase flag OFF this is always the mock
+ *  (INITIAL_DOC) — byte-identical to the prototype path. With the flag ON it is
+ *  EMPTY_DOC, so the very first paint shows "nothing yet" instead of flashing
+ *  mock fixtures or a prior owner's data before the hydrate effect resolves.
+ *
+ *  SSR-SAFE: isPlannerSupabaseConfigured() reads only NEXT_PUBLIC_* env vars,
+ *  which are inlined identically into the server bundle and the client bundle,
+ *  so this branch yields the same initial state on the server and on the first
+ *  client render — no hydration mismatch. */
+function pickInitialDoc(): PlannerDoc {
+  return isPlannerSupabaseConfigured() ? EMPTY_DOC : INITIAL_DOC;
+}
+
+/** The hydration lifecycle for the first render. Flag OFF → "ready" (the mock is
+ *  the permanent document, nothing to load). Flag ON → "loading" (the backend
+ *  hydrate effect will resolve it to ready/empty/error for the current owner). */
+function pickInitialHydration(): PlannerHydration {
+  return isPlannerSupabaseConfigured() ? "loading" : "ready";
+}
+
 const INITIAL_HISTORY: HistoryState = {
   past: [],
-  present: INITIAL_DOC,
+  present: pickInitialDoc(),
   future: [],
 };
 
@@ -956,6 +1010,13 @@ interface HistoryReducerState {
   lastCoalesceTs: number;
   /** The lastChange signal — updated on every mutation. */
   lastChange: LastChange | null;
+  /** The load/empty/error lifecycle for the backend-sourced document. */
+  hydration: PlannerHydration;
+  /** The auth owner id the present document was hydrated for, or null for the
+   *  flag-OFF mock / a signed-out empty doc. The provider compares this against
+   *  the current owner to gate readiness — a mismatch means the doc on screen
+   *  belongs to a prior owner and must not be treated as ready. */
+  hydratedForOwner: string | null;
 }
 
 const INITIAL_REDUCER_STATE: HistoryReducerState = {
@@ -963,6 +1024,10 @@ const INITIAL_REDUCER_STATE: HistoryReducerState = {
   lastCoalesceKey: null,
   lastCoalesceTs: 0,
   lastChange: null,
+  hydration: pickInitialHydration(),
+  // Flag OFF → the mock belongs to no specific owner; null is correct and the
+  // provider's owner-gating is bypassed under the flag (see effectiveHydration).
+  hydratedForOwner: null,
 };
 
 function historyReducer(
@@ -1037,7 +1102,18 @@ function historyReducer(
       lastCoalesceKey: null,
       lastCoalesceTs: 0,
       lastChange: null,
+      hydration: action.hydration,
+      hydratedForOwner: action.owner,
     };
+  }
+
+  // ── Set hydration ────────────────────────────────────────────────────
+  // Flip only the lifecycle flag (no document/history change). Used to mark
+  // "loading" the moment an owner change is detected, before the async hydrate
+  // resolves. Never fires with the flag OFF.
+  if (action.type === "setHydration") {
+    if (state.hydration === action.hydration) return state; // no-op
+    return { ...state, hydration: action.hydration };
   }
 
   // ── Content mutations ────────────────────────────────────────────────
@@ -1066,8 +1142,10 @@ function historyReducer(
     coalesceTs - state.lastCoalesceTs <= COALESCE_WINDOW_MS;
 
   if (shouldCoalesce) {
-    // Apply change to present in-place — no new past entry.
+    // Apply change to present in-place — no new past entry. Carry the hydration
+    // lifecycle + hydrated-for owner through unchanged: an edit is not a load.
     return {
+      ...state,
       history: { ...state.history, present: nextDoc },
       lastCoalesceKey: coalesceKey,
       lastCoalesceTs: coalesceTs,
@@ -1082,6 +1160,7 @@ function historyReducer(
   ].slice(-HISTORY_LIMIT);
 
   return {
+    ...state,
     history: {
       past: newPast,
       present: nextDoc,
@@ -1384,6 +1463,23 @@ export interface PlannerValue {
    *             [lastChange]);
    */
   lastChange: LastChange | null;
+
+  // ── Hydration lifecycle ─────────────────────────────────────────────────
+  /**
+   * The load/empty/error lifecycle of the (backend-sourced) document.
+   *
+   * • With the Supabase flag OFF this is permanently "ready" — the mock
+   *   fixtures are the document and there is nothing to load.
+   * • With the flag ON it is "loading" on the first paint (and whenever the
+   *   auth owner changes), then settles to "ready" (lessons loaded), "empty"
+   *   (no grade / no lessons / signed out), or "error" (hydrate threw).
+   *
+   * Views should render a loading or empty state instead of an ambiguous blank
+   * when this is not "ready". It is owner-keyed: if the auth owner changes, it
+   * reverts to "loading" until the new owner's document hydrates, so a teacher
+   * never sees the previous owner's lessons.
+   */
+  hydration: PlannerHydration;
 }
 
 const PlannerContext = createContext<PlannerValue | null>(null);
@@ -1455,24 +1551,46 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
 
     // Reset stale data immediately. Without this, a sign-out / account switch /
     // slow load would leave the previous owner's (or the mock) document on
-    // screen until the async work resolved.
+    // screen until the async work resolved. The hydrate carries the CURRENT
+    // owner + a "loading" status so the readiness gate (effectiveHydration)
+    // knows this empty doc belongs to the owner being loaded — not the prior
+    // owner whose lessons must never flash through.
     gradeLevelIdRef.current = null;
-    dispatchRef.current({ type: "hydrate", doc: EMPTY_DOC });
+    dispatchRef.current({
+      type: "hydrate",
+      doc: EMPTY_DOC,
+      hydration: "loading",
+      owner: ownerId,
+    });
 
-    if (!ownerId) return; // signed out / session not resolved → empty doc
+    // Signed out / session not resolved → the empty doc is the FINAL state for a
+    // null owner; mark it "empty" (not "loading") so views show an empty state
+    // rather than a permanent spinner.
+    if (!ownerId) {
+      dispatchRef.current({ type: "setHydration", hydration: "empty" });
+      return;
+    }
 
     let alive = true;
     void (async () => {
       try {
         const gradeLevelId = await resolveGrade(ownerId);
         if (!alive) return;
-        if (!gradeLevelId) return; // no grade → stay EMPTY_DOC (never mock)
+        if (!gradeLevelId) {
+          // No grade → stay EMPTY_DOC (never mock), settle to "empty".
+          dispatchRef.current({ type: "setHydration", hydration: "empty" });
+          return;
+        }
         // Stash the resolved grade uuid so createLesson tees (duplicate*) have a
         // real grade to key new rows on without re-resolving per call.
         gradeLevelIdRef.current = gradeLevelId;
         const lessons = await plannerClient.listLessons(gradeLevelId, ownerId);
         if (!alive) return;
-        if (lessons.length === 0) return; // genuinely empty → stay EMPTY_DOC
+        if (lessons.length === 0) {
+          // Genuinely empty → stay EMPTY_DOC, settle to "empty".
+          dispatchRef.current({ type: "setHydration", hydration: "empty" });
+          return;
+        }
         // Batched section hydrate — one round-trip seeds every lesson's
         // sections (kills the prior per-lesson N+1). Lessons the batch omits
         // (no persisted sections) fall back to empty via ensureSections.
@@ -1484,13 +1602,17 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         dispatchRef.current({
           type: "hydrate",
           doc: { lessons, sections, cellLayouts: {} },
+          hydration: "ready",
+          owner: ownerId,
         });
       } catch (err) {
         // On any backend/auth error, stay on EMPTY_DOC (already hydrated above)
         // rather than falling back to the mock — surfacing mock/Grade-5 fixtures
         // as if they were live data would be worse than an honest blank planner.
         // Surface the failure so a dropped hydrate is visible in the console.
+        if (!alive) return;
         console.error("[planner] hydrate failed; showing empty document", err);
+        dispatchRef.current({ type: "setHydration", hydration: "error" });
       }
     })();
     return () => {
@@ -1844,6 +1966,25 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const undoLabel = canUndo ? past[past.length - 1].label : null;
   const redoLabel = canRedo ? future[0].label : null;
 
+  // ── Owner-keyed hydration readiness ────────────────────────────────────
+  // The reducer's `hydration` is the raw lifecycle for whatever doc is on
+  // screen. But between an owner change and the re-hydrate that follows it,
+  // the effect's synchronous reset has not run yet for this render — so the
+  // present doc may still belong to the PRIOR owner. We must never paint that
+  // prior owner's lessons as "ready". Gate readiness on the hydrated-for owner
+  // matching the current owner: any mismatch is treated as "loading" so views
+  // show a loading state instead of the stale owner's data.
+  //
+  // Flag OFF is unaffected: the mock document is owner-agnostic (hydratedForOwner
+  // and ownerId are both irrelevant), and the reducer's hydration is permanently
+  // "ready" — short-circuit before the owner check so the prototype path stays
+  // byte-identical.
+  const effectiveHydration: PlannerHydration = !isPlannerSupabaseConfigured()
+    ? "ready"
+    : state.hydratedForOwner !== ownerId
+      ? "loading"
+      : state.hydration;
+
   // ── Stable context value ──────────────────────────────────────────────
   // Memoized on the doc and history boundaries — views re-render only when
   // the document or history flags actually change.
@@ -1884,6 +2025,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       undoLabel,
       redoLabel,
       lastChange,
+      hydration: effectiveHydration,
     }),
     [
       present.lessons,
@@ -1920,6 +2062,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       undoLabel,
       redoLabel,
       lastChange,
+      effectiveHydration,
     ],
   );
 

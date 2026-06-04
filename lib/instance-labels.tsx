@@ -27,6 +27,24 @@
 // seam the Phase 1B Supabase backend swaps: team-scope rows move to a
 // team-shared table (RLS), personal-scope rows to a per-user table. The
 // resolver/mutator contract below does not change when that happens.
+//
+// SHARED-BROWSER ISOLATION (finding #6): both scopes' overrides used to live
+// under GLOBAL localStorage keys, so on a shared machine (or across schools)
+// one teacher inherited another's renames. Every key is now namespaced by the
+// authenticated user id resolved from the Supabase session (the app's existing
+// auth path — mirrors lib/teach/use-teach-groups.ts + lib/catchup-state.tsx).
+//   • PERSONAL — namespaced by the teacher uid. Genuinely per-teacher.
+//   • TEAM     — conceptually shared across a team/school, but today it is
+//                localStorage-only (no backend). We cannot derive a
+//                school/team id client-side from the session, so team is ALSO
+//                namespaced by uid and keeps its "device-local until backend
+//                sync" semantics (real cross-teacher team sync is Phase 1B).
+//                The hard requirement this satisfies: a DIFFERENT logged-in
+//                user on the same browser must never read the previous user's
+//                team overrides.
+// Before a real uid resolves we use an anonymous namespace that is wiped on
+// sign-in; switching accounts drops the in-memory overrides and re-hydrates
+// from the new user's namespace.
 
 import {
   createContext,
@@ -34,9 +52,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useReducer,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 // ── Public types ───────────────────────────────────────────────────────────
 
@@ -63,16 +84,38 @@ export function weekKey(unitId: string, week: number): string {
 
 // ── Storage ────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY: Record<LabelScope, string> = {
+const STORAGE_PREFIX: Record<LabelScope, string> = {
   personal: "mycurricula:instance-labels:personal",
   team: "mycurricula:instance-labels:team",
 };
 
+/** Namespace used before a real auth uid resolves (signed out / session not
+ *  yet loaded). Cleared on sign-in so it can never leak into an account. */
+const ANON_UID = "__anon";
+
+/** Compose the uid-scoped localStorage key for one scope. */
+function storageKey(scope: LabelScope, uid: string): string {
+  return `${STORAGE_PREFIX[scope]}:${uid}`;
+}
+
+/** Remove every anonymous-namespace blob. Called when a real uid resolves so
+ *  pre-auth scratch overrides never linger for the next signed-in user. */
+function clearAnonStorage(): void {
+  if (typeof window === "undefined") return;
+  for (const scope of ["personal", "team"] as const) {
+    try {
+      window.localStorage.removeItem(storageKey(scope, ANON_UID));
+    } catch {
+      // Storage disabled — nothing to clear.
+    }
+  }
+}
+
 /** Load one scope's overrides, tolerating absent/malformed storage. */
-function loadScope(scope: LabelScope): OverrideRecord {
+function loadScope(scope: LabelScope, uid: string): OverrideRecord {
   if (typeof window === "undefined") return EMPTY_RECORD();
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY[scope]);
+    const raw = window.localStorage.getItem(storageKey(scope, uid));
     if (!raw) return EMPTY_RECORD();
     const parsed = JSON.parse(raw) as Partial<OverrideRecord> | null;
     if (!parsed || typeof parsed !== "object") return EMPTY_RECORD();
@@ -92,21 +135,17 @@ function loadScope(scope: LabelScope): OverrideRecord {
 }
 
 /** Persist one scope's overrides; swallow quota / disabled-storage errors. */
-function saveScope(scope: LabelScope, record: OverrideRecord): void {
+function saveScope(
+  scope: LabelScope,
+  uid: string,
+  record: OverrideRecord,
+): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY[scope], JSON.stringify(record));
+    window.localStorage.setItem(storageKey(scope, uid), JSON.stringify(record));
   } catch {
     // non-fatal
   }
-}
-
-/** True when a record carries at least one override (drives the post-mount
- *  setState guard so mounting with empty storage never triggers a re-render). */
-function isEmpty(record: OverrideRecord): boolean {
-  return (Object.keys(record) as InstanceLevel[]).every(
-    (level) => Object.keys(record[level]).length === 0,
-  );
 }
 
 // ── Context ────────────────────────────────────────────────────────────────
@@ -156,12 +195,60 @@ export function InstanceLabelsProvider({
   const [personal, setPersonal] = useState<OverrideRecord>(EMPTY_RECORD);
   const [team, setTeam] = useState<OverrideRecord>(EMPTY_RECORD);
 
+  // Gate persistence so the (re)hydration effect below never writes the loaded
+  // state straight back to storage. Only subsequent mutations persist.
+  const hydratedRef = useRef(false);
+
+  // ── Authenticated user id (finding #6) ────────────────────────────────────
+  // Held in a ref so the stable mutator callbacks always persist under the
+  // CURRENT user's namespace without being re-created on every auth change.
+  // Anon until a real uid resolves. `uidVersion` bumps on every uid change to
+  // retrigger the (re)hydration effect below so an account switch on a shared
+  // browser swaps the visible overrides instead of leaking the prior teacher's.
+  const uidRef = useRef<string>(ANON_UID);
+  const [uidVersion, bumpUidVersion] = useReducer((n: number) => n + 1, 0);
+
   useEffect(() => {
-    const p = loadScope("personal");
-    const t = loadScope("team");
-    if (!isEmpty(p)) setPersonal(p);
-    if (!isEmpty(t)) setTeam(t);
+    const supabase = createClient();
+    let active = true;
+
+    const applyUid = (nextUid: string): void => {
+      if (!active) return;
+      if (uidRef.current === nextUid) return; // no-op — same user
+      // Switching INTO a real account: clear the pre-auth scratch namespace so
+      // it can never be re-read by (or bleed into) the signed-in user.
+      if (nextUid !== ANON_UID) clearAnonStorage();
+      uidRef.current = nextUid;
+      bumpUidVersion();
+    };
+
+    supabase.auth.getUser().then(({ data }) => {
+      applyUid(data.user?.id ?? ANON_UID);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      applyUid(session?.user?.id ?? ANON_UID);
+    });
+
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
   }, []);
+
+  // (Re)hydration. Runs post-mount AND whenever the resolved uid changes. On a
+  // uid change (account switch / sign-out) we RESET to empty first so the prior
+  // user's overrides never linger when the new user's namespace is empty, then
+  // load the new user's own namespace. Hydration itself must not persist —
+  // hydratedRef gates the mutators below.
+  useEffect(() => {
+    hydratedRef.current = false;
+    const uid = uidRef.current;
+    const p = loadScope("personal", uid);
+    const t = loadScope("team", uid);
+    setPersonal(p);
+    setTeam(t);
+    hydratedRef.current = true;
+  }, [uidVersion]);
 
   const stateFor = (scope: LabelScope) => (scope === "personal" ? personal : team); // prettier-ignore
 
@@ -202,7 +289,7 @@ export function InstanceLabelsProvider({
         if (trimmed.length > 0) nextLevel[key] = trimmed;
         else delete nextLevel[key];
         const next: OverrideRecord = { ...prev, [level]: nextLevel };
-        saveScope(scope, next);
+        if (hydratedRef.current) saveScope(scope, uidRef.current, next);
         return next;
       });
     },
@@ -215,7 +302,7 @@ export function InstanceLabelsProvider({
       const nextLevel = { ...prev[level] };
       delete nextLevel[key];
       const next = { ...prev, [level]: nextLevel };
-      saveScope("personal", next);
+      if (hydratedRef.current) saveScope("personal", uidRef.current, next);
       return next;
     });
     setTeam((prev) => {
@@ -223,7 +310,7 @@ export function InstanceLabelsProvider({
       const nextLevel = { ...prev[level] };
       delete nextLevel[key];
       const next = { ...prev, [level]: nextLevel };
-      saveScope("team", next);
+      if (hydratedRef.current) saveScope("team", uidRef.current, next);
       return next;
     });
   }, []);
