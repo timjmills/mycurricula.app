@@ -10,22 +10,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { ensureTeacherRecord } from "@/lib/supabase/ensure-teacher";
-
-/** Post-login landing route when no `?next=` was preserved. */
-const DEFAULT_NEXT = "/weekly";
-
-/** A `next` value is safe only if it's a relative, in-app path. */
-function safeNext(next: string | null) {
-  if (next && next.startsWith("/") && !next.startsWith("//")) {
-    return next;
-  }
-  return DEFAULT_NEXT;
-}
+// Shared open-redirect guard (audit #21). Only same-origin relative paths
+// survive; anything absolute / protocol-relative / backslash-tricked falls
+// back to the safe default. Defined once in claude-bypass.ts and reused here.
+import { safeRelativePath } from "@/lib/claude-bypass";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
-  const next = safeNext(searchParams.get("next"));
+  const next = safeRelativePath(searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();

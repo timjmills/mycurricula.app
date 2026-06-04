@@ -177,8 +177,11 @@ export const LESSONS: Lesson[] = [
     objective: "I can find three equivalent fractions for a given fraction.",
     preview:
       "Number-talk routine: pairs find three equivalent fractions for 3/4, share strategies, then class consolidates the visual model on the board.",
+    // NOTE (finding #20): teacher notes in SHARED fixtures must never carry
+    // student-identifying content (CLAUDE.md §11.4) — the original copy named a
+    // class roster; scrubbed to a non-personal pedagogical hint.
     notes:
-      "If they struggle, fall back to the strip diagrams from Lesson 22. Maya's class skipped this in October — extend by 5min.",
+      "If they struggle, fall back to the strip diagrams from Lesson 22. If a prior section skipped this, extend by 5min.",
     // Resources seeded per spec §7 / §4.2 — this lesson is the default Teach
     // board target, so its set is deliberately RICH and varied: every Teach
     // center-canvas render branch is represented with a real, embeddable URL
@@ -238,7 +241,9 @@ export const LESSONS: Lesson[] = [
       "Anchor problem: 5 cookies shared by 4 friends. Students use bar models then long division to connect the two representations.",
     directions:
       "Open with the bake-sale anchor on slide 3. Give pairs 10 min to model. Pull two contrasting samples for the whole-class discussion. Closing exit ticket: one new problem of their own.",
-    notes: "Pull aside Aya, Tariq, Lara if they're still on the array model.",
+    // NOTE (finding #20): scrubbed student names from this shared fixture.
+    notes:
+      "Pull aside the small group still on the array model for a quick reteach.",
     resources: [
       { type: "slides", label: "Lesson 23 deck" },
       { type: "doc", label: "Exit ticket" },
@@ -344,7 +349,9 @@ export const LESSONS: Lesson[] = [
       "I can describe how a narrator's point of view influences events.",
     preview:
       "First-person narrator shift from August to Via. Students annotate three places the same event is reframed.",
-    notes: "Lara was absent for ch 13 — have her partner with Sofia.",
+    // NOTE (finding #20): scrubbed student names from this shared fixture.
+    notes:
+      "Pair anyone who was absent for ch 13 with a partner who has read it.",
     resources: [
       {
         type: "doc",
@@ -384,8 +391,10 @@ export const LESSONS: Lesson[] = [
       "Three-station rotation: reading comprehension · grammar dictation · narrative writing. 25 min per station with 5-min transitions.",
     directions:
       "Bell rings at 9:35 — Group A starts at reading, B at grammar, C at writing. Rotate at the chime. I conference at the writing station throughout.",
+    // NOTE (finding #20): scrubbed a named student's group from this shared
+    // fixture; kept the non-personal logistics.
     notes:
-      "Print rotation chart for the back wall. Tariq's group should start at writing (he needs the longest at writing today).",
+      "Print rotation chart for the back wall. Start the group that needs the longest at the writing station.",
     resources: [
       { type: "image", label: "Rotation chart" },
       { type: "doc", label: "Conferring tracker" },

@@ -31,7 +31,8 @@
 //   4. `normalize()` runs on every read AND write so a malformed payload is
 //      repaired rather than crashing the Groups module.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -61,10 +62,26 @@ const EMPTY_STORE: TeachGroupsStore = { students: [], groups: [] };
 
 // ── Storage ──────────────────────────────────────────────────────────────
 
-/** localStorage key — USER-scoped per the `mycurricula:user:*` convention.
- *  This key is the ONLY persistence surface for names; it has no DB analogue
- *  and intentionally never migrates to Supabase (plan §11.4). */
-const STORAGE_KEY = "mycurricula:user:teach-groups";
+/** localStorage key prefix — USER-scoped per the `mycurricula:user:*`
+ *  convention. This key is the ONLY persistence surface for names; it has no
+ *  DB analogue and intentionally never migrates to Supabase (plan §11.4).
+ *
+ *  SHARED-BROWSER ISOLATION (finding #19): the key is namespaced by the
+ *  authenticated user id so Teacher B on the same machine never reads
+ *  Teacher A's roster. Before a real uid resolves we use an anonymous
+ *  namespace (see `ANON_UID`); that namespace is cleared the moment a real
+ *  uid resolves on sign-in so pre-auth scratch data never bleeds into an
+ *  account. */
+const STORAGE_PREFIX = "mycurricula:user:teach-groups";
+
+/** Namespace used before a real auth uid resolves (signed out / session not
+ *  yet loaded). Cleared on sign-in so it can never leak into an account. */
+const ANON_UID = "__anon";
+
+/** Compose the uid-scoped localStorage key. */
+function storageKey(uid: string): string {
+  return `${STORAGE_PREFIX}:${uid}`;
+}
 
 let seq = 0;
 function localId(prefix: string): string {
@@ -130,10 +147,10 @@ function normalize(input: unknown): TeachGroupsStore {
   return { students, groups };
 }
 
-function readFromStorage(): TeachGroupsStore | null {
+function readFromStorage(uid: string): TeachGroupsStore | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey(uid));
     if (raw == null) return null;
     const parsed: unknown = JSON.parse(raw);
     return normalize(parsed);
@@ -142,12 +159,23 @@ function readFromStorage(): TeachGroupsStore | null {
   }
 }
 
-function writeToStorage(store: TeachGroupsStore): void {
+function writeToStorage(uid: string, store: TeachGroupsStore): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    window.localStorage.setItem(storageKey(uid), JSON.stringify(store));
   } catch {
     // Storage disabled / quota exceeded — state still updates in-memory.
+  }
+}
+
+/** Drop the anonymous-namespace blob. Called when a real uid resolves so
+ *  pre-auth scratch roster data never lingers for the next signed-in user. */
+function clearAnonStorage(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(storageKey(ANON_UID));
+  } catch {
+    // Storage disabled — nothing to clear.
   }
 }
 
@@ -155,11 +183,11 @@ function writeToStorage(store: TeachGroupsStore): void {
 // The native `storage` event only fires on OTHER tabs, so a tiny in-process
 // bus keeps multiple hook instances in THIS tab coherent after a write.
 
-type Listener = (next: TeachGroupsStore) => void;
+type Listener = (uid: string, next: TeachGroupsStore) => void;
 const listeners = new Set<Listener>();
 
-function broadcast(store: TeachGroupsStore): void {
-  for (const fn of listeners) fn(store);
+function broadcast(uid: string, store: TeachGroupsStore): void {
+  for (const fn of listeners) fn(uid, store);
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────────
@@ -190,22 +218,69 @@ export function useTeachGroups(): UseTeachGroupsResult {
   // SSR-safe initial state — never reads localStorage during render.
   const [store, setStore] = useState<TeachGroupsStore>(EMPTY_STORE);
 
-  // Post-mount: sync from localStorage + subscribe to in-process broadcasts.
+  // The authenticated user id, resolved post-mount from the Supabase session.
+  // The anonymous namespace until a real uid resolves (signed out OR
+  // pre-resolution). Held in a ref so the stable `commit` callback always
+  // reads the latest uid without being re-created on every auth change. The
+  // ref is the source of truth; re-renders on uid change are driven by the
+  // accompanying `setStore` (which swaps the visible roster).
+  const uidRef = useRef<string>(ANON_UID);
+
+  // ── Resolve uid from the Supabase session (the app's existing auth path —
+  // mirrors lib/app-state.tsx). Re-hydrates the roster from the resolved
+  // user's own namespace on every auth change so an account switch on a
+  // shared browser swaps rosters instead of leaking the prior teacher's. ────
   useEffect(() => {
-    const stored = readFromStorage();
+    const supabase = createClient();
+    let active = true;
+
+    const applyUid = (nextUid: string): void => {
+      if (!active) return;
+      if (uidRef.current === nextUid) return; // no-op — same user
+      // Switching INTO a real account: clear the pre-auth scratch namespace so
+      // it can never be re-read by (or bleed into) the signed-in user.
+      if (nextUid !== ANON_UID) clearAnonStorage();
+      // uid changed (A→B, or anon→real): drop the prior user's in-memory
+      // roster and load the new user's namespace fresh BEFORE any commit can
+      // write under the new key.
+      uidRef.current = nextUid;
+      const stored = readFromStorage(nextUid);
+      setStore(stored ?? EMPTY_STORE);
+    };
+
+    supabase.auth.getUser().then(({ data }) => {
+      applyUid(data.user?.id ?? ANON_UID);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      applyUid(session?.user?.id ?? ANON_UID);
+    });
+
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Post-mount: sync from localStorage (for the initial anon namespace, before
+  // the session resolves) + subscribe to in-process broadcasts scoped by uid.
+  useEffect(() => {
+    const stored = readFromStorage(uidRef.current);
     if (stored != null) setStore(stored);
-    const listener: Listener = (next) => setStore(next);
+    const listener: Listener = (broadcastUid, next) => {
+      if (broadcastUid === uidRef.current) setStore(next);
+    };
     listeners.add(listener);
     return () => {
       listeners.delete(listener);
     };
   }, []);
 
-  // Cross-tab sync (same device — still local-only).
+  // Cross-tab sync (same device — still local-only). Only react to the key for
+  // the CURRENTLY resolved uid so another account's tab can't push its roster.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handler = (e: StorageEvent): void => {
-      if (e.key !== STORAGE_KEY) return;
+      if (e.key !== storageKey(uidRef.current)) return;
       if (e.newValue == null) {
         setStore(EMPTY_STORE);
         return;
@@ -224,10 +299,11 @@ export function useTeachGroups(): UseTeachGroupsResult {
   /** Apply a producer, normalize, persist (LOCAL ONLY), and broadcast. */
   const commit = useCallback(
     (producer: (prev: TeachGroupsStore) => TeachGroupsStore): void => {
+      const activeUid = uidRef.current;
       setStore((prev) => {
         const next = normalize(producer(prev));
-        writeToStorage(next);
-        broadcast(next);
+        writeToStorage(activeUid, next);
+        broadcast(activeUid, next);
         return next;
       });
     },
@@ -318,9 +394,10 @@ export function useTeachGroups(): UseTeachGroupsResult {
   );
 
   const clearAll = useCallback((): void => {
+    const activeUid = uidRef.current;
     setStore(EMPTY_STORE);
-    writeToStorage(EMPTY_STORE);
-    broadcast(EMPTY_STORE);
+    writeToStorage(activeUid, EMPTY_STORE);
+    broadcast(activeUid, EMPTY_STORE);
   }, []);
 
   return {

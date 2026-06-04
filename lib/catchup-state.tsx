@@ -40,25 +40,57 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
 import type { CatchupAction } from "./catchup-data";
+import { createClient } from "@/lib/supabase/client";
 
 // ── Storage keys ─────────────────────────────────────────────────────────
+//
+// SHARED-BROWSER ISOLATION (finding #19): Catch-up actions and especially the
+// free-text per-item NOTES can hold teacher-private content (including student
+// names a teacher types in). On a shared machine these must never bleed across
+// accounts, so every key is namespaced by the authenticated user id resolved
+// from the Supabase session (the app's existing auth path — mirrors
+// lib/teach/use-teach-groups.ts). Before a real uid resolves we use an
+// anonymous namespace that is wiped on sign-in; switching accounts re-hydrates
+// from the new user's namespace.
 
-const ENABLED_KEY = "mycurricula:catchup-enabled";
-const DISMISSED_WEEKS_KEY = "mycurricula:catchup-dismissed-weeks";
-const ACTIONS_KEY = "mycurricula:catchup-actions";
-const NOTES_KEY = "mycurricula:catchup-notes";
+const KEY_PREFIX = "mycurricula:catchup";
+
+/** Namespace used before a real auth uid resolves (signed out / session not
+ *  yet loaded). Cleared on sign-in so it can never leak into an account. */
+const ANON_UID = "__anon";
+
+type CatchupKeyKind = "enabled" | "dismissed-weeks" | "actions" | "notes";
+
+/** Compose the uid-scoped localStorage key for one Catch-up sub-store. */
+function storageKey(kind: CatchupKeyKind, uid: string): string {
+  return `${KEY_PREFIX}:${kind}:${uid}`;
+}
+
+/** Remove every anonymous-namespace blob. Called when a real uid resolves so
+ *  pre-auth scratch state never lingers for the next signed-in user. */
+function clearAnonStorage(): void {
+  if (typeof window === "undefined") return;
+  for (const kind of ["enabled", "dismissed-weeks", "actions", "notes"] as const) {
+    try {
+      window.localStorage.removeItem(storageKey(kind, ANON_UID));
+    } catch {
+      // Storage disabled — nothing to clear.
+    }
+  }
+}
 
 // ── Loaders ──────────────────────────────────────────────────────────────
 
-function loadEnabled(): boolean {
+function loadEnabled(uid: string): boolean {
   if (typeof window === "undefined") return true;
   try {
-    const raw = window.localStorage.getItem(ENABLED_KEY);
+    const raw = window.localStorage.getItem(storageKey("enabled", uid));
     if (raw === null) return true; // default ON
     return raw === "1";
   } catch {
@@ -66,10 +98,10 @@ function loadEnabled(): boolean {
   }
 }
 
-function loadDismissedWeeks(): Set<number> {
+function loadDismissedWeeks(uid: string): Set<number> {
   if (typeof window === "undefined") return new Set();
   try {
-    const raw = window.localStorage.getItem(DISMISSED_WEEKS_KEY);
+    const raw = window.localStorage.getItem(storageKey("dismissed-weeks", uid));
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();
@@ -79,10 +111,10 @@ function loadDismissedWeeks(): Set<number> {
   }
 }
 
-function loadActions(): Map<string, CatchupAction> {
+function loadActions(uid: string): Map<string, CatchupAction> {
   if (typeof window === "undefined") return new Map();
   try {
-    const raw = window.localStorage.getItem(ACTIONS_KEY);
+    const raw = window.localStorage.getItem(storageKey("actions", uid));
     if (!raw) return new Map();
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") return new Map();
@@ -103,10 +135,10 @@ function loadActions(): Map<string, CatchupAction> {
   }
 }
 
-function loadNotes(): Map<string, string> {
+function loadNotes(uid: string): Map<string, string> {
   if (typeof window === "undefined") return new Map();
   try {
-    const raw = window.localStorage.getItem(NOTES_KEY);
+    const raw = window.localStorage.getItem(storageKey("notes", uid));
     if (!raw) return new Map();
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") return new Map();
@@ -131,25 +163,28 @@ function save<T>(key: string, serialize: () => T): void {
   }
 }
 
-function saveEnabled(enabled: boolean): void {
+function saveEnabled(uid: string, enabled: boolean): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(ENABLED_KEY, enabled ? "1" : "0");
+    window.localStorage.setItem(
+      storageKey("enabled", uid),
+      enabled ? "1" : "0",
+    );
   } catch {
     // Non-fatal — state persists for the session.
   }
 }
 
-function saveDismissedWeeks(set: Set<number>): void {
-  save(DISMISSED_WEEKS_KEY, () => [...set]);
+function saveDismissedWeeks(uid: string, set: Set<number>): void {
+  save(storageKey("dismissed-weeks", uid), () => [...set]);
 }
 
-function saveActions(map: Map<string, CatchupAction>): void {
-  save(ACTIONS_KEY, () => Object.fromEntries(map));
+function saveActions(uid: string, map: Map<string, CatchupAction>): void {
+  save(storageKey("actions", uid), () => Object.fromEntries(map));
 }
 
-function saveNotes(map: Map<string, string>): void {
-  save(NOTES_KEY, () => Object.fromEntries(map));
+function saveNotes(uid: string, map: Map<string, string>): void {
+  save(storageKey("notes", uid), () => Object.fromEntries(map));
 }
 
 // ── Context ──────────────────────────────────────────────────────────────
@@ -205,29 +240,67 @@ export function CatchupProvider({
 
   const hydratedRef = useRef(false);
 
-  // Post-mount hydration. Do not persist on this first effect — only on
-  // subsequent mutations (gated below by hydratedRef).
+  // ── Authenticated user id (finding #19) ───────────────────────────────────
+  // Held in a ref so the stable saver callbacks always persist under the
+  // CURRENT user's namespace without being re-created on every auth change.
+  // Anon until a real uid resolves. `uidVersion` bumps on every uid change to
+  // retrigger the (re)hydration effect below so an account switch on a shared
+  // browser swaps the visible Catch-up state instead of leaking the prior
+  // teacher's notes/actions.
+  const uidRef = useRef<string>(ANON_UID);
+  const [uidVersion, bumpUidVersion] = useReducer((n: number) => n + 1, 0);
+
   useEffect(() => {
-    setEnabledState(loadEnabled());
-    const dw = loadDismissedWeeks();
-    if (dw.size > 0) setDismissedWeeks(dw);
-    const a = loadActions();
-    if (a.size > 0) setActions(a);
-    const n = loadNotes();
-    if (n.size > 0) setNotes(n);
-    hydratedRef.current = true;
+    const supabase = createClient();
+    let active = true;
+
+    const applyUid = (nextUid: string): void => {
+      if (!active) return;
+      if (uidRef.current === nextUid) return; // no-op — same user
+      // Switching INTO a real account: clear the pre-auth scratch namespace so
+      // it can never be re-read by (or bleed into) the signed-in user.
+      if (nextUid !== ANON_UID) clearAnonStorage();
+      uidRef.current = nextUid;
+      bumpUidVersion();
+    };
+
+    supabase.auth.getUser().then(({ data }) => {
+      applyUid(data.user?.id ?? ANON_UID);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      applyUid(session?.user?.id ?? ANON_UID);
+    });
+
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
   }, []);
+
+  // (Re)hydration. Runs post-mount AND whenever the resolved uid changes. Do
+  // not persist on this effect — only on subsequent mutations (gated below by
+  // hydratedRef). On a uid change we RESET to defaults first so the prior
+  // user's state never lingers when the new user's namespace is empty.
+  useEffect(() => {
+    hydratedRef.current = false;
+    const uid = uidRef.current;
+    setEnabledState(loadEnabled(uid));
+    setDismissedWeeks(loadDismissedWeeks(uid));
+    setActions(loadActions(uid));
+    setNotes(loadNotes(uid));
+    hydratedRef.current = true;
+  }, [uidVersion]);
 
   // ── Layer 1 — global toggle ─────────────────────────────────────────
   const setEnabled = useCallback((v: boolean): void => {
     setEnabledState(v);
-    if (hydratedRef.current) saveEnabled(v);
+    if (hydratedRef.current) saveEnabled(uidRef.current, v);
   }, []);
 
   const toggleEnabled = useCallback((): void => {
     setEnabledState((prev) => {
       const next = !prev;
-      if (hydratedRef.current) saveEnabled(next);
+      if (hydratedRef.current) saveEnabled(uidRef.current, next);
       return next;
     });
   }, []);
@@ -243,7 +316,7 @@ export function CatchupProvider({
       if (prev.has(week)) return prev;
       const next = new Set(prev);
       next.add(week);
-      if (hydratedRef.current) saveDismissedWeeks(next);
+      if (hydratedRef.current) saveDismissedWeeks(uidRef.current, next);
       return next;
     });
   }, []);
@@ -253,7 +326,7 @@ export function CatchupProvider({
       if (!prev.has(week)) return prev;
       const next = new Set(prev);
       next.delete(week);
-      if (hydratedRef.current) saveDismissedWeeks(next);
+      if (hydratedRef.current) saveDismissedWeeks(uidRef.current, next);
       return next;
     });
   }, []);
@@ -268,7 +341,7 @@ export function CatchupProvider({
     setActions((prev) => {
       const next = new Map(prev);
       next.set(id, action);
-      if (hydratedRef.current) saveActions(next);
+      if (hydratedRef.current) saveActions(uidRef.current, next);
       return next;
     });
   }, []);
@@ -278,7 +351,7 @@ export function CatchupProvider({
       if (!prev.has(id)) return prev;
       const next = new Map(prev);
       next.delete(id);
-      if (hydratedRef.current) saveActions(next);
+      if (hydratedRef.current) saveActions(uidRef.current, next);
       return next;
     });
   }, []);
@@ -297,12 +370,12 @@ export function CatchupProvider({
         if (!prev.has(id)) return prev;
         const next = new Map(prev);
         next.delete(id);
-        if (hydratedRef.current) saveNotes(next);
+        if (hydratedRef.current) saveNotes(uidRef.current, next);
         return next;
       }
       const next = new Map(prev);
       next.set(id, trimmed);
-      if (hydratedRef.current) saveNotes(next);
+      if (hydratedRef.current) saveNotes(uidRef.current, next);
       return next;
     });
   }, []);
@@ -312,7 +385,7 @@ export function CatchupProvider({
       if (!prev.has(id)) return prev;
       const next = new Map(prev);
       next.delete(id);
-      if (hydratedRef.current) saveNotes(next);
+      if (hydratedRef.current) saveNotes(uidRef.current, next);
       return next;
     });
   }, []);

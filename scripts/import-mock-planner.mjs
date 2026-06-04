@@ -25,12 +25,17 @@
 //   provisions a dev teacher + grade assignment when CLAUDE_USER_EMAIL is set,
 //   closing the Part-B RLS gap for local testing.
 //
-// **Privacy (CLAUDE.md §11.4 / ultraplan §4)**
-//   Planner rows carry NO student names. The mock fixtures only reference first
-//   names inside free-text `notes` (e.g. "Pull aside Aya…"); those are teacher
-//   notes, not structured student fields. This importer NEVER writes any column
-//   named for a student, and asserts the master-event payload has no student-*
-//   key before upserting.
+// **Privacy (CLAUDE.md §11.4 / ultraplan §4 / finding #20)**
+//   Master (shared) planner rows carry NO student names — not in a structured
+//   column AND not buried in free-text. Two guards enforce this before upsert:
+//     • assertNoStudentFields — refuses any column NAME matching student/pupil/
+//       learner.
+//     • assertNoPersonalNotes — refuses any `notes`/`directions` VALUE that
+//       reads like a per-teacher roster note (named pull-aside / absence /
+//       pairing). The shared mock fixtures were scrubbed of such notes; this
+//       assertion is the regression guard so a future fixture edit that
+//       re-introduces a student-name note FAILS the seed instead of leaking it
+//       into the team-wide curriculum.
 //
 // **Safety**
 //   Refuses to run without NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY,
@@ -181,6 +186,61 @@ function assertNoStudentFields(rows, table) {
         throw new Error(
           `privacy violation: ${table} row would write student field "${key}" — refusing.`,
         );
+      }
+    }
+  }
+}
+
+// ── privacy scrub for SHARED free-text (finding #20 / CLAUDE.md §11.4) ───────
+// The `notes` / `directions` text on a master (shared) lesson is visible to the
+// WHOLE team, so it must never carry a teacher's per-student note (named student
+// roster references). `assertNoStudentFields` only guards column NAMES; this
+// guards column VALUES.
+//
+// Heuristic: a personal note names individual children alongside an action a
+// teacher takes ON that child — absence, pull-aside, pairing, or possessive
+// "<Name>'s group/class/partner". We deliberately do NOT flag a bare "X and Y"
+// capitalized run, because ordinary lesson prose contains those (book
+// characters like "August and Jack", section labels like "Group A … B …"); the
+// contextual cues below are what distinguish a roster note from curriculum
+// copy. A comma-separated run is only flagged when a roster cue (pull/remind/
+// check on/conference with) precedes it. On a match we FAIL the import rather
+// than leak — the fixture must be cleaned at the source (lib/mock/lessons.ts),
+// not silently truncated server-side, so the shared seed and the in-app mock
+// stay in sync.
+// NOTE: these are intentionally case-SENSITIVE on the name token — a capital
+// first letter is the signal that a token is a proper name rather than an
+// ordinary word ("pull aside Aya" leaks; "pull aside the small group" does
+// not). Do not add the `i` flag to the name char class or "the"/"his"/etc.
+// would match.
+const PERSONAL_NOTE_PATTERNS = [
+  // "<Name> was/were absent".
+  /\b[A-Z][a-z]+(?:'s)?\s+(?:was|were)\s+absent\b/,
+  // "<Name>'s group/class/partner".
+  /\b[A-Z][a-z]+'s\s+(?:group|class|partner)\b/,
+  // "pull aside <Name>" / "partner <Name> with <Name>" (cue is case-insensitive
+  // via the inline (?i:) group; the NAME token stays case-sensitive).
+  /\b(?:[Pp]ull)\s+aside\s+[A-Z][a-z]+/,
+  /\b(?:[Pp]artner)\s+[A-Z][a-z]+\s+with\s+[A-Z][a-z]+/,
+  // A roster cue immediately followed by a comma/and run of ≥2 capitalized
+  // first names: "pull aside Aya, Tariq, Lara", "check on Sam and Mia".
+  /\b(?:[Pp]ull(?:\s+aside)?|[Rr]emind|[Cc]heck\s+on|[Cc]onference\s+with|[Rr]eteach(?:\s+to)?)\s+[A-Z][a-z]+(?:\s*,\s*|\s+and\s+)[A-Z][a-z]+/,
+];
+const SHARED_TEXT_FIELDS = ["notes", "directions"];
+function assertNoPersonalNotes(rows, table) {
+  for (const row of rows) {
+    for (const field of SHARED_TEXT_FIELDS) {
+      const value = row[field];
+      if (typeof value !== "string" || value.length === 0) continue;
+      for (const pattern of PERSONAL_NOTE_PATTERNS) {
+        if (pattern.test(value)) {
+          throw new Error(
+            `privacy violation: ${table}.${field} on a SHARED master row looks ` +
+              `like a per-teacher student note — refusing to seed it into the ` +
+              `team-wide curriculum. Scrub the source fixture ` +
+              `(lib/mock/lessons.ts). Offending value: ${JSON.stringify(value)}`,
+          );
+        }
       }
     }
   }
@@ -401,6 +461,9 @@ async function main() {
     }),
   );
   assertNoStudentFields(masterRows, "master_core_lesson_events");
+  // Value-level scrub (finding #20): shared master notes/directions must not
+  // carry per-teacher student-name notes — fail rather than seed them.
+  assertNoPersonalNotes(masterRows, "master_core_lesson_events");
   await upsertCounted(admin, "master_core_lesson_events", masterRows, cLessons);
 
   // ── Optional: provision a dev teacher + grade assignment (Part-B gap) ──────

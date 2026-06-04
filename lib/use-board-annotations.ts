@@ -6,16 +6,26 @@
 // (plan §5.2, §13.5).
 //
 // PERSISTENCE: per-teacher, USER-scoped, persists ACROSS SESSIONS (plan §13.5).
-// One localStorage blob under `mycurricula:user:teach-annotations`, an object
-// sub-keyed by `lessonId:boardId:resourceId` (resourceId "" = the board grid
-// itself). Removed only by an explicit Clear. SSR-safe in the
-// use-rail-layout.ts mold: initial state is empty so server HTML == first
-// client paint; a post-mount effect hydrates from storage.
+// One localStorage blob PER AUTHENTICATED USER under
+// `mycurricula:user:teach-annotations:<uid>`, an object sub-keyed by
+// `lessonId:boardId:resourceId` (resourceId "" = the board grid itself).
+// Removed only by an explicit Clear. SSR-safe in the use-rail-layout.ts mold:
+// initial state is empty so server HTML == first client paint; a post-mount
+// effect hydrates from storage.
+//
+// SHARED-BROWSER ISOLATION (finding #19): annotations are private board ink and
+// MUST NOT leak across accounts on a shared machine. The storage key is
+// namespaced by the authenticated user id (resolved from the Supabase session,
+// the app's existing auth path — mirrors lib/teach/use-teach-groups.ts). Before
+// a real uid resolves we use an anonymous namespace that is wiped on sign-in so
+// pre-auth scratch ink never bleeds into an account, and switching accounts
+// (A→B) re-hydrates from B's namespace instead of showing A's strokes.
 //
 // The `onChange` seam keeps the store decoupled — Phase 4 swaps localStorage
 // for the owner-scoped `board_annotations` table with no change here.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   apply,
   EMPTY_ANNOTATIONS,
@@ -32,7 +42,18 @@ import {
 
 // ── Storage ─────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = "mycurricula:user:teach-annotations";
+/** localStorage key prefix. The full key is `${STORAGE_PREFIX}:<uid>` so each
+ *  authenticated user gets an isolated annotation blob (finding #19). */
+const STORAGE_PREFIX = "mycurricula:user:teach-annotations";
+
+/** Namespace used before a real auth uid resolves (signed out / session not
+ *  yet loaded). Cleared on sign-in so it can never leak into an account. */
+const ANON_UID = "__anon";
+
+/** Compose the uid-scoped localStorage blob key. */
+function storageKey(uid: string): string {
+  return `${STORAGE_PREFIX}:${uid}`;
+}
 
 /** Compose the per-surface storage sub-key. `resourceId` empty/undefined keys
  *  the board grid itself (annotations drawn over the widget board, not a
@@ -47,10 +68,10 @@ export function annotationStoreKey(
 
 type StoreShape = Record<string, BoardAnnotations>;
 
-function readStore(): StoreShape {
+function readStore(uid: string): StoreShape {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey(uid));
     if (raw == null) return {};
     const parsed: unknown = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
@@ -62,8 +83,8 @@ function readStore(): StoreShape {
   }
 }
 
-function readEntry(subKey: string): BoardAnnotations | null {
-  const store = readStore();
+function readEntry(uid: string, subKey: string): BoardAnnotations | null {
+  const store = readStore(uid);
   const entry = store[subKey];
   if (
     entry &&
@@ -76,18 +97,33 @@ function readEntry(subKey: string): BoardAnnotations | null {
   return null;
 }
 
-function writeEntry(subKey: string, value: BoardAnnotations): void {
+function writeEntry(
+  uid: string,
+  subKey: string,
+  value: BoardAnnotations,
+): void {
   if (typeof window === "undefined") return;
   try {
-    const store = readStore();
+    const store = readStore(uid);
     if (value.strokes.length === 0) {
       delete store[subKey];
     } else {
       store[subKey] = value;
     }
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    window.localStorage.setItem(storageKey(uid), JSON.stringify(store));
   } catch {
     // Storage disabled / quota exceeded — in-memory state still holds.
+  }
+}
+
+/** Drop the anonymous-namespace blob. Called when a real uid resolves so
+ *  pre-auth scratch ink never lingers for the next signed-in user. */
+function clearAnonStorage(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(storageKey(ANON_UID));
+  } catch {
+    // Storage disabled — nothing to clear.
   }
 }
 
@@ -199,6 +235,45 @@ export function useBoardAnnotations(
     initAnnotationState,
   );
 
+  // ── Authenticated user id (finding #19) ───────────────────────────────────
+  // Resolved post-mount from the Supabase session (the app's existing auth
+  // path — mirrors lib/teach/use-teach-groups.ts). Held in a ref so the stable
+  // persist callback always reads the latest uid; a sibling `uidVersion`
+  // counter bumps on every uid change to retrigger the hydrate effect (which
+  // must re-read from the new user's namespace). Anon until a real uid
+  // resolves.
+  const uidRef = useRef<string>(ANON_UID);
+  const [uidVersion, bumpUidVersion] = useReducer((n: number) => n + 1, 0);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let active = true;
+
+    const applyUid = (nextUid: string): void => {
+      if (!active) return;
+      if (uidRef.current === nextUid) return; // no-op — same user
+      // Switching INTO a real account: clear the pre-auth scratch namespace so
+      // it can never be re-read by (or bleed into) the signed-in user.
+      if (nextUid !== ANON_UID) clearAnonStorage();
+      uidRef.current = nextUid;
+      // Retrigger the hydrate effect so the visible ink swaps to the new user's
+      // namespace (drops the prior user's in-memory strokes via HYDRATE).
+      bumpUidVersion();
+    };
+
+    supabase.auth.getUser().then(({ data }) => {
+      applyUid(data.user?.id ?? ANON_UID);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      applyUid(session?.user?.id ?? ANON_UID);
+    });
+
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
   // Canvas + box refs. The box is the CSS-pixel size of the board.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const boxRef = useRef<BoardBox>({ width: 0, height: 0 });
@@ -219,16 +294,18 @@ export function useBoardAnnotations(
   // a spurious persist of B's freshly-hydrated value.
   const hydratedRef = useRef(false);
 
-  // ── Hydrate from storage post-mount (SSR-safe) + on surface change ────────
+  // ── Hydrate from storage post-mount (SSR-safe) + on surface OR uid change ──
+  // Re-runs when the resolved uid changes (uidVersion) so an account switch on
+  // a shared browser re-hydrates from the new user's namespace.
   useEffect(() => {
     // Suppress the immediate post-hydrate persist run for THIS surface. The
     // hydrate effect is declared before the persist effect, so this reset lands
     // before the persist effect re-runs in the same commit.
     hydratedRef.current = false;
-    const stored = readEntry(subKey);
+    const stored = readEntry(uidRef.current, subKey);
     dispatch({ type: "HYDRATE", annotations: stored ?? EMPTY_ANNOTATIONS });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subKey]);
+  }, [subKey, uidVersion]);
 
   // ── rAF-batched repaint ───────────────────────────────────────────────────
   const scheduleRedraw = useCallback(() => {
@@ -265,7 +342,7 @@ export function useBoardAnnotations(
       return;
     }
     const annotations = toAnnotations(stateRef.current);
-    writeEntry(subKey, annotations);
+    writeEntry(uidRef.current, subKey, annotations);
     onChangeRef.current?.(annotations);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.strokes, subKey]);
