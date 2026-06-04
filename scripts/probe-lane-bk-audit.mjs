@@ -20,7 +20,18 @@ import path from "path";
 const BASE = process.env.PROBE_BASE || "http://localhost:3000";
 const OUT_DIR = "docs/screenshots/lane-bk-audit";
 const REPORT = path.join(OUT_DIR, "_findings.json");
-const TOKEN = process.env.CLAUDE_BYPASS_TOKEN || "DO8s/Cy/3L3KPTE6i5VOK84CdESyBcZIgx0b2i+x0zA=";
+// SECURITY: never hard-code the bypass token. It must come from the
+// environment; the probe refuses to run without it (and we never commit a
+// fallback credential — a leaked read/write token in a public repo is a
+// rotate-now incident).
+const TOKEN = process.env.CLAUDE_BYPASS_TOKEN || "";
+if (!TOKEN) {
+  console.error(
+    "CLAUDE_BYPASS_TOKEN is not set. Export it before running this probe; " +
+      "this script will not embed a fallback credential.",
+  );
+  process.exit(1);
+}
 const TOKEN_ENC = encodeURIComponent(TOKEN);
 
 const TIERS = [
