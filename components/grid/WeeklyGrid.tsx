@@ -374,13 +374,27 @@ export function WeeklyGrid(): ReactNode {
   }
 
   function handleSelect(lessonId: string): void {
-    // Plain click: clear bulk selection, then open the lesson DETAIL surface
-    // (the WeeklyShell right-rail / WeeklyRailDrawer, both driven by
-    // app-state `selectedLessonId`). Collapsed chips are now title-only; the
-    // rich detail lives in the panel, so a click no longer toggles an inline
-    // expansion. Clicking the already-selected chip again closes the panel.
+    // Plain SINGLE click: expand the chip inline (bring back the lesson
+    // preview). Clicking an already-expanded chip collapses it. The rich
+    // DETAIL surface (right-rail / drawer) now opens on DOUBLE click — see
+    // handleActivateDetail. Selecting also highlights the chip locally
+    // (selectedId) without opening the panel.
     clearBulkSelection();
-    setSelectedLessonId(selectedLessonId === lessonId ? null : lessonId);
+    setSelectedId(lessonId);
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(lessonId)) next.delete(lessonId);
+      else next.add(lessonId);
+      return next;
+    });
+  }
+
+  function handleActivateDetail(lessonId: string): void {
+    // DOUBLE click: open the lesson DETAIL surface (WeeklyShell right-rail /
+    // WeeklyRailDrawer, driven by app-state `selectedLessonId`). The two
+    // single clicks that precede a dblclick net to no inline-expand change.
+    clearBulkSelection();
+    setSelectedLessonId(lessonId);
     setSelectedId(lessonId);
   }
 
@@ -665,6 +679,7 @@ export function WeeklyGrid(): ReactNode {
                 onAdd={handleAdd}
                 onSelect={handleSelect}
                 onSelectWithModifiers={handleSelectWithModifiers}
+                onActivateDetail={handleActivateDetail}
                 onToggleComplete={handleToggleComplete}
                 onContextAction={handleContextAction}
                 onToggleMaximize={handleToggleMaximize}
@@ -786,6 +801,8 @@ interface SubjectRowProps {
     id: string,
     modifiers: { ctrl: boolean; shift: boolean },
   ) => void;
+  /** Double-click — open the lesson DETAIL surface. */
+  onActivateDetail: (id: string) => void;
   onToggleComplete: (id: string, next: LessonStatus) => void;
   onContextAction: (
     action: ContextAction,
@@ -813,6 +830,7 @@ function SubjectRow({
   onAdd,
   onSelect,
   onSelectWithModifiers,
+  onActivateDetail,
   onToggleComplete,
   onContextAction,
   onToggleMaximize,
@@ -859,6 +877,7 @@ function SubjectRow({
           onAdd={onAdd}
           onSelect={onSelect}
           onSelectWithModifiers={onSelectWithModifiers}
+          onActivateDetail={onActivateDetail}
           onToggleComplete={onToggleComplete}
           onContextAction={onContextAction}
           onToggleMaximize={onToggleMaximize}

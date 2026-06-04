@@ -85,6 +85,8 @@ interface SortableLessonItemProps {
     id: string,
     modifiers: { ctrl: boolean; shift: boolean },
   ) => void;
+  /** Double-click — open the lesson DETAIL surface (right rail / drawer). */
+  onActivateDetail: (id: string) => void;
   onToggleComplete: (id: string, next: LessonStatus) => void;
   onContextAction: (
     action: ContextAction,
@@ -116,6 +118,7 @@ const SortableLessonItem = React.memo(function SortableLessonItem({
   deck,
   onSelect,
   onSelectWithModifiers,
+  onActivateDetail,
   onToggleComplete,
   onContextAction,
   onEditLesson,
@@ -160,6 +163,14 @@ const SortableLessonItem = React.memo(function SortableLessonItem({
     }
   }
 
+  // Double-click opens the lesson DETAIL surface (right rail / drawer). Single
+  // click expands the chip inline (handled by the card's onSelect → grid). The
+  // two single clicks that precede a dblclick net to no inline-expand change.
+  function handleWrapperDoubleClick(e: React.MouseEvent<HTMLDivElement>): void {
+    e.stopPropagation();
+    onActivateDetail(lesson.id);
+  }
+
   // A bulk-selected card shows the card's own `selected` ring in addition to
   // a data attribute so CSS can add a distinct overlay ring without modifying
   // the card component itself.
@@ -169,6 +180,7 @@ const SortableLessonItem = React.memo(function SortableLessonItem({
       style={wrapperStyle}
       className={styles.cardSlot}
       onClick={handleWrapperClick}
+      onDoubleClick={handleWrapperDoubleClick}
       data-bulk-selected={bulkSelected ? "true" : undefined}
     >
       <WeeklyLessonCard
@@ -217,6 +229,8 @@ interface GridCellProps {
     id: string,
     modifiers: { ctrl: boolean; shift: boolean },
   ) => void;
+  /** Double-click — open the lesson DETAIL surface (right rail / drawer). */
+  onActivateDetail: (lessonId: string) => void;
   onToggleComplete: (lessonId: string, next: LessonStatus) => void;
   onContextAction: (
     action: ContextAction,
@@ -245,6 +259,7 @@ export function GridCell({
   onAdd,
   onSelect,
   onSelectWithModifiers,
+  onActivateDetail,
   onToggleComplete,
   onContextAction,
   navProps,
@@ -318,6 +333,7 @@ export function GridCell({
         deck={deck}
         onSelect={onSelect}
         onSelectWithModifiers={onSelectWithModifiers}
+        onActivateDetail={onActivateDetail}
         onToggleComplete={onToggleComplete}
         onContextAction={onContextAction}
         onEditLesson={onEditLesson}
@@ -332,6 +348,7 @@ export function GridCell({
       dragActiveId,
       onSelect,
       onSelectWithModifiers,
+      onActivateDetail,
       onToggleComplete,
       onContextAction,
       onEditLesson,
