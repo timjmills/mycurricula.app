@@ -57,6 +57,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # ── Test gate (audit finding #25) ──────────────────────────────────
+      # Lint, typecheck, and unit tests run BEFORE the build/deploy step so a
+      # red gate blocks the deploy. Any non-zero exit here fails the job and
+      # the "Build + deploy" step never runs.
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm run test
+
       # `deploy:cf` runs `opennextjs-cloudflare build && opennextjs-cloudflare
       # deploy` so this single step covers both the build + deploy.
       - name: Build + deploy to Cloudflare
