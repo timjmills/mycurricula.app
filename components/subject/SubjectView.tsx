@@ -459,37 +459,6 @@ function SubjectPane({
             </div>
           </div>
 
-          {/* Subject roadmap — unit cards */}
-          <div className={styles.ecard}>
-            <div className={styles.ech}>
-              <span className={styles.ci}>
-                <Icon name="roadmap" />
-              </span>
-              <h3>Subject roadmap</h3>
-            </div>
-            <div className={styles.roadmap}>
-              {units.map((u) => (
-                <button
-                  key={u.id}
-                  className={`${styles.rcard} ${u.id === activeUnitId ? styles.rcardOn : ""}`}
-                  onClick={() => pickUnit(u.id)}
-                  title={`Open ${unitTopic(u.name)} — its weeks and lessons`}
-                >
-                  <div className={styles.rn} style={{ color: color.cd }}>
-                    {unitTag(u.index)}
-                  </div>
-                  <div className={styles.rnm}>{unitTopic(u.name)}</div>
-                  <div className={styles.rdt}>{u.weeks}</div>
-                  {u.id === activeUnitId && (
-                    <div className={styles.arr}>
-                      <Icon name="chR" />
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Week breakdown — weeks of the active unit */}
           <div className={styles.ecard} ref={weekCardRef}>
             <div className={styles.ech}>
