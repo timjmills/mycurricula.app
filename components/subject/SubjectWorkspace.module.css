@@ -2,13 +2,15 @@
    design ported to production. Adapted from
    app/prototypes/workspace/workspace.module.css but WITH the prototype's outer
    chrome removed (no app nav rail `.side`, no global `.etop` topbar/user) — the
-   app shell provides global nav. Keeps the view-specific panels: subjects
-   switcher (.snav), center stack (.center), and right lesson viewer (.rpanel).
+   app shell provides global nav. The old left "Subjects" panel was removed
+   (it duplicated the app-wide SideNav); subject switching now lives in the
+   in-view top bar as a horizontal chip switcher (.subjtabs/.subjtab). Keeps
+   the center stack (.center) and right lesson viewer (.rpanel).
 
    Color cascade: the active-subject accent vars (--ac/--ac-d/--ac-t/--ac-s) are
-   set inline on .app from the active subject's resolved SubjectColor; per-subject
-   swatch vars (--s-c/--s-d/--s-t/--s-s) are set inline per subject row. Neutral/
-   brand colors use the app's v1.3 tokens — no hard-coded hex here. */
+   set inline on .app from the active subject's resolved SubjectColor; the chip
+   switcher resolves its own per-subject colors via .cp-subj.<id> (--c/--cl/--cd).
+   Neutral/brand colors use the app's v1.3 tokens — no hard-coded hex here. */
 
 .app {
   display: flex;
@@ -58,171 +60,67 @@
   color: var(--ink);
 }
 .viewbar .grade {
+  flex: 0 0 auto;
   font-size: 12.5px;
   color: var(--muted);
   font-weight: 600;
 }
-.viewbar .grow {
+
+/* Horizontal subject switcher (replaces the old left "Subjects" panel).
+   Scrolls horizontally on narrow viewports rather than wrapping. */
+.subjtabs {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+.subjtab {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: 0.12s;
+}
+.subjtab:hover {
+  background: var(--canvas);
+}
+.subjtabOn {
+  background: var(--cl);
+  border-color: var(--c);
+  color: var(--cd);
+}
+.subjtab .sti {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--c);
+}
+.subjtabOn .sti {
+  color: var(--cd);
+}
+.subjtab .sti svg {
+  width: 15px;
+  height: 15px;
 }
 
 .bodyrow {
   flex: 1;
   min-height: 0;
   display: flex;
-}
-
-/* ── Subjects panel (cascade) ── */
-.snav {
-  width: 272px;
-  flex: 0 0 auto;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  overflow: auto;
-  padding: 16px 13px;
-}
-.snhead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  text-transform: uppercase;
-  padding: 6px 10px 9px;
-}
-.snhead .n {
-  margin-left: auto;
-  background: var(--hairline);
-  border-radius: var(--r-pill);
-  padding: 1px 8px;
-  color: var(--ink-soft);
-  letter-spacing: 0;
-}
-.subj {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 9px 11px;
-  border-radius: 12px;
-  cursor: pointer;
-  margin-bottom: 3px;
-  transition: 0.12s;
-  border: 1.5px solid transparent;
-  width: 100%;
-  text-align: left;
-  background: transparent;
-}
-.subj:hover {
-  background: var(--canvas);
-}
-.subjOn {
-  background: var(--s-t);
-  border-color: var(--s-c);
-}
-.subj .si {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: var(--s-s);
-  display: grid;
-  place-items: center;
-  color: #fff;
-  flex: 0 0 auto;
-  font-weight: 800;
-  font-size: 12px;
-}
-.subj .si svg {
-  width: 17px;
-  height: 17px;
-}
-.subj .sn {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--ink);
-}
-.subjOn .sn {
-  color: var(--s-d);
-}
-.subj .sg {
-  font-size: 11px;
-  color: var(--muted);
-}
-.subj .sc {
-  margin-left: auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--s-c);
-  flex: 0 0 auto;
-}
-.subjOn .sc {
-  box-shadow: 0 0 0 3px var(--s-t);
-}
-
-.subwrap {
-  margin: 2px 0 8px 14px;
-  padding-left: 10px;
-  border-left: 2px solid var(--ac-t);
-}
-.uitem {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  cursor: pointer;
-  margin-bottom: 2px;
-  transition: 0.12s;
-  width: 100%;
-  text-align: left;
-  background: transparent;
-}
-.uitem:hover {
-  background: var(--canvas);
-}
-.uitemOn {
-  background: var(--ac-t);
-}
-.uitem .uc {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 2px solid var(--ac);
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-}
-.uitemOn .uc {
-  background: var(--ac);
-}
-.uitemDone .uc {
-  background: var(--done);
-  border-color: var(--done);
-}
-.uitemDone .uc svg {
-  width: 7px;
-  height: 7px;
-  color: #fff;
-}
-.uitem .un {
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--muted);
-}
-.uitemOn .un {
-  color: var(--ac-d);
-}
-.uitem .ut {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink-soft);
-  line-height: 1.2;
-}
-.uitemOn .ut {
-  color: var(--ac-d);
-  font-weight: 700;
 }
 
 /* ── Center ── */
@@ -316,6 +214,19 @@
   height: 9px;
   border-radius: 6px;
   position: relative;
+  padding: 0;
+  border: none;
+  appearance: none;
+  cursor: pointer;
+  transition: 0.12s;
+}
+.ybar:hover {
+  filter: brightness(1.06) saturate(1.05);
+}
+.ybarOn {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--ac);
 }
 .ybar .mk {
   position: absolute;
@@ -338,6 +249,24 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
+}
+.uleg {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  padding: 8px 9px;
+  cursor: pointer;
+  transition: 0.12s;
+}
+.uleg:hover {
+  background: var(--canvas);
+}
+.ulegOn {
+  background: var(--ac-t);
+  border-color: var(--ac);
 }
 .uleg .ud {
   display: flex;
@@ -917,24 +846,6 @@
   width: 18px;
   height: 18px;
 }
-.topbtn {
-  display: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  place-items: center;
-  color: var(--ink-soft);
-  cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--surface);
-}
-.topbtn:hover {
-  background: var(--canvas);
-}
-.topbtn svg {
-  width: 20px;
-  height: 20px;
-}
 .mscrim {
   position: fixed;
   inset: 0;
@@ -959,28 +870,6 @@
   }
   .rpanel .pclose {
     display: grid;
-  }
-}
-@media (max-width: 1000px) {
-  .snav {
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 100vh;
-    width: 304px;
-    max-width: 86vw;
-    transform: translateX(-101%);
-    z-index: 60;
-    box-shadow: var(--sh-lg);
-  }
-  .snavOpen {
-    transform: none;
-  }
-  .snav .pclose {
-    display: grid;
-  }
-  .topbtnSubjects {
-    display: inline-grid;
   }
 }
 @media (max-width: 720px) {

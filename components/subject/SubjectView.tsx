@@ -32,6 +32,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -169,82 +170,6 @@ function unitAssessments(
   ];
 }
 
-// ── Subject row (its own component so each can resolve its swatch color) ──────
-
-interface SubjectRowProps {
-  subjectId: SubjectId;
-  isActive: boolean;
-  units: { id: string; name: string; index: number; done: boolean }[];
-  activeUnitId: string;
-  onPickSubject: () => void;
-  onPickUnit: (unitId: string) => void;
-}
-
-function SubjectRow({
-  subjectId,
-  isActive,
-  units,
-  activeUnitId,
-  onPickSubject,
-  onPickUnit,
-}: SubjectRowProps): ReactNode {
-  const color = useSubjectColor(subjectId);
-  const subject = SUBJECTS.find((s) => s.id === subjectId)!;
-
-  // Per-subject swatch vars consumed by the .subj* rules.
-  const svars = {
-    "--s-c": color.c,
-    "--s-d": color.cd,
-    "--s-t": color.cl,
-    "--s-s": color.stripe,
-  } as CSSProperties;
-
-  return (
-    <div>
-      <button
-        className={`${styles.subj} ${isActive ? styles.subjOn : ""}`}
-        style={svars}
-        onClick={onPickSubject}
-        title={`Show ${subject.name} — its units, weeks, and lessons`}
-      >
-        <span className={styles.si}>
-          <Icon name={SUBJECT_ICON[subjectId]} />
-        </span>
-        <div>
-          <div className={styles.sn}>{subject.name}</div>
-          <div className={styles.sg}>Grade 5</div>
-        </div>
-        <span className={styles.sc} />
-      </button>
-      {isActive && (
-        <div className={styles.subwrap}>
-          {units.map((ut) => (
-            <button
-              key={ut.id}
-              className={[
-                styles.uitem,
-                ut.id === activeUnitId ? styles.uitemOn : "",
-                ut.done ? styles.uitemDone : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => onPickUnit(ut.id)}
-            >
-              <span className={styles.uc}>
-                {ut.done && <Icon name="check" sw={3} />}
-              </span>
-              <div>
-                <span className={styles.un}>{unitTag(ut.index)}</span> ·{" "}
-                <span className={styles.ut}>{unitTopic(ut.name)}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Main pane (one active subject) ───────────────────────────────────────────
 
 interface SubjectPaneProps {
@@ -362,6 +287,11 @@ function SubjectPane({
   const [tab, setTab] = useState("Overview");
   const [rpanelOpen, setRpanelOpen] = useState(false);
 
+  // The Week-breakdown card — picking a unit scrolls it into view so the
+  // newly-opened weeks are visible (matters when picking from the Year
+  // overview, which sits above the week list).
+  const weekCardRef = useRef<HTMLDivElement>(null);
+
   // Keep the selection valid when the day set changes (unit/week switch).
   useEffect(() => {
     if (!selectedId || !days.some((l) => l.id === selectedId)) {
@@ -379,10 +309,9 @@ function SubjectPane({
   // ── Selection handlers ───────────────────────────────────────────────────
   function pickUnit(unitId: string): void {
     setActiveUnitId(unitId);
-    // week/day reset via the validity effects above.
-    if (typeof window !== "undefined" && window.innerWidth <= 1000) {
-      setSnavOpen(false);
-    }
+    // week/day reset via the validity effects above. Bring the Week-breakdown
+    // card into view so the unit's weeks are visibly "opened".
+    weekCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); // prettier-ignore
   }
   function pickWeek(week: number): void {
     setActiveWeek(week);
@@ -406,13 +335,9 @@ function SubjectPane({
     }
   }
 
-  // Subjects-panel slide-over open state.
-  const [snavOpen, setSnavOpen] = useState(false);
-
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       if (e.key === "Escape") {
-        setSnavOpen(false);
         setRpanelOpen(false);
       }
     }
@@ -432,20 +357,32 @@ function SubjectPane({
 
   return (
     <div className={styles.app} style={accent}>
-      {/* In-view bar — subject name + the subjects-panel toggle for narrow
-          viewports (replaces the prototype's global topbar). */}
-      <div className={`${styles.viewbar} cp-subj ${subjectId}`}>
-        <button
-          className={`${styles.topbtn} ${styles.topbtnSubjects}`}
-          onClick={() => setSnavOpen(true)}
-          aria-label="Show subjects"
-          title="Show the subjects panel"
-        >
-          <Icon name="curriculum" />
-        </button>
-        <h2>{subject.name}</h2>
+      {/* In-view bar — a horizontal subject switcher. Replaces both the
+          prototype's global topbar AND the old left "Subjects" panel, which
+          duplicated the app-wide SideNav. Picking a chip switches subjects. */}
+      <div className={styles.viewbar}>
+        <div className={styles.subjtabs} role="tablist" aria-label="Subjects">
+          {SUBJECTS.map((sj) => {
+            const on = sj.id === subjectId;
+            return (
+              <button
+                key={sj.id}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                className={`${styles.subjtab} ${on ? styles.subjtabOn : ""} cp-subj ${sj.id}`}
+                onClick={() => onPickSubject(sj.id)}
+                title={`Show ${sj.name} — its units, weeks, and lessons`}
+              >
+                <span className={styles.sti}>
+                  <Icon name={SUBJECT_ICON[sj.id]} />
+                </span>
+                <span className={styles.stn}>{sj.name}</span>
+              </button>
+            );
+          })}
+        </div>
         <span className={styles.grade}>Grade 5</span>
-        <span className={styles.grow} />
       </div>
 
       {/* Stat strip — scoped to the active subject's lessons. KEPT from the
@@ -455,46 +392,6 @@ function SubjectPane({
       </div>
 
       <div className={styles.bodyrow}>
-        {/* ── Subjects panel ── */}
-        <aside
-          className={`${styles.snav} ${snavOpen ? styles.snavOpen : ""}`}
-          title="Switch subjects and drill into a unit"
-        >
-          <div className={styles.snhead}>
-            Subjects <span className={styles.n}>{SUBJECTS.length}</span>
-            <button
-              className={styles.pclose}
-              style={{ marginLeft: 10 }}
-              onClick={() => setSnavOpen(false)}
-              aria-label="Close subjects panel"
-            >
-              <Icon name="x" />
-            </button>
-          </div>
-          {SUBJECTS.map((sj) => {
-            const isActive = sj.id === subjectId;
-            const rowUnits = isActive
-              ? units.map((u) => ({
-                  id: u.id,
-                  name: u.name,
-                  index: u.index,
-                  done: u.allDone,
-                }))
-              : [];
-            return (
-              <SubjectRow
-                key={sj.id}
-                subjectId={sj.id}
-                isActive={isActive}
-                units={rowUnits}
-                activeUnitId={activeUnitId}
-                onPickSubject={() => onPickSubject(sj.id)}
-                onPickUnit={pickUnit}
-              />
-            );
-          })}
-        </aside>
-
         {/* ── Center stack ── */}
         <main className={styles.center}>
           {/* Year overview */}
@@ -516,27 +413,38 @@ function SubjectPane({
               {units.map((u) => {
                 const isPastOrCurrent =
                   activeUnit != null && u.index <= activeUnit.index;
+                const on = u.id === activeUnitId;
                 return (
-                  <div
+                  <button
                     key={u.id}
-                    className={styles.ybar}
+                    type="button"
+                    className={`${styles.ybar} ${on ? styles.ybarOn : ""}`}
                     style={{
                       background: isPastOrCurrent ? color.c : color.stripe,
                       opacity: isPastOrCurrent ? 1 : 0.45,
                     }}
+                    onClick={() => pickUnit(u.id)}
+                    aria-label={`Open ${unitTag(u.index)} ${unitTopic(u.name)}`}
+                    title={`Open ${unitTag(u.index)}: ${unitTopic(u.name)} — its weeks and lessons`}
                   >
                     {u.allDone && (
                       <span className={styles.mk} style={{ color: color.c }}>
                         <Icon name="check" sw={2.6} />
                       </span>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
             <div className={styles.ulegend}>
               {units.map((u) => (
-                <div className={styles.uleg} key={u.id}>
+                <button
+                  type="button"
+                  className={`${styles.uleg} ${u.id === activeUnitId ? styles.ulegOn : ""}`}
+                  key={u.id}
+                  onClick={() => pickUnit(u.id)}
+                  title={`Open ${unitTag(u.index)}: ${unitTopic(u.name)} — its weeks and lessons`}
+                >
                   <div className={styles.ud}>
                     <span
                       className={styles.d}
@@ -546,7 +454,7 @@ function SubjectPane({
                   </div>
                   <div className={styles.un}>{unitTopic(u.name)}</div>
                   <div className={styles.udt}>{u.weeks}</div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -583,7 +491,7 @@ function SubjectPane({
           </div>
 
           {/* Week breakdown — weeks of the active unit */}
-          <div className={styles.ecard}>
+          <div className={styles.ecard} ref={weekCardRef}>
             <div className={styles.ech}>
               <span className={styles.ci}>
                 <Icon name="grid" />
@@ -955,13 +863,10 @@ function SubjectPane({
         </aside>
       </div>
 
-      {(snavOpen || rpanelOpen) && (
+      {rpanelOpen && (
         <div
           className={styles.mscrim}
-          onClick={() => {
-            setSnavOpen(false);
-            setRpanelOpen(false);
-          }}
+          onClick={() => setRpanelOpen(false)}
           aria-hidden="true"
         />
       )}
