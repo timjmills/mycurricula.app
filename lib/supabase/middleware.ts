@@ -40,18 +40,6 @@ function isPublicPath(pathname: string) {
  * response, or a redirect to /login carrying those same cookies.
  */
 export async function updateSession(request: NextRequest) {
-  // Preview-deploy auth bypass. Gated on the PREVIEW_BYPASS runtime var, which
-  // is set ONLY on the throwaway Cloudflare *version* uploaded by
-  // .github/workflows/preview-deploy.yml (via wrangler.preview.jsonc `vars`).
-  // The production Worker (deployed from wrangler.jsonc, which has no such var)
-  // never sets it, so this is a strict no-op on mycurricula.app — Google SSO
-  // stays fully enforced there. On a preview version it short-circuits the
-  // gate so the (mock-data) app is browsable from its *.workers.dev URL with
-  // no login. Never enable PREVIEW_BYPASS on a Worker that serves real data.
-  if (process.env.PREVIEW_BYPASS === "1") {
-    return NextResponse.next({ request });
-  }
-
   // Claude auth-bypass (lib/claude-bypass.ts). When the request carries
   // a valid `?claude=<token>` URL param (or a Bearer header) this short-
   // circuits the SSO gate, mints a Supabase session for CLAUDE_USER_EMAIL,
