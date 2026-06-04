@@ -147,7 +147,13 @@ export function Button({
     .join(" ");
 
   // Mirror the tooltip value to the native title= attribute when provided.
-  // A caller's explicit `title=` wins (allows opt-out / override).
+  // A caller's explicit `title=` wins (allows opt-out / override). The native
+  // title= is the cross-engine fallback that always fires: it surfaces on
+  // touch long-press (CLAUDE.md §4 touch path) and on disabled buttons, where
+  // Chromium drops the pointer events the styled tooltip relies on. The
+  // wrapping <Tooltip> below adds aria-describedby on open for screen readers
+  // and preserves this title (it no longer strips it), so hover, keyboard
+  // focus, touch, and AT are all covered.
   const effectiveTitle = title ?? tooltip;
 
   const buttonEl = (

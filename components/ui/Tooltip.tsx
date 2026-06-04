@@ -10,13 +10,21 @@
 //   when the preferred side would overflow the viewport.
 //
 // Touch devices (@media (hover: none)):
-//   Hover is suppressed — the tooltip only shows on keyboard focus.
-//   Long-press handling adds complexity and diverges from native platform
-//   behavior; most mobile teacher workflows are keyboard-free so the
-//   tradeoff is acceptable. Revisit in Phase 2 if touch users request it.
+//   The styled hover bubble is suppressed (a touch has no hover state and
+//   long-press of a custom portal is non-native + fiddly). Instead — per
+//   CLAUDE.md §4 ("touch = long-press surfacing the native `title=` attribute
+//   the Tooltip primitive mirrors") — when the tooltip content is a plain
+//   string we mirror it to the trigger's native `title=` attribute. A
+//   long-press on phone/tablet then surfaces the OS tooltip, so touch users
+//   are never left without an explanation. The focus path below also still
+//   shows the styled bubble for keyboard/AT users.
 //
 // Keyboard:
-//   Opens immediately on focus, closes on blur or Escape.
+//   Opens immediately on focus (focus-visible-friendly — the trigger's own
+//   :focus-visible styling decides the ring; we open on any focus so that
+//   AT/keyboard users always get the bubble), closes on blur or Escape. The
+//   bubble id is linked to the trigger via aria-describedby while open so
+//   screen readers announce the explanation.
 //
 // Motion:
 //   120ms fade by default. Under prefers-reduced-motion the transition is
@@ -91,6 +99,14 @@ export interface TooltipProps {
 }
 
 type Side = NonNullable<TooltipProps["side"]>;
+
+// Native `title=` is only meaningful for plain-string content — the OS tooltip
+// cannot render a React node. When `content` is a string we mirror it so touch
+// long-press (and the disabled-button quirk, where pointer events never reach
+// the styled listeners) always surfaces an explanation per CLAUDE.md §4.
+function nativeTitleFor(content: ReactNode): string | undefined {
+  return typeof content === "string" ? content : undefined;
+}
 
 // ── Position calculation ─────────────────────────────────────────────────────
 
@@ -321,6 +337,19 @@ export function Tooltip({
     childProps?.["aria-disabled"] === true ||
     childProps?.["aria-disabled"] === "true";
 
+  // Native title= mirror (CLAUDE.md §4 touch path). Prefer a title the caller
+  // already set on the child; otherwise derive one from string content. This
+  // is what a long-press surfaces on phone/tablet and what a disabled button
+  // falls back to (Chromium drops pointer events on disabled <button>, so the
+  // styled bubble's hover listeners never fire — but native title= still does).
+  // When suppressed (dismissed + not required) we drop the native title too so
+  // a turned-off tip stays off on touch as well.
+  const existingTitle =
+    typeof childProps?.title === "string" ? childProps.title : undefined;
+  const nativeTitle = suppress
+    ? undefined
+    : (existingTitle ?? nativeTitleFor(content));
+
   // Clone the trigger to inject ref + aria-describedby (always) and the
   // hover/focus listeners (only on the enabled path). When the child is
   // disabled, the listeners move to the wrapper span below.
@@ -343,17 +372,15 @@ export function Tooltip({
         ? {}
         : { ref: triggerRef as React.Ref<HTMLButtonElement> }),
       "aria-describedby": open ? tooltipId : undefined,
-      // Strip any native `title=` attribute from the wrapped child so the
-      // browser-default OS tooltip never fires alongside our styled bubble.
-      // User direction 2026-05-27 ("It's still showing the old popups as
-      // well — take those ones off"). Lane Z + Lane DA + the EA/EB/EC sweep
-      // added belt-and-braces `title=` attrs as a cross-engine fallback;
-      // they're redundant now that every interactive element is wrapped
-      // in this primitive and the styled portal handles every interaction
-      // surface (hover + focus + the disabled-button wrapper-span case).
-      // Accessibility is preserved via aria-describedby above linking the
-      // trigger to the tooltip text on open.
-      title: undefined,
+      // Native `title=` mirror. CLAUDE.md §4 requires touch users to reach the
+      // explanation via long-press of the native OS tooltip, and the
+      // disabled-button quirk (Chromium drops pointer events on disabled
+      // <button>) means native title= is the only fallback that always fires
+      // there. We keep it on the trigger so both paths work. Screen-reader
+      // users get the explanation via aria-describedby (above) on open. On
+      // desktop the styled bubble's 400ms hover delay generally beats the OS
+      // tooltip, so the two rarely collide; accessibility is the priority.
+      title: nativeTitle,
       ...triggerHandlers,
     },
   );
@@ -413,6 +440,11 @@ export function Tooltip({
     <span
       ref={triggerRef as React.Ref<HTMLSpanElement>}
       className={styles.disabledWrapper}
+      // Mirror the native title onto the event-catching wrapper too: a
+      // long-press on the disabled button's area lands on this span (the
+      // disabled <button> swallows pointer events), so the OS tooltip surfaces
+      // here on touch. CLAUDE.md §4 touch path for disabled controls.
+      title={nativeTitle}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onFocus={handleFocus}
