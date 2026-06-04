@@ -82,7 +82,6 @@ import {
 } from "react";
 import type { Lesson, LessonResource, SubjectId } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
-import { SUBJECTS } from "@/lib/mock";
 import { useLabels } from "@/lib/labels";
 import { Button, Tooltip } from "@/components/ui";
 import { parseResourceUrl } from "@/lib/resource-embed";
@@ -299,8 +298,17 @@ export function ResourceComposer({
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   // ── Planner store ────────────────────────────────────────────────────
-  const { lessons, getSections, addSectionResource, editLesson, getLesson } =
-    usePlanner();
+  // Subjects come from the planner store's catalog (frozen API) rather than
+  // lib/mock SUBJECTS — the composer always renders under PlannerProvider
+  // (launched from LessonDetail / lesson-flow on the (planner) routes).
+  const {
+    lessons,
+    getSections,
+    addSectionResource,
+    editLesson,
+    getLesson,
+    subjects,
+  } = usePlanner();
 
   // ── Local UI state ───────────────────────────────────────────────────
   const [title, setTitle] = useState<string>("");
@@ -428,7 +436,7 @@ export function ResourceComposer({
   // present — that "show me THIS week" filter matches the routing spec.
 
   /** Subjects: just the canonical eight — fixed order, locked team-wide. */
-  const subjectOptions = useMemo(() => SUBJECTS, []);
+  const subjectOptions = useMemo(() => subjects, [subjects]);
 
   /** Unique unit ids present in the planner doc for the chosen subject. */
   const unitOptions = useMemo(() => {
@@ -1383,8 +1391,7 @@ export function ResourceComposer({
                                   style={{
                                     padding: "2px 8px",
                                     fontSize: 11,
-                                    border:
-                                      "1px solid var(--ink-100, #e4e4e7)",
+                                    border: "1px solid var(--ink-100, #e4e4e7)",
                                     borderRadius: 4,
                                     background:
                                       item.displayMode === mode

@@ -24,7 +24,7 @@
 
 import type { ReactNode } from "react";
 import type { Lesson } from "@/lib/types";
-import { SUBJECT_BY_ID } from "@/lib/mock";
+import { usePlanner } from "@/lib/planner-store";
 import { useLabels, pluralize } from "@/lib/labels";
 import { Tooltip } from "@/components/ui";
 import styles from "./DailyView.module.css";
@@ -45,6 +45,10 @@ export function TodayDashboard({
   dayLabel,
 }: TodayDashboardProps): ReactNode {
   const labels = useLabels();
+  // Subject metadata comes from the planner store's catalog (frozen API),
+  // not lib/mock — safe here, TodayDashboard only renders inside DailyView's
+  // lesson-list column under the (planner) /daily route (PlannerProvider).
+  const { subjectById } = usePlanner();
   const doneCount = dayLessons.filter((l) => l.status === "done").length;
   const total = dayLessons.length;
   const lessonsWord = pluralize(labels.lesson).toLowerCase();
@@ -81,7 +85,7 @@ export function TodayDashboard({
           {dayLessons.map((l) => (
             <Tooltip
               key={l.id}
-              content={`${SUBJECT_BY_ID[l.subject].name} — ${l.status === "done" ? "complete" : l.status === "partial" ? "partially complete" : "not yet started"}. Each segment in this bar represents one of today's lessons.`}
+              content={`${subjectById[l.subject].name} — ${l.status === "done" ? "complete" : l.status === "partial" ? "partially complete" : "not yet started"}. Each segment in this bar represents one of today's lessons.`}
               side="bottom"
             >
               <div
@@ -94,10 +98,10 @@ export function TodayDashboard({
                         ? "var(--cl)"
                         : "var(--ink-150)",
                 }}
-                title={`${SUBJECT_BY_ID[l.subject].name} — ${l.status}`}
+                title={`${subjectById[l.subject].name} — ${l.status}`}
                 tabIndex={0}
                 role="img"
-                aria-label={`${SUBJECT_BY_ID[l.subject].name} — ${l.status}`}
+                aria-label={`${subjectById[l.subject].name} — ${l.status}`}
               />
             </Tooltip>
           ))}

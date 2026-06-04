@@ -31,8 +31,8 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { ReactNode, KeyboardEvent, FormEvent } from "react";
 import type { SubjectId } from "@/lib/types";
-import { SUBJECTS } from "@/lib/mock";
 import { WEEK_DAYS } from "@/lib/mock";
+import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip } from "@/components/ui";
 import styles from "./AddLessonForm.module.css";
 
@@ -62,6 +62,11 @@ export function AddLessonForm({
   day,
 }: AddLessonFormProps): ReactNode {
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Subject picker options come from the planner store's catalog (frozen
+  // API), not lib/mock — safe here, AddLessonForm is rendered by DailyView
+  // (and DailyList) under the (planner) /daily route (PlannerProvider).
+  const { subjects } = usePlanner();
 
   // Form field state — controlled inputs, all as strings so the native form
   // element values are always predictable.
@@ -222,7 +227,7 @@ export function AddLessonForm({
               value={subject}
               onChange={(e) => setSubject(e.target.value as SubjectId)}
             >
-              {SUBJECTS.map((s) => (
+              {subjects.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>

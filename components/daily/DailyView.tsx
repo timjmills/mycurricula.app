@@ -118,7 +118,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
-import { SUBJECT_BY_ID, dateNumberForWeekDay, notesForDay } from "@/lib/mock";
+import { dateNumberForWeekDay, notesForDay } from "@/lib/mock";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useDayHoliday, useHolidaysByDay } from "@/lib/use-day-holiday";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
@@ -636,7 +636,11 @@ function LessonRow({
   onSelect,
   onToggleComplete,
 }: LessonRowProps): ReactNode {
-  const subj = SUBJECT_BY_ID[lesson.subject];
+  // Catalog-migrated: subject metadata now comes from the planner store's
+  // catalog (frozen API), not the lib/mock SUBJECT_BY_ID map. Safe here —
+  // LessonRow only renders under the (planner) /daily route (PlannerProvider).
+  const { subjectById } = usePlanner();
+  const subj = subjectById[lesson.subject];
 
   // dnd-kit sortable wiring — `id` is the lesson id (matches SortableContext).
   const {
@@ -1242,7 +1246,7 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
 
   // Lessons come from the planner store so completions, edits, and undo/redo
   // are immediately reflected in the left pane list and right pane detail.
-  const { lessons, setLessonStatus, lastChange } = usePlanner();
+  const { lessons, setLessonStatus, lastChange, subjectById } = usePlanner();
 
   // ── Per-teacher row order (local + localStorage, NOT the shared doc) ──
   // Keyed by week+day. Initialised EMPTY rather than from localStorage: the
@@ -1920,7 +1924,7 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
                     </span>
                     <span className={styles.lessonRowSelectBtn}>
                       <span className={styles.lessonSubjectLabel}>
-                        {SUBJECT_BY_ID[draggingLesson.subject].name}
+                        {subjectById[draggingLesson.subject].name}
                       </span>
                       <span className={styles.lessonTitle}>
                         {draggingLesson.title}
@@ -2053,7 +2057,7 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
   // segment is omitted rather than showing a stale value when no lesson is
   // selected (e.g. the day is empty).
   const breadcrumbSubject = selectedLesson
-    ? SUBJECT_BY_ID[selectedLesson.subject]
+    ? subjectById[selectedLesson.subject]
     : null;
 
   // ── Daily schedule-pill state ──────────────────────────────────────────

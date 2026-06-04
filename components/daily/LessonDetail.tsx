@@ -76,7 +76,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { ReactNode, SyntheticEvent } from "react";
 import type { Lesson } from "@/lib/types";
-import { SUBJECT_BY_ID, lessonTime } from "@/lib/mock";
+import { lessonTime } from "@/lib/mock";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
 import { usePlanner } from "@/lib/planner-store";
@@ -206,14 +206,16 @@ export function LessonDetail({
   lesson,
   onToggleComplete,
 }: LessonDetailProps): ReactNode {
-  const subj = SUBJECT_BY_ID[lesson.subject];
-
-  // ── Store — notes editing ────────────────────────────────────────────
+  // ── Store — notes editing + subject catalog ──────────────────────────
   // Notes are written through editLesson with coalescing so a typing burst
   // produces one history step. Sections are managed by LessonFlow directly.
   // Completion is routed through onToggleComplete → DailyView, which calls
   // setLessonStatus — keeping a single dispatch path per UI action.
-  const { editLesson } = usePlanner();
+  // Subject metadata comes from the planner store's catalog (frozen API),
+  // not lib/mock — safe here, LessonDetail only renders under the (planner)
+  // /daily route (PlannerProvider present).
+  const { editLesson, subjectById } = usePlanner();
+  const subj = subjectById[lesson.subject];
 
   // ── Docked-toolbar target ref ────────────────────────────────────────
   // cellRef is attached to the scrollable detail body region — the "cell"
