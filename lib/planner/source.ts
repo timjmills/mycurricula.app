@@ -57,6 +57,10 @@ export type LessonPatch = Partial<
  */
 export interface PlannerDataSource {
   // ── Reads (hydrate the document) ───────────────────────────────────────────
+  /** Resolve the teacher's active grade uuid — `teachers.default_grade_level_id`
+   *  first, else the first row in `teacher_grade_assignments`. Lets a caller
+   *  hydrate without already knowing the grade. Mock returns the single grade. */
+  getActiveGradeLevelId(ownerId: string): Promise<string | null>;
   /** All lessons a teacher sees for a grade: personal forks resolved over
    *  master, soft-deletes excluded (plan §4.3). */
   listLessons(gradeLevelId: string, ownerId: string): Promise<Lesson[]>;
@@ -66,8 +70,19 @@ export interface PlannerDataSource {
   listSubjects(gradeLevelId: string): Promise<Subject[]>;
   /** Standards (code → description) for a grade's assigned frameworks. */
   listStandards(gradeLevelId: string): Promise<StandardsMap>;
-  /** The editable section content for one lesson (heading/body/resources). */
-  getSections(lessonId: string): Promise<LessonSectionContent[]>;
+  /** The editable section content for one lesson (heading/body/resources),
+   *  personal-fork-resolved when `ownerId` is supplied. */
+  getSections(
+    lessonId: string,
+    ownerId?: string,
+  ): Promise<LessonSectionContent[]>;
+  /** Batched section hydrate — one call seeds every lesson's sections, keyed by
+   *  lesson id. Kills the per-lesson N+1 at document-load time. Lessons with no
+   *  persisted sections are omitted (callers fall back to `getSections`). */
+  getSectionsBatch(
+    lessonIds: string[],
+    ownerId: string,
+  ): Promise<Record<string, LessonSectionContent[]>>;
 
   // ── Lesson mutations (the reducer commits through these) ───────────────────
   /** Patch a lesson's content/flags. In personal mode this lazily forks
@@ -89,7 +104,10 @@ export interface PlannerDataSource {
     status: LessonStatus,
     ownerId: string,
   ): Promise<Lesson>;
-  /** Create a teacher's own (personal) lesson in a slot. */
+  /** Create a teacher's own (personal) lesson in a slot. `gradeLevelId` is the
+   *  RESOLVED grade uuid the row is keyed on (the Supabase source needs a real
+   *  uuid for `personal_authored_lessons.grade_level_id`); it defaults to
+   *  `input.gradeLevelId` when omitted so existing callers keep working. */
   createLesson(
     input: {
       gradeLevelId: string;
@@ -100,8 +118,12 @@ export interface PlannerDataSource {
       title: string;
     },
     ownerId: string,
+    gradeLevelId?: string,
   ): Promise<Lesson>;
-  /** Soft-delete a lesson (30-day window, §4.6). */
+  /** Soft-delete a lesson — PERSONAL-scoped (§4.6). For a master-derived lesson
+   *  the owner's personal copy is archived (lazy-forked if absent); a
+   *  teacher-authored lesson sets its own `deleted_at`. The shared master row is
+   *  NEVER mutated. */
   softDeleteLesson(lessonId: string, ownerId: string): Promise<void>;
 
   // ── Section + resource mutations ───────────────────────────────────────────

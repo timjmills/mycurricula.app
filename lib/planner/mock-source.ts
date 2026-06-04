@@ -158,6 +158,14 @@ function findLesson(lessonId: string): Lesson | undefined {
 export const plannerMockSource: PlannerDataSource = {
   // ── Reads ──────────────────────────────────────────────────────────────────
 
+  async getActiveGradeLevelId(_ownerId: string): Promise<string | null> {
+    // The prototype runs a single Grade 5 grade; the resolver is a constant
+    // here. The Supabase source reads teachers.default_grade_level_id (falling
+    // back to teacher_grade_assignments). Keeping the param honours the contract.
+    void _ownerId;
+    return "g5";
+  },
+
   async listLessons(
     _gradeLevelId: string,
     _ownerId: string,
@@ -189,8 +197,30 @@ export const plannerMockSource: PlannerDataSource = {
     return { ...STANDARDS };
   },
 
-  async getSections(lessonId: string): Promise<LessonSectionContent[]> {
+  async getSections(
+    lessonId: string,
+    _ownerId?: string,
+  ): Promise<LessonSectionContent[]> {
+    // `ownerId` is accepted for contract parity (the Supabase source resolves a
+    // personal fork by it); the single-document mock ignores it.
+    void _ownerId;
     return cloneSections(ensureSections(lessonId));
+  },
+
+  async getSectionsBatch(
+    lessonIds: string[],
+    _ownerId: string,
+  ): Promise<Record<string, LessonSectionContent[]>> {
+    // Batched seed — the same per-lesson `ensureSections` logic mapped over the
+    // requested ids in one call, so the store hydrates every lesson's sections
+    // without N async round-trips. Behaviour per lesson is identical to
+    // `getSections`; ownerId is ignored (single-document mock).
+    void _ownerId;
+    const out: Record<string, LessonSectionContent[]> = {};
+    for (const lessonId of lessonIds) {
+      out[resolveLessonId(lessonId)] = cloneSections(ensureSections(lessonId));
+    }
+    return out;
   },
 
   // ── Lesson mutations ─────────────────────────────────────────────────────────
@@ -256,11 +286,15 @@ export const plannerMockSource: PlannerDataSource = {
       title: string;
     },
     _ownerId: string,
+    _gradeLevelId?: string,
   ): Promise<Lesson> {
     // A teacher-created lesson is PERSONAL by definition (isPersonal=true),
     // unmodified/unmoved, with empty content and a fresh id — matching the
-    // reducer's duplicate/personal-create flag defaults.
+    // reducer's duplicate/personal-create flag defaults. `gradeLevelId` is the
+    // resolved-uuid override the Supabase source needs; the mock keys off the
+    // single grade and ignores it.
     void _ownerId;
+    void _gradeLevelId;
     const lesson: Lesson = {
       id: nextId("lesson"),
       subject: input.subject,

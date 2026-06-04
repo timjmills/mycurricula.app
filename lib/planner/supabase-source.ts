@@ -2,9 +2,13 @@
 //
 // A drop-in implementation of the planner repository contract defined in
 // `lib/planner/source.ts`, backed by the curriculum tables in the initial
-// schema migration (`supabase/migrations/20260518102823_initial_schema.sql`).
-// It satisfies the SAME async interface the in-memory planner mock will — the
-// store awaits both identically — but reads/writes durable rows.
+// schema migration (`supabase/migrations/20260518102823_initial_schema.sql`),
+// the sections + authored-lessons tables
+// (`20260601120000_planner_sections_personal.sql`), and the scale-hardening
+// denormalization (`20260604120000_planner_scale_hardening.sql` — the local
+// `grade_level_id` on the two hot lesson tables + `archived_at` on personal
+// copies). It satisfies the SAME async interface the in-memory planner mock
+// does — the store awaits both identically — but reads/writes durable rows.
 //
 // CLIENT CHOICE / RLS
 //   Every read + write goes through the per-request server client
@@ -13,24 +17,38 @@
 //   deliberately NOT imported here: nothing in this contract needs to bypass
 //   RLS. Grade-scoping is carried on every read; we never do a bare table scan.
 //
+// SERVER-ONLY: `lib/supabase/server.ts` awaits `cookies()`, so this module is
+//   server-only by construction and must never be imported into a client
+//   component (the mock source is the client/default path).
+//
 // FORKING (CLAUDE.md §2, migration §4.3)
 //   `master_core_lesson_events` is the single source of truth;
 //   `personal_core_lesson_event_copies` is the per-teacher LAZY fork. Reads
 //   resolve a teacher's personal copy over the master where one exists. An edit
 //   in personal mode UPSERTS a personal copy row (it never mutates master);
-//   completion (`setLessonStatus`) writes `completion_status` and NEVER forks;
-//   `softDeleteLesson` sets `deleted_at` on the master row.
+//   completion (`setLessonStatus`) writes `completion_status` and NEVER forks.
+//   `softDeleteLesson` is PERSONAL-scoped: a master-derived lesson archives the
+//   teacher's personal copy (`archived_at`, lazy-forking first if absent) and
+//   NEVER touches the shared master row; a teacher-authored lesson sets its own
+//   `deleted_at`.
 //
 //   This source operates in personal mode (every mutator takes an `ownerId` and
 //   forks against that teacher). Master-mode editing is a separate, explicitly
 //   gated surface (the Personal | Master top-bar toggle) that is not part of
 //   this contract — the contract's mutators only carry an owner, so they always
-//   write the teacher's personal fork. See the SCHEMA-GAP/notes section below.
+//   write the teacher's personal fork.
+//
+// SECTIONS (lesson_sections, migration 20260601120000)
+//   A lesson's editable sections (heading / prompt / body / ordered resources)
+//   persist in `lesson_sections`, keyed polymorphically by
+//   (owner_kind, owner_lesson_id). Reads resolve the teacher's own
+//   (owner_id = ownerId) rows over the team/master (owner_id null) rows. A
+//   lesson with no persisted section rows falls back to a single synthetic
+//   section carrying the lesson's flat `resources` jsonb so reads never break.
 //
 // PRIVACY (§11.4)
 //   Planner rows carry STRUCTURE only — title, directions, objectives, notes,
-//   resources, standards. Never student names. Nothing here reads or writes a
-//   roster.
+//   resources, standards, section headings/bodies. Never student names.
 //
 // ID BRIDGE (lib/planner/id-bridge.ts)
 //   The mock fixtures + UI speak human SLUGS (lesson `m-12-0`, unit `u-m3`,
@@ -39,32 +57,6 @@
 //   `slugToUuid(kind, slug)` resolves slug → uuid without a round-trip, and a
 //   per-request reverse index maps the uuids a query returns back to the slugs
 //   the domain types expect.
-//
-// SCHEMA GAPS (reported to the lead — NOT patched here; B is single-file and
-// must not edit SQL):
-//   1. SECTIONS — `getSections` / `setSections` / `addSectionResource` /
-//      `removeSectionResource` operate on the per-lesson SECTION model
-//      (`LessonSectionContent`, lib/lesson-flow.ts). The schema has NO
-//      lesson-section table: a lesson's sections are a frontend construct
-//      instantiated from a lesson-flow template, and only the FLAT lesson-level
-//      `resources` jsonb is persisted. This source therefore derives a single
-//      synthetic section on read (carrying the lesson's resources) and, on a
-//      section mutation, writes the union of all section resources back to the
-//      lesson's `resources` jsonb (forking in personal mode). Section
-//      headings/bodies/order do NOT persist until a lesson_sections table lands.
-//   2. SUBJECT/UNIT GRADE for createLesson — a new personal lesson needs a
-//      `unit_id` + `subject_id` (NOT NULL on the copies table) and a
-//      `master_core_lesson_event_id` (also NOT NULL). The contract's
-//      `createLesson` creates a teacher's OWN lesson with no backing master,
-//      but `personal_core_lesson_event_copies.master_core_lesson_event_id` is
-//      NOT NULL with an FK. There is no "personal-only lesson" table in this
-//      schema (the spec's `extra_lesson_events` is date-keyed, not
-//      week/day-keyed, and is a different entity). `createLesson` therefore
-//      throws a descriptive error flagging the gap rather than silently
-//      corrupting the fork model.
-//   3. PERSONAL MOVE/ORDER metadata — the FLAT `Lesson.moved` ("same-week" /
-//      "across-weeks") is DERIVED here by comparing the personal copy's
-//      week/day to its master; the schema has no explicit "moved" column.
 
 import type {
   Lesson,
@@ -79,6 +71,7 @@ import type {
 } from "../types";
 import { SUBJECTS } from "../mock/subjects";
 import type { LessonSectionContent } from "../lesson-flow";
+import type { SectionResource } from "../lesson-flow";
 import {
   type LessonMoveTarget,
   type LessonPatch,
@@ -179,11 +172,30 @@ function statusFromDb(status: DbCompletion): LessonStatus {
   return status === "carried_over" ? "carried" : status;
 }
 
+/** Coerce a free-text `status` column (personal_authored_lessons stores `status`
+ *  as text, not the enum) back to a `LessonStatus`, defaulting to "not_done". */
+function statusFromText(raw: string | null): LessonStatus {
+  switch (raw) {
+    case "done":
+    case "skipped":
+    case "partial":
+    case "not_done":
+      return raw;
+    case "carried_over":
+    case "carried":
+      return "carried";
+    default:
+      return "not_done";
+  }
+}
+
 // ── Row shapes (snake_case, as the migration declares them) ───────────────────
 
-/** A `master_core_lesson_events` row (the columns this source reads). */
+/** A `master_core_lesson_events` row (the columns this source reads). After the
+ *  scale-hardening migration the table carries a local `grade_level_id`. */
 interface MasterEventRow {
   id: string;
+  grade_level_id: string | null;
   unit_id: string;
   subject_id: string;
   week_number: number;
@@ -198,11 +210,13 @@ interface MasterEventRow {
   deleted_at: string | null;
 }
 
-/** A `personal_core_lesson_event_copies` row (the lazy fork). */
+/** A `personal_core_lesson_event_copies` row (the lazy fork). Carries the
+ *  scale-hardening `archived_at` (personal soft-delete) + `grade_level_id`. */
 interface PersonalCopyRow {
   id: string;
   teacher_id: string;
   master_core_lesson_event_id: string;
+  grade_level_id: string | null;
   unit_id: string;
   subject_id: string;
   week_number: number;
@@ -215,6 +229,28 @@ interface PersonalCopyRow {
   standards: string[];
   display_order_within_day: number;
   is_diverged_from_master: boolean;
+  archived_at: string | null;
+}
+
+/** A `personal_authored_lessons` row (a teacher's OWN lesson, no master). */
+interface AuthoredLessonRow {
+  id: string;
+  owner_id: string;
+  grade_level_id: string;
+  unit_id: string | null;
+  subject_id: string;
+  week_number: number;
+  day_of_week: Weekday;
+  title: string;
+  directions: string | null;
+  learning_objectives: unknown;
+  notes: string | null;
+  resources: unknown;
+  standards: string[];
+  display_order_within_day: number;
+  status: string | null;
+  reason_not_done: string | null;
+  deleted_at: string | null;
 }
 
 interface CompletionRow {
@@ -247,16 +283,35 @@ interface StandardRow {
   description: string | null;
 }
 
+/** A `lesson_sections` row (the editable section content for a lesson). */
+interface SectionRow {
+  id: string;
+  owner_kind: "master" | "personal_copy" | "personal_authored";
+  owner_lesson_id: string;
+  owner_id: string | null;
+  grade_level_id: string;
+  template_section_id: string | null;
+  heading: string;
+  prompt: string;
+  body: string;
+  resources: unknown; // jsonb: SectionResource[]
+  display_order: number;
+}
+
 // Column lists kept in one place so reads stay consistent.
 const MASTER_COLS =
-  "id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, deleted_at";
+  "id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, deleted_at";
 const COPY_COLS =
-  "id, teacher_id, master_core_lesson_event_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, is_diverged_from_master";
+  "id, teacher_id, master_core_lesson_event_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, is_diverged_from_master, archived_at";
+const AUTHORED_COLS =
+  "id, owner_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, status, reason_not_done, deleted_at";
 const COMPLETION_COLS = "core_lesson_event_id, status, reason_not_done";
 const UNIT_COLS = "id, grade_level_id, subject_id, name, start_week, end_week";
 const SUBJECT_COLS =
   "id, grade_level_id, name, color, parent_id, display_order";
 const STANDARD_COLS = "id, code, description";
+const SECTION_COLS =
+  "id, owner_kind, owner_lesson_id, owner_id, grade_level_id, template_section_id, heading, prompt, body, resources, display_order";
 
 // ── jsonb helpers ─────────────────────────────────────────────────────────────
 
@@ -288,6 +343,32 @@ function jsonToResources(raw: unknown): LessonResource[] {
       typeof (r as { type?: unknown }).type === "string" &&
       typeof (r as { label?: unknown }).label === "string",
   );
+}
+
+/** Coerce a jsonb section `resources` value to typed `SectionResource[]`,
+ *  minting a stable id when the persisted row lacks one. */
+function jsonToSectionResources(
+  raw: unknown,
+  sectionId: string,
+): SectionResource[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SectionResource[] = [];
+  raw.forEach((r, i) => {
+    if (
+      typeof r === "object" &&
+      r !== null &&
+      typeof (r as { type?: unknown }).type === "string" &&
+      typeof (r as { label?: unknown }).label === "string"
+    ) {
+      const res = r as SectionResource & { id?: unknown };
+      const id =
+        typeof res.id === "string" && res.id.length > 0
+          ? res.id
+          : `${sectionId}-r${i}`;
+      out.push({ ...res, id });
+    }
+  });
+  return out;
 }
 
 // ── Standards uuid[] ↔ slug code[] bridge ─────────────────────────────────────
@@ -427,9 +508,9 @@ async function loadSubjectIndex(
 /** Load the grade's units as rows, plus a uuid→slug index built from the loaded
  *  unit set (the slug is recovered via the deterministic reverse map; the
  *  importer assigns `slugToUuid("unit", slug)`). The reverse map needs the slug
- *  set, which we don't have from the DB — so we map a unit uuid back to a slug
- *  by reversing `slugToUuid` over the KNOWN mock unit slugs, and fall back to
- *  the uuid itself for unknown units. */
+ *  set, which we don't have from the DB — so we expose the DB uuid AS the unit
+ *  id (stable + unique); the UI joins lessons↔units by this same id, so internal
+ *  consistency holds even though it's a uuid rather than the human `u-m3` slug. */
 async function loadUnitIndex(
   client: ServerClient,
   gradeLevelId: string,
@@ -439,13 +520,6 @@ async function loadUnitIndex(
     .select(UNIT_COLS)
     .eq("grade_level_id", gradeLevelId);
   const rows = unwrap(res, "list units") as UnitRow[];
-  // We cannot reverse a uuid→slug without the slug set. The domain `Unit.id`
-  // the UI expects IS the slug; the importer set `unit.id = slugToUuid("unit",
-  // slug)`. Since the planner store keys units by their domain id, we expose the
-  // DB uuid AS the unit id here (stable + unique) — the UI joins lessons↔units
-  // by this same id, so internal consistency holds even though it's a uuid
-  // rather than the human `u-m3` slug. (A human-slug round-trip needs the
-  // importer to persist the slug; flagged for the lead.)
   const uuidToUnitSlug = new Map<string, string>();
   for (const row of rows) uuidToUnitSlug.set(row.id, row.id);
   return { rows, uuidToUnitSlug };
@@ -490,26 +564,54 @@ async function loadStandardsIndex(
 
 export const plannerSupabaseSource: PlannerDataSource = {
   // ── Reads ──────────────────────────────────────────────────────────────────
+
+  async getActiveGradeLevelId(ownerId) {
+    const client = await sb();
+    // 1. The teacher's explicit default grade, if set.
+    const teacherRes = await client
+      .from("teachers")
+      .select("default_grade_level_id")
+      .eq("id", ownerId)
+      .maybeSingle();
+    const teacher = unwrapMaybe(teacherRes, "get active grade (teacher)") as {
+      default_grade_level_id: string | null;
+    } | null;
+    if (teacher?.default_grade_level_id) return teacher.default_grade_level_id;
+
+    // 2. Fallback: the first grade the teacher is assigned to (stable order by
+    //    created_at so the resolution is deterministic across calls).
+    const assignRes = await client
+      .from("teacher_grade_assignments")
+      .select("grade_level_id, created_at")
+      .eq("teacher_id", ownerId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    const assign = unwrapMaybe(assignRes, "get active grade (assignment)") as {
+      grade_level_id: string;
+    } | null;
+    return assign?.grade_level_id ?? null;
+  },
+
   async listLessons(gradeLevelId, ownerId) {
     const client = await sb();
 
-    // 1. Resolve the grade's subjects + units (and their slug indexes), so we
-    //    can scope master events to the grade (events carry unit_id/subject_id
-    //    but not grade_level_id) and map back to domain slugs.
-    const [{ uuidToSubjectId }, { rows: unitRows, uuidToUnitSlug }, standards] =
+    // 1. Resolve the grade's subjects + units (and their slug indexes), and the
+    //    standards index. Subjects/units map DB uuids back to domain slugs.
+    const [{ uuidToSubjectId }, { uuidToUnitSlug }, standards] =
       await Promise.all([
         loadSubjectIndex(client, gradeLevelId),
         loadUnitIndex(client, gradeLevelId),
         loadStandardsIndex(client, gradeLevelId),
       ]);
-    const gradeUnitIds = unitRows.map((u) => u.id);
-    if (gradeUnitIds.length === 0) return [];
 
-    // 2. Master events for the grade's units, excluding soft-deletes.
+    // 2. Master events for the grade — read the DENORMALIZED local
+    //    grade_level_id column directly (no units join — the #1 scale fix),
+    //    excluding soft-deletes.
     const masterRes = await client
       .from("master_core_lesson_events")
       .select(MASTER_COLS)
-      .in("unit_id", gradeUnitIds)
+      .eq("grade_level_id", gradeLevelId)
       .is("deleted_at", null)
       .order("week_number", { ascending: true })
       .order("display_order_within_day", { ascending: true });
@@ -517,28 +619,45 @@ export const plannerSupabaseSource: PlannerDataSource = {
       masterRes,
       "list master lessons",
     ) as MasterEventRow[];
-    if (masterRows.length === 0) return [];
+
     const masterIds = masterRows.map((m) => m.id);
 
-    // 3. This teacher's personal copies for those masters (the lazy fork), and
-    //    their completion rows. Both keyed by the MASTER event id.
-    const [copyRes, complRes] = await Promise.all([
+    // 3. This teacher's personal copies for those masters (the lazy fork), their
+    //    completion rows, and the teacher's own AUTHORED lessons for the grade.
+    //    Copies/completion are keyed by the MASTER event id.
+    const [copyRes, complRes, authoredRes] = await Promise.all([
+      masterIds.length > 0
+        ? client
+            .from("personal_core_lesson_event_copies")
+            .select(COPY_COLS)
+            .eq("teacher_id", ownerId)
+            .in("master_core_lesson_event_id", masterIds)
+        : Promise.resolve({ data: [] as PersonalCopyRow[], error: null }),
+      masterIds.length > 0
+        ? client
+            .from("completion_status")
+            .select(COMPLETION_COLS)
+            .eq("teacher_id", ownerId)
+            .in("core_lesson_event_id", masterIds)
+        : Promise.resolve({ data: [] as CompletionRow[], error: null }),
       client
-        .from("personal_core_lesson_event_copies")
-        .select(COPY_COLS)
-        .eq("teacher_id", ownerId)
-        .in("master_core_lesson_event_id", masterIds),
-      client
-        .from("completion_status")
-        .select(COMPLETION_COLS)
-        .eq("teacher_id", ownerId)
-        .in("core_lesson_event_id", masterIds),
+        .from("personal_authored_lessons")
+        .select(AUTHORED_COLS)
+        .eq("owner_id", ownerId)
+        .eq("grade_level_id", gradeLevelId)
+        .is("deleted_at", null)
+        .order("week_number", { ascending: true })
+        .order("display_order_within_day", { ascending: true }),
     ]);
     const copyRows = unwrap(
       copyRes,
       "list personal copies",
     ) as PersonalCopyRow[];
     const complRows = unwrap(complRes, "list completion") as CompletionRow[];
+    const authoredRows = unwrap(
+      authoredRes,
+      "list authored lessons",
+    ) as AuthoredLessonRow[];
 
     const copyByMaster = new Map<string, PersonalCopyRow>();
     for (const c of copyRows)
@@ -546,9 +665,13 @@ export const plannerSupabaseSource: PlannerDataSource = {
     const complByMaster = new Map<string, CompletionRow>();
     for (const c of complRows) complByMaster.set(c.core_lesson_event_id, c);
 
-    // 4. Resolve personal-over-master and map each to a FLAT Lesson.
-    return masterRows.map((master) => {
+    // 4. Resolve personal-over-master and map each to a FLAT Lesson, EXCLUDING
+    //    masters the owner has archived for themselves (archived_at not null on
+    //    their personal copy — a personal soft-delete that never touches master).
+    const masterLessons: Lesson[] = [];
+    for (const master of masterRows) {
       const copy = copyByMaster.get(master.id);
+      if (copy?.archived_at) continue; // personal soft-delete — hide from owner.
       const compl = complByMaster.get(master.id);
       const status = compl ? statusFromDb(compl.status) : "not_done";
       const reasonNotDone = compl?.reason_not_done ?? "";
@@ -558,25 +681,56 @@ export const plannerSupabaseSource: PlannerDataSource = {
       const subjectId = uuidToSubjectId.get(src.subject_id) ?? "math";
       const unitSlug = uuidToUnitSlug.get(src.unit_id) ?? src.unit_id;
 
+      masterLessons.push(
+        buildLesson({
+          id: master.id, // completion/boards key on the master id — keep it stable.
+          subject: subjectId,
+          unit: unitSlug,
+          week: src.week_number,
+          day: weekdayToDayIndex(src.day_of_week),
+          title: src.title,
+          objective: objectivesToObjective(src.learning_objectives),
+          directions: src.directions ?? "",
+          notes: src.notes ?? "",
+          resources: jsonToResources(src.resources),
+          standards: standardUuidsToCodes(src.standards, standards.uuidToCode),
+          status,
+          reasonNotDone,
+          isPersonal: copy != null,
+          modified: copy?.is_diverged_from_master ?? false,
+          moved: copy ? deriveMoved(master, copy) : null,
+        }),
+      );
+    }
+
+    // 5. Teacher-authored lessons (no master). These are always personal; their
+    //    completion lives on their own `status` column (not completion_status).
+    const authoredLessons = authoredRows.map((a) => {
+      const subjectId = uuidToSubjectId.get(a.subject_id) ?? "math";
+      const unitSlug = a.unit_id
+        ? (uuidToUnitSlug.get(a.unit_id) ?? a.unit_id)
+        : "";
       return buildLesson({
-        id: master.id, // completion/boards key on the master id — keep it stable.
+        id: a.id,
         subject: subjectId,
         unit: unitSlug,
-        week: src.week_number,
-        day: weekdayToDayIndex(src.day_of_week),
-        title: src.title,
-        objective: objectivesToObjective(src.learning_objectives),
-        directions: src.directions ?? "",
-        notes: src.notes ?? "",
-        resources: jsonToResources(src.resources),
-        standards: standardUuidsToCodes(src.standards, standards.uuidToCode),
-        status,
-        reasonNotDone,
-        isPersonal: copy != null,
-        modified: copy?.is_diverged_from_master ?? false,
-        moved: copy ? deriveMoved(master, copy) : null,
+        week: a.week_number,
+        day: weekdayToDayIndex(a.day_of_week),
+        title: a.title,
+        objective: objectivesToObjective(a.learning_objectives),
+        directions: a.directions ?? "",
+        notes: a.notes ?? "",
+        resources: jsonToResources(a.resources),
+        standards: standardUuidsToCodes(a.standards, standards.uuidToCode),
+        status: statusFromText(a.status),
+        reasonNotDone: a.reason_not_done ?? "",
+        isPersonal: true,
+        modified: false,
+        moved: null,
       });
     });
+
+    return [...masterLessons, ...authoredLessons];
   },
 
   async listUnits(gradeLevelId) {
@@ -632,34 +786,47 @@ export const plannerSupabaseSource: PlannerDataSource = {
     return map;
   },
 
-  async getSections(lessonId) {
-    // SCHEMA GAP (see header note 1): no lesson-section table. A lesson's
-    // sections are a frontend template instantiation; only the flat lesson-level
-    // `resources` jsonb persists. We expose a single synthetic section carrying
-    // the lesson's resources so the Teach/section UI has a real container to
-    // read. Headings/bodies/order do not persist until a lesson_sections table
-    // lands. Reading the master row (the contract's `lessonId` is the master id).
+  async getSections(lessonId, ownerId) {
+    // Read the persisted `lesson_sections` for this lesson, personal-fork
+    // resolved: the teacher's own (owner_id = ownerId) rows resolve over the
+    // team/master (owner_id null) rows. If there are no persisted section rows,
+    // fall back to a single synthetic section carrying the lesson's flat
+    // `resources` jsonb so reads never break.
+    const client = await sb();
+    const rows = await loadSectionRows(client, lessonId, ownerId);
+    if (rows.length > 0) return mapSectionRows(rows);
+    return [await syntheticSection(client, lessonId, ownerId)];
+  },
+
+  async getSectionsBatch(lessonIds, ownerId) {
+    // One batched call seeds every lesson's sections, killing the per-lesson
+    // N+1 at hydrate time. We do a single `.in("owner_lesson_id", lessonIds)`
+    // and group in memory, picking the personal-fork row over the team row for
+    // each (lesson, section slot). Lessons with NO persisted section rows are
+    // OMITTED from the result (the contract: callers fall back to getSections).
+    const out: Record<string, LessonSectionContent[]> = {};
+    if (lessonIds.length === 0) return out;
+
     const client = await sb();
     const res = await client
-      .from("master_core_lesson_events")
-      .select("id, resources")
-      .eq("id", lessonId)
-      .maybeSingle();
-    const row = unwrapMaybe(res, "get sections (load lesson)") as {
-      id: string;
-      resources: unknown;
-    } | null;
-    if (!row) throw new Error(`Lesson not found: ${lessonId}`);
-    const resources = jsonToResources(row.resources);
-    const section: LessonSectionContent = {
-      id: `${lessonId}-s0`,
-      templateSectionId: null,
-      heading: "Lesson",
-      prompt: "",
-      body: "",
-      resources: resources.map((r, i) => ({ ...r, id: `${lessonId}-r${i}` })),
-    };
-    return [section];
+      .from("lesson_sections")
+      .select(SECTION_COLS)
+      .in("owner_lesson_id", lessonIds)
+      .order("display_order", { ascending: true });
+    const rows = unwrap(res, "get sections batch") as SectionRow[];
+
+    // Group rows by lesson, then resolve personal-over-team within each lesson.
+    const byLesson = new Map<string, SectionRow[]>();
+    for (const row of rows) {
+      const list = byLesson.get(row.owner_lesson_id);
+      if (list) list.push(row);
+      else byLesson.set(row.owner_lesson_id, [row]);
+    }
+    for (const [lessonId, lessonRows] of byLesson) {
+      const resolved = resolvePersonalOverTeam(lessonRows, ownerId);
+      if (resolved.length > 0) out[lessonId] = mapSectionRows(resolved);
+    }
+    return out;
   },
 
   // ── Lesson mutations ─────────────────────────────────────────────────────
@@ -735,82 +902,192 @@ export const plannerSupabaseSource: PlannerDataSource = {
     return reloadLesson(client, lessonId, ownerId);
   },
 
-  async createLesson(input, ownerId) {
-    // SCHEMA GAP (see header note 2): a teacher's OWN week/day-keyed lesson with
-    // no backing master has no table in this schema —
-    // `personal_core_lesson_event_copies` requires a NOT-NULL
-    // `master_core_lesson_event_id` (+ FK), and `extra_lesson_events` is
-    // date-keyed, not week/day-keyed. Creating one would either corrupt the fork
-    // model (a copy with no master) or land in the wrong entity. Throw loudly
-    // rather than silently mis-persist.
-    void input;
-    void ownerId;
-    throw new Error(
-      "Planner repository createLesson is unavailable: the schema has no week/day-keyed personal-lesson table (personal_core_lesson_event_copies requires a master FK; extra_lesson_events is date-keyed). Add a personal-lesson table before wiring teacher-authored lessons.",
-    );
+  async createLesson(input, ownerId, gradeLevelId) {
+    // A teacher's OWN week/day-keyed lesson with no backing master lands in
+    // `personal_authored_lessons` (migration 20260601120000). The row is
+    // strictly owner-scoped (RLS: owner_id = auth.uid()). `gradeLevelId` is the
+    // RESOLVED grade uuid the row keys on; it defaults to `input.gradeLevelId`.
+    const client = await sb();
+    const grade = gradeLevelId ?? input.gradeLevelId;
+    // Resolve the subject slug → its DB uuid for this grade (the column is a
+    // NOT-NULL FK to subjects). The importer keys subjects by the slug-derived
+    // uuid, so the deterministic bridge resolves it without a round-trip.
+    const subjectUuid = slugToUuid("subject", input.subject);
+    // The unit slug may be a fixture slug or a DB uuid; the column is a nullable
+    // FK (on delete set null), so we pass the resolved uuid when it's a slug.
+    const unitUuid = input.unit ? slugToUuid("unit", input.unit) : null;
+
+    const row = {
+      owner_id: ownerId,
+      grade_level_id: grade,
+      unit_id: unitUuid,
+      subject_id: subjectUuid,
+      week_number: input.week,
+      day_of_week: dayIndexToWeekday(input.day),
+      title: input.title,
+      directions: null,
+      learning_objectives: [] as string[],
+      notes: null,
+      resources: [] as LessonResource[],
+      standards: [] as string[],
+      display_order_within_day: 0,
+      status: "not_done",
+      reason_not_done: null,
+    };
+
+    const res = await client
+      .from("personal_authored_lessons")
+      .insert(row)
+      .select(AUTHORED_COLS)
+      .single();
+    const inserted = unwrap(res, "create lesson") as AuthoredLessonRow;
+
+    // Map the inserted row back to a FLAT Lesson. Resolve subject/unit/standard
+    // slugs against the lesson's grade so the domain id matches the read path.
+    const [{ uuidToSubjectId }, { uuidToUnitSlug }, standards] =
+      await Promise.all([
+        loadSubjectIndex(client, grade),
+        loadUnitIndex(client, grade),
+        loadStandardsIndex(client, grade),
+      ]);
+    const subjectId = uuidToSubjectId.get(inserted.subject_id) ?? input.subject;
+    const unitSlug = inserted.unit_id
+      ? (uuidToUnitSlug.get(inserted.unit_id) ?? input.unit)
+      : input.unit;
+
+    return buildLesson({
+      id: inserted.id,
+      subject: subjectId,
+      unit: unitSlug,
+      week: inserted.week_number,
+      day: weekdayToDayIndex(inserted.day_of_week),
+      title: inserted.title,
+      objective: objectivesToObjective(inserted.learning_objectives),
+      directions: inserted.directions ?? "",
+      notes: inserted.notes ?? "",
+      resources: jsonToResources(inserted.resources),
+      standards: standardUuidsToCodes(inserted.standards, standards.uuidToCode),
+      status: statusFromText(inserted.status),
+      reasonNotDone: inserted.reason_not_done ?? "",
+      isPersonal: true,
+      modified: false,
+      moved: null,
+    });
   },
 
   async softDeleteLesson(lessonId, ownerId) {
-    // Soft-delete the MASTER lesson (30-day window, §4.6). RLS gates whether
-    // this teacher may write the master; the ownerId is accepted for parity with
-    // the contract but the delete targets the shared master row.
-    void ownerId;
+    // PERSONAL-scoped soft-delete (§4.6). NEVER mutates the shared master row.
+    //   • Teacher-authored lesson → set its own `deleted_at`.
+    //   • Master-derived lesson   → archive the teacher's personal copy
+    //     (`archived_at`), lazy-forking the copy first if it does not exist.
     const client = await sb();
-    const res = await client
-      .from("master_core_lesson_events")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", lessonId);
-    if (res.error) {
-      throw new Error(
-        `Planner repository soft-delete lesson failed: ${res.error.message}`,
-      );
+
+    // 1. If this is an authored lesson the owner owns, soft-delete it directly.
+    const authoredRes = await client
+      .from("personal_authored_lessons")
+      .select("id")
+      .eq("id", lessonId)
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+    const authored = unwrapMaybe(
+      authoredRes,
+      "soft-delete lesson (authored lookup)",
+    ) as { id: string } | null;
+    if (authored) {
+      const del = await client
+        .from("personal_authored_lessons")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", lessonId)
+        .eq("owner_id", ownerId);
+      if (del.error) {
+        throw new Error(
+          `Planner repository soft-delete authored lesson failed: ${del.error.message}`,
+        );
+      }
+      return;
     }
+
+    // 2. Otherwise it's a master-derived lesson: archive the owner's personal
+    //    copy. Lazy-fork the copy first (cloning master content) so a teacher
+    //    who never edited a master can still hide it for themselves.
+    await forkAndPatch(client, lessonId, ownerId, () => ({
+      archived_at: new Date().toISOString(),
+    }));
   },
 
   // ── Section + resource mutations ──────────────────────────────────────────
   async setSections(lessonId, sections, ownerId) {
-    // SCHEMA GAP (header note 1): persist only the UNION of section resources
-    // back to the lesson's flat `resources` jsonb (forking in personal mode).
-    // Section headings/bodies/order do not persist. We strip the runtime
-    // section-resource `id` so the stored shape matches the lesson `resources`
-    // jsonb contract.
+    // Persist the full section list to `lesson_sections` (personal fork: the
+    // rows are written owner-scoped, owner_id = ownerId). Replace-the-set
+    // semantics: delete the owner's existing sections for this lesson, then
+    // insert the new ordered set. Heading/prompt/body/order are preserved.
     const client = await sb();
-    const merged = flattenSectionResources(sections);
-    await forkAndPatch(client, lessonId, ownerId, () => ({
-      resources: merged,
-    }));
-    return this.getSections(lessonId);
+    const grade = await resolveLessonGrade(client, lessonId, ownerId);
+    const ownerKind = await resolveOwnerKind(client, lessonId, ownerId);
+
+    // Delete the owner's prior sections for this lesson (idempotent set-replace).
+    const del = await client
+      .from("lesson_sections")
+      .delete()
+      .eq("owner_lesson_id", lessonId)
+      .eq("owner_id", ownerId);
+    if (del.error) {
+      throw new Error(
+        `Planner repository set sections (clear) failed: ${del.error.message}`,
+      );
+    }
+
+    if (sections.length > 0) {
+      const rows = sections.map((s, i) => ({
+        owner_kind: ownerKind,
+        owner_lesson_id: lessonId,
+        owner_id: ownerId,
+        grade_level_id: grade,
+        template_section_id: s.templateSectionId,
+        heading: s.heading,
+        prompt: s.prompt,
+        body: s.body,
+        resources: s.resources,
+        display_order: i,
+      }));
+      const ins = await client.from("lesson_sections").insert(rows);
+      if (ins.error) {
+        throw new Error(
+          `Planner repository set sections (insert) failed: ${ins.error.message}`,
+        );
+      }
+    }
+
+    return this.getSections(lessonId, ownerId);
   },
 
   async addSectionResource(lessonId, sectionId, resource, ownerId) {
-    // SCHEMA GAP (header note 1): with one synthetic section, "add to a section"
-    // appends to the lesson's flat resources. `sectionId` is accepted for
-    // contract parity but every resource lives on the single implicit section.
-    void sectionId;
-    const client = await sb();
-    const current = await readResources(client, lessonId, ownerId);
-    const next = [...current, stripResourceRuntimeId(resource)];
-    await forkAndPatch(client, lessonId, ownerId, () => ({ resources: next }));
-    return this.getSections(lessonId);
+    // Append a resource to a single section. The section may be a persisted
+    // owner/team row, or a synthetic id from a not-yet-persisted lesson — in the
+    // latter case we materialize the current sections first, then append.
+    const sections = await this.getSections(lessonId, ownerId);
+    const minted: SectionResource = {
+      ...resource,
+      id:
+        (resource as Partial<SectionResource>).id ??
+        `${sectionId}-r${Date.now().toString(36)}`,
+    };
+    const next = sections.map((s) =>
+      s.id === sectionId
+        ? { ...s, resources: [...s.resources, minted] }
+        : s,
+    );
+    return this.setSections(lessonId, next, ownerId);
   },
 
   async removeSectionResource(lessonId, sectionId, resourceId, ownerId) {
-    // SCHEMA GAP (header note 1): the synthetic section assigns each resource a
-    // derived id `${lessonId}-r<index>`; removing by that id drops the matching
-    // index from the flat resources array.
-    void sectionId;
-    const client = await sb();
-    const current = await readResources(client, lessonId, ownerId);
-    const prefix = `${lessonId}-r`;
-    const idx = resourceId.startsWith(prefix)
-      ? Number.parseInt(resourceId.slice(prefix.length), 10)
-      : -1;
-    const next =
-      idx >= 0 && idx < current.length
-        ? current.filter((_, i) => i !== idx)
-        : current;
-    await forkAndPatch(client, lessonId, ownerId, () => ({ resources: next }));
-    return this.getSections(lessonId);
+    const sections = await this.getSections(lessonId, ownerId);
+    const next = sections.map((s) =>
+      s.id === sectionId
+        ? { ...s, resources: s.resources.filter((r) => r.id !== resourceId) }
+        : s,
+    );
+    return this.setSections(lessonId, next, ownerId);
   },
 };
 
@@ -851,6 +1128,9 @@ async function loadCopy(
  * cloning the master's fields on first edit — then applies `patch(copy)` to it
  * and marks it diverged. NEVER mutates the master row. Upsert is keyed on the
  * table's `unique (teacher_id, master_core_lesson_event_id)` constraint.
+ *
+ * `grade_level_id` is denormalized onto the copy too (kept filled by the table's
+ * BEFORE trigger, but we set it explicitly from the master for clarity).
  */
 async function forkAndPatch(
   client: ServerClient,
@@ -866,6 +1146,7 @@ async function forkAndPatch(
     ? {
         teacher_id: existing.teacher_id,
         master_core_lesson_event_id: existing.master_core_lesson_event_id,
+        grade_level_id: existing.grade_level_id,
         unit_id: existing.unit_id,
         subject_id: existing.subject_id,
         week_number: existing.week_number,
@@ -878,10 +1159,12 @@ async function forkAndPatch(
         standards: existing.standards,
         display_order_within_day: existing.display_order_within_day,
         is_diverged_from_master: existing.is_diverged_from_master,
+        archived_at: existing.archived_at,
       }
     : {
         teacher_id: ownerId,
         master_core_lesson_event_id: master.id,
+        grade_level_id: master.grade_level_id,
         unit_id: master.unit_id,
         subject_id: master.subject_id,
         week_number: master.week_number,
@@ -894,6 +1177,7 @@ async function forkAndPatch(
         standards: master.standards,
         display_order_within_day: master.display_order_within_day,
         is_diverged_from_master: false,
+        archived_at: null,
       };
 
   const applied = patch(existing);
@@ -959,7 +1243,8 @@ async function writeStatus(
 
 /** Re-read a single lesson (personal-over-master + completion) after a mutation
  *  and map it to the FLAT domain Lesson. Resolves subject/unit/standard slugs
- *  by deriving the grade from the lesson's unit. */
+ *  by deriving the grade from the lesson's denormalized grade column (fallback:
+ *  the lesson's unit). */
 async function reloadLesson(
   client: ServerClient,
   lessonId: string,
@@ -967,27 +1252,34 @@ async function reloadLesson(
 ): Promise<Lesson> {
   const master = await loadMaster(client, lessonId);
 
-  // Derive the grade from the lesson's unit so subject/standard slugs resolve.
-  const unitRes = await client
-    .from("units")
-    .select("id, grade_level_id, subject_id, name, start_week, end_week")
-    .eq("id", master.unit_id)
-    .maybeSingle();
-  const unitRow = unwrapMaybe(unitRes, "reload lesson unit") as UnitRow | null;
-  if (!unitRow) throw new Error(`Unit not found for lesson: ${lessonId}`);
-  const gradeLevelId = unitRow.grade_level_id;
+  // Prefer the denormalized grade column; fall back to the unit's grade if the
+  // column is somehow null (pre-backfill rows).
+  let gradeLevelId = master.grade_level_id;
+  let unitRow: UnitRow | null = null;
+  if (!gradeLevelId) {
+    const unitRes = await client
+      .from("units")
+      .select(UNIT_COLS)
+      .eq("id", master.unit_id)
+      .maybeSingle();
+    unitRow = unwrapMaybe(unitRes, "reload lesson unit") as UnitRow | null;
+    if (!unitRow) throw new Error(`Unit not found for lesson: ${lessonId}`);
+    gradeLevelId = unitRow.grade_level_id;
+  }
 
-  const [{ uuidToSubjectId }, standards, copy, complRes] = await Promise.all([
-    loadSubjectIndex(client, gradeLevelId),
-    loadStandardsIndex(client, gradeLevelId),
-    loadCopy(client, lessonId, ownerId),
-    client
-      .from("completion_status")
-      .select(COMPLETION_COLS)
-      .eq("teacher_id", ownerId)
-      .eq("core_lesson_event_id", lessonId)
-      .maybeSingle(),
-  ]);
+  const [{ uuidToSubjectId }, { uuidToUnitSlug }, standards, copy, complRes] =
+    await Promise.all([
+      loadSubjectIndex(client, gradeLevelId),
+      loadUnitIndex(client, gradeLevelId),
+      loadStandardsIndex(client, gradeLevelId),
+      loadCopy(client, lessonId, ownerId),
+      client
+        .from("completion_status")
+        .select(COMPLETION_COLS)
+        .eq("teacher_id", ownerId)
+        .eq("core_lesson_event_id", lessonId)
+        .maybeSingle(),
+    ]);
   if (complRes.error) {
     throw new Error(
       `Planner repository reload completion failed: ${complRes.error.message}`,
@@ -999,7 +1291,7 @@ async function reloadLesson(
   return buildLesson({
     id: master.id,
     subject: uuidToSubjectId.get(src.subject_id) ?? "math",
-    unit: src.unit_id, // uuid-as-slug (see loadUnitIndex note)
+    unit: uuidToUnitSlug.get(src.unit_id) ?? src.unit_id,
     week: src.week_number,
     day: weekdayToDayIndex(src.day_of_week),
     title: src.title,
@@ -1016,39 +1308,176 @@ async function reloadLesson(
   });
 }
 
+// ── Section read/resolve helpers ──────────────────────────────────────────────
+
+/** Load the `lesson_sections` rows for one lesson, personal-fork resolved (the
+ *  owner's rows resolve over the team/master rows). Returns the resolved set in
+ *  display order. */
+async function loadSectionRows(
+  client: ServerClient,
+  lessonId: string,
+  ownerId: string | undefined,
+): Promise<SectionRow[]> {
+  const res = await client
+    .from("lesson_sections")
+    .select(SECTION_COLS)
+    .eq("owner_lesson_id", lessonId)
+    .order("display_order", { ascending: true });
+  const rows = unwrap(res, "get sections") as SectionRow[];
+  return resolvePersonalOverTeam(rows, ownerId);
+}
+
+/** Resolve a lesson's section rows personal-over-team: if the owner has ANY of
+ *  their own (owner_id = ownerId) rows for this lesson, use ONLY those; else use
+ *  the team/master (owner_id null) rows. (A teacher who has edited sections owns
+ *  the full set — set-replace semantics in `setSections` guarantee this.) */
+function resolvePersonalOverTeam(
+  rows: SectionRow[],
+  ownerId: string | undefined,
+): SectionRow[] {
+  if (ownerId) {
+    const own = rows.filter((r) => r.owner_id === ownerId);
+    if (own.length > 0) {
+      return [...own].sort((a, b) => a.display_order - b.display_order);
+    }
+  }
+  return rows
+    .filter((r) => r.owner_id == null)
+    .sort((a, b) => a.display_order - b.display_order);
+}
+
+/** Map persisted section rows → the domain `LessonSectionContent[]`. */
+function mapSectionRows(rows: SectionRow[]): LessonSectionContent[] {
+  return rows.map((row) => ({
+    id: row.id,
+    templateSectionId: row.template_section_id,
+    heading: row.heading,
+    prompt: row.prompt,
+    body: row.body,
+    resources: jsonToSectionResources(row.resources, row.id),
+  }));
+}
+
+/** Build the synthetic single section for a lesson that has no persisted section
+ *  rows yet — it carries the lesson's effective (personal-fork-resolved) flat
+ *  `resources` so the section UI has a real container to read. */
+async function syntheticSection(
+  client: ServerClient,
+  lessonId: string,
+  ownerId: string | undefined,
+): Promise<LessonSectionContent> {
+  const resources = await readResources(client, lessonId, ownerId);
+  return {
+    id: `${lessonId}-s0`,
+    templateSectionId: null,
+    heading: "Lesson",
+    prompt: "",
+    body: "",
+    resources: resources.map((r, i) => ({ ...r, id: `${lessonId}-r${i}` })),
+  };
+}
+
 /** Read the effective resources for a lesson (personal copy where one exists,
- *  else master) as a typed array. */
+ *  else master; or the authored lesson's own resources) as a typed array. */
 async function readResources(
   client: ServerClient,
   lessonId: string,
-  ownerId: string,
+  ownerId: string | undefined,
 ): Promise<LessonResource[]> {
-  const copy = await loadCopy(client, lessonId, ownerId);
-  if (copy) return jsonToResources(copy.resources);
-  const master = await loadMaster(client, lessonId);
-  return jsonToResources(master.resources);
-}
-
-/** Strip a section resource's runtime `id` so the persisted shape matches the
- *  lesson-level `resources` jsonb contract (which has no per-resource id). */
-function stripResourceRuntimeId(resource: LessonResource): LessonResource {
-  // `LessonResource` itself has no `id`; a `SectionResource` adds one. Spread
-  // the resource and drop any stray `id` defensively.
-  const out: Record<string, unknown> = { ...resource };
-  delete out.id;
-  return out as unknown as LessonResource;
-}
-
-/** Flatten the per-section resources into a single lesson-level array, stripping
- *  runtime ids (privacy/contract — sections are a frontend construct). */
-function flattenSectionResources(
-  sections: LessonSectionContent[],
-): LessonResource[] {
-  const out: LessonResource[] = [];
-  for (const section of sections) {
-    for (const r of section.resources) {
-      out.push(stripResourceRuntimeId(r));
-    }
+  if (ownerId) {
+    const copy = await loadCopy(client, lessonId, ownerId);
+    if (copy) return jsonToResources(copy.resources);
   }
-  return out;
+  // Try the master row; if absent, try a teacher-authored lesson.
+  const masterRes = await client
+    .from("master_core_lesson_events")
+    .select("id, resources")
+    .eq("id", lessonId)
+    .maybeSingle();
+  const master = unwrapMaybe(masterRes, "read resources (master)") as {
+    id: string;
+    resources: unknown;
+  } | null;
+  if (master) return jsonToResources(master.resources);
+
+  const authoredRes = await client
+    .from("personal_authored_lessons")
+    .select("id, resources")
+    .eq("id", lessonId)
+    .maybeSingle();
+  const authored = unwrapMaybe(authoredRes, "read resources (authored)") as {
+    id: string;
+    resources: unknown;
+  } | null;
+  if (authored) return jsonToResources(authored.resources);
+
+  throw new Error(`Lesson not found: ${lessonId}`);
+}
+
+/** Resolve the grade uuid for a lesson (master or authored) — used when writing
+ *  `lesson_sections.grade_level_id` (NOT NULL). */
+async function resolveLessonGrade(
+  client: ServerClient,
+  lessonId: string,
+  ownerId: string,
+): Promise<string> {
+  // Master lesson: prefer the denormalized grade column.
+  const masterRes = await client
+    .from("master_core_lesson_events")
+    .select("id, grade_level_id, unit_id")
+    .eq("id", lessonId)
+    .maybeSingle();
+  const master = unwrapMaybe(masterRes, "resolve lesson grade (master)") as {
+    id: string;
+    grade_level_id: string | null;
+    unit_id: string;
+  } | null;
+  if (master) {
+    if (master.grade_level_id) return master.grade_level_id;
+    const unitRes = await client
+      .from("units")
+      .select("grade_level_id")
+      .eq("id", master.unit_id)
+      .maybeSingle();
+    const unit = unwrapMaybe(unitRes, "resolve lesson grade (unit)") as {
+      grade_level_id: string;
+    } | null;
+    if (unit) return unit.grade_level_id;
+  }
+
+  // Authored lesson the owner owns.
+  const authoredRes = await client
+    .from("personal_authored_lessons")
+    .select("id, grade_level_id")
+    .eq("id", lessonId)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+  const authored = unwrapMaybe(
+    authoredRes,
+    "resolve lesson grade (authored)",
+  ) as { id: string; grade_level_id: string } | null;
+  if (authored) return authored.grade_level_id;
+
+  throw new Error(`Lesson not found (resolve grade): ${lessonId}`);
+}
+
+/** Resolve the `lesson_owner_kind` for a section row this owner is writing. A
+ *  master-derived lesson the teacher edits is a `personal_copy` section (owner-
+ *  scoped); a teacher-authored lesson is `personal_authored`. */
+async function resolveOwnerKind(
+  client: ServerClient,
+  lessonId: string,
+  ownerId: string,
+): Promise<"personal_copy" | "personal_authored"> {
+  const authoredRes = await client
+    .from("personal_authored_lessons")
+    .select("id")
+    .eq("id", lessonId)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+  const authored = unwrapMaybe(
+    authoredRes,
+    "resolve owner kind (authored)",
+  ) as { id: string } | null;
+  return authored ? "personal_authored" : "personal_copy";
 }
