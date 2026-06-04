@@ -458,6 +458,16 @@ const INITIAL_DOC: PlannerDoc = {
   cellLayouts: {},
 };
 
+/** An empty document — no lessons, no sections, no layouts. Used ONLY when the
+ *  Supabase flag is ON to avoid showing mock/prior-user data while loading,
+ *  for a signed-out / no-grade / empty-result / errored owner. Never used with
+ *  the flag OFF (the prototype path always renders INITIAL_DOC). */
+const EMPTY_DOC: PlannerDoc = {
+  lessons: [],
+  sections: {},
+  cellLayouts: {},
+};
+
 const INITIAL_HISTORY: HistoryState = {
   past: [],
   present: INITIAL_DOC,
@@ -1421,31 +1431,48 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const gradeLevelIdRef = useRef<string | null>(null);
 
   // ── Backend hydration (planner Supabase seam) ──────────────────────────
-  // When NEXT_PUBLIC_PLANNER_USE_SUPABASE=1 AND we have a real auth uid,
-  // replace the mock-seeded document with real lessons + sections from the
-  // backend. With the flag OFF this effect is a no-op and the store renders the
-  // mock fixtures exactly as before. The grade uuid is resolved from the owner
-  // (never hard-coded); a null owner or null grade skips hydrate so we never
-  // send null / the mock slug to the backend. Hydration resets undo/redo (a
-  // load is not an undoable edit). Errors are surfaced (console.error) but
-  // non-fatal → the mock document stays visible rather than a blank planner.
+  // When NEXT_PUBLIC_PLANNER_USE_SUPABASE=1, the document is sourced ENTIRELY
+  // from the backend for the CURRENT auth owner — the mock fixtures are never
+  // shown under the flag. With the flag OFF this effect is a no-op and the
+  // store renders the mock fixtures exactly as before (byte-identical).
   //
-  // Re-runs when the auth uid changes (sign-in resolving after first paint):
-  // an unconfigured run still short-circuits on the flag check.
+  // Leak guard (finding #4): under the flag we must never show mock data nor a
+  // prior owner's data. So:
+  //   • The effect re-runs whenever the owner id changes (added to deps).
+  //   • It resets to EMPTY_DOC synchronously at the top of every run, BEFORE
+  //     awaiting, so stale data from a previous owner / the mock seed is gone
+  //     while the new owner's lessons load.
+  //   • A null owner (signed out / session not resolved) loads EMPTY_DOC — not
+  //     the mock — and stops.
+  //   • A null grade, an empty result, or any error loads EMPTY_DOC — never the
+  //     mock LESSONS — so another teacher's data / Grade-5 fixtures can't leak.
+  // Hydration resets undo/redo (a load is not an undoable edit); EMPTY_DOC is
+  // hydrated the same way so the history baseline is the empty doc, not stale
+  // mock content.
   const ownerId = currentUser.id;
   useEffect(() => {
-    if (!isPlannerSupabaseConfigured()) return;
-    if (!ownerId) return; // session not resolved / signed out → keep mock doc
+    if (!isPlannerSupabaseConfigured()) return; // flag OFF → keep mock, no-op
+
+    // Reset stale data immediately. Without this, a sign-out / account switch /
+    // slow load would leave the previous owner's (or the mock) document on
+    // screen until the async work resolved.
+    gradeLevelIdRef.current = null;
+    dispatchRef.current({ type: "hydrate", doc: EMPTY_DOC });
+
+    if (!ownerId) return; // signed out / session not resolved → empty doc
+
     let alive = true;
     void (async () => {
       try {
         const gradeLevelId = await resolveGrade(ownerId);
-        if (!alive || !gradeLevelId) return; // no grade → keep mock doc
+        if (!alive) return;
+        if (!gradeLevelId) return; // no grade → stay EMPTY_DOC (never mock)
         // Stash the resolved grade uuid so createLesson tees (duplicate*) have a
         // real grade to key new rows on without re-resolving per call.
         gradeLevelIdRef.current = gradeLevelId;
         const lessons = await plannerClient.listLessons(gradeLevelId, ownerId);
-        if (!alive || lessons.length === 0) return;
+        if (!alive) return;
+        if (lessons.length === 0) return; // genuinely empty → stay EMPTY_DOC
         // Batched section hydrate — one round-trip seeds every lesson's
         // sections (kills the prior per-lesson N+1). Lessons the batch omits
         // (no persisted sections) fall back to empty via ensureSections.
@@ -1459,9 +1486,11 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
           doc: { lessons, sections, cellLayouts: {} },
         });
       } catch (err) {
-        // Keep the mock document on any backend/auth error, but surface it so a
-        // failed hydrate is visible rather than silently leaving stale mock data.
-        console.error("[planner] hydrate failed; keeping mock document", err);
+        // On any backend/auth error, stay on EMPTY_DOC (already hydrated above)
+        // rather than falling back to the mock — surfacing mock/Grade-5 fixtures
+        // as if they were live data would be worse than an honest blank planner.
+        // Surface the failure so a dropped hydrate is visible in the console.
+        console.error("[planner] hydrate failed; showing empty document", err);
       }
     })();
     return () => {
@@ -1526,15 +1555,21 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     ) => {
       dispatchRef.current({ type: "moveLesson", id, patch });
       if (patch.week != null || patch.day != null) {
-        persist(
-          "moveLesson",
-          id,
-          { week: patch.week ?? 0, day: patch.day ?? 0 },
-          ownerIdRef.current ?? "",
-        );
+        // Persist the lesson's RESOLVED final slot, not the bare patch. Call
+        // sites (e.g. the weekly board) pass only { day }; sending that raw lets
+        // an omitted `week` default to 0 server-side, persisting the lesson into
+        // week 0 so it vanishes on reload (finding #8). Merge the patch over the
+        // current lesson so an unchanged axis keeps its real value.
+        // NOTE: the move contract (LessonMoveTarget) is slot-only (week/day);
+        // it has no subject field, so a subject-only move is reducer-local and
+        // does not tee here — matching the prior behavior.
+        const current = present.lessons.find((l) => l.id === id);
+        const week = patch.week ?? current?.week ?? 0;
+        const day = patch.day ?? current?.day ?? 0;
+        persist("moveLesson", id, { week, day }, ownerIdRef.current ?? "");
       }
     },
-    [persist],
+    [persist, present.lessons],
   );
 
   const setLessonStatus = useCallback(
@@ -1565,75 +1600,35 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [persist],
   );
 
-  const duplicateLesson = useCallback(
-    (id: string) => {
-      dispatchRef.current({ type: "duplicateLesson", id });
-      // Persist the duplicate as a fresh personal lesson. We read the source off
-      // the latest present doc (via the ref-stable presentRef) for its slot +
-      // metadata. KNOWN LIMITATIONS (no reducer rewrite allowed here):
-      //   1. ID DRIFT — the source's createLesson mints its own row id, which
-      //      will not match the optimistic id the reducer assigned. Subsequent
-      //      edits to the duplicate before a reload tee against the optimistic
-      //      id and won't reach this new row; a reload re-reads the backend and
-      //      reconciles. Closing this needs a server "duplicate" verb or an
-      //      id-reconcile dispatch — both out of scope for this seam pass.
-      //   2. CONTENT NOT COPIED — createLesson writes a blank lesson (empty
-      //      objective/sections); the reducer's deep copy of content/sections is
-      //      not replayed to the backend. The follow-up that persists section
-      //      content for created lessons lands with the master-snapshot work.
-      // Skipped entirely when the grade uuid hasn't resolved yet (createLesson
-      // needs a real grade) — the optimistic row still renders.
-      const source = present.lessons.find((l) => l.id === id);
-      const gradeLevelId = gradeLevelIdRef.current;
-      if (source && gradeLevelId) {
-        persist(
-          "createLesson",
-          {
-            gradeLevelId,
-            subject: source.subject,
-            unit: source.unit,
-            week: source.week,
-            day: source.day,
-            title: source.title,
-          },
-          ownerIdRef.current ?? "",
-          gradeLevelId,
-        );
-      }
-    },
-    [persist, present.lessons],
-  );
+  const duplicateLesson = useCallback((id: string) => {
+    dispatchRef.current({ type: "duplicateLesson", id });
+    // DELIBERATELY NOT PERSISTED (finding #10). Teeing this to `createLesson`
+    // wrote a CORRUPT row: the backend mints its own id (≠ the reducer's
+    // optimistic id) and createLesson writes a blank lesson, so neither the
+    // duplicated content/sections nor follow-up edits keyed to the optimistic
+    // id reach the server. Writing corrupt blank rows is worse than not
+    // persisting, so the duplicate stays reducer-local until a proper server
+    // "duplicate" verb exists.
+    // TODO: durable duplication needs a server-side `duplicateLesson` op that
+    // deep-copies content + sections and RETURNS the real row id so the store
+    // can reconcile the optimistic id. Until then a reload will not show the
+    // duplicate — honest and non-corrupting.
+  }, []);
 
   const duplicateWeek = useCallback(
     (sourceWeek: number, targetWeek: number) => {
       dispatchRef.current({ type: "duplicateWeek", sourceWeek, targetWeek });
-      // Persist one createLesson per copied lesson. Same two limitations as
-      // duplicateLesson (id drift + content-not-copied); see that callsite. Each
-      // new row is a blank personal lesson in the target week at the source's
-      // slot. Skipped when no grade uuid is resolved.
-      const gradeLevelId = gradeLevelIdRef.current;
-      if (gradeLevelId) {
-        const ownerId = ownerIdRef.current ?? "";
-        for (const source of present.lessons.filter(
-          (l) => l.week === sourceWeek,
-        )) {
-          persist(
-            "createLesson",
-            {
-              gradeLevelId,
-              subject: source.subject,
-              unit: source.unit,
-              week: targetWeek,
-              day: source.day,
-              title: source.title,
-            },
-            ownerId,
-            gradeLevelId,
-          );
-        }
-      }
+      // DELIBERATELY NOT PERSISTED (finding #10). Same corruption as
+      // duplicateLesson: teeing each copy to `createLesson` wrote blank rows
+      // with backend-minted ids that don't match the optimistic ids, losing the
+      // copied content/sections. Stays reducer-local until a server "duplicate"
+      // verb exists.
+      // TODO: durable week-duplication needs a server op that deep-copies each
+      // lesson (content + sections) into the target week and returns the real
+      // row ids for reconciliation. Until then a reload will not show the copied
+      // week — honest and non-corrupting.
     },
-    [persist, present.lessons],
+    [],
   );
 
   const setSaveTarget = useCallback(

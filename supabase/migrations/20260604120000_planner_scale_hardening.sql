@@ -76,17 +76,19 @@ update personal_core_lesson_event_copies p
    and m.grade_level_id is not null;
 
 -- --- keep-filled trigger function (shared shape, one fn per table) ---------
--- On INSERT/UPDATE, if the caller did not supply grade_level_id, derive it from
--- the row's unit_id. Lets every write path stay grade-agnostic while the column
--- is always populated for the read policies below.
+-- On INSERT/UPDATE, ALWAYS derive grade_level_id from the row's unit_id,
+-- unconditionally overwriting any client-supplied value. This is deliberate:
+-- the read policies below trust this denormalized column for grade-scoped RLS,
+-- so it must be authoritative and can never be set (or left stale) by the
+-- client. A master editor cannot mis-scope a lesson by passing a wrong grade or
+-- by changing unit_id without updating the grade — the grade always tracks the
+-- unit on every write.
 create or replace function set_master_event_grade_level()
 returns trigger
 language plpgsql
 as $$
 begin
-  if new.grade_level_id is null then
-    new.grade_level_id := (select grade_level_id from units where id = new.unit_id);
-  end if;
+  new.grade_level_id := (select grade_level_id from units where id = new.unit_id);
   return new;
 end;
 $$;
@@ -96,9 +98,7 @@ returns trigger
 language plpgsql
 as $$
 begin
-  if new.grade_level_id is null then
-    new.grade_level_id := (select grade_level_id from units where id = new.unit_id);
-  end if;
+  new.grade_level_id := (select grade_level_id from units where id = new.unit_id);
   return new;
 end;
 $$;
@@ -173,9 +173,11 @@ create index if not exists idx_boards_published_by
 -- ## SECTION 4 — OPTIMIZE can_read_grade()  (was M1:1139)
 -- ###########################################################################
 -- Same security semantics as the original: TRUE iff the caller is assigned to
--- the grade OR is an admin of that grade's school. The teacher branch is
--- rewritten to `= ANY(auth_teacher_grade_ids())` so the assignment set is
--- evaluated once; the school-admin EXISTS is the short-circuited second branch.
+-- the grade OR is an admin of that grade's school. The teacher branch tests
+-- membership in the assignment set via `in (select auth_teacher_grade_ids())`
+-- — auth_teacher_grade_ids() returns SETOF uuid (NOT an array), so it must be
+-- consumed as a subquery; `= ANY(srf)` would be invalid SQL. The school-admin
+-- EXISTS is the short-circuited second branch.
 -- Signature, SECURITY DEFINER, STABLE, and search_path are all unchanged.
 create or replace function can_read_grade(p_grade_level_id uuid)
 returns boolean
@@ -183,7 +185,7 @@ language sql stable security definer
 set search_path = public
 as $$
   select
-    p_grade_level_id = any (auth_teacher_grade_ids())
+    p_grade_level_id in (select auth_teacher_grade_ids())
     or exists (
       select 1
       from grade_levels g
@@ -275,6 +277,11 @@ drop policy if exists audit_log_insert on audit_log;
 create policy audit_log_insert on audit_log for insert with check (
   actor_teacher_id = auth.uid()
 );
+-- NOTE: this policy still permits a direct client INSERT as long as the row
+-- stamps the caller's own id (an authenticated user logging as themselves is
+-- acceptable; impersonating another actor is blocked by the check). The
+-- log_audit_event() RPC below is the preferred path — it stamps the actor
+-- server-side so application code never sets actor_teacher_id at all.
 
 -- Sanctioned server path: a SECURITY DEFINER RPC that stamps
 -- actor_teacher_id = auth.uid() server-side so application code never sets the
@@ -296,6 +303,14 @@ as $$
 declare
   v_id uuid;
 begin
+  -- This is SECURITY DEFINER and bypasses RLS, so it must never run for an
+  -- unauthenticated caller — otherwise auth.uid() is NULL and the row would be
+  -- stamped with a null actor, re-opening the forgery hole. Require an
+  -- authenticated caller before inserting.
+  if auth.uid() is null then
+    raise exception 'log_audit_event requires an authenticated caller';
+  end if;
+
   insert into audit_log (
     actor_teacher_id,
     grade_level_id,
@@ -318,6 +333,12 @@ begin
   return v_id;
 end;
 $$;
+
+-- A SECURITY DEFINER function defaults to EXECUTE granted to PUBLIC, which would
+-- let the anon role call it and (since the function bypasses RLS) insert an
+-- audit row with a null actor. Lock execute down to authenticated callers only.
+revoke execute on function log_audit_event(audit_action, text, uuid, uuid, uuid, jsonb) from public;
+grant execute on function log_audit_event(audit_action, text, uuid, uuid, uuid, jsonb) to authenticated;
 
 
 -- ###########################################################################
