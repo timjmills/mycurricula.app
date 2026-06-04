@@ -98,6 +98,7 @@
   font-weight: 700;
   line-height: 1.2;
   color: var(--ink);
+  text-align: center;
   text-wrap: pretty;
   overflow-wrap: anywhere;
   /* Single line — the dense chip stays short; full title is in the detail panel. */
