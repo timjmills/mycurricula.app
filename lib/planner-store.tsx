@@ -43,7 +43,10 @@ import type {
   Lesson,
   LessonResource,
   LessonStatus,
+  StandardsMap,
+  Subject,
   SubjectId,
+  Unit,
 } from "@/lib/types";
 import type { LessonSectionContent, SectionResource } from "@/lib/lesson-flow";
 import {
@@ -57,7 +60,7 @@ import {
 } from "@/lib/lesson-flow";
 import type { CellLayout } from "@/lib/cell-layout";
 import { cellKey, isTrivialLayout } from "@/lib/cell-layout";
-import { LESSONS } from "@/lib/mock";
+import { LESSONS, ALL_UNITS, UNITS, SUBJECTS, STANDARDS } from "@/lib/mock";
 import { useAppState } from "@/lib/app-state";
 import { plannerClient } from "@/lib/planner/client";
 import { resolveGrade } from "@/lib/planner/grade";
@@ -88,6 +91,30 @@ export interface PlannerDoc {
   /** Arranged cell layouts keyed by cellKey(subjectId, day).
    *  Empty record = every cell uses its default CardStack view. */
   cellLayouts: Record<string, CellLayout>;
+}
+
+// ── Catalog model ────────────────────────────────────────────────────────────
+
+/** The planner CATALOG — the read-only reference data every view filters and
+ *  labels against: the grade's subjects, its full-year unit superset, its
+ *  standards map, and the active grade id. This is deliberately a SIBLING of the
+ *  document (not part of PlannerDoc) so it NEVER enters the undo/redo history —
+ *  editing a lesson must not put the subject list on the undo stack. The store
+ *  hydrates it once per owner alongside the lessons (one dispatch) and replaces
+ *  it wholesale on an owner change; it is never mutated by content actions. */
+export interface PlannerCatalog {
+  /** The 8 locked subjects for the grade, in display order. */
+  subjects: Subject[];
+  /** The FULL-YEAR unit superset for the grade (every unit any lesson may
+   *  reference) — NOT the active-unit-per-subject map. Views that show all units
+   *  (SubjectView, TimelineYear) filter this by subject; the active-unit map is
+   *  derived separately (see `activeUnitBySubject` on PlannerValue). */
+  units: Unit[];
+  /** Standards (code → description) for the grade's assigned frameworks. */
+  standards: StandardsMap;
+  /** The resolved active grade uuid (or the mock "g5" slug under the flag OFF),
+   *  or null when no grade is resolved (signed out / no assignment / error). */
+  activeGradeId: string | null;
 }
 
 // ── History ────────────────────────────────────────────────────────────────
@@ -121,12 +148,7 @@ interface HistoryState {
  *  • "empty"   — hydrate completed but the owner has no lessons (signed-out,
  *                no grade, or a genuinely empty result).
  *  • "error"   — the hydrate threw; the document is empty (never mock). */
-export type PlannerHydration =
-  | "idle"
-  | "loading"
-  | "ready"
-  | "empty"
-  | "error";
+export type PlannerHydration = "idle" | "loading" | "ready" | "empty" | "error";
 
 // ── lastChange signal ──────────────────────────────────────────────────────
 
@@ -329,12 +351,21 @@ type RedoAction = { type: "redo" };
 type HydrateAction = {
   type: "hydrate";
   doc: PlannerDoc;
+  /** The catalog hydrated alongside the document, so lessons + sections +
+   *  catalog land in ONE dispatch — there is never a frame where the lessons
+   *  are live but the catalog is still stale (or vice versa). */
+  catalog: PlannerCatalog;
   hydration: PlannerHydration;
   owner: string | null;
 };
 /** Update only the hydration lifecycle flag (e.g. flip to "loading" before an
  *  async hydrate begins) without touching the document or history. */
 type SetHydrationAction = { type: "setHydration"; hydration: PlannerHydration };
+/** Replace ONLY the catalog slice (subjects/units/standards/grade) without
+ *  touching the document or the undo/redo history. Mirrors setHydration: a
+ *  non-history side-channel. Used if the catalog ever needs to settle
+ *  independently of a full hydrate; the slice is never part of undo/redo. */
+type SetCatalogAction = { type: "setCatalog"; catalog: PlannerCatalog };
 
 type PlannerAction =
   | MoveLessonAction
@@ -363,7 +394,8 @@ type PlannerAction =
   | UndoAction
   | RedoAction
   | HydrateAction
-  | SetHydrationAction;
+  | SetHydrationAction
+  | SetCatalogAction;
 
 // ── Human labels for undo/redo tooltips ──────────────────────────────────
 
@@ -513,6 +545,50 @@ const EMPTY_DOC: PlannerDoc = {
  *  client render — no hydration mismatch. */
 function pickInitialDoc(): PlannerDoc {
   return isPlannerSupabaseConfigured() ? EMPTY_DOC : INITIAL_DOC;
+}
+
+// ── Initial catalog ──────────────────────────────────────────────────────────
+
+/** The catalog the store paints on the FIRST render with the Supabase flag OFF.
+ *  It MUST reproduce exactly what views read from `lib/mock` today (R1/R2):
+ *   • `subjects` = a copy of SUBJECTS (the 8 locked subjects, display order).
+ *   • `units`    = the FULL-YEAR superset ALL_UNITS — the set SubjectView and
+ *                  TimelineYear filter over. (NOT the active-8 UNITS map; the
+ *                  active-unit-per-subject map is derived in the provider from
+ *                  this superset and, under the flag OFF, pinned to the mock
+ *                  UNITS map for byte-identical WeeklyGrid output.)
+ *   • `standards`= the STANDARDS map (referential — describeStandard reads it).
+ *   • `activeGradeId` = "g5" — the single mock grade (mirrors
+ *                  plannerMockSource.getActiveGradeLevelId). */
+const INITIAL_CATALOG: PlannerCatalog = {
+  subjects: [...SUBJECTS],
+  units: [...ALL_UNITS],
+  standards: STANDARDS,
+  activeGradeId: "g5",
+};
+
+/** An empty catalog — no subjects, no units, no standards, no grade. Used ONLY
+ *  when the Supabase flag is ON to avoid showing mock catalog data while
+ *  loading (and for a signed-out / no-grade / empty-result / errored owner).
+ *  Never used with the flag OFF (the prototype path always renders
+ *  INITIAL_CATALOG). Mirrors EMPTY_DOC's leak-guard role for the catalog. */
+const EMPTY_CATALOG: PlannerCatalog = {
+  subjects: [],
+  units: [],
+  standards: {},
+  activeGradeId: null,
+};
+
+/** The catalog the store paints on the FIRST server/client render, before any
+ *  backend hydrate runs. Mirrors `pickInitialDoc()` exactly: flag OFF → the mock
+ *  catalog (byte-identical to the prototype path); flag ON → EMPTY_CATALOG, so
+ *  the first paint shows "nothing yet" instead of flashing mock fixtures or a
+ *  prior owner's catalog before the hydrate effect resolves.
+ *
+ *  SSR-SAFE for the same reason as pickInitialDoc(): isPlannerSupabaseConfigured()
+ *  reads only NEXT_PUBLIC_* env vars, inlined identically server/client. */
+function pickInitialCatalog(): PlannerCatalog {
+  return isPlannerSupabaseConfigured() ? EMPTY_CATALOG : INITIAL_CATALOG;
 }
 
 /** The hydration lifecycle for the first render. Flag OFF → "ready" (the mock is
@@ -1017,6 +1093,11 @@ interface HistoryReducerState {
    *  the current owner to gate readiness — a mismatch means the doc on screen
    *  belongs to a prior owner and must not be treated as ready. */
   hydratedForOwner: string | null;
+  /** The reference catalog (subjects/units/standards/grade). A SIBLING of
+   *  `history` — it is replaced wholesale on hydrate/setCatalog and NEVER enters
+   *  the undo/redo stacks (editing a lesson must not put the subject list on the
+   *  undo stack). */
+  catalog: PlannerCatalog;
 }
 
 const INITIAL_REDUCER_STATE: HistoryReducerState = {
@@ -1028,6 +1109,8 @@ const INITIAL_REDUCER_STATE: HistoryReducerState = {
   // Flag OFF → the mock belongs to no specific owner; null is correct and the
   // provider's owner-gating is bypassed under the flag (see effectiveHydration).
   hydratedForOwner: null,
+  // Flag OFF → the mock catalog; flag ON → EMPTY_CATALOG until a hydrate lands.
+  catalog: pickInitialCatalog(),
 };
 
 function historyReducer(
@@ -1104,6 +1187,9 @@ function historyReducer(
       lastChange: null,
       hydration: action.hydration,
       hydratedForOwner: action.owner,
+      // Catalog lands in the SAME dispatch as the document — no frame where the
+      // lessons are live but the catalog is stale (or vice versa).
+      catalog: action.catalog,
     };
   }
 
@@ -1114,6 +1200,14 @@ function historyReducer(
   if (action.type === "setHydration") {
     if (state.hydration === action.hydration) return state; // no-op
     return { ...state, hydration: action.hydration };
+  }
+
+  // ── Set catalog ───────────────────────────────────────────────────────
+  // Replace ONLY the catalog slice (no document/history change). Mirrors
+  // setHydration as a non-history side-channel: spread `...state` so the
+  // undo/redo stacks are untouched. Never fires with the flag OFF.
+  if (action.type === "setCatalog") {
+    return { ...state, catalog: action.catalog };
   }
 
   // ── Content mutations ────────────────────────────────────────────────
@@ -1480,6 +1574,54 @@ export interface PlannerValue {
    * never sees the previous owner's lessons.
    */
   hydration: PlannerHydration;
+
+  // ── Catalog (reference data — never undoable) ───────────────────────────
+  // The grade's read-only reference data, routed through the store so views
+  // stop importing the `lib/mock` catalogs directly. ADDITIVE: every field
+  // below is new — no existing PlannerValue field changed. With the Supabase
+  // flag OFF these reproduce exactly what views read from `lib/mock` today
+  // (see PARITY notes at each field); with the flag ON they come from the
+  // backend hydrate (EMPTY until the owner's catalog loads — never mock).
+  /**
+   * The grade's subjects, in display order. Flag OFF = a copy of SUBJECTS.
+   * The subject→color mapping is locked team-wide; this is the ordered list
+   * views iterate (left filter rail, subject view, year roadmap).
+   */
+  subjects: Subject[];
+  /**
+   * The FULL-YEAR unit superset for the grade — every unit any lesson may
+   * reference. Flag OFF = a copy of ALL_UNITS. Views that show all units
+   * (SubjectView, TimelineYear) filter THIS by subject. NOT the active-unit
+   * map — see `activeUnitBySubject` for the per-subject "current" unit.
+   */
+  units: Unit[];
+  /** Unit lookup by unit id, derived from `units` (mirrors mock UNIT_BY_ID). */
+  unitById: Record<string, Unit>;
+  /** Subject lookup by subject id, derived from `subjects`. */
+  subjectById: Record<SubjectId, Subject>;
+  /**
+   * The active unit per subject — the single "current" unit a subject column
+   * shows (WeeklyGrid `UNITS[subjectId]`, left filter rail).
+   *
+   * Flag OFF: pinned to the mock UNITS map EXACTLY (byte-identical to what
+   * WeeklyGrid reads today). Flag ON: derived from `units` — see the provider
+   * `useMemo` for the derivation (first unit per subject as a safe default;
+   * CURRENT_WEEK is out of scope, see the TODO there).
+   */
+  activeUnitBySubject: Record<SubjectId, Unit | undefined>;
+  /** Standards map (code → description). Flag OFF = STANDARDS. */
+  standards: StandardsMap;
+  /**
+   * Look up a standard's description by code; returns the code itself when
+   * unknown. Flag OFF this matches the mock `describeStandard` exactly. Derived
+   * from `standards` so it tracks the hydrated catalog under the flag.
+   */
+  describeStandard: (code: string) => string;
+  /**
+   * The resolved active grade id (the mock "g5" slug under the flag OFF, the
+   * grade uuid under the flag ON), or null when no grade is resolved.
+   */
+  activeGradeId: string | null;
 }
 
 const PlannerContext = createContext<PlannerValue | null>(null);
@@ -1559,6 +1701,10 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     dispatchRef.current({
       type: "hydrate",
       doc: EMPTY_DOC,
+      // Catalog resets to EMPTY in lockstep with the document so a prior owner's
+      // subjects/units/standards never linger on screen while the new owner's
+      // catalog loads (mirrors the EMPTY_DOC lesson leak guard).
+      catalog: EMPTY_CATALOG,
       hydration: "loading",
       owner: ownerId,
     });
@@ -1584,7 +1730,19 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         // Stash the resolved grade uuid so createLesson tees (duplicate*) have a
         // real grade to key new rows on without re-resolving per call.
         gradeLevelIdRef.current = gradeLevelId;
-        const lessons = await plannerClient.listLessons(gradeLevelId, ownerId);
+        // Fetch lessons AND the catalog (subjects/units/standards) in ONE
+        // Promise.all so they resolve together — the success path then lands
+        // both in a single `hydrate` dispatch (no frame where lessons are live
+        // but the catalog is stale). All four reads are grade-scoped through
+        // plannerClient. Under the flag the catalog NEVER falls back to mock:
+        // any null owner / null grade / error keeps EMPTY_CATALOG, matching the
+        // EMPTY_DOC lesson leak guard.
+        const [lessons, subjects, units, standards] = await Promise.all([
+          plannerClient.listLessons(gradeLevelId, ownerId),
+          plannerClient.listSubjects(gradeLevelId),
+          plannerClient.listUnits(gradeLevelId),
+          plannerClient.listStandards(gradeLevelId),
+        ]);
         if (!alive) return;
         if (lessons.length === 0) {
           // Genuinely empty → stay EMPTY_DOC, settle to "empty".
@@ -1602,6 +1760,12 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         dispatchRef.current({
           type: "hydrate",
           doc: { lessons, sections, cellLayouts: {} },
+          // The catalog hydrated for this owner/grade lands in the SAME dispatch
+          // as the document. `listUnits` returns the FULL-YEAR superset (the
+          // Supabase source selects every grade unit; the mock source returns
+          // ALL_UNITS) so `store.units` is the superset every view filters over;
+          // the active-unit-per-subject map is derived from it in the provider.
+          catalog: { subjects, units, standards, activeGradeId: gradeLevelId },
           hydration: "ready",
           owner: ownerId,
         });
@@ -1985,6 +2149,63 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       ? "loading"
       : state.hydration;
 
+  // ── Catalog derivations ─────────────────────────────────────────────────
+  // The catalog slice (subjects/units/standards/grade) is a non-history sibling
+  // of the document. Derive the lookup maps + the per-subject active unit +
+  // describeStandard from it here, memoized on the slice so hot render paths
+  // (every lesson card reads describeStandard / unitById) get STABLE references
+  // that change only when the catalog actually changes (hydrate / setCatalog).
+  const { catalog } = state;
+
+  const unitById = useMemo<Record<string, Unit>>(() => {
+    // Mirrors the mock UNIT_BY_ID: id → Unit over the full-year superset.
+    const map: Record<string, Unit> = {};
+    for (const u of catalog.units) map[u.id] = u;
+    return map;
+  }, [catalog.units]);
+
+  const subjectById = useMemo<Record<SubjectId, Subject>>(() => {
+    const map = {} as Record<SubjectId, Subject>;
+    for (const s of catalog.subjects) map[s.id] = s;
+    return map;
+  }, [catalog.subjects]);
+
+  const activeUnitBySubject = useMemo<
+    Record<SubjectId, Unit | undefined>
+  >(() => {
+    // PARITY (R2): WeeklyGrid + the left filter read the active-unit-per-subject
+    // map. With the flag OFF we MUST reproduce the mock UNITS map byte-identical,
+    // so return a copy of it directly — deriving from the superset would pick a
+    // different unit (e.g. ALL_UNITS' first math unit "m-u1" vs. UNITS' "u-m3").
+    if (!isPlannerSupabaseConfigured()) {
+      return { ...UNITS };
+    }
+    // Flag ON: derive the active unit per subject from the full-year superset.
+    // DERIVATION: pick the FIRST unit listed for each subject as a safe default.
+    // A true "active" pick would test which unit's week span contains the
+    // current instructional week, but CURRENT_WEEK is explicitly OUT of scope
+    // for this wave (it must not be imported or routed through the store), and
+    // Unit.weeks is a human label ("Wk 9–14"), not a numeric span. First-per-
+    // subject is deterministic and never empty when the subject has any unit.
+    // TODO(catalog): once a current-week notion is plumbed through the store,
+    // replace "first unit" with "the unit whose week span contains the current
+    // week, else the first unit".
+    const map = {} as Record<SubjectId, Unit | undefined>;
+    for (const u of catalog.units) {
+      if (map[u.subject] === undefined) map[u.subject] = u;
+    }
+    return map;
+  }, [catalog.units]);
+
+  const describeStandard = useCallback(
+    (code: string): string => {
+      // PARITY: mirrors the mock describeStandard exactly — return the mapped
+      // description, else the code itself for an unknown standard.
+      return catalog.standards[code] ?? code;
+    },
+    [catalog.standards],
+  );
+
   // ── Stable context value ──────────────────────────────────────────────
   // Memoized on the doc and history boundaries — views re-render only when
   // the document or history flags actually change.
@@ -2026,6 +2247,15 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       redoLabel,
       lastChange,
       hydration: effectiveHydration,
+      // Catalog (additive) — reference data routed through the store.
+      subjects: catalog.subjects,
+      units: catalog.units,
+      unitById,
+      subjectById,
+      activeUnitBySubject,
+      standards: catalog.standards,
+      describeStandard,
+      activeGradeId: catalog.activeGradeId,
     }),
     [
       present.lessons,
@@ -2063,6 +2293,15 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       redoLabel,
       lastChange,
       effectiveHydration,
+      // Catalog derivations (stable across renders unless the slice changes).
+      catalog.subjects,
+      catalog.units,
+      unitById,
+      subjectById,
+      activeUnitBySubject,
+      catalog.standards,
+      describeStandard,
+      catalog.activeGradeId,
     ],
   );
 

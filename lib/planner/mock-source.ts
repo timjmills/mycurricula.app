@@ -48,7 +48,7 @@ import {
   LESSON_TEMPLATE_BY_ID,
   DEFAULT_LESSON_TEMPLATE_ID,
 } from "../lesson-templates";
-import { LESSONS, UNITS, SUBJECTS, STANDARDS } from "../mock";
+import { LESSONS, ALL_UNITS, SUBJECTS, STANDARDS } from "../mock";
 import type {
   PlannerDataSource,
   LessonPatch,
@@ -186,10 +186,15 @@ export const plannerMockSource: PlannerDataSource = {
   },
 
   async listUnits(_gradeLevelId: string): Promise<Unit[]> {
-    // UNITS is the active-unit-per-subject map; the contract returns an ordered
-    // array. Subjects' display order is the source of truth, so order by it.
+    // The contract's listUnits MUST return ALL units for the grade (the
+    // full-year superset), matching the Supabase source which selects every
+    // grade unit. ALL_UNITS is that superset — the set SubjectView and
+    // TimelineYear filter over (`ALL_UNITS.filter(u => u.subject === id)`).
+    // The store derives the active-unit-per-subject map from this superset, so
+    // returning the active-8 here (the old behavior) would starve the catalog.
+    // Clone each row so callers can't mutate the fixture array.
     void _gradeLevelId;
-    return SUBJECTS.map((s) => UNITS[s.id]).filter((u): u is Unit => u != null);
+    return ALL_UNITS.map((u) => ({ ...u }));
   },
 
   async listSubjects(_gradeLevelId: string): Promise<Subject[]> {
