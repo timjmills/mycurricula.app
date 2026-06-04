@@ -122,17 +122,58 @@ function unwrapMaybe<T>(
   return result.data;
 }
 
+// ── Chunked `.in(...)` lookups ────────────────────────────────────────────────
+// A PostgREST `.in("col", ids)` serializes every id into the request URL, so a
+// large id set (a grade with thousands of master events) can blow the URL /
+// proxy length limit. `chunkedIn` slices the id set into fixed-size batches,
+// runs `query(idsChunk)` per batch, and concatenates the rows. An empty id set
+// short-circuits to `[]` (PostgREST `.in("col", [])` is valid but wasteful).
+
+/** Max ids per `.in(...)` batch. ~150 keeps each request URL well under the
+ *  typical 2–8KB proxy/URL ceiling even with uuid (36-char) ids. */
+const IN_CHUNK_SIZE = 150;
+
+async function chunkedIn<T>(
+  ids: string[],
+  query: (
+    idsChunk: string[],
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  context: string,
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK_SIZE) {
+    const chunk = ids.slice(i, i + IN_CHUNK_SIZE);
+    const res = await query(chunk);
+    out.push(...(unwrap(res, context) as T[]));
+  }
+  return out;
+}
+
+/** True when `s` looks like a canonical uuid (8-4-4-4-12 hex). Used to tell a
+ *  real `units.id` uuid (pass through) from a fixture SLUG (`u-m3`, hash it) so
+ *  createLesson never re-hashes an already-resolved unit id (Codex #6). */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(s: string): boolean {
+  return UUID_RE.test(s);
+}
+
 // ── Weekday enum ↔ day-index bridge ──────────────────────────────────────────
 // The DB stores `day_of_week` as the `weekday` enum ('sun'..'sat'); the FLAT
-// `Lesson.day` is a 0-based index into the CONFIGURED school week (0 = Sunday …
-// 4 = Thursday for the beta school). We map against the full Sun-first weekday
-// order so the bridge is total (every enum value has an index), and the beta
-// Sun–Thu week happens to land 0–4. NOTE: when the school-week config wave lands
-// (CLAUDE.md §1), the index should derive from the school's configured weekday
-// SET, not this fixed Sun-first order — flagged for the lead. We never hard-code
-// a 5-day assumption here; the array spans all seven days.
+// `Lesson.day` is a 0-based index into the CONFIGURED school week. The mapping
+// is NOT a fixed Sun-first order (CLAUDE.md §1: NEVER hard-code the weekday set):
+// it derives from the school's `schools.school_week` (a `weekday[]` in the
+// configured running order), so day 0 is the school's FIRST teaching day. A
+// Mon–Fri school maps day 0 → 'mon'; the beta Sun–Thu school maps day 0 → 'sun'.
+//
+// `school_week` is resolved once per request (via `resolveSchoolWeek`, cached on
+// the request-scoped server client) and threaded into the bridge functions. When
+// it is unavailable (no teacher row / no school / unset), we fall back to the
+// `FALLBACK_WEEKDAY_ORDER` below — the full Sun-first seven-day order, so the
+// bridge stays total — and the call site logs the degraded path once.
 
-const WEEKDAY_ORDER = [
+const FALLBACK_WEEKDAY_ORDER = [
   "sun",
   "mon",
   "tue",
@@ -141,15 +182,107 @@ const WEEKDAY_ORDER = [
   "fri",
   "sat",
 ] as const;
-type Weekday = (typeof WEEKDAY_ORDER)[number];
+type Weekday = (typeof FALLBACK_WEEKDAY_ORDER)[number];
 
-function weekdayToDayIndex(day: Weekday): number {
-  const i = WEEKDAY_ORDER.indexOf(day);
-  return i < 0 ? 0 : i;
+/** A resolved school-week mapping: the configured weekday order (day index →
+ *  weekday enum) plus its inverse (weekday enum → day index). */
+interface WeekMap {
+  /** day index → weekday enum (the school's configured running order). */
+  order: readonly Weekday[];
+  /** weekday enum → day index (inverse of `order`). */
+  indexOf: Map<Weekday, number>;
 }
 
-function dayIndexToWeekday(day: number): Weekday {
-  return WEEKDAY_ORDER[day] ?? "sun";
+/** Build a `WeekMap` from a configured weekday order. Falls back to the full
+ *  Sun-first seven-day order when the configured set is empty/absent so the
+ *  bridge is always total. */
+function buildWeekMap(order: readonly Weekday[] | null | undefined): WeekMap {
+  const resolved = order && order.length > 0 ? order : FALLBACK_WEEKDAY_ORDER;
+  const indexOf = new Map<Weekday, number>();
+  resolved.forEach((wd, i) => {
+    // First occurrence wins (a well-formed school_week has no duplicates).
+    if (!indexOf.has(wd)) indexOf.set(wd, i);
+  });
+  return { order: resolved, indexOf };
+}
+
+/** The default (fallback) week map — full Sun-first order. Used when the school
+ *  week cannot be resolved (logged at the call site). */
+const FALLBACK_WEEK_MAP: WeekMap = buildWeekMap(FALLBACK_WEEKDAY_ORDER);
+
+function weekdayToDayIndex(day: Weekday, week: WeekMap): number {
+  const i = week.indexOf.get(day);
+  // A weekday outside the configured week (e.g. a Friday lesson in a Sun–Thu
+  // school) has no column; fall back to the absolute Sun-first index so the
+  // mapping stays total rather than collapsing to day 0.
+  if (i != null) return i;
+  const abs = FALLBACK_WEEKDAY_ORDER.indexOf(day);
+  return abs < 0 ? 0 : abs;
+}
+
+function dayIndexToWeekday(day: number, week: WeekMap): Weekday {
+  return week.order[day] ?? week.order[0] ?? "sun";
+}
+
+// ── School-week resolution (per-request cache) ───────────────────────────────
+// Resolve the teacher's school's configured `school_week` once per request and
+// cache it on the request-scoped server client (a fresh client per request, so
+// the WeakMap entry lives exactly one request — no cross-request leakage).
+
+const schoolWeekCache = new WeakMap<object, Promise<WeekMap>>();
+
+/** Resolve the configured `school_week` for a teacher's school → a `WeekMap`.
+ *  Cached per request (keyed on the server client). On any failure (no teacher
+ *  row, no school, transport error) this logs once and returns the fallback
+ *  Sun-first map so callers never throw on the day↔weekday bridge. */
+async function resolveSchoolWeek(
+  client: ServerClient,
+  ownerId: string,
+): Promise<WeekMap> {
+  const cached = schoolWeekCache.get(client);
+  if (cached) return cached;
+  const promise = (async (): Promise<WeekMap> => {
+    try {
+      const teacherRes = await client
+        .from("teachers")
+        .select("school_id")
+        .eq("id", ownerId)
+        .maybeSingle();
+      if (teacherRes.error) throw new Error(teacherRes.error.message);
+      const schoolId = (teacherRes.data as { school_id: string } | null)
+        ?.school_id;
+      if (!schoolId) {
+        console.warn(
+          `[planner] school_week unavailable (no school for teacher ${ownerId}); using Sun-first fallback order.`,
+        );
+        return FALLBACK_WEEK_MAP;
+      }
+      const schoolRes = await client
+        .from("schools")
+        .select("school_week")
+        .eq("id", schoolId)
+        .maybeSingle();
+      if (schoolRes.error) throw new Error(schoolRes.error.message);
+      const order = (schoolRes.data as { school_week: Weekday[] } | null)
+        ?.school_week;
+      if (!order || order.length === 0) {
+        console.warn(
+          `[planner] school_week unset for school ${schoolId}; using Sun-first fallback order.`,
+        );
+        return FALLBACK_WEEK_MAP;
+      }
+      return buildWeekMap(order);
+    } catch (err) {
+      console.warn(
+        `[planner] school_week resolution failed; using Sun-first fallback order: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return FALLBACK_WEEK_MAP;
+    }
+  })();
+  schoolWeekCache.set(client, promise);
+  return promise;
 }
 
 // ── Status enum ↔ domain bridge ──────────────────────────────────────────────
@@ -593,26 +726,62 @@ export const plannerSupabaseSource: PlannerDataSource = {
     return assign?.grade_level_id ?? null;
   },
 
-  async listLessons(gradeLevelId, ownerId) {
+  async listLessons(gradeLevelId, ownerId, opts) {
     const client = await sb();
 
-    // 1. Resolve the grade's subjects + units (and their slug indexes), and the
-    //    standards index. Subjects/units map DB uuids back to domain slugs.
-    const [{ uuidToSubjectId }, { uuidToUnitSlug }, standards] =
+    // 1. Resolve the grade's subjects + units (and their slug indexes), the
+    //    standards index, and the school's configured week map (day↔weekday).
+    //    Subjects/units map DB uuids back to domain slugs.
+    const [{ uuidToSubjectId }, { uuidToUnitSlug }, standards, week] =
       await Promise.all([
         loadSubjectIndex(client, gradeLevelId),
         loadUnitIndex(client, gradeLevelId),
         loadStandardsIndex(client, gradeLevelId),
+        resolveSchoolWeek(client, ownerId),
       ]);
+
+    // OPTIONAL windowing: when `opts` is omitted, behaviour is unchanged (the
+    // full grade is read). `weekStart`/`weekEnd` scope the master + authored
+    // reads to a `week_number` window; `schoolYearId` scopes to a school year.
+    // Defaults keep existing callers byte-identical.
+    const weekStart = opts?.weekStart;
+    const weekEnd = opts?.weekEnd;
+    const schoolYearId = opts?.schoolYearId;
+
+    // School-year scoping is carried on `units`, NOT on the lesson tables:
+    // neither `master_core_lesson_events` nor `personal_authored_lessons` has a
+    // `school_year_id` column (only `units` does). So when a school year is
+    // requested we first resolve the unit ids in that (grade, school_year) and
+    // constrain the lesson reads by `unit_id IN (…)`. Resolved once and reused.
+    let schoolYearUnitIds: string[] | null = null;
+    if (schoolYearId != null) {
+      const unitsRes = await client
+        .from("units")
+        .select("id")
+        .eq("grade_level_id", gradeLevelId)
+        .eq("school_year_id", schoolYearId);
+      const unitRows = unwrap(unitsRes, "list school-year units") as {
+        id: string;
+      }[];
+      schoolYearUnitIds = unitRows.map((u) => u.id);
+      // No units in that school year → no master/authored lessons to read.
+      if (schoolYearUnitIds.length === 0) return [];
+    }
 
     // 2. Master events for the grade — read the DENORMALIZED local
     //    grade_level_id column directly (no units join — the #1 scale fix),
-    //    excluding soft-deletes.
-    const masterRes = await client
+    //    excluding soft-deletes. Optionally scoped to a school-year / week window.
+    let masterQuery = client
       .from("master_core_lesson_events")
       .select(MASTER_COLS)
       .eq("grade_level_id", gradeLevelId)
-      .is("deleted_at", null)
+      .is("deleted_at", null);
+    if (schoolYearUnitIds != null)
+      masterQuery = masterQuery.in("unit_id", schoolYearUnitIds);
+    if (weekStart != null)
+      masterQuery = masterQuery.gte("week_number", weekStart);
+    if (weekEnd != null) masterQuery = masterQuery.lte("week_number", weekEnd);
+    const masterRes = await masterQuery
       .order("week_number", { ascending: true })
       .order("display_order_within_day", { ascending: true });
     const masterRows = unwrap(
@@ -624,36 +793,50 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
     // 3. This teacher's personal copies for those masters (the lazy fork), their
     //    completion rows, and the teacher's own AUTHORED lessons for the grade.
-    //    Copies/completion are keyed by the MASTER event id.
-    const [copyRes, complRes, authoredRes] = await Promise.all([
-      masterIds.length > 0
-        ? client
+    //    Copies/completion are keyed by the MASTER event id. The `.in(masterIds)`
+    //    lookups are CHUNKED (a large grade can have thousands of master ids,
+    //    which would otherwise blow the PostgREST/proxy URL length limit).
+    let authoredQuery = client
+      .from("personal_authored_lessons")
+      .select(AUTHORED_COLS)
+      .eq("owner_id", ownerId)
+      .eq("grade_level_id", gradeLevelId)
+      .is("deleted_at", null);
+    if (schoolYearUnitIds != null)
+      // Authored lessons carry a nullable unit_id; school-year scoping keeps
+      // only those tied to a unit in the requested year (untied authored
+      // lessons fall outside any school-year window by construction).
+      authoredQuery = authoredQuery.in("unit_id", schoolYearUnitIds);
+    if (weekStart != null)
+      authoredQuery = authoredQuery.gte("week_number", weekStart);
+    if (weekEnd != null)
+      authoredQuery = authoredQuery.lte("week_number", weekEnd);
+
+    const [copyRows, complRows, authoredRes] = await Promise.all([
+      chunkedIn<PersonalCopyRow>(
+        masterIds,
+        (ids) =>
+          client
             .from("personal_core_lesson_event_copies")
             .select(COPY_COLS)
             .eq("teacher_id", ownerId)
-            .in("master_core_lesson_event_id", masterIds)
-        : Promise.resolve({ data: [] as PersonalCopyRow[], error: null }),
-      masterIds.length > 0
-        ? client
+            .in("master_core_lesson_event_id", ids),
+        "list personal copies",
+      ),
+      chunkedIn<CompletionRow>(
+        masterIds,
+        (ids) =>
+          client
             .from("completion_status")
             .select(COMPLETION_COLS)
             .eq("teacher_id", ownerId)
-            .in("core_lesson_event_id", masterIds)
-        : Promise.resolve({ data: [] as CompletionRow[], error: null }),
-      client
-        .from("personal_authored_lessons")
-        .select(AUTHORED_COLS)
-        .eq("owner_id", ownerId)
-        .eq("grade_level_id", gradeLevelId)
-        .is("deleted_at", null)
+            .in("core_lesson_event_id", ids),
+        "list completion",
+      ),
+      authoredQuery
         .order("week_number", { ascending: true })
         .order("display_order_within_day", { ascending: true }),
     ]);
-    const copyRows = unwrap(
-      copyRes,
-      "list personal copies",
-    ) as PersonalCopyRow[];
-    const complRows = unwrap(complRes, "list completion") as CompletionRow[];
     const authoredRows = unwrap(
       authoredRes,
       "list authored lessons",
@@ -687,7 +870,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
           subject: subjectId,
           unit: unitSlug,
           week: src.week_number,
-          day: weekdayToDayIndex(src.day_of_week),
+          day: weekdayToDayIndex(src.day_of_week, week),
           title: src.title,
           objective: objectivesToObjective(src.learning_objectives),
           directions: src.directions ?? "",
@@ -715,7 +898,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
         subject: subjectId,
         unit: unitSlug,
         week: a.week_number,
-        day: weekdayToDayIndex(a.day_of_week),
+        day: weekdayToDayIndex(a.day_of_week, week),
         title: a.title,
         objective: objectivesToObjective(a.learning_objectives),
         directions: a.directions ?? "",
@@ -831,10 +1014,47 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
   // ── Lesson mutations ─────────────────────────────────────────────────────
   async updateLesson(lessonId, patch, ownerId) {
-    // Personal mode: lazily fork. Status is handled by `setLessonStatus` (it
-    // never forks), so a status-only patch is delegated there; any content key
-    // forks the lesson.
+    // Owner-kind branch (Codex #7): a teacher-AUTHORED lesson patches its OWN
+    // `personal_authored_lessons` row directly (no fork — it has no master);
+    // a master-derived lesson lazily forks into `personal_core_lesson_event_copies`.
     const client = await sb();
+    const authored = await loadAuthored(client, lessonId, ownerId);
+
+    if (authored) {
+      const next: Partial<AuthoredLessonRow> = {};
+      if (patch.title !== undefined) next.title = patch.title;
+      if (patch.objective !== undefined)
+        next.learning_objectives = objectiveToObjectives(patch.objective);
+      if (patch.directions !== undefined) next.directions = patch.directions;
+      if (patch.notes !== undefined) next.notes = patch.notes;
+      if (patch.resources !== undefined)
+        next.resources =
+          patch.resources as unknown as AuthoredLessonRow["resources"];
+      if (patch.standards !== undefined)
+        next.standards = standardCodesToUuids(patch.standards);
+      // Authored completion lives on its OWN `status`/`reason_not_done` columns
+      // (NOT `completion_status`, which FKs to master events).
+      if (patch.status !== undefined) next.status = statusToDb(patch.status);
+      if (patch.reasonNotDone !== undefined)
+        next.reason_not_done = patch.reasonNotDone;
+      // `preview`/`time`/`tasks` are derived/unmodelled — skipped, as for copies.
+      if (Object.keys(next).length > 0) {
+        const upd = await client
+          .from("personal_authored_lessons")
+          .update(next)
+          .eq("id", lessonId)
+          .eq("owner_id", ownerId);
+        if (upd.error) {
+          throw new Error(
+            `Planner repository update authored lesson failed: ${upd.error.message}`,
+          );
+        }
+      }
+      return reloadAuthoredLesson(client, lessonId, ownerId);
+    }
+
+    // Master-derived path: status-only patch is delegated to setLessonStatus
+    // (which never forks); any content key forks the lesson.
     const contentKeys: (keyof LessonPatch)[] = [
       "title",
       "objective",
@@ -888,16 +1108,55 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
   async moveLesson(lessonId, target: LessonMoveTarget, ownerId) {
     const client = await sb();
+    const week = await resolveSchoolWeek(client, ownerId);
+    const dayOfWeek = dayIndexToWeekday(target.day, week);
+
+    // Owner-kind branch (Codex #7): an authored lesson moves on its own row;
+    // a master-derived lesson moves via the lazy fork.
+    const authored = await loadAuthored(client, lessonId, ownerId);
+    if (authored) {
+      const upd = await client
+        .from("personal_authored_lessons")
+        .update({ week_number: target.week, day_of_week: dayOfWeek })
+        .eq("id", lessonId)
+        .eq("owner_id", ownerId);
+      if (upd.error) {
+        throw new Error(
+          `Planner repository move authored lesson failed: ${upd.error.message}`,
+        );
+      }
+      return reloadAuthoredLesson(client, lessonId, ownerId);
+    }
+
     await forkAndPatch(client, lessonId, ownerId, () => ({
       week_number: target.week,
-      day_of_week: dayIndexToWeekday(target.day),
+      day_of_week: dayOfWeek,
     }));
     return reloadLesson(client, lessonId, ownerId);
   },
 
   async setLessonStatus(lessonId, status, ownerId) {
-    // Completion NEVER forks (CLAUDE.md §2). Upsert the completion_status row.
+    // Completion NEVER forks (CLAUDE.md §2).
     const client = await sb();
+
+    // Owner-kind branch (Codex #7): an authored lesson has no master event, so
+    // its completion can't live in `completion_status` (that table FKs to
+    // master_core_lesson_events). Write the authored row's own `status` column.
+    const authored = await loadAuthored(client, lessonId, ownerId);
+    if (authored) {
+      const upd = await client
+        .from("personal_authored_lessons")
+        .update({ status: statusToDb(status) })
+        .eq("id", lessonId)
+        .eq("owner_id", ownerId);
+      if (upd.error) {
+        throw new Error(
+          `Planner repository set authored status failed: ${upd.error.message}`,
+        );
+      }
+      return reloadAuthoredLesson(client, lessonId, ownerId);
+    }
+
     await writeStatus(client, lessonId, ownerId, status, undefined);
     return reloadLesson(client, lessonId, ownerId);
   },
@@ -913,9 +1172,23 @@ export const plannerSupabaseSource: PlannerDataSource = {
     // NOT-NULL FK to subjects). The importer keys subjects by the slug-derived
     // uuid, so the deterministic bridge resolves it without a round-trip.
     const subjectUuid = slugToUuid("subject", input.subject);
-    // The unit slug may be a fixture slug or a DB uuid; the column is a nullable
-    // FK (on delete set null), so we pass the resolved uuid when it's a slug.
-    const unitUuid = input.unit ? slugToUuid("unit", input.unit) : null;
+    // Unit id (Codex #6): the column is a nullable FK to `units.id` (real uuid).
+    // `input.unit` may already BE a real units.id uuid (the DB read path exposes
+    // the unit as its uuid — see loadUnitIndex) or a fixture SLUG (`u-m3`). Only
+    // hash a slug; re-hashing an already-uuid id mints a DIFFERENT, non-existent
+    // uuid that fails the FK / drops the lesson from unit views. We detect a uuid
+    // by shape and pass it through unchanged.
+    // NOTE (separate pre-flip blocker, Codex #6): SubjectView / TimelineYear
+    // still compare a lesson's `unit` against the MOCK ALL_UNITS slugs, so an
+    // authored lesson keyed by a real units.id uuid won't match those slug-based
+    // groupings until the unit catalog is routed through the store. Out of scope
+    // here (needs the store + catalog change); flagged so it isn't lost.
+    const unitUuid = input.unit
+      ? isUuid(input.unit)
+        ? input.unit
+        : slugToUuid("unit", input.unit)
+      : null;
+    const week = await resolveSchoolWeek(client, ownerId);
 
     const row = {
       owner_id: ownerId,
@@ -923,7 +1196,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
       unit_id: unitUuid,
       subject_id: subjectUuid,
       week_number: input.week,
-      day_of_week: dayIndexToWeekday(input.day),
+      day_of_week: dayIndexToWeekday(input.day, week),
       title: input.title,
       directions: null,
       learning_objectives: [] as string[],
@@ -951,16 +1224,19 @@ export const plannerSupabaseSource: PlannerDataSource = {
         loadStandardsIndex(client, grade),
       ]);
     const subjectId = uuidToSubjectId.get(inserted.subject_id) ?? input.subject;
+    // The read path exposes a unit AS its DB uuid (loadUnitIndex maps id→id), so
+    // the authored lesson's `unit` round-trips to the SAME real units.id it was
+    // written with — listLessons resolves it identically.
     const unitSlug = inserted.unit_id
-      ? (uuidToUnitSlug.get(inserted.unit_id) ?? input.unit)
-      : input.unit;
+      ? (uuidToUnitSlug.get(inserted.unit_id) ?? inserted.unit_id)
+      : "";
 
     return buildLesson({
       id: inserted.id,
       subject: subjectId,
       unit: unitSlug,
       week: inserted.week_number,
-      day: weekdayToDayIndex(inserted.day_of_week),
+      day: weekdayToDayIndex(inserted.day_of_week, week),
       title: inserted.title,
       objective: objectivesToObjective(inserted.learning_objectives),
       directions: inserted.directions ?? "",
@@ -1017,26 +1293,28 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
   // ── Section + resource mutations ──────────────────────────────────────────
   async setSections(lessonId, sections, ownerId) {
-    // Persist the full section list to `lesson_sections` (personal fork: the
-    // rows are written owner-scoped, owner_id = ownerId). Replace-the-set
-    // semantics: delete the owner's existing sections for this lesson, then
-    // insert the new ordered set. Heading/prompt/body/order are preserved.
+    // Persist the full section list to `lesson_sections`, owner-scoped (personal
+    // fork: owner_id = ownerId). Owner-kind is resolved so an authored lesson's
+    // sections carry owner_kind='personal_authored' and a master-derived
+    // lesson's carry 'personal_copy' (Codex #7).
+    //
+    // FAIL-SAFE replace (Codex #9): the old path DELETED every existing row then
+    // INSERTED — so an insert failure wiped all sections. We now INSERT the new
+    // rows FIRST, and only AFTER that succeeds delete the prior rows that are no
+    // longer present (delete by id NOT IN the freshly-inserted set). If the
+    // insert errors we abort BEFORE any destructive delete, so the existing
+    // sections survive intact. Section `resources` jsonb is passed through
+    // unchanged (never dropped). NOTE: this is fail-safe, not fully atomic — a
+    // crash between insert and delete leaves stale rows (harmless duplicates that
+    // a later setSections prunes). A truly atomic swap wants a server-side RPC
+    // (future follow-up; migrations are out of this file's ownership).
     const client = await sb();
     const grade = await resolveLessonGrade(client, lessonId, ownerId);
     const ownerKind = await resolveOwnerKind(client, lessonId, ownerId);
 
-    // Delete the owner's prior sections for this lesson (idempotent set-replace).
-    const del = await client
-      .from("lesson_sections")
-      .delete()
-      .eq("owner_lesson_id", lessonId)
-      .eq("owner_id", ownerId);
-    if (del.error) {
-      throw new Error(
-        `Planner repository set sections (clear) failed: ${del.error.message}`,
-      );
-    }
-
+    // 1. Insert the new ordered set FIRST. Capture the generated ids so we can
+    //    delete exactly the rows that are NOT part of the new set afterwards.
+    let insertedIds: string[] = [];
     if (sections.length > 0) {
       const rows = sections.map((s, i) => ({
         owner_kind: ownerKind,
@@ -1047,15 +1325,44 @@ export const plannerSupabaseSource: PlannerDataSource = {
         heading: s.heading,
         prompt: s.prompt,
         body: s.body,
-        resources: s.resources,
+        resources: s.resources, // preserve the section's resources jsonb.
         display_order: i,
       }));
-      const ins = await client.from("lesson_sections").insert(rows);
+      const ins = await client
+        .from("lesson_sections")
+        .insert(rows)
+        .select("id");
       if (ins.error) {
+        // Abort BEFORE the destructive delete — existing sections survive.
         throw new Error(
           `Planner repository set sections (insert) failed: ${ins.error.message}`,
         );
       }
+      insertedIds = (
+        unwrap(ins, "set sections (insert)") as { id: string }[]
+      ).map((r) => r.id);
+    }
+
+    // 2. Now that the new rows are committed, delete the owner's PRIOR rows for
+    //    this lesson — every owner row whose id is NOT one we just inserted.
+    //    (An empty new set deletes all prior owner rows = a true clear.)
+    let delQuery = client
+      .from("lesson_sections")
+      .delete()
+      .eq("owner_lesson_id", lessonId)
+      .eq("owner_id", ownerId);
+    if (insertedIds.length > 0) {
+      // PostgREST `not in` takes a parenthesized list literal.
+      delQuery = delQuery.not("id", "in", `(${insertedIds.join(",")})`);
+    }
+    const del = await delQuery;
+    if (del.error) {
+      // The new sections are already persisted; a stale-row delete failure is
+      // non-destructive (leaves duplicates a later write prunes). Surface it so
+      // it's not silently swallowed.
+      throw new Error(
+        `Planner repository set sections (prune old) failed: ${del.error.message}`,
+      );
     }
 
     return this.getSections(lessonId, ownerId);
@@ -1073,9 +1380,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
         `${sectionId}-r${Date.now().toString(36)}`,
     };
     const next = sections.map((s) =>
-      s.id === sectionId
-        ? { ...s, resources: [...s.resources, minted] }
-        : s,
+      s.id === sectionId ? { ...s, resources: [...s.resources, minted] } : s,
     );
     return this.setSections(lessonId, next, ownerId);
   },
@@ -1267,19 +1572,26 @@ async function reloadLesson(
     gradeLevelId = unitRow.grade_level_id;
   }
 
-  const [{ uuidToSubjectId }, { uuidToUnitSlug }, standards, copy, complRes] =
-    await Promise.all([
-      loadSubjectIndex(client, gradeLevelId),
-      loadUnitIndex(client, gradeLevelId),
-      loadStandardsIndex(client, gradeLevelId),
-      loadCopy(client, lessonId, ownerId),
-      client
-        .from("completion_status")
-        .select(COMPLETION_COLS)
-        .eq("teacher_id", ownerId)
-        .eq("core_lesson_event_id", lessonId)
-        .maybeSingle(),
-    ]);
+  const [
+    { uuidToSubjectId },
+    { uuidToUnitSlug },
+    standards,
+    copy,
+    complRes,
+    week,
+  ] = await Promise.all([
+    loadSubjectIndex(client, gradeLevelId),
+    loadUnitIndex(client, gradeLevelId),
+    loadStandardsIndex(client, gradeLevelId),
+    loadCopy(client, lessonId, ownerId),
+    client
+      .from("completion_status")
+      .select(COMPLETION_COLS)
+      .eq("teacher_id", ownerId)
+      .eq("core_lesson_event_id", lessonId)
+      .maybeSingle(),
+    resolveSchoolWeek(client, ownerId),
+  ]);
   if (complRes.error) {
     throw new Error(
       `Planner repository reload completion failed: ${complRes.error.message}`,
@@ -1293,7 +1605,7 @@ async function reloadLesson(
     subject: uuidToSubjectId.get(src.subject_id) ?? "math",
     unit: uuidToUnitSlug.get(src.unit_id) ?? src.unit_id,
     week: src.week_number,
-    day: weekdayToDayIndex(src.day_of_week),
+    day: weekdayToDayIndex(src.day_of_week, week),
     title: src.title,
     objective: objectivesToObjective(src.learning_objectives),
     directions: src.directions ?? "",
@@ -1305,6 +1617,70 @@ async function reloadLesson(
     isPersonal: copy != null,
     modified: copy?.is_diverged_from_master ?? false,
     moved: copy ? deriveMoved(master, copy) : null,
+  });
+}
+
+// ── Authored-lesson helpers (Codex #7) ────────────────────────────────────────
+
+/** Load a teacher's OWN authored lesson by id, or null if this id is not an
+ *  authored lesson the owner owns (then the caller treats it as master-derived).
+ *  Excludes soft-deleted rows. */
+async function loadAuthored(
+  client: ServerClient,
+  lessonId: string,
+  ownerId: string,
+): Promise<AuthoredLessonRow | null> {
+  const res = await client
+    .from("personal_authored_lessons")
+    .select(AUTHORED_COLS)
+    .eq("id", lessonId)
+    .eq("owner_id", ownerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  return unwrapMaybe(res, "load authored lesson") as AuthoredLessonRow | null;
+}
+
+/** Re-read a single AUTHORED lesson after a mutation → the FLAT domain Lesson.
+ *  Authored lessons are always personal, never forked, and carry their own
+ *  status; the unit/subject/standard slugs resolve against the lesson's grade. */
+async function reloadAuthoredLesson(
+  client: ServerClient,
+  lessonId: string,
+  ownerId: string,
+): Promise<Lesson> {
+  const authored = await loadAuthored(client, lessonId, ownerId);
+  if (!authored) throw new Error(`Authored lesson not found: ${lessonId}`);
+
+  const [{ uuidToSubjectId }, { uuidToUnitSlug }, standards, week] =
+    await Promise.all([
+      loadSubjectIndex(client, authored.grade_level_id),
+      loadUnitIndex(client, authored.grade_level_id),
+      loadStandardsIndex(client, authored.grade_level_id),
+      resolveSchoolWeek(client, ownerId),
+    ]);
+
+  const subjectId = uuidToSubjectId.get(authored.subject_id) ?? "math";
+  const unitSlug = authored.unit_id
+    ? (uuidToUnitSlug.get(authored.unit_id) ?? authored.unit_id)
+    : "";
+
+  return buildLesson({
+    id: authored.id,
+    subject: subjectId,
+    unit: unitSlug,
+    week: authored.week_number,
+    day: weekdayToDayIndex(authored.day_of_week, week),
+    title: authored.title,
+    objective: objectivesToObjective(authored.learning_objectives),
+    directions: authored.directions ?? "",
+    notes: authored.notes ?? "",
+    resources: jsonToResources(authored.resources),
+    standards: standardUuidsToCodes(authored.standards, standards.uuidToCode),
+    status: statusFromText(authored.status),
+    reasonNotDone: authored.reason_not_done ?? "",
+    isPersonal: true,
+    modified: false,
+    moved: null,
   });
 }
 

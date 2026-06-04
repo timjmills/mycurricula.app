@@ -53,6 +53,7 @@ import type {
   PlannerDataSource,
   LessonPatch,
   LessonMoveTarget,
+  ListLessonsOptions,
 } from "./source";
 
 // ── Id bridge (mock slugs ↔ db uuids) ───────────────────────────────────────
@@ -169,14 +170,18 @@ export const plannerMockSource: PlannerDataSource = {
   async listLessons(
     _gradeLevelId: string,
     _ownerId: string,
+    _opts?: ListLessonsOptions,
   ): Promise<Lesson[]> {
     // The single mock grade makes the grade-scope filter a pass-through (every
     // fixture lesson belongs to it). Soft-deletes are excluded (plan §4.3), the
     // same as the views, which filter `archived === true`. The scope params are
     // honoured by the Supabase source (grade + RLS); the mock keeps them in the
-    // signature so the contract is identical.
+    // signature so the contract is identical. `_opts` (school-year/week window)
+    // is accepted for parity and intentionally a NO-OP here, so the in-memory
+    // behaviour stays byte-identical to the pre-windowing mock.
     void _gradeLevelId;
     void _ownerId;
+    void _opts;
     return lessons.filter((l) => l.archived !== true).map(cloneLesson);
   },
 

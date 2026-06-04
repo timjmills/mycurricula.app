@@ -24,6 +24,17 @@ import type {
 } from "../types";
 import type { LessonSectionContent } from "../lesson-flow";
 
+/** Optional windowing for `listLessons`. All fields optional; omitting the
+ *  whole object preserves the original full-grade read (backward-compatible). */
+export interface ListLessonsOptions {
+  /** Scope master/authored lessons to one school year (uuid). */
+  schoolYearId?: string;
+  /** Lower bound (inclusive) on `week_number`. */
+  weekStart?: number;
+  /** Upper bound (inclusive) on `week_number`. */
+  weekEnd?: number;
+}
+
 /** Identity for a lesson move (mirrors the reducer's moveLesson args). */
 export interface LessonMoveTarget {
   week: number;
@@ -62,8 +73,18 @@ export interface PlannerDataSource {
    *  hydrate without already knowing the grade. Mock returns the single grade. */
   getActiveGradeLevelId(ownerId: string): Promise<string | null>;
   /** All lessons a teacher sees for a grade: personal forks resolved over
-   *  master, soft-deletes excluded (plan §4.3). */
-  listLessons(gradeLevelId: string, ownerId: string): Promise<Lesson[]>;
+   *  master, soft-deletes excluded (plan §4.3).
+   *
+   *  `opts` is OPTIONAL and backward-compatible — omitting it reads the full
+   *  grade exactly as before. When supplied it narrows the read:
+   *    • `schoolYearId` scopes master/authored lessons to one school year.
+   *    • `weekStart`/`weekEnd` clamp the read to a `week_number` window.
+   *  The mock source ignores `opts` (single in-memory grade). */
+  listLessons(
+    gradeLevelId: string,
+    ownerId: string,
+    opts?: ListLessonsOptions,
+  ): Promise<Lesson[]>;
   /** Units for a grade, in display order. */
   listUnits(gradeLevelId: string): Promise<Unit[]>;
   /** The 8 locked subjects for a grade. */
