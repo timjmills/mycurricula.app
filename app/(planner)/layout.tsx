@@ -6,7 +6,6 @@ import { PlannerProvider } from "@/lib/planner-store";
 import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
   GlobalShortcuts,
-  LeftFilterPanel,
   MasterBanner,
   RightPanel,
   SideNav,
@@ -86,7 +85,6 @@ export default function PlannerLayout({
                     <MasterBanner />
                     <TopBar />
                     <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-                      <LeftFilterPanel />
                       <main
                         id="main-content"
                         style={{

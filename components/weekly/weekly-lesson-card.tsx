@@ -356,8 +356,11 @@ export function WeeklyLessonCard({
 
   const cardSurface: CSSProperties = {
     position: "relative",
-    // Body surface is always neutral so header color contrast is maximum.
-    background: "var(--paper)",
+    // Collapsed title-only chips carry the subject's Vivid tint gradient — the
+    // "preview tree" look — so each chip reads by subject at a glance. The
+    // expanded card keeps a neutral (paper) body so its colored header band has
+    // maximum contrast. Quiet/Calm styles stay neutral (white + stripe).
+    background: !isCompact && !expanded && isVivid ? color.bg : "var(--paper)",
     border: selected
       ? `1.5px solid ${color.stripe}`
       : isVivid
@@ -803,21 +806,49 @@ export function WeeklyLessonCard({
                   )}
                 </h3>
 
-                {/* Minimal completion-status dot — subject color when done /
-                    partial, neutral ink when pending. Purely a glanceable cue;
-                    the full status control lives in the detail panel. */}
-                <span
-                  aria-hidden
-                  className={styles.collapsedDot}
-                  style={{
-                    background:
-                      lesson.status === "done"
-                        ? color.stripe
-                        : lesson.status === "partial"
-                          ? `color-mix(in oklch, ${color.stripe} 55%, var(--surface))`
-                          : "var(--ink-200)",
+                {/* Completion checkbox — restored on the chip so a lesson can be
+                    marked done without opening the detail panel. Click toggles
+                    done ⇄ not_done (never forks, per the planner store). Stops
+                    propagation so it doesn't open the detail panel. Subject
+                    color fills the box when done; partial shows a half-tint. */}
+                <button
+                  type="button"
+                  className={styles.collapsedCheck}
+                  data-done={done ? "true" : undefined}
+                  aria-label={
+                    done ? "Mark lesson not done" : "Mark lesson done"
+                  }
+                  aria-pressed={done}
+                  title={done ? "Mark not done" : "Mark done"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLessonStatus(lesson.id, done ? "not_done" : "done");
                   }}
-                />
+                  style={{
+                    background: done
+                      ? color.stripe
+                      : lesson.status === "partial"
+                        ? `color-mix(in oklch, ${color.stripe} 30%, var(--surface))`
+                        : "var(--surface)",
+                    borderColor: done
+                      ? color.stripe
+                      : lesson.status === "partial"
+                        ? color.stripe
+                        : "var(--ink-300)",
+                  }}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m5 13 4 4 10-11" />
+                  </svg>
+                </button>
 
                 {/* Drag handle — preserves drag-to-reschedule. Hidden at rest,
                     revealed on hover/focus; 44px touch target via .affordance. */}

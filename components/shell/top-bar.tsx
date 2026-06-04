@@ -138,8 +138,6 @@ export function TopBar(): ReactNode {
     week,
     search,
     setSearch,
-    leftPanelOpen,
-    toggleLeftPanel,
     todoPanelOpen,
     toggleTodoPanel,
     commentsPanelOpen,
@@ -227,52 +225,6 @@ export function TopBar(): ReactNode {
 
   return (
     <header className={styles.bar}>
-      {/* ── Wordmark ──────────────────────────────────────────────────
-          The tooltip carries the brand motto so it surfaces on hover
-          without crowding the chrome — the full pair lives on the
-          login screen; here we keep just the manifesto as a quiet
-          tooltip on the home link. Wrapped in the styled <Tooltip>
-          primitive (black backdrop / blur / light text) so it matches
-          the rest of the chrome instead of rendering as the OS-default
-          light-background native title bubble. The native title= is
-          kept on the inner element as a cross-engine fallback for
-          touch long-press. */}
-      {/* Task #27 / audit m3: the wordmark suffix is FREE TEXT, not a
-          grade enum. CLAUDE.md §1 mandates multi-grade by design; teachers
-          might type "Grade 5", "K-12 Math", "Lower Elementary Reading",
-          "Year 7 Science", etc. The label comes from
-          currentUser.curriculumLabel (Lane S is building the Settings UI
-          that edits it). When the label is absent (real Supabase users
-          until the DB column lands), the suffix simply disappears — the
-          wordmark reads "MyCurricula" alone. */}
-      {/* ── Left-panel collapse toggle (TOPBAR-004) ───────────────────
-          onClick calls toggleLeftPanel from useAppState() which drives the
-          leftPanelOpen boolean. The panel itself is rendered by another agent
-          (WeeklyShell / planner layout) — this button is solely responsible
-          for toggling the state that controls it. */}
-      {/* Lane X verification sample — uses the new Button.tooltip prop
-          instead of the manual <Tooltip> wrapper. The tooltip copy follows
-          CLAUDE.md §4 onboarding voice: it teaches the first-time teacher
-          what the control accomplishes ("Hide the subject/unit/standards
-          filters…"), not just what it's named ("Collapse panel"). */}
-      <Button
-        variant="icon"
-        iconAriaLabel={
-          leftPanelOpen ? "Collapse filter panel" : "Expand filter panel"
-        }
-        tooltip={
-          leftPanelOpen
-            ? "Hide the subject, unit, and standards filters to give the planner more room"
-            : "Show the filter panel — narrow the planner to a subject, unit, or set of standards"
-        }
-        tooltipSide="bottom"
-        onClick={toggleLeftPanel}
-        aria-expanded={leftPanelOpen}
-        className={leftPanelOpen ? styles.iconActive : undefined}
-      >
-        <PanelLeftIcon />
-      </Button>
-
       {/* ── Week label — static heading (POLISH-011) ─────────────────
           The top bar previously duplicated the in-grid week-navigation
           trio (Prev / Today / Next). POLISH-011 removes that duplication:
@@ -780,25 +732,6 @@ function ProfileAvatar({ user }: { user: CurrentUser }): ReactNode {
 
 // ── SVG icons ────────────────────────────────────────────────────────────
 // All icons are inline SVG, aria-hidden, 18×18 grid.
-
-function PanelLeftIcon(): ReactNode {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <line x1="9" y1="3" x2="9" y2="21" />
-    </svg>
-  );
-}
 
 function SearchIcon(): ReactNode {
   return (

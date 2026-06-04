@@ -79,10 +79,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  /* ≥44px touch target — a comfortable, uniform chip height across the grid. */
-  min-height: 44px;
+  /* Title-only chips are compact (~half the height of the old meta-rich card)
+     since they carry only the lesson title. Short titles sit on one line at
+     ~28px; a long title wraps to at most 2 lines. */
+  min-height: 28px;
   /* Inline padding clears the 5px fork stripe on the card root's start edge. */
-  padding: 8px 8px 8px 9px;
+  padding: 4px 8px 4px 10px;
   cursor: pointer;
 }
 
@@ -93,9 +95,9 @@
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: var(--t-14);
+  font-size: var(--t-13);
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.2;
   color: var(--ink);
   text-wrap: pretty;
   overflow-wrap: anywhere;
@@ -105,16 +107,36 @@
   overflow: hidden;
 }
 
-/* Minimal completion-status dot — the only at-a-glance status cue on the
-   collapsed chip. 6px circle; color set inline (subject color when done /
-   partial, neutral ink when pending). flex:0 so it never shrinks the title. */
-.collapsedDot {
+/* Completion checkbox on the collapsed chip — restores the mark-done control
+   so a teacher can complete a lesson without opening the detail panel. 18px
+   ring; fill + border colors are set inline (subject color when done). The
+   white check fades in only when done. flex:0 so it never shrinks the title. */
+.collapsedCheck {
   flex: 0 0 auto;
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  /* background set inline per status. */
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--ink-300);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+.collapsedCheck svg {
+  width: 11px;
+  height: 11px;
+  color: #fff;
+  opacity: 0;
+}
+.collapsedCheck[data-done="true"] svg {
+  opacity: 1;
+}
+.collapsedCheck:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
 }
 
 /* Drag handle on the collapsed chip — hidden at rest, revealed on card
