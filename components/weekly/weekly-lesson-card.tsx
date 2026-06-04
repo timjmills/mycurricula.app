@@ -80,6 +80,7 @@ import {
 import { cycleStatus } from "@/components/lesson-card/status";
 import { TaskRow } from "@/components/lesson-card/task-row";
 import { RichTextEditor } from "@/components/rich-text";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import { usePlanner } from "@/lib/planner-store";
 import { lessonResources } from "@/lib/lesson-resources";
 import styles from "./weekly-lesson-card.module.css";
@@ -515,6 +516,31 @@ export function WeeklyLessonCard({
     };
   }, [lesson.title]);
 
+  // ── Sanitized HTML for render (audit #9 — stored XSS) ──────────────────
+  // Every dangerouslySetInnerHTML sink on this card injects teacher-authored
+  // HTML that, under the forking model, originates from a teammate and cannot
+  // be trusted. Run each through sanitizeHtml() (strict DOMPurify allowlist)
+  // before injection. Memoized so the work only re-runs when the source HTML
+  // changes, not on every render.
+  const safeTitle = useMemo(() => sanitizeHtml(lesson.title), [lesson.title]);
+  const safeTitleMain = useMemo(() => sanitizeHtml(titleMain), [titleMain]);
+  const safePreview = useMemo(
+    () => sanitizeHtml(lesson.preview),
+    [lesson.preview],
+  );
+  const safeObjectiveBody = useMemo(
+    () => sanitizeHtml(objectiveBody),
+    [objectiveBody],
+  );
+  const safeDirections = useMemo(
+    () => sanitizeHtml(lesson.directions),
+    [lesson.directions],
+  );
+  const safeNotes = useMemo(
+    () => sanitizeHtml(lesson.notes ?? ""),
+    [lesson.notes],
+  );
+
   // CARD-TITLE-002 — enforce a 120-char plain-text ceiling on the title field.
   // The RichTextEditor produces HTML; we measure the stripped plain-text length
   // so HTML tags don't count against the budget. If the paste exceeds the cap,
@@ -801,7 +827,7 @@ export function WeeklyLessonCard({
                       }}
                       title={stripHtml(lesson.title)}
                       // eslint-disable-next-line react/no-danger
-                      dangerouslySetInnerHTML={{ __html: lesson.title }}
+                      dangerouslySetInnerHTML={{ __html: safeTitle }}
                     />
                   )}
                 </h3>
@@ -1104,7 +1130,7 @@ export function WeeklyLessonCard({
                         // read the complete text when the 2-line clamp truncates it.
                         title={stripHtml(lesson.title)}
                         // eslint-disable-next-line react/no-danger
-                        dangerouslySetInnerHTML={{ __html: titleMain }}
+                        dangerouslySetInnerHTML={{ __html: safeTitleMain }}
                       />
                     )}
                   </h3>
@@ -1179,7 +1205,7 @@ export function WeeklyLessonCard({
                             }}
                             title="Double-click or press Enter to edit the lesson preview"
                             // eslint-disable-next-line react/no-danger
-                            dangerouslySetInnerHTML={{ __html: lesson.preview }}
+                            dangerouslySetInnerHTML={{ __html: safePreview }}
                           />
                         </Tooltip>
                       )}
@@ -1269,7 +1295,7 @@ export function WeeklyLessonCard({
                                 title="Double-click or press Enter to edit the I-can objective"
                                 // eslint-disable-next-line react/no-danger
                                 dangerouslySetInnerHTML={{
-                                  __html: objectiveBody,
+                                  __html: safeObjectiveBody,
                                 }}
                               />
                             );
@@ -1308,7 +1334,7 @@ export function WeeklyLessonCard({
                                 title="Double-click or press Enter to edit the directions"
                                 // eslint-disable-next-line react/no-danger
                                 dangerouslySetInnerHTML={{
-                                  __html: lesson.directions,
+                                  __html: safeDirections,
                                 }}
                               />
                             );
@@ -1368,7 +1394,7 @@ export function WeeklyLessonCard({
                                     title="Double-click or press Enter to edit the teacher notes"
                                     // eslint-disable-next-line react/no-danger
                                     dangerouslySetInnerHTML={{
-                                      __html: lesson.notes ?? "",
+                                      __html: safeNotes,
                                     }}
                                   />
                                 ))}

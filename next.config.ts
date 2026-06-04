@@ -30,14 +30,20 @@ const r2Host = process.env.R2_PUBLIC_HOST ?? "*.r2.cloudflarestorage.com";
 //   • frame-src   — GSI renders the button + account picker in iframes
 //                   under /gsi/ (e.g. /gsi/button, /gsi/select).
 //   • connect-src — GSI makes XHR status/log calls under /gsi/.
+// 'unsafe-eval' is ONLY needed for the dev/runtime React fast-refresh path.
+// In production it weakens the CSP (it permits eval()/new Function(), a common
+// XSS escalation vector) for no benefit, so it is dropped from the prod policy
+// (audit #24). Next.js still requires 'unsafe-inline' in both modes for its
+// runtime + Next/font inline scripts.
+const isDev = process.env.NODE_ENV !== "production";
+const scriptEval = isDev ? " 'unsafe-eval'" : "";
+
 const csp = [
   "default-src 'self'",
-  // Next.js requires unsafe-inline (runtime + Next/font), and unsafe-eval
-  // is needed for the dev/runtime React fast-refresh path.
   // static.cloudflareinsights.com is the Cloudflare Web Analytics beacon
   // the Worker host injects automatically when observability is on; CSP
   // must allow it or every page console-errors on script load.
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com https://accounts.google.com/gsi/client",
+  `script-src 'self' 'unsafe-inline'${scriptEval} https://static.cloudflareinsights.com https://accounts.google.com/gsi/client`,
   "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
   "font-src 'self' data:",
   `img-src 'self' data: blob: https://${r2Host} https://img.youtube.com https://i.vimeocdn.com https://*.googleusercontent.com https://*.ggpht.com https://upload.wikimedia.org`,

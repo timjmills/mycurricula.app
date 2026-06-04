@@ -96,6 +96,7 @@ import {
   useDndSensors,
 } from "@/lib/collapse-on-drag";
 import { usePlanner } from "@/lib/planner-store";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import { Button, Tooltip } from "@/components/ui";
 import { RichTextEditor } from "@/components/rich-text";
 import { SectionToolbar } from "./section-toolbar";
@@ -284,6 +285,15 @@ const SortableSection = memo(function SortableSection({
   onDraftChange,
 }: SortableSectionProps): ReactNode {
   const { canonical, storeSection } = resolved;
+
+  // Sanitize the section body before it is injected via
+  // dangerouslySetInnerHTML (audit #9 — stored XSS). Under the forking model
+  // this body can come from another teacher, so it is untrusted. Memoized so
+  // the strict DOMPurify pass only re-runs when the stored body changes.
+  const safeBody = useMemo(
+    () => sanitizeHtml(storeSection?.body ?? ""),
+    [storeSection?.body],
+  );
 
   // Virtual (Standards) row has no store-backed id — use a synthetic key for
   // sortable so it still participates (read-only) in the DnD context. The
@@ -605,7 +615,7 @@ const SortableSection = memo(function SortableSection({
                           title={`Double-click or press Enter to edit ${canonical.title}`}
                           // eslint-disable-next-line react/no-danger
                           dangerouslySetInnerHTML={{
-                            __html: storeSection.body,
+                            __html: safeBody,
                           }}
                         />
                       ) : (

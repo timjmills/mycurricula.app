@@ -22,11 +22,14 @@
 // formatting commands remain available. Multi-line paste is collapsed to a
 // single plain-text line before insertion.
 //
-// XSS note: `value` is written via innerHTML and is teacher-authored content
-// rendered back only to the same teacher. There is no cross-user injection
-// risk in the current single-user prototype. When multi-user persistence
-// lands (Supabase backend), sanitize stored HTML with DOMPurify before
-// trusting it from the server.
+// XSS note: `value` is written via innerHTML and is teacher-authored content.
+// Under the forking model that content reaches teammates, so it CANNOT be
+// trusted. The HTML this editor reports up via onChange is run through
+// sanitizeHtml() (lib/sanitize-html.ts, DOMPurify with a strict allowlist) so
+// the value that gets persisted is already clean. The render sites that inject
+// stored HTML (weekly-lesson-card, lesson-flow) ALSO re-sanitize at render
+// time as defence in depth. The live contentEditable DOM is left unsanitized
+// so the caret never jumps mid-edit; only the emitted/stored value is cleaned.
 //
 // execCommand note: document.execCommand is deprecated in the spec but is
 // universally supported in all current browsers and is the pragmatic choice
@@ -41,6 +44,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import styles from "./rich-text-editor.module.css";
 
 // ── Public contract ─────────────────────────────────────────────────────────
@@ -737,6 +741,21 @@ export function RichTextEditor({
     }
   }, [autoFocus]);
 
+  // ── Sanitizing emit ─────────────────────────────────────────────────
+  // Every path that reports edited HTML upward goes through here so the value
+  // that callers persist is already sanitized (strict allowlist, no scripts /
+  // event handlers / unsafe URLs). We sanitize the EMITTED value only — the
+  // live contentEditable DOM keeps its raw HTML so the caret never jumps while
+  // typing. lastWrittenRef tracks the raw DOM html (set by callers before
+  // emit) so the value→DOM sync effect does not overwrite the editor with the
+  // sanitized string. Render sites re-sanitize as defence in depth.
+  const emitChange = useCallback(
+    (rawHtml: string) => {
+      onChange(sanitizeHtml(rawHtml));
+    },
+    [onChange],
+  );
+
   // ── Keyboard handler ────────────────────────────────────────────────
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -752,11 +771,11 @@ export function RichTextEditor({
       if (el && tryAutoList(e, el, singleLine)) {
         const html = el.innerHTML;
         lastWrittenRef.current = html;
-        onChange(html);
+        emitChange(html);
         setEmpty(isEditorEmpty(el));
       }
     },
-    [singleLine, onChange],
+    [singleLine, emitChange],
   );
 
   // ── Input handler — report changes, check empty state ──────────────
@@ -765,9 +784,9 @@ export function RichTextEditor({
     if (!el) return;
     const html = el.innerHTML;
     lastWrittenRef.current = html;
-    onChange(html);
+    emitChange(html);
     setEmpty(isEditorEmpty(el));
-  }, [onChange]);
+  }, [emitChange]);
 
   // ── Selection change → update toolbar ──────────────────────────────
   useEffect(() => {
@@ -874,9 +893,9 @@ export function RichTextEditor({
       // Report the updated HTML.
       const html = editorRef.current?.innerHTML ?? "";
       lastWrittenRef.current = html;
-      onChange(html);
+      emitChange(html);
     },
-    [onChange, syncFormatState],
+    [emitChange, syncFormatState],
   );
 
   const applyTextColor = useCallback(
@@ -948,9 +967,9 @@ export function RichTextEditor({
       exec("createLink", url.trim());
       const html = editorRef.current?.innerHTML ?? "";
       lastWrittenRef.current = html;
-      onChange(html);
+      emitChange(html);
     },
-    [onChange],
+    [emitChange],
   );
 
   const applyImage = useCallback(
@@ -971,9 +990,9 @@ export function RichTextEditor({
       exec("insertImage", url.trim());
       const html = editorRef.current?.innerHTML ?? "";
       lastWrittenRef.current = html;
-      onChange(html);
+      emitChange(html);
     },
-    [onChange],
+    [emitChange],
   );
 
   // ── Checklist (best-effort) ─────────────────────────────────────────
@@ -990,9 +1009,9 @@ export function RichTextEditor({
       exec("insertText", "☐ ");
       const html = editorRef.current?.innerHTML ?? "";
       lastWrittenRef.current = html;
-      onChange(html);
+      emitChange(html);
     },
-    [onChange],
+    [emitChange],
   );
 
   // ── Paste handler ───────────────────────────────────────────────────
@@ -1011,7 +1030,7 @@ export function RichTextEditor({
           exec("insertText", text);
           const html = editorRef.current?.innerHTML ?? "";
           lastWrittenRef.current = html;
-          onChange(html);
+          emitChange(html);
           setEmpty(false);
         }
         return;
@@ -1023,11 +1042,11 @@ export function RichTextEditor({
         if (!el) return;
         const html = el.innerHTML;
         lastWrittenRef.current = html;
-        onChange(html);
+        emitChange(html);
         setEmpty(isEditorEmpty(el));
       }, 0);
     },
-    [singleLine, onChange],
+    [singleLine, emitChange],
   );
 
   // ── Render ──────────────────────────────────────────────────────────
