@@ -54,6 +54,7 @@ import {
   type CustomUnit,
 } from "@/lib/use-custom-units";
 import { Tooltip } from "@/components/ui";
+import { useLabels, pluralize } from "@/lib/labels";
 import styles from "./AddUnitDialog.module.css";
 
 // ── Focusable selector for the trap ───────────────────────────────────────
@@ -123,6 +124,7 @@ export function AddUnitDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
+  const labels = useLabels();
   const { days: schoolWeek } = useSchoolWeek();
   const { add, defaultUnitTypeLabel, setDefaultUnitTypeLabel } =
     useCustomUnits();
@@ -382,7 +384,7 @@ export function AddUnitDialog({
           {/* Unit type label — free text, remembered as the user's default. */}
           <div className={styles.field}>
             <label htmlFor="add-unit-type" className={styles.label}>
-              Unit type label
+              {`${labels.unit} type label`}
             </label>
             <Tooltip
               content="What you call your units — 'Unit of Study', 'Unit of Inquiry', 'Unit of Lesson'. We'll remember this and use it as the default next time."
@@ -404,7 +406,8 @@ export function AddUnitDialog({
           {/* Unit name — required. */}
           <div className={styles.field}>
             <label htmlFor="add-unit-name" className={styles.label}>
-              Unit name<span className={styles.required}>*</span>
+              {`${labels.unit} name`}
+              <span className={styles.required}>*</span>
             </label>
             <Tooltip
               content="Short, recognizable name for this unit — what teachers and students will see across the planner."
@@ -431,7 +434,8 @@ export function AddUnitDialog({
           {/* Subject — dropdown. */}
           <div className={styles.field}>
             <label htmlFor="add-unit-subject" className={styles.label}>
-              Subject<span className={styles.required}>*</span>
+              {labels.subject}
+              <span className={styles.required}>*</span>
             </label>
             <Tooltip
               content="Which of your subjects this unit belongs to. The Year roadmap groups units by subject lane."
@@ -502,7 +506,7 @@ export function AddUnitDialog({
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <label htmlFor="add-unit-weeks" className={styles.label}>
-                Weeks
+                {pluralize(labels.week)}
                 {weeksOverride == null && (
                   <span className={styles.autoBadge}>Auto</span>
                 )}
@@ -531,7 +535,7 @@ export function AddUnitDialog({
 
             <div className={styles.field}>
               <label htmlFor="add-unit-lessons" className={styles.label}>
-                Lessons
+                {pluralize(labels.lesson)}
                 {lessonsOverride == null && (
                   <span className={styles.autoBadge}>Auto</span>
                 )}

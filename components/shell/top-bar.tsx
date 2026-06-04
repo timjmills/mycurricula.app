@@ -53,6 +53,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppState, type CurrentUser } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
+import { useLabels } from "@/lib/labels";
 import { Button, Tooltip, ToggleGroup } from "@/components/ui";
 import { CatchupFlameButton } from "./catchup-flame-button";
 import { Clock } from "./Clock";
@@ -158,6 +159,10 @@ export function TopBar(): ReactNode {
 
   const pathname = usePathname();
 
+  // Renameable hierarchy caption for the "Week N" context label — a school
+  // may rename "Week" → "Module", so the heading follows the configured term.
+  const labels = useLabels();
+
   // TOPBAR-001 — collapsible search state.
   // The search field is hidden at rest (icon-only button shows instead).
   // Clicking the icon or focusing the input reveals the full input field.
@@ -233,17 +238,17 @@ export function TopBar(): ReactNode {
           the working navigation control. Tooltip explains what "Week N"
           means in the school year per CLAUDE.md §4 onboarding voice. */}
       <Tooltip
-        content={`Week ${week} of your school year — use the in-grid Prev/Today/Next controls to navigate`}
+        content={`${labels.week} ${week} of your school year — use the in-grid Prev/Today/Next controls to navigate`}
         side="bottom"
       >
         <span
           className={styles.weekLabel}
           aria-live="polite"
           aria-atomic="true"
-          aria-label={`Current week: Week ${week}`}
-          title={`Week ${week} of your school year — use the in-grid Prev/Today/Next controls to navigate`}
+          aria-label={`Current ${labels.week.toLowerCase()}: ${labels.week} ${week}`}
+          title={`${labels.week} ${week} of your school year — use the in-grid Prev/Today/Next controls to navigate`}
         >
-          Week {week}
+          {labels.week} {week}
         </span>
       </Tooltip>
 

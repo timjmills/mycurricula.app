@@ -25,6 +25,7 @@
 import type { ReactNode } from "react";
 import type { Lesson } from "@/lib/types";
 import { SUBJECT_BY_ID } from "@/lib/mock";
+import { useLabels, pluralize } from "@/lib/labels";
 import { Tooltip } from "@/components/ui";
 import styles from "./DailyView.module.css";
 
@@ -43,8 +44,10 @@ export function TodayDashboard({
   dayLessons,
   dayLabel,
 }: TodayDashboardProps): ReactNode {
+  const labels = useLabels();
   const doneCount = dayLessons.filter((l) => l.status === "done").length;
   const total = dayLessons.length;
+  const lessonsWord = pluralize(labels.lesson).toLowerCase();
 
   return (
     <div
@@ -59,14 +62,14 @@ export function TodayDashboard({
       <div
         className={styles.dayHeaderProgress}
         role="status"
-        aria-label={`${doneCount} of ${total} lessons done`}
+        aria-label={`${doneCount} of ${total} ${lessonsWord} done`}
       >
         <div className={styles.dayHeaderProgressNumbers}>
           <span className={styles.dayHeaderProgressCount}>
             {doneCount}
             <span className={styles.dayHeaderProgressOf}>
               {" "}
-              of {total} lessons
+              of {total} {lessonsWord}
             </span>
           </span>
         </div>

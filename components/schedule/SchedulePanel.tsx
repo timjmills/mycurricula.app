@@ -56,6 +56,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useAppState } from "@/lib/app-state";
+import { useLabels } from "@/lib/labels";
 import { useSchoolWeek, WEEKDAY_INDEX } from "@/lib/use-school-week";
 import { WEEK_DAYS, WEEK_DAYS_SHORT } from "@/lib/mock";
 import { dateNumberForWeekDay } from "@/lib/mock/calendar";
@@ -109,6 +110,7 @@ export function SchedulePanel({
   onClose,
 }: SchedulePanelProps): ReactNode {
   const { week, selectedDay, setSelectedDay } = useAppState();
+  const labels = useLabels();
   const focusedDay = selectedDay;
   const { days: configuredDays } = useSchoolWeek();
   const schoolWeekDays = configuredDays.map((d) => WEEKDAY_INDEX[d]);
@@ -209,7 +211,7 @@ export function SchedulePanel({
 
   // ── Accessible heading text ───────────────────────────────────────────────
   const dayLabel = useMemo(() => WEEK_DAYS[focusedDay] ?? "Day", [focusedDay]);
-  const headingText = `Schedule — ${dayLabel}, Week ${week}`;
+  const headingText = `Schedule — ${dayLabel}, ${labels.week} ${week}`;
 
   if (!open) return null;
   if (typeof document === "undefined") return null;

@@ -40,6 +40,7 @@ import {
 import { useRouter } from "next/navigation";
 import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
+import { useLabels, pluralize } from "@/lib/labels";
 import { useSubjectColor } from "@/lib/palette";
 import { SUBJECTS, ALL_UNITS, CURRENT_WEEK, WEEK_DAYS } from "@/lib/mock";
 import { describeStandard } from "@/lib/mock/standards";
@@ -135,9 +136,10 @@ function parseWeekSpan(label: string): number[] {
   return out;
 }
 
-/** A unit's display tag, e.g. "Unit 3" — derived from its 1-based index. */
-function unitTag(index: number): string {
-  return `Unit ${index + 1}`;
+/** A unit's display tag, e.g. "Unit 3" — derived from its 1-based index.
+ *  `term` is the (possibly renamed) Unit caption from useLabels(). */
+function unitTag(index: number, term = "Unit"): string {
+  return `${term} ${index + 1}`;
 }
 
 /** Strip a leading "Unit N · " prefix from a mock unit name so the roadmap card
@@ -185,6 +187,9 @@ function SubjectPane({
   const subject = SUBJECTS.find((s) => s.id === subjectId)!;
   const { lessons } = usePlanner();
   const { setSelectedLessonId } = useAppState();
+  // Renameable hierarchy captions (Subject / Unit / Week / Lesson). Picking a
+  // term in Settings → Appearance retitles every heading below site-wide.
+  const labels = useLabels();
 
   // Active-subject accent cascade — set on the root so the whole subtree
   // inherits the colors via var() references in the CSS module.
@@ -361,7 +366,11 @@ function SubjectPane({
           prototype's global topbar AND the old left "Subjects" panel, which
           duplicated the app-wide SideNav. Picking a chip switches subjects. */}
       <div className={styles.viewbar}>
-        <div className={styles.subjtabs} role="tablist" aria-label="Subjects">
+        <div
+          className={styles.subjtabs}
+          role="tablist"
+          aria-label={pluralize(labels.subject)}
+        >
           {SUBJECTS.map((sj) => {
             const on = sj.id === subjectId;
             return (
@@ -424,8 +433,8 @@ function SubjectPane({
                       opacity: isPastOrCurrent ? 1 : 0.45,
                     }}
                     onClick={() => pickUnit(u.id)}
-                    aria-label={`Open ${unitTag(u.index)} ${unitTopic(u.name)}`}
-                    title={`Open ${unitTag(u.index)}: ${unitTopic(u.name)} — its weeks and lessons`}
+                    aria-label={`Open ${unitTag(u.index, labels.unit)} ${unitTopic(u.name)}`}
+                    title={`Open ${unitTag(u.index, labels.unit)}: ${unitTopic(u.name)} — its ${pluralize(labels.week).toLowerCase()} and ${pluralize(labels.lesson).toLowerCase()}`}
                   >
                     {u.allDone && (
                       <span className={styles.mk} style={{ color: color.c }}>
@@ -443,14 +452,14 @@ function SubjectPane({
                   className={`${styles.uleg} ${u.id === activeUnitId ? styles.ulegOn : ""}`}
                   key={u.id}
                   onClick={() => pickUnit(u.id)}
-                  title={`Open ${unitTag(u.index)}: ${unitTopic(u.name)} — its weeks and lessons`}
+                  title={`Open ${unitTag(u.index, labels.unit)}: ${unitTopic(u.name)} — its ${pluralize(labels.week).toLowerCase()} and ${pluralize(labels.lesson).toLowerCase()}`}
                 >
                   <div className={styles.ud}>
                     <span
                       className={styles.d}
                       style={{ background: color.c }}
                     />
-                    {unitTag(u.index)}
+                    {unitTag(u.index, labels.unit)}
                   </div>
                   <div className={styles.un}>{unitTopic(u.name)}</div>
                   <div className={styles.udt}>{u.weeks}</div>
@@ -466,15 +475,16 @@ function SubjectPane({
                 <Icon name="grid" />
               </span>
               <h3>
-                Week breakdown —{" "}
+                {labels.week} breakdown —{" "}
                 {activeUnit
-                  ? `${unitTag(activeUnit.index)}: ${unitTopic(activeUnit.name)}`
-                  : "Unit"}
+                  ? `${unitTag(activeUnit.index, labels.unit)}: ${unitTopic(activeUnit.name)}`
+                  : labels.unit}
               </h3>
             </div>
             {weeks.length === 0 ? (
               <div className={styles.empty}>
-                No planned lessons for this unit yet.
+                No planned {pluralize(labels.lesson).toLowerCase()} for this{" "}
+                {labels.unit.toLowerCase()} yet.
               </div>
             ) : (
               <div className={styles.hscroll}>
@@ -483,12 +493,16 @@ function SubjectPane({
                     key={wk.week}
                     className={`${styles.wkcard} ${wk.week === activeWeek ? styles.wkcardOn : ""}`}
                     onClick={() => pickWeek(wk.week)}
-                    title={`Show Week ${wk.week} lessons`}
+                    title={`Show ${labels.week} ${wk.week} ${pluralize(labels.lesson).toLowerCase()}`}
                   >
-                    <div className={styles.wn}>Week {wk.week}</div>
+                    <div className={styles.wn}>
+                      {labels.week} {wk.week}
+                    </div>
                     <div className={styles.wt}>
-                      {wk.lessons.length} lesson
-                      {wk.lessons.length === 1 ? "" : "s"}
+                      {wk.lessons.length}{" "}
+                      {wk.lessons.length === 1
+                        ? labels.lesson.toLowerCase()
+                        : pluralize(labels.lesson).toLowerCase()}
                     </div>
                     <div className={styles.wd}>
                       <span className={styles.wdt}>Wk {wk.week}</span>
@@ -511,12 +525,17 @@ function SubjectPane({
                 <Icon name="calendar" />
               </span>
               <h3>
-                Daily lessons —{" "}
-                {activeWeekEntry ? `Week ${activeWeekEntry.week}` : "Week"}
+                Daily {pluralize(labels.lesson).toLowerCase()} —{" "}
+                {activeWeekEntry
+                  ? `${labels.week} ${activeWeekEntry.week}`
+                  : labels.week}
               </h3>
             </div>
             {days.length === 0 ? (
-              <div className={styles.empty}>No lessons this week.</div>
+              <div className={styles.empty}>
+                No {pluralize(labels.lesson).toLowerCase()} this{" "}
+                {labels.week.toLowerCase()}.
+              </div>
             ) : (
               <div className={styles.hscroll}>
                 {days.map((lesson) => {
@@ -594,7 +613,9 @@ function SubjectPane({
                   }}
                 >
                   <Icon name="chL" />
-                  {activeWeekEntry ? `Week ${activeWeekEntry.week}` : "Back"}
+                  {activeWeekEntry
+                    ? `${labels.week} ${activeWeekEntry.week}`
+                    : "Back"}
                 </button>
                 <div className={styles.rnav}>
                   <button
@@ -624,8 +645,8 @@ function SubjectPane({
               </div>
 
               <div className={styles.rdate}>
-                {WEEK_DAYS[selectedLesson.day] ?? `Day ${selectedLesson.day}`} ·
-                Week {selectedLesson.week}
+                {WEEK_DAYS[selectedLesson.day] ?? `Day ${selectedLesson.day}`} ·{" "}
+                {labels.week} {selectedLesson.week}
               </div>
               <div className={styles.rtitle}>{selectedLesson.title}</div>
 
@@ -681,7 +702,7 @@ function SubjectPane({
                   <div className={styles.rsec}>
                     <h4>
                       <Icon name="book" />
-                      Lesson overview
+                      {labels.lesson} overview
                     </h4>
                     <p>
                       {selectedLesson.preview ||
@@ -780,8 +801,8 @@ function SubjectPane({
                 <div className={styles.rsec}>
                   <h4>
                     <Icon name="clipboard" />
-                    Unit assessments —{" "}
-                    {activeUnit ? unitTag(activeUnit.index) : ""}
+                    {labels.unit} assessments —{" "}
+                    {activeUnit ? unitTag(activeUnit.index, labels.unit) : ""}
                   </h4>
                   {asmt.map((a) => (
                     <div className={styles.uasmt} key={a.t}>
@@ -808,7 +829,7 @@ function SubjectPane({
                 <div className={`${styles.rsec} ${styles.rprog}`}>
                   <h4>
                     <Icon name="chart" />
-                    Unit progress
+                    {labels.unit} progress
                   </h4>
                   <div className={styles.bar}>
                     <i style={{ width: `${unitPct}%` }} />
@@ -818,7 +839,8 @@ function SubjectPane({
                       <b>{unitPct}%</b> complete
                     </span>
                     <span>
-                      {unitDone} of {unitTotal} lessons
+                      {unitDone} of {unitTotal}{" "}
+                      {pluralize(labels.lesson).toLowerCase()}
                     </span>
                   </div>
                 </div>
@@ -826,7 +848,8 @@ function SubjectPane({
             </>
           ) : (
             <p className={styles.rempty}>
-              Pick a day from the lessons above to see its details here.
+              Pick a day from the {pluralize(labels.lesson).toLowerCase()} above
+              to see its details here.
             </p>
           )}
         </aside>

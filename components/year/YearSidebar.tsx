@@ -10,6 +10,7 @@
 // the label so the rail stays comprehensible at icon-only width.
 
 import { FutureControl } from "@/components/ui";
+import { useLabels, pluralize } from "@/lib/labels";
 import styles from "./YearSidebar.module.css";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -131,15 +132,25 @@ const NAV_ITEMS: NavItem[] = [
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function YearSidebar() {
+  const labels = useLabels();
+
+  // Hierarchy-term nav items carry the school's (possibly renamed) caption
+  // rather than the hard-coded "Units" / "Lessons" labels.
+  const labelOverrides: Record<string, string> = {
+    units: pluralize(labels.unit),
+    lessons: pluralize(labels.lesson),
+  };
+
   return (
     <nav className={styles.sidebar} aria-label="Year view navigation">
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
+        const label = labelOverrides[item.id] ?? item.label;
         return (
           <FutureControl
             key={item.id}
             variant="icon-only"
-            tooltip={`${item.label} — coming after beta. Will switch the Year view to a ${item.label.toLowerCase()} focus.`}
+            tooltip={`${label} — coming after beta. Will switch the Year view to a ${label.toLowerCase()} focus.`}
             tooltipSide="right"
             leadingIcon={
               <Icon className={styles.navIcon} width={20} height={20} />

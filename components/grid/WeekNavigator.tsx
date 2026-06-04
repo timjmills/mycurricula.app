@@ -9,6 +9,7 @@
 
 import type { ReactNode } from "react";
 import { Button, Tooltip } from "@/components/ui";
+import { useLabels } from "@/lib/labels";
 import { CatchupChip } from "./CatchupChip";
 import styles from "./WeeklyGrid.module.css";
 
@@ -59,6 +60,7 @@ export function WeekNavigator({
   actions,
   headingLevel = "h2",
 }: WeekNavigatorProps): ReactNode {
+  const labels = useLabels();
   const isCurrent = week === currentWeek;
   const atStart = week <= minWeek;
   const atEnd = week >= maxWeek;
@@ -72,7 +74,7 @@ export function WeekNavigator({
             heading is the view's top heading. Kept as h2 to sit under the
             app-shell chrome rather than competing as a second page h1. */}
         <Heading className={styles.navTitle}>
-          Week {week}
+          {labels.week} {week}
           {isCurrent && <span className={styles.currentTag}>This week</span>}
         </Heading>
       </div>
@@ -135,7 +137,6 @@ export function WeekNavigator({
           </Button>
         </Tooltip>
       </div>
-
     </header>
   );
 }

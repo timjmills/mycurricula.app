@@ -30,6 +30,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
+import { useLabels } from "@/lib/labels";
 import { WEEK_DAYS } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
 import { useHolidaysByDay } from "@/lib/use-day-holiday";
@@ -130,6 +131,7 @@ function DaySection({
 
 export function WeeklyList(): ReactNode {
   const router = useRouter();
+  const labels = useLabels();
   const { week, setSelectedDay, setSelectedLessonId } = useAppState();
   const { lessons } = usePlanner();
   // Holiday lookup for this week — used to decorate each day section with
@@ -178,7 +180,9 @@ export function WeeklyList(): ReactNode {
           <div className={styles.headingRow}>
             {/* h2 (not h1) — the page-level h1 lives in WeeklyShell's
                 PageHeader. This in-list week heading is a section. */}
-            <h2 className={styles.heading}>Week {week}</h2>
+            <h2 className={styles.heading}>
+              {labels.week} {week}
+            </h2>
             <span className={styles.hint}>
               Same data as the grid view, listed by day.
             </span>

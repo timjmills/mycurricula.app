@@ -36,6 +36,7 @@ import type {
   CatchupScope,
 } from "@/lib/catchup-data";
 import { usePlanner } from "@/lib/planner-store";
+import { useLabels } from "@/lib/labels";
 import { SUBJECT_BY_ID } from "@/lib/mock";
 import { Tooltip } from "@/components/ui";
 import { BulkActionBar } from "./BulkActionBar";
@@ -83,12 +84,11 @@ const STATUS_CHIPS: ReadonlyArray<CatchupItem["status"]> = [
   "carried",
 ];
 
-const GROUP_OPTIONS: ReadonlyArray<{ id: CatchupGroupBy; label: string }> = [
-  { id: "subject", label: "Subject" },
-  { id: "chrono", label: "Chronological" },
-  { id: "standard", label: "Standard" },
-  { id: "unit", label: "Unit" },
-];
+// The non-renameable group-by labels. The subject/unit captions are
+// renameable, so they're resolved at render time from useLabels() (see the
+// `groupOptions` memo inside the component) rather than hard-coded here.
+const GROUP_LABEL_CHRONO = "Chronological";
+const GROUP_LABEL_STANDARD = "Standard";
 
 // Inline flame SVG — keep it stroke=currentColor so tokens drive color.
 function IconFlame() {
@@ -112,6 +112,21 @@ export function CatchupScreen() {
   const { lessons } = usePlanner();
   const { week, currentUser } = useAppState();
   const { enabled, actions, setAction, setNote, getNote } = useCatchup();
+  const labels = useLabels();
+
+  // Group-by options with the renameable subject/unit captions resolved
+  // from the current hierarchy labels.
+  const groupOptions = useMemo<
+    ReadonlyArray<{ id: CatchupGroupBy; label: string }>
+  >(
+    () => [
+      { id: "subject", label: labels.subject },
+      { id: "chrono", label: GROUP_LABEL_CHRONO },
+      { id: "standard", label: GROUP_LABEL_STANDARD },
+      { id: "unit", label: labels.unit },
+    ],
+    [labels.subject, labels.unit],
+  );
 
   const [scope, setScope] = useState<CatchupScope>("last4");
   const [groupBy, setGroupBy] = useState<CatchupGroupBy>("subject");
@@ -390,7 +405,7 @@ export function CatchupScreen() {
               aria-label="Group rows by"
               title="Choose how to organize the catch-up list — by subject, by week, by standard, or by unit"
             >
-              {GROUP_OPTIONS.map((o) => (
+              {groupOptions.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>

@@ -147,6 +147,7 @@ import { DailyList } from "@/components/list/DailyList";
 import { ScheduleDayPane } from "@/components/schedule";
 import { DailySchedulePill } from "./daily-schedule-pill";
 import { useDailyScheduleMode } from "@/lib/daily-schedule-state";
+import { useLabels, pluralize } from "@/lib/labels";
 import styles from "./DailyView.module.css";
 
 // ── Pane width persistence — NO fixed clamps; sanity-bounded by container ─
@@ -1235,6 +1236,11 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
   const { viewMode, week, selectedDay, setSelectedDay, setWeek } =
     useAppState();
 
+  // Renameable hierarchy captions — a school may rename "Week" → "Module",
+  // "Lesson" → "Activity", etc. Read once at the top of the component so the
+  // nested column renderers below use the dynamic caption everywhere.
+  const labels = useLabels();
+
   // Lessons come from the planner store so completions, edits, and undo/redo
   // are immediately reflected in the left pane list and right pane detail.
   const { lessons, setLessonStatus, lastChange } = usePlanner();
@@ -1781,7 +1787,9 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
               hide it in list mode. */}
 
           {/* ── WEEK eyebrow ───────────────────────────────────── */}
-          <div className={styles.leftPaneEyebrow}>Week {week}</div>
+          <div className={styles.leftPaneEyebrow}>
+            {labels.week} {week}
+          </div>
 
           {/* ── Week strip: one pill per configured school-week day ─ */}
           <WeekStrip
@@ -1809,7 +1817,9 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
 
           {/* ── "Lessons" label row + collapse-all + add-lesson stub ─ */}
           <div className={styles.lessonsLabelRow}>
-            <span className={styles.lessonsLabel}>Lessons</span>
+            <span className={styles.lessonsLabel}>
+              {pluralize(labels.lesson)}
+            </span>
             <div className={styles.lessonsLabelActions}>
               {/* Collapse all / Expand all — keyboard-accessible button. */}
               <Button

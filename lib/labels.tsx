@@ -2,10 +2,10 @@
 
 // labels.tsx — renameable hierarchy labels for the planner.
 //
-// The planner uses four nested concepts — Subject, Unit, Lesson, Section —
-// across every surface. Schools sometimes call these by different names
-// ("Strand" instead of "Subject", "Module" instead of "Unit", etc.). This
-// context lets a teacher rename ANY of the four from Settings → Appearance
+// The planner uses five nested concepts — Subject, Unit, Week, Lesson,
+// Section — across every surface. Schools sometimes call these by different
+// names ("Strand" instead of "Subject", "Module" instead of "Week", etc.).
+// This context lets a teacher rename ANY of them from Settings → Appearance
 // without changing what the concepts DO; only the visible captions follow.
 //
 // Surfaces that need a caption (e.g. the ResourceComposer's routing-row
@@ -22,7 +22,7 @@
 //
 // Contract — frozen across agents. Other agents (e.g. the resource-composer
 // agent rendering the four routing pickers) import `useLabels` and read
-// `subject / unit / lesson / section`. Do not rename or add fields without
+// `subject / unit / week / lesson / section`. Do not rename or add fields without
 // coordinating across all consumers.
 
 import {
@@ -38,13 +38,14 @@ import type { ReactNode } from "react";
 // ── Public types ─────────────────────────────────────────────────────────
 
 /**
- * The renameable captions for the four planner hierarchy levels. Field
+ * The renameable captions for the planner hierarchy levels. Field
  * names match the underlying concepts (which are NOT renameable); only the
  * string VALUES change when a teacher overrides them.
  */
 export interface HierarchyLabels {
   subject: string;
   unit: string;
+  week: string;
   lesson: string;
   section: string;
 }
@@ -52,14 +53,31 @@ export interface HierarchyLabels {
 /**
  * The factory-default captions. Used as the SSR + first-client-render
  * value (so hydration matches), and as the target of the
- * "Restore defaults" affordance in Settings.
+ * "Restore defaults" affordance in Settings. Ordered by the planner
+ * hierarchy: Subject › Unit › Week › Lesson › Section.
  */
 export const DEFAULT_LABELS: HierarchyLabels = {
   subject: "Subject",
   unit: "Unit",
+  week: "Week",
   lesson: "Lesson",
   section: "Section",
 };
+
+/**
+ * Pluralize a caption for "Weeks / Units / Lessons" style headings. Handles
+ * the common English cases so renamed terms read correctly:
+ *   Module → Modules, Class → Classes, Strand → Strands, Story → Stories.
+ * Good enough for the school-vocabulary terms teachers actually use; not a
+ * full inflection engine.
+ */
+export function pluralize(term: string): string {
+  const t = term.trim();
+  if (t.length === 0) return t;
+  if (/[^aeiou]y$/i.test(t)) return t.slice(0, -1) + "ies";
+  if (/(s|x|z|ch|sh)$/i.test(t)) return t + "es";
+  return t + "s";
+}
 
 // ── Storage ──────────────────────────────────────────────────────────────
 
@@ -92,6 +110,10 @@ function loadLabels(): HierarchyLabels {
         typeof parsed.unit === "string" && parsed.unit.trim().length > 0
           ? parsed.unit
           : DEFAULT_LABELS.unit,
+      week:
+        typeof parsed.week === "string" && parsed.week.trim().length > 0
+          ? parsed.week
+          : DEFAULT_LABELS.week,
       lesson:
         typeof parsed.lesson === "string" && parsed.lesson.trim().length > 0
           ? parsed.lesson
@@ -163,6 +185,7 @@ export function LabelsProvider({ children }: LabelsProviderProps): ReactNode {
     if (
       saved.subject !== DEFAULT_LABELS.subject ||
       saved.unit !== DEFAULT_LABELS.unit ||
+      saved.week !== DEFAULT_LABELS.week ||
       saved.lesson !== DEFAULT_LABELS.lesson ||
       saved.section !== DEFAULT_LABELS.section
     ) {
@@ -189,6 +212,12 @@ export function LabelsProvider({ children }: LabelsProviderProps): ReactNode {
               ? patch.unit
               : DEFAULT_LABELS.unit
             : prev.unit,
+        week:
+          patch.week !== undefined
+            ? patch.week.trim().length > 0
+              ? patch.week
+              : DEFAULT_LABELS.week
+            : prev.week,
         lesson:
           patch.lesson !== undefined
             ? patch.lesson.trim().length > 0
@@ -222,9 +251,9 @@ export function LabelsProvider({ children }: LabelsProviderProps): ReactNode {
 // ── Hooks ────────────────────────────────────────────────────────────────
 
 /**
- * Read the current hierarchy labels. Returns the four caption strings
+ * Read the current hierarchy labels. Returns the caption strings
  * directly — consumers typically destructure
- * `const { subject, unit, lesson, section } = useLabels();`.
+ * `const { subject, unit, week, lesson, section } = useLabels();`.
  *
  * Throws when called outside a `<LabelsProvider>` so the missing provider
  * surfaces immediately in development rather than producing silent
@@ -240,7 +269,7 @@ export function useLabels(): HierarchyLabels {
 
 /**
  * Read the partial-patch setter for the hierarchy labels. Pass any subset
- * of `{ subject, unit, lesson, section }`; the omitted fields keep their
+ * of `{ subject, unit, week, lesson, section }`; the omitted fields keep their
  * current value. Persists to localStorage on every call.
  *
  * Throws when called outside a `<LabelsProvider>`.

@@ -30,6 +30,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
+import { useLabels } from "@/lib/labels";
 import { usePlanner } from "@/lib/planner-store";
 import { SUBJECTS, SUBJECT_BY_ID, UNIT_BY_ID } from "@/lib/mock";
 import { allYearMonthsFor } from "@/lib/year-calendar";
@@ -125,6 +126,7 @@ export default function YearPrintPage(): ReactNode {
   // useAppState() — read currentUser.curriculumLabel for the cover title
   // (omitted entirely when the label is empty so the title still scans).
   const { currentUser } = useAppState();
+  const labels = useLabels();
   const { lessons } = usePlanner();
   // TEAM-scoped academic year — same hook the screen Year view reads.
   // Print + screen layouts stay in lockstep so the printed range mirrors
@@ -201,7 +203,7 @@ export default function YearPrintPage(): ReactNode {
                   <thead>
                     <tr>
                       {/* Subject stub column. */}
-                      <th scope="col" aria-label="Subject" />
+                      <th scope="col" aria-label={labels.subject} />
                       {weekIndices.map((wi) => (
                         <th key={wi} scope="col">
                           Wk {wi + 1}

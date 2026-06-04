@@ -22,6 +22,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
+import { useLabels } from "@/lib/labels";
 import { usePlanner } from "@/lib/planner-store";
 import {
   SUBJECTS,
@@ -59,6 +60,7 @@ function formatDate(d: Date): string {
 
 export default function WeeklyPrintPage(): ReactNode {
   const { week, currentUser } = useAppState();
+  const labels = useLabels();
   const { lessons } = usePlanner();
 
   // Only lessons in the current week, in day order.
@@ -108,18 +110,21 @@ export default function WeeklyPrintPage(): ReactNode {
         <div className={styles.sheetHeader}>
           <h1 className={styles.sheetTitle}>
             {currentUser.curriculumLabel
-              ? `Week ${week} — ${currentUser.curriculumLabel} Curriculum`
-              : `Week ${week}`}
+              ? `${labels.week} ${week} — ${currentUser.curriculumLabel} Curriculum`
+              : `${labels.week} ${week}`}
           </h1>
           <span className={styles.sheetMeta}>Printed {formatDate(today)}</span>
         </div>
 
         {/* Subject × day grid */}
-        <table className={styles.grid} aria-label={`Week ${week} lesson grid`}>
+        <table
+          className={styles.grid}
+          aria-label={`${labels.week} ${week} lesson grid`}
+        >
           <thead>
             <tr>
               {/* Subject stub header — empty, describes the stub column. */}
-              <th scope="col" aria-label="Subject" />
+              <th scope="col" aria-label={labels.subject} />
               {dayIndices.map((di) => (
                 <th key={di} scope="col">
                   {WEEK_DAYS_SHORT[di]}
@@ -228,7 +233,7 @@ export default function WeeklyPrintPage(): ReactNode {
                     fontSize: "var(--t-13)",
                   }}
                 >
-                  No lessons for Week {week}.
+                  No lessons for {labels.week} {week}.
                 </td>
               </tr>
             )}

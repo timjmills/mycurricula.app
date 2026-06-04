@@ -56,6 +56,7 @@ import React, {
   useState,
 } from "react";
 import { Button, Tooltip } from "@/components/ui";
+import { useLabels, pluralize } from "@/lib/labels";
 import {
   DndContext,
   DragOverlay,
@@ -103,6 +104,7 @@ const DAY_COUNT = WEEK_DAYS.length;
 
 export function WeeklyGrid(): ReactNode {
   const { style } = useTheme();
+  const labels = useLabels();
   const { week, search, filters, selectedLessonId, setSelectedLessonId } =
     useAppState();
   const prefersReducedMotion = useReducedMotion();
@@ -560,7 +562,7 @@ export function WeeklyGrid(): ReactNode {
           <div
             className={styles.grid}
             role="grid"
-            aria-label={`Weekly plan, week ${week}`}
+            aria-label={`Weekly plan, ${labels.week.toLowerCase()} ${week}`}
           >
             {/* ── Day header row — anchored chrome (spec §3.5) ── */}
             <div className={styles.cornerCell} role="presentation" />
@@ -642,7 +644,7 @@ export function WeeklyGrid(): ReactNode {
             {/* ── Subject rows ── */}
             {!weekHasLessons && (
               <div className={styles.emptyWeek} role="status">
-                No lessons planned for week {week} yet.
+                {`No ${pluralize(labels.lesson).toLowerCase()} planned for ${labels.week.toLowerCase()} ${week} yet.`}
               </div>
             )}
             {SUBJECTS.map((subject, rowIdx) => (

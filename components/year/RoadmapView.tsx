@@ -23,6 +23,7 @@
 
 import { useMemo, useEffect, useRef } from "react";
 import { usePlanner } from "@/lib/planner-store";
+import { useLabels, pluralize } from "@/lib/labels";
 import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
 import {
   subjectCompletePct,
@@ -554,6 +555,7 @@ function RoadmapSummary({
 }: {
   lessons: ReturnType<typeof usePlanner>["lessons"];
 }) {
+  const labels = useLabels();
   const totalLessons = lessons.length;
   const uniqueUnits = new Set(lessons.map((l) => l.unit)).size;
   const done = lessons.filter((l) => l.status === "done").length;
@@ -561,8 +563,11 @@ function RoadmapSummary({
 
   return (
     <div className={styles.summaryStats}>
-      <SmallStat value={String(uniqueUnits)} label="Units" />
-      <SmallStat value={String(totalLessons)} label="Lessons" />
+      <SmallStat value={String(uniqueUnits)} label={pluralize(labels.unit)} />
+      <SmallStat
+        value={String(totalLessons)}
+        label={pluralize(labels.lesson)}
+      />
       <SmallStat value={`${avgPct}%`} label="Avg. Progress" />
     </div>
   );

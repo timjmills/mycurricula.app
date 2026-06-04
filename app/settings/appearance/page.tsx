@@ -9,8 +9,8 @@
 //   • Subject colors                 — per-subject swatch picker with the
 //                                      Core (team) / Personal scope split.
 //   • Palette reference              — the full 20-swatch table (A3).
-//   • Hierarchy labels               — rename the four planner concepts
-//                                      (Subject / Unit / Lesson / Section)
+//   • Hierarchy labels               — rename the planner concepts
+//                                      (Subject / Unit / Week / Lesson / Section)
 //                                      app-wide. Reads + writes through
 //                                      lib/labels (LabelsProvider).
 //
@@ -88,7 +88,7 @@ export default function AppearancePage(): ReactNode {
         <PaletteReference />
 
         {/* ── Hierarchy labels ──────────────────────────────────────────
-            Rename the four planner concepts. The captions follow the
+            Rename the planner concepts. The captions follow the
             change immediately, app-wide; the underlying behavior does
             not. Persists to localStorage via the LabelsProvider. */}
         <HierarchyLabelsCard />
@@ -157,6 +157,7 @@ function HierarchyLabelsCard(): ReactNode {
   const hasOverrides =
     labels.subject !== DEFAULT_LABELS.subject ||
     labels.unit !== DEFAULT_LABELS.unit ||
+    labels.week !== DEFAULT_LABELS.week ||
     labels.lesson !== DEFAULT_LABELS.lesson ||
     labels.section !== DEFAULT_LABELS.section;
 
@@ -185,7 +186,7 @@ function HierarchyLabelsCard(): ReactNode {
       eyebrow="Vocabulary"
       title={
         <Tooltip
-          content="Rename what your school calls each planning level (Subject, Unit, Lesson, Section). The captions update everywhere in the app immediately — behavior is unchanged."
+          content="Rename what your school calls each planning level (Subject, Unit, Week, Lesson, Section). The captions update everywhere in the app immediately — behavior is unchanged."
           side="bottom"
         >
           <span>Hierarchy labels</span>
@@ -219,6 +220,14 @@ function HierarchyLabelsCard(): ReactNode {
           value={drafts.unit}
           onChange={onDraft("unit")}
           onBlur={onCommit("unit")}
+        />
+        <LabelInput
+          name="week"
+          legend="Week"
+          defaultLabel={DEFAULT_LABELS.week}
+          value={drafts.week}
+          onChange={onDraft("week")}
+          onBlur={onCommit("week")}
         />
         <LabelInput
           name="lesson"

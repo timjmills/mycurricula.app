@@ -15,6 +15,7 @@
 // differently at a glance (lunch, recess, assembly vs. lesson-flow subjects).
 
 import type { CSSProperties, ReactNode } from "react";
+import { useLabels, pluralize } from "@/lib/labels";
 import { useOnboarding } from "@/lib/onboarding-state";
 import type { OnboardingSubject } from "@/lib/onboarding-state";
 import { Button, ToggleGroup, Tooltip } from "@/components/ui";
@@ -80,12 +81,17 @@ interface SwatchPickerProps {
 // Eight color swatches. The selected one shows a white checkmark.
 // Each swatch uses `background: var(--<token>)` from tokens.css.
 function SwatchPicker({ value, onChange }: SwatchPickerProps): ReactNode {
+  const labels = useLabels();
   return (
     <div className={styles.colorCol}>
       <span className={styles.colorLabel} aria-hidden>
         Color
       </span>
-      <div className={styles.swatches} role="group" aria-label="Subject color">
+      <div
+        className={styles.swatches}
+        role="group"
+        aria-label={`${labels.subject} color`}
+      >
         {COLOR_TOKENS.map((token) => {
           const tip = `Use the ${token} color for this subject — every card, stripe, and chip for this subject picks up this hue`;
           return (
@@ -131,6 +137,7 @@ function AcademicPicker({
   isAcademic,
   onChange,
 }: AcademicPickerProps): ReactNode {
+  const labels = useLabels();
   return (
     <div className={styles.planCol}>
       <span className={styles.planLabel} aria-hidden>
@@ -140,7 +147,7 @@ function AcademicPicker({
         options={[...ACADEMIC_OPTIONS]}
         value={isAcademic ? "academic" : "non-academic"}
         onChange={(v) => onChange(v === "academic")}
-        ariaLabel="Lesson planning type"
+        ariaLabel={`${labels.lesson} planning type`}
         variant="subtle"
         size="sm"
       />
@@ -218,6 +225,7 @@ function SubjectRow({
   onMoveDown,
   onRemove,
 }: SubjectRowProps): ReactNode {
+  const labels = useLabels();
   const rowClass = [
     styles.row,
     !subject.isAcademic ? styles.rowNonAcademic : "",
@@ -260,8 +268,8 @@ function SubjectRow({
           type="text"
           className={styles.nameInput}
           value={subject.name}
-          placeholder="Subject name"
-          aria-label="Subject name"
+          placeholder={`${labels.subject} name`}
+          aria-label={`${labels.subject} name`}
           onChange={(e) => onChangeName(subject.id, e.target.value)}
         />
       </div>
@@ -299,6 +307,7 @@ function SubjectRow({
 
 export function SubjectsStep(): ReactNode {
   const { data, update } = useOnboarding();
+  const labels = useLabels();
   const subjects = data.subjects;
 
   // ── Mutation helpers — each rebuilds the array and calls update() ────
@@ -358,7 +367,7 @@ export function SubjectsStep(): ReactNode {
         which ones you write lesson plans for.
       </p>
 
-      <ul className={styles.list} aria-label="Subjects">
+      <ul className={styles.list} aria-label={pluralize(labels.subject)}>
         {subjects.map((subject, index) => (
           <li key={subject.id} style={{ listStyle: "none", padding: 0 }}>
             <SubjectRow
