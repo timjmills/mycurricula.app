@@ -7,8 +7,11 @@
       "Bash(git rev-list *)",
       "Bash(git check-ignore *)",
       "Bash(git add *)",
-      "Bash(git commit -q -m ' *)",
-      "Bash(git push *)"
+      "Bash(git commit -q -m *)",
+      "Bash(git push)",
+      "Bash(git push origin master)",
+      "Bash(gh api *)",
+      "Bash(grep -iE \"design.*\\\\.\\(html|css|md\\)$\")"
     ]
   },
   "enabledPlugins": {
