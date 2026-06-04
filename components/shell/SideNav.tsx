@@ -34,8 +34,8 @@ const SECTIONS: NavSection[] = [
   {
     label: "Plan",
     items: [
-      { label: "Weekly", href: "/weekly", icon: <GridIcon /> },
       { label: "Daily", href: "/daily", icon: <CalendarIcon /> },
+      { label: "Weekly", href: "/weekly", icon: <GridIcon /> },
       { label: "Year", href: "/year", icon: <LayersIcon /> },
       { label: "Curriculum", href: "/subject", icon: <BookIcon /> },
     ],
