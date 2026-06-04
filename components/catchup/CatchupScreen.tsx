@@ -286,6 +286,22 @@ export function CatchupScreen() {
                 ? `${currentUser.curriculumLabel} · 2025–26 school year · ${currentUser.name}`
                 : `2025–26 school year · ${currentUser.name}`}
             </div>
+            {/* Honest-persistence note (audit finding #22). The per-item
+                Mark-done / Skip / Carry-over / Note decisions below persist to
+                this browser's localStorage only — they do NOT yet write to the
+                backend, so a teammate on another device won't see them and they
+                won't survive a different browser. Until Phase 1B wires the
+                catch-up store through Supabase, the affordances must not imply a
+                durable, team-visible save. Copy mirrors the InstanceRename
+                precedent ("Saved on this device for now…"). */}
+            <p
+              className={styles.metaRow}
+              style={{ color: "var(--catchup)" }}
+              role="note"
+            >
+              Catch-up decisions (done, skipped, carried, notes) are saved on
+              this device for now — your team sees them once backend sync is on.
+            </p>
           </div>
 
           <div className={styles.coverage}>

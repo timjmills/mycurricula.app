@@ -152,6 +152,16 @@ interface OnboardingContextValue {
    * suppress rendering until this is true.
    */
   hydrated: boolean;
+  /**
+   * HONEST-PERSISTENCE FLAG (audit finding #22). The wizard's collected
+   * config — and the `finished` flag set by `finish()` — persist to THIS
+   * browser's localStorage ONLY; nothing is written to the backend yet (see
+   * the module header). Consumers (e.g. the summary step's "You're all set!"
+   * recap) must use this to keep their success copy honest: setup is saved on
+   * this device, not synced to the team or the server. Flips to false once
+   * Phase 1B wires onboarding through Supabase. Until then it is always true.
+   */
+  localOnly: boolean;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
@@ -245,6 +255,10 @@ export function OnboardingProvider({
       finished,
       finish,
       hydrated,
+      // localStorage-only today (no backend seam in this provider yet), so the
+      // honest-persistence flag is constant. Promote to real state when the
+      // Supabase onboarding write lands in Phase 1B.
+      localOnly: true,
     }),
     [stepIndex, data, update, next, back, goTo, finished, finish, hydrated],
   );

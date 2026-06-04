@@ -1042,7 +1042,7 @@ export function ResourceComposer({
             variant="primary"
             size="sm"
             className={styles.addBtn}
-            tooltip="Attach every captured resource to the chosen lesson section — the resources appear in the lesson flow"
+            tooltip="Attach every captured resource to the chosen lesson for this session — files aren't uploaded to the server yet, so they won't survive a reload or reach your team until backend sync is on"
             onClick={handleAdd}
             disabled={!canAdd}
           >
@@ -1213,6 +1213,24 @@ export function ResourceComposer({
             {/* ── Caption ────────────────────────────────────────────────── */}
             <p className={styles.caption}>
               Add an image, video, link, or file.
+            </p>
+
+            {/* Honest-persistence note (audit finding #22). The composer
+                writes captured resources into the planner store, but uploads
+                are SYNTHETIC (blob URLs — see the header) and, until the
+                Supabase seam is on, the store is in-memory only: an Add does
+                NOT durably save to the server or reach the team. Surface that
+                inline so the Add button never implies a durable, team-visible
+                save. Mirrors the InstanceRename "saved on this device for now"
+                precedent. */}
+            <p
+              className={styles.caption}
+              style={{ color: "var(--catchup, #b45309)" }}
+              role="note"
+            >
+              Attached for this session only — files aren&rsquo;t uploaded to
+              the server yet, so they won&rsquo;t survive a reload or reach your
+              team until backend sync is on.
             </p>
 
             {/* ── Body textarea ──────────────────────────────────────────── */}

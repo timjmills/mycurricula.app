@@ -30,7 +30,7 @@ const ROTATION_LABEL: Record<ScheduleRotation, string> = {
 
 /** Step 9 — configuration recap before entering the planner. */
 export function SummaryStep(): ReactNode {
-  const { data } = useOnboarding();
+  const { data, localOnly } = useOnboarding();
 
   const templateName =
     LESSON_TEMPLATE_BY_ID[data.defaultTemplateId]?.name ?? "None";
@@ -53,6 +53,15 @@ export function SummaryStep(): ReactNode {
         Here&rsquo;s a summary of your setup. You can change any of this in
         Settings once you&rsquo;re inside the planner.
       </p>
+      {/* Honesty caveat (finding #22): the wizard config persists to this
+          browser only until the backend lands — don't imply a durable,
+          team-visible save. */}
+      {localOnly && (
+        <p className={styles.subheading} role="note">
+          Saved on this device for now — your setup syncs to your team once
+          backend sync is on.
+        </p>
+      )}
 
       {/* Recap card — each row is a labelled value pair. */}
       <dl className={styles.card}>
