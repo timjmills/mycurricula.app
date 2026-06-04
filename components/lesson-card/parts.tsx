@@ -12,7 +12,7 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { LessonResource, LessonStatus } from "@/lib/types";
-import { describeStandard } from "@/lib/mock";
+import { useCatalogOptional } from "@/lib/planner-store";
 import { Tooltip } from "@/components/ui";
 import { Icon } from "./icon";
 import type { IconName } from "./icon";
@@ -335,6 +335,9 @@ export function ResourceList({ resources }: { resources: LessonResource[] }) {
 /** Collapsed footer badge — `CCSS·N`, with the first code on hover. */
 export function StandardsBadge({ codes }: { codes: string[] }) {
   const [hovered, setHovered] = useState(false);
+  // Provider-optional: real catalog under a <PlannerProvider>, mock fallback in
+  // the no-provider settings preview (describeStandard never throws there).
+  const { describeStandard } = useCatalogOptional();
   if (codes.length === 0) return null;
   const first = codes[0];
   return (
@@ -396,6 +399,8 @@ export function StandardsBadge({ codes }: { codes: string[] }) {
 
 /** Full standards list shown in the expanded card body. */
 export function StandardsList({ codes }: { codes: string[] }) {
+  // Provider-optional catalog (see StandardsBadge).
+  const { describeStandard } = useCatalogOptional();
   if (codes.length === 0) {
     return (
       <p style={{ fontSize: 12, color: "var(--ink-400)", margin: 0 }}>

@@ -54,6 +54,7 @@ import type {
   LessonPatch,
   LessonMoveTarget,
   ListLessonsOptions,
+  SaveTarget,
 } from "./source";
 
 // ── Id bridge (mock slugs ↔ db uuids) ───────────────────────────────────────
@@ -239,13 +240,21 @@ export const plannerMockSource: PlannerDataSource = {
     lessonId: string,
     patch: LessonPatch,
     _ownerId: string,
+    _saveTarget?: SaveTarget,
   ): Promise<Lesson> {
     const lesson = findLesson(lessonId);
     if (!lesson) throw new Error(`Lesson not found: ${lessonId}`);
     // Mirror the reducer's `editLesson`: spread the patch over the lesson. This
     // does NOT fork — the personal-fork write lands in the Supabase source; the
     // mock keeps the pre-source single-document behavior byte-identical.
+    //
+    // `_saveTarget` is accepted for contract parity (#14): a "core" save in the
+    // Supabase source writes the shared master row, but the single-document mock
+    // has no master/personal split — every write already lands in the one shared
+    // doc — so both targets edit the same lesson here, a NO-OP distinction that
+    // keeps flag-OFF behavior byte-identical.
     void _ownerId;
+    void _saveTarget;
     Object.assign(lesson, patch);
     return cloneLesson(lesson);
   },
@@ -254,12 +263,16 @@ export const plannerMockSource: PlannerDataSource = {
     lessonId: string,
     target: LessonMoveTarget,
     _ownerId: string,
+    _saveTarget?: SaveTarget,
   ): Promise<Lesson> {
     const lesson = findLesson(lessonId);
     if (!lesson) throw new Error(`Lesson not found: ${lessonId}`);
     // Port of the reducer's `moveLesson` flag logic: a real slot change sets
     // `moved` to "across-weeks" (week changed) or "same-week" (day only).
+    // `_saveTarget` is parity-only here (see updateLesson): the single shared
+    // mock doc has no master/personal split, so both targets move the same row.
     void _ownerId;
+    void _saveTarget;
     const sameSlot = target.week === lesson.week && target.day === lesson.day;
     lesson.day = target.day;
     lesson.week = target.week;
@@ -277,11 +290,15 @@ export const plannerMockSource: PlannerDataSource = {
     lessonId: string,
     status: LessonStatus,
     _ownerId: string,
+    _saveTarget?: SaveTarget,
   ): Promise<Lesson> {
     const lesson = findLesson(lessonId);
     if (!lesson) throw new Error(`Lesson not found: ${lessonId}`);
-    // Completion NEVER forks (CLAUDE.md §2) — status only.
+    // Completion NEVER forks (CLAUDE.md §2) — status only. `_saveTarget` is
+    // inert for completion in BOTH sources (status is always per-teacher and
+    // never writes the master row); accepted only for signature parity.
     void _ownerId;
+    void _saveTarget;
     lesson.status = status;
     return cloneLesson(lesson);
   },
@@ -349,11 +366,15 @@ export const plannerMockSource: PlannerDataSource = {
     lessonId: string,
     sections: LessonSectionContent[],
     _ownerId: string,
+    _saveTarget?: SaveTarget,
   ): Promise<LessonSectionContent[]> {
     const id = resolveLessonId(lessonId);
     // Clone on the way IN so the store doesn't alias the caller's array, then
-    // again on the way OUT so the caller can't mutate the store.
+    // again on the way OUT so the caller can't mutate the store. `_saveTarget`
+    // is parity-only: the single shared mock doc has no team/personal section
+    // split, so both targets write the one section list (byte-identical).
     void _ownerId;
+    void _saveTarget;
     const next = cloneSections(sections);
     sectionsStore.set(id, next);
     return cloneSections(next);

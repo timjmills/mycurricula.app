@@ -42,6 +42,20 @@ export interface LessonMoveTarget {
   day: number;
 }
 
+/**
+ * Where a mutation should land (CLAUDE.md §2 — the forking model). OPTIONAL on
+ * every mutator that accepts it; defaults to "personal" so existing callers
+ * (which never pass it) keep the current lazy-fork behavior unchanged.
+ *
+ * • "personal" — the default. An edit lazily forks a personal copy (or edits the
+ *   teacher's own authored lesson); the shared master/team row is never touched.
+ * • "core" — an AUTHORIZED Team/Master write. The mutator writes the MASTER /
+ *   shared-team row instead of forking. Authorization is enforced server-side by
+ *   RLS (`can_edit_subject_master`); on an RLS denial the mutator THROWS — it
+ *   must NEVER silently fall back to a personal fork (#14: no false success).
+ */
+export type SaveTarget = "personal" | "core";
+
 /** The fields a lesson edit can patch. A subset of `Lesson` — the content +
  *  flags the reducer mutates. The source decides whether the patch forks. */
 export type LessonPatch = Partial<
@@ -107,23 +121,33 @@ export interface PlannerDataSource {
 
   // ── Lesson mutations (the reducer commits through these) ───────────────────
   /** Patch a lesson's content/flags. In personal mode this lazily forks
-   *  (writes a personal copy); in master mode it edits the master. */
+   *  (writes a personal copy); in master mode it edits the master.
+   *
+   *  `saveTarget` (OPTIONAL, default "personal") selects the destination: omit
+   *  it (or pass "personal") for the existing lazy-fork behavior; pass "core" to
+   *  write the MASTER row (authorized Team-Curriculum edit, RLS-gated). */
   updateLesson(
     lessonId: string,
     patch: LessonPatch,
     ownerId: string,
+    saveTarget?: SaveTarget,
   ): Promise<Lesson>;
-  /** Move a lesson to a new week/day slot. */
+  /** Move a lesson to a new week/day slot. `saveTarget` as in `updateLesson`
+   *  ("core" moves the master row instead of forking; default "personal"). */
   moveLesson(
     lessonId: string,
     target: LessonMoveTarget,
     ownerId: string,
+    saveTarget?: SaveTarget,
   ): Promise<Lesson>;
-  /** Set completion status. Completion NEVER forks (CLAUDE.md §2). */
+  /** Set completion status. Completion NEVER forks (CLAUDE.md §2) — so
+   *  `saveTarget` is accepted for signature parity but is intentionally inert:
+   *  completion is always per-teacher and never writes the master row. */
   setLessonStatus(
     lessonId: string,
     status: LessonStatus,
     ownerId: string,
+    saveTarget?: SaveTarget,
   ): Promise<Lesson>;
   /** Create a teacher's own (personal) lesson in a slot. `gradeLevelId` is the
    *  RESOLVED grade uuid the row is keyed on (the Supabase source needs a real
@@ -148,11 +172,15 @@ export interface PlannerDataSource {
   softDeleteLesson(lessonId: string, ownerId: string): Promise<void>;
 
   // ── Section + resource mutations ───────────────────────────────────────────
-  /** Replace a lesson's full section list (reorder / bulk edit). */
+  /** Replace a lesson's full section list (reorder / bulk edit). `saveTarget`
+   *  (OPTIONAL, default "personal") as in `updateLesson`: "core" writes the
+   *  shared team section rows (owner_id null) instead of the teacher's personal
+   *  fork, RLS-gated. */
   setSections(
     lessonId: string,
     sections: LessonSectionContent[],
     ownerId: string,
+    saveTarget?: SaveTarget,
   ): Promise<LessonSectionContent[]>;
   /** Add a resource to a section. */
   addSectionResource(

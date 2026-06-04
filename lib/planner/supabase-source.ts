@@ -76,6 +76,7 @@ import {
   type LessonMoveTarget,
   type LessonPatch,
   type PlannerDataSource,
+  type SaveTarget,
 } from "./source";
 import { buildReverseIndex, slugToUuid } from "./id-bridge";
 import { createClient } from "../supabase/server";
@@ -1021,7 +1022,12 @@ export const plannerSupabaseSource: PlannerDataSource = {
   },
 
   // ── Lesson mutations ─────────────────────────────────────────────────────
-  async updateLesson(lessonId, patch, ownerId) {
+  async updateLesson(
+    lessonId,
+    patch,
+    ownerId,
+    saveTarget: SaveTarget = "personal",
+  ) {
     // Owner-kind branch (Codex #7): a teacher-AUTHORED lesson patches its OWN
     // `personal_authored_lessons` row directly (no fork — it has no master);
     // a master-derived lesson lazily forks into `personal_core_lesson_event_copies`.
@@ -1077,8 +1083,50 @@ export const plannerSupabaseSource: PlannerDataSource = {
     const hasContent = contentKeys.some((k) => patch[k] !== undefined);
 
     if (patch.status !== undefined && !hasContent) {
-      // Status-only patch: never forks.
+      // Status-only patch: never forks (completion is always per-teacher, so the
+      // saveTarget is irrelevant here — see setLessonStatus).
       return this.setLessonStatus(lessonId, patch.status, ownerId);
+    }
+
+    // ── #14 AUTHORIZED MASTER-WRITE ──────────────────────────────────────────
+    // saveTarget === "core": write the SHARED master row instead of forking a
+    // personal copy. Authorization is enforced server-side by RLS
+    // (`can_edit_subject_master`); an unauthorized write affects 0 rows (RLS
+    // denial is silent in PostgREST), so `patchMaster` re-selects and THROWS if
+    // nothing came back — never a silent fall-through to a personal fork (#14:
+    // no false success). Completion (status/reasonNotDone) still NEVER touches
+    // master — it is written per-teacher below regardless of target.
+    if (saveTarget === "core") {
+      const next: Partial<MasterEventRow> = {};
+      if (patch.title !== undefined) next.title = patch.title;
+      if (patch.objective !== undefined)
+        next.learning_objectives = objectiveToObjectives(patch.objective);
+      if (patch.directions !== undefined) next.directions = patch.directions;
+      if (patch.notes !== undefined) next.notes = patch.notes;
+      if (patch.resources !== undefined)
+        next.resources =
+          patch.resources as unknown as MasterEventRow["resources"];
+      if (patch.standards !== undefined)
+        next.standards = standardCodesToUuids(patch.standards);
+      // `preview`/`time`/`tasks` have no master column (derived/unmodelled) —
+      // skipped, exactly as in the personal-copy patch below.
+      if (Object.keys(next).length > 0) {
+        await patchMaster(client, lessonId, next);
+      }
+      // Completion never forks and never writes master — write it per-teacher.
+      if (patch.status !== undefined) {
+        await writeStatus(client, lessonId, ownerId, patch.status, undefined);
+      }
+      if (patch.reasonNotDone !== undefined) {
+        await writeStatus(
+          client,
+          lessonId,
+          ownerId,
+          undefined,
+          patch.reasonNotDone,
+        );
+      }
+      return reloadLesson(client, lessonId, ownerId);
     }
 
     await forkAndPatch(client, lessonId, ownerId, (copy) => {
@@ -1114,13 +1162,19 @@ export const plannerSupabaseSource: PlannerDataSource = {
     return reloadLesson(client, lessonId, ownerId);
   },
 
-  async moveLesson(lessonId, target: LessonMoveTarget, ownerId) {
+  async moveLesson(
+    lessonId,
+    target: LessonMoveTarget,
+    ownerId,
+    saveTarget: SaveTarget = "personal",
+  ) {
     const client = await sb();
     const week = await resolveSchoolWeek(client, ownerId);
     const dayOfWeek = dayIndexToWeekday(target.day, week);
 
     // Owner-kind branch (Codex #7): an authored lesson moves on its own row;
-    // a master-derived lesson moves via the lazy fork.
+    // a master-derived lesson moves via the lazy fork (personal) or the shared
+    // master row (#14 authorized core move).
     const authored = await loadAuthored(client, lessonId, ownerId);
     if (authored) {
       const upd = await client
@@ -1136,6 +1190,17 @@ export const plannerSupabaseSource: PlannerDataSource = {
       return reloadAuthoredLesson(client, lessonId, ownerId);
     }
 
+    // #14 AUTHORIZED MASTER-WRITE: move the SHARED master row's slot instead of
+    // forking. RLS-gated; `patchMaster` throws on a 0-row (unauthorized) write
+    // rather than silently forking.
+    if (saveTarget === "core") {
+      await patchMaster(client, lessonId, {
+        week_number: target.week,
+        day_of_week: dayOfWeek,
+      });
+      return reloadLesson(client, lessonId, ownerId);
+    }
+
     await forkAndPatch(client, lessonId, ownerId, () => ({
       week_number: target.week,
       day_of_week: dayOfWeek,
@@ -1143,8 +1208,16 @@ export const plannerSupabaseSource: PlannerDataSource = {
     return reloadLesson(client, lessonId, ownerId);
   },
 
-  async setLessonStatus(lessonId, status, ownerId) {
-    // Completion NEVER forks (CLAUDE.md §2).
+  async setLessonStatus(
+    lessonId,
+    status,
+    ownerId,
+    _saveTarget: SaveTarget = "personal",
+  ) {
+    // Completion NEVER forks (CLAUDE.md §2) and NEVER writes the master row —
+    // it is always per-teacher. `_saveTarget` is accepted for signature parity
+    // but is intentionally inert: a "core" completion is a contradiction.
+    void _saveTarget;
     const client = await sb();
 
     // Owner-kind branch (Codex #7): an authored lesson has no master event, so
@@ -1300,11 +1373,25 @@ export const plannerSupabaseSource: PlannerDataSource = {
   },
 
   // ── Section + resource mutations ──────────────────────────────────────────
-  async setSections(lessonId, sections, ownerId) {
+  async setSections(
+    lessonId,
+    sections,
+    ownerId,
+    saveTarget: SaveTarget = "personal",
+  ) {
     // Persist the full section list to `lesson_sections`, owner-scoped (personal
     // fork: owner_id = ownerId). Owner-kind is resolved so an authored lesson's
     // sections carry owner_kind='personal_authored' and a master-derived
     // lesson's carry 'personal_copy' (Codex #7).
+    //
+    // #14 AUTHORIZED MASTER-WRITE: saveTarget === "core" writes the SHARED team
+    // section rows (owner_kind='master', owner_id=null) instead of the teacher's
+    // personal fork. The `replace_lesson_sections` RPC runs SECURITY INVOKER, so
+    // its INSERTs are RLS-checked as the caller; an unauthorized master section
+    // write fails the `with check` (`can_edit_subject_master`) and RAISES — the
+    // error is surfaced (thrown) below, never silently downgraded to a personal
+    // fork. A "core" save only makes sense for a master-derived lesson; an
+    // authored lesson has no master, so it always writes its own personal rows.
     //
     // ATOMIC replace (Codex #5): the prior path INSERTED then DELETEd across two
     // round-trips — an insert OK followed by a delete failure left duplicate /
@@ -1319,7 +1406,15 @@ export const plannerSupabaseSource: PlannerDataSource = {
     // never silently swallowed.
     const client = await sb();
     const grade = await resolveLessonGrade(client, lessonId, ownerId);
-    const ownerKind = await resolveOwnerKind(client, lessonId, ownerId);
+    const personalOwnerKind = await resolveOwnerKind(client, lessonId, ownerId);
+
+    // For a "core" save against a MASTER-derived lesson the rows are the shared
+    // team set: owner_kind='master', owner_id=null. An authored lesson has no
+    // master, so even a "core" request stays on its own personal_authored rows.
+    const writeCore =
+      saveTarget === "core" && personalOwnerKind === "personal_copy";
+    const ownerKind = writeCore ? "master" : personalOwnerKind;
+    const rowOwnerId = writeCore ? null : ownerId;
 
     // Map each section → the p_sections JSON element shape the RPC expects (keys
     // → columns). `display_order` is the array position; `template_section_id` is
@@ -1336,7 +1431,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
     const rpc = await client.rpc("replace_lesson_sections", {
       p_owner_lesson_id: lessonId,
       p_owner_kind: ownerKind,
-      p_owner_id: ownerId, // teacher uid (personal fork); null is master-only.
+      p_owner_id: rowOwnerId, // teacher uid (personal fork); null for master/team.
       p_grade_level_id: grade,
       p_sections: pSections,
     });
@@ -1475,6 +1570,44 @@ async function forkAndPatch(
   if (res.error) {
     throw new Error(
       `Planner repository fork/patch failed: ${res.error.message}`,
+    );
+  }
+}
+
+/**
+ * #14 AUTHORIZED MASTER-WRITE primitive. UPDATE the SHARED master row in place
+ * (never forks). Authorization is enforced server-side by the `master_events_write`
+ * RLS policy (`can_edit_subject_master(subject_id)`); an unauthorized caller's
+ * UPDATE silently matches 0 rows under PostgREST (RLS filters the row out of the
+ * UPDATE's scope rather than raising), so we `.select()` the affected rows back
+ * and THROW when none returned — guaranteeing a core save that could not persist
+ * surfaces an error rather than reporting a false success (and never falls back
+ * to a personal fork). A transport/SQL error is surfaced the same way.
+ */
+async function patchMaster(
+  client: ServerClient,
+  lessonId: string,
+  patch: Partial<MasterEventRow>,
+): Promise<void> {
+  const res = await client
+    .from("master_core_lesson_events")
+    .update(patch)
+    .eq("id", lessonId)
+    .is("deleted_at", null)
+    .select("id");
+  if (res.error) {
+    throw new Error(
+      `Planner repository master write failed: ${res.error.message}`,
+    );
+  }
+  const rows = (res.data ?? []) as { id: string }[];
+  if (rows.length === 0) {
+    // 0 rows = RLS denied the write (no can_edit_subject_master) OR the master
+    // row is missing/soft-deleted. Either way the Team Curriculum was NOT
+    // changed — throw so the caller's persist error path reports it, instead of
+    // a teacher believing they edited the team plan when nobody else did (#14).
+    throw new Error(
+      `Planner repository master write affected no rows for lesson ${lessonId} — not authorized to edit this subject's Team Curriculum, or the lesson no longer exists.`,
     );
   }
 }

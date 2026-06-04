@@ -60,7 +60,15 @@ import {
 } from "@/lib/lesson-flow";
 import type { CellLayout } from "@/lib/cell-layout";
 import { cellKey, isTrivialLayout } from "@/lib/cell-layout";
-import { LESSONS, ALL_UNITS, UNITS, SUBJECTS, STANDARDS } from "@/lib/mock";
+import {
+  LESSONS,
+  ALL_UNITS,
+  UNITS,
+  SUBJECTS,
+  SUBJECT_BY_ID,
+  STANDARDS,
+  describeStandard as mockDescribeStandard,
+} from "@/lib/mock";
 import { useAppState } from "@/lib/app-state";
 import { plannerClient } from "@/lib/planner/client";
 import { resolveGrade } from "@/lib/planner/grade";
@@ -1635,6 +1643,82 @@ export function usePlanner(): PlannerValue {
   return ctx;
 }
 
+// ── Provider-optional catalog hook ─────────────────────────────────────────
+// The reference-data slice (subjects/units/standards/grade + lookups), readable
+// WITHOUT a <PlannerProvider> in scope. The strict usePlanner() throws when no
+// provider wraps the consumer; but LessonCard + its parts also render in
+// /settings/appearance as a live theme PREVIEW, where there is NO
+// PlannerProvider — calling usePlanner() there would throw. Those callsites only
+// need the catalog (subjectById / describeStandard), so this hook returns the
+// catalog from context WHEN a provider exists and a mock fallback when one does
+// NOT. The fallback reproduces exactly what the card read from `lib/mock` before
+// the catalog was routed through the store, so the no-provider preview is
+// unchanged AND flag-OFF (with a provider) stays byte-identical (the provider's
+// catalog under the flag OFF is the same mock data — see INITIAL_CATALOG).
+//
+// This hook is ADDITIVE: usePlanner() keeps throwing for the strict consumers
+// (views that genuinely require the full store). Only catalog-only callsites
+// that must survive a no-provider render should use this.
+
+/** The catalog surface readable with or without a <PlannerProvider>. A strict
+ *  subset of PlannerValue's catalog fields — never the document or mutators. */
+export interface CatalogValue {
+  subjects: Subject[];
+  units: Unit[];
+  unitById: Record<string, Unit>;
+  subjectById: Record<SubjectId, Subject>;
+  activeUnitBySubject: Record<SubjectId, Unit | undefined>;
+  standards: StandardsMap;
+  describeStandard: (code: string) => string;
+  activeGradeId: string | null;
+}
+
+/** The mock catalog fallback, built ONCE at module load from `lib/mock`. Used
+ *  when useCatalogOptional() runs with no <PlannerProvider> (settings preview).
+ *  Mirrors what LessonCard/parts imported from `lib/mock` directly before the
+ *  catalog was routed through the store, so a no-provider render is unchanged.
+ *
+ *  `unitById` / `activeUnitBySubject` reproduce the mock maps exactly:
+ *  `unitById` indexes the FULL-YEAR superset (ALL_UNITS, like UNIT_BY_ID), and
+ *  `activeUnitBySubject` is the active-unit map (mock UNITS), matching the
+ *  provider's flag-OFF derivation. */
+const MOCK_CATALOG_FALLBACK: CatalogValue = {
+  subjects: SUBJECTS as Subject[],
+  units: ALL_UNITS as Unit[],
+  unitById: Object.fromEntries(ALL_UNITS.map((u) => [u.id, u])) as Record<
+    string,
+    Unit
+  >,
+  subjectById: SUBJECT_BY_ID,
+  activeUnitBySubject: UNITS,
+  standards: STANDARDS,
+  describeStandard: mockDescribeStandard,
+  activeGradeId: "g5",
+};
+
+/**
+ * Provider-OPTIONAL catalog accessor. Returns the planner store's catalog when a
+ * <PlannerProvider> is in scope; returns the mock catalog fallback when one is
+ * NOT (e.g. the Settings → Appearance lesson-card preview, which mounts cards
+ * with no provider). Never throws — the whole point is no-provider safety.
+ */
+export function useCatalogOptional(): CatalogValue {
+  const ctx = useContext(PlannerContext);
+  if (!ctx) return MOCK_CATALOG_FALLBACK;
+  // A provider is in scope: surface its catalog slice. (Under the flag OFF this
+  // IS the same mock data; under the flag ON it is the hydrated backend catalog.)
+  return {
+    subjects: ctx.subjects,
+    units: ctx.units,
+    unitById: ctx.unitById,
+    subjectById: ctx.subjectById,
+    activeUnitBySubject: ctx.activeUnitBySubject,
+    standards: ctx.standards,
+    describeStandard: ctx.describeStandard,
+    activeGradeId: ctx.activeGradeId,
+  };
+}
+
 // ── Provider ───────────────────────────────────────────────────────────────
 
 interface PlannerProviderProps {
@@ -1658,9 +1742,24 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   // no provider reorder needed. We stash it in a ref so the persist callbacks
   // (kept stable on `[persist]`) always read the latest uid without
   // re-creating on every auth change.
-  const { currentUser } = useAppState();
+  const { currentUser, editMode } = useAppState();
   const ownerIdRef = useRef<string | null>(currentUser.id);
   ownerIdRef.current = currentUser.id;
+
+  // ── Resolved save target (#14) ───────────────────────────────────────────
+  // The top-bar Personal | Team-Curriculum toggle lives in app-state as
+  // `editMode` ("personal" | "master"). It maps to the source's SaveTarget:
+  // "master" → "core" (an AUTHORIZED write to the SHARED Team Curriculum row),
+  // "personal" → "personal" (the default lazy-fork). Stashed in a ref so the
+  // persist callbacks (kept stable on `[persist]`) read the latest target
+  // without re-creating on every mode flip. Completion (setLessonStatus) never
+  // uses this — it is always per-teacher (CLAUDE.md §2). With the Supabase flag
+  // OFF the save target never reaches a mutator that branches on it (persist is
+  // a no-op), so flag-OFF behavior is byte-identical.
+  const saveTargetRef = useRef<"personal" | "core">(
+    editMode === "master" ? "core" : "personal",
+  );
+  saveTargetRef.current = editMode === "master" ? "core" : "personal";
 
   // The resolved grade uuid, captured during hydrate. createLesson needs a real
   // grade uuid for the row it writes (the reducer never carries one). Null until
@@ -1852,7 +1951,15 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         const current = present.lessons.find((l) => l.id === id);
         const week = patch.week ?? current?.week ?? 0;
         const day = patch.day ?? current?.day ?? 0;
-        persist("moveLesson", id, { week, day }, ownerIdRef.current ?? "");
+        // saveTarget threads the Personal | Team-Curriculum mode: "core" moves
+        // the shared master row (#14, RLS-gated), else a personal-copy move.
+        persist(
+          "moveLesson",
+          id,
+          { week, day },
+          ownerIdRef.current ?? "",
+          saveTargetRef.current,
+        );
       }
     },
     [persist, present.lessons],
@@ -1880,8 +1987,15 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         coalesceTs: coalesce?.ts ?? Date.now(),
       });
       // Only the content fields the source's LessonPatch accepts are teed; the
-      // source decides whether the edit forks (personal mode).
-      persist("updateLesson", id, patch, ownerIdRef.current ?? "");
+      // source decides whether the edit forks (personal) or writes the shared
+      // master row (core — #14 authorized Team-Curriculum write, RLS-gated).
+      persist(
+        "updateLesson",
+        id,
+        patch,
+        ownerIdRef.current ?? "",
+        saveTargetRef.current,
+      );
     },
     [persist],
   );
@@ -1969,7 +2083,15 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const setSections = useCallback(
     (lessonId: string, next: LessonSectionContent[]) => {
       dispatchRef.current({ type: "setSections", lessonId, next });
-      persist("setSections", lessonId, next, ownerIdRef.current ?? "");
+      // saveTarget threads the Personal | Team-Curriculum mode: "core" writes
+      // the shared team section rows (#14, RLS-gated), else a personal fork.
+      persist(
+        "setSections",
+        lessonId,
+        next,
+        ownerIdRef.current ?? "",
+        saveTargetRef.current,
+      );
     },
     [persist],
   );

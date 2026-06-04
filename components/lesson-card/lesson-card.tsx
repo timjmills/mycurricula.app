@@ -22,7 +22,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { CSSProperties, MouseEvent } from "react";
 import type { Lesson, LessonStatus } from "@/lib/types";
-import { SUBJECT_BY_ID } from "@/lib/mock";
+import { useCatalogOptional } from "@/lib/planner-store";
 import { useSubjectColor } from "@/lib/palette";
 import { useTeamModeEditCue } from "@/lib/use-team-mode-edit-cue";
 import { useTheme } from "@/lib/theme";
@@ -103,7 +103,12 @@ export function LessonCard({
 }: LessonCardProps) {
   const { style } = useTheme();
   const color = useSubjectColor(lesson.subject);
-  const subject = SUBJECT_BY_ID[lesson.subject];
+  // Provider-OPTIONAL catalog: a <PlannerProvider> supplies the real backend
+  // catalog (flag ON) or the mock catalog (flag OFF); with NO provider — the
+  // Settings → Appearance preview — it falls back to the mock catalog so the
+  // card still renders (usePlanner() would throw there).
+  const { subjectById } = useCatalogOptional();
+  const subject = subjectById[lesson.subject];
 
   // W4-D1: per-lesson presence lookup. The hook reads from a module-frozen
   // map today (lib/realtime-presence.ts); the result drives both the
