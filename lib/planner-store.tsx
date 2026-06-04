@@ -58,8 +58,9 @@ import {
 import type { CellLayout } from "@/lib/cell-layout";
 import { cellKey, isTrivialLayout } from "@/lib/cell-layout";
 import { LESSONS } from "@/lib/mock";
-import { ME } from "@/lib/mock/teachers";
+import { useAppState } from "@/lib/app-state";
 import { plannerClient } from "@/lib/planner/client";
+import { resolveGrade } from "@/lib/planner/grade";
 import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
 import {
   LESSON_TEMPLATE_BY_ID,
@@ -1401,39 +1402,72 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
 
+  // ── Identity from auth (NOT the mock slug) ─────────────────────────────
+  // RLS needs the real auth uid (a uuid), not the mock `ME.id` slug. The uid
+  // already lives in app-state's `currentUser.id`, hydrated from the live
+  // Supabase session (null while loading / signed out). AppStateProvider wraps
+  // PlannerProvider in app/(planner)/layout.tsx, so reading it here is safe —
+  // no provider reorder needed. We stash it in a ref so the persist callbacks
+  // (kept stable on `[persist]`) always read the latest uid without
+  // re-creating on every auth change.
+  const { currentUser } = useAppState();
+  const ownerIdRef = useRef<string | null>(currentUser.id);
+  ownerIdRef.current = currentUser.id;
+
+  // The resolved grade uuid, captured during hydrate. createLesson needs a real
+  // grade uuid for the row it writes (the reducer never carries one). Null until
+  // a hydrate resolves it; a create attempted before then skips persistence (the
+  // optimistic reducer row stands and a later reload re-reads the backend).
+  const gradeLevelIdRef = useRef<string | null>(null);
+
   // ── Backend hydration (planner Supabase seam) ──────────────────────────
-  // When NEXT_PUBLIC_PLANNER_USE_SUPABASE=1, replace the mock-seeded document
-  // with real lessons + sections from the backend on mount. With the flag OFF
-  // this effect is a no-op and the store renders the mock fixtures exactly as
-  // before. Hydration resets undo/redo (a load is not an undoable edit). Errors
-  // are swallowed → the mock document stays visible rather than a blank planner.
+  // When NEXT_PUBLIC_PLANNER_USE_SUPABASE=1 AND we have a real auth uid,
+  // replace the mock-seeded document with real lessons + sections from the
+  // backend. With the flag OFF this effect is a no-op and the store renders the
+  // mock fixtures exactly as before. The grade uuid is resolved from the owner
+  // (never hard-coded); a null owner or null grade skips hydrate so we never
+  // send null / the mock slug to the backend. Hydration resets undo/redo (a
+  // load is not an undoable edit). Errors are surfaced (console.error) but
+  // non-fatal → the mock document stays visible rather than a blank planner.
+  //
+  // Re-runs when the auth uid changes (sign-in resolving after first paint):
+  // an unconfigured run still short-circuits on the flag check.
+  const ownerId = currentUser.id;
   useEffect(() => {
     if (!isPlannerSupabaseConfigured()) return;
+    if (!ownerId) return; // session not resolved / signed out → keep mock doc
     let alive = true;
     void (async () => {
       try {
-        const lessons = await plannerClient.listLessons("g5", ME.id);
+        const gradeLevelId = await resolveGrade(ownerId);
+        if (!alive || !gradeLevelId) return; // no grade → keep mock doc
+        // Stash the resolved grade uuid so createLesson tees (duplicate*) have a
+        // real grade to key new rows on without re-resolving per call.
+        gradeLevelIdRef.current = gradeLevelId;
+        const lessons = await plannerClient.listLessons(gradeLevelId, ownerId);
         if (!alive || lessons.length === 0) return;
-        // Build the per-lesson sections map from the backend.
-        const sections: PlannerDoc["sections"] = {};
-        await Promise.all(
-          lessons.map(async (l) => {
-            sections[l.id] = await plannerClient.getSections(l.id);
-          }),
+        // Batched section hydrate — one round-trip seeds every lesson's
+        // sections (kills the prior per-lesson N+1). Lessons the batch omits
+        // (no persisted sections) fall back to empty via ensureSections.
+        const sections = await plannerClient.getSectionsBatch(
+          lessons.map((l) => l.id),
+          ownerId,
         );
         if (!alive) return;
         dispatchRef.current({
           type: "hydrate",
           doc: { lessons, sections, cellLayouts: {} },
         });
-      } catch {
-        // Keep the mock document on any backend/auth error.
+      } catch (err) {
+        // Keep the mock document on any backend/auth error, but surface it so a
+        // failed hydrate is visible rather than silently leaving stale mock data.
+        console.error("[planner] hydrate failed; keeping mock document", err);
       }
     })();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [ownerId]);
 
   const { history, lastChange } = state;
   const { past, present, future } = history;
@@ -1453,22 +1487,31 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
 
   // ── Optimistic persistence tee (planner Supabase seam) ─────────────────
   // Mutators dispatch to the reducer FIRST (snappy optimistic UI), then fire a
-  // best-effort write through plannerClient. With the backend flag OFF,
-  // plannerClient delegates to the in-memory mock (a harmless no-op echo), so
-  // this is inert for the prototype. Errors are swallowed here; a follow-up adds
-  // a reconcile-on-error toast (the reducer remains the source of truth for the
-  // session). Fire-and-forget — never blocks the UI thread.
+  // best-effort write through plannerClient. Gated on BOTH the backend flag AND
+  // a resolved auth uid — with the flag OFF (or no session) this is a no-op, so
+  // the prototype path is byte-identical to the pre-seam reducer (the mutator's
+  // dispatch is the only effect). The reducer remains the source of truth for
+  // the session; a rejected write is surfaced via console.error (never blocks
+  // the UI thread). Fire-and-await: the await lives inside the detached promise
+  // so the caller stays synchronous + optimistic.
   const persist = useCallback(
     <M extends keyof typeof plannerClient>(
       method: M,
       ...args: Parameters<(typeof plannerClient)[M]>
     ): void => {
       if (!isPlannerSupabaseConfigured()) return;
+      if (!ownerIdRef.current) return; // no session → never send null/slug
       const fn = plannerClient[method] as (
         ...a: Parameters<(typeof plannerClient)[M]>
       ) => Promise<unknown>;
-      void fn.apply(plannerClient, args).catch(() => {
-        // Best-effort; reducer state stands. Reconcile toast is a follow-up.
+      void fn.apply(plannerClient, args).catch((err: unknown) => {
+        // Reducer state stands; surface the failure so a dropped write is
+        // visible. A reconcile toast is unavailable here — ConsequenceToast-
+        // Provider mounts as a CHILD of PlannerProvider (see (planner)/layout),
+        // so its hook is out of scope in this provider body. console.error is
+        // the strongest non-blocking signal reachable without reordering
+        // providers or adding a dependency.
+        console.error(`[planner] persist '${String(method)}' failed`, err);
       });
     },
     [],
@@ -1487,7 +1530,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
           "moveLesson",
           id,
           { week: patch.week ?? 0, day: patch.day ?? 0 },
-          ME.id,
+          ownerIdRef.current ?? "",
         );
       }
     },
@@ -1497,7 +1540,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const setLessonStatus = useCallback(
     (id: string, status: LessonStatus) => {
       dispatchRef.current({ type: "setLessonStatus", id, status });
-      persist("setLessonStatus", id, status, ME.id);
+      persist("setLessonStatus", id, status, ownerIdRef.current ?? "");
     },
     [persist],
   );
@@ -1517,20 +1560,80 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       });
       // Only the content fields the source's LessonPatch accepts are teed; the
       // source decides whether the edit forks (personal mode).
-      persist("updateLesson", id, patch, ME.id);
+      persist("updateLesson", id, patch, ownerIdRef.current ?? "");
     },
     [persist],
   );
 
-  const duplicateLesson = useCallback((id: string) => {
-    dispatchRef.current({ type: "duplicateLesson", id });
-  }, []);
+  const duplicateLesson = useCallback(
+    (id: string) => {
+      dispatchRef.current({ type: "duplicateLesson", id });
+      // Persist the duplicate as a fresh personal lesson. We read the source off
+      // the latest present doc (via the ref-stable presentRef) for its slot +
+      // metadata. KNOWN LIMITATIONS (no reducer rewrite allowed here):
+      //   1. ID DRIFT — the source's createLesson mints its own row id, which
+      //      will not match the optimistic id the reducer assigned. Subsequent
+      //      edits to the duplicate before a reload tee against the optimistic
+      //      id and won't reach this new row; a reload re-reads the backend and
+      //      reconciles. Closing this needs a server "duplicate" verb or an
+      //      id-reconcile dispatch — both out of scope for this seam pass.
+      //   2. CONTENT NOT COPIED — createLesson writes a blank lesson (empty
+      //      objective/sections); the reducer's deep copy of content/sections is
+      //      not replayed to the backend. The follow-up that persists section
+      //      content for created lessons lands with the master-snapshot work.
+      // Skipped entirely when the grade uuid hasn't resolved yet (createLesson
+      // needs a real grade) — the optimistic row still renders.
+      const source = present.lessons.find((l) => l.id === id);
+      const gradeLevelId = gradeLevelIdRef.current;
+      if (source && gradeLevelId) {
+        persist(
+          "createLesson",
+          {
+            gradeLevelId,
+            subject: source.subject,
+            unit: source.unit,
+            week: source.week,
+            day: source.day,
+            title: source.title,
+          },
+          ownerIdRef.current ?? "",
+          gradeLevelId,
+        );
+      }
+    },
+    [persist, present.lessons],
+  );
 
   const duplicateWeek = useCallback(
     (sourceWeek: number, targetWeek: number) => {
       dispatchRef.current({ type: "duplicateWeek", sourceWeek, targetWeek });
+      // Persist one createLesson per copied lesson. Same two limitations as
+      // duplicateLesson (id drift + content-not-copied); see that callsite. Each
+      // new row is a blank personal lesson in the target week at the source's
+      // slot. Skipped when no grade uuid is resolved.
+      const gradeLevelId = gradeLevelIdRef.current;
+      if (gradeLevelId) {
+        const ownerId = ownerIdRef.current ?? "";
+        for (const source of present.lessons.filter(
+          (l) => l.week === sourceWeek,
+        )) {
+          persist(
+            "createLesson",
+            {
+              gradeLevelId,
+              subject: source.subject,
+              unit: source.unit,
+              week: targetWeek,
+              day: source.day,
+              title: source.title,
+            },
+            ownerId,
+            gradeLevelId,
+          );
+        }
+      }
     },
-    [],
+    [persist, present.lessons],
   );
 
   const setSaveTarget = useCallback(
@@ -1551,9 +1654,17 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     dispatchRef.current({ type: "bumpLesson", id });
   }, []);
 
-  const archiveLesson = useCallback((id: string) => {
-    dispatchRef.current({ type: "archiveLesson", id });
-  }, []);
+  const archiveLesson = useCallback(
+    (id: string) => {
+      dispatchRef.current({ type: "archiveLesson", id });
+      // Soft-delete is PERSONAL-scoped in the source (archives the owner's copy;
+      // never mutates the shared master row). Optimistic: reducer first, persist
+      // after. unarchiveLesson stays local-only — the contract has no
+      // "restore" method yet (TODO: add a source un-delete when it lands).
+      persist("softDeleteLesson", id, ownerIdRef.current ?? "");
+    },
+    [persist],
+  );
 
   const unarchiveLesson = useCallback((id: string) => {
     dispatchRef.current({ type: "unarchiveLesson", id });
@@ -1577,8 +1688,9 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const setSections = useCallback(
     (lessonId: string, next: LessonSectionContent[]) => {
       dispatchRef.current({ type: "setSections", lessonId, next });
+      persist("setSections", lessonId, next, ownerIdRef.current ?? "");
     },
-    [],
+    [persist],
   );
 
   const reorderSections = useCallback(
@@ -1642,8 +1754,21 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         sectionId,
         resource,
       });
+      // The contract takes a bare LessonResource (it mints the section-resource
+      // id server-side); the optimistic chip the reducer added carries a local
+      // id the backend won't match. That id drift is acceptable for resources —
+      // the next section hydrate reconciles by lesson, and nothing keys off a
+      // resource id across the seam. We pass type+label (+ any url/provider the
+      // caller supplied) so the persisted row is faithful.
+      persist(
+        "addSectionResource",
+        lessonId,
+        sectionId,
+        resource as SectionResource,
+        ownerIdRef.current ?? "",
+      );
     },
-    [],
+    [persist],
   );
 
   const editSectionResource = useCallback(
@@ -1674,8 +1799,15 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         sectionId,
         resourceId,
       });
+      persist(
+        "removeSectionResource",
+        lessonId,
+        sectionId,
+        resourceId,
+        ownerIdRef.current ?? "",
+      );
     },
-    [],
+    [persist],
   );
 
   const moveSectionResource = useCallback(
