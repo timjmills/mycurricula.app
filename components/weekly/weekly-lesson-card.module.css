@@ -79,12 +79,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  /* Title-only chips are compact (~half the height of the old meta-rich card)
-     since they carry only the lesson title. Short titles sit on one line at
-     ~28px; a long title wraps to at most 2 lines. */
-  min-height: 28px;
+  /* Dense title-only chips: a single thin band carrying just the title + the
+     completion box. Single-line at ~18px so the grid stays compact. */
+  min-height: 18px;
   /* Inline padding clears the 5px fork stripe on the card root's start edge. */
-  padding: 4px 8px 4px 10px;
+  padding: 2px 7px 2px 8px;
   cursor: pointer;
 }
 
@@ -95,14 +94,15 @@
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: var(--t-13);
+  font-size: var(--t-12);
   font-weight: 700;
   line-height: 1.2;
   color: var(--ink);
   text-wrap: pretty;
   overflow-wrap: anywhere;
+  /* Single line — the dense chip stays short; full title is in the detail panel. */
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -113,10 +113,10 @@
    white check fades in only when done. flex:0 so it never shrinks the title. */
 .collapsedCheck {
   flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  border: 2px solid var(--ink-300);
+  border: 1.5px solid var(--ink-300);
   display: grid;
   place-items: center;
   padding: 0;
@@ -126,8 +126,8 @@
     border-color 0.12s ease;
 }
 .collapsedCheck svg {
-  width: 11px;
-  height: 11px;
+  width: 9px;
+  height: 9px;
   color: #fff;
   opacity: 0;
 }
