@@ -16,7 +16,7 @@
 // "DATE / CURRICULUM LANES" eyebrow label.
 
 import type { SubjectId } from "@/lib/types";
-import { SUBJECT_BY_ID } from "@/lib/mock";
+import { usePlanner } from "@/lib/planner-store";
 import { Tooltip } from "@/components/ui";
 import { subjectClassName } from "./roadTones";
 import styles from "./QuarterMonthWeekHeader.module.css";
@@ -48,6 +48,7 @@ export function QuarterMonthWeekHeader({
   leftRailWidthPx,
   subjectId,
 }: QuarterMonthWeekHeaderProps) {
+  const { subjectById } = usePlanner();
   const totalCols = weeks.length;
 
   // Grid template: fixed left rail + N equal week columns.
@@ -62,7 +63,7 @@ export function QuarterMonthWeekHeader({
   // active subject when one is set so screen-reader users get the same
   // context sighted users see via the gradient.
   const activeSubjectName = subjectId
-    ? (SUBJECT_BY_ID[subjectId]?.name ?? null)
+    ? (subjectById[subjectId]?.name ?? null)
     : null;
   const ariaLabel = activeSubjectName
     ? `Year timeline header — currently viewing ${activeSubjectName}`
@@ -74,23 +75,23 @@ export function QuarterMonthWeekHeader({
       side="bottom"
       tooltipId="year-chameleon-header"
     >
-    <div
-      className={`${styles.header} ${chameleonClass}`}
-      style={{ "--left-rail": `${leftRailWidthPx}px` } as React.CSSProperties}
-      aria-label={ariaLabel}
-    >
-      {/* ── Row 1: Month bands ────────────────────────────────────────── */}
       <div
-        className={`${styles.row} ${styles.monthRow}`}
-        style={{ gridTemplateColumns: gridTemplate }}
+        className={`${styles.header} ${chameleonClass}`}
+        style={{ "--left-rail": `${leftRailWidthPx}px` } as React.CSSProperties}
+        aria-label={ariaLabel}
       >
-        {/* Eyebrow cell above the lane-card column */}
-        <div className={styles.railCell}>
-          <span className={styles.eyebrowLine1}>DATE</span>
-          <span className={styles.eyebrowLine2}>CURRICULUM LANES</span>
-        </div>
+        {/* ── Row 1: Month bands ────────────────────────────────────────── */}
+        <div
+          className={`${styles.row} ${styles.monthRow}`}
+          style={{ gridTemplateColumns: gridTemplate }}
+        >
+          {/* Eyebrow cell above the lane-card column */}
+          <div className={styles.railCell}>
+            <span className={styles.eyebrowLine1}>DATE</span>
+            <span className={styles.eyebrowLine2}>CURRICULUM LANES</span>
+          </div>
 
-        {/* Lane R changed `allYearMonths()` to always return 12 calendar
+          {/* Lane R changed `allYearMonths()` to always return 12 calendar
             months — including months that contain ZERO of the 36 mock-data
             academic weeks (default mock: Aug/Sep/Oct). Their `weeks` field is
             0, but CSS Grid spec defines `span 0` as invalid and clamps to
@@ -102,40 +103,40 @@ export function QuarterMonthWeekHeader({
             queued) restructures the data so all 12 calendar months can
             render with empty week cells underneath. Audit ref:
             docs/audit-roadmap-progression-days-2026-05-25.md F1. */}
-        {months
-          .filter((m) => m.weeks > 0)
-          .map((m, mi) => (
+          {months
+            .filter((m) => m.weeks > 0)
+            .map((m, mi) => (
+              <div
+                key={`${m.label}-${mi}`}
+                className={`${styles.monthCell} ${mi > 0 ? styles.monthBorder : ""}`}
+                style={{ gridColumn: `span ${m.weeks}` }}
+              >
+                {m.label}
+              </div>
+            ))}
+        </div>
+
+        {/* ── Row 2: Week labels ────────────────────────────────────────── */}
+        <div
+          className={`${styles.row} ${styles.weekRow}`}
+          style={{ gridTemplateColumns: gridTemplate }}
+        >
+          {/* Empty left-rail cell */}
+          <div className={styles.railCell} aria-hidden="true" />
+
+          {weeks.map((w, wi) => (
             <div
-              key={`${m.label}-${mi}`}
-              className={`${styles.monthCell} ${mi > 0 ? styles.monthBorder : ""}`}
-              style={{ gridColumn: `span ${m.weeks}` }}
+              key={w.idx}
+              className={`${styles.weekCell} ${wi > 0 ? styles.weekBorder : ""} ${w.idx === todayWeekIdx ? styles.weekCellToday : ""}`}
             >
-              {m.label}
+              {w.label}
+              {w.idx === todayWeekIdx && (
+                <span className={styles.todayDot} aria-label="Current week" />
+              )}
             </div>
           ))}
+        </div>
       </div>
-
-      {/* ── Row 2: Week labels ────────────────────────────────────────── */}
-      <div
-        className={`${styles.row} ${styles.weekRow}`}
-        style={{ gridTemplateColumns: gridTemplate }}
-      >
-        {/* Empty left-rail cell */}
-        <div className={styles.railCell} aria-hidden="true" />
-
-        {weeks.map((w, wi) => (
-          <div
-            key={w.idx}
-            className={`${styles.weekCell} ${wi > 0 ? styles.weekBorder : ""} ${w.idx === todayWeekIdx ? styles.weekCellToday : ""}`}
-          >
-            {w.label}
-            {w.idx === todayWeekIdx && (
-              <span className={styles.todayDot} aria-label="Current week" />
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
     </Tooltip>
   );
 }

@@ -22,7 +22,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
-import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
+import { CURRENT_WEEK } from "@/lib/mock";
 import {
   allYearWeeksFor,
   allYearMonthsFor,
@@ -233,7 +233,7 @@ const LEFT_RAIL_WIDTH_PX = 200;
 
 export function YearView() {
   const { viewMode, setViewMode } = useAppState();
-  const { lessons } = usePlanner();
+  const { lessons, subjects } = usePlanner();
 
   // CURRENT_WEEK is 1-based; convert to 0-based for index math.
   const currentWeekIdx = CURRENT_WEEK - 1;
@@ -341,7 +341,7 @@ export function YearView() {
 
   // ── Active subject (chameleon driver) ─────────────────────────────────
   const [activeSubjectId, setActiveSubjectId] = useState<SubjectId>(
-    SUBJECTS[0].id as SubjectId,
+    subjects[0].id as SubjectId,
   );
 
   // ── Add-unit dialog open state ────────────────────────────────────────
@@ -352,7 +352,7 @@ export function YearView() {
   // ── Stat strip values ─────────────────────────────────────────────────
   const totalUnits = new Set(lessons.map((l) => l.unit)).size;
   const totalLessons = lessons.length;
-  const activeLanes = SUBJECTS.length;
+  const activeLanes = subjects.length;
   const weeksInView = weeks.length;
 
   return (

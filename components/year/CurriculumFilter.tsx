@@ -43,14 +43,10 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Button, Tooltip } from "@/components/ui";
-import { SUBJECTS } from "@/lib/mock";
+import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import type { SubjectId } from "@/lib/types";
 import styles from "./CurriculumFilter.module.css";
-
-// ── Constants ─────────────────────────────────────────────────────────────
-
-const ALL_IDS: SubjectId[] = SUBJECTS.map((s) => s.id as SubjectId);
 
 // ── Hook ──────────────────────────────────────────────────────────────────
 
@@ -79,15 +75,22 @@ export interface CurriculumFilterState {
  */
 export function useCurriculumFilter(): CurriculumFilterState {
   const { filters, updateFilters } = useAppState();
+  const { subjects: catalogSubjects } = usePlanner();
+
+  // Canonical list of all subject ids, derived from the planner catalog.
+  const allIds = useMemo<SubjectId[]>(
+    () => catalogSubjects.map((s) => s.id as SubjectId),
+    [catalogSubjects],
+  );
 
   // selectedIds derives from filters.subjects. Empty array = "show all" so we
   // present the popover as fully checked (matches the shell semantics).
   const selectedIds = useMemo<Set<SubjectId>>(
     () =>
       filters.subjects.length === 0
-        ? new Set(ALL_IDS)
+        ? new Set(allIds)
         : new Set(filters.subjects),
-    [filters.subjects],
+    [filters.subjects, allIds],
   );
 
   const setSelectedIds = useCallback(
@@ -96,10 +99,10 @@ export function useCurriculumFilter(): CurriculumFilterState {
       // so the left panel does not show all 8 chips as active when the user
       // intent is "no filter applied."
       const subjects: SubjectId[] =
-        next.size === ALL_IDS.length ? [] : [...next];
+        next.size === allIds.length ? [] : [...next];
       updateFilters({ subjects });
     },
-    [updateFilters],
+    [updateFilters, allIds.length],
   );
 
   const subjectFilter =
@@ -149,6 +152,12 @@ export function CurriculumFilter({
   onChange,
 }: CurriculumFilterProps): ReactNode {
   const panelId = useId();
+  const { subjects } = usePlanner();
+  // Canonical list of all subject ids, derived from the planner catalog.
+  const allIds = useMemo<SubjectId[]>(
+    () => subjects.map((s) => s.id as SubjectId),
+    [subjects],
+  );
   // triggerRef wraps the <Button> so we can measure position without needing
   // Button to forward its ref.
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -158,7 +167,7 @@ export function CurriculumFilter({
 
   // Count: show total selected; if all are selected, "All" is implied.
   const selectedCount = selectedIds.size;
-  const allSelected = selectedCount === ALL_IDS.length;
+  const allSelected = selectedCount === allIds.length;
   const label = allSelected
     ? "Select the curriculum"
     : `Select the curriculum (${selectedCount})`;
@@ -222,10 +231,10 @@ export function CurriculumFilter({
     onChange(next);
   };
 
-  const selectAll = () => onChange(new Set(ALL_IDS));
+  const selectAll = () => onChange(new Set(allIds));
   const selectNone = () => {
     // "None" selects only the first subject to avoid an empty set.
-    onChange(new Set([ALL_IDS[0]]));
+    onChange(new Set([allIds[0]]));
   };
 
   // ── Panel content ─────────────────────────────────────────────────────
@@ -279,7 +288,7 @@ export function CurriculumFilter({
 
       {/* Checklist */}
       <ul role="listbox" aria-multiselectable="true" className={styles.list}>
-        {SUBJECTS.map((subject) => {
+        {subjects.map((subject) => {
           const id = subject.id as SubjectId;
           const checked = selectedIds.has(id);
           const checkId = `cf-${id}`;

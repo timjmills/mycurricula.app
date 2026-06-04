@@ -24,7 +24,7 @@
 import { useMemo, useEffect, useRef } from "react";
 import { usePlanner } from "@/lib/planner-store";
 import { useLabels, pluralize } from "@/lib/labels";
-import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
+import { CURRENT_WEEK } from "@/lib/mock";
 import {
   subjectCompletePct,
   lessonToFlatIndex,
@@ -141,7 +141,7 @@ export function RoadmapView({
   onActiveSubjectChange,
   subjectFilter,
 }: RoadmapViewProps = {}) {
-  const { lessons } = usePlanner();
+  const { lessons, subjects } = usePlanner();
   // TEAM-scoped school week (CLAUDE.md §1 — configurable, never hard-coded).
   // We only need the length here for flat-index math + unit-bar date labels;
   // the per-weekday tokens drive ProgressionView's daily grid, not Roadmap's
@@ -208,7 +208,7 @@ export function RoadmapView({
   // ── Per-subject lane data ─────────────────────────────────────────────
 
   const laneData = useMemo(() => {
-    return SUBJECTS.map((subject) => {
+    return subjects.map((subject) => {
       const subjectId = subject.id as SubjectId;
       const completePct = subjectCompletePct(lessons, subjectId);
       const subjectLessons = lessons.filter((l) => l.subject === subject.id);
@@ -355,6 +355,7 @@ export function RoadmapView({
     });
   }, [
     lessons,
+    subjects,
     schoolWeekLen,
     todaySchoolDayIdx,
     currentWeekIdx,

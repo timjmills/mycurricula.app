@@ -18,7 +18,7 @@
 
 import { useMemo, useEffect, useRef } from "react";
 import { usePlanner } from "@/lib/planner-store";
-import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
+import { CURRENT_WEEK } from "@/lib/mock";
 import {
   buildSchoolDays,
   groupByMonth,
@@ -94,7 +94,7 @@ export function ProgressionView({
   onActiveSubjectChange,
   subjectFilter,
 }: ProgressionViewProps = {}) {
-  const { lessons } = usePlanner();
+  const { lessons, subjects } = usePlanner();
   const { isMinimized, toggle } = useMinimizedSubjects();
   // TEAM-scoped academic year. Drives the day-column count + the
   // term-start date the buildSchoolDays helper anchors against.
@@ -163,7 +163,7 @@ export function ProgressionView({
 
   // Per-subject glyph maps and completion percentages.
   const subjectData = useMemo(() => {
-    return SUBJECTS.map((subject) => {
+    return subjects.map((subject) => {
       const subjectId = subject.id as SubjectId;
       const glyphMap = buildDayGlyphMap(lessons, subjectId, schoolWeekLen);
       const completePct = subjectCompletePct(lessons, subjectId);
@@ -204,7 +204,7 @@ export function ProgressionView({
 
       return { subject, subjectId, glyphMap, completePct, unitBars, pacing };
     });
-  }, [lessons, schoolWeekLen, todayFlatIdx]);
+  }, [lessons, subjects, schoolWeekLen, todayFlatIdx]);
 
   // Sort: expanded subjects first, minimized at the bottom.
   const orderedLanes = useMemo(() => {

@@ -17,7 +17,7 @@
 
 import { useMemo, useRef, useEffect, useCallback } from "react";
 import { usePlanner } from "@/lib/planner-store";
-import { SUBJECT_BY_ID, CURRENT_WEEK } from "@/lib/mock";
+import { CURRENT_WEEK } from "@/lib/mock";
 import { useAcademicYear } from "@/lib/use-academic-year";
 import { DEFAULT_SCHOOL_WEEK } from "@/lib/year-calendar";
 import type { SubjectId } from "@/lib/types";
@@ -97,8 +97,8 @@ export function SubjectCalendar({
   columnWidthPx,
   leftRailWidthPx,
 }: SubjectCalendarProps) {
-  const { lessons } = usePlanner();
-  const subject = SUBJECT_BY_ID[subjectId];
+  const { lessons, subjectById } = usePlanner();
+  const subject = subjectById[subjectId];
   const schoolWeekLen = DEFAULT_SCHOOL_WEEK.length;
   const { start: yearStart } = useAcademicYear();
 

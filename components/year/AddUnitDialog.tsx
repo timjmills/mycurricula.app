@@ -6,7 +6,7 @@
 //   1. Unit type label   — free text, remembered per-user as the default
 //                          for subsequent opens.
 //   2. Unit name         — free text, required.
-//   3. Subject           — dropdown over SUBJECTS.
+//   3. Subject           — dropdown over the planner catalog subjects.
 //   4. Start date        — <input type="date">.
 //   5. End date          — <input type="date">.
 //   6. Weeks             — auto from (start, end), user-overridable.
@@ -41,7 +41,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { SUBJECTS } from "@/lib/mock";
+import { usePlanner } from "@/lib/planner-store";
 import type { SubjectId } from "@/lib/types";
 import {
   useSchoolWeek,
@@ -125,6 +125,7 @@ export function AddUnitDialog({
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
   const labels = useLabels();
+  const { subjects } = usePlanner();
   const { days: schoolWeek } = useSchoolWeek();
   const { add, defaultUnitTypeLabel, setDefaultUnitTypeLabel } =
     useCustomUnits();
@@ -133,7 +134,7 @@ export function AddUnitDialog({
   const [typeLabel, setTypeLabel] = useState<string>(defaultUnitTypeLabel);
   const [name, setName] = useState<string>("");
   const [subjectId, setSubjectId] = useState<SubjectId>(
-    SUBJECTS[0].id as SubjectId,
+    subjects[0].id as SubjectId,
   );
   const [startDate, setStartDate] = useState<string>(() => todayIso());
   const [endDate, setEndDate] = useState<string>(() =>
@@ -171,7 +172,7 @@ export function AddUnitDialog({
     // Pre-fill from the remembered default + sensible scaffolding.
     setTypeLabel(defaultUnitTypeLabel);
     setName("");
-    setSubjectId(SUBJECTS[0].id as SubjectId);
+    setSubjectId(subjects[0].id as SubjectId);
     const start = todayIso();
     setStartDate(start);
     setEndDate(isoPlusDays(start, 41));
@@ -447,7 +448,7 @@ export function AddUnitDialog({
                 value={subjectId}
                 onChange={(e) => setSubjectId(e.target.value as SubjectId)}
               >
-                {SUBJECTS.map((s) => (
+                {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
                   </option>

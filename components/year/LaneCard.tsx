@@ -20,7 +20,7 @@
 
 import { Tooltip } from "@/components/ui";
 import { useSubjectColor } from "@/lib/palette";
-import { SUBJECT_BY_ID } from "@/lib/mock";
+import { usePlanner } from "@/lib/planner-store";
 import type { SubjectId } from "@/lib/types";
 import styles from "./LaneCard.module.css";
 
@@ -75,7 +75,8 @@ export function LaneCard({
   // (components/grid/WeeklyGrid.tsx line 860). The tile gets the highlight
   // fill; the name + chevron text use the deep tone.
   const color = useSubjectColor(subjectId);
-  const subject = SUBJECT_BY_ID[subjectId];
+  const { subjectById } = usePlanner();
+  const subject = subjectById[subjectId];
   const monogram = subject?.icon ?? name.slice(0, 2);
 
   // The `cp-subj <subjectId>` cascade is set on the wrapping <div> so any

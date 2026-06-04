@@ -16,7 +16,7 @@
 import { useMemo } from "react";
 import { Card } from "@/components/ui";
 import { usePlanner } from "@/lib/planner-store";
-import { SUBJECTS, CURRENT_WEEK } from "@/lib/mock";
+import { CURRENT_WEEK } from "@/lib/mock";
 import { subjectCompletePct, lessonToFlatIndex } from "@/lib/year-calendar";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { pacingFor, pacingLabel } from "@/lib/year-pacing";
@@ -60,7 +60,7 @@ interface SubjectSummary {
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function YearMobile() {
-  const { lessons } = usePlanner();
+  const { lessons, subjects: catalogSubjects } = usePlanner();
   // TEAM-scoped school week (CLAUDE.md §1 — configurable, never hard-coded).
   // YearMobile only consumes the length for flat-index + pacing math; it
   // doesn't render per-weekday columns.
@@ -70,7 +70,7 @@ export function YearMobile() {
   const todaySchoolDayIdx = lessonToFlatIndex(CURRENT_WEEK, 0, schoolWeekLen);
 
   const subjects = useMemo<SubjectSummary[]>(() => {
-    return SUBJECTS.map((subject) => {
+    return catalogSubjects.map((subject) => {
       const subjectId = subject.id as SubjectId;
       const subjectLessons = lessons.filter((l) => l.subject === subject.id);
       const completePct = subjectCompletePct(lessons, subjectId);
@@ -127,7 +127,13 @@ export function YearMobile() {
           : null,
       };
     });
-  }, [lessons, schoolWeekLen, todaySchoolDayIdx, currentWeekIdx]);
+  }, [
+    lessons,
+    catalogSubjects,
+    schoolWeekLen,
+    todaySchoolDayIdx,
+    currentWeekIdx,
+  ]);
 
   return (
     <div className={styles.root}>
