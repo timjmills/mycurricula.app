@@ -30,7 +30,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
-import { SUBJECTS, UNITS, describeStandard } from "@/lib/mock";
 import type { SubjectId, LessonStatus } from "@/lib/types";
 import { Tooltip } from "@/components/ui/Tooltip";
 import styles from "./left-filter-panel.module.css";
@@ -121,7 +120,11 @@ export function LeftFilterPanel(): ReactNode {
   const pathname = usePathname();
   const { filters, updateFilters, resetFilters, leftPanelOpen, subjectView } =
     useAppState();
-  const { lessons } = usePlanner();
+  // Catalog reference data now flows through the planner store (catalog
+  // migration). Flag OFF these mirror the mock SUBJECTS / UNITS / describeStandard
+  // byte-identically; flag ON they track the hydrated grade catalog.
+  const { lessons, subjects, activeUnitBySubject, describeStandard } =
+    usePlanner();
 
   // ── Subject-aware standards (BUG-004 / MED-6) ─────────────────────────
   // On /subject the panel shows only standards that appear in lessons of the
@@ -205,7 +208,12 @@ export function LeftFilterPanel(): ReactNode {
     updateFilters({ showHolidays: !filters.showHolidays });
   }
 
-  const allUnits = Object.values(UNITS);
+  // The active-unit-per-subject list (mirrors the mock `Object.values(UNITS)`).
+  // activeUnitBySubject is typed Unit | undefined per subject; flag OFF every
+  // subject has an active unit, so the filter only guards the type.
+  const allUnits = Object.values(activeUnitBySubject).filter(
+    (u): u is NonNullable<typeof u> => u != null,
+  );
 
   return (
     <aside className={`cp-root ${panelClass}`} aria-label="Filters">
@@ -291,7 +299,7 @@ export function LeftFilterPanel(): ReactNode {
             </p>
           </Tooltip>
           <div className={styles.chips}>
-            {SUBJECTS.map((subj) => {
+            {subjects.map((subj) => {
               const active = isSubjectActive(subj.id);
               const chipClass = active
                 ? `${styles.chip} ${styles.chipActive}`

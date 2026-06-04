@@ -17,7 +17,7 @@
 import { useId, useState } from "react";
 import type { CSSProperties } from "react";
 import type { CatchupItem } from "@/lib/catchup-data";
-import { SUBJECT_BY_ID } from "@/lib/mock";
+import { usePlanner } from "@/lib/planner-store";
 import { Tooltip } from "@/components/ui";
 import { StatusPill } from "./StatusPill";
 import styles from "./CatchupRow.module.css";
@@ -127,7 +127,12 @@ export function CatchupRow({
   onJumpToLesson,
   onSaveNote,
 }: CatchupRowProps) {
-  const subj = SUBJECT_BY_ID[item.subject];
+  // Subject label comes from the planner catalog (catalog migration). Flag OFF
+  // `subjectById` mirrors the mock SUBJECT_BY_ID byte-identically; flag ON it
+  // resolves the hydrated grade's subjects. CatchupRow only renders under the
+  // planner shell (CatchupScreen), so the provider is always present.
+  const { subjectById } = usePlanner();
+  const subj = subjectById[item.subject];
   const [editingNote, setEditingNote] = useState(false);
   const [draft, setDraft] = useState(note);
 

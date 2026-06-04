@@ -37,7 +37,6 @@ import type {
 } from "@/lib/catchup-data";
 import { usePlanner } from "@/lib/planner-store";
 import { useLabels } from "@/lib/labels";
-import { SUBJECT_BY_ID } from "@/lib/mock";
 import { Tooltip } from "@/components/ui";
 import { BulkActionBar } from "./BulkActionBar";
 import { CatchupRow } from "./CatchupRow";
@@ -109,7 +108,10 @@ function IconFlame() {
 
 export function CatchupScreen() {
   const router = useRouter();
-  const { lessons } = usePlanner();
+  // Subject labels now come from the planner catalog (catalog migration). Flag
+  // OFF `subjectById` mirrors the mock SUBJECT_BY_ID byte-identically; flag ON
+  // it resolves the hydrated grade's subjects.
+  const { lessons, subjectById } = usePlanner();
   const { week, currentUser } = useAppState();
   const { enabled, actions, setAction, setNote, getNote } = useCatchup();
   const labels = useLabels();
@@ -424,7 +426,7 @@ export function CatchupScreen() {
             // Subject grouping resolves the subject class via the bucket
             // hint; other groupings still nest cp-subj on the rows so
             // the stripe color resolves correctly per-row.
-            const subj = group.subject ? SUBJECT_BY_ID[group.subject] : null;
+            const subj = group.subject ? subjectById[group.subject] : null;
             return (
               <section key={group.key} className={styles.group}>
                 <header

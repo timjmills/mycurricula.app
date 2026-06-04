@@ -20,7 +20,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Lesson, SubjectId } from "@/lib/types";
-import { SUBJECTS, WEEK_DAYS_SHORT } from "@/lib/mock";
+import { usePlanner } from "@/lib/planner-store";
+import { WEEK_DAYS_SHORT } from "@/lib/mock";
 import { Button, Tooltip } from "@/components/ui";
 
 // ── Focus-trap selector (mirrors command-palette.tsx) ─────────────────────
@@ -54,6 +55,12 @@ export function RelocatePicker({
   onClose,
   onRelocate,
 }: RelocatePickerProps) {
+  // Subject list now comes from the planner catalog (catalog migration). Flag
+  // OFF it mirrors the mock SUBJECTS byte-identically; flag ON it tracks the
+  // hydrated grade's subjects. RelocatePicker only renders under the planner
+  // shell (WeeklyGrid), so the provider is always present.
+  const { subjects } = usePlanner();
+
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -372,7 +379,7 @@ export function RelocatePicker({
                 appearance: "auto",
               }}
             >
-              {SUBJECTS.map((s) => (
+              {subjects.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>

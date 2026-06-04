@@ -35,17 +35,10 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
+import { usePlanner } from "@/lib/planner-store";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  TODOS,
-  TAG_BY_ID,
-  LESSONS,
-  LESSON_BY_ID,
-  SUBJECT_BY_ID,
-  UNIT_BY_ID,
-  describeStandard,
-} from "@/lib/mock";
-import type { LessonStatus } from "@/lib/types";
+import { TODOS, TAG_BY_ID, LESSONS, LESSON_BY_ID } from "@/lib/mock";
+import type { LessonStatus, Subject, SubjectId, Unit } from "@/lib/types";
 import { Tooltip } from "@/components/ui";
 import styles from "./right-panel.module.css";
 
@@ -382,6 +375,11 @@ interface CommentRow {
 
 function CommentsPanel(): ReactNode {
   const { toggleCommentsPanel, setSelectedLessonId } = useAppState();
+  // Subject / unit labels now come from the planner catalog (catalog
+  // migration). Flag OFF these mirror the mock SUBJECT_BY_ID / UNIT_BY_ID
+  // byte-identically; flag ON they resolve the hydrated grade's (uuid-keyed)
+  // subjects and units — the key fix for the All-comments unit headers.
+  const { subjectById, unitById } = usePlanner();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ShoutboxTabId>("team");
 
@@ -472,7 +470,11 @@ function CommentsPanel(): ReactNode {
 
       {/* Tabs row — reuses the .todoTabs / .todoTab vocabulary so the visual
           treatment matches the To-do panel above. */}
-      <div className={styles.todoTabs} role="tablist" aria-label="Team Shoutbox sections">
+      <div
+        className={styles.todoTabs}
+        role="tablist"
+        aria-label="Team Shoutbox sections"
+      >
         {SHOUTBOX_TABS.map((tab) => {
           const isActive = tab.id === activeTab;
           return (
@@ -504,6 +506,7 @@ function CommentsPanel(): ReactNode {
           <LessonCommentsTab
             rows={lessonComments}
             onJump={jumpToLesson}
+            subjectById={subjectById}
           />
         )}
         {activeTab === "unit" && <UnitCommentsTab />}
@@ -512,6 +515,8 @@ function CommentsPanel(): ReactNode {
             grouped={groupedAll}
             onJumpLesson={jumpToLesson}
             onJumpUnit={jumpToUnit}
+            subjectById={subjectById}
+            unitById={unitById}
           />
         )}
       </div>
@@ -526,15 +531,28 @@ function CommentsPanel(): ReactNode {
 
 function TeamChatTab(): ReactNode {
   return (
-    <div style={{ padding: "20px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
-      <p className={styles.emptyState} style={{ padding: 0, textAlign: "left" }}>
+    <div
+      style={{
+        padding: "20px 16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      <p
+        className={styles.emptyState}
+        style={{ padding: 0, textAlign: "left" }}
+      >
         Team chat is the team-wide, always-on conversation. Use it for quick
         messages between teachers covering the same lessons and units.
       </p>
-      <p className={styles.emptyState} style={{ padding: 0, textAlign: "left" }}>
+      <p
+        className={styles.emptyState}
+        style={{ padding: 0, textAlign: "left" }}
+      >
         While the global team chat is still being built, head to{" "}
-        <strong>Today&apos;s Shoutbox</strong> on the Daily view — it&apos;s
-        the day-scoped version that&apos;s live today.
+        <strong>Today&apos;s Shoutbox</strong> on the Daily view — it&apos;s the
+        day-scoped version that&apos;s live today.
       </p>
     </div>
   );
@@ -548,9 +566,11 @@ function TeamChatTab(): ReactNode {
 function LessonCommentsTab({
   rows,
   onJump,
+  subjectById,
 }: {
   rows: CommentRow[];
   onJump: (lessonId: string) => void;
+  subjectById: Record<SubjectId, Subject>;
 }): ReactNode {
   if (rows.length === 0) {
     return (
@@ -563,7 +583,7 @@ function LessonCommentsTab({
   return (
     <>
       {rows.map((row) => {
-        const subj = SUBJECT_BY_ID[row.subjectId as keyof typeof SUBJECT_BY_ID];
+        const subj = subjectById[row.subjectId as SubjectId];
         if (!subj) return null;
         return (
           <Tooltip
@@ -628,9 +648,8 @@ function LessonCommentsTab({
 function UnitCommentsTab(): ReactNode {
   return (
     <p className={styles.emptyState}>
-      No Unit Comments yet — when teachers leave comments on a whole unit
-      (e.g. about pacing or assessment), they&apos;ll appear here grouped by
-      subject.
+      No Unit Comments yet — when teachers leave comments on a whole unit (e.g.
+      about pacing or assessment), they&apos;ll appear here grouped by subject.
     </p>
   );
 }
@@ -644,10 +663,14 @@ function AllCommentsTab({
   grouped,
   onJumpLesson,
   onJumpUnit,
+  subjectById,
+  unitById,
 }: {
   grouped: Map<string, Map<string, CommentRow[]>>;
   onJumpLesson: (lessonId: string) => void;
   onJumpUnit: (subjectId: string) => void;
+  subjectById: Record<SubjectId, Subject>;
+  unitById: Record<string, Unit>;
 }): ReactNode {
   if (grouped.size === 0) {
     return (
@@ -661,10 +684,13 @@ function AllCommentsTab({
   return (
     <>
       {Array.from(grouped.entries()).map(([subjectId, byUnit]) => {
-        const subj = SUBJECT_BY_ID[subjectId as keyof typeof SUBJECT_BY_ID];
+        const subj = subjectById[subjectId as SubjectId];
         if (!subj) return null;
         return (
-          <section key={subjectId} aria-labelledby={`shoutbox-subj-${subjectId}`}>
+          <section
+            key={subjectId}
+            aria-labelledby={`shoutbox-subj-${subjectId}`}
+          >
             {/* Subject header — reuses the sticky group header from
                 .todoGroup so visual rhythm matches the To-do panel above. */}
             <div
@@ -686,7 +712,7 @@ function AllCommentsTab({
             </div>
 
             {Array.from(byUnit.entries()).map(([unitId, rows]) => {
-              const unit = UNIT_BY_ID[unitId];
+              const unit = unitById[unitId];
               const unitTotal = rows.reduce((n, r) => n + r.count, 0);
               const unitUnread = rows.reduce((n, r) => n + r.unread, 0);
               return (
@@ -771,7 +797,9 @@ function AllCommentsTab({
                           />
                         </span>
                         <div className={styles.commentContent}>
-                          <p className={styles.commentTitle}>{row.lessonTitle}</p>
+                          <p className={styles.commentTitle}>
+                            {row.lessonTitle}
+                          </p>
                           <div className={styles.commentCounts}>
                             <span className={styles.commentTotal}>
                               {row.count} Lesson Comment
@@ -810,6 +838,10 @@ function AllCommentsTab({
 
 function LessonDetailPanel({ lessonId }: { lessonId: string }): ReactNode {
   const { setSelectedLessonId } = useAppState();
+  // Subject label + standard descriptions come from the planner catalog
+  // (catalog migration). Flag OFF these mirror the mock SUBJECT_BY_ID /
+  // describeStandard byte-identically; flag ON they track the hydrated grade.
+  const { subjectById, describeStandard } = usePlanner();
   const lesson = LESSON_BY_ID[lessonId];
 
   // Guard: lesson not found (stale id after mock updates).
@@ -836,7 +868,7 @@ function LessonDetailPanel({ lessonId }: { lessonId: string }): ReactNode {
     );
   }
 
-  const subj = SUBJECT_BY_ID[lesson.subject];
+  const subj = subjectById[lesson.subject];
 
   // Guard: subject not found in lookup (e.g. stale mock data).
   if (!subj) return null;
