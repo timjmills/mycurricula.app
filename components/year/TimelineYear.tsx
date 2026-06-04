@@ -6,10 +6,10 @@
 // that week's days/lessons appear; click a day → the app's lesson-detail panel
 // opens via setSelectedLessonId (no bespoke drawer).
 //
-// Everything is wired to the LIVE planner document (usePlanner().lessons) plus
-// the curriculum fixtures (SUBJECTS, ALL_UNITS). There is NO filter UI here —
-// the surface's single job is to navigate the year. A StatStrip at the top
-// shows live year-wide totals.
+// Everything is wired to the LIVE planner store via usePlanner(): the editable
+// document (lessons) plus the catalog slice (subjects, units). There is NO
+// filter UI here — the surface's single job is to navigate the year. A
+// StatStrip at the top shows live year-wide totals.
 //
 // Visual contract: each subject row carries the `.cp-subj.<id>` class so the
 // palette bridge's --c / --cl / --cd tokens cascade; the CSS module derives
@@ -19,7 +19,7 @@
 import { useMemo, useState, type ReactNode, type SVGProps } from "react";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
-import { SUBJECTS, ALL_UNITS, CURRENT_WEEK, WEEK_DAYS_SHORT } from "@/lib/mock";
+import { CURRENT_WEEK, WEEK_DAYS_SHORT } from "@/lib/mock";
 import type { Lesson, LessonStatus, Subject, Unit } from "@/lib/types";
 import { StatStrip } from "@/components/subject";
 import styles from "./TimelineYear.module.css";
@@ -143,9 +143,15 @@ function parseSpan(label: string): [number, number] | null {
   return [start, end];
 }
 
-/** Build the per-subject unit groups from the live lessons + unit catalog. */
-function buildSubjectGroups(subject: Subject, lessons: Lesson[]): UnitGroup[] {
-  const units = ALL_UNITS.filter((u) => u.subject === subject.id);
+/** Build the per-subject unit groups from the live lessons + unit catalog.
+ *  `allUnits` is the full-year unit superset (usePlanner().units) — passed in
+ *  because this is a module-level pure helper, not a component. */
+function buildSubjectGroups(
+  subject: Subject,
+  lessons: Lesson[],
+  allUnits: Unit[],
+): UnitGroup[] {
+  const units = allUnits.filter((u) => u.subject === subject.id);
 
   const groups = units.map<UnitGroup>((unit) => {
     const unitLessons = lessons.filter(
@@ -218,7 +224,7 @@ function WeekCircle({ state }: { state: WeekGroup["state"] }): ReactNode {
 type OpenKey = string | null;
 
 export function TimelineYear(): ReactNode {
-  const { lessons } = usePlanner();
+  const { lessons, subjects, units: allUnits } = usePlanner();
   const { setSelectedLessonId } = useAppState();
 
   // Progressive selection — nothing open by default.
@@ -228,11 +234,11 @@ export function TimelineYear(): ReactNode {
   // Per-subject unit groups, recomputed when the live document changes.
   const subjectGroups = useMemo(
     () =>
-      SUBJECTS.map((s) => ({
+      subjects.map((s) => ({
         subject: s,
-        groups: buildSubjectGroups(s, lessons),
+        groups: buildSubjectGroups(s, lessons, allUnits),
       })),
-    [lessons],
+    [lessons, subjects, allUnits],
   );
 
   function toggleUnit(subjectId: string, unitId: string) {

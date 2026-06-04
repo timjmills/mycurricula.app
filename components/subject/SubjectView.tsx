@@ -44,8 +44,7 @@ import { useLabels, pluralize } from "@/lib/labels";
 import { weekKey } from "@/lib/instance-labels";
 import { InstanceRenameLabel } from "@/components/rename";
 import { useSubjectColor } from "@/lib/palette";
-import { SUBJECTS, ALL_UNITS, CURRENT_WEEK, WEEK_DAYS } from "@/lib/mock";
-import { describeStandard } from "@/lib/mock/standards";
+import { CURRENT_WEEK, WEEK_DAYS } from "@/lib/mock";
 import { usePlanner } from "@/lib/planner-store";
 import { StatStrip } from "./StatStrip";
 import styles from "./SubjectWorkspace.module.css";
@@ -194,7 +193,8 @@ function SubjectRow({
   onPickUnit,
 }: SubjectRowProps): ReactNode {
   const color = useSubjectColor(subjectId);
-  const subject = SUBJECTS.find((s) => s.id === subjectId)!;
+  const { subjectById } = usePlanner();
+  const subject = subjectById[subjectId];
   // Renameable Unit caption — so the inline unit list under each subject reads
   // "Module 1" etc. when the team has renamed the level.
   const labels = useLabels();
@@ -267,8 +267,14 @@ function SubjectPane({
   onPickSubject,
 }: SubjectPaneProps): ReactNode {
   const color = useSubjectColor(subjectId);
-  const subject = SUBJECTS.find((s) => s.id === subjectId)!;
-  const { lessons } = usePlanner();
+  const {
+    lessons,
+    units: allUnits,
+    subjects,
+    subjectById,
+    describeStandard,
+  } = usePlanner();
+  const subject = subjectById[subjectId];
   const { setSelectedLessonId } = useAppState();
   // Renameable hierarchy captions (Subject / Unit / Week / Lesson). Picking a
   // term in Settings → Appearance retitles every heading below site-wide.
@@ -291,7 +297,7 @@ function SubjectPane({
 
   // Units for this subject, in catalog order, with per-unit progress.
   const units = useMemo(() => {
-    const subjUnits = ALL_UNITS.filter((u) => u.subject === subjectId);
+    const subjUnits = allUnits.filter((u) => u.subject === subjectId);
     return subjUnits.map((u, index) => {
       const unitLessons = subjectLessons.filter((l) => l.unit === u.id);
       const total = unitLessons.length;
@@ -314,7 +320,7 @@ function SubjectPane({
         isCurrent,
       };
     });
-  }, [subjectId, subjectLessons]);
+  }, [subjectId, subjectLessons, allUnits]);
 
   // ── Selection state: unit → week → day(lesson). Reset on subject change via
   //    the key on <SubjectPane> in the root. Initial unit = the current one,
@@ -492,7 +498,7 @@ function SubjectPane({
         >
           <div className={styles.snhead}>
             {pluralize(labels.subject)}{" "}
-            <span className={styles.n}>{SUBJECTS.length}</span>
+            <span className={styles.n}>{subjects.length}</span>
             <button
               className={styles.pclose}
               style={{ marginLeft: 10 }}
@@ -502,7 +508,7 @@ function SubjectPane({
               <Icon name="x" />
             </button>
           </div>
-          {SUBJECTS.map((sj) => {
+          {subjects.map((sj) => {
             const isActive = sj.id === subjectId;
             const rowUnits = isActive
               ? units.map((u) => ({
