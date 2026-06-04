@@ -983,20 +983,28 @@ export const plannerSupabaseSource: PlannerDataSource = {
 
   async getSectionsBatch(lessonIds, ownerId) {
     // One batched call seeds every lesson's sections, killing the per-lesson
-    // N+1 at hydrate time. We do a single `.in("owner_lesson_id", lessonIds)`
-    // and group in memory, picking the personal-fork row over the team row for
-    // each (lesson, section slot). Lessons with NO persisted section rows are
-    // OMITTED from the result (the contract: callers fall back to getSections).
+    // N+1 at hydrate time. We CHUNK the `.in("owner_lesson_id", lessonIds)`
+    // lookup (a full-year grade can carry thousands of lesson ids, which would
+    // otherwise blow the PostgREST/proxy URL length limit and blank section
+    // hydration — Codex #4). Each chunk's rows merge into one set; behaviour is
+    // identical for small id sets. We then group in memory, picking the
+    // personal-fork row over the team row for each (lesson, section slot).
+    // Lessons with NO persisted section rows are OMITTED from the result (the
+    // contract: callers fall back to getSections).
     const out: Record<string, LessonSectionContent[]> = {};
     if (lessonIds.length === 0) return out;
 
     const client = await sb();
-    const res = await client
-      .from("lesson_sections")
-      .select(SECTION_COLS)
-      .in("owner_lesson_id", lessonIds)
-      .order("display_order", { ascending: true });
-    const rows = unwrap(res, "get sections batch") as SectionRow[];
+    const rows = await chunkedIn<SectionRow>(
+      lessonIds,
+      (ids) =>
+        client
+          .from("lesson_sections")
+          .select(SECTION_COLS)
+          .in("owner_lesson_id", ids)
+          .order("display_order", { ascending: true }),
+      "get sections batch",
+    );
 
     // Group rows by lesson, then resolve personal-over-team within each lesson.
     const byLesson = new Map<string, SectionRow[]>();
@@ -1298,70 +1306,43 @@ export const plannerSupabaseSource: PlannerDataSource = {
     // sections carry owner_kind='personal_authored' and a master-derived
     // lesson's carry 'personal_copy' (Codex #7).
     //
-    // FAIL-SAFE replace (Codex #9): the old path DELETED every existing row then
-    // INSERTED — so an insert failure wiped all sections. We now INSERT the new
-    // rows FIRST, and only AFTER that succeeds delete the prior rows that are no
-    // longer present (delete by id NOT IN the freshly-inserted set). If the
-    // insert errors we abort BEFORE any destructive delete, so the existing
-    // sections survive intact. Section `resources` jsonb is passed through
-    // unchanged (never dropped). NOTE: this is fail-safe, not fully atomic — a
-    // crash between insert and delete leaves stale rows (harmless duplicates that
-    // a later setSections prunes). A truly atomic swap wants a server-side RPC
-    // (future follow-up; migrations are out of this file's ownership).
+    // ATOMIC replace (Codex #5): the prior path INSERTED then DELETEd across two
+    // round-trips — an insert OK followed by a delete failure left duplicate /
+    // stale rows. We now delegate the full swap to the transactional RPC
+    // `replace_lesson_sections` (SECURITY INVOKER — RLS still applies), which
+    // deletes the owner's prior rows for this lesson and inserts the new set in a
+    // SINGLE transaction. Either the whole replace commits or none of it does, so
+    // no partial/duplicate state can persist. Section `resources` jsonb is passed
+    // through unchanged (never dropped). An empty `sections` list clears the
+    // owner's rows for this lesson. If the RPC is unavailable at runtime the call
+    // errors and is surfaced (thrown) so the store's persist error path logs it —
+    // never silently swallowed.
     const client = await sb();
     const grade = await resolveLessonGrade(client, lessonId, ownerId);
     const ownerKind = await resolveOwnerKind(client, lessonId, ownerId);
 
-    // 1. Insert the new ordered set FIRST. Capture the generated ids so we can
-    //    delete exactly the rows that are NOT part of the new set afterwards.
-    let insertedIds: string[] = [];
-    if (sections.length > 0) {
-      const rows = sections.map((s, i) => ({
-        owner_kind: ownerKind,
-        owner_lesson_id: lessonId,
-        owner_id: ownerId,
-        grade_level_id: grade,
-        template_section_id: s.templateSectionId,
-        heading: s.heading,
-        prompt: s.prompt,
-        body: s.body,
-        resources: s.resources, // preserve the section's resources jsonb.
-        display_order: i,
-      }));
-      const ins = await client
-        .from("lesson_sections")
-        .insert(rows)
-        .select("id");
-      if (ins.error) {
-        // Abort BEFORE the destructive delete — existing sections survive.
-        throw new Error(
-          `Planner repository set sections (insert) failed: ${ins.error.message}`,
-        );
-      }
-      insertedIds = (
-        unwrap(ins, "set sections (insert)") as { id: string }[]
-      ).map((r) => r.id);
-    }
+    // Map each section → the p_sections JSON element shape the RPC expects (keys
+    // → columns). `display_order` is the array position; `template_section_id` is
+    // null when absent. `resources` passes through as a jsonb array.
+    const pSections = sections.map((s, i) => ({
+      heading: s.heading,
+      prompt: s.prompt,
+      body: s.body,
+      resources: s.resources, // preserve the section's resources jsonb array.
+      display_order: i,
+      template_section_id: s.templateSectionId ?? null,
+    }));
 
-    // 2. Now that the new rows are committed, delete the owner's PRIOR rows for
-    //    this lesson — every owner row whose id is NOT one we just inserted.
-    //    (An empty new set deletes all prior owner rows = a true clear.)
-    let delQuery = client
-      .from("lesson_sections")
-      .delete()
-      .eq("owner_lesson_id", lessonId)
-      .eq("owner_id", ownerId);
-    if (insertedIds.length > 0) {
-      // PostgREST `not in` takes a parenthesized list literal.
-      delQuery = delQuery.not("id", "in", `(${insertedIds.join(",")})`);
-    }
-    const del = await delQuery;
-    if (del.error) {
-      // The new sections are already persisted; a stale-row delete failure is
-      // non-destructive (leaves duplicates a later write prunes). Surface it so
-      // it's not silently swallowed.
+    const rpc = await client.rpc("replace_lesson_sections", {
+      p_owner_lesson_id: lessonId,
+      p_owner_kind: ownerKind,
+      p_owner_id: ownerId, // teacher uid (personal fork); null is master-only.
+      p_grade_level_id: grade,
+      p_sections: pSections,
+    });
+    if (rpc.error) {
       throw new Error(
-        `Planner repository set sections (prune old) failed: ${del.error.message}`,
+        `Planner repository set sections (replace) failed: ${rpc.error.message}`,
       );
     }
 
