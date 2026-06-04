@@ -124,7 +124,19 @@ then the seed (dev only). Apply order:
    multi-page boards, themes, real-link repeat, and the board library to persist.
    Verified: all four migrations apply cleanly via `supabase start`, and a board
    exercising every new column round-trips through the REST API + SQL.
-5. `supabase/seed.sql` — **dev only.** Demo school → active Grade 5 → 2025–2026
+5. `supabase/migrations/20260604120000_planner_scale_hardening.sql` — the
+   **scale-hardening** wave (additive, **safe on a live DB with data**).
+   Denormalizes a `grade_level_id uuid` tenant key onto
+   `master_core_lesson_events` and `personal_core_lesson_event_copies` (+
+   ordered backfill + sync trigger), adds `archived_at` on personal copies and
+   `updated_at` on `daily_notes`, the `deleted_at` partial + missing FK/RLS
+   indexes, rewrites the hot-path `master_events_read` / `completion_read_public`
+   policies to filter the local column instead of a unit→grade join, optimizes
+   `can_read_grade`, closes the `recurrence_patterns` team-write leak, and locks
+   `audit_log` inserts to a SECURITY DEFINER RPC. Idempotent and
+   backfill-before-policy-swap, so it applies cleanly after the four migrations
+   above on a populated project without a maintenance window.
+6. `supabase/seed.sql` — **dev only.** Demo school → active Grade 5 → 2025–2026
    school year → the 8 locked subjects. It does NOT seed teachers (a
    `teachers` row references `auth.users(id)`; create a test teacher via Supabase
    Auth/Studio first, then insert a matching `teachers` row keyed to that auth
@@ -141,7 +153,8 @@ npx supabase login
 # 2. Link this repo to the mycurricula cloud project (prompts for DB password).
 npx supabase link --project-ref xuukfpvonsbvvbspsrsl
 
-# 3. Push every migration in supabase/migrations/ in order (all 6).
+# 3. Push every migration in supabase/migrations/ in order (all 5, including
+#    20260604120000_planner_scale_hardening — additive, safe on a live DB).
 npx supabase db push
 
 # 4. REQUIRED — load the seed graph. `db push` does NOT run seed.sql, and the
@@ -171,8 +184,9 @@ Dashboard → **SQL Editor**. Paste-and-run each file **in this exact order**:
 2. `supabase/migrations/20260527120000_resources_embed_fields.sql`
 3. `supabase/migrations/20260530090000_teach_view.sql`
 4. `supabase/migrations/20260531120000_teach_freeform.sql`
-5. `supabase/seed.sql` _(dev only — fresh database; errors if rows already exist)_
-5. `docs/claude-bypass.sql` _(only if using the Claude bypass — see §5)_
+5. `supabase/migrations/20260604120000_planner_scale_hardening.sql` _(additive — safe on a live DB with data)_
+6. `supabase/seed.sql` _(dev only — fresh database; errors if rows already exist)_
+7. `docs/claude-bypass.sql` _(only if using the Claude bypass — see §5)_
 
 Each migration is idempotent-ish only within a fresh DB; if a run half-fails,
 fix the cause and reset rather than re-running partial files.
@@ -324,6 +338,69 @@ The remaining UI step is pointing the client mutation callsites
 (`components/teach/TeachWorkspace.tsx`) at the `actions.ts` server actions
 instead of the mock `teach` seam — the actions are 1:1 with the
 `TeachDataSource` methods the workspace already calls.
+
+## 8. Flip the planner onto Supabase
+
+The planner data layer (Weekly / Daily / Year / Subject) is flag-gated on
+`NEXT_PUBLIC_PLANNER_USE_SUPABASE`. Flag **unset/`0`** = byte-identical mock;
+`1` reads/writes the live tables under RLS. Flip only **after** §3 (all
+migrations incl. `20260604120000_planner_scale_hardening` + seed + importer) and
+§4 (SSO) are done and a teacher is provisioned (§5).
+
+**Ordered flip (mirrors the ultraplan §5 owner steps):**
+
+1. Apply `20260604120000_planner_scale_hardening.sql` (§3) — additive, safe on
+   the live project with data; backfills `grade_level_id` on existing rows.
+2. Re-run `node scripts/import-mock-planner.mjs` if backfilling fixtures — it now
+   stamps `grade_level_id` on every master event so the hot-path RLS/index is
+   correct from the first seed. Idempotent.
+3. Confirm Supavisor pooling is on in **transaction mode** for the project
+   (Dashboard → Database → Connection pooling).
+4. Set `NEXT_PUBLIC_PLANNER_USE_SUPABASE=1` in the Cloudflare Pages env (it is a
+   `NEXT_PUBLIC_*` build-time var — it must be present when the Pages build
+   runs, then trigger a redeploy).
+
+**Smoke test (do all of these against the deployed app):**
+
+- [ ] **Sign in** → `/weekly` renders **real** lessons (from the importer/upload,
+      not the mock fixtures) under RLS.
+- [ ] **Round-trip every mutator** on a lesson and reload to confirm it persists:
+      **edit** content, **move** day/order, **status** (mark done/undone),
+      **create** a new lesson, **archive** it, and **section** add/edit/reorder.
+- [ ] **RLS isolation** — as a 2nd teacher (different account), confirm you
+      **cannot** see teacher 1's *personal* forks/authored lessons, while the
+      shared **team** master lessons for the grade ARE visible. (SQL editor runs
+      as service-role and bypasses RLS — verify via the app or a user JWT.)
+
+If Weekly is blank or writes are rejected after the flip, the usual cause is a
+missing teacher → grade assignment (the owner id / grade uuid never resolves):
+re-check §5 provisioning and that the migration's `grade_level_id` backfill ran.
+
+## 9. Deferred scale follow-ups (P2/P3 — not in the scale-hardening wave)
+
+These are spec'd in the ultraplan (§4) but intentionally **out of scope** for
+the additive `20260604120000` migration — each needs a maintenance window, an
+invasive rewrite, or an operational confirmation. Track them before the user
+base crosses into the thousands:
+
+- **Partition `audit_log` by month + retention policy.** The table is
+  append-only and unpartitioned; "reusable year-over-year" means it grows
+  unbounded. Partitioning is an invasive table recreation — schedule a
+  maintenance window. Pair it with a retention/rollup policy for old partitions.
+- **jsonb size CHECKs on bloat vectors.** Add column CHECK constraints bounding
+  the serialized size of `board_annotations.annotations`, `audit_log.metadata`,
+  and `coverage_snapshots.per_teacher_coverage` so a runaway payload can't bloat
+  a hot table.
+- **Orphan GC for polymorphic owners.** `resources`, `lesson_sections`,
+  `board_annotations`, and `edit_undo_stack` reference owners polymorphically;
+  add a periodic sweep (or ON DELETE wiring) so rows whose owner is gone don't
+  accumulate.
+- **Confirm Supavisor / PgBouncer transaction-mode pooling.** Operational, not
+  schema — verify the project pools in transaction mode so thousands of
+  short-lived serverless connections don't exhaust Postgres backends.
+- **`audit_action` enum → text + CHECK.** As the audited action set grows,
+  `ALTER TYPE … ADD VALUE` can't run inside a transaction; migrating the enum to
+  a `text` column with a CHECK constraint dodges that limit.
 
 ## Note: manual SQL paste limits (2026-06-01)
 

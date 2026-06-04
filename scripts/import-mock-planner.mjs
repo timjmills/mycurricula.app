@@ -372,11 +372,20 @@ async function main() {
   // forks (isPersonal) belong in personal_core_lesson_event_copies, which is
   // per-teacher and out of scope for a seed importer. Tasks/comments are UI/
   // collaboration concerns not modelled on the master event row.
+  //
+  // `grade_level_id` is the denormalized tenant key added by migration
+  // 20260604120000_planner_scale_hardening (ultraplan §1/§3 wave 1). Every
+  // master event's unit is upserted above under this same `gradeId` (units
+  // resolve to the active grade), so each lesson's grade is exactly `gradeId`.
+  // Populating it on import keeps the hot-path RLS/index (`master_events_read`
+  // filtering on the local column instead of a unit→grade join) correct from
+  // the first seed, with no separate backfill needed for imported rows.
   const cLessons = makeCounter();
   const masterRows = LESSONS.filter((l) => !l.isPersonal && !l.archived).map(
     (l, i) => ({
       id: slugToUuid("lesson", l.id),
       unit_id: slugToUuid("unit", UNITS[l.subject].id),
+      grade_level_id: gradeId,
       subject_id: slugToUuid("subject", l.subject),
       week_number: l.week,
       day_of_week: weekdayForIndex(l.day),
