@@ -56,7 +56,7 @@ import { Badge, Button, Tooltip } from "@/components/ui";
 import { SaveTargetDialog } from "@/components/weekly/save-target-dialog";
 import { NotePopover } from "@/components/weekly/note-popover";
 import type { Lesson, LessonStatus, WeeklyCardDeck } from "@/lib/types";
-import { ME, SUBJECT_BY_ID, WEEK_DAYS } from "@/lib/mock";
+import { ME, WEEK_DAYS } from "@/lib/mock";
 import { lessonTime } from "@/lib/mock";
 import { useSubjectColor } from "@/lib/palette";
 import { useTheme } from "@/lib/theme";
@@ -225,11 +225,15 @@ export function WeeklyLessonCard({
 }: WeeklyLessonCardProps) {
   const { style } = useTheme();
   const color = useSubjectColor(lesson.subject);
-  const subject = SUBJECT_BY_ID[lesson.subject];
 
   // BUG-006 — canonical resource source: derive resources from the planner
   // sections store (the same source the right-rail and daily detail use) so
   // all three surfaces agree on the same list (audit finding BUG-006).
+  // subjectById is the Wave-A catalog subject lookup; flag OFF it mirrors the
+  // mock SUBJECT_BY_ID exactly. WeeklyLessonCard always renders under
+  // PlannerProvider (its only importers are WeeklyGrid, GridCell, and
+  // weekly-board — all planner surfaces), and it already consumes usePlanner()
+  // here, so reading the catalog from the same hook is safe.
   const {
     getSections,
     addSectionResource,
@@ -240,7 +244,9 @@ export function WeeklyLessonCard({
     relocateLesson,
     duplicateLesson,
     setLessonStatus,
+    subjectById,
   } = usePlanner();
+  const subject = subjectById[lesson.subject];
   const sectionResources = lessonResources(getSections(lesson.id));
 
   // Respect prefers-reduced-motion (spec §2.5 / §2.4): under reduced motion,

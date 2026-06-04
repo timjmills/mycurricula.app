@@ -66,11 +66,17 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { useReducedMotion } from "framer-motion";
-import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
+import type {
+  Lesson,
+  LessonStatus,
+  Subject,
+  SubjectId,
+  Unit,
+} from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { useTheme } from "@/lib/theme";
 import { useSubjectColor } from "@/lib/palette";
-import { SUBJECTS, UNITS, CURRENT_WEEK, SUBJECT_BY_ID } from "@/lib/mock";
+import { CURRENT_WEEK } from "@/lib/mock";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useHolidaysByDay } from "@/lib/use-day-holiday";
 import type {
@@ -122,6 +128,13 @@ export function WeeklyGrid(): ReactNode {
     duplicateLesson,
     setSaveTarget,
     lastChange,
+    // Catalog data (Wave A) — the subject rows map, subject lookup, and the
+    // active-unit-per-subject map. Flag OFF these mirror the mock SUBJECTS /
+    // SUBJECT_BY_ID / UNITS exactly (same 8 subjects, same order) so the grid
+    // renders byte-identically. activeUnitBySubject drives unit-cell shading.
+    subjects,
+    subjectById,
+    activeUnitBySubject,
   } = usePlanner();
 
   // ── Inline expansion state ─────────────────────────────────────────────────
@@ -226,7 +239,7 @@ export function WeeklyGrid(): ReactNode {
   // Applies the search + filter predicate so non-matching lessons are hidden.
   const bySubjectDay = useMemo(() => {
     const buckets: Record<string, Lesson[][]> = {};
-    for (const s of SUBJECTS) {
+    for (const s of subjects) {
       buckets[s.id] = Array.from({ length: DAY_COUNT }, () => []);
     }
     for (const lesson of lessons) {
@@ -236,7 +249,7 @@ export function WeeklyGrid(): ReactNode {
       buckets[lesson.subject]?.[lesson.day].push(lesson);
     }
     return buckets;
-  }, [lessons, week, lessonMatchesQuery, DAY_COUNT]);
+  }, [lessons, week, lessonMatchesQuery, DAY_COUNT, subjects]);
 
   const weekHasLessons = useMemo(
     () => lessons.some((l) => l.week === week),
@@ -248,7 +261,7 @@ export function WeeklyGrid(): ReactNode {
   // Declared after bySubjectDay to avoid the temporal dead zone.
   const flatWeekLessons = useMemo<Lesson[]>(() => {
     const result: Lesson[] = [];
-    for (const subject of SUBJECTS) {
+    for (const subject of subjects) {
       for (let d = 0; d < DAY_COUNT; d++) {
         for (const lesson of bySubjectDay[subject.id]?.[d] ?? []) {
           result.push(lesson);
@@ -256,12 +269,12 @@ export function WeeklyGrid(): ReactNode {
       }
     }
     return result;
-  }, [bySubjectDay, DAY_COUNT]);
+  }, [bySubjectDay, DAY_COUNT, subjects]);
 
   // ── Keyboard navigation ────────────────────────────────────────────────────
   const expandCell = useCallback(
     (pos: CellPos) => {
-      const subject = SUBJECTS[pos.row];
+      const subject = subjects[pos.row];
       const cellLessons = bySubjectDay[subject.id]?.[pos.col] ?? [];
       if (cellLessons.length === 0) return;
       setExpandedIds((prev) => {
@@ -271,7 +284,7 @@ export function WeeklyGrid(): ReactNode {
       });
       setSelectedId(cellLessons[0].id);
     },
-    [bySubjectDay],
+    [bySubjectDay, subjects],
   );
 
   const collapseAll = useCallback(() => {
@@ -279,7 +292,7 @@ export function WeeklyGrid(): ReactNode {
   }, []);
 
   const gridNav = useGridNavigation({
-    rowCount: SUBJECTS.length,
+    rowCount: subjects.length,
     colCount: DAY_COUNT,
     onActivate: expandCell,
     onCollapse: collapseAll,
@@ -305,7 +318,7 @@ export function WeeklyGrid(): ReactNode {
     setDragState({ phase: "dragging", activeId: id, overId: null });
     // Announce pick-up for screen readers.
     const lesson = lessons.find((l) => l.id === id);
-    const subjectName = lesson ? SUBJECT_BY_ID[lesson.subject]?.name : "";
+    const subjectName = lesson ? subjectById[lesson.subject]?.name : "";
     setLiveAnnouncement(
       `Picked up ${subjectName ? subjectName + " lesson: " : "lesson: "}${lesson?.title ?? id}. Drag to a new cell.`,
     );
@@ -320,7 +333,7 @@ export function WeeklyGrid(): ReactNode {
     if (overId?.startsWith("cell:")) {
       const [, subjectId, dayStr] = overId.split(":");
       const dayName = weekdays[Number(dayStr)]?.longLabel ?? dayStr;
-      const subj = SUBJECTS.find((s) => s.id === subjectId);
+      const subj = subjects.find((s) => s.id === subjectId);
       setLiveAnnouncement(`Over ${subj?.name ?? subjectId}, ${dayName}.`);
     }
   }
@@ -349,7 +362,7 @@ export function WeeklyGrid(): ReactNode {
       // Announce drop.
       const [, tgtSubjectId, tgtDayStr] = overId.split(":");
       const dayName = weekdays[Number(tgtDayStr)]?.longLabel ?? tgtDayStr;
-      const subj = SUBJECTS.find((s) => s.id === tgtSubjectId);
+      const subj = subjects.find((s) => s.id === tgtSubjectId);
       setLiveAnnouncement(
         `Dropped in ${subj?.name ?? tgtSubjectId}, ${dayName}.`,
       );
@@ -672,11 +685,13 @@ export function WeeklyGrid(): ReactNode {
                 {`No ${pluralize(labels.lesson).toLowerCase()} planned for ${labels.week.toLowerCase()} ${week} yet.`}
               </div>
             )}
-            {SUBJECTS.map((subject, rowIdx) => (
+            {subjects.map((subject, rowIdx) => (
               <SubjectRow
                 key={subject.id}
                 rowIndex={rowIdx}
                 subjectId={subject.id}
+                subject={subject}
+                activeUnit={activeUnitBySubject[subject.id]}
                 cells={bySubjectDay[subject.id]}
                 dayCount={DAY_COUNT}
                 style={style}
@@ -799,6 +814,11 @@ export function WeeklyGrid(): ReactNode {
 interface SubjectRowProps {
   rowIndex: number;
   subjectId: SubjectId;
+  /** The subject record (from the planner catalog) for this row. */
+  subject: Subject;
+  /** The active unit for this subject — drives unit-cell shading. May be
+   *  undefined when a subject has no active unit (flag ON edge case). */
+  activeUnit: Unit | undefined;
   cells: Lesson[][];
   /** Number of day columns — derived from the configured school week. */
   dayCount: number;
@@ -838,6 +858,8 @@ interface SubjectRowProps {
 function SubjectRow({
   rowIndex,
   subjectId,
+  subject,
+  activeUnit,
   cells,
   dayCount,
   style,
@@ -860,10 +882,15 @@ function SubjectRow({
   onSaveTarget,
 }: SubjectRowProps): ReactNode {
   const color = useSubjectColor(subjectId);
-  const subject = SUBJECTS.find((s) => s.id === subjectId)!;
-  const unit = UNITS[subjectId];
-
-  const shade: CellShade = resolveCellShade(style, color, unit.shade);
+  // `activeUnit` is the per-subject "current" unit from the planner catalog
+  // (Wave A's activeUnitBySubject). Flag OFF it is pinned to the mock UNITS
+  // map exactly, so it is always present here; the `?.shade` guard keeps the
+  // type sound for the flag-ON edge case where a subject has no active unit.
+  const shade: CellShade = resolveCellShade(
+    style,
+    color,
+    activeUnit?.shade ?? 2,
+  );
 
   return (
     <>
