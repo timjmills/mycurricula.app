@@ -320,7 +320,8 @@ function RenamePopover({
         </div>
         {scope === "team" ? (
           <p className={`${styles.note} ${styles.noteWarn}`}>
-            Everyone on your team will see this name.
+            Saved on this device for now — your team sees it once backend sync
+            is on.
           </p>
         ) : (
           <p className={styles.note}>Only you will see this name.</p>

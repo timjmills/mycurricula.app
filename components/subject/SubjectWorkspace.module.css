@@ -976,3 +976,19 @@
     padding: 14px;
   }
 }
+
+/* Touch / coarse pointers (phone, tablet): the panel reveal/close buttons and
+   the right-panel pager arrows are tappable controls that sit below the 44px
+   minimum on desktop. Expand only their HIT AREA on coarse pointers per
+   CLAUDE.md §4; their glyph sizes and desktop appearance are untouched. */
+@media (hover: none), (pointer: coarse) {
+  .topbtn,
+  .pclose {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .rnav button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

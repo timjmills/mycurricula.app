@@ -171,6 +171,19 @@ const SortableLessonItem = React.memo(function SortableLessonItem({
     onActivateDetail(lesson.id);
   }
 
+  // Keyboard equivalent of the double-click detail open (a11y — double-click has
+  // no native keyboard analogue). Plain Enter already expands the card inline
+  // (via the card's own handler), so we reserve Shift+Enter for the full detail
+  // surface. Only the handled combo is intercepted; every other key passes
+  // through so card/grid navigation is never trapped.
+  function handleWrapperKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
+    if (e.key === "Enter" && e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      onActivateDetail(lesson.id);
+    }
+  }
+
   // A bulk-selected card shows the card's own `selected` ring in addition to
   // a data attribute so CSS can add a distinct overlay ring without modifying
   // the card component itself.
@@ -181,6 +194,8 @@ const SortableLessonItem = React.memo(function SortableLessonItem({
       className={styles.cardSlot}
       onClick={handleWrapperClick}
       onDoubleClick={handleWrapperDoubleClick}
+      onKeyDown={handleWrapperKeyDown}
+      title="Double-click or Shift+Enter for full detail"
       data-bulk-selected={bulkSelected ? "true" : undefined}
     >
       <WeeklyLessonCard
