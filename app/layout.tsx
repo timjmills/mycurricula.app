@@ -11,6 +11,7 @@ import {
 import "./globals.css";
 import { ThemeProvider, DEFAULT_STYLE, DEFAULT_PALETTE } from "@/lib/theme";
 import { LabelsProvider } from "@/lib/labels";
+import { InstanceLabelsProvider } from "@/lib/instance-labels";
 
 // ── v1.3 brand type system (Curricula Design System) ──────────────────────
 // Display + H1 use Poppins (geometric, friendly); smaller headings, card
@@ -97,7 +98,14 @@ export default function RootLayout({
               reads from the same source. SSR-safe: it initializes with the
               defaults and loads saved overrides post-mount so hydration
               cannot mismatch. */}
-          <LabelsProvider>{children}</LabelsProvider>
+          {/* InstanceLabelsProvider hosts per-INSTANCE renames (e.g. naming a
+              specific Unit "Fractions Deep Dive") with personal/team scope.
+              Sibling to LabelsProvider (which renames the level TERM). Same
+              SSR-safe hydration model: empty on first paint, overrides arrive
+              post-mount. */}
+          <LabelsProvider>
+            <InstanceLabelsProvider>{children}</InstanceLabelsProvider>
+          </LabelsProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -178,15 +178,23 @@ export function InstanceLabelsProvider({
   );
 
   const overrideFor = useCallback(
-    (level: InstanceLevel, key: string, scope: LabelScope): string | undefined =>
-      stateFor(scope)[level][key],
+    (
+      level: InstanceLevel,
+      key: string,
+      scope: LabelScope,
+    ): string | undefined => stateFor(scope)[level][key],
     // stateFor reads the latest personal/team via closure on each render
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [personal, team],
   );
 
   const rename = useCallback(
-    (level: InstanceLevel, key: string, name: string, scope: LabelScope): void => {
+    (
+      level: InstanceLevel,
+      key: string,
+      name: string,
+      scope: LabelScope,
+    ): void => {
       const trimmed = name.trim();
       const setter = scope === "personal" ? setPersonal : setTeam;
       setter((prev) => {
