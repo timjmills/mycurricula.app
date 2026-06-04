@@ -1,12 +1,20 @@
-/* Year Overview — Workspace (EduPlan) prototype, ported to React.
-   v1.3-branded multi-panel workspace. The active-subject accent cascade vars
-   (--ac/--ac-d/--ac-t/--ac-s) are set inline on .app from the current subject;
-   per-subject swatch vars (--s-c/--s-d/--s-t/--s-s) are set inline per row.
-   Neutral/brand colors use the app's v1.3 tokens. TEMPORARY preview surface. */
+/* SubjectWorkspace.module.css — Subject (Curriculum) view, Workspace (EduPlan)
+   design ported to production. Adapted from
+   app/prototypes/workspace/workspace.module.css but WITH the prototype's outer
+   chrome removed (no app nav rail `.side`, no global `.etop` topbar/user) — the
+   app shell provides global nav. Keeps the view-specific panels: subjects
+   switcher (.snav), center stack (.center), and right lesson viewer (.rpanel).
+
+   Color cascade: the active-subject accent vars (--ac/--ac-d/--ac-t/--ac-s) are
+   set inline on .app from the active subject's resolved SubjectColor; per-subject
+   swatch vars (--s-c/--s-d/--s-t/--s-s) are set inline per subject row. Neutral/
+   brand colors use the app's v1.3 tokens — no hard-coded hex here. */
 
 .app {
   display: flex;
-  height: 100vh;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   background: var(--canvas);
   color: var(--ink);
@@ -24,230 +32,38 @@
   margin: 0;
 }
 
-/* ── Left rail ── */
-.side {
-  width: 194px;
+/* The stat strip sits above the three-panel body, full width. */
+.statWrap {
   flex: 0 0 auto;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  padding: 16px 12px;
-}
-.elogo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 8px 20px;
-}
-.elogo .bk {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: var(--grad-honey);
-  display: grid;
-  place-items: center;
-  box-shadow: var(--sh-honey);
-}
-.elogo .bk svg {
-  width: 18px;
-  height: 18px;
-}
-.elogo b {
-  font-size: 17px;
-  font-weight: 800;
-  color: var(--ink);
-  font-family: var(--font-logo);
-  letter-spacing: -0.02em;
-}
-.enav {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 9px 11px;
-  border-radius: 11px;
-  font-weight: 600;
-  font-size: 13.5px;
-  color: var(--ink-soft);
-  margin-bottom: 2px;
-  cursor: pointer;
-}
-.enav svg {
-  width: 18px;
-  height: 18px;
-  color: var(--muted);
-}
-.enav:hover {
+  padding: 14px 20px 0;
   background: var(--canvas);
-}
-.enavOn {
-  background: var(--brand-50);
-  color: var(--brand-700);
-}
-.enavOn svg {
-  color: var(--brand-500);
-}
-.grow {
-  flex: 1;
-}
-.ediv {
-  height: 1px;
-  background: var(--hairline);
-  margin: 8px 4px;
-}
-.euser {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 8px;
-}
-.euser .av {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--grad-dawn);
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-weight: 800;
-  font-size: 12px;
-  font-family: var(--font-display-sm);
-  border: 2px solid var(--surface);
-  box-shadow: var(--sh-xs);
-}
-.euser .nm {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink);
-  line-height: 1.15;
-}
-.euser .rl {
-  font-size: 11px;
-  color: var(--muted);
 }
 
-/* ── Top bar ── */
-.wrap {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.etop {
-  height: 58px;
+/* Compact in-view header — the subject name + a button to reveal the subjects
+   panel on narrow viewports. Replaces the prototype's global topbar. */
+.viewbar {
   flex: 0 0 auto;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 20px;
-}
-.eyear {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 13.5px;
-  color: var(--ink-soft);
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  padding: 8px 14px;
-}
-.eyear .g {
-  color: var(--muted);
-  font-weight: 500;
-}
-.eyear svg {
-  width: 15px;
-  height: 15px;
-  color: var(--muted);
-}
-.esearch {
-  flex: 1;
-  max-width: 440px;
-  margin: 0 auto;
-  position: relative;
-}
-.esearch input {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: var(--surface-warm);
-  padding: 9px 14px 9px 38px;
-  font-family: inherit;
-  font-size: 13.5px;
-  color: var(--ink);
-}
-.esearch input::placeholder {
-  color: var(--faint);
-}
-.esearch svg {
-  position: absolute;
-  left: 13px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
-  color: var(--faint);
-}
-.etbtn {
-  position: relative;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-}
-.etbtn:hover {
+  gap: 12px;
+  padding: 12px 20px 6px;
   background: var(--canvas);
 }
-.etbtn svg {
-  width: 18px;
-  height: 18px;
-}
-.etbtn .bd {
-  position: absolute;
-  top: 4px;
-  right: 5px;
-  min-width: 15px;
-  height: 15px;
-  border-radius: 8px;
-  background: var(--danger);
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
-  padding: 0 3px;
-}
-.euser2 {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.euser2 .av {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--grad-dawn);
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-weight: 800;
-  font-size: 12px;
+.viewbar h2 {
   font-family: var(--font-display-sm);
-  border: 2px solid var(--surface);
+  letter-spacing: -0.02em;
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+  color: var(--ink);
 }
-.euser2 .nm {
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-.euser2 .rl {
-  font-size: 11px;
+.viewbar .grade {
+  font-size: 12.5px;
   color: var(--muted);
+  font-weight: 600;
+}
+.viewbar .grow {
+  flex: 1;
 }
 
 .bodyrow {
@@ -296,6 +112,7 @@
   border: 1.5px solid transparent;
   width: 100%;
   text-align: left;
+  background: transparent;
 }
 .subj:hover {
   background: var(--canvas);
@@ -313,6 +130,8 @@
   place-items: center;
   color: #fff;
   flex: 0 0 auto;
+  font-weight: 800;
+  font-size: 12px;
 }
 .subj .si svg {
   width: 17px;
@@ -358,6 +177,7 @@
   transition: 0.12s;
   width: 100%;
   text-align: left;
+  background: transparent;
 }
 .uitem:hover {
   background: var(--canvas);
@@ -516,7 +336,7 @@
 }
 .ulegend {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
 }
 .uleg .ud {
@@ -563,7 +383,7 @@
   text-align: left;
 }
 .rcard:hover {
-  box-shadow: 0 8px 18px -10px rgba(28, 27, 46, 0.3);
+  box-shadow: var(--sh-md);
   transform: translateY(-2px);
 }
 .rcardOn {
@@ -623,7 +443,7 @@
   text-align: left;
 }
 .wkcard:hover {
-  box-shadow: 0 8px 18px -10px rgba(28, 27, 46, 0.28);
+  box-shadow: var(--sh-md);
   transform: translateY(-2px);
 }
 .wkcardOn {
@@ -671,7 +491,7 @@
   text-align: left;
 }
 .daycard:hover {
-  box-shadow: 0 8px 18px -10px rgba(28, 27, 46, 0.28);
+  box-shadow: var(--sh-md);
   transform: translateY(-2px);
 }
 .daycardOn {
@@ -733,6 +553,11 @@
   width: 16px;
   height: 16px;
 }
+.empty {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 8px 2px;
+}
 
 .elegend {
   display: flex;
@@ -782,6 +607,8 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--ac-d);
+  background: transparent;
+  cursor: pointer;
 }
 .rback .b svg {
   width: 16px;
@@ -799,6 +626,12 @@
   display: grid;
   place-items: center;
   color: var(--muted);
+  background: var(--surface);
+  cursor: pointer;
+}
+.rnav button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 .rnav button svg {
   width: 15px;
@@ -815,6 +648,13 @@
   letter-spacing: -0.02em;
   margin: 4px 0 12px;
   font-family: var(--font-display-sm);
+}
+.robjlead {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0 0 14px;
+  font-weight: 600;
 }
 .rbadges {
   display: flex;
@@ -863,6 +703,8 @@
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   white-space: nowrap;
+  background: transparent;
+  cursor: pointer;
 }
 .rtabOn {
   color: var(--ac-d);
@@ -934,13 +776,6 @@
   margin-left: 7px;
   vertical-align: middle;
 }
-.rlink {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--ac-d);
-  margin-top: 4px;
-  cursor: pointer;
-}
 .rres {
   display: flex;
   align-items: center;
@@ -949,6 +784,11 @@
   border-radius: 11px;
   padding: 10px 12px;
   margin-bottom: 9px;
+  text-decoration: none;
+  color: inherit;
+}
+.rres:hover {
+  border-color: var(--ac);
 }
 .rres .ri {
   width: 30px;
@@ -957,6 +797,8 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  background: var(--ac-t);
+  color: var(--ac-d);
 }
 .rres .ri svg {
   width: 16px;
@@ -970,6 +812,7 @@
 .rres .rk {
   font-size: 11px;
   color: var(--muted);
+  text-transform: capitalize;
 }
 .uasmt {
   display: flex;
@@ -1051,25 +894,10 @@
 .rprog .pm b {
   color: var(--done);
 }
-.rbtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  padding: 10px;
+.rempty {
   font-size: 13px;
-  font-weight: 700;
-  color: var(--ink-soft);
-  margin-top: 12px;
-  background: var(--surface);
-}
-.rbtn svg {
-  width: 15px;
-  height: 15px;
   color: var(--muted);
+  line-height: 1.5;
 }
 
 /* ── Responsive slide-overs ── */
@@ -1097,6 +925,8 @@
   place-items: center;
   color: var(--ink-soft);
   cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 .topbtn:hover {
   background: var(--canvas);
@@ -1122,7 +952,7 @@
     max-width: 92vw;
     transform: translateX(101%);
     z-index: 60;
-    box-shadow: -24px 0 60px -28px rgba(28, 27, 46, 0.5);
+    box-shadow: var(--sh-lg);
   }
   .rpanelOpen {
     transform: none;
@@ -1141,7 +971,7 @@
     max-width: 86vw;
     transform: translateX(-101%);
     z-index: 60;
-    box-shadow: 24px 0 60px -28px rgba(28, 27, 46, 0.4);
+    box-shadow: var(--sh-lg);
   }
   .snavOpen {
     transform: none;
@@ -1154,48 +984,17 @@
   }
 }
 @media (max-width: 720px) {
-  .side {
-    width: 58px;
-  }
-  .side .lbl,
-  .elogo b,
-  .euser .nm,
-  .euser .rl {
-    display: none;
-  }
-  .enav {
-    justify-content: center;
-    gap: 0;
-    padding: 10px;
-  }
-  .euser {
-    justify-content: center;
-    padding: 9px 0;
-  }
-  .esearch {
-    display: none;
-  }
   .rpanel {
     width: 100vw;
     max-width: 100vw;
   }
-}
-
-/* Temp-preview flag */
-.protoFlag {
-  position: fixed;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 70;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--grad-honey);
-  color: #3a2a05;
-  font-size: 12px;
-  font-weight: 800;
-  padding: 7px 14px;
-  border-radius: var(--r-pill);
-  box-shadow: var(--sh-honey);
+  .statWrap {
+    padding: 12px 14px 0;
+  }
+  .viewbar {
+    padding: 10px 14px 4px;
+  }
+  .center {
+    padding: 14px;
+  }
 }

@@ -103,7 +103,8 @@ const DAY_COUNT = WEEK_DAYS.length;
 
 export function WeeklyGrid(): ReactNode {
   const { style } = useTheme();
-  const { week, search, filters } = useAppState();
+  const { week, search, filters, selectedLessonId, setSelectedLessonId } =
+    useAppState();
   const prefersReducedMotion = useReducedMotion();
 
   // ── Planner store — single source of truth for lessons and layouts ─────────
@@ -371,15 +372,14 @@ export function WeeklyGrid(): ReactNode {
   }
 
   function handleSelect(lessonId: string): void {
-    // Plain click: clear bulk selection, act as single-card select.
+    // Plain click: clear bulk selection, then open the lesson DETAIL surface
+    // (the WeeklyShell right-rail / WeeklyRailDrawer, both driven by
+    // app-state `selectedLessonId`). Collapsed chips are now title-only; the
+    // rich detail lives in the panel, so a click no longer toggles an inline
+    // expansion. Clicking the already-selected chip again closes the panel.
     clearBulkSelection();
+    setSelectedLessonId(selectedLessonId === lessonId ? null : lessonId);
     setSelectedId(lessonId);
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(lessonId)) next.delete(lessonId);
-      else next.add(lessonId);
-      return next;
-    });
   }
 
   /**
@@ -655,7 +655,7 @@ export function WeeklyGrid(): ReactNode {
                 dragState={dragState}
                 density={density}
                 expandedIds={expandedIds}
-                selectedId={selectedId}
+                selectedId={selectedLessonId ?? selectedId}
                 bulkSelectedIds={bulkSelectedIds}
                 maximizedCell={maximizedCell}
                 cellLayouts={cellLayouts}
@@ -751,7 +751,6 @@ export function WeeklyGrid(): ReactNode {
           </Button>
         </div>
       )}
-
     </div>
   );
 }
@@ -868,4 +867,3 @@ function SubjectRow({
     </>
   );
 }
-

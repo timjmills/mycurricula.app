@@ -1,1058 +1,982 @@
 "use client";
 
-// SubjectView.tsx — S1 Subject view (redesign, Wave 8).
+// SubjectView.tsx — S1 Subject (Curriculum) view.
 //
-// Layout (top-to-bottom inside the main content column):
-//   1. Subject header — eyebrow + title + unit context
-//   2. StatStrip — 5 live-computed stats
-//   3. "Unit health" section — UnitHealthCard grid (2-up)
-//   4. Current-unit lesson area — Grid (GroupBlock table) or List (ListRow)
-//      toggled by the global viewMode from useAppState()
-//   5. ResourcesSort — all resources for the subject, with type-filter chips
+// REBUILD: Workspace (EduPlan) design, wired to REAL curriculum data.
+// A multi-panel workspace:
+//   • left  — subjects switcher panel (each subject + its inline unit list,
+//             per-subject color cascade)
+//   • center — a vertical stack:
+//       Year overview (unit bars)
+//         → Subject roadmap (unit cards)
+//         → Week breakdown (week cards for the active unit)
+//         → Daily lessons (day cards for the active week)
+//   • right — lesson viewer with tabs (Overview / Standards / Resources /
+//             Assessments / Progress) for the selected lesson.
 //
-// The subject switcher sidebar (col 1) is unchanged from the previous build.
+// Selection cascade: pick subject → recolors + loads its units; pick unit →
+// loads that unit's weeks; pick week → loads that week's days; pick day → opens
+// the right viewer on that real Lesson.
 //
-// Filter panel behavior:
-//   The left filter panel is OPEN by default on the Subject view per Unified
-//   Audit Decision #11 — the unit/subject planner benefits from filters being
-//   visible. We let the global default (`leftPanelOpen=true` in app-state)
-//   carry; the top-bar filter toggle still opens/closes it from there.
+// The prototype's OUTER chrome (app nav rail `.side`, global `.etop` topbar) is
+// intentionally NOT rendered — the app shell owns global nav. Only the
+// view-specific panels are kept.
 //
-// Don't-miss persistence:
-//   useUnitNote(unitId) / useSetUnitNote() — localStorage via UnitNotesProvider.
-//   UnitNotesProvider is mounted in app/(planner)/layout.tsx with seed values
-//   sourced from the mock unit definitions.
+// The StatStrip (the one piece kept from the previous Subject view) renders at
+// the top, scoped to the active subject's lessons.
+//
+// Route sync: the dynamic route /subject/[slug] renders <SubjectView
+// initialSubject={slug} />. We mirror the slug into app-state's subjectView and,
+// on a subject pick, router.push("/subject/<id>") + setSubjectView(id).
 
-import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
-import type { SubjectId, LessonResource, LessonStatus } from "@/lib/types";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { useRouter } from "next/navigation";
+import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { useSubjectColor } from "@/lib/palette";
-import {
-  SUBJECTS,
-  UNITS,
-  UNIT_BY_ID,
-  WEEK_DAYS,
-  CURRENT_WEEK,
-} from "@/lib/mock";
-import { dateForWeekDay } from "@/lib/mock/calendar";
-import { useRouter } from "next/navigation";
-import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
-import { useUnitNote } from "@/lib/unit-notes";
-import { IntroSubtitle, ToggleGroup, Tooltip } from "@/components/ui";
-import { ListRow } from "@/components/list";
+import { SUBJECTS, ALL_UNITS, CURRENT_WEEK, WEEK_DAYS } from "@/lib/mock";
+import { describeStandard } from "@/lib/mock/standards";
+import { usePlanner } from "@/lib/planner-store";
 import { StatStrip } from "./StatStrip";
-import { UnitHealthCard } from "./UnitHealthCard";
-import type { UnitHealthData } from "./UnitHealthCard";
-import { ResourcesSort } from "./ResourcesSort";
-import type { ResourceEntry } from "./ResourcesSort";
-import styles from "./SubjectView.module.css";
+import styles from "./SubjectWorkspace.module.css";
 
-// ── Constants ──────────────────────────────────────────────────────────────
+// ── Icons ────────────────────────────────────────────────────────────────────
+// A small inline icon set (ported from the prototype) so the view is
+// self-contained and does not depend on the shell's icon components.
 
-const PERIOD_FILTERS = ["All", "Unit", "Month", "Week"] as const;
-type PeriodFilter = (typeof PERIOD_FILTERS)[number];
+type IconName =
+  | "book" | "grid" | "pencil" | "list" | "sparkle" | "flask" | "globe"
+  | "heart" | "calendar" | "roadmap" | "chD" | "chL" | "chR" | "x" | "plus"
+  | "check" | "clock" | "more" | "chart" | "target" | "clipboard" | "edit"
+  | "standards" | "folder" | "assess" | "curriculum"; // prettier-ignore
 
-type GroupMode = "unit" | "week";
+const ICON_PATHS: Record<IconName, ReactNode> = {
+  book: <><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z" /><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z" /></>, // prettier-ignore
+  grid: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M8 4v16" /></>, // prettier-ignore
+  pencil: <><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M14 6l4 4" /></>, // prettier-ignore
+  list: <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />,
+  sparkle: <path d="M12 3l1.8 4.7L18.5 9.5 13.8 11.3 12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />, // prettier-ignore
+  flask: <path d="M9 3h6M10 3v6l-5 8a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-8V3M7 14h10" />, // prettier-ignore
+  globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18" /></>, // prettier-ignore
+  heart: <path d="M12 20s-7-4.4-9.2-8.2C1.3 9 2.6 5.5 6 5.5c2 0 3.2 1.3 4 2.4.8-1.1 2-2.4 4-2.4 3.4 0 4.7 3.5 3.2 6.3C19 15.6 12 20 12 20z" />, // prettier-ignore
+  calendar: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></>, // prettier-ignore
+  roadmap: <><circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="M8.5 6H16a2 2 0 0 1 2 2v7M6 8.5V16a2 2 0 0 0 2 2h7.5" /></>, // prettier-ignore
+  chD: <path d="m6 9 6 6 6-6" />,
+  chL: <path d="m15 6-6 6 6 6" />,
+  chR: <path d="m9 6 6 6-6 6" />,
+  x: <path d="M6 6l12 12M18 6 6 18" />,
+  plus: <path d="M12 5v14M5 12h14" />,
+  check: <path d="m5 13 4 4 10-11" />,
+  clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7.5V12l3 2" /></>, // prettier-ignore
+  more: <><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>, // prettier-ignore
+  chart: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 14v3M12 10v7M16 7v10" /></>, // prettier-ignore
+  target: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.8" /><circle cx="12" cy="12" r="1.3" /></>, // prettier-ignore
+  clipboard: <><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9 4V3h6v1M9 11h6M9 15h4" /></>, // prettier-ignore
+  edit: <><path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" /><path d="M18.5 3.5a2.1 2.1 0 0 1 3 3L12 16l-4 1 1-4z" /></>, // prettier-ignore
+  standards: <><path d="M4 19.5V6a2 2 0 0 1 2-2h12v15" /><path d="M6 17h12v3H6a2 2 0 0 1 0-3z" /></>, // prettier-ignore
+  folder: <path d="M4 6a2 2 0 0 1 2-2h5l2 2h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />, // prettier-ignore
+  assess: <><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></>, // prettier-ignore
+  curriculum: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>, // prettier-ignore
+};
 
-/** Map a week number to an approximate month index (0 = Aug). */
-function weekToMonthIndex(week: number): number {
-  return Math.floor((week - 1) / 4);
-}
-
-/** Short month name from a week number, derived from the mock calendar anchor. */
-function monthNameForWeek(week: number): string {
-  const d = dateForWeekDay(week, 0);
-  return d.toLocaleString("en-US", { month: "short" }).toUpperCase();
-}
-
-// ── Small pure presentational helpers ──────────────────────────────────────
-
-function ChevronIcon({ size = 10 }: { size?: number }): ReactNode {
+function Icon({ name, sw = 2 }: { name: IconName; sw?: number }): ReactNode {
   return (
     <svg
-      width={size}
-      height={size}
-      viewBox="0 0 10 10"
+      viewBox="0 0 24 24"
       fill="none"
+      stroke="currentColor"
+      strokeWidth={sw}
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path
-        d="M3 2L7 5L3 8"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      {ICON_PATHS[name]}
     </svg>
   );
 }
 
-function CheckIcon({ status }: { status: string }): ReactNode {
-  const cls = [
-    styles.checkIcon,
-    status === "done" ? styles.checkDone : "",
-    status === "partial" ? styles.checkPartial : "",
-    status === "skipped" ? styles.checkSkipped : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+/** Per-subject glyph for the panel + viewer badge. */
+const SUBJECT_ICON: Record<SubjectId, IconName> = {
+  math: "grid",
+  reading: "book",
+  writing: "pencil",
+  grammar: "list",
+  spelling: "sparkle",
+  ufli: "flask",
+  explorers: "globe",
+  sel: "heart",
+};
 
-  return (
-    <span className={cls} aria-hidden="true">
-      {status === "done" && (
-        <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-          <path
-            d="M1.5 4L3 5.5L6.5 2"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      )}
-      {status === "partial" && (
-        <svg width="6" height="2" viewBox="0 0 6 2" fill="none">
-          <rect width="6" height="2" rx="1" fill="currentColor" />
-        </svg>
-      )}
-      {status === "skipped" && (
-        <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
-          <path
-            d="M1 1L5 5M5 1L1 5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      )}
-    </span>
-  );
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const TABS = ["Overview", "Standards", "Resources", "Assessments", "Progress"];
+const MONTHS = ["AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY", "JUN"]; // prettier-ignore
+
+type AsmtStatus = "done" | "due" | "up";
+
+// ── Pure helpers ─────────────────────────────────────────────────────────────
+
+/** Parse a unit's "Wk 11–16" / "Wk 12" label into an ordered week-number list.
+ *  Falls back to an empty list when the label has no parseable digits. */
+function parseWeekSpan(label: string): number[] {
+  const nums = label.match(/\d+/g);
+  if (!nums || nums.length === 0) return [];
+  const start = parseInt(nums[0], 10);
+  const end = nums.length > 1 ? parseInt(nums[1], 10) : start;
+  const out: number[] = [];
+  for (let w = start; w <= end; w++) out.push(w);
+  return out;
 }
 
-// ── Section header ─────────────────────────────────────────────────────────
-// Matches the artboard's SectionHeader: kicker + title + optional hint.
-
-function SectionHeader({
-  kicker,
-  title,
-  hint,
-}: {
-  kicker: string;
-  title: string;
-  hint?: string;
-}): ReactNode {
-  return (
-    <div className={styles.sectionHeader}>
-      <div className={styles.sectionKicker}>{kicker}</div>
-      <div className={styles.sectionTitle}>{title}</div>
-      {hint && <div className={styles.sectionHint}>{hint}</div>}
-    </div>
-  );
+/** A unit's display tag, e.g. "Unit 3" — derived from its 1-based index. */
+function unitTag(index: number): string {
+  return `Unit ${index + 1}`;
 }
 
-// ── Lesson row data ─────────────────────────────────────────────────────────
-
-interface LessonRowData {
-  id: string;
-  title: string;
-  week: number;
-  day: number;
-  status: LessonStatus;
-  isPersonal: boolean;
-  standards: string[];
-  resources: LessonResource[];
-  directions: string;
-  taskCount: number;
-  isCurrent: boolean;
+/** Strip a leading "Unit N · " prefix from a mock unit name so the roadmap card
+ *  shows just the topic (the tag carries the "Unit N"). */
+function unitTopic(name: string): string {
+  return name.replace(/^Unit\s+\d+\s*·\s*/i, "").replace(/^List\s+\d+\s*·\s*/i, ""); // prettier-ignore
 }
 
-function LessonRowItem({
-  lesson,
-  isExpanded,
-  onToggle,
-  onToggleStatus,
-}: {
-  lesson: LessonRowData;
-  isExpanded: boolean;
-  onToggle: () => void;
-  onToggleStatus: () => void;
-}): ReactNode {
-  const dayLabel = WEEK_DAYS[lesson.day] ?? `Day ${lesson.day}`;
-
-  return (
-    <div
-      data-planner-item={`lesson:${lesson.id}`}
-      className={[
-        styles.lessonItem,
-        lesson.status === "skipped" ? styles.lessonItemSkipped : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
-      {lesson.isPersonal && <span className={styles.personalStripe} />}
-
-      <Tooltip
-        content={`Expand "${lesson.title}" to see its directions, standards, and a quick preview of the lesson content.`}
-        side="top"
-      >
-        <div
-          role="button"
-          tabIndex={0}
-          className={[
-            styles.lessonRow,
-            lesson.isPersonal ? styles.lessonRowPersonal : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          onClick={onToggle}
-          onKeyDown={(e) => {
-            // Only fire on the row itself — Enter/Space on the nested
-            // checkBtn must reach the inner button's native onClick alone.
-            if (e.target !== e.currentTarget) return;
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onToggle();
-            }
-          }}
-          aria-expanded={isExpanded}
-          aria-label={`Toggle ${lesson.title}`}
-          title={`Expand "${lesson.title}" to see its directions, standards, and a quick preview of the lesson content`}
-        >
-          <span
-            className={[
-              styles.lessonRowChevron,
-              isExpanded ? styles.lessonRowChevronOpen : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <ChevronIcon size={8} />
-          </span>
-
-          <Tooltip
-            content={`Mark "${lesson.title}" done or not done — completion is personal and never forks the Team Curriculum copy.`}
-            side="top"
-          >
-            <button
-              className={styles.checkBtn}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleStatus();
-              }}
-              aria-label={`Toggle completion for ${lesson.title}`}
-              title={`Mark "${lesson.title}" done or not done — completion is personal and never forks the Team Curriculum copy`}
-            >
-              <CheckIcon status={lesson.status} />
-            </button>
-          </Tooltip>
-
-          <span
-            className={[
-              styles.lessonTitle,
-              lesson.status === "done" || lesson.status === "skipped"
-                ? styles.lessonTitleDone
-                : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            {lesson.title}
-          </span>
-
-          <span
-            style={{
-              fontSize: "var(--t-11)",
-              color: "var(--ink-400)",
-              fontVariantNumeric: "tabular-nums",
-              fontFamily: "var(--font-mono)",
-              flexShrink: 0,
-            }}
-          >
-            W{lesson.week} · {dayLabel.slice(0, 3)}
-          </span>
-
-          {lesson.isPersonal && (
-            <Tooltip content="Personalized lesson" side="top">
-              <span className={styles.personalPill}>Personal</span>
-            </Tooltip>
-          )}
-
-          {lesson.taskCount > 0 && (
-            <Tooltip
-              content={`${lesson.taskCount} task${lesson.taskCount === 1 ? "" : "s"}`}
-              side="top"
-            >
-              <span className={styles.subEventsBadge}>
-                <span className={styles.subEventsBadgeDot} />+{lesson.taskCount}
-              </span>
-            </Tooltip>
-          )}
-
-          {lesson.standards.slice(0, 2).map((s, idx) => (
-            <span key={`${s}-${idx}`} className={styles.standardChip}>
-              {s}
-            </span>
-          ))}
-
-          {lesson.resources.length > 0 && (
-            <span
-              style={{
-                fontSize: "var(--t-11)",
-                color: "var(--ink-400)",
-                flexShrink: 0,
-              }}
-            >
-              {lesson.resources.length} res
-            </span>
-          )}
-
-          {lesson.isCurrent && <span className={styles.currentDot}>•</span>}
-        </div>
-      </Tooltip>
-
-      {isExpanded && (
-        <div className={styles.lessonDetail}>
-          <p className={styles.lessonDirections}>
-            {lesson.directions ||
-              "Open in Weekly to see directions and resources."}
-          </p>
-          {lesson.standards.length > 0 && (
-            <div className={styles.lessonStandards}>
-              {lesson.standards.map((s, idx) => (
-                <span key={`${s}-${idx}`} className={styles.lessonStdChip}>
-                  {s}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+/** Approximate month index (0 = Aug) for a week number — 4 weeks ≈ 1 month. */
+function weekToMonthIndex(week: number): number {
+  return Math.min(MONTHS.length - 1, Math.floor((week - 1) / 4));
 }
 
-// ── Group block ────────────────────────────────────────────────────────────
-
-interface GroupData {
-  key: string;
-  tag: string;
-  name: string;
-  isCurrent: boolean;
-  lessons: LessonRowData[];
+/** Map a lesson status onto the prototype's three-state vocabulary. */
+function statusBucket(status: LessonStatus): "done" | "cur" | "todo" {
+  if (status === "done") return "done";
+  if (status === "partial" || status === "carried") return "cur";
+  return "todo";
 }
 
-function GroupBlock({
-  group,
-  isOpen,
-  onToggleOpen,
-  expandedLessons,
-  onToggleLesson,
-  onToggleAllLessons,
-  onToggleStatus,
-}: {
-  group: GroupData;
-  isOpen: boolean;
-  onToggleOpen: () => void;
-  expandedLessons: Set<string>;
-  onToggleLesson: (id: string) => void;
-  onToggleAllLessons: () => void;
-  onToggleStatus: (id: string) => void;
-}): ReactNode {
-  const doneCount = group.lessons.filter((l) => l.status === "done").length;
-  const allExpanded =
-    group.lessons.length > 0 &&
-    group.lessons.every((l) => expandedLessons.has(l.id));
-
-  function handleExpandAll(e: React.MouseEvent): void {
-    e.stopPropagation();
-    onToggleAllLessons();
-  }
-
-  return (
-    <div className={styles.group}>
-      <Tooltip
-        content={`Expand or collapse the ${group.name} group — see all lessons in this unit, their completion progress, and a "Now" pill on the unit you're currently teaching.`}
-        side="top"
-      >
-        <div
-          role="button"
-          tabIndex={0}
-          className={[
-            styles.groupHeader,
-            group.isCurrent ? styles.groupHeaderCurrent : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          onClick={onToggleOpen}
-          onKeyDown={(e) => {
-            // Only fire on the header itself — Enter/Space on the nested
-            // groupExpandBtn must reach the inner button's native onClick alone.
-            if (e.target !== e.currentTarget) return;
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onToggleOpen();
-            }
-          }}
-          aria-expanded={isOpen}
-          aria-label={`Toggle ${group.name} group`}
-          title={`Expand or collapse the ${group.name} group — see all lessons in this unit, their completion progress, and a "Now" pill on the unit you're currently teaching`}
-        >
-          <span
-            className={[
-              styles.groupHeaderChevron,
-              isOpen ? styles.groupHeaderChevronOpen : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <ChevronIcon size={11} />
-          </span>
-
-          <span className={styles.groupTag}>{group.tag}</span>
-          <span className={styles.groupName}>{group.name}</span>
-
-          {group.isCurrent && <span className={styles.nowPill}>Now</span>}
-
-          <span className={styles.groupProgress}>
-            {doneCount}/{group.lessons.length}
-          </span>
-
-          {isOpen && (
-            <Tooltip
-              content={
-                allExpanded
-                  ? "Collapse every lesson in this group back to its title row."
-                  : "Open every lesson in this group to see their directions and standards."
-              }
-              side="top"
-            >
-              <button
-                className={styles.groupExpandBtn}
-                onClick={handleExpandAll}
-                title={
-                  allExpanded
-                    ? "Collapse every lesson in this group back to its title row"
-                    : "Open every lesson in this group to see their directions and standards"
-                }
-              >
-                {allExpanded ? "Close all" : "Expand all"}
-              </button>
-            </Tooltip>
-          )}
-        </div>
-      </Tooltip>
-
-      {isOpen && (
-        <div className={styles.groupBody}>
-          <div className={styles.lessonRows}>
-            {group.lessons.map((lesson) => (
-              <LessonRowItem
-                key={lesson.id}
-                lesson={lesson}
-                isExpanded={expandedLessons.has(lesson.id)}
-                onToggle={() => onToggleLesson(lesson.id)}
-                onToggleStatus={() => onToggleStatus(lesson.id)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+/** Derived unit assessments — mocked, but keyed to the real unit name. */
+function unitAssessments(
+  unitName: string,
+): { t: string; m: string; st: AsmtStatus; ic: IconName }[] {
+  return [
+    { t: `${unitName} — Diagnostic`, m: "Pre-assessment · 10 items", st: "done", ic: "clipboard" }, // prettier-ignore
+    { t: `${unitName} — Mid-Unit Quiz`, m: "Formative", st: "due", ic: "assess" }, // prettier-ignore
+    { t: `${unitName} — Performance Task`, m: "Summative · end of unit", st: "up", ic: "target" }, // prettier-ignore
+    { t: `${unitName} — Exit Tickets`, m: "Daily checks · ongoing", st: "up", ic: "edit" }, // prettier-ignore
+  ];
 }
 
-// ── Subject sidebar button ─────────────────────────────────────────────────
+// ── Subject row (its own component so each can resolve its swatch color) ──────
 
-interface SubjectBtnProps {
+interface SubjectRowProps {
   subjectId: SubjectId;
   isActive: boolean;
-  doneCount: number;
-  totalCount: number;
-  onClick: () => void;
+  units: { id: string; name: string; index: number; done: boolean }[];
+  activeUnitId: string;
+  onPickSubject: () => void;
+  onPickUnit: (unitId: string) => void;
 }
 
-function SubjectBtn({
+function SubjectRow({
   subjectId,
   isActive,
-  doneCount,
-  totalCount,
-  onClick,
-}: SubjectBtnProps): ReactNode {
+  units,
+  activeUnitId,
+  onPickSubject,
+  onPickUnit,
+}: SubjectRowProps): ReactNode {
   const color = useSubjectColor(subjectId);
   const subject = SUBJECTS.find((s) => s.id === subjectId)!;
 
+  // Per-subject swatch vars consumed by the .subj* rules.
+  const svars = {
+    "--s-c": color.c,
+    "--s-d": color.cd,
+    "--s-t": color.cl,
+    "--s-s": color.stripe,
+  } as CSSProperties;
+
   return (
-    <Tooltip
-      content={`Switch the Subject view to ${subject.name} — see all ${subject.name} units, your progress, and the team's pace.`}
-      side="bottom"
-    >
+    <div>
       <button
-        className={`${styles.subjectBtn} ${isActive ? styles.subjectBtnActive : ""} cp-subj ${subjectId}`}
-        onClick={onClick}
-        title={`Switch the Subject view to ${subject.name} — see all ${subject.name} units, your progress, and the team's pace`}
+        className={`${styles.subj} ${isActive ? styles.subjOn : ""}`}
+        style={svars}
+        onClick={onPickSubject}
+        title={`Show ${subject.name} — its units, weeks, and lessons`}
       >
-        <span
-          className={styles.subjectBtnStripe}
-          style={{ background: color.c }}
-          aria-hidden="true"
-        />
-        <span
-          className={`${styles.subjectBtnName} ${isActive ? styles.subjectBtnNameActive : ""}`}
-        >
-          {subject.name}
+        <span className={styles.si}>
+          <Icon name={SUBJECT_ICON[subjectId]} />
         </span>
-        {isActive && (
-          <span className={styles.subjectBtnCount}>
-            {doneCount}/{totalCount}
-          </span>
-        )}
+        <div>
+          <div className={styles.sn}>{subject.name}</div>
+          <div className={styles.sg}>Grade 5</div>
+        </div>
+        <span className={styles.sc} />
       </button>
-    </Tooltip>
+      {isActive && (
+        <div className={styles.subwrap}>
+          {units.map((ut) => (
+            <button
+              key={ut.id}
+              className={[
+                styles.uitem,
+                ut.id === activeUnitId ? styles.uitemOn : "",
+                ut.done ? styles.uitemDone : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => onPickUnit(ut.id)}
+            >
+              <span className={styles.uc}>
+                {ut.done && <Icon name="check" sw={3} />}
+              </span>
+              <div>
+                <span className={styles.un}>{unitTag(ut.index)}</span> ·{" "}
+                <span className={styles.ut}>{unitTopic(ut.name)}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
-// ── UnitHealthCard data bridge ─────────────────────────────────────────────
-// Reads the "Don't miss" note from context then assembles UnitHealthData.
-// Extracted as a separate component so the hook is called at a stable position
-// per unit (the unit list won't re-order, but this pattern is safest).
-
-interface UnitHealthCardBridgeProps {
-  unitId: string;
-  unitIndex: number;
-  unitName: string;
-  isCurrent: boolean;
-  done: number;
-  total: number;
-  skipped: number;
-  standardsCovered: number;
-  standardsTotal: number;
-  when: string;
-  canEdit: boolean;
-  editorName: string;
-}
-
-function UnitHealthCardBridge({
-  unitId,
-  unitIndex,
-  unitName,
-  isCurrent,
-  done,
-  total,
-  skipped,
-  standardsCovered,
-  standardsTotal,
-  when,
-  canEdit,
-  editorName,
-}: UnitHealthCardBridgeProps): ReactNode {
-  const note = useUnitNote(unitId);
-
-  const data: UnitHealthData = {
-    id: unitId,
-    index: unitIndex,
-    name: unitName,
-    isCurrent,
-    done,
-    total,
-    skipped,
-    standardsCovered,
-    standardsTotal,
-    when,
-    dontMiss: note,
-    canEdit,
-    editorName,
-  };
-
-  return <UnitHealthCard unit={data} />;
-}
-
-// ── Main subject pane ──────────────────────────────────────────────────────
+// ── Main pane (one active subject) ───────────────────────────────────────────
 
 interface SubjectPaneProps {
   subjectId: SubjectId;
-  week: number;
+  onPickSubject: (id: SubjectId) => void;
 }
 
-function SubjectPane({ subjectId, week }: SubjectPaneProps): ReactNode {
+function SubjectPane({
+  subjectId,
+  onPickSubject,
+}: SubjectPaneProps): ReactNode {
   const color = useSubjectColor(subjectId);
   const subject = SUBJECTS.find((s) => s.id === subjectId)!;
-  // Active unit from the mock — the mock has one unit per subject.
-  const activeUnit = UNITS[subjectId];
-  const router = useRouter();
+  const { lessons } = usePlanner();
+  const { setSelectedLessonId } = useAppState();
 
-  const { lessons, setLessonStatus, lastChange } = usePlanner();
-  const { filters, viewMode, currentUser } = useAppState();
+  // Active-subject accent cascade — set on the root so the whole subtree
+  // inherits the colors via var() references in the CSS module.
+  const accent = {
+    "--ac": color.c,
+    "--ac-d": color.cd,
+    "--ac-t": color.cl,
+    "--ac-s": color.stripe,
+  } as CSSProperties;
 
-  // Scroll preservation — bring the last-changed lesson into view.
-  useEffect(() => {
-    const id = lastChange?.lessonIds[0];
-    if (id) scrollPlannerItemIntoView(id);
-  }, [lastChange]);
-
-  // Local UI state — period filter, group mode, collapse state.
-  const [period, setPeriod] = useState<PeriodFilter>("All");
-  const [groupMode, setGroupMode] = useState<GroupMode>("unit");
-  const [groupOpenState, setGroupOpenState] = useState<Map<string, boolean>>(
-    () => new Map(),
-  );
-  const [groupExpandedLessons, setGroupExpandedLessons] = useState<
-    Map<string, Set<string>>
-  >(() => new Map());
-
-  // All lessons for this subject from the live store.
-  const allLessons = useMemo(
-    () => lessons.filter((l) => l.subject === subjectId),
+  // All lessons for this subject (the StatStrip + every panel derive from this).
+  const subjectLessons = useMemo(
+    () => lessons.filter((l) => l.subject === subjectId && !l.archived),
     [lessons, subjectId],
   );
 
-  const currentMonth = weekToMonthIndex(week);
-
-  // Period filter
-  const periodFilteredLessons = useMemo(() => {
-    if (period === "All") return allLessons;
-    if (period === "Unit")
-      return allLessons.filter((l) => l.unit === activeUnit.id);
-    if (period === "Month")
-      return allLessons.filter(
-        (l) => weekToMonthIndex(l.week) === currentMonth,
-      );
-    if (period === "Week") return allLessons.filter((l) => l.week === week);
-    return allLessons;
-  }, [allLessons, period, activeUnit.id, week, currentMonth]);
-
-  // Left-rail filters on top of period filter (AND semantics)
-  const filteredLessons = useMemo(() => {
-    let base = periodFilteredLessons;
-    if (filters.subjects.length > 0)
-      base = base.filter((l) => filters.subjects.includes(l.subject));
-    if (filters.units.length > 0)
-      base = base.filter((l) => filters.units.includes(l.unit));
-    if (filters.statuses.length > 0)
-      base = base.filter((l) => filters.statuses.includes(l.status));
-    if (filters.standards.length > 0)
-      base = base.filter((l) =>
-        l.standards.some((s) => filters.standards.includes(s)),
-      );
-    return base;
-  }, [periodFilteredLessons, filters]);
-
-  // ── Build unit health data ───────────────────────────────────────────────
-  // Group all lessons by unit id to compute per-unit aggregates.
-  // NOTE: The mock currently has one unit per subject. All lessons reference
-  // that unit id. The health card grid will show one card (the active unit).
-  // When the backend lands and multi-unit data is available, this computation
-  // naturally produces one card per unit without code changes.
-  const unitHealthList = useMemo((): Array<{
-    unitId: string;
-    unitIndex: number;
-    unitName: string;
-    isCurrent: boolean;
-    done: number;
-    total: number;
-    skipped: number;
-    standardsCovered: number;
-    standardsTotal: number;
-    when: string;
-  }> => {
-    // Collect all units present in lessons, preserving first-seen order.
-    const unitIds = [...new Set(allLessons.map((l) => l.unit))];
-
-    return unitIds.map((unitId, idx) => {
-      const unitLessons = allLessons.filter((l) => l.unit === unitId);
-      const done = unitLessons.filter((l) => l.status === "done").length;
+  // Units for this subject, in catalog order, with per-unit progress.
+  const units = useMemo(() => {
+    const subjUnits = ALL_UNITS.filter((u) => u.subject === subjectId);
+    return subjUnits.map((u, index) => {
+      const unitLessons = subjectLessons.filter((l) => l.unit === u.id);
       const total = unitLessons.length;
-      const skipped = unitLessons.filter((l) => l.status === "skipped").length;
-
-      // Standards covered: unique codes on done lessons.
-      // Standards total: unique codes across all lessons in the unit.
-      // A conservative derivation — if a standard appears on any lesson it
-      // counts as "expected"; only lessons with status=done count toward
-      // covered. (If the unit had an explicit expected-standards list the
-      // backend would supply that directly; for the mock we use the lesson
-      // set as a proxy.)
-      const allCodes = new Set<string>();
-      const doneCodes = new Set<string>();
-      for (const l of unitLessons) {
-        for (const s of l.standards) {
-          allCodes.add(s);
-          if (l.status === "done") doneCodes.add(s);
-        }
-      }
-
-      // When: derive month range from earliest → latest lesson week.
-      const weeks = unitLessons.map((l) => l.week);
-      const minWk = Math.min(...weeks);
-      const maxWk = Math.max(...weeks);
-      const startMonth = monthNameForWeek(minWk);
-      const endMonth = monthNameForWeek(maxWk);
-      const when =
-        startMonth === endMonth ? startMonth : `${startMonth} → ${endMonth}`;
-
-      // Lookup unit metadata for the name.
-      const unitMeta = UNIT_BY_ID[unitId] ?? activeUnit;
-
-      // Current: true if any lesson in the unit falls in the current week.
-      const isCurrent = unitLessons.some((l) => l.week === CURRENT_WEEK);
-
+      const done = unitLessons.filter((l) => l.status === "done").length;
+      const weeks = parseWeekSpan(u.weeks);
+      const isCurrent =
+        weeks.length > 0 &&
+        CURRENT_WEEK >= weeks[0] &&
+        CURRENT_WEEK <= weeks[weeks.length - 1];
       return {
-        unitId,
-        unitIndex: idx + 1,
-        unitName: unitMeta.name,
-        isCurrent,
-        done,
+        id: u.id,
+        name: u.name,
+        index,
+        weeks: u.weeks,
+        weekNums: weeks,
         total,
-        skipped,
-        standardsCovered: doneCodes.size,
-        standardsTotal: allCodes.size,
-        when,
+        done,
+        // A unit reads "done" only when it has lessons AND all are done.
+        allDone: total > 0 && done === total,
+        isCurrent,
       };
     });
-  }, [allLessons, activeUnit]);
+  }, [subjectId, subjectLessons]);
 
-  // Is the current user the lead teacher? (leads can edit "Don't miss")
-  const canEdit = currentUser.name.length > 0; // simplified: all authenticated users can edit
-  const editorName = currentUser.name || "Lead teacher";
+  // ── Selection state: unit → week → day(lesson). Reset on subject change via
+  //    the key on <SubjectPane> in the root. Initial unit = the current one,
+  //    else the first. Initial week = current week if in span, else first.
+  const initialUnitId = useMemo(() => {
+    const cur = units.find((u) => u.isCurrent);
+    return cur?.id ?? units[0]?.id ?? "";
+  }, [units]);
 
-  // ── Lesson list (for the Grid/List area) ────────────────────────────────
-  const lessonRows = useMemo((): LessonRowData[] => {
-    return filteredLessons.map((l) => ({
-      id: l.id,
-      title: l.title,
-      week: l.week,
-      day: l.day,
-      status: l.status,
-      isPersonal: l.isPersonal,
-      standards: l.standards,
-      resources: l.resources,
-      directions: l.directions,
-      taskCount: l.tasks.length,
-      isCurrent: l.week === CURRENT_WEEK,
-    }));
-  }, [filteredLessons]);
+  const [activeUnitId, setActiveUnitId] = useState<string>(initialUnitId);
+  const activeUnit = units.find((u) => u.id === activeUnitId) ?? units[0];
 
-  // Group lessons by unit or by week for the Grid (table) mode.
-  const groups = useMemo((): GroupData[] => {
-    if (groupMode === "unit") {
-      const unitById = new Map(allLessons.map((l) => [l.id, l.unit]));
-      const byUnit: Map<string, LessonRowData[]> = new Map();
-      for (const l of lessonRows) {
-        const unitId = unitById.get(l.id) ?? "unknown";
-        const existing = byUnit.get(unitId) ?? [];
-        existing.push(l);
-        byUnit.set(unitId, existing);
-      }
-      return [...byUnit.entries()].map(([unitId, ls], idx) => {
-        const u = UNIT_BY_ID[unitId] ?? activeUnit;
-        const isCurrent = ls.some((l) => l.isCurrent);
-        return {
-          key: unitId,
-          tag: `U${idx + 1}`,
-          name: u.name,
-          isCurrent,
-          lessons: ls,
-        };
-      });
-    }
-
-    const byWeek: Map<number, LessonRowData[]> = new Map();
-    for (const l of lessonRows) {
-      const existing = byWeek.get(l.week) ?? [];
-      existing.push(l);
-      byWeek.set(l.week, existing);
+  // Weeks of the active unit that actually carry lessons, in order.
+  const weeks = useMemo(() => {
+    if (!activeUnit) return [];
+    const byWeek = new Map<number, Lesson[]>();
+    for (const l of subjectLessons) {
+      if (l.unit !== activeUnit.id) continue;
+      const arr = byWeek.get(l.week) ?? [];
+      arr.push(l);
+      byWeek.set(l.week, arr);
     }
     return [...byWeek.keys()]
       .sort((a, b) => a - b)
       .map((w) => {
-        const ls = byWeek.get(w)!;
+        const wl = byWeek.get(w)!.sort((a, b) => a.day - b.day);
+        const done = wl.filter((l) => l.status === "done").length;
         return {
-          key: `week-${w}`,
-          tag: `W${w}`,
-          name: `Week ${w} · ${ls.length} lesson${ls.length === 1 ? "" : "s"}`,
+          week: w,
+          lessons: wl,
+          allDone: wl.length > 0 && done === wl.length,
           isCurrent: w === CURRENT_WEEK,
-          lessons: ls,
         };
       });
-  }, [groupMode, lessonRows, allLessons, activeUnit]);
+  }, [activeUnit, subjectLessons]);
 
-  // All resources for the ResourcesSort section.
-  // Spread every LessonResource field so the optional url / provider /
-  // thumbnailUrl / previewTitle propagate through to ResourcesSort — they
-  // drive the actionable-row branch (URL → open in new tab vs lesson-jump
-  // → /daily?lesson=<id>) added in W3-C4.
-  const allResources = useMemo((): ResourceEntry[] => {
-    return allLessons.flatMap((l) => {
-      const unitMeta = UNIT_BY_ID[l.unit] ?? activeUnit;
-      return l.resources.map((r) => ({
-        ...r,
-        lessonTitle: l.title,
-        unitName: unitMeta.name,
-        lessonId: l.id,
-      }));
-    });
-  }, [allLessons, activeUnit]);
+  const initialWeek = useMemo(() => {
+    const cur = weeks.find((w) => w.isCurrent);
+    return cur?.week ?? weeks[0]?.week ?? null;
+  }, [weeks]);
 
-  // Lifted group state callbacks — preserve expand/collapse across re-renders.
-  function getGroupIsOpen(
-    groupKey: string,
-    isCurrent: boolean,
-    tag: string,
-  ): boolean {
-    if (groupOpenState.has(groupKey)) return groupOpenState.get(groupKey)!;
-    return isCurrent || tag.startsWith("W");
+  const [activeWeek, setActiveWeek] = useState<number | null>(initialWeek);
+
+  // Keep selection valid when the active unit's week set changes.
+  useEffect(() => {
+    if (activeWeek == null || !weeks.some((w) => w.week === activeWeek)) {
+      setActiveWeek(initialWeek);
+    }
+  }, [weeks, activeWeek, initialWeek]);
+
+  const activeWeekEntry = weeks.find((w) => w.week === activeWeek) ?? weeks[0];
+  const days = activeWeekEntry?.lessons ?? [];
+
+  // Selected lesson (right viewer). Default to the first day of the week.
+  const [selectedId, setSelectedId] = useState<string | null>(
+    days[0]?.id ?? null,
+  );
+  const [tab, setTab] = useState("Overview");
+  const [rpanelOpen, setRpanelOpen] = useState(false);
+
+  // Keep the selection valid when the day set changes (unit/week switch).
+  useEffect(() => {
+    if (!selectedId || !days.some((l) => l.id === selectedId)) {
+      setSelectedId(days[0]?.id ?? null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeUnitId, activeWeek]);
+
+  const selectedLesson =
+    days.find((l) => l.id === selectedId) ?? days[0] ?? null;
+  const selectedIndex = selectedLesson
+    ? days.findIndex((l) => l.id === selectedLesson.id)
+    : -1;
+
+  // ── Selection handlers ───────────────────────────────────────────────────
+  function pickUnit(unitId: string): void {
+    setActiveUnitId(unitId);
+    // week/day reset via the validity effects above.
+    if (typeof window !== "undefined" && window.innerWidth <= 1000) {
+      setSnavOpen(false);
+    }
+  }
+  function pickWeek(week: number): void {
+    setActiveWeek(week);
+  }
+  function pickDay(lesson: Lesson): void {
+    setSelectedId(lesson.id);
+    setTab("Overview");
+    // Mirror to app-state so other shell surfaces can react if they want; the
+    // Workspace's own right viewer remains the primary detail surface here.
+    setSelectedLessonId(lesson.id);
+    if (typeof window !== "undefined" && window.innerWidth <= 1240) {
+      setRpanelOpen(true);
+    }
+  }
+  function stepDay(delta: number): void {
+    if (selectedIndex < 0) return;
+    const next = days[selectedIndex + delta];
+    if (next) {
+      setSelectedId(next.id);
+      setSelectedLessonId(next.id);
+    }
   }
 
-  function handleToggleGroupOpen(
-    groupKey: string,
-    isCurrent: boolean,
-    tag: string,
-  ): void {
-    setGroupOpenState((prev) => {
-      const next = new Map(prev);
-      next.set(groupKey, !getGroupIsOpen(groupKey, isCurrent, tag));
-      return next;
-    });
-  }
+  // Subjects-panel slide-over open state.
+  const [snavOpen, setSnavOpen] = useState(false);
 
-  function getGroupExpanded(groupKey: string): Set<string> {
-    return groupExpandedLessons.get(groupKey) ?? new Set();
-  }
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === "Escape") {
+        setSnavOpen(false);
+        setRpanelOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
-  function handleToggleLesson(groupKey: string, lessonId: string): void {
-    setGroupExpandedLessons((prev) => {
-      const next = new Map(prev);
-      const cur = new Set(prev.get(groupKey) ?? []);
-      if (cur.has(lessonId)) cur.delete(lessonId);
-      else cur.add(lessonId);
-      next.set(groupKey, cur);
-      return next;
-    });
-  }
+  const asmt = activeUnit ? unitAssessments(unitTopic(activeUnit.name)) : [];
+  const currentMonth = activeUnit?.weekNums.length
+    ? weekToMonthIndex(activeUnit.weekNums[0])
+    : -1;
 
-  function handleToggleAllLessons(groupKey: string, lessonIds: string[]): void {
-    setGroupExpandedLessons((prev) => {
-      const next = new Map(prev);
-      const cur = prev.get(groupKey) ?? new Set();
-      const allExpanded =
-        lessonIds.length > 0 && lessonIds.every((id) => cur.has(id));
-      next.set(groupKey, allExpanded ? new Set() : new Set(lessonIds));
-      return next;
-    });
-  }
-
-  function handleToggleStatus(lessonId: string): void {
-    const lesson = allLessons.find((l) => l.id === lessonId);
-    if (!lesson) return;
-    const next: LessonStatus = lesson.status === "done" ? "not_done" : "done";
-    setLessonStatus(lessonId, next);
-  }
-
-  // Determine current-unit context for the lesson-list section heading.
-  const currentUnitName = activeUnit.name;
+  // Right-viewer progress (derived from the active unit's completion).
+  const unitDone = activeUnit?.done ?? 0;
+  const unitTotal = activeUnit?.total ?? 0;
+  const unitPct = unitTotal > 0 ? Math.round((unitDone / unitTotal) * 100) : 0;
 
   return (
-    <div className={`${styles.main} cp-subj ${subjectId}`}>
-      {/* ── Subject header ──────────────────────────────────────────────── */}
-      <header className={styles.header}>
-        <div className={styles.headerEyebrow}>
-          <span className={styles.headerDot} style={{ background: color.c }} />
-          Subject
-        </div>
-        <h1 className={styles.headerTitle}>{subject.name}</h1>
-        {/* Onboarding-voice subtitle (CLAUDE.md §4) — tells a first-time
-            teacher what the Subject (Curriculum) tab is FOR. The grade +
-            current-unit metadata moved to the .headerMeta line below so
-            the subtitle slot carries a clear job statement. */}
-        <p className={styles.headerSub}>
-          The full year of units and lessons for {subject.name}, with the
-          standards each one covers — pick a unit to drill in, or scan the
-          health cards to see where you&rsquo;re ahead and behind.
-        </p>
-        <p className={styles.headerMeta}>
-          {currentUser.curriculumLabel
-            ? `${currentUser.curriculumLabel} · ${activeUnit.weeks}`
-            : activeUnit.weeks}
-        </p>
-      </header>
-
-      {/* ── W3-C10 once-per-view onboarding subtitle ──────────────────
-          Tells a first-time teacher what the Curriculum surface is FOR.
-          Distinct from the header's job-statement subtitle above: this
-          row is dismissible and disappears once the teacher clicks
-          "Got it". Persisted under `mycurricula:user:subject-intro-seen`. */}
-      <IntroSubtitle viewKey="subject">
-        One subject&rsquo;s units, standards covered, and your team&rsquo;s
-        don&rsquo;t-miss callouts.
-      </IntroSubtitle>
-
-      {/* ── Stat strip ──────────────────────────────────────────────────── */}
-      <div className={styles.content}>
-        <StatStrip lessons={allLessons} />
-
-        {/* ── Unit health cards ─────────────────────────────────────────── */}
-        <SectionHeader
-          kicker="Unit health"
-          title="Each unit at a glance"
-          hint="What's done, what got skipped, which standards are covered, and the one move a teacher really doesn't want to forget."
-        />
-        <div className={styles.unitHealthGrid}>
-          {unitHealthList.map((u) => (
-            <UnitHealthCardBridge
-              key={u.unitId}
-              unitId={u.unitId}
-              unitIndex={u.unitIndex}
-              unitName={u.unitName}
-              isCurrent={u.isCurrent}
-              done={u.done}
-              total={u.total}
-              skipped={u.skipped}
-              standardsCovered={u.standardsCovered}
-              standardsTotal={u.standardsTotal}
-              when={u.when}
-              canEdit={canEdit}
-              editorName={editorName}
-            />
-          ))}
-        </div>
-
-        {/* ── Filter / grouping bar ─────────────────────────────────────── */}
-        <SectionHeader
-          kicker={`Current unit · ${unitHealthList.find((u) => u.isCurrent)?.unitName ? `U${unitHealthList.find((u) => u.isCurrent)!.unitIndex}` : "Unit"}`}
-          title={currentUnitName + " — lesson list"}
-          hint="The familiar by-unit lesson list — kept here for triage and quick drill-in."
-        />
-
-        <div
-          className={styles.filterBar}
-          role="toolbar"
-          aria-label="Time period and grouping"
+    <div className={styles.app} style={accent}>
+      {/* In-view bar — subject name + the subjects-panel toggle for narrow
+          viewports (replaces the prototype's global topbar). */}
+      <div className={`${styles.viewbar} cp-subj ${subjectId}`}>
+        <button
+          className={`${styles.topbtn} ${styles.topbtnSubjects}`}
+          onClick={() => setSnavOpen(true)}
+          aria-label="Show subjects"
+          title="Show the subjects panel"
         >
-          <span className={styles.filterLabel}>Period</span>
-          {PERIOD_FILTERS.map((p) => (
-            <Tooltip
-              key={p}
-              content={`Narrow the lesson list to the ${p.toLowerCase()} time window.`}
-              side="bottom"
+          <Icon name="curriculum" />
+        </button>
+        <h2>{subject.name}</h2>
+        <span className={styles.grade}>Grade 5</span>
+        <span className={styles.grow} />
+      </div>
+
+      {/* Stat strip — scoped to the active subject's lessons. KEPT from the
+          previous Subject view. */}
+      <div className={`${styles.statWrap} cp-subj ${subjectId}`}>
+        <StatStrip lessons={subjectLessons} />
+      </div>
+
+      <div className={styles.bodyrow}>
+        {/* ── Subjects panel ── */}
+        <aside
+          className={`${styles.snav} ${snavOpen ? styles.snavOpen : ""}`}
+          title="Switch subjects and drill into a unit"
+        >
+          <div className={styles.snhead}>
+            Subjects <span className={styles.n}>{SUBJECTS.length}</span>
+            <button
+              className={styles.pclose}
+              style={{ marginLeft: 10 }}
+              onClick={() => setSnavOpen(false)}
+              aria-label="Close subjects panel"
             >
-              <button
-                className={`${styles.chip} ${period === p ? styles.chipActive : ""}`}
-                onClick={() => setPeriod(p)}
-                aria-pressed={period === p}
-                title={`Narrow the lesson list to the ${p.toLowerCase()} time window`}
-              >
-                {p}
-              </button>
-            </Tooltip>
-          ))}
-
-          <span className={styles.filterSep} />
-
-          {/* Group-by toggle only applies in Grid mode */}
-          {viewMode === "grid" && (
-            <>
-              <span className={styles.filterLabel}>Group by</span>
-              <ToggleGroup
-                variant="subtle"
-                size="sm"
-                options={[
-                  { value: "unit", label: "By Unit" },
-                  { value: "week", label: "By Week" },
-                ]}
-                value={groupMode}
-                onChange={setGroupMode}
-                ariaLabel="Group lessons by"
+              <Icon name="x" />
+            </button>
+          </div>
+          {SUBJECTS.map((sj) => {
+            const isActive = sj.id === subjectId;
+            const rowUnits = isActive
+              ? units.map((u) => ({
+                  id: u.id,
+                  name: u.name,
+                  index: u.index,
+                  done: u.allDone,
+                }))
+              : [];
+            return (
+              <SubjectRow
+                key={sj.id}
+                subjectId={sj.id}
+                isActive={isActive}
+                units={rowUnits}
+                activeUnitId={activeUnitId}
+                onPickSubject={() => onPickSubject(sj.id)}
+                onPickUnit={pickUnit}
               />
-            </>
-          )}
-        </div>
+            );
+          })}
+        </aside>
 
-        {/* ── Lesson list — Grid or List mode ───────────────────────────── */}
-        {viewMode === "list" ? (
-          // List mode: <ListRow> from @/components/list, one per lesson.
-          // onClick navigates to /daily focused on the lesson's day.
-          <div
-            className={styles.listArea}
-            aria-label={`${subject.name} lessons`}
-          >
-            {filteredLessons.length === 0 ? (
-              <div className={styles.empty}>No lessons for this period.</div>
+        {/* ── Center stack ── */}
+        <main className={styles.center}>
+          {/* Year overview */}
+          <div className={styles.ecard}>
+            <div className={styles.ech}>
+              <span className={styles.ci}>
+                <Icon name="calendar" />
+              </span>
+              <h3>Year overview — {subject.name}</h3>
+            </div>
+            <div className={styles.months2}>
+              {MONTHS.map((m, i) => (
+                <span key={m} className={i === currentMonth ? styles.on : ""}>
+                  {m}
+                </span>
+              ))}
+            </div>
+            <div className={styles.ybars}>
+              {units.map((u) => {
+                const isPastOrCurrent =
+                  activeUnit != null && u.index <= activeUnit.index;
+                return (
+                  <div
+                    key={u.id}
+                    className={styles.ybar}
+                    style={{
+                      background: isPastOrCurrent ? color.c : color.stripe,
+                      opacity: isPastOrCurrent ? 1 : 0.45,
+                    }}
+                  >
+                    {u.allDone && (
+                      <span className={styles.mk} style={{ color: color.c }}>
+                        <Icon name="check" sw={2.6} />
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className={styles.ulegend}>
+              {units.map((u) => (
+                <div className={styles.uleg} key={u.id}>
+                  <div className={styles.ud}>
+                    <span
+                      className={styles.d}
+                      style={{ background: color.c }}
+                    />
+                    {unitTag(u.index)}
+                  </div>
+                  <div className={styles.un}>{unitTopic(u.name)}</div>
+                  <div className={styles.udt}>{u.weeks}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Subject roadmap — unit cards */}
+          <div className={styles.ecard}>
+            <div className={styles.ech}>
+              <span className={styles.ci}>
+                <Icon name="roadmap" />
+              </span>
+              <h3>Subject roadmap</h3>
+            </div>
+            <div className={styles.roadmap}>
+              {units.map((u) => (
+                <button
+                  key={u.id}
+                  className={`${styles.rcard} ${u.id === activeUnitId ? styles.rcardOn : ""}`}
+                  onClick={() => pickUnit(u.id)}
+                  title={`Open ${unitTopic(u.name)} — its weeks and lessons`}
+                >
+                  <div className={styles.rn} style={{ color: color.cd }}>
+                    {unitTag(u.index)}
+                  </div>
+                  <div className={styles.rnm}>{unitTopic(u.name)}</div>
+                  <div className={styles.rdt}>{u.weeks}</div>
+                  {u.id === activeUnitId && (
+                    <div className={styles.arr}>
+                      <Icon name="chR" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Week breakdown — weeks of the active unit */}
+          <div className={styles.ecard}>
+            <div className={styles.ech}>
+              <span className={styles.ci}>
+                <Icon name="grid" />
+              </span>
+              <h3>
+                Week breakdown —{" "}
+                {activeUnit
+                  ? `${unitTag(activeUnit.index)}: ${unitTopic(activeUnit.name)}`
+                  : "Unit"}
+              </h3>
+            </div>
+            {weeks.length === 0 ? (
+              <div className={styles.empty}>
+                No planned lessons for this unit yet.
+              </div>
             ) : (
-              <div className={styles.listRows}>
-                {filteredLessons.map((l) => (
-                  <ListRow
-                    key={l.id}
-                    lesson={l}
-                    weekday={`W${l.week} · ${(WEEK_DAYS[l.day] ?? "").slice(0, 3)}`}
-                    onClick={() => router.push(`/daily?lesson=${l.id}`)}
-                  />
+              <div className={styles.hscroll}>
+                {weeks.map((wk) => (
+                  <button
+                    key={wk.week}
+                    className={`${styles.wkcard} ${wk.week === activeWeek ? styles.wkcardOn : ""}`}
+                    onClick={() => pickWeek(wk.week)}
+                    title={`Show Week ${wk.week} lessons`}
+                  >
+                    <div className={styles.wn}>Week {wk.week}</div>
+                    <div className={styles.wt}>
+                      {wk.lessons.length} lesson
+                      {wk.lessons.length === 1 ? "" : "s"}
+                    </div>
+                    <div className={styles.wd}>
+                      <span className={styles.wdt}>Wk {wk.week}</span>
+                      {wk.allDone && (
+                        <span style={{ color: "var(--done)" }}>
+                          <Icon name="check" sw={3} />
+                        </span>
+                      )}
+                    </div>
+                  </button>
                 ))}
               </div>
             )}
           </div>
-        ) : (
-          // Grid mode: the collapsible GroupBlock tree.
-          <div
-            className={styles.listArea}
-            aria-label={`${subject.name} lessons`}
-          >
-            {groups.length === 0 ? (
-              <div className={styles.empty}>No lessons for this period.</div>
-            ) : (
-              groups.map((group) => {
-                const isOpen = getGroupIsOpen(
-                  group.key,
-                  group.isCurrent,
-                  group.tag,
-                );
-                const expandedLessons = getGroupExpanded(group.key);
-                return (
-                  <GroupBlock
-                    key={group.key}
-                    group={group}
-                    isOpen={isOpen}
-                    onToggleOpen={() =>
-                      handleToggleGroupOpen(
-                        group.key,
-                        group.isCurrent,
-                        group.tag,
-                      )
-                    }
-                    expandedLessons={expandedLessons}
-                    onToggleLesson={(id) => handleToggleLesson(group.key, id)}
-                    onToggleAllLessons={() =>
-                      handleToggleAllLessons(
-                        group.key,
-                        group.lessons.map((l) => l.id),
-                      )
-                    }
-                    onToggleStatus={handleToggleStatus}
-                  />
-                );
-              })
-            )}
-          </div>
-        )}
 
-        {/* ── Resources sort ────────────────────────────────────────────── */}
-        <SectionHeader
-          kicker="Resources"
-          title={`All ${subject.name} resources`}
-          hint="All resources attached to this subject's lessons — moved to the bottom so it's there when you need it without taking the top of the screen."
-        />
-        <ResourcesSort resources={allResources} subjectName={subject.name} />
+          {/* Daily lessons — days of the active week */}
+          <div className={styles.ecard}>
+            <div className={styles.ech}>
+              <span className={styles.ci}>
+                <Icon name="calendar" />
+              </span>
+              <h3>
+                Daily lessons —{" "}
+                {activeWeekEntry ? `Week ${activeWeekEntry.week}` : "Week"}
+              </h3>
+            </div>
+            {days.length === 0 ? (
+              <div className={styles.empty}>No lessons this week.</div>
+            ) : (
+              <div className={styles.hscroll}>
+                {days.map((lesson) => {
+                  const bucket = statusBucket(lesson.status);
+                  const dayLabel = WEEK_DAYS[lesson.day] ?? `Day ${lesson.day}`;
+                  return (
+                    <button
+                      key={lesson.id}
+                      className={`${styles.daycard} ${lesson.id === selectedId ? styles.daycardOn : ""}`}
+                      onClick={() => pickDay(lesson)}
+                      title={`Open ${lesson.title} in the lesson viewer`}
+                    >
+                      <div className={styles.dh}>{dayLabel}</div>
+                      <div className={styles.dt2}>{lesson.title}</div>
+                      {lesson.objective && (
+                        <div className={styles.it}>
+                          <Icon name="check" sw={3} />
+                          {lesson.objective}
+                        </div>
+                      )}
+                      {lesson.standards.slice(0, 2).map((s) => (
+                        <div className={styles.it} key={s}>
+                          <Icon name="check" sw={3} />
+                          {s}
+                        </div>
+                      ))}
+                      <div className={styles.df}>
+                        <span className={styles.min}>
+                          {lesson.time ?? "45 min"}
+                        </span>
+                        <span className={styles.dots}>
+                          {bucket === "done" ? (
+                            <Icon name="check" sw={3} />
+                          ) : bucket === "cur" ? (
+                            <Icon name="clock" />
+                          ) : (
+                            <Icon name="more" />
+                          )}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div className={styles.elegend} style={{ marginTop: 14 }}>
+              <span className={styles.elg} style={{ color: "var(--done)" }}>
+                <Icon name="assess" />
+                <span style={{ color: "var(--muted)" }}>Completed</span>
+              </span>
+              <span className={styles.elg}>
+                <Icon name="clock" />
+                In progress
+              </span>
+              <span className={styles.elg}>
+                <span className={styles.rc0} />
+                Upcoming
+              </span>
+            </div>
+          </div>
+        </main>
+
+        {/* ── Right lesson viewer ── */}
+        <aside
+          className={`${styles.rpanel} ${rpanelOpen ? styles.rpanelOpen : ""}`}
+          title="The selected lesson — overview, standards, resources, and progress"
+        >
+          {selectedLesson ? (
+            <>
+              <div className={styles.rback}>
+                <button
+                  className={styles.b}
+                  onClick={() => {
+                    setRpanelOpen(false);
+                  }}
+                >
+                  <Icon name="chL" />
+                  {activeWeekEntry ? `Week ${activeWeekEntry.week}` : "Back"}
+                </button>
+                <div className={styles.rnav}>
+                  <button
+                    onClick={() => stepDay(-1)}
+                    disabled={selectedIndex <= 0}
+                    aria-label="Previous lesson"
+                  >
+                    <Icon name="chL" />
+                  </button>
+                  <button
+                    onClick={() => stepDay(1)}
+                    disabled={
+                      selectedIndex < 0 || selectedIndex >= days.length - 1
+                    }
+                    aria-label="Next lesson"
+                  >
+                    <Icon name="chR" />
+                  </button>
+                  <button
+                    className={styles.pclose}
+                    onClick={() => setRpanelOpen(false)}
+                    aria-label="Close lesson viewer"
+                  >
+                    <Icon name="x" />
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.rdate}>
+                {WEEK_DAYS[selectedLesson.day] ?? `Day ${selectedLesson.day}`} ·
+                Week {selectedLesson.week}
+              </div>
+              <div className={styles.rtitle}>{selectedLesson.title}</div>
+
+              <div className={styles.rbadges}>
+                <span className={`${styles.rb} ${styles.p}`}>
+                  <Icon name={SUBJECT_ICON[subjectId]} />
+                  {subject.name}
+                </span>
+                <span className={`${styles.rb} ${styles.g}`}>
+                  <Icon name="clock" />
+                  {selectedLesson.time ?? "45 min"}
+                </span>
+                {selectedLesson.status === "done" ? (
+                  <span className={`${styles.rb} ${styles.d}`}>
+                    <Icon name="check" sw={3} />
+                    Completed
+                  </span>
+                ) : (
+                  <span className={`${styles.rb} ${styles.g}`}>
+                    <Icon name="clock" />
+                    {statusBucket(selectedLesson.status) === "cur"
+                      ? "In progress"
+                      : "Upcoming"}
+                  </span>
+                )}
+                {selectedLesson.isPersonal && (
+                  <span className={`${styles.rb} ${styles.p}`}>
+                    <Icon name="edit" />
+                    Personal
+                  </span>
+                )}
+              </div>
+
+              <div className={styles.rtabs}>
+                {TABS.map((t) => (
+                  <button
+                    key={t}
+                    className={`${styles.rtab} ${t === tab ? styles.rtabOn : ""}`}
+                    onClick={() => setTab(t)}
+                  >
+                    {t === "Assessments" ? "Assess" : t}
+                  </button>
+                ))}
+              </div>
+
+              {tab === "Overview" && (
+                <>
+                  {selectedLesson.objective && (
+                    <p className={styles.robjlead}>
+                      {selectedLesson.objective}
+                    </p>
+                  )}
+                  <div className={styles.rsec}>
+                    <h4>
+                      <Icon name="book" />
+                      Lesson overview
+                    </h4>
+                    <p>
+                      {selectedLesson.preview ||
+                        "No preview written for this lesson yet."}
+                    </p>
+                  </div>
+                  {selectedLesson.directions && (
+                    <div className={styles.rsec}>
+                      <h4>
+                        <Icon name="target" />
+                        Directions
+                      </h4>
+                      <p>{selectedLesson.directions}</p>
+                    </div>
+                  )}
+                  {selectedLesson.notes && (
+                    <div className={styles.rsec}>
+                      <h4>
+                        <Icon name="edit" />
+                        Teacher notes
+                      </h4>
+                      <p>{selectedLesson.notes}</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {tab === "Standards" && (
+                <div className={styles.rsec}>
+                  <h4>
+                    <Icon name="standards" />
+                    Standards <span className={styles.ccgs}>CCSS</span>
+                  </h4>
+                  {selectedLesson.standards.length === 0 ? (
+                    <p className={styles.rempty}>
+                      No standards tagged on this lesson yet.
+                    </p>
+                  ) : (
+                    selectedLesson.standards.map((code) => (
+                      <div className={styles.rstd} key={code}>
+                        <div className={styles.code}>{code}</div>
+                        <div className={styles.txt}>
+                          {describeStandard(code)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {tab === "Resources" && (
+                <div className={styles.rsec}>
+                  <h4>
+                    <Icon name="folder" />
+                    Resources
+                  </h4>
+                  {selectedLesson.resources.length === 0 ? (
+                    <p className={styles.rempty}>
+                      No resources attached to this lesson yet.
+                    </p>
+                  ) : (
+                    selectedLesson.resources.map((r, i) =>
+                      r.url ? (
+                        <a
+                          key={`${r.label}-${i}`}
+                          className={styles.rres}
+                          href={r.url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                        >
+                          <span className={styles.ri}>
+                            <Icon name="folder" />
+                          </span>
+                          <div>
+                            <div className={styles.rt}>{r.label}</div>
+                            <div className={styles.rk}>{r.type}</div>
+                          </div>
+                        </a>
+                      ) : (
+                        <div className={styles.rres} key={`${r.label}-${i}`}>
+                          <span className={styles.ri}>
+                            <Icon name="folder" />
+                          </span>
+                          <div>
+                            <div className={styles.rt}>{r.label}</div>
+                            <div className={styles.rk}>{r.type}</div>
+                          </div>
+                        </div>
+                      ),
+                    )
+                  )}
+                </div>
+              )}
+
+              {tab === "Assessments" && (
+                <div className={styles.rsec}>
+                  <h4>
+                    <Icon name="clipboard" />
+                    Unit assessments —{" "}
+                    {activeUnit ? unitTag(activeUnit.index) : ""}
+                  </h4>
+                  {asmt.map((a) => (
+                    <div className={styles.uasmt} key={a.t}>
+                      <span className={styles.ai}>
+                        <Icon name={a.ic} />
+                      </span>
+                      <div>
+                        <div className={styles.at}>{a.t}</div>
+                        <div className={styles.am}>{a.m}</div>
+                      </div>
+                      <span className={`${styles.ab} ${styles[a.st]}`}>
+                        {a.st === "done"
+                          ? "Done"
+                          : a.st === "due"
+                            ? "Due soon"
+                            : "Upcoming"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {tab === "Progress" && (
+                <div className={`${styles.rsec} ${styles.rprog}`}>
+                  <h4>
+                    <Icon name="chart" />
+                    Unit progress
+                  </h4>
+                  <div className={styles.bar}>
+                    <i style={{ width: `${unitPct}%` }} />
+                  </div>
+                  <div className={styles.pm}>
+                    <span>
+                      <b>{unitPct}%</b> complete
+                    </span>
+                    <span>
+                      {unitDone} of {unitTotal} lessons
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className={styles.rempty}>
+              Pick a day from the lessons above to see its details here.
+            </p>
+          )}
+        </aside>
       </div>
+
+      {(snavOpen || rpanelOpen) && (
+        <div
+          className={styles.mscrim}
+          onClick={() => {
+            setSnavOpen(false);
+            setRpanelOpen(false);
+          }}
+          aria-hidden="true"
+        />
+      )}
     </div>
   );
 }
 
-// ── Root SubjectView ────────────────────────────────────────────────────────
+// ── Root SubjectView ─────────────────────────────────────────────────────────
 
 export interface SubjectViewProps {
   initialSubject?: SubjectId;
 }
 
 export function SubjectView({ initialSubject }: SubjectViewProps): ReactNode {
-  const { subjectView, setSubjectView, week } = useAppState();
+  const { subjectView, setSubjectView } = useAppState();
   const router = useRouter();
 
   // Sync app-state when a slug param is passed in (from the dynamic route).
@@ -1068,87 +992,13 @@ export function SubjectView({ initialSubject }: SubjectViewProps): ReactNode {
     setSubjectView(id);
   }
 
-  const { lessons } = usePlanner();
-
-  // Per-subject done/total for sidebar badges.
-  const subjectCounts = useMemo(() => {
-    const counts: Record<string, { done: number; total: number }> = {};
-    for (const s of SUBJECTS) {
-      const subjectLessons = lessons.filter((l) => l.subject === s.id);
-      counts[s.id] = {
-        total: subjectLessons.length,
-        done: subjectLessons.filter((l) => l.status === "done").length,
-      };
-    }
-    return counts;
-  }, [lessons]);
-
+  // Re-mount the pane on subject change so the unit/week/day selection state
+  // resets cleanly to the new subject's defaults.
   return (
-    <div className={styles.page}>
-      <div className={styles.body}>
-        {/* Subject switcher — two surfaces driving the same handler:
-            • tab strip (>480px) — visual sidebar / horizontal-scroll bar
-            • native <select> dropdown (≤480px) — full names visible without
-              horizontal scroll, addresses W3-C6.
-            CSS swaps which is visible at the 480px breakpoint. */}
-        <nav className={styles.sidebar} aria-label="Subject switcher">
-          <div className={styles.sidebarLabel} aria-hidden="true">
-            Subjects
-          </div>
-          {SUBJECTS.map((s) => (
-            <SubjectBtn
-              key={s.id}
-              subjectId={s.id}
-              isActive={subjectView === s.id}
-              doneCount={subjectCounts[s.id]?.done ?? 0}
-              totalCount={subjectCounts[s.id]?.total ?? 0}
-              onClick={() => handleSubjectSelect(s.id)}
-            />
-          ))}
-        </nav>
-
-        <div className={styles.mobilePicker}>
-          <Tooltip
-            content="Switch the Subject view to a different subject — see all of that subject's units, your progress, and the team's pace."
-            side="bottom"
-            tooltipId="subject-mobile-picker"
-          >
-            <label className={styles.mobilePickerLabel}>
-              <span className={styles.mobilePickerLabelText}>Subject</span>
-              <span className={styles.mobilePickerSelectWrap}>
-                <select
-                  className={styles.mobilePickerSelect}
-                  value={subjectView}
-                  onChange={(e) =>
-                    handleSubjectSelect(e.target.value as SubjectId)
-                  }
-                  aria-label="Switch subject"
-                >
-                  {SUBJECTS.map((s) => {
-                    const c = subjectCounts[s.id];
-                    const done = c?.done ?? 0;
-                    const total = c?.total ?? 0;
-                    return (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({done}/{total})
-                      </option>
-                    );
-                  })}
-                </select>
-                <span
-                  className={styles.mobilePickerChevron}
-                  aria-hidden="true"
-                >
-                  <ChevronIcon size={12} />
-                </span>
-              </span>
-            </label>
-          </Tooltip>
-        </div>
-
-        {/* Main pane — re-mounts on subject change to reset local filter state */}
-        <SubjectPane key={subjectView} subjectId={subjectView} week={week} />
-      </div>
-    </div>
+    <SubjectPane
+      key={subjectView}
+      subjectId={subjectView}
+      onPickSubject={handleSubjectSelect}
+    />
   );
 }

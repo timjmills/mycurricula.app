@@ -5,13 +5,11 @@ import { ConsequenceToastProvider } from "@/lib/consequence-toast";
 import { PlannerProvider } from "@/lib/planner-store";
 import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
-  GlobalRail,
   GlobalShortcuts,
   LeftFilterPanel,
   MasterBanner,
-  RailsDndProvider,
-  RightIconRail,
   RightPanel,
+  SideNav,
   TopBar,
 } from "@/components/shell";
 import styles from "./layout.module.css";
@@ -47,78 +45,66 @@ export default function PlannerLayout({
             team-scoped settings can fire a transient confirmation
             naming the team-wide effect. */}
         <ConsequenceToastProvider>
-        <UnitNotesProvider>
-          <CatchupProvider>
-            {/* Skip-to-content (A11Y-004) — must be the first focusable element
+          <UnitNotesProvider>
+            <CatchupProvider>
+              {/* Skip-to-content (A11Y-004) — must be the first focusable element
                 in the DOM so keyboard users reach it before the top-bar chrome. */}
-            <a href="#main-content" className={styles.skipLink}>
-              Skip to content
-            </a>
-            <div
-              className="cp-root"
-              style={{
-                flex: 1,
-                minHeight: 0,
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
+              <a href="#main-content" className={styles.skipLink}>
+                Skip to content
+              </a>
+              <div
+                className="cp-root"
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
                   Mounted as a client leaf so the layout stays a Server Component. */}
-              <GlobalShortcuts />
-              {/* Team Curriculum mode heads-up → persistent banner. Renders only
-                  while the Team Curriculum edit mode (internal value: "master")
-                  is active; pins above the top bar. */}
-              <MasterBanner />
-              <TopBar />
-              {/* RailsDndProvider wraps the body row in a single dnd-kit
-                  DndContext so teachers can drag icon buttons BETWEEN the
-                  left rail (<GlobalRail>) and the right icon rail
-                  (<RightIconRail>). The provider owns the cross-rail
-                  drop-end handler and writes the new arrangement through
-                  useRailLayout; both rails register their own
-                  SortableContext inside it (Lane FA — Wave 1.5). */}
-              <RailsDndProvider>
+                <GlobalShortcuts />
+                {/* v1.3 shell: an app-wide left SideNav (primary navigation,
+                  replacing the old top-bar tabs + icon rails) and a content
+                  column holding the Team-Curriculum banner, the slimmed top
+                  bar, and the body row (left filter panel + canvas + right
+                  panel). Teach is a separate route group with its own chrome. */}
                 <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-                  {/* GlobalRail — the site-wide slim icon nav strip, mounted
-                      on every planner route. Lane CC promoted it from the
-                      Daily-only IconRail; Lane DD also wired the Schedule
-                      drawer trigger here so the Schedule side-panel is
-                      reachable from /weekly, /year, /catch-up, /subject (not
-                      just /daily) — audit F#8. GlobalRail itself mounts the
-                      <SchedulePanel> with state from useAppState so the
-                      drawer ships exactly once per page (no duplicate
-                      mounts) and the trigger + drawer share one toggle. */}
-                  <GlobalRail />
-                  <LeftFilterPanel />
-                  <main
-                    id="main-content"
+                  <SideNav />
+                  <div
                     style={{
                       flex: 1,
                       minWidth: 0,
                       minHeight: 0,
-                      overflow: "auto",
+                      display: "flex",
+                      flexDirection: "column",
                     }}
                   >
-                    {children}
-                  </main>
-                  <RightPanel />
-                  {/* RightIconRail — the right-side mirror of GlobalRail.
-                      Renders whichever icons the teacher has dragged from
-                      the left rail; starts empty by default. Mounted on
-                      every planner route so the arrangement is consistent
-                      across views (Lane FA — Wave 1.5). */}
-                  <RightIconRail />
+                    {/* Team Curriculum mode heads-up → persistent banner. Renders
+                      only while the Team Curriculum edit mode (internal value:
+                      "master") is active; pins above the top bar. */}
+                    <MasterBanner />
+                    <TopBar />
+                    <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+                      <LeftFilterPanel />
+                      <main
+                        id="main-content"
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          minHeight: 0,
+                          overflow: "auto",
+                        }}
+                      >
+                        {children}
+                      </main>
+                      <RightPanel />
+                    </div>
+                  </div>
                 </div>
-              </RailsDndProvider>
-              {/* Live Clock now lives inline in the top-bar next to
-                  Week N (user direction 2026-05-26). The floating
-                  bottom-right variant is still supported via
-                  <Clock variant="floating" />; it's just not mounted
-                  here by default. */}
-            </div>
-          </CatchupProvider>
-        </UnitNotesProvider>
+              </div>
+            </CatchupProvider>
+          </UnitNotesProvider>
         </ConsequenceToastProvider>
       </PlannerProvider>
     </AppStateProvider>

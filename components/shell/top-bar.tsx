@@ -245,34 +245,6 @@ export function TopBar(): ReactNode {
           that edits it). When the label is absent (real Supabase users
           until the DB column lands), the suffix simply disappears — the
           wordmark reads "MyCurricula" alone. */}
-      <Tooltip
-        content="Built for teachers, by teachers — click to return to your Weekly planner home"
-        side="bottom"
-      >
-        <Link
-          href="/weekly"
-          className={styles.wordmark}
-          aria-label="mycurricula.app home"
-          title="Built for teachers, by teachers — click to return to your Weekly planner home"
-        >
-          <span className={styles.wordmarkGlyph} aria-hidden="true">
-            <BookGlyph />
-          </span>
-          <span className={styles.wordmarkLabel}>
-            <span className={styles.wordmarkApp}>
-              mycurricula<span className={styles.wordmarkTld}>.app</span>
-            </span>
-            {currentUser.curriculumLabel && (
-              <span className={styles.wordmarkGrade}>
-                {currentUser.curriculumLabel}
-              </span>
-            )}
-          </span>
-        </Link>
-      </Tooltip>
-
-      <div className={styles.divider} aria-hidden="true" />
-
       {/* ── Left-panel collapse toggle (TOPBAR-004) ───────────────────
           onClick calls toggleLeftPanel from useAppState() which drives the
           leftPanelOpen boolean. The panel itself is rendered by another agent
@@ -300,133 +272,6 @@ export function TopBar(): ReactNode {
       >
         <PanelLeftIcon />
       </Button>
-
-      {/* This divider sits between the left-panel-collapse toggle and the
-          view switcher. At ≤768px the switcher collapses into the More
-          menu's Navigation section, so the divider that "frames" it must
-          hide alongside the strip — otherwise we'd render a lone hairline
-          between two unrelated chunks of chrome. */}
-      <div
-        className={styles.divider}
-        data-tabs-divider="true"
-        aria-hidden="true"
-      />
-
-      {/* ── View switcher ─────────────────────────────────────────── */}
-      {/* RES-CRIT-002 / Round 2: at ≤768px (tablet/phone) the inline tabs
-          (Daily / Teach / Weekly / Yearly / Curriculum) cannot fit alongside
-          the Logo, Personal/Master toggle, More trigger, and Profile
-          avatar within the viewport. They collapse into the More menu's
-          Navigation section (rendered by TopBarMoreMenu) via
-          `display: none` in the module CSS — see the
-          `@media (max-width: 768px)` rule. The data-narrow-hide rules at
-          ≤480px still apply when the strip IS visible (>768), so they
-          remain on the Yearly/Curriculum tabs. */}
-      <nav className={styles.viewSwitcher} aria-label="View">
-        {VIEWS.map((v) => {
-          if (v.soon) {
-            // POLISH-003/TOPBAR-002/QW-4: soon tabs render at low opacity
-            // with cursor:not-allowed and a descriptive tooltip. No hover
-            // state. The SOON badge is uppercase for consistency. They are
-            // hidden below 1280px via CSS (from Wave 2).
-            const soonCopy = `Coming soon — ${v.label} view`;
-            return (
-              <Tooltip key={v.label} content={soonCopy} side="bottom">
-                <span
-                  className={`${styles.viewTab} ${styles.viewTabSoon}`}
-                  aria-disabled="true"
-                  title={soonCopy}
-                >
-                  {v.label}
-                  <span className={styles.soonBadge} aria-hidden="true">
-                    SOON
-                  </span>
-                </span>
-              </Tooltip>
-            );
-          }
-          const isActive =
-            pathname === v.href || pathname.startsWith(v.href + "/");
-          // RES-CRIT-002: at phone widths the master/personal toggle must
-          // remain visible per CLAUDE.md §4. To keep the bar within the
-          // viewport budget at ≤480px we hide the less-used Yearly +
-          // Curriculum tabs. The data-narrow attribute drives the CSS
-          // media-query hide below. Daily / Weekly are the two primary
-          // tabs and stay visible at every width.
-          const narrowOnly = v.label === "Yearly" || v.label === "Curriculum";
-          // Convert the native title= to the styled <Tooltip> primitive
-          // (black backdrop, blur, light text) so the four primary view
-          // tabs match the rest of the chrome instead of rendering the
-          // OS-default light bubble. The inner Link keeps the same
-          // string as title= for touch long-press fallback (Lane X
-          // pattern).
-          return (
-            <Tooltip key={v.label} content={v.tooltip ?? ""} side="bottom">
-              <Link
-                href={v.href!}
-                className={`${styles.viewTab} ${isActive ? styles.viewTabActive : ""}`}
-                data-narrow-hide={narrowOnly ? "true" : undefined}
-                aria-current={isActive ? "page" : undefined}
-                title={v.tooltip}
-              >
-                {v.label}
-              </Link>
-            </Tooltip>
-          );
-        })}
-      </nav>
-
-      {/* ── TEMPORARY: Year Overview prototype previews ───────────────────
-          Two interactive design directions (Timeline · Curriculy and
-          Workspace · EduPlan) surfaced as quick links so the team can
-          compare them in-app. These are throwaway buttons — remove this
-          block (and app/prototypes/*) once a direction is chosen. */}
-      <nav
-        className={styles.protoNav}
-        aria-label="Year Overview prototype previews"
-        data-tabs-divider="true"
-      >
-        <Tooltip
-          content="Prototype A — Year Overview as a Timeline (expand-under-row + lesson drawer). Temporary preview."
-          side="bottom"
-        >
-          <Link
-            href="/prototypes/timeline"
-            className={`${styles.protoTab} ${
-              pathname.startsWith("/prototypes/timeline")
-                ? styles.protoTabActive
-                : ""
-            }`}
-            title="Prototype A — Timeline (temporary preview)"
-          >
-            Proto · Timeline
-          </Link>
-        </Tooltip>
-        <Tooltip
-          content="Prototype B — Year Overview as a responsive multi-panel Workspace. Temporary preview."
-          side="bottom"
-        >
-          <Link
-            href="/prototypes/workspace"
-            className={`${styles.protoTab} ${
-              pathname.startsWith("/prototypes/workspace")
-                ? styles.protoTabActive
-                : ""
-            }`}
-            title="Prototype B — Workspace (temporary preview)"
-          >
-            Proto · Workspace
-          </Link>
-        </Tooltip>
-      </nav>
-
-      {/* Paired with the divider above the switcher — same data attribute
-          so the hide rule at ≤768px collapses the tabbed group cleanly. */}
-      <div
-        className={styles.divider}
-        data-tabs-divider="true"
-        aria-hidden="true"
-      />
 
       {/* ── Week label — static heading (POLISH-011) ─────────────────
           The top bar previously duplicated the in-grid week-navigation
@@ -935,30 +780,6 @@ function ProfileAvatar({ user }: { user: CurrentUser }): ReactNode {
 
 // ── SVG icons ────────────────────────────────────────────────────────────
 // All icons are inline SVG, aria-hidden, 18×18 grid.
-
-// Open-book brand glyph — drawn white to sit in the honey-gradient wordmark
-// tile (v1.3 logo lockup). Two pages, rounded.
-function BookGlyph(): ReactNode {
-  return (
-    <svg
-      width="19"
-      height="19"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z"
-        fill="#fff"
-      />
-      <path
-        d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13V4Z"
-        fill="#3A2A05"
-        opacity=".5"
-      />
-    </svg>
-  );
-}
 
 function PanelLeftIcon(): ReactNode {
   return (

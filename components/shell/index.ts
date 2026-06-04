@@ -3,6 +3,7 @@
 // only consumer.
 
 export { TopBar } from "./top-bar";
+export { SideNav } from "./SideNav";
 export { MasterBanner } from "./master-banner";
 export { LeftFilterPanel } from "./left-filter-panel";
 export { RightPanel } from "./right-panel";

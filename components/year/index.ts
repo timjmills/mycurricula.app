@@ -1,6 +1,7 @@
 // Barrel export for the year component family.
 // Consumers import from "@/components/year" — never from deep files.
 
+export { TimelineYear } from "./TimelineYear";
 export { YearView } from "./YearView";
 export { YearMobile } from "./YearMobile";
 export { YearSidebar } from "./YearSidebar";

@@ -150,7 +150,17 @@ export function LeftFilterPanel(): ReactNode {
   // so another agent can wire its filter pills to the weekly grid without
   // changing this file. Bailing with `null` keeps the panel entirely out of
   // the DOM and out of the accessibility tree on `/daily*` routes.
-  if (pathname?.startsWith("/daily")) return null;
+  // Suppressed on /daily (own IconRail), and on /year + /subject: the v1.3
+  // Year (Timeline) view ships filter-free, and the v1.3 Subject (Workspace)
+  // view has its own left subjects panel — the global filter panel would be
+  // redundant/conflicting on both.
+  if (
+    pathname?.startsWith("/daily") ||
+    pathname?.startsWith("/year") ||
+    pathname?.startsWith("/subject")
+  ) {
+    return null;
+  }
 
   // When the panel is closed, return null — keeps the element entirely out
   // of the accessibility tree so screen readers cannot tab into hidden content.
