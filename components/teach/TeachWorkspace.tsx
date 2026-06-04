@@ -46,6 +46,7 @@ import { shoutboxForDay } from "@/lib/mock";
 import { toTeachResource } from "@/lib/teach/toTeachResource";
 import { ME } from "@/lib/mock/teachers";
 import { teachClient as teach } from "@/lib/teach/client";
+import { plannerClient } from "@/lib/planner/client";
 import {
   BOARD_LAYOUT_GRID,
   parseBoardCellDroppableId,
@@ -121,6 +122,19 @@ const DEFAULT_LESSON_ID = "m-12-0";
 // purely the repository key for the ephemeral set. Distinct per-mount is NOT
 // wanted — keeping it stable lets the same sandbox set survive tab switches.
 const SANDBOX_LESSON_ID = "sandbox";
+
+// Whether the Teach surface persists to Supabase (the same flag the client
+// facade in lib/teach/client.ts branches on). When OFF the workspace keeps the
+// pre-backend mock identity (the `ME` slug + the "g5" grade slug) so behaviour
+// is byte-identical to the prototype. When ON the workspace must feed the
+// repository the REAL auth uid + grade uuid (never a fixture slug), exactly as
+// the planner store does — a slug in a uuid/RLS column is audit finding #18.
+const USE_SUPABASE = process.env.NEXT_PUBLIC_TEACH_USE_SUPABASE === "1";
+
+// The mock grade slug used by every fixture board (mirrors lib/mock/boards
+// MOCK_GRADE_LEVEL_ID). Only ever used on the flag-OFF prototype path; under the
+// flag the real grade uuid is resolved from the planner data source.
+const MOCK_GRADE_SLUG = "g5";
 
 // ── Central state reducer ───────────────────────────────────────────────────
 // The full action surface a zone agent dispatches against. Kept minimal +
@@ -232,7 +246,56 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
 
   const rootRef = useRef<HTMLDivElement>(null);
   const resourceContainerRef = useRef<HTMLDivElement>(null);
-  const ownerId = ME.id;
+
+  // ── Repository identity (audit finding #18) ────────────────────────────────
+  // The board repository keys every row on an OWNER id and a GRADE id that, when
+  // Supabase is wired, are uuid columns gated by RLS (`auth.uid()`). The mock
+  // fixtures use slug ids (`ME.id` = a teacher slug, "g5" = a grade slug). Under
+  // the flag we MUST pass the real auth uid + grade uuid — sending a slug into a
+  // uuid column silently breaks RLS (rows the teacher can't see) and was the
+  // finding. This mirrors planner-store.tsx: the owner id is the live
+  // `currentUser.id` (auth uid, null while the session loads), and the grade
+  // uuid is resolved asynchronously through the planner data source.
+  //
+  // Flag OFF (prototype): keep the EXACT prior identity — `ME.id` + "g5" — so
+  // every flag-OFF code path is byte-identical to the mock behaviour.
+  const ownerId: string | null = USE_SUPABASE ? currentUser.id : ME.id;
+  // Resolved grade uuid under the flag; null until the async resolve lands (or
+  // when signed out / no grade). Flag-OFF this stays unused — the mock grade
+  // slug drives every call as before.
+  const [resolvedGradeId, setResolvedGradeId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!USE_SUPABASE) return; // flag OFF → mock slug drives grade, no resolve
+    if (!ownerId) {
+      setResolvedGradeId(null);
+      return;
+    }
+    let alive = true;
+    void plannerClient
+      .getActiveGradeLevelId(ownerId)
+      .then((id) => {
+        if (alive) setResolvedGradeId(id);
+      })
+      .catch(() => {
+        if (alive) setResolvedGradeId(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [ownerId]);
+
+  // The grade id every create/widget call keys new rows on. Flag OFF: the mock
+  // slug (or the active board's own grade) — byte-identical to before. Flag ON:
+  // the resolved grade uuid, falling back to the active board's grade (already a
+  // uuid once boards load from Supabase). Never the "g5" slug under the flag.
+  const gradeIdFallback = USE_SUPABASE
+    ? (resolvedGradeId ?? undefined)
+    : MOCK_GRADE_SLUG;
+  const boardGradeId = useCallback(
+    (board?: Board | null): string | undefined =>
+      board?.gradeLevelId ?? gradeIdFallback,
+    [gradeIdFallback],
+  );
   // Guards the `?resource=` deep-link auto-open so it fires AT MOST once — after
   // the teacher closes the canvas (openResource(null)) we must not re-open it.
   const resourceDeepLinkDone = useRef(false);
@@ -365,7 +428,11 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   const boardScopeLessonIdRef = useRef(boardScopeLessonId);
   boardScopeLessonIdRef.current = boardScopeLessonId;
   useEffect(() => {
-    if (boardScopeLessonId == null) {
+    // No scope, or (under the flag) no resolved auth uid yet → show nothing
+    // rather than query with a null/slug owner against an RLS-gated table. Once
+    // the session resolves `ownerId`, this effect re-runs and loads the set.
+    // Flag-OFF `ownerId` is the mock slug (never null), so this is byte-identical.
+    if (boardScopeLessonId == null || ownerId == null) {
       setBoards([]);
       return;
     }
@@ -389,7 +456,8 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   // boards into the freshly-selected scope.
   const reloadBoards = useCallback(async (): Promise<Board[]> => {
     const requested = boardScopeLessonId;
-    if (requested == null) return [];
+    // Same identity guard as the load effect: never query with a null owner.
+    if (requested == null || ownerId == null) return [];
     const next = await teach.listBoardsForLesson(requested, ownerId);
     if (boardScopeLessonIdRef.current !== requested) return next;
     setBoards(next);
@@ -613,6 +681,13 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   // ── Chrome callbacks ───────────────────────────────────────────────────────
   const handleAddBoard = useCallback(async (): Promise<void> => {
     if (activeLessonId == null) return;
+    // Resolve the grade id (real uuid under the flag, mock slug flag-OFF). When
+    // the flag is ON and the grade hasn't resolved yet we MUST NOT write a slug
+    // into the uuid/RLS column — skip the create until identity is ready (audit
+    // finding #18). Flag OFF this is always defined (the mock slug), so the
+    // guard is inert and behaviour is byte-identical.
+    const gradeLevelId = boardGradeId(activeBoard);
+    if (ownerId == null || gradeLevelId == null) return;
     await teach.createBoard({
       masterLessonId: activeLessonId,
       ownerId,
@@ -620,12 +695,19 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
       title: `Board ${boards.length + 1}`,
       displayOrderWithinLesson: boards.length,
       templateId: null,
-      gradeLevelId: activeBoard?.gradeLevelId ?? "g5",
+      gradeLevelId,
     });
     const next = await reloadBoards();
     const created = next[next.length - 1];
     if (created) dispatch({ type: "selectBoard", boardId: created.id });
-  }, [activeLessonId, ownerId, boards.length, activeBoard, reloadBoards]);
+  }, [
+    activeLessonId,
+    ownerId,
+    boards.length,
+    activeBoard,
+    reloadBoards,
+    boardGradeId,
+  ]);
 
   const togglePanels = useCallback((): void => {
     // On small screens the panels are overlay drawers, so "show panels" must
@@ -695,6 +777,10 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
       type: WidgetType,
       title: string,
       canvas: CanvasPosition,
+      // The resolved grade id (real uuid under the flag, mock slug flag-OFF).
+      // The caller resolves + guards it via `boardGradeId` so a slug never
+      // reaches a uuid column under the flag (audit finding #18).
+      gradeLevelId: string,
       config: Record<string, unknown> = {},
     ): Widget => ({
       id: newWidgetId(type),
@@ -709,9 +795,9 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
       config,
       state: {},
       persistence: "inherit",
-      gradeLevelId: activeBoard?.gradeLevelId ?? "g5",
+      gradeLevelId,
     }),
-    [newWidgetId, pages, activeBoard],
+    [newWidgetId, pages],
   );
   const handleEditorIntent = useCallback(
     (intent: BoardEditorIntent): void => {
@@ -729,23 +815,31 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
             return;
           }
           case "addWidget": {
+            // Guard the grade id so a slug never reaches a uuid column under the
+            // flag; flag-OFF this is the mock slug and the guard is inert.
+            const gradeLevelId = boardGradeId(board);
+            if (gradeLevelId == null) return;
             const meta = widgetMeta(intent.widgetType);
             const widget = buildWidget(
               board.id,
               intent.widgetType,
               meta?.label ?? intent.widgetType,
               intent.canvas,
+              gradeLevelId,
             );
             await teach.upsertWidgetOnPage(board.id, intent.pageId, widget);
             await Promise.all([reloadBoards(), reloadPages()]);
             return;
           }
           case "addResource": {
+            const gradeLevelId = boardGradeId(board);
+            if (gradeLevelId == null) return;
             const widget = buildWidget(
               board.id,
               "resource",
               intent.resource.title,
               intent.canvas,
+              gradeLevelId,
               { label: intent.resource.title, kind: intent.resource.kind },
             );
             await teach.upsertWidgetOnPage(board.id, intent.pageId, widget);
@@ -803,6 +897,10 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
             dispatch({ type: "setPresent", present: true });
             return;
           case "share":
+            // publishBoardToTeamLibrary writes the owner id into a uuid/RLS
+            // column; skip until the real auth uid is resolved (flag-OFF this is
+            // the mock slug and is always set).
+            if (ownerId == null) return;
             await teach.publishBoardToTeamLibrary(board.id, ownerId);
             await reloadBoards();
             return;
@@ -822,12 +920,17 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
       reloadPages,
       ownerId,
       openLeftPanel,
+      boardGradeId,
     ],
   );
 
   // ── Embed a resource onto the active board (explicit T8 path) ──────────────
   const embedResourceAtCell = useCallback(
     async (resource: TeachResource, target: BoardCellTarget): Promise<void> => {
+      // Guard the grade id so a slug never reaches a uuid column under the flag;
+      // flag-OFF this is the mock slug and the guard is inert.
+      const gradeLevelId = boardGradeId(activeBoard);
+      if (gradeLevelId == null) return;
       const widget: Widget = {
         id: `w-embed-${Date.now()}-${Math.round(Math.random() * 1e6)}`,
         boardId: target.boardId,
@@ -843,12 +946,12 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
         },
         state: {},
         persistence: "inherit",
-        gradeLevelId: activeBoard?.gradeLevelId ?? "g5",
+        gradeLevelId,
       };
       await teach.upsertWidget(widget);
       await reloadBoards();
     },
-    [widgets.length, activeBoard, reloadBoards],
+    [widgets.length, activeBoard, reloadBoards, boardGradeId],
   );
 
   const handleEmbedResource = useCallback(
@@ -1124,7 +1227,7 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
               // TeachWorkspace.boards + reloadBoards, never its own fetch, so the
               // sub-bar pills, footer count, and center board stay in lockstep.
               boards={boards}
-              boardsGradeLevelId={activeBoard?.gradeLevelId ?? "g5"}
+              boardsGradeLevelId={boardGradeId(activeBoard)}
               reloadBoards={reloadBoards}
               onOpenWidgetLibrary={() => setLibraryOverlay("widgets")}
             />
@@ -1275,11 +1378,14 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
           </footer>
         ) : null}
 
-        {/* Widget picker — owned here because the board emits target cells. */}
-        {pickerTarget ? (
+        {/* Widget picker — owned here because the board emits target cells. It
+            persists a widget keyed on the grade uuid, so only mount it once the
+            grade id resolves (flag-OFF this is the mock slug and is always set)
+            — never hand the picker a slug for a uuid column (audit finding #18). */}
+        {pickerTarget && boardGradeId(activeBoard) != null ? (
           <WidgetPicker
             target={pickerTarget}
-            gradeLevelId={activeBoard?.gradeLevelId ?? "g5"}
+            gradeLevelId={boardGradeId(activeBoard) as string}
             nextDisplayOrder={widgets.length}
             onClose={() => setPickerTarget(null)}
             onCreated={() => {
@@ -1339,7 +1445,7 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
               <div className={styles.libraryBody}>
                 {libraryOverlay === "boards" ? (
                   <BoardLibraryModule
-                    gradeLevelId={activeBoard?.gradeLevelId ?? "g5"}
+                    gradeLevelId={boardGradeId(activeBoard)}
                     onOpenBoard={(board) => {
                       dispatch({
                         type: "selectLesson",

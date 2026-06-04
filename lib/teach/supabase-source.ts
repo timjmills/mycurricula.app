@@ -45,7 +45,6 @@ import type {
   BoardPage,
   BoardTag,
   BoardTemplate,
-  CanvasPosition,
   RepeatSchedule,
   ThemeOverride,
   Widget,
@@ -53,12 +52,13 @@ import type {
   WidgetPersistence,
   WidgetType,
 } from "../types";
-import { MOCK_GRADE_LEVEL_ID, buildDefaultBoardSet } from "../mock/boards";
+import { buildDefaultBoardSet } from "../mock/boards";
 import { boardMatchesContext, type BoardContext } from "./board-tags";
 import { ensureCanvas } from "./board-migrate";
 import { BoardCapError, MAX_BOARDS_PER_TEACHER } from "./limits";
 import type { TeachDataSource } from "./queries";
 import { createClient } from "../supabase/server";
+import { slugToUuid } from "../planner/id-bridge";
 
 // ── Supabase client helper ───────────────────────────────────────────────────
 // The server client is async (it awaits `cookies()`), so every method resolves
@@ -401,42 +401,80 @@ async function nextWidgetOrder(
   );
 }
 
-/** Locate the board id that owns a widget (the schema has no page table, so a
- *  widget belongs directly to its board). Throws if not found / not visible. */
-async function boardIdForWidget(
+// ── Id bridge (mock slugs ↔ db uuids) ─────────────────────────────────────────
+// The Teach board rows key on UUID columns (`master_core_lesson_event_id` is a
+// FK to the planner's core_lesson_events.id; `owner_id`/`grade_level_id` are
+// RLS-gated uuids). The CLIENT (TeachWorkspace) now passes the REAL auth uid +
+// the resolved grade/lesson uuids under the flag, so the common path arrives as
+// uuids and these resolvers are pass-throughs.
+//
+// Audit finding #18 backstop: a fixture SLUG (e.g. the default lesson `m-12-0`)
+// must NEVER land verbatim in a uuid column — it would silently miss every row
+// (RLS-invisible) and corrupt the FK. So when a non-uuid slips through we map it
+// through the SAME deterministic `slugToUuid` bridge the planner importer uses,
+// so a slug resolves to the exact uuid the planner assigned that lesson (a Teach
+// board then joins the right planner lesson). Owner ids have no importer-side
+// slug→uuid mapping, so a non-uuid owner is a genuine bug we surface loudly
+// rather than write garbage into the RLS column.
+
+/** RFC-4122 uuid shape guard (any version). Mirrors the planner's UUID_RE. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(s: string): boolean {
+  return UUID_RE.test(s);
+}
+
+function resolveLessonId(lessonId: string): string {
+  // Already a uuid (the live planner path) → use as-is. A fixture slug →
+  // deterministic uuid matching the planner importer (lesson sub-namespace).
+  return isUuid(lessonId) ? lessonId : slugToUuid("lesson", lessonId);
+}
+function resolveOwnerId(ownerId: string): string {
+  if (isUuid(ownerId)) return ownerId;
+  // A non-uuid owner means a fixture slug (e.g. `ME.id`) leaked past the client
+  // guard into an RLS-gated uuid column. There is no importer mapping for owner
+  // slugs, so fail loudly instead of corrupting the column / silently writing
+  // rows the teacher can never read back.
+  throw new Error(
+    `Teach repository owner id must be the authenticated auth.uid() (a uuid), got a non-uuid value. A fixture slug must not reach an RLS-gated column.`,
+  );
+}
+function resolveGradeId(gradeLevelId: string): string {
+  if (isUuid(gradeLevelId)) return gradeLevelId;
+  // Like the owner id, a grade slug (`g5`, the mock `MOCK_GRADE_LEVEL_ID`) has
+  // no importer-side uuid mapping — the planner stores real grade uuids. Writing
+  // the slug into `boards.grade_level_id` (a uuid column) would create rows that
+  // join no real grade and are invisible to RLS. The client resolves the real
+  // grade uuid before any create, so a non-uuid here is a bug we surface loudly.
+  throw new Error(
+    `Teach repository grade id must be a grade uuid, got a non-uuid value ("${gradeLevelId}"). Resolve the real grade uuid before creating a board.`,
+  );
+}
+
+/** Resolve a lesson's real grade uuid from the master event row (the FK target
+ *  of `boards.master_core_lesson_event_id`). Used when seeding the default team
+ *  set, where no caller-supplied grade is available — never the mock slug. */
+async function gradeIdForLesson(
   client: ServerClient,
-  widgetId: string,
+  lessonUuid: string,
 ): Promise<string> {
   const res = await client
-    .from("widgets")
-    .select("board_id")
-    .eq("id", widgetId)
+    .from("master_core_lesson_events")
+    .select("grade_level_id")
+    .eq("id", lessonUuid)
     .maybeSingle();
   if (res.error) {
     throw new Error(
-      `Teach repository widget lookup failed: ${res.error.message}`,
+      `Teach repository lesson grade lookup failed: ${res.error.message}`,
     );
   }
-  const row = res.data as { board_id: string } | null;
-  if (!row) throw new Error(`Widget not found: ${widgetId}`);
-  return row.board_id;
-}
-
-/** Clamp a free-form canvas width to the handoff's 230–640 range. */
-function clampWidth(w: number): number {
-  return Math.min(640, Math.max(230, Math.round(w)));
-}
-
-// ── Id bridge (mock slugs ↔ db uuids) ─────────────────────────────────────────
-// Identity for now: the live planner already supplies db uuids once the backend
-// is wired. Kept as explicit hooks so a slug→uuid bridge lands in one place if
-// the planner still hands slugs through during the transition.
-
-function resolveLessonId(lessonId: string): string {
-  return lessonId;
-}
-function resolveOwnerId(ownerId: string): string {
-  return ownerId;
+  const row = res.data as { grade_level_id: string | null } | null;
+  if (!row?.grade_level_id) {
+    throw new Error(
+      `Teach repository cannot seed boards: lesson ${lessonUuid} has no grade_level_id.`,
+    );
+  }
+  return row.grade_level_id;
 }
 
 // ── Implementation ────────────────────────────────────────────────────────────
@@ -500,7 +538,7 @@ export const supabaseTeachSource: TeachDataSource = {
         title,
         display_order_within_lesson: nextOrder,
         template_id: input.templateId ?? null,
-        grade_level_id: input.gradeLevelId ?? MOCK_GRADE_LEVEL_ID,
+        grade_level_id: resolveGradeId(input.gradeLevelId),
       })
       .select(BOARD_COLS)
       .single();
@@ -814,7 +852,7 @@ export const supabaseTeachSource: TeachDataSource = {
         title: input.title ?? "Whiteboard",
         display_order_within_lesson: nextOrder,
         template_id: null,
-        grade_level_id: input.gradeLevelId ?? MOCK_GRADE_LEVEL_ID,
+        grade_level_id: resolveGradeId(input.gradeLevelId),
       })
       .select(BOARD_COLS)
       .single();
@@ -949,45 +987,38 @@ export const supabaseTeachSource: TeachDataSource = {
   },
 
   async moveWidget(widgetId, x, y) {
-    // SCHEMA GAP: no `canvas` column. The free-form x/y/w cannot be persisted.
-    // We reload the widget and return it with the requested canvas applied
-    // in-memory so the optimistic UI is correct, but the move does NOT survive a
-    // reload until the canvas column lands. Reported to the lead.
-    const client = await sb();
-    const boardId = await boardIdForWidget(client, widgetId);
-    const board = await loadBoard(client, boardId);
-    const widget = board.widgets.find((w) => w.id === widgetId);
-    if (!widget) throw new Error(`Widget not found: ${widgetId}`);
-    const prev: CanvasPosition = widget.canvas ?? { x: 0, y: 0, w: 320 };
-    return {
-      ...widget,
-      canvas: {
-        x: Math.max(0, Math.round(x)),
-        y: Math.max(0, Math.round(y)),
-        w: prev.w,
-      },
-    };
+    // SCHEMA GAP: no `canvas` column. The free-form x/y cannot be persisted, so
+    // returning the widget with the requested canvas applied in-memory would
+    // report SUCCESS for a change that vanishes on the next reload (audit
+    // finding #18: "shows success for an unpersisted change"). Throw loudly
+    // instead — the UI gates the control off under the flag (see TeachWorkspace
+    // handleEditorIntent) so this is a defensive backstop, never a hot path.
+    void widgetId;
+    void x;
+    void y;
+    throw new Error(
+      "Teach repository moveWidget is unavailable: the widgets schema has no canvas column. Add it before wiring free-form widget moves.",
+    );
   },
 
   async resizeWidget(widgetId, w) {
-    // SCHEMA GAP: no `canvas` column — see `moveWidget`. In-memory only.
-    const client = await sb();
-    const boardId = await boardIdForWidget(client, widgetId);
-    const board = await loadBoard(client, boardId);
-    const widget = board.widgets.find((wi) => wi.id === widgetId);
-    if (!widget) throw new Error(`Widget not found: ${widgetId}`);
-    const prev: CanvasPosition = widget.canvas ?? { x: 0, y: 0, w: 320 };
-    return { ...widget, canvas: { x: prev.x, y: prev.y, w: clampWidth(w) } };
+    // SCHEMA GAP: no `canvas` column — see `moveWidget`. Throw rather than return
+    // a fake-success in-memory value.
+    void widgetId;
+    void w;
+    throw new Error(
+      "Teach repository resizeWidget is unavailable: the widgets schema has no canvas column. Add it before wiring free-form widget resizes.",
+    );
   },
 
   async setWidgetAppearance(widgetId, appearance: ThemeOverride) {
-    // SCHEMA GAP: no `appearance` column. In-memory only — see `moveWidget`.
-    const client = await sb();
-    const boardId = await boardIdForWidget(client, widgetId);
-    const board = await loadBoard(client, boardId);
-    const widget = board.widgets.find((w) => w.id === widgetId);
-    if (!widget) throw new Error(`Widget not found: ${widgetId}`);
-    return { ...widget, appearance: { ...appearance } };
+    // SCHEMA GAP: no `appearance` column — see `moveWidget`. Throw rather than
+    // return a fake-success in-memory value.
+    void widgetId;
+    void appearance;
+    throw new Error(
+      "Teach repository setWidgetAppearance is unavailable: the widgets schema has no appearance column. Add it before wiring per-widget appearance.",
+    );
   },
 
   async listPages(boardId) {
@@ -1063,6 +1094,10 @@ async function seedDefaultTeamSet(
   lessonId: string,
 ): Promise<Board[]> {
   const defaults = buildDefaultBoardSet(lessonId);
+  // The default board fixtures carry the mock grade slug ("g5"); never write
+  // that into the uuid `grade_level_id` column. Resolve the lesson's REAL grade
+  // uuid from the master event row (the FK target) once for the whole set.
+  const gradeLevelId = await gradeIdForLesson(client, lessonId);
   const out: Board[] = [];
   for (let i = 0; i < defaults.length; i += 1) {
     const b = defaults[i];
@@ -1075,7 +1110,7 @@ async function seedDefaultTeamSet(
         title: b.title,
         display_order_within_lesson: b.displayOrderWithinLesson ?? i,
         template_id: b.templateId ?? null,
-        grade_level_id: b.gradeLevelId ?? MOCK_GRADE_LEVEL_ID,
+        grade_level_id: gradeLevelId,
       })
       .select(BOARD_COLS)
       .single();
@@ -1109,7 +1144,8 @@ function boardPatchToRow(
   if (patch.displayOrderWithinLesson !== undefined)
     row.display_order_within_lesson = patch.displayOrderWithinLesson;
   if (patch.templateId !== undefined) row.template_id = patch.templateId;
-  if (patch.gradeLevelId !== undefined) row.grade_level_id = patch.gradeLevelId;
+  if (patch.gradeLevelId !== undefined)
+    row.grade_level_id = resolveGradeId(patch.gradeLevelId);
   return row;
 }
 
@@ -1135,7 +1171,8 @@ function widgetPatchToRow(
   if (patch.state !== undefined) row.state = stripNames(patch.state ?? {});
   if (patch.persistence !== undefined)
     row.persistence_override = patch.persistence;
-  if (patch.gradeLevelId !== undefined) row.grade_level_id = patch.gradeLevelId;
+  if (patch.gradeLevelId !== undefined)
+    row.grade_level_id = resolveGradeId(patch.gradeLevelId);
   return row;
 }
 
