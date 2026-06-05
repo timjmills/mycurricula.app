@@ -1519,59 +1519,103 @@ async function forkAndPatch(
   ownerId: string,
   patch: (copy: PersonalCopyRow | null) => Partial<PersonalCopyRow>,
 ): Promise<void> {
-  const master = await loadMaster(client, lessonId);
+  // CONCURRENT-FIRST-EDIT RACE FIX (re-derived from Codex). The prior path
+  // cloned the ENTIRE master row and `.upsert`ed it on the (teacher, master)
+  // conflict key. Two concurrent first-edits of DIFFERENT columns then each sent
+  // a FULL row, so the second upsert clobbered the first's column with its own
+  // cloned-from-master value (a lost update). Now we ensure the copy exists once
+  // (cloning master content on first fork), then issue a PARTIAL `.update` that
+  // touches ONLY the patched columns by primary key — concurrent edits of
+  // distinct columns no longer overwrite each other. `ensurePersonalCopy` is
+  // idempotent (ignoreDuplicates on the conflict key), so a simultaneous first
+  // fork by two writers still yields a single copy row.
   const existing = await loadCopy(client, lessonId, ownerId);
-
-  // The full copy row, cloning master content where the copy doesn't exist yet.
-  const base: Omit<PersonalCopyRow, "id"> = existing
-    ? {
-        teacher_id: existing.teacher_id,
-        master_core_lesson_event_id: existing.master_core_lesson_event_id,
-        grade_level_id: existing.grade_level_id,
-        unit_id: existing.unit_id,
-        subject_id: existing.subject_id,
-        week_number: existing.week_number,
-        day_of_week: existing.day_of_week,
-        title: existing.title,
-        directions: existing.directions,
-        learning_objectives: existing.learning_objectives,
-        notes: existing.notes,
-        resources: existing.resources,
-        standards: existing.standards,
-        display_order_within_day: existing.display_order_within_day,
-        is_diverged_from_master: existing.is_diverged_from_master,
-        archived_at: existing.archived_at,
-      }
-    : {
-        teacher_id: ownerId,
-        master_core_lesson_event_id: master.id,
-        grade_level_id: master.grade_level_id,
-        unit_id: master.unit_id,
-        subject_id: master.subject_id,
-        week_number: master.week_number,
-        day_of_week: master.day_of_week,
-        title: master.title,
-        directions: master.directions,
-        learning_objectives: master.learning_objectives,
-        notes: master.notes,
-        resources: master.resources,
-        standards: master.standards,
-        display_order_within_day: master.display_order_within_day,
-        is_diverged_from_master: false,
-        archived_at: null,
-      };
+  const copy = existing ?? (await ensurePersonalCopy(client, lessonId, ownerId));
 
   const applied = patch(existing);
-  const row = { ...base, ...applied, is_diverged_from_master: true };
+  const row = { ...applied, is_diverged_from_master: true };
 
+  // `.select("id")` + zero-row guard (mirrors patchMaster): a partial `.update`
+  // that matches no rows — RLS denial, or the copy row deleted/archived between
+  // ensurePersonalCopy and here (a concurrent soft-delete) — returns no error
+  // under PostgREST. Without this guard that would be a FALSE successful save
+  // (the edit silently lands nowhere). Throw so the store's persist error path
+  // surfaces it instead of reporting success.
   const res = await client
     .from("personal_core_lesson_event_copies")
-    .upsert(row, { onConflict: "teacher_id,master_core_lesson_event_id" });
+    .update(row)
+    .eq("id", copy.id)
+    .eq("teacher_id", ownerId)
+    .select("id");
   if (res.error) {
     throw new Error(
       `Planner repository fork/patch failed: ${res.error.message}`,
     );
   }
+  const updated = (res.data ?? []) as { id: string }[];
+  if (updated.length === 0) {
+    throw new Error(
+      `Planner repository fork/patch affected no rows for lesson ${lessonId} — the personal copy was removed concurrently or the write was not authorized.`,
+    );
+  }
+}
+
+/**
+ * Ensure this teacher's personal copy exists for a master lesson and return it,
+ * cloning the master's content on first fork. Idempotent: the insert uses the
+ * `(teacher_id, master_core_lesson_event_id)` conflict key with
+ * `ignoreDuplicates`, so two concurrent first-forks converge on ONE copy row
+ * (the loser's insert is a no-op and the follow-up read returns the winner's
+ * row). NEVER mutates the master row. Factored out of `forkAndPatch` so the
+ * partial-update race fix has a clean "copy exists" precondition.
+ */
+async function ensurePersonalCopy(
+  client: ServerClient,
+  lessonId: string,
+  ownerId: string,
+): Promise<PersonalCopyRow> {
+  const existing = await loadCopy(client, lessonId, ownerId);
+  if (existing) return existing;
+
+  const master = await loadMaster(client, lessonId);
+  const base: Omit<PersonalCopyRow, "id"> = {
+    teacher_id: ownerId,
+    master_core_lesson_event_id: master.id,
+    grade_level_id: master.grade_level_id,
+    unit_id: master.unit_id,
+    subject_id: master.subject_id,
+    week_number: master.week_number,
+    day_of_week: master.day_of_week,
+    title: master.title,
+    directions: master.directions,
+    learning_objectives: master.learning_objectives,
+    notes: master.notes,
+    resources: master.resources,
+    standards: master.standards,
+    display_order_within_day: master.display_order_within_day,
+    is_diverged_from_master: false,
+    archived_at: null,
+  };
+  const inserted = await client
+    .from("personal_core_lesson_event_copies")
+    .upsert(base, {
+      onConflict: "teacher_id,master_core_lesson_event_id",
+      ignoreDuplicates: true,
+    });
+  if (inserted.error) {
+    throw new Error(
+      `Planner repository create personal copy failed: ${inserted.error.message}`,
+    );
+  }
+  // Re-read so we get the row id (the conflict-target ignoreDuplicates upsert
+  // does not reliably return the row when it was a no-op).
+  const created = await loadCopy(client, lessonId, ownerId);
+  if (!created) {
+    throw new Error(
+      `Planner repository failed to create personal copy: ${lessonId}`,
+    );
+  }
+  return created;
 }
 
 /**

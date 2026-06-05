@@ -10,16 +10,20 @@
 //   picker showed "xuukfpvonsbvvbspsrsl.supabase.co" as the requesting app.
 //   Google Identity Services (GSI) runs the account picker in the browser
 //   against *our* OAuth client, so Google shows the MyCurricula app name
-//   instead. We then hand the resulting Google ID token to Supabase via
-//   supabase.auth.signInWithIdToken() — no third-party redirect, no extra cost.
+//   instead. We then POST the resulting Google ID token to our own `/auth/gsi`
+//   route, which completes the Supabase sign-in AND the fail-closed tenant
+//   provisioning SERVER-SIDE before any session cookie is allowed to persist.
+//   Completing the exchange client-side (the old approach) wrote the session
+//   cookie before provisioning could gate it — an auth hole this closes.
 //
 // Nonce flow (replay protection — the hashed/raw split matters):
 //   1. Generate a raw random nonce (base64 of 32 random bytes).
 //   2. Hash it with SHA-256 → lowercase hex string (`hashedNonce`).
 //   3. Give the HASHED nonce to google.accounts.id.initialize(): Google embeds
 //      it inside the signed ID token it issues.
-//   4. Give the RAW nonce to supabase.auth.signInWithIdToken(): Supabase hashes
-//      the raw value itself and checks it equals the nonce baked into the token.
+//   4. Give the RAW nonce to the `/auth/gsi` route, which forwards it to
+//      supabase.auth.signInWithIdToken(): Supabase hashes the raw value itself
+//      and checks it equals the nonce baked into the token.
 //   Passing the hashed value to Supabase (or the raw value to Google) breaks
 //   verification — the direction is load-bearing.
 //
@@ -29,7 +33,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { safeRelativePath } from "@/lib/safe-path";
 import styles from "./google-sign-in-button.module.css";
 
 // ── Google Identity Services typings ───────────────────────────────────────
@@ -82,8 +86,6 @@ const GSI_SCRIPT_ID = "google-gsi-client";
 const GSI_MIN_WIDTH = 200;
 const GSI_MAX_WIDTH = 400;
 
-const DEFAULT_DESTINATION = "/weekly";
-
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
 interface GoogleSignInButtonProps {
@@ -110,19 +112,21 @@ export function GoogleSignInButton({
   const [pending, setPending] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Resolve `next` to a destination, accepting only safe in-app paths: must
-  // start with a single "/" so it cannot be a protocol-relative ("//evil.com")
-  // or absolute external URL. Anything else falls back to the planner home.
+  // Resolve `next` to a destination, accepting only safe same-origin relative
+  // paths. Uses the shared `safeRelativePath` guard (audit #21) — the same
+  // logic the server-side redirects use — so protocol-relative (`//evil`),
+  // backslash-host (`/\evil`), control-char, and post-resolution
+  // (`/x/../..//evil`) tricks are all rejected to the planner home. Its default
+  // fallback when `next` is missing/unsafe is the planner home (`/weekly`).
   const safeDestination = useCallback((): string => {
-    if (next && next.startsWith("/") && !next.startsWith("//")) {
-      return next;
-    }
-    return DEFAULT_DESTINATION;
+    return safeRelativePath(next);
   }, [next]);
 
   // The credential callback — fires once Google issues a signed ID token.
-  // It exchanges that token with Supabase, then does a full-page navigation so
-  // server components and middleware see the fresh session cookie.
+  // It POSTs the token to our `/auth/gsi` route, which completes the Supabase
+  // sign-in AND fail-closed tenant provisioning server-side before any session
+  // cookie persists. On success we do a full-page navigation so server
+  // components and middleware see the fresh session cookie.
   const handleCredential = useCallback(
     async (
       response: GsiCredentialResponse,
@@ -132,18 +136,27 @@ export function GoogleSignInButton({
       setErrorMsg(null);
 
       try {
-        const supabase = createClient();
-        const { error } = await supabase.auth.signInWithIdToken({
-          provider: "google",
-          token: response.credential,
-          // RAW nonce — Supabase hashes this itself and matches it against the
-          // hashed nonce embedded in the token (see file header).
-          nonce: rawNonce,
+        const result = await fetch("/auth/gsi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            credential: response.credential,
+            // RAW nonce — the server route forwards it to Supabase, which hashes
+            // it itself and matches against the hashed nonce embedded in the
+            // token (see file header).
+            nonce: rawNonce,
+          }),
         });
 
-        if (error) {
+        if (!result.ok) {
           setPending(false);
-          setErrorMsg("We couldn’t sign you in. Please try again.");
+          // 403 == provisioning denied (valid Google account, but not
+          // allow-listed for this school); anything else is a generic failure.
+          setErrorMsg(
+            result.status === 403
+              ? "Your account isn’t set up for this school yet. Please contact your school lead."
+              : "We couldn’t sign you in. Please try again.",
+          );
           return;
         }
 
