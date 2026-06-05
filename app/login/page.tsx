@@ -9,7 +9,9 @@
 // the root layout (ThemeProvider + fonts) — no top bar, no side panels.
 //
 // The OAuth callback route redirects back here with `?error=auth` when a
-// sign-in attempt fails; that case renders an inline alert above the button.
+// sign-in attempt fails, or `?error=provisioning` when the account signed in
+// successfully but is not allow-listed for any school (fail-closed tenant
+// provisioning, audit #3); each case renders an inline alert above the button.
 
 import type { ReactNode } from "react";
 import { GoogleSignInButton } from "@/components/auth";
@@ -26,6 +28,7 @@ export default async function LoginPage({
 }: LoginPageProps): Promise<ReactNode> {
   const { error, next } = await searchParams;
   const hasAuthError = error === "auth";
+  const hasProvisioningError = error === "provisioning";
 
   return (
     <main className={`cp-root ${styles.page}`}>
@@ -58,6 +61,12 @@ export default async function LoginPage({
         {hasAuthError && (
           <p className={styles.error} role="alert">
             We couldn&rsquo;t sign you in. Please try again.
+          </p>
+        )}
+        {hasProvisioningError && (
+          <p className={styles.error} role="alert">
+            Your account isn&rsquo;t set up for this school yet. Please contact
+            your school lead.
           </p>
         )}
 

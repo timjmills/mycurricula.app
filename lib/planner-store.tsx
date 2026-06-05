@@ -347,6 +347,35 @@ type ToggleSectionWebsiteAction = {
   sectionId: string;
 };
 
+// ── Persistable section actions ────────────────────────────────────────────
+// The section reducer actions whose RESULTING section list must be persisted to
+// the backend so the edit survives a reload. Routed through a single helper
+// (persistSectionAction) that re-applies the action to the current document and
+// tees the resulting `present.sections[lessonId]` through `setSections` — so a
+// reorder / add / remove / duplicate / resource-move / resource-add / -remove
+// (which the reducer handles but had no durable persist verb) survives reload.
+//
+// WHY FULL-LIST REPLACE (not the granular source verbs): the source's
+// `setSections` is the only section write that is robust to section-id DRIFT
+// across the seam. `replace_lesson_sections` deletes + reinserts rows with
+// DB-minted ids, so the UI's in-memory section ids never match the persisted
+// ids after any persisted section mutation. The granular source verbs
+// (addSectionResource/removeSectionResource) key on a single `sectionId`, so a
+// follow-up resource edit using a now-stale UI id would silently miss the
+// persisted row and be lost on reload. Routing EVERY section/resource mutation
+// through the full current-section-list replace means nothing is ever keyed by a
+// single section id across the seam — the whole resolved list is sent, matched
+// by content + order, and a reload reconciles ids cleanly.
+
+type PersistableSectionAction =
+  | ReorderSectionsAction
+  | AddSectionAction
+  | RemoveSectionAction
+  | DuplicateSectionAction
+  | MoveSectionResourceAction
+  | AddSectionResourceAction
+  | RemoveSectionResourceAction;
+
 // ── History control actions ──────────────────────────────────────────────
 
 type UndoAction = { type: "undo" };
@@ -503,6 +532,35 @@ function ensureSections(
   lessonId: string,
 ): LessonSectionContent[] {
   return sections[lessonId] ?? buildInitialSections();
+}
+
+/** READ-ONLY synthetic-section fallback for the backend hydrate.
+ *
+ *  `getSectionsBatch` deliberately OMITS lessons that have no persisted
+ *  `lesson_sections` rows (its contract: callers fall back). Without a fallback
+ *  a section-less lesson's flat `resources` jsonb (loaded onto each Lesson by
+ *  listLessons) would never surface after hydrate — the section UI would render
+ *  an empty container even though the lesson carries resources. This fills the
+ *  gap from the ALREADY-LOADED lessons (no extra round-trips): for every lesson
+ *  the batch omitted, it synthesizes the default-template sections from the
+ *  lesson's own `resources`, exactly as the flag-OFF seed (`seedSections`) does.
+ *
+ *  These sections are SYNTHETIC and READ-ONLY by construction: they only flow
+ *  INTO the hydrated document for display. They are never written back to the
+ *  backend here — the source's persisting mutators (setSections, …) run only on
+ *  an explicit teacher edit, at which point the edited set is what persists. A
+ *  lesson the teacher never touches keeps zero persisted section rows. */
+function fillSyntheticSections(
+  lessons: Lesson[],
+  batched: Record<string, LessonSectionContent[]>,
+): Record<string, LessonSectionContent[]> {
+  const result: Record<string, LessonSectionContent[]> = { ...batched };
+  for (const lesson of lessons) {
+    if (result[lesson.id] === undefined) {
+      result[lesson.id] = buildInitialSections(lesson.resources);
+    }
+  }
+  return result;
 }
 
 /** Duplicate uid helper (mirrors lesson-flow.ts, avoids importing its counter). */
@@ -1850,12 +1908,18 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         }
         // Batched section hydrate — one round-trip seeds every lesson's
         // sections (kills the prior per-lesson N+1). Lessons the batch omits
-        // (no persisted sections) fall back to empty via ensureSections.
-        const sections = await plannerClient.getSectionsBatch(
+        // (no persisted sections) are filled with READ-ONLY synthetic sections
+        // built from each lesson's ALREADY-LOADED flat `resources` — see
+        // fillSyntheticSections. This reuses data the listLessons read already
+        // returned (no extra masters/authored round-trips) and never persists:
+        // a section-less lesson's resources surface for display, but the backend
+        // still has zero section rows until the teacher explicitly edits.
+        const batchedSections = await plannerClient.getSectionsBatch(
           lessons.map((l) => l.id),
           ownerId,
         );
         if (!alive) return;
+        const sections = fillSyntheticSections(lessons, batchedSections);
         dispatchRef.current({
           type: "hydrate",
           doc: { lessons, sections, cellLayouts: {} },
@@ -1885,6 +1949,22 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
 
   const { history, lastChange } = state;
   const { past, present, future } = history;
+
+  // Latest present document, mirrored into a ref so the synchronous section
+  // persist helper (persistSectionAction) can re-apply an action to the CURRENT
+  // document without listing `present` in its dep array (which would re-create it
+  // on every edit). The reducer is the source of truth; this ref only feeds the
+  // best-effort persist tee with the same pure transform the reducer ran.
+  //
+  // INTRA-TICK ACCUMULATION: persistSectionAction ADVANCES this ref by the action
+  // it just applied (see below), so two section mutations dispatched in the SAME
+  // tick — before React re-renders — each build on the prior one instead of both
+  // reading the stale pre-render doc (which would make the second persist clobber
+  // the first). On the next render this line resets the ref to the authoritative
+  // committed reducer state (which by then includes every dispatched action), so
+  // the ref reconciles to truth and never drifts.
+  const presentRef = useRef(present);
+  presentRef.current = present;
 
   // ── Selectors ────────────────────────────────────────────────────────
 
@@ -1929,6 +2009,44 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       });
     },
     [],
+  );
+
+  // ── Granular section-mutator persistence ───────────────────────────────
+  // Several section reducer actions (reorder / add / remove / duplicate section,
+  // move resource) mutate `present.sections[lessonId]` but had NO dedicated
+  // persist verb — so the edit was lost on reload. This helper re-applies the
+  // SAME pure transform the reducer runs (applyDocAction) to the CURRENT
+  // document, then tees the RESULTING section list through `setSections` so the
+  // whole new arrangement is durable. The payload is exactly the reducer's
+  // resulting `present.sections[lessonId]` (via ensureSections on the next doc),
+  // so the persisted set matches what the UI shows.
+  //
+  // FORKING (#14): the persist passes `saveTargetRef.current` — the live
+  // Personal | Team-Curriculum toggle — so a Team/Master-mode section edit
+  // writes the SHARED team section rows (RLS-gated, throws on denial) instead of
+  // being forced into a personal fork. This mirrors updateLesson/moveLesson and
+  // is the regression the stale Codex branch introduced by dropping saveTarget.
+  // With the Supabase flag OFF `persist` is a no-op, so this is reducer-local.
+  const persistSectionAction = useCallback(
+    (action: PersistableSectionAction): void => {
+      const nextDoc = applyDocAction(presentRef.current, action);
+      // A no-op reducer action (e.g. reorder with equal indices) leaves the doc
+      // object identical — nothing to persist.
+      if (nextDoc === presentRef.current) return;
+      // Advance the ref so a second same-tick section mutation re-applies its
+      // action ON TOP of this one (and persists the combined result), rather
+      // than re-reading the stale pre-render doc and clobbering this change. The
+      // next render resets presentRef to the committed reducer state.
+      presentRef.current = nextDoc;
+      persist(
+        "setSections",
+        action.lessonId,
+        ensureSections(nextDoc.sections, action.lessonId),
+        ownerIdRef.current ?? "",
+        saveTargetRef.current,
+      );
+    },
+    [persist],
   );
 
   // ── Mutation callbacks ────────────────────────────────────────────────
@@ -2098,14 +2216,16 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
 
   const reorderSections = useCallback(
     (lessonId: string, activeId: string, overId: string) => {
-      dispatchRef.current({
+      const action: ReorderSectionsAction = {
         type: "reorderSections",
         lessonId,
         activeId,
         overId,
-      });
+      };
+      dispatchRef.current(action);
+      persistSectionAction(action);
     },
-    [],
+    [persistSectionAction],
   );
 
   const editSection = useCallback(
@@ -2127,19 +2247,39 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [],
   );
 
-  const addSection = useCallback((lessonId: string, heading?: string) => {
-    dispatchRef.current({ type: "addSection", lessonId, heading });
-  }, []);
+  const addSection = useCallback(
+    (lessonId: string, heading?: string) => {
+      const action: AddSectionAction = { type: "addSection", lessonId, heading };
+      dispatchRef.current(action);
+      persistSectionAction(action);
+    },
+    [persistSectionAction],
+  );
 
-  const removeSection = useCallback((lessonId: string, sectionId: string) => {
-    dispatchRef.current({ type: "removeSection", lessonId, sectionId });
-  }, []);
+  const removeSection = useCallback(
+    (lessonId: string, sectionId: string) => {
+      const action: RemoveSectionAction = {
+        type: "removeSection",
+        lessonId,
+        sectionId,
+      };
+      dispatchRef.current(action);
+      persistSectionAction(action);
+    },
+    [persistSectionAction],
+  );
 
   const duplicateSection = useCallback(
     (lessonId: string, sectionId: string) => {
-      dispatchRef.current({ type: "duplicateSection", lessonId, sectionId });
+      const action: DuplicateSectionAction = {
+        type: "duplicateSection",
+        lessonId,
+        sectionId,
+      };
+      dispatchRef.current(action);
+      persistSectionAction(action);
     },
-    [],
+    [persistSectionAction],
   );
 
   const addSectionResource = useCallback(
@@ -2151,27 +2291,22 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         label: string;
       },
     ) => {
-      dispatchRef.current({
+      const action: AddSectionResourceAction = {
         type: "addSectionResource",
         lessonId,
         sectionId,
         resource,
-      });
-      // The contract takes a bare LessonResource (it mints the section-resource
-      // id server-side); the optimistic chip the reducer added carries a local
-      // id the backend won't match. That id drift is acceptable for resources —
-      // the next section hydrate reconciles by lesson, and nothing keys off a
-      // resource id across the seam. We pass type+label (+ any url/provider the
-      // caller supplied) so the persisted row is faithful.
-      persist(
-        "addSectionResource",
-        lessonId,
-        sectionId,
-        resource as SectionResource,
-        ownerIdRef.current ?? "",
-      );
+      };
+      dispatchRef.current(action);
+      // Persist via the full current-section-list replace (not the granular
+      // source `addSectionResource`, which keys on a single `sectionId` that may
+      // have drifted from the DB-minted id after a prior persisted section
+      // mutation — see PersistableSectionAction). The replay re-applies this same
+      // action and tees the resolved list through `setSections` with the live
+      // saveTarget, so a Team/Master-mode resource add writes the shared rows.
+      persistSectionAction(action);
     },
-    [persist],
+    [persistSectionAction],
   );
 
   const editSectionResource = useCallback(
@@ -2196,21 +2331,20 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
 
   const removeSectionResource = useCallback(
     (lessonId: string, sectionId: string, resourceId: string) => {
-      dispatchRef.current({
+      const action: RemoveSectionResourceAction = {
         type: "removeSectionResource",
         lessonId,
         sectionId,
         resourceId,
-      });
-      persist(
-        "removeSectionResource",
-        lessonId,
-        sectionId,
-        resourceId,
-        ownerIdRef.current ?? "",
-      );
+      };
+      dispatchRef.current(action);
+      // Full-list replace, same rationale as addSectionResource: never key a
+      // persist on a single (possibly-drifted) section/resource id across the
+      // seam. Threads the live saveTarget so a Team/Master-mode removal writes
+      // the shared section rows (RLS-gated) rather than forking.
+      persistSectionAction(action);
     },
-    [persist],
+    [persistSectionAction],
   );
 
   const moveSectionResource = useCallback(
@@ -2220,15 +2354,17 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       targetSectionId: string,
       resource: SectionResource,
     ) => {
-      dispatchRef.current({
+      const action: MoveSectionResourceAction = {
         type: "moveSectionResource",
         lessonId,
         sourceSectionId,
         targetSectionId,
         resource,
-      });
+      };
+      dispatchRef.current(action);
+      persistSectionAction(action);
     },
-    [],
+    [persistSectionAction],
   );
 
   const toggleSectionWebsite = useCallback(
