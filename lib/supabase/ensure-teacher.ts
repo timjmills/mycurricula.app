@@ -415,28 +415,81 @@ async function ensureTeacherDomain(
 }
 
 /**
- * Individual (teacher-first) provisioning — STUB (ultraplan Wave 3).
+ * Individual (teacher-first) provisioning — the lockout-free path (ultraplan
+ * Wave 3, §2/§5).
  *
- * When `PROVISIONING_MODE="individual"`, every fresh signup should land in its
- * OWN private workspace (a hidden per-team `schools` row + 8 subjects + a
- * school_year + a `teachers` row + a lead TGA + self STM + a team-of-1). None of
- * that is built yet — Wave 1 only scaffolds the dispatch branch. Until the real
- * implementation lands, this fails CLOSED (same posture as a domain-allow-list
- * miss): no rows are written, the caller leaves no session behind, and the
- * reason is explicit + diagnosable from logs.
+ * When `PROVISIONING_MODE="individual"`, every fresh signup lands in its OWN
+ * private workspace with NO domain check and NO shared-tenant lookup: a hidden
+ * per-team `schools` row + an active grade + the 8 locked subjects + a personal
+ * `school_years` row + a `teachers` row (id = auth uid) + a lead
+ * `teacher_grade_assignments` row + self `subject_team_memberships`
+ * (`can_edit_master=true`, so "solo = Master") + a `teams` row owned by the user
+ * + the owner's `team_memberships` seat.
  *
- * The params are accepted to lock the call signature against `ensureTeacherRecord`
- * so Wave 3 can fill in the body without touching any call site; they are
- * intentionally unused for now.
+ * ── Atomicity + idempotency live in the DB. ──
+ * All of the above is performed by the `provision_individual_workspace` RPC
+ * (migration 20260606130000) inside a SINGLE transaction: a partial failure
+ * rolls back every insert (no orphan rows), and a re-run / double signup is a
+ * no-op that returns the existing workspace (the RPC guards on an already-owned
+ * team). This wrapper therefore stays thin — it just invokes the RPC with the
+ * service-role admin client (required: the user has no `teachers` row yet, so it
+ * cannot write any RLS-gated row itself) and maps the result.
+ *
+ * Never throws — returns `{ ok: false, reason }` on any failure, matching
+ * `ensureTeacherDomain`, so a failed provision degrades to denied/empty data
+ * rather than blocking login.
  */
 export async function ensureIndividualWorkspace(
-  // Wave-1 stub: params are part of the locked signature but unused until the
-  // Wave-3 body lands. Disable the unused-vars warning rather than rename, so
-  // the real implementation drops in without touching the signature.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _admin: SupabaseClient,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _user: AuthUserLike,
+  admin: SupabaseClient,
+  user: AuthUserLike,
 ): Promise<EnsureTeacherResult> {
-  return { ok: false, reason: "individual-provisioning-not-implemented" };
+  if (!user?.id) return { ok: false, reason: "missing auth user id" };
+
+  try {
+    const email = (user.email ?? "").trim();
+    // Display name = email local-part (same derivation as the domain path); the
+    // RPC clamps/falls back to "Teacher" if this is empty.
+    const displayName = (email.split("@")[0] || "Teacher").slice(0, 120);
+
+    // The RPC does ALL the work atomically + idempotently. It returns one row
+    // ({ teacher_id, grade_level_id }) on success.
+    const { data, error } = await admin.rpc("provision_individual_workspace", {
+      p_uid: user.id,
+      p_email: email,
+      p_display_name: displayName,
+    });
+    if (error) {
+      return {
+        ok: false,
+        reason: `provision_individual_workspace: ${error.message}`,
+      };
+    }
+
+    // `returns table(...)` surfaces as an array of rows over PostgREST. Accept
+    // either an array (take the first row) or a bare object, defensively.
+    const row = Array.isArray(data) ? data[0] : data;
+    const gradeLevelId =
+      row && typeof row === "object"
+        ? ((row as Record<string, unknown>).grade_level_id as
+            | string
+            | undefined)
+        : undefined;
+
+    // The teacher row is keyed to the auth uid; the grade comes from the RPC.
+    // A successful RPC that returns no grade id is treated as a failure so a
+    // caller never proceeds with a half-resolved workspace.
+    if (!gradeLevelId) {
+      return {
+        ok: false,
+        reason: "provision_individual_workspace: no grade returned",
+      };
+    }
+
+    return { ok: true, teacherId: user.id, gradeLevelId };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
