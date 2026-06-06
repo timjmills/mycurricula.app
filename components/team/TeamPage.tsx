@@ -34,6 +34,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
+import { useRouter } from "next/navigation";
 import type { WorkspaceMember, WorkspaceNotebook, SeatUsage } from "@/lib/admin/queries";
 import type { PendingInvite, CallerInfo, ActionResult } from "@/app/settings/team/actions";
 import {
@@ -140,7 +141,6 @@ interface MemberListProps {
   callerTeacherId: string | null;
   isWorkspaceAdmin: boolean;
   callerNotebookRoles: Record<string, "teacher" | "lead" | "grade_admin">;
-  notebooks: WorkspaceNotebook[];
   onDataChange: () => void;
 }
 
@@ -150,7 +150,6 @@ function MemberList({
   callerTeacherId,
   isWorkspaceAdmin,
   callerNotebookRoles,
-  notebooks,
   onDataChange,
 }: MemberListProps): ReactNode {
   const [pending, startTransition] = useTransition();
@@ -375,7 +374,6 @@ function MemberList({
 
 interface PendingInvitesProps {
   invites: PendingInvite[];
-  callerTeacherId: string | null;
   isWorkspaceAdmin: boolean;
   callerNotebookRoles: Record<string, "teacher" | "lead" | "grade_admin">;
   onDataChange: () => void;
@@ -383,7 +381,6 @@ interface PendingInvitesProps {
 
 function PendingInvites({
   invites,
-  callerTeacherId: _callerTeacherId,
   isWorkspaceAdmin,
   callerNotebookRoles,
   onDataChange,
@@ -981,10 +978,11 @@ export function TeamPage({
 
   // Panel visibility state.
   const [showInvite, setShowInvite] = useState(false);
-  // Data-reload trigger: increment to re-render (parent re-fetches via
-  // router.refresh). We rely on Next.js Server Action revalidation for true
-  // data refresh; this is used to collapse panels post-action.
   const [, startTransition] = useTransition();
+  // router.refresh() re-triggers the server component data fetch without a
+  // full navigation. The revalidatePath calls in each server action invalidate
+  // the Next.js cache for this route, so router.refresh() picks up fresh data.
+  const router = useRouter();
 
   const isSolo = members.length <= 1;
 
@@ -998,15 +996,12 @@ export function TeamPage({
     );
 
   // Trigger a server-side refresh when mutations succeed.
-  // Next.js revalidation (revalidatePath) in the server actions handles the
-  // actual cache invalidation; here we just force a client navigation refresh.
+  // revalidatePath in the server actions invalidates the cache; router.refresh()
+  // re-executes the server component to pick up the new data without a full
+  // page navigation.
   function handleDataChange(): void {
     startTransition(() => {
-      // router.refresh() would be ideal here but requires importing useRouter.
-      // Instead we reload the page to pick up the fresh server render.
-      if (typeof window !== "undefined") {
-        window.location.reload();
-      }
+      router.refresh();
     });
   }
 
@@ -1065,14 +1060,12 @@ export function TeamPage({
               callerTeacherId={callerTeacherId}
               isWorkspaceAdmin={isWorkspaceAdmin}
               callerNotebookRoles={callerNotebookRoles}
-              notebooks={notebooks}
               onDataChange={handleDataChange}
             />
 
             {pendingInvites.length > 0 && (
               <PendingInvites
                 invites={pendingInvites}
-                callerTeacherId={callerTeacherId}
                 isWorkspaceAdmin={isWorkspaceAdmin}
                 callerNotebookRoles={callerNotebookRoles}
                 onDataChange={handleDataChange}

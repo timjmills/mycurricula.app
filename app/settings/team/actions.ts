@@ -20,6 +20,7 @@
 // NEVER THROWS for user-facing failures — errors are returned in the result's
 // `error` field so the client can render them gracefully.
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { listWorkspaceMembers, listWorkspaceNotebooks } from "@/lib/admin/queries";
 import type { WorkspaceMembersResult, WorkspaceNotebook } from "@/lib/admin/queries";
@@ -184,6 +185,8 @@ export async function createInviteAction(
       return { ok: false, error: "Could not create invite. Please try again." };
     }
 
+    // Revalidate so the server re-fetches the updated pending-invites list.
+    revalidatePath("/settings/team");
     return {
       ok: true,
       inviteId: data as string,
@@ -214,6 +217,7 @@ export async function revokeInviteAction(
       });
       return { ok: false, error: "Could not revoke the invite. Please try again." };
     }
+    revalidatePath("/settings/team");
     return { ok: true };
   } catch (err) {
     console.error("[team/actions] revokeInviteAction unexpected error", err);
@@ -248,6 +252,7 @@ export async function createNotebookAction(
       }
       return { ok: false, error: "Could not create notebook. Please try again." };
     }
+    revalidatePath("/settings/team");
     return { ok: true, gradeLevelId: data as string };
   } catch (err) {
     console.error("[team/actions] createNotebookAction unexpected error", err);
@@ -277,6 +282,7 @@ export async function renameNotebookAction(
       }
       return { ok: false, error: "Could not rename notebook. Please try again." };
     }
+    revalidatePath("/settings/team");
     return { ok: true };
   } catch (err) {
     console.error("[team/actions] renameNotebookAction unexpected error", err);
@@ -301,6 +307,7 @@ export async function archiveNotebookAction(
       }
       return { ok: false, error: "Could not archive notebook. Please try again." };
     }
+    revalidatePath("/settings/team");
     return { ok: true };
   } catch (err) {
     console.error("[team/actions] archiveNotebookAction unexpected error", err);
@@ -335,6 +342,7 @@ export async function setMemberRoleAction(
       }
       return { ok: false, error: "Could not change role. Please try again." };
     }
+    revalidatePath("/settings/team");
     return { ok: true };
   } catch (err) {
     console.error("[team/actions] setMemberRoleAction unexpected error", err);
@@ -364,6 +372,7 @@ export async function removeMemberAction(
       }
       return { ok: false, error: "Could not remove member. Please try again." };
     }
+    revalidatePath("/settings/team");
     return { ok: true };
   } catch (err) {
     console.error("[team/actions] removeMemberAction unexpected error", err);
@@ -388,6 +397,7 @@ export async function grantWorkspaceAdminAction(
       }
       return { ok: false, error: "Could not grant admin. Please try again." };
     }
+    revalidatePath("/settings/team");
     return { ok: true };
   } catch (err) {
     console.error("[team/actions] grantWorkspaceAdminAction unexpected error", err);
@@ -415,6 +425,7 @@ export async function revokeWorkspaceAdminAction(
       }
       return { ok: false, error: "Could not revoke admin. Please try again." };
     }
+    revalidatePath("/settings/team");
     return { ok: true };
   } catch (err) {
     console.error("[team/actions] revokeWorkspaceAdminAction unexpected error", err);

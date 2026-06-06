@@ -24,7 +24,7 @@ import {
   listPendingInvites,
   getCallerInfo,
 } from "./actions";
-import { TeamPage } from "@/components/team/TeamPage";
+import { TeamPage } from "@/components/team";
 
 // ── Suspense fallback ──────────────────────────────────────────────────────────
 
