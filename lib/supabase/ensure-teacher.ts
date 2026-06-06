@@ -39,21 +39,35 @@
 //     ALLOWED_TEACHER_EMAIL_DOMAINS  (preferred)
 //     CLAUDE_PROVISION_EMAIL_DOMAINS (legacy alias, also honored)
 //
-//   Format: comma-separated `domain` or `domain:school_id` pairs, e.g.
+//   Format: comma-separated `domain:school_id` pairs, e.g.
 //
-//     ALLOWED_TEACHER_EMAIL_DOMAINS="school.edu.qa,example.org:550e8400-e29b-41d4-a716-446655440000"
+//     ALLOWED_TEACHER_EMAIL_DOMAINS="school.edu.qa:550e8400-e29b-41d4-a716-446655440000"
 //
-//   • `domain`            → allow-listed; the target school is resolved by
-//                           query (oldest school → its active grade) ONLY
-//                           because the domain is explicitly trusted.
-//   • `domain:school_id`  → allow-listed AND pinned to that exact school
-//                           (recommended once more than one tenant exists).
+//   • `domain:school_id`  → allow-listed AND pinned to that exact school. This
+//                           is now the ONLY accepted form: every domain MUST
+//                           name the tenant it belongs to.
+//   • bare `domain`       → IGNORED (fails closed). The previous "bare domain →
+//                           resolve the oldest school by created_at" fallback
+//                           was a single-tenant assumption (violates CLAUDE.md's
+//                           multi-tenant rule) and silently enrolled accounts
+//                           into whichever school happened to be first. It is
+//                           gone — there is NO guessed-school fallback.
+//
+//   ── ENV MIGRATION REQUIRED (breaking config change) ──────────────────────
+//   If the live deploy currently sets a BARE domain (e.g.
+//   `ALLOWED_TEACHER_EMAIL_DOMAINS="school.edu.qa"`), it MUST be updated to the
+//   pinned form `"school.edu.qa:<school_uuid>"` BEFORE this change ships, or
+//   EVERY teacher is locked out (provisioning fails closed with reason
+//   `domain-not-pinned-to-school`). Look up the school UUID with
+//   `select id, name, created_at from schools;` and set the secret on the
+//   Cloudflare worker AND in `.env.local`.
 //
 //   If the env var is unset, OR the user's email domain is not in the list,
-//   NO teacher/grade rows are created. The function returns
-//   `{ ok: false, reason: "domain-not-allowlisted" }` and RLS denies access.
-//   **The deploy owner MUST set this env var** (Cloudflare worker secret +
-//   `.env.local`) or no one — including legitimate teachers — gets provisioned.
+//   OR the matched entry has no `:school_id`, NO teacher/grade rows are created.
+//   The function returns `{ ok: false, reason: … }` and RLS denies access. The
+//   reason distinguishes "domain not listed at all" (`domain-not-allowlisted`)
+//   from "listed but not pinned to a school" (`domain-not-pinned-to-school`) so
+//   a lockout is diagnosable from logs.
 //   Still multi-grade-ready (provisions onto the first active grade; multi-grade
 //   assignment is a later admin concern, not auth-time) and idempotent for
 //   already-provisioned users.
@@ -67,10 +81,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Parse the email-domain allow-list env var into a domain→schoolId? map.
  *
  * Reads `ALLOWED_TEACHER_EMAIL_DOMAINS` (preferred) and falls back to the
- * legacy `CLAUDE_PROVISION_EMAIL_DOMAINS`. Format: comma-separated `domain`
- * or `domain:school_id` entries. Domains are lower-cased and trimmed; a
- * leading `@` (if someone writes `@school.edu`) is stripped. Blank entries
- * and entries with an empty domain are ignored.
+ * legacy `CLAUDE_PROVISION_EMAIL_DOMAINS`. Format: comma-separated
+ * `domain:school_id` entries. Domains are lower-cased and trimmed; a leading
+ * `@` (if someone writes `@school.edu`) is stripped. Blank entries and entries
+ * with an empty domain are ignored.
+ *
+ * A bare `domain` (no `:school_id`) is RETAINED in the map with a `null` value
+ * rather than dropped — this lets the caller distinguish "domain not listed at
+ * all" from "listed but not pinned to a school" and report the explicit
+ * `domain-not-pinned-to-school` reason for the latter, so a misconfiguration
+ * (e.g. an un-migrated bare-domain env var) is diagnosable from logs. Both
+ * still FAIL CLOSED — a `null` (unpinned) entry never resolves to a school.
  *
  * Returns an empty Map when the env var is unset/empty — which fails closed
  * (every lookup misses, so nothing is provisioned).
@@ -155,38 +176,29 @@ export async function ensureTeacherRecord(
       return { ok: false, reason: "domain-not-allowlisted" };
     }
     const pinnedSchoolId = allowed.get(domain) ?? null;
-
-    // Resolve the target school. If the allow-list entry pinned a school_id,
-    // use it exactly; otherwise the domain is explicitly trusted, so resolving
-    // the (single-tenant) seeded school by query is acceptable.
-    let schoolId: string;
-    if (pinnedSchoolId) {
-      const { data: school, error: schoolErr } = await admin
-        .from("schools")
-        .select("id")
-        .eq("id", pinnedSchoolId)
-        .maybeSingle();
-      if (schoolErr)
-        return { ok: false, reason: `schools: ${schoolErr.message}` };
-      if (!school)
-        return {
-          ok: false,
-          reason: `allow-listed school_id not found: ${pinnedSchoolId}`,
-        };
-      schoolId = school.id as string;
-    } else {
-      const { data: school, error: schoolErr } = await admin
-        .from("schools")
-        .select("id")
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (schoolErr)
-        return { ok: false, reason: `schools: ${schoolErr.message}` };
-      if (!school)
-        return { ok: false, reason: "no school row (seed not applied)" };
-      schoolId = school.id as string;
+    // A domain MUST be pinned to a specific tenant. There is NO "guess the
+    // oldest school" fallback — that was a single-tenant assumption (CLAUDE.md
+    // multi-tenant rule) that silently enrolled accounts into whichever school
+    // sorted first. A listed-but-unpinned domain fails closed with an explicit,
+    // diagnosable reason (see the ENV MIGRATION note in the file header).
+    if (!pinnedSchoolId) {
+      return { ok: false, reason: "domain-not-pinned-to-school" };
     }
+
+    // Resolve the target school by its pinned id, exactly.
+    const { data: school, error: schoolErr } = await admin
+      .from("schools")
+      .select("id")
+      .eq("id", pinnedSchoolId)
+      .maybeSingle();
+    if (schoolErr)
+      return { ok: false, reason: `schools: ${schoolErr.message}` };
+    if (!school)
+      return {
+        ok: false,
+        reason: `allow-listed school_id not found: ${pinnedSchoolId}`,
+      };
+    const schoolId = school.id as string;
 
     // Resolve the active grade for that school.
     const { data: grade, error: gradeErr } = await admin
@@ -205,6 +217,77 @@ export async function ensureTeacherRecord(
     const gradeId = grade.id as string;
     const displayName = (email.split("@")[0] || "Teacher").slice(0, 120);
 
+    // ── Cross-tenant hardening ───────────────────────────────────────────────
+    // Before writing anything, reject if this auth uid is already bound to a
+    // DIFFERENT school, or already carries grade rows that belong to a different
+    // school. A domain re-pin (or a malicious/buggy path) must never quietly
+    // migrate an existing teacher across tenants or leave them straddling two.
+    // Pure hardening — a correctly-configured single-tenant teacher has no
+    // mismatched rows, so this never locks out a legitimate user.
+    const { data: existingTeacher, error: existingTeacherErr } = await admin
+      .from("teachers")
+      .select("id, school_id, default_grade_level_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (existingTeacherErr)
+      return {
+        ok: false,
+        reason: `teachers(existing): ${existingTeacherErr.message}`,
+      };
+    if (existingTeacher?.school_id && existingTeacher.school_id !== schoolId) {
+      return { ok: false, reason: "existing teacher school mismatch" };
+    }
+
+    // Validate that every existing grade assignment AND the existing
+    // default_grade_level_id belongs to the resolved school.
+    const { data: assignments, error: assignmentsErr } = await admin
+      .from("teacher_grade_assignments")
+      .select("grade_level_id")
+      .eq("teacher_id", user.id);
+    if (assignmentsErr)
+      return {
+        ok: false,
+        reason: `teacher_grade_assignments(existing): ${assignmentsErr.message}`,
+      };
+
+    const gradeIdsToValidate = new Set<string>();
+    for (const assignment of assignments ?? []) {
+      if (assignment.grade_level_id) {
+        gradeIdsToValidate.add(assignment.grade_level_id as string);
+      }
+    }
+    if (existingTeacher?.default_grade_level_id) {
+      gradeIdsToValidate.add(existingTeacher.default_grade_level_id as string);
+    }
+
+    if (gradeIdsToValidate.size > 0) {
+      const gradeIds = [...gradeIdsToValidate];
+      const { data: existingGrades, error: existingGradesErr } = await admin
+        .from("grade_levels")
+        .select("id, school_id")
+        .in("id", gradeIds);
+      if (existingGradesErr)
+        return {
+          ok: false,
+          reason: `grade_levels(existing): ${existingGradesErr.message}`,
+        };
+      const schoolByGrade = new Map(
+        (existingGrades ?? []).map((row) => [
+          row.id as string,
+          row.school_id as string,
+        ]),
+      );
+      for (const existingGradeId of gradeIds) {
+        // Unknown grade id (not found) OR a grade in another school → mismatch.
+        if (schoolByGrade.get(existingGradeId) !== schoolId) {
+          return {
+            ok: false,
+            reason: "existing grade assignment school mismatch",
+          };
+        }
+      }
+    }
+
     // Upsert the teachers row. PK = auth uid; on-conflict ignore so we don't
     // clobber a teacher's later-edited preferences (display_name etc.).
     const { error: teacherErr } = await admin.from("teachers").upsert(
@@ -221,6 +304,25 @@ export async function ensureTeacherRecord(
     );
     if (teacherErr)
       return { ok: false, reason: `teachers: ${teacherErr.message}` };
+
+    // Re-verify after the upsert (provisioning atomicity). The upsert uses
+    // ignoreDuplicates, so under a CONCURRENT first-provision for the same uid
+    // the loser's write is a no-op against the winner's row — and the pre-write
+    // cross-tenant check above can't see a row the racing request hasn't
+    // committed yet. Re-read the persisted teacher and confirm it is bound to
+    // the school we resolved BEFORE attaching any grade assignment, so a race
+    // during a domain re-pin can never bind an assignment to the wrong tenant.
+    const { data: persistedTeacher, error: persistedErr } = await admin
+      .from("teachers")
+      .select("school_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (persistedErr)
+      return { ok: false, reason: `teachers(verify): ${persistedErr.message}` };
+    if (!persistedTeacher)
+      return { ok: false, reason: "teachers(verify): row missing after upsert" };
+    if (persistedTeacher.school_id !== schoolId)
+      return { ok: false, reason: "existing teacher school mismatch" };
 
     // Upsert the grade assignment. Unique (teacher_id, grade_level_id); ignore
     // duplicates so a re-run is a no-op and never escalates an existing role.
