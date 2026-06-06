@@ -77,6 +77,40 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+// ── Provisioning mode (ultraplan §4 / Wave 1) ─────────────────────────────
+//
+// The app provisions a freshly-authenticated user one of two ways:
+//
+//   • "domain"     — TODAY'S behavior, verbatim: fail-closed enrollment into a
+//                    tenant via the `ALLOWED_TEACHER_EMAIL_DOMAINS` allow-list
+//                    (the school-first model). This is the DEFAULT and the only
+//                    implemented path.
+//   • "individual" — the teacher-first model (ultraplan): every signup gets its
+//                    own private workspace. NOT IMPLEMENTED in Wave 1 — branched
+//                    here as a fail-closed stub so the dispatch wiring exists
+//                    before the real implementation lands (Wave 3).
+//
+// The mode is read ONCE through `provisioningMode()` (a typed reader, not
+// scattered `process.env` reads) so the branch point is single + greppable.
+// Unknown / unset / malformed → "domain", so the default deploy is unchanged.
+
+export type ProvisioningMode = "domain" | "individual";
+
+/**
+ * Resolve the active provisioning mode from `process.env.PROVISIONING_MODE`.
+ *
+ * Only the exact lowercase token `"individual"` selects the individual model;
+ * EVERYTHING else — unset, empty, mixed-case typo, garbage — resolves to
+ * `"domain"`. Failing safe to the current behavior guarantees that a missing or
+ * fat-fingered env var never silently flips a deploy into the (stubbed,
+ * fail-closed) individual path.
+ */
+export function provisioningMode(): ProvisioningMode {
+  return process.env.PROVISIONING_MODE === "individual"
+    ? "individual"
+    : "domain";
+}
+
 /**
  * Parse the email-domain allow-list env var into a domain→schoolId? map.
  *
@@ -146,8 +180,17 @@ export interface EnsureTeacherResult {
 }
 
 /**
- * Idempotently ensure the `teachers` + `teacher_grade_assignments` rows exist
- * for an authenticated auth user. Uses the service-role admin client.
+ * THE single provisioning entry point. Every auth path (Google GSI, OAuth code
+ * callback, Claude bypass) calls this one function — fa68392 already converged
+ * the three call sites onto it, and Wave 1 keeps that convergence: there is no
+ * other provisioning hook (the middleware refreshes the session only; it does
+ * NOT provision). Branch the provisioning STRATEGY here, behind
+ * `provisioningMode()`, so the dispatch lives in exactly one place.
+ *
+ *   • "domain" (default)  → `ensureTeacherDomain` — the existing allow-list
+ *                           behavior, byte-for-byte unchanged.
+ *   • "individual"        → `ensureIndividualWorkspace` — Wave 3; a fail-closed
+ *                           stub for now.
  *
  * Never throws — returns `{ ok: false, reason }` on any failure so the auth
  * flow that calls it can continue (a failed provision must not block login;
@@ -155,6 +198,26 @@ export interface EnsureTeacherResult {
  * later request).
  */
 export async function ensureTeacherRecord(
+  admin: SupabaseClient,
+  user: AuthUserLike,
+): Promise<EnsureTeacherResult> {
+  if (provisioningMode() === "individual") {
+    return ensureIndividualWorkspace(admin, user);
+  }
+  return ensureTeacherDomain(admin, user);
+}
+
+/**
+ * Domain-allow-list provisioning — the school-first model and the DEFAULT.
+ *
+ * This is the original `ensureTeacherRecord` body, moved verbatim behind the
+ * `provisioningMode()` dispatch above with ZERO logic change. In `"domain"`
+ * mode (the default) the call path is identical to before Wave 1.
+ *
+ * Idempotently ensures the `teachers` + `teacher_grade_assignments` rows exist
+ * for an authenticated auth user. Uses the service-role admin client.
+ */
+async function ensureTeacherDomain(
   admin: SupabaseClient,
   user: AuthUserLike,
 ): Promise<EnsureTeacherResult> {
@@ -349,4 +412,31 @@ export async function ensureTeacherRecord(
       reason: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+/**
+ * Individual (teacher-first) provisioning — STUB (ultraplan Wave 3).
+ *
+ * When `PROVISIONING_MODE="individual"`, every fresh signup should land in its
+ * OWN private workspace (a hidden per-team `schools` row + 8 subjects + a
+ * school_year + a `teachers` row + a lead TGA + self STM + a team-of-1). None of
+ * that is built yet — Wave 1 only scaffolds the dispatch branch. Until the real
+ * implementation lands, this fails CLOSED (same posture as a domain-allow-list
+ * miss): no rows are written, the caller leaves no session behind, and the
+ * reason is explicit + diagnosable from logs.
+ *
+ * The params are accepted to lock the call signature against `ensureTeacherRecord`
+ * so Wave 3 can fill in the body without touching any call site; they are
+ * intentionally unused for now.
+ */
+export async function ensureIndividualWorkspace(
+  // Wave-1 stub: params are part of the locked signature but unused until the
+  // Wave-3 body lands. Disable the unused-vars warning rather than rename, so
+  // the real implementation drops in without touching the signature.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _admin: SupabaseClient,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _user: AuthUserLike,
+): Promise<EnsureTeacherResult> {
+  return { ok: false, reason: "individual-provisioning-not-implemented" };
 }

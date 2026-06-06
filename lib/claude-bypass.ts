@@ -297,6 +297,10 @@ async function mintSession(
   // session is left behind; both callers audit `result.reason` (which carries
   // the `teacher_provision: …` detail) so the denial signal is preserved.
   if (process.env.CLAUDE_BYPASS_PROVISION !== "0") {
+    // CONVERGENCE (ultraplan Wave 1): the single provisioning hook, shared with
+    // /auth/gsi and the OAuth callback. `ensureTeacherRecord` branches on
+    // `PROVISIONING_MODE` internally (default "domain"); under "individual" the
+    // bypass user gets its own workspace too (ultraplan §8 R9) once Wave 3 lands.
     const provision = await ensureTeacherRecord(admin, bypassUser);
     if (!provision.ok) {
       return {
