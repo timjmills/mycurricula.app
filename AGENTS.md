@@ -144,9 +144,28 @@ Re-run the review after fixes until Claude Code reports `NO BLOCKING ISSUES`, or
 until only justified Low/Medium items remain.
 
 If local policy, sandboxing, authentication, or CLI availability prevents the
-review command from running, do not bypass the restriction or send code through
-another path. Report the blocker and the safest available local verification
-instead.
+review command from running (for example, the `claude` CLI is unavailable in the
+environment), do not bypass the restriction or send code through another path.
+Report the blocker, then do BOTH of the following — neither substitutes for the
+other:
+
+1. **Mandatory self-administered adversarial review.** You MUST perform the
+   review yourself, to the same standard the reviewer would. This is NOT optional
+   and is NOT satisfied by lint/typecheck/build alone. Adopt the reviewer persona
+   from the prompt above ("strict, skeptical Senior Security & QA Engineer"),
+   read the full uncommitted diff (`git diff` + `git diff --cached`), and report
+   findings in the SAME format — file/line, severity (Critical / High / Medium /
+   Low), the concrete failure scenario, and a suggested fix. Hunt for logic
+   errors, security flaws, race conditions, unhandled edge cases, broken error
+   handling, and missing/wrong tests. Be adversarial against your OWN code —
+   assume it is wrong until proven otherwise. Fix every legitimate Critical and
+   High before committing; justify any dismissed finding. Conclude with
+   `NO BLOCKING ISSUES` (or the remaining justified Low/Medium items). State
+   plainly that this was a self-administered review (the gate was unavailable) so
+   the substitution is on the record.
+
+2. **Local verification stack**, on top of the self-review — the project's lint,
+   typecheck, build, and the relevant test suite.
 
 ## Sandbox Discipline
 

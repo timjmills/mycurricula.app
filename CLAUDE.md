@@ -323,11 +323,34 @@ intended behavior. Re-run the gate after fixes until Codex outputs
 
 **If the gate cannot run** (Codex not installed, not authenticated, sandbox
 denied by local policy, network unavailable, etc.), do not bypass the
-restriction or send code through another path. Report the blocker to the user
-and fall back to the strongest available local verification — typically
-`npm run lint && npx tsc --noEmit && npm run build`, the responsive probe
-script (`node scripts/probe-uxa.mjs`), and a manual diff re-read against the
-review-prompt checklist.
+restriction or send code through another path. Report the blocker to the user,
+then do BOTH of the following — neither substitutes for the other:
+
+1. **Mandatory self-administered adversarial review.** You MUST perform the
+   review yourself, to the same standard Codex would. This is NOT optional and
+   is NOT satisfied by lint/tsc/build alone. Adopt the reviewer persona from the
+   review prompt above ("strict, skeptical Senior Security & QA Engineer"), read
+   the full uncommitted diff (`git diff` + `git diff --cached`), and report
+   findings in the SAME format the prompt demands — file/line, severity
+   (Critical / High / Medium / Low), the concrete failure scenario, and a
+   suggested fix. Hunt specifically for logic errors, security flaws, race
+   conditions, unhandled edge cases, broken error handling, and missing/wrong
+   tests. Be adversarial against your OWN code — assume it is wrong until proven
+   otherwise. Fix every legitimate Critical and High before committing; justify
+   any dismissed finding. Conclude with `NO BLOCKING ISSUES` (or the remaining
+   justified Low/Medium items), exactly as the gate would. State plainly in your
+   report that this was a self-administered review (Codex was unavailable) so the
+   substitution is on the record.
+
+   **This applies on every cloud / remote (Claude Code on the web) session**,
+   where Codex is not installed and cannot act as the gate — there, the
+   self-review IS the gate, and it runs for every logic / security /
+   data-handling / public-interface change, every time, before the commit lands.
+
+2. **Local verification stack**, on top of the self-review — typically
+   `npm run lint && npx tsc --noEmit && npm run build`, the responsive probe
+   script (`node scripts/probe-uxa.mjs`), and the relevant test suite
+   (`npm run test`).
 
 ### Known sandbox limitations + mitigations (Windows, 2026-05-28)
 
