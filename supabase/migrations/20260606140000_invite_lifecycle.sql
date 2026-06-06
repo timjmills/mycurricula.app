@@ -439,13 +439,22 @@ begin
   -- ── ALREADY A MEMBER → report cleanly (review H2) ─────────────────────
   -- A caller already on this team must NOT re-run the grants: the on-conflict
   -- do-nothing inserts would silently drop the new invite's role (a misleading
-  -- audit + no actual change). Report 'already_member' and leave the pending
-  -- invite untouched (it may be an open link a different new teacher can still
-  -- use, or it will expire).
+  -- audit + no actual change). Report 'already_member'.
   if exists (
     select 1 from team_memberships m
     where m.team_id = v_inv.team_id and m.teacher_id = v_uid
   ) then
+    -- Seat hygiene (review L3): if this was an EMAIL-BOUND invite to that member,
+    -- retire it (accepted) so its reserved seat is released now instead of being
+    -- held until expiry. No membership/grant/audit is written — the caller is
+    -- already in with their existing role. An OPEN-LINK invite (null email) is
+    -- deliberately left pending: its seat is legitimately reserved for a future
+    -- NEW joiner who can still use the link.
+    if v_inv.invitee_email is not null then
+      update invitations
+         set status = 'accepted', accepted_by = v_uid, accepted_at = now()
+       where id = v_inv.id and status = 'pending';
+    end if;
     return query select 'already_member'::text, v_inv.team_id, v_inv.target_grade_level_id;
     return;
   end if;
