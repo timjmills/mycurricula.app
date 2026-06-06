@@ -446,6 +446,55 @@ export async function ensureIndividualWorkspace(
   if (!user?.id) return { ok: false, reason: "missing auth user id" };
 
   try {
+    // ── Already provisioned? Return early; do NOT call the provisioning RPC. ──
+    // provision_individual_workspace is fail-closed (guard #2): for ANY existing
+    // teachers row that does not OWN a team — i.e. every INVITED member and every
+    // backfilled non-owner teammate — it RAISES. Calling it on each sign-in would
+    // surface that raise as a hard, fail-closed login failure and lock teammates
+    // out. An existing teachers row means the account is already set up (owner OR
+    // member); resolve the grade to land on and return. The RPC is reserved for
+    // brand-new accounts (no teachers row yet).
+    const { data: existing, error: existingErr } = await admin
+      .from("teachers")
+      .select("default_grade_level_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (existingErr) {
+      return {
+        ok: false,
+        reason: `ensureIndividualWorkspace: teacher lookup failed: ${existingErr.message}`,
+      };
+    }
+    if (existing) {
+      // Land on the teacher's default grade if set, else any grade they are
+      // assigned to (an invited member always holds a TGA from redeem/backfill;
+      // the owner holds one from provisioning/backfill).
+      let gradeLevelId =
+        ((existing as Record<string, unknown>).default_grade_level_id as
+          | string
+          | null
+          | undefined) ?? undefined;
+      if (!gradeLevelId) {
+        const { data: tga } = await admin
+          .from("teacher_grade_assignments")
+          .select("grade_level_id")
+          .eq("teacher_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        gradeLevelId =
+          ((tga as Record<string, unknown> | null)?.grade_level_id as
+            | string
+            | undefined) ?? undefined;
+      }
+      if (!gradeLevelId) {
+        return {
+          ok: false,
+          reason: "ensureIndividualWorkspace: existing teacher has no grade",
+        };
+      }
+      return { ok: true, teacherId: user.id, gradeLevelId };
+    }
+
     const email = (user.email ?? "").trim();
     // Display name = email local-part (same derivation as the domain path); the
     // RPC clamps/falls back to "Teacher" if this is empty.
