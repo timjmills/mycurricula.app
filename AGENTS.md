@@ -149,20 +149,34 @@ environment), do not bypass the restriction or send code through another path.
 Report the blocker, then do BOTH of the following — neither substitutes for the
 other:
 
-1. **Mandatory self-administered adversarial review.** You MUST perform the
-   review yourself, to the same standard the reviewer would. This is NOT optional
-   and is NOT satisfied by lint/typecheck/build alone. Adopt the reviewer persona
-   from the prompt above ("strict, skeptical Senior Security & QA Engineer"),
-   read the full uncommitted diff (`git diff` + `git diff --cached`), and report
-   findings in the SAME format — file/line, severity (Critical / High / Medium /
-   Low), the concrete failure scenario, and a suggested fix. Hunt for logic
-   errors, security flaws, race conditions, unhandled edge cases, broken error
-   handling, and missing/wrong tests. Be adversarial against your OWN code —
-   assume it is wrong until proven otherwise. Fix every legitimate Critical and
-   High before committing; justify any dismissed finding. Conclude with
-   `NO BLOCKING ISSUES` (or the remaining justified Low/Medium items). State
-   plainly that this was a self-administered review (the gate was unavailable) so
-   the substitution is on the record.
+1. **Mandatory adversarial review — run by whichever reviewer is the more
+   rigorous for the change.** The gate's defining property is INDEPENDENT
+   adversarial review — a reviewer that did not author the code. When the
+   primary reviewer is unavailable, choose the substitute that best preserves
+   that, by rigor:
+   - **An independent review pass** that did NOT author the diff (e.g. a freshly
+     spawned review agent) is the closest substitute: clean eyes, none of the
+     author's blind spots. Prefer it for security / auth / data-handling /
+     migration / privilege / public-interface changes.
+   - **Your own self-administered review** brings full intent + integration
+     context. Prefer it when that context is scarce or an independent pass isn't
+     practical.
+   - **Both** is the most rigorous, and is REQUIRED for high-consequence changes
+     (auth, RLS/privileges, data migrations — tenant-leak or lockout risks).
+   - If the two are genuinely equally good for the change at hand, either alone
+     suffices — pick one.
+
+   Regardless of who reviews: the reviewer must be INDEPENDENT of the author (an
+   implementation pass reviewing its OWN diff does not count); adopt the "strict,
+   skeptical Senior Security & QA Engineer" persona; read the full diff; and
+   report file/line, severity (Critical / High / Medium / Low), the concrete
+   failure scenario, and a fix. NOT satisfied by lint/typecheck/build alone. You
+   OWN the outcome — critically validate every finding (never rubber-stamp a
+   `NO BLOCKING ISSUES`), fix every legitimate Critical and High before
+   committing, justify any dismissal, and conclude with `NO BLOCKING ISSUES` (or
+   the remaining justified Low/Medium items). State plainly which reviewer(s) ran
+   and that the primary gate was unavailable, so the substitution is on the
+   record.
 
 2. **Local verification stack**, on top of the self-review — the project's lint,
    typecheck, build, and the relevant test suite.
