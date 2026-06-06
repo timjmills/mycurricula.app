@@ -475,12 +475,20 @@ export async function ensureIndividualWorkspace(
           | null
           | undefined) ?? undefined;
       if (!gradeLevelId) {
-        const { data: tga } = await admin
+        const { data: tga, error: tgaErr } = await admin
           .from("teacher_grade_assignments")
           .select("grade_level_id")
           .eq("teacher_id", user.id)
           .limit(1)
           .maybeSingle();
+        // Distinguish a transient read failure from the genuine "no grade" end
+        // state below, so a one-off denial is diagnosable in logs (audit Low).
+        if (tgaErr) {
+          return {
+            ok: false,
+            reason: `ensureIndividualWorkspace: grade lookup failed: ${tgaErr.message}`,
+          };
+        }
         gradeLevelId =
           ((tga as Record<string, unknown> | null)?.grade_level_id as
             | string
