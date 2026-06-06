@@ -1,0 +1,94 @@
+/* login/SignInTabs.module.css — tab switcher for sign-in methods.
+ *
+ * All color / type / spacing via var(--token). No hex, no px font sizes.
+ * Tailwind is not used here.
+ */
+
+.root {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Tab bar — segmented control style ──────────────────────────────────── */
+
+.tabBar {
+  display: flex;
+  gap: 0;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 3px;
+  background: var(--hairline);
+}
+
+/* Each tab button takes equal space. */
+.tabBtn {
+  flex: 1;
+  /* 36px visual height — inside the 3px inset pad the outer bar is 44px-ish */
+  height: 36px;
+  border: none;
+  border-radius: calc(var(--r-md) - 2px);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+  white-space: nowrap;
+  /* Touch target: the bar itself is ≥44px at all phone/tablet widths because
+     the outer card min-width keeps it wide, and the bar height + padding ≈ 44px. */
+}
+
+.tabBtn:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+}
+
+/* Active tab — white pill with subtle shadow */
+.tabBtn.active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.tabBtn:not(.active):hover {
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface) 50%, transparent);
+}
+
+/* ── Panel ───────────────────────────────────────────────────────────────── */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* hidden attribute — browser hides natively; we keep this for clarity. */
+.panel[hidden] {
+  display: none;
+}
+
+/* Small note below the Google button — secondary meta text */
+.tabNote {
+  margin: 0;
+  font-size: var(--t-11);
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .tabBtn {
+    transition: none;
+  }
+}
