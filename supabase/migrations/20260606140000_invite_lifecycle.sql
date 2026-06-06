@@ -195,6 +195,35 @@ begin
       p_target_grade_level_id, p_team_id;
   end if;
 
+  -- ── INVITER MUST BE ABLE TO READ THE TARGET GRADE (review M2) ─────────
+  -- The grade is pinned to the team's SCHOOL above; also require the caller to
+  -- be able to READ that grade. This closes the gap where a member with a TGA
+  -- for only one grade mints an invite into another grade of the same school,
+  -- and prevents an opaque rollback inside log_audit_event's grade gate (the
+  -- audit below passes this grade) for a future multi-grade team.
+  if not can_read_grade(p_target_grade_level_id) then
+    raise exception
+      'create_invite: caller cannot access the target grade %',
+      p_target_grade_level_id;
+  end if;
+
+  -- ── GRANTABLE-ROLE GUARD (review H1 — escalation via unbounded p_role) ─
+  -- "Any member may invite" (decision #4) is bounded BY ROLE: a plain member may
+  -- mint VIEWER invites ('teacher') only; minting a 'lead' invite (which grants
+  -- master-write on redeem) requires the caller to already be a lead/grade_admin
+  -- of the target grade. 'grade_admin' is NEVER an invite role (it is a
+  -- school-admin grant, outside the §5 viewer/collaborator/lead mapping) — reject
+  -- it outright. Without this, a fork-only viewer could invite a second account
+  -- they control as 'lead'/'grade_admin' and manufacture master/admin access.
+  if coalesce(p_role, 'teacher') not in ('teacher', 'lead') then
+    raise exception 'create_invite: % is not an invitable role', p_role;
+  end if;
+  if coalesce(p_role, 'teacher') = 'lead'
+     and not is_grade_lead(p_target_grade_level_id) then
+    raise exception
+      'create_invite: only a grade lead may invite at the lead role';
+  end if;
+
   -- ── ATOMIC SEAT-CAP CHECK ─────────────────────────────────────────────
   -- A seat is consumed by an active membership OR a still-pending invite.
   -- (Both counts are read under the teams row lock taken above.)
@@ -227,8 +256,14 @@ begin
     returning id into v_invite_id;
   exception
     when unique_violation then
+      -- Two constraints can fire here: the partial-unique
+      -- invitations_one_pending_per_email (a second pending invite to the same
+      -- email on this team) OR the global-unique token_hash (a token collision —
+      -- astronomically unlikely with a 256-bit hash, but possible on a buggy
+      -- client RNG). Report both possibilities rather than mislabeling a token
+      -- collision as an email duplicate (review L2).
       raise exception
-        'create_invite: a pending invite already exists for this email/token on team %',
+        'create_invite: a pending invite already exists for this email on team %, or the token is already in use (regenerate the token)',
         p_team_id
         using errcode = 'unique_violation';
   end;
@@ -266,31 +301,56 @@ $$;
 -- ###########################################################################
 -- The invitee (auth.uid()) accepts a pending invite by its token hash. Creates
 -- the membership + grade assignment + per-role subject memberships and marks the
--- invite accepted. Idempotent on a re-redeem by the SAME accepter.
+-- invite accepted.
+--
+-- RETURN CONTRACT (review M1/H2): returns ONE row (redeem_status, team_id,
+-- grade_level_id). Terminal invite states are reported via `redeem_status`
+-- rather than `raise`, because a raise rolls back the whole transaction — which
+-- for lazy expiry would also undo the very status='expired' write + audit we
+-- need to persist (else the held seat is never freed). redeem_status values:
+--   'accepted'         success, or idempotent re-redeem by the same caller —
+--                      team_id + grade_level_id are set.
+--   'already_member'   caller is already on this team — ids set so the UI can
+--                      route them in; the pending invite is left untouched.
+--   'already_accepted' the invite was already accepted by someone else.
+--   'revoked'          the invite was revoked.
+--   'expired'          expired; lazy expiry PERSISTS the transition + audit here.
+--   'email_mismatch'   email-bound invite; caller's email differs.
+--   'seat_full'        team is at capacity.
+--   'invalid'          unknown token, or the team/grade no longer exists.
+-- For every status other than 'accepted'/'already_member' the ids are NULL. Only
+-- a null auth.uid() / null token (programming errors, never normal flow) raise.
 --
 -- LOCKING / ATOMICITY:
---   * The invitation row is locked (FOR UPDATE) so two concurrent redeems of
---     the same token serialize; the second sees status<>'pending' and no-ops/raises.
---   * The teams row is locked (FOR UPDATE) and the seat cap RE-CHECKED at redeem
---     (a pending invite reserves a seat, but re-verify to avoid overfill from
---     any path that freed/added seats between create and redeem, ultraplan §8 R6).
+--   * The invitation row is locked (FOR UPDATE) so two concurrent redeems of the
+--     same token serialize; the second sees status<>'pending' and reports it.
+--   * The teams row is locked (FOR UPDATE) and the seat cap re-checked at redeem.
+--     INVARIANT (review L1): team_memberships rows are created ONLY by this RPC
+--     (provisioning seeds a different, NEW team's owner), so create_invite's
+--     "members + pending" cap accounting and this "active members" re-check
+--     cannot overshoot the cap.
 --
 -- EMAIL BINDING: if invitee_email is non-null it MUST match the caller's email
 -- (case/space-insensitive). Open-link invites (null email) skip this.
 --
--- LAZY EXPIRY: an expired pending invite is transitioned to 'expired' (+ audit)
--- and the redeem raises.
---
 -- §5 REDEEM HAZARD FIX (R2): STM rows are written with can_edit_master set
--- EXPLICITLY per role — true ONLY for 'lead', false otherwise — and viewers
--- ('teacher' with no master intent) ... see the role mapping below. We NEVER
--- rely on the column's default of true.
+-- EXPLICITLY per role — true ONLY for 'lead'/'grade_admin', false for 'teacher'
+-- (viewer/collaborator). We NEVER rely on the column's default of true. Because
+-- create_invite now forbids minting 'grade_admin' invites and gates 'lead'
+-- invites behind grade-lead authority (review H1), a 'teacher' redeemer here can
+-- only have come from a viewer invite.
 --
--- Returns (team_id, grade_level_id).
-create or replace function redeem_invite(
+-- NOTE: the OUT column is named `redeem_status` (not `status`) so it cannot be
+-- confused with the `invitations.status` COLUMN inside the UPDATE ... WHERE
+-- status='pending' clauses (plpgsql variable/column ambiguity). The return type
+-- changed from the first cut, so DROP then CREATE (CREATE OR REPLACE cannot
+-- change a function's return type); DROP IF EXISTS is a no-op on a fresh reset
+-- and keeps the migration safe to re-run.
+drop function if exists redeem_invite(text);
+create function redeem_invite(
   p_token_hash text
 )
-returns table (team_id uuid, grade_level_id uuid)
+returns table (redeem_status text, team_id uuid, grade_level_id uuid)
 language plpgsql
 security definer
 set search_path = public
@@ -319,36 +379,38 @@ begin
 
   if v_inv.id is null then
     -- Do not reveal whether a token ever existed beyond "invalid".
-    raise exception 'redeem_invite: invalid or unknown invite';
-  end if;
-
-  -- ── IDEMPOTENCY: already accepted BY THIS caller → return, no-op ───────
-  -- A re-redeem by the same accepter converges on the same membership/grade
-  -- rather than raising (the membership/TGA/STM inserts below are also guarded
-  -- on-conflict, so this is belt-and-suspenders for the common re-click case).
-  if v_inv.status = 'accepted' and v_inv.accepted_by = v_uid then
-    return query select v_inv.team_id, v_inv.target_grade_level_id;
+    return query select 'invalid'::text, null::uuid, null::uuid;
     return;
   end if;
 
-  -- ── STATE GATE ────────────────────────────────────────────────────────
-  if v_inv.status <> 'pending' then
-    raise exception 'redeem_invite: invite is % (not pending)', v_inv.status
-      using errcode = 'check_violation';
+  -- ── IDEMPOTENCY: already accepted BY THIS caller → success, no-op ──────
+  if v_inv.status = 'accepted' and v_inv.accepted_by = v_uid then
+    return query select 'accepted'::text, v_inv.team_id, v_inv.target_grade_level_id;
+    return;
   end if;
 
-  -- ── LAZY EXPIRY ───────────────────────────────────────────────────────
+  -- ── TERMINAL (non-pending) STATES → report, do not mutate ─────────────
+  -- accepted-by-someone-else, revoked, or already-marked expired.
+  if v_inv.status <> 'pending' then
+    return query select
+      (case when v_inv.status = 'accepted' then 'already_accepted' else v_inv.status end)::text,
+      null::uuid, null::uuid;
+    return;
+  end if;
+
+  -- ── LAZY EXPIRY — PERSIST then report (no raise → the write commits) ───
   if v_inv.expires_at <= now() then
-    update invitations set status = 'expired' where id = v_inv.id;
-    -- Audit the lazy expiry. NULL grade so the gate (caller has no TGA here)
-    -- does not block; NULL school for the same reason (the expirer may be any
-    -- signed-in user who clicked a stale link, not necessarily a team member).
+    update invitations set status = 'expired'
+     where id = v_inv.id and status = 'pending';
+    -- Audit the lazy expiry. NULL grade + NULL school: the expirer may be any
+    -- signed-in user who clicked a stale link, not necessarily a team member, so
+    -- neither scope gate would pass.
     perform log_audit_event(
       'invite_expired', 'role_assignment', v_inv.id, null, null,
       jsonb_build_object('team_id', v_inv.team_id, 'reason', 'expired_on_redeem')
     );
-    raise exception 'redeem_invite: invite has expired'
-      using errcode = 'check_violation';
+    return query select 'expired'::text, null::uuid, null::uuid;
+    return;
   end if;
 
   -- ── EMAIL BINDING ─────────────────────────────────────────────────────
@@ -357,15 +419,12 @@ begin
     from teachers t where t.id = v_uid;
     -- citext compares case-insensitively; btrim handles incidental whitespace.
     if v_caller_email is null or v_caller_email <> v_inv.invitee_email then
-      raise exception 'redeem_invite: invite is bound to a different email address'
-        using errcode = 'check_violation';
+      return query select 'email_mismatch'::text, null::uuid, null::uuid;
+      return;
     end if;
   end if;
 
-  -- ── ATOMIC SEAT RE-CHECK ──────────────────────────────────────────────
-  -- Lock the team row, then count ACTIVE members only (the pending invite being
-  -- redeemed already "reserved" a seat; we verify active members < cap so the
-  -- conversion pending→active cannot push the active count past the cap).
+  -- ── LOCK TEAM + CAPTURE ───────────────────────────────────────────────
   select t.school_id, t.seat_cap
     into v_school_id, v_seat_cap
   from teams t
@@ -373,23 +432,33 @@ begin
   for update;
 
   if v_school_id is null then
-    raise exception 'redeem_invite: team no longer exists';
+    return query select 'invalid'::text, null::uuid, null::uuid;  -- team gone
+    return;
   end if;
 
-  -- If the caller is ALREADY an active member (e.g. re-redeem of a different
-  -- token, or membership created out-of-band), do not consume another seat.
-  if not exists (
+  -- ── ALREADY A MEMBER → report cleanly (review H2) ─────────────────────
+  -- A caller already on this team must NOT re-run the grants: the on-conflict
+  -- do-nothing inserts would silently drop the new invite's role (a misleading
+  -- audit + no actual change). Report 'already_member' and leave the pending
+  -- invite untouched (it may be an open link a different new teacher can still
+  -- use, or it will expire).
+  if exists (
     select 1 from team_memberships m
     where m.team_id = v_inv.team_id and m.teacher_id = v_uid
   ) then
-    select count(*) into v_active
-    from team_memberships m where m.team_id = v_inv.team_id;
+    return query select 'already_member'::text, v_inv.team_id, v_inv.target_grade_level_id;
+    return;
+  end if;
 
-    if v_active >= v_seat_cap then
-      raise exception
-        'redeem_invite: team is full (% of % seats used)', v_active, v_seat_cap
-        using errcode = 'check_violation';
-    end if;
+  -- ── ATOMIC SEAT RE-CHECK ──────────────────────────────────────────────
+  -- Caller is confirmed NOT yet a member, so this pending→active conversion adds
+  -- exactly one seat; verify active members < cap under the teams row lock.
+  select count(*) into v_active
+  from team_memberships m where m.team_id = v_inv.team_id;
+
+  if v_active >= v_seat_cap then
+    return query select 'seat_full'::text, null::uuid, null::uuid;
+    return;
   end if;
 
   -- ── GRADE STILL VALID FOR THIS TEAM ───────────────────────────────────
@@ -398,38 +467,28 @@ begin
     where g.id = v_inv.target_grade_level_id
       and g.school_id = v_school_id
   ) then
-    raise exception 'redeem_invite: target grade is no longer part of this team';
+    return query select 'invalid'::text, null::uuid, null::uuid;  -- grade detached
+    return;
   end if;
 
   -- ── GRANT: membership ─────────────────────────────────────────────────
-  -- Idempotent on (team_id, teacher_id) unique constraint (M9).
+  -- on-conflict is belt-and-suspenders for a concurrent same-invite redeem (the
+  -- already-member fast path above handles normal re-entry).
   insert into team_memberships (team_id, teacher_id, role)
   values (v_inv.team_id, v_uid, coalesce(v_inv.role, 'teacher'))
   on conflict (team_id, teacher_id) do nothing;
 
   -- ── GRANT: grade assignment (TGA) ─────────────────────────────────────
-  -- This is the §5 fix-2 sanctioned non-admin TGA write: TGA carries no
-  -- authenticated self-insert policy (M7), so this SECURITY DEFINER RPC is the
-  -- only non-admin path. Idempotent on (teacher_id, grade_level_id) unique (M1).
+  -- The §5 fix-2 sanctioned non-admin TGA write: TGA carries no authenticated
+  -- self-insert policy (M7), so this SECURITY DEFINER RPC is the only non-admin
+  -- path. Idempotent on (teacher_id, grade_level_id) unique (M1).
   insert into teacher_grade_assignments (teacher_id, grade_level_id, role)
   values (v_uid, v_inv.target_grade_level_id, coalesce(v_inv.role, 'teacher'))
   on conflict (teacher_id, grade_level_id) do nothing;
 
   -- ── GRANT: per-role subject memberships (§5 fix-1 / R2) ────────────────
-  -- can_edit_master is set EXPLICITLY: true ONLY for 'lead'; false for every
-  -- other role (collaborator/viewer map to grade_role 'teacher'). We do NOT
-  -- rely on the column default (true), which would silently grant every invitee
-  -- Master-write.
-  --
-  -- ROLE → STM MAPPING (this wave):
-  --   'lead'        → STM row, can_edit_master = TRUE  (full team master-edit)
-  --   'teacher'     → STM row, can_edit_master = FALSE (read + fork only;
-  --                   covers viewer AND collaborator, since both map to the
-  --                   'teacher' grade_role — the explicit-false guarantees a
-  --                   viewer can never get master-edit; a collaborator's
-  --                   master-edit upgrade is a later, explicit grant)
-  --   'grade_admin' → STM row, can_edit_master = TRUE  (admin authority)
-  -- A non-lead therefore CANNOT obtain Master-write through redeem.
+  -- can_edit_master EXPLICIT: true only for lead/grade_admin, false for
+  -- 'teacher' (viewer/collaborator). Never relies on the column default (true).
   v_can_edit := (coalesce(v_inv.role, 'teacher') in ('lead', 'grade_admin'));
 
   insert into subject_team_memberships (subject_id, teacher_id, can_edit_master)
@@ -440,19 +499,16 @@ begin
   on conflict (subject_id, teacher_id) do nothing;
 
   -- ── MARK ACCEPTED ─────────────────────────────────────────────────────
-  -- Guard the transition on still-pending so a racing redeem (already past the
-  -- FOR UPDATE on this row, which serializes us) cannot double-accept.
+  -- Guarded on still-pending (the FOR UPDATE on this row already serializes us).
   update invitations
      set status = 'accepted', accepted_by = v_uid, accepted_at = now()
    where id = v_inv.id
      and status = 'pending';
 
   -- ── AUDIT ─────────────────────────────────────────────────────────────
-  -- Called AFTER the TGA insert above, so can_read_grade(target grade) is now
-  -- true for this caller within the same transaction (log_audit_event is STABLE
-  -- and sees prior statements' writes). School is omitted (null) because under
-  -- the v1 scalar-school model the redeemer's auth_teacher_school_id() may still
-  -- be their own solo school (R4); the grade gate is the meaningful scope here.
+  -- After the TGA insert, can_read_grade(target) is true for this caller within
+  -- the same transaction, so the grade gate passes. School null per R4 (the
+  -- redeemer's auth_teacher_school_id() may still be their own solo school).
   perform log_audit_event(
     'invite_accepted',
     'role_assignment',
@@ -466,7 +522,7 @@ begin
     )
   );
 
-  return query select v_inv.team_id, v_inv.target_grade_level_id;
+  return query select 'accepted'::text, v_inv.team_id, v_inv.target_grade_level_id;
   return;
 end;
 $$;
