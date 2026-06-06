@@ -249,6 +249,201 @@ select
        where tm.teacher_id='00000000-0000-0000-0000-0000000000f2'
          and t.owner_teacher_id='00000000-0000-0000-0000-0000000000a1') = 0);
 
+-- ###########################################################################
+-- ## DATA-LOSS-GUARD REGRESSION (Wave W-A fix, commit cf660d9) — independent
+-- ## audit extension 2026-06-06.
+-- ###########################################################################
+-- The original pristine guard inspected ONLY the personal_* tables, so a solo
+-- OWNER whose curriculum lives in master_core_lesson_events / units (the
+-- "solo = Master" model, CLAUDE.md §2) — or who had boards / daily_notes — was
+-- wrongly judged "pristine" and RE-HOMED, silently orphaning their entire plan
+-- (rows kept in the DB but invisible on every grade-scoped surface once
+-- teachers.school_id moves and can_read_grade() turns false). The fix expands
+-- v_pristine to defer (→ existing_workspace, ZERO mutation) when the OLD
+-- workspace holds ANY teacher-authored content.
+--
+-- Each scenario below seeds ONE kind of teacher-authored content in a fresh
+-- solo workspace, then redeems an invite into the team workspace and asserts:
+--   • redeem_status = 'existing_workspace' (deferred, not accepted),
+--   • teachers.school_id UNCHANGED (no re-home),
+--   • NO membership / TGA / STM granted in the target,
+--   • the seeded content row is INTACT (never touched),
+--   • the invite is left pending (its reserved seat is untouched).
+-- A genuine fresh skeleton (scenario i) still redeems 'accepted' and converges,
+-- proving the stricter guard did not over-defer real fresh invitees.
+
+-- Four fresh solo invitees (three content owners a4/a5/a6 + a fresh skeleton a7),
+-- each auto-seeded with their own solo workspace (the convergence precondition).
+-- (Hex-only suffixes a4–a7 — the scenario letters f/g/h/i are used for assertion
+-- names, not for the auth uids, since g/h/i are not valid hex.)
+insert into auth.users (id, email) values
+  ('00000000-0000-0000-0000-0000000000a4','master@solo.test'),
+  ('00000000-0000-0000-0000-0000000000a5','board@solo.test'),
+  ('00000000-0000-0000-0000-0000000000a6','note@solo.test'),
+  ('00000000-0000-0000-0000-0000000000a7','skeleton@solo.test');
+select provision_individual_workspace('00000000-0000-0000-0000-0000000000a4','master@solo.test','MasterOwner');
+select provision_individual_workspace('00000000-0000-0000-0000-0000000000a5','board@solo.test','BoardOwner');
+select provision_individual_workspace('00000000-0000-0000-0000-0000000000a6','note@solo.test','NoteOwner');
+select provision_individual_workspace('00000000-0000-0000-0000-0000000000a7','skeleton@solo.test','Skeleton');
+
+-- Seats: scenario (e) deliberately drove the team to cap 5 with a leftover
+-- pending 'seatOVER' invite. The data-loss-guard scenarios below are orthogonal
+-- to seat accounting (that is already proven by scenario (e)), and the pristine
+-- guard fires BEFORE the seat re-check anyway — but create_invite's own pre-check
+-- (active members + pending invites < cap) would block minting the fresh invites
+-- these scenarios need. So clear the leftover pending invite and raise seat_cap
+-- generously for the remainder of the script (a privileged test-fixture write,
+-- not a path under test). This isolates f/g/h/i to the convergence guard.
+select _become('00000000-0000-0000-0000-0000000000a1');
+update invitations set status='revoked'
+ where team_id=:'team_id' and status='pending';
+update teams set seat_cap = 50 where id=:'team_id';
+
+-- ===========================================================================
+\echo '== SCENARIO (f): solo owner with a MASTER lesson event (on a unit) -> existing_workspace, ZERO mutation =='
+-- ===========================================================================
+-- master_core_lesson_events requires a unit (FK) whose unit_id↔subject_id pair
+-- is validated by trg_master_events_validate_unit (M8), so build the unit on the
+-- SAME subject. units also needs an active school_year (provisioning seeds one).
+select id as f_grade from grade_levels
+  where school_id=(select school_id from teachers where id='00000000-0000-0000-0000-0000000000a4') \gset
+select id as f_subj from subjects where grade_level_id=:'f_grade' and name='Math' \gset
+select id as f_year from school_years
+  where school_id=(select school_id from teachers where id='00000000-0000-0000-0000-0000000000a4') and is_active \gset
+insert into units (grade_level_id, subject_id, school_year_id, name, start_week, end_week)
+values (:'f_grade', :'f_subj', :'f_year', 'Unit 1: Place Value', 1, 4)
+returning id as f_unit \gset
+insert into master_core_lesson_events (unit_id, subject_id, week_number, day_of_week, title)
+values (:'f_unit', :'f_subj', 1, 'sun', 'Lesson 1: Reading millions');
+
+select school_id as f_old_school from teachers where id='00000000-0000-0000-0000-0000000000a4' \gset
+select
+  (select count(*) from team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a4') as f_tm_before,
+  (select count(*) from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a4') as f_tga_before,
+  (select count(*) from subject_team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a4') as f_stm_before
+\gset
+select _become('00000000-0000-0000-0000-0000000000a1');
+select create_invite(:'team_id', :'team_grade', 'teacher', null, 'hashF', now() + interval '7 days');
+select _become('00000000-0000-0000-0000-0000000000a4');
+select redeem_status from redeem_invite('hashF') \gset f_
+select _check('f0_status_existing_workspace', :'f_redeem_status' = 'existing_workspace');
+select
+  _check('f1_school_unchanged',
+    (select school_id from teachers where id='00000000-0000-0000-0000-0000000000a4') = :'f_old_school'),
+  _check('f2_tm_unchanged',
+    (select count(*) from team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a4') = :f_tm_before),
+  _check('f3_tga_unchanged',
+    (select count(*) from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a4') = :f_tga_before),
+  _check('f4_stm_unchanged',
+    (select count(*) from subject_team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a4') = :f_stm_before),
+  _check('f5_not_joined_team',
+    not exists(select 1 from team_memberships where team_id=:'team_id' and teacher_id='00000000-0000-0000-0000-0000000000a4')),
+  _check('f6_invite_still_pending',
+    (select status from invitations where token_hash='hashF') = 'pending'),
+  _check('f7_master_event_intact',
+    exists(select 1 from master_core_lesson_events m join subjects s on s.id=m.subject_id
+           where s.grade_level_id=:'f_grade')),
+  _check('f8_unit_intact',
+    exists(select 1 from units where grade_level_id=:'f_grade'));
+
+-- ===========================================================================
+\echo '== SCENARIO (g): solo owner with a BOARD -> existing_workspace, ZERO mutation =='
+-- ===========================================================================
+-- A personal board (scope='personal', owner_id set) hung off no lesson (sandbox).
+select id as g_grade from grade_levels
+  where school_id=(select school_id from teachers where id='00000000-0000-0000-0000-0000000000a5') \gset
+select id as g_subj from subjects where grade_level_id=:'g_grade' and name='Reading' \gset
+insert into boards (grade_level_id, subject_id, owner_id, scope, title)
+values (:'g_grade', :'g_subj', '00000000-0000-0000-0000-0000000000a5', 'personal', 'My morning board');
+
+select school_id as g_old_school from teachers where id='00000000-0000-0000-0000-0000000000a5' \gset
+select
+  (select count(*) from team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a5') as g_tm_before,
+  (select count(*) from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a5') as g_tga_before,
+  (select count(*) from subject_team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a5') as g_stm_before
+\gset
+select _become('00000000-0000-0000-0000-0000000000a1');
+select create_invite(:'team_id', :'team_grade', 'teacher', null, 'hashG', now() + interval '7 days');
+select _become('00000000-0000-0000-0000-0000000000a5');
+select redeem_status from redeem_invite('hashG') \gset g_
+select _check('g0_status_existing_workspace', :'g_redeem_status' = 'existing_workspace');
+select
+  _check('g1_school_unchanged',
+    (select school_id from teachers where id='00000000-0000-0000-0000-0000000000a5') = :'g_old_school'),
+  _check('g2_tm_unchanged',
+    (select count(*) from team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a5') = :g_tm_before),
+  _check('g3_tga_unchanged',
+    (select count(*) from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a5') = :g_tga_before),
+  _check('g4_stm_unchanged',
+    (select count(*) from subject_team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a5') = :g_stm_before),
+  _check('g5_not_joined_team',
+    not exists(select 1 from team_memberships where team_id=:'team_id' and teacher_id='00000000-0000-0000-0000-0000000000a5')),
+  _check('g6_invite_still_pending',
+    (select status from invitations where token_hash='hashG') = 'pending'),
+  _check('g7_board_intact',
+    exists(select 1 from boards where owner_id='00000000-0000-0000-0000-0000000000a5'));
+
+-- ===========================================================================
+\echo '== SCENARIO (h): solo owner with a DAILY NOTE -> existing_workspace, ZERO mutation =='
+-- ===========================================================================
+select id as h_grade from grade_levels
+  where school_id=(select school_id from teachers where id='00000000-0000-0000-0000-0000000000a6') \gset
+insert into daily_notes (grade_level_id, teacher_id, date, body)
+values (:'h_grade', '00000000-0000-0000-0000-0000000000a6', date '2025-09-01', 'Remember picture day');
+
+select school_id as h_old_school from teachers where id='00000000-0000-0000-0000-0000000000a6' \gset
+select
+  (select count(*) from team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a6') as h_tm_before,
+  (select count(*) from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a6') as h_tga_before,
+  (select count(*) from subject_team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a6') as h_stm_before
+\gset
+select _become('00000000-0000-0000-0000-0000000000a1');
+select create_invite(:'team_id', :'team_grade', 'teacher', null, 'hashH', now() + interval '7 days');
+select _become('00000000-0000-0000-0000-0000000000a6');
+select redeem_status from redeem_invite('hashH') \gset h_
+select _check('h0_status_existing_workspace', :'h_redeem_status' = 'existing_workspace');
+select
+  _check('h1_school_unchanged',
+    (select school_id from teachers where id='00000000-0000-0000-0000-0000000000a6') = :'h_old_school'),
+  _check('h2_tm_unchanged',
+    (select count(*) from team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a6') = :h_tm_before),
+  _check('h3_tga_unchanged',
+    (select count(*) from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a6') = :h_tga_before),
+  _check('h4_stm_unchanged',
+    (select count(*) from subject_team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a6') = :h_stm_before),
+  _check('h5_not_joined_team',
+    not exists(select 1 from team_memberships where team_id=:'team_id' and teacher_id='00000000-0000-0000-0000-0000000000a6')),
+  _check('h6_invite_still_pending',
+    (select status from invitations where token_hash='hashH') = 'pending'),
+  _check('h7_note_intact',
+    exists(select 1 from daily_notes where teacher_id='00000000-0000-0000-0000-0000000000a6'));
+
+-- ===========================================================================
+\echo '== SCENARIO (i): genuine FRESH skeleton -> accepted + converges (guard did NOT over-defer) =='
+-- ===========================================================================
+-- h1 has ONLY the auto-seed (grade + 8 team subjects + school_year + grants) and
+-- zero teacher-authored content, so the stricter guard must still treat them as
+-- pristine and converge them. This is the false-positive guard: it proves the
+-- expanded content checks did not break real fresh invitees.
+select school_id as i_old_school from teachers where id='00000000-0000-0000-0000-0000000000a7' \gset
+select id as i_old_grade from grade_levels where school_id=:'i_old_school' \gset
+select _become('00000000-0000-0000-0000-0000000000a1');
+select create_invite(:'team_id', :'team_grade', 'teacher', null, 'hashI', now() + interval '7 days');
+select _become('00000000-0000-0000-0000-0000000000a7');
+select redeem_status from redeem_invite('hashI') \gset i_
+select _check('i0_status_accepted', :'i_redeem_status' = 'accepted');
+select
+  _check('i1_rehomed_to_team_school',
+    (select school_id from teachers where id='00000000-0000-0000-0000-0000000000a7') = :'team_school'),
+  _check('i2_member_of_team',
+    exists(select 1 from team_memberships where team_id=:'team_id' and teacher_id='00000000-0000-0000-0000-0000000000a7')),
+  _check('i3_tga_team_grade',
+    exists(select 1 from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a7' and grade_level_id=:'team_grade')),
+  _check('i4_old_tga_removed',
+    not exists(select 1 from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a7' and grade_level_id=:'i_old_grade')),
+  _check('i5_convergence_audited',
+    exists(select 1 from audit_log where action='workspace_converged' and actor_teacher_id='00000000-0000-0000-0000-0000000000a7'));
+
 -- ===========================================================================
 -- FINAL GATE — print the full result table and RAISE if any assertion failed
 -- (so the script exits non-zero in CI).

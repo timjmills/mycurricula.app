@@ -346,6 +346,35 @@ begin
         select 1 from recurrence_patterns rp
         where rp.owner_id = v_uid
       )
+      -- Teach/planner content the first fix missed (external audit 2026-06-06
+      -- reproduced day_events + todos re-home/orphan). Provisioning seeds NONE of
+      -- these, so a genuine fresh skeleton still converges.
+      and not exists (
+        select 1 from day_events de
+        where de.grade_level_id in (
+          select g.id from grade_levels g where g.school_id = v_old_school
+        )
+      )
+      and not exists (
+        select 1 from todos td
+        where td.grade_level_id in (
+          select g.id from grade_levels g where g.school_id = v_old_school
+        )
+      )
+      and not exists (
+        select 1 from board_templates bt
+        where bt.grade_level_id in (
+          select g.id from grade_levels g where g.school_id = v_old_school
+        )
+      )
+      -- tags: team tags are grade-scoped; personal tags hang off owner_id.
+      and not exists (
+        select 1 from tags tg
+        where tg.owner_id = v_uid
+           or tg.grade_level_id in (
+             select g.id from grade_levels g where g.school_id = v_old_school
+           )
+      )
     )
   );
 
