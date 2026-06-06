@@ -266,9 +266,21 @@ begin
 
   -- Pristine ⇒ safe to re-home. EITHER already in this workspace (idempotent —
   -- nothing to re-home) OR (solo OWNER of the old workspace AND that workspace
-  -- holds NO personal content they authored). Conservative: any of the content
-  -- checks finding a row, or the redeemer not solo-owning the old workspace,
-  -- makes them NOT pristine.
+  -- holds NO teacher-authored content). Conservative: ANY content check finding a
+  -- row, or the redeemer not solo-owning the old workspace, makes them NOT
+  -- pristine (defer to existing_workspace). Over-deferring is safe; under-
+  -- deferring orphans data.
+  --
+  -- DATA-LOSS GUARD (external audit 2026-06-06, reproduced on real PG): the
+  -- "solo = Master" linchpin (CLAUDE.md §2) means a solo teacher's curriculum
+  -- lives in master_core_lesson_events / units — NOT the personal_* tables — so
+  -- checking only personal_* (the original bug) silently orphaned full year plans,
+  -- boards, and notes on re-home. We therefore check every teacher-authored
+  -- content table scoped to the OLD workspace. The auto-seed
+  -- (provision_individual_workspace, M11) creates ONLY grade + 8 team subjects +
+  -- school_year + grants, so a genuine fresh invitee has zero rows here and still
+  -- converges. KEEP THIS LIST IN SYNC as new content tables are added — an
+  -- omission re-introduces the silent-data-loss bug.
   v_pristine := (
     v_old_school = v_school_id
     or (
@@ -284,6 +296,55 @@ begin
       and not exists (
         select 1 from personal_core_lesson_event_copies pcc
         where pcc.teacher_id = v_uid
+      )
+      -- Curriculum core (solo = Master): units + their master lesson events.
+      and not exists (
+        select 1 from units u
+        where u.grade_level_id in (
+          select g.id from grade_levels g where g.school_id = v_old_school
+        )
+      )
+      and not exists (
+        select 1 from master_core_lesson_events m
+        join subjects s on s.id = m.subject_id
+        where s.grade_level_id in (
+          select g.id from grade_levels g where g.school_id = v_old_school
+        )
+      )
+      -- Planner + Teach content authored in the old workspace.
+      and not exists (
+        select 1 from daily_notes dn
+        where dn.grade_level_id in (
+          select g.id from grade_levels g where g.school_id = v_old_school
+        )
+      )
+      and not exists (
+        select 1 from boards b
+        where b.grade_level_id in (
+          select g.id from grade_levels g where g.school_id = v_old_school
+        )
+      )
+      and not exists (
+        select 1 from extra_lesson_events ele
+        where ele.grade_level_id in (
+          select g.id from grade_levels g where g.school_id = v_old_school
+        )
+      )
+      and not exists (
+        select 1 from time_blocks tb
+        where tb.grade_level_id in (
+          select g.id from grade_levels g where g.school_id = v_old_school
+        )
+      )
+      and not exists (
+        select 1 from event_day_order_overrides edo
+        where edo.grade_level_id in (
+          select g.id from grade_levels g where g.school_id = v_old_school
+        )
+      )
+      and not exists (
+        select 1 from recurrence_patterns rp
+        where rp.owner_id = v_uid
       )
     )
   );
