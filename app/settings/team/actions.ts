@@ -1,0 +1,468 @@
+"use server";
+
+// app/settings/team/actions.ts — server actions for the Team + admin settings
+// page (Wave W-D). Each action calls the matching SECURITY DEFINER RPC through
+// the authenticated server Supabase client (session from request cookies), so the
+// RPC runs as the authenticated user. The RPCs re-check every capability
+// server-side — UI gating is cosmetic-but-required (CLAUDE.md / ultraplan §4).
+//
+// IMPORTANT: every RPC that takes a raw UUID or string parameter is called with
+// the value exactly as received; no re-hashing is done here (unlike the invite
+// redeem path which must hash the raw URL token). The RPCs themselves validate
+// workspace membership, role gates, and cross-tenant isolation.
+//
+// TOKEN HASHING FOR CREATE INVITE:
+//   The token is generated CLIENT-SIDE in TeamPage via crypto.randomUUID() +
+//   hex encoding, then SHA-256 hashed here before being passed to create_invite.
+//   Only the raw token is returned to the caller so they can display it once.
+//   Same scheme as app/invite/[token]/actions.ts.
+//
+// NEVER THROWS for user-facing failures — errors are returned in the result's
+// `error` field so the client can render them gracefully.
+
+import { createClient } from "@/lib/supabase/server";
+import { listWorkspaceMembers, listWorkspaceNotebooks } from "@/lib/admin/queries";
+import type { WorkspaceMembersResult, WorkspaceNotebook } from "@/lib/admin/queries";
+
+// ── Re-exports (aggregation layer) ────────────────────────────────────────────
+// The page components call these to seed their data on the server.
+// Exported here so app/settings/team/page.tsx has one import seam.
+export { listWorkspaceMembers, listWorkspaceNotebooks };
+export type { WorkspaceMembersResult, WorkspaceNotebook };
+
+// ── Shared result shape ────────────────────────────────────────────────────────
+
+export interface ActionResult {
+  ok: boolean;
+  /** Human-readable error message, set only when ok === false. */
+  error?: string;
+}
+
+// ── Hashing helper (mirrors app/invite/[token]/actions.ts) ────────────────────
+
+async function hashToken(raw: string): Promise<string> {
+  const data = new TextEncoder().encode(raw);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// ── Pending-invites query ──────────────────────────────────────────────────────
+// Reads the invitations table for the caller's team. The RLS member-read policy
+// (20260606140000 SECTION B) ensures only team members can see their team's rows.
+
+export interface PendingInvite {
+  id: string;
+  inviteeEmail: string | null;
+  role: "teacher" | "lead";
+  notebookName: string;
+  gradeLevelId: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export async function listPendingInvites(): Promise<PendingInvite[]> {
+  const supabase = await createClient();
+
+  // Get the caller's team id first (Strategy A: 1:1 school→team).
+  const { data: teamRow, error: teamError } = await supabase
+    .from("teams")
+    .select("id")
+    .maybeSingle();
+  if (teamError) throw teamError;
+  if (!teamRow) return [];
+
+  // Fetch pending invitations with the grade name via embedded join.
+  const { data, error } = await supabase
+    .from("invitations")
+    .select(
+      "id, invitee_email, role, target_grade_level_id, expires_at, created_at, grade_levels(name)",
+    )
+    .eq("team_id", teamRow.id as string)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  type InvRow = {
+    id: string;
+    invitee_email: string | null;
+    role: "teacher" | "lead";
+    target_grade_level_id: string;
+    expires_at: string;
+    created_at: string;
+    grade_levels: { name: string | null } | null;
+  };
+
+  return ((data ?? []) as unknown as InvRow[]).map((r) => ({
+    id: r.id,
+    inviteeEmail: r.invitee_email ?? null,
+    role: r.role,
+    notebookName: r.grade_levels?.name ?? "",
+    gradeLevelId: r.target_grade_level_id,
+    expiresAt: r.expires_at,
+    createdAt: r.created_at,
+  }));
+}
+
+// ── create_invite action ───────────────────────────────────────────────────────
+// Generates a raw token client-side (passed in), hashes it server-side, and
+// calls create_invite. Returns the raw token ONCE so the caller can display it.
+//
+// The token is only meaningful to the caller for generating the link; only the
+// hash is stored in the DB. The caller must NOT persist the raw token beyond the
+// single display moment.
+
+export interface CreateInviteParams {
+  /** UUID of the team to invite into. */
+  teamId: string;
+  /** The target grade_level_id (notebook). */
+  gradeLevelId: string;
+  /** 'teacher' (viewer/collaborator) or 'lead'. grade_admin is forbidden by the RPC. */
+  role: "teacher" | "lead";
+  /** Optional email binding — if provided, only this email can redeem. */
+  inviteeEmail: string | null;
+  /**
+   * Raw token generated by the client (crypto.randomUUID() + hex, or similar).
+   * We hash it here before passing to the RPC. Returned to caller so they can
+   * display the invite link exactly once.
+   */
+  rawToken: string;
+  /** ISO timestamp for expiry — e.g. 7 days from now. */
+  expiresAt: string;
+}
+
+export interface CreateInviteResult extends ActionResult {
+  /** Set only when ok === true — the raw token for link display. */
+  inviteId?: string;
+  /** Raw token returned to caller for link display. Only shown once. */
+  rawToken?: string;
+}
+
+export async function createInviteAction(
+  params: CreateInviteParams,
+): Promise<CreateInviteResult> {
+  if (!params.rawToken || params.rawToken.trim() === "") {
+    return { ok: false, error: "Token is required." };
+  }
+
+  let tokenHash: string;
+  try {
+    tokenHash = await hashToken(params.rawToken.trim());
+  } catch {
+    return { ok: false, error: "Token processing failed." };
+  }
+
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.rpc("create_invite", {
+      p_team_id: params.teamId,
+      p_target_grade_level_id: params.gradeLevelId,
+      p_role: params.role,
+      p_invitee_email: params.inviteeEmail ?? "",
+      p_token_hash: tokenHash,
+      p_expires_at: params.expiresAt,
+    });
+
+    if (error) {
+      console.error("[team/actions] create_invite RPC error", {
+        message: error.message,
+        code: error.code,
+      });
+      // Surface constraint violations as readable messages.
+      if (error.message.includes("capacity")) {
+        return { ok: false, error: "Your workspace is at capacity — no more seats available." };
+      }
+      if (error.message.includes("already exists")) {
+        return { ok: false, error: "A pending invite already exists for that email address." };
+      }
+      if (error.message.includes("grade lead")) {
+        return { ok: false, error: "Only a notebook lead can invite at the Lead role." };
+      }
+      return { ok: false, error: "Could not create invite. Please try again." };
+    }
+
+    return {
+      ok: true,
+      inviteId: data as string,
+      rawToken: params.rawToken,
+    };
+  } catch (err) {
+    console.error("[team/actions] createInviteAction unexpected error", err);
+    return { ok: false, error: "Something went wrong. Please try again." };
+  }
+}
+
+// ── revoke_invite action ───────────────────────────────────────────────────────
+
+export async function revokeInviteAction(
+  inviteId: string,
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+
+    const { error } = await supabase.rpc("revoke_invite", {
+      p_invitation_id: inviteId,
+    });
+
+    if (error) {
+      console.error("[team/actions] revoke_invite RPC error", {
+        message: error.message,
+        code: error.code,
+      });
+      return { ok: false, error: "Could not revoke the invite. Please try again." };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[team/actions] revokeInviteAction unexpected error", err);
+    return { ok: false, error: "Something went wrong. Please try again." };
+  }
+}
+
+// ── create_notebook action (workspace-admin only) ──────────────────────────────
+
+export interface CreateNotebookResult extends ActionResult {
+  gradeLevelId?: string;
+}
+
+export async function createNotebookAction(
+  name: string,
+): Promise<CreateNotebookResult> {
+  if (!name.trim()) {
+    return { ok: false, error: "Notebook name is required." };
+  }
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("create_notebook", {
+      p_name: name.trim(),
+    });
+    if (error) {
+      console.error("[team/actions] create_notebook RPC error", { message: error.message });
+      if (error.message.includes("not a workspace admin")) {
+        return { ok: false, error: "Only workspace admins can create notebooks." };
+      }
+      if (error.message.includes("no active school year")) {
+        return { ok: false, error: "Your workspace has no active school year — set one in Curriculum settings first." };
+      }
+      return { ok: false, error: "Could not create notebook. Please try again." };
+    }
+    return { ok: true, gradeLevelId: data as string };
+  } catch (err) {
+    console.error("[team/actions] createNotebookAction unexpected error", err);
+    return { ok: false, error: "Something went wrong. Please try again." };
+  }
+}
+
+// ── rename_notebook action (workspace-admin OR notebook-lead) ──────────────────
+
+export async function renameNotebookAction(
+  gradeLevelId: string,
+  name: string,
+): Promise<ActionResult> {
+  if (!name.trim()) {
+    return { ok: false, error: "Notebook name is required." };
+  }
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("rename_notebook", {
+      p_grade_level_id: gradeLevelId,
+      p_name: name.trim(),
+    });
+    if (error) {
+      console.error("[team/actions] rename_notebook RPC error", { message: error.message });
+      if (error.message.includes("not a workspace admin or lead")) {
+        return { ok: false, error: "Only workspace admins or notebook leads can rename notebooks." };
+      }
+      return { ok: false, error: "Could not rename notebook. Please try again." };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[team/actions] renameNotebookAction unexpected error", err);
+    return { ok: false, error: "Something went wrong. Please try again." };
+  }
+}
+
+// ── archive_notebook action (workspace-admin only) ─────────────────────────────
+
+export async function archiveNotebookAction(
+  gradeLevelId: string,
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("archive_notebook", {
+      p_grade_level_id: gradeLevelId,
+    });
+    if (error) {
+      console.error("[team/actions] archive_notebook RPC error", { message: error.message });
+      if (error.message.includes("not a workspace admin")) {
+        return { ok: false, error: "Only workspace admins can archive notebooks." };
+      }
+      return { ok: false, error: "Could not archive notebook. Please try again." };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[team/actions] archiveNotebookAction unexpected error", err);
+    return { ok: false, error: "Something went wrong. Please try again." };
+  }
+}
+
+// ── set_member_role action (workspace-admin OR notebook-lead) ──────────────────
+
+export async function setMemberRoleAction(
+  teacherId: string,
+  gradeLevelId: string,
+  role: "teacher" | "lead" | "grade_admin",
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("set_member_role", {
+      p_teacher_id: teacherId,
+      p_grade_level_id: gradeLevelId,
+      p_role: role,
+    });
+    if (error) {
+      console.error("[team/actions] set_member_role RPC error", { message: error.message });
+      if (error.message.includes("not a workspace admin or lead")) {
+        return { ok: false, error: "You don't have permission to change this member's role." };
+      }
+      if (error.message.includes("grade_admin role")) {
+        return { ok: false, error: "Only workspace admins can assign the Grade Admin role." };
+      }
+      if (error.message.includes("last lead")) {
+        return { ok: false, error: "Cannot demote the last notebook lead — appoint another lead first." };
+      }
+      return { ok: false, error: "Could not change role. Please try again." };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[team/actions] setMemberRoleAction unexpected error", err);
+    return { ok: false, error: "Something went wrong. Please try again." };
+  }
+}
+
+// ── remove_member action (workspace-admin OR notebook-lead) ───────────────────
+
+export async function removeMemberAction(
+  teacherId: string,
+  gradeLevelId: string,
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("remove_member", {
+      p_teacher_id: teacherId,
+      p_grade_level_id: gradeLevelId,
+    });
+    if (error) {
+      console.error("[team/actions] remove_member RPC error", { message: error.message });
+      if (error.message.includes("not a workspace admin or lead")) {
+        return { ok: false, error: "You don't have permission to remove this member." };
+      }
+      if (error.message.includes("last lead")) {
+        return { ok: false, error: "Cannot remove the last notebook lead — appoint another lead first." };
+      }
+      return { ok: false, error: "Could not remove member. Please try again." };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[team/actions] removeMemberAction unexpected error", err);
+    return { ok: false, error: "Something went wrong. Please try again." };
+  }
+}
+
+// ── grant_workspace_admin action (workspace-admin only) ───────────────────────
+
+export async function grantWorkspaceAdminAction(
+  teacherId: string,
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("grant_workspace_admin", {
+      p_teacher_id: teacherId,
+    });
+    if (error) {
+      console.error("[team/actions] grant_workspace_admin RPC error", { message: error.message });
+      if (error.message.includes("not a workspace admin")) {
+        return { ok: false, error: "Only workspace admins can grant admin privileges." };
+      }
+      return { ok: false, error: "Could not grant admin. Please try again." };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[team/actions] grantWorkspaceAdminAction unexpected error", err);
+    return { ok: false, error: "Something went wrong. Please try again." };
+  }
+}
+
+// ── revoke_workspace_admin action (workspace-admin only) ──────────────────────
+
+export async function revokeWorkspaceAdminAction(
+  teacherId: string,
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("revoke_workspace_admin", {
+      p_teacher_id: teacherId,
+    });
+    if (error) {
+      console.error("[team/actions] revoke_workspace_admin RPC error", { message: error.message });
+      if (error.message.includes("not a workspace admin")) {
+        return { ok: false, error: "Only workspace admins can revoke admin privileges." };
+      }
+      if (error.message.includes("last workspace admin")) {
+        return { ok: false, error: "Cannot remove the last workspace admin — appoint another admin first." };
+      }
+      return { ok: false, error: "Could not revoke admin. Please try again." };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[team/actions] revokeWorkspaceAdminAction unexpected error", err);
+    return { ok: false, error: "Something went wrong. Please try again." };
+  }
+}
+
+// ── getCurrentTeacher helper ───────────────────────────────────────────────────
+// Resolves the current authenticated teacher's id + workspace-admin status
+// so the page can derive which UI controls to surface. Server-side only.
+
+export interface CallerInfo {
+  teacherId: string;
+  isWorkspaceAdmin: boolean;
+  /** team id for use in create_invite */
+  teamId: string | null;
+}
+
+export async function getCallerInfo(): Promise<CallerInfo | null> {
+  try {
+    const supabase = await createClient();
+
+    // auth.uid() — from the session
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    // Is this teacher a workspace admin?
+    const { data: adminRows } = await supabase
+      .from("school_admins")
+      .select("teacher_id")
+      .eq("teacher_id", user.id);
+    const isWorkspaceAdmin = Array.isArray(adminRows) && adminRows.length > 0;
+
+    // team id (for invite)
+    const { data: teamRow } = await supabase
+      .from("teams")
+      .select("id")
+      .maybeSingle();
+
+    return {
+      teacherId: user.id,
+      isWorkspaceAdmin,
+      teamId: (teamRow?.id as string) ?? null,
+    };
+  } catch (err) {
+    console.error("[team/actions] getCallerInfo unexpected error", err);
+    return null;
+  }
+}
