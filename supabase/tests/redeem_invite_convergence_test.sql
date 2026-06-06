@@ -444,6 +444,103 @@ select
   _check('i5_convergence_audited',
     exists(select 1 from audit_log where action='workspace_converged' and actor_teacher_id='00000000-0000-0000-0000-0000000000a7'));
 
+-- ###########################################################################
+-- ## DATA-LOSS-GUARD REGRESSION — second extension (gate re-confirm 2026-06-06).
+-- ###########################################################################
+-- The convergence migration's pristine guard was widened (after a prior audit's
+-- Medium) to ALSO check day_events / todos / board_templates / tags — Teach +
+-- planner content tables a solo owner can populate that the first fix missed.
+-- These two scenarios mirror the f/g/h pattern for the two tables the gate is
+-- re-confirming: a solo OWNER with (j) a day_events row and (k) a todos row.
+-- EACH must redeem to 'existing_workspace' with ZERO mutation — school_id
+-- unchanged, NO membership/TGA/STM granted in the target, the seeded content row
+-- intact, and the invite left pending. (Provisioning seeds NEITHER table, so
+-- these never break a genuine fresh invitee — scenario (i) above already proves
+-- the guard does not over-defer.)
+--
+-- Two more fresh solo invitees (a8 = day_events owner, a9 = todos owner), each
+-- auto-seeded with their own solo workspace (the convergence precondition).
+insert into auth.users (id, email) values
+  ('00000000-0000-0000-0000-0000000000a8','dayevent@solo.test'),
+  ('00000000-0000-0000-0000-0000000000a9','todo@solo.test');
+select provision_individual_workspace('00000000-0000-0000-0000-0000000000a8','dayevent@solo.test','DayEventOwner');
+select provision_individual_workspace('00000000-0000-0000-0000-0000000000a9','todo@solo.test','TodoOwner');
+
+-- ===========================================================================
+\echo '== SCENARIO (j): solo owner with a DAY EVENT -> existing_workspace, ZERO mutation =='
+-- ===========================================================================
+-- day_events requires grade_level_id + date + title + author_id (NOT NULL, M1).
+-- A plain calendar event in the solo workspace — exactly the kind of Teach/
+-- planner content the widened guard must now treat as "not pristine".
+select id as j_grade from grade_levels
+  where school_id=(select school_id from teachers where id='00000000-0000-0000-0000-0000000000a8') \gset
+insert into day_events (grade_level_id, date, title, author_id)
+values (:'j_grade', date '2025-09-01', 'Field trip permission slips due', '00000000-0000-0000-0000-0000000000a8');
+
+select school_id as j_old_school from teachers where id='00000000-0000-0000-0000-0000000000a8' \gset
+select
+  (select count(*) from team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a8') as j_tm_before,
+  (select count(*) from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a8') as j_tga_before,
+  (select count(*) from subject_team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a8') as j_stm_before
+\gset
+select _become('00000000-0000-0000-0000-0000000000a1');
+select create_invite(:'team_id', :'team_grade', 'teacher', null, 'hashJ', now() + interval '7 days');
+select _become('00000000-0000-0000-0000-0000000000a8');
+select redeem_status from redeem_invite('hashJ') \gset j_
+select _check('j0_status_existing_workspace', :'j_redeem_status' = 'existing_workspace');
+select
+  _check('j1_school_unchanged',
+    (select school_id from teachers where id='00000000-0000-0000-0000-0000000000a8') = :'j_old_school'),
+  _check('j2_tm_unchanged',
+    (select count(*) from team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a8') = :j_tm_before),
+  _check('j3_tga_unchanged',
+    (select count(*) from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a8') = :j_tga_before),
+  _check('j4_stm_unchanged',
+    (select count(*) from subject_team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a8') = :j_stm_before),
+  _check('j5_not_joined_team',
+    not exists(select 1 from team_memberships where team_id=:'team_id' and teacher_id='00000000-0000-0000-0000-0000000000a8')),
+  _check('j6_invite_still_pending',
+    (select status from invitations where token_hash='hashJ') = 'pending'),
+  _check('j7_day_event_intact',
+    exists(select 1 from day_events where author_id='00000000-0000-0000-0000-0000000000a8'));
+
+-- ===========================================================================
+\echo '== SCENARIO (k): solo owner with a TODO -> existing_workspace, ZERO mutation =='
+-- ===========================================================================
+-- todos requires grade_level_id + title + author_id (NOT NULL, M1). A personal
+-- to-do in the solo workspace — the second table the widened guard re-confirms.
+select id as k_grade from grade_levels
+  where school_id=(select school_id from teachers where id='00000000-0000-0000-0000-0000000000a9') \gset
+insert into todos (grade_level_id, title, scope, author_id)
+values (:'k_grade', 'Prep math manipulatives', 'personal', '00000000-0000-0000-0000-0000000000a9');
+
+select school_id as k_old_school from teachers where id='00000000-0000-0000-0000-0000000000a9' \gset
+select
+  (select count(*) from team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a9') as k_tm_before,
+  (select count(*) from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a9') as k_tga_before,
+  (select count(*) from subject_team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a9') as k_stm_before
+\gset
+select _become('00000000-0000-0000-0000-0000000000a1');
+select create_invite(:'team_id', :'team_grade', 'teacher', null, 'hashK', now() + interval '7 days');
+select _become('00000000-0000-0000-0000-0000000000a9');
+select redeem_status from redeem_invite('hashK') \gset k_
+select _check('k0_status_existing_workspace', :'k_redeem_status' = 'existing_workspace');
+select
+  _check('k1_school_unchanged',
+    (select school_id from teachers where id='00000000-0000-0000-0000-0000000000a9') = :'k_old_school'),
+  _check('k2_tm_unchanged',
+    (select count(*) from team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a9') = :k_tm_before),
+  _check('k3_tga_unchanged',
+    (select count(*) from teacher_grade_assignments where teacher_id='00000000-0000-0000-0000-0000000000a9') = :k_tga_before),
+  _check('k4_stm_unchanged',
+    (select count(*) from subject_team_memberships where teacher_id='00000000-0000-0000-0000-0000000000a9') = :k_stm_before),
+  _check('k5_not_joined_team',
+    not exists(select 1 from team_memberships where team_id=:'team_id' and teacher_id='00000000-0000-0000-0000-0000000000a9')),
+  _check('k6_invite_still_pending',
+    (select status from invitations where token_hash='hashK') = 'pending'),
+  _check('k7_todo_intact',
+    exists(select 1 from todos where author_id='00000000-0000-0000-0000-0000000000a9'));
+
 -- ===========================================================================
 -- FINAL GATE — print the full result table and RAISE if any assertion failed
 -- (so the script exits non-zero in CI).
