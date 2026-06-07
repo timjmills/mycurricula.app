@@ -43,6 +43,19 @@ export async function teachDispatch<M extends keyof TeachDataSource>(
   args: Parameters<TeachDataSource[M]>,
 ): Promise<Awaited<ReturnType<TeachDataSource[M]>>> {
   const src = source();
+  // SECURITY: this is a `'use server'` boundary — compiled to an HTTP endpoint
+  // any client can POST to — and the `keyof` generic is erased at runtime, so
+  // `method` is an attacker-controlled string. Dispatch ONLY to an OWN, callable
+  // property of the source (every TeachDataSource method is an own prop of the
+  // source object literal); fail closed on anything else, so an inherited member
+  // (constructor / hasOwnProperty / __proto__ / …) can't be invoked or throw an
+  // uncaught error past the boundary.
+  if (
+    !Object.prototype.hasOwnProperty.call(src, method) ||
+    typeof src[method] !== "function"
+  ) {
+    throw new Error(`teachDispatch: unknown method "${String(method)}"`);
+  }
   const fn = src[method] as (
     ...a: Parameters<TeachDataSource[M]>
   ) => Promise<Awaited<ReturnType<TeachDataSource[M]>>>;
