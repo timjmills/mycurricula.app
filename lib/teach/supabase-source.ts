@@ -460,6 +460,102 @@ async function nextWidgetOrder(
   );
 }
 
+/** Pick the first candidate title not already in `taken`. `candidate(n)` yields
+ *  the nth form (n starts at 1): the default sequence is the bare title, then
+ *  "… (2)", "… (3)", … `taken` is matched verbatim (titles are stored verbatim
+ *  in the unique indexes), so the search terminates at the first gap. Pure — no
+ *  DB. */
+function firstFreeTitle(
+  taken: Set<string>,
+  candidate: (n: number) => string,
+): string {
+  for (let n = 1; ; n += 1) {
+    const title = candidate(n);
+    if (!taken.has(title)) return title;
+  }
+}
+
+/** Default candidate sequence: `desiredTitle`, then `desiredTitle (2)`, `(3)`, … */
+function suffixSequence(desiredTitle: string): (n: number) => string {
+  return (n) => (n === 1 ? desiredTitle : `${desiredTitle} (${n})`);
+}
+
+/** Copy candidate sequence: `base (copy)`, then `base (copy 2)`, `(copy 3)`, …
+ *  Mirrors the convention the audit specifies for `duplicateBoard`. */
+function copySequence(baseTitle: string): (n: number) => string {
+  return (n) => (n === 1 ? `${baseTitle} (copy)` : `${baseTitle} (copy ${n})`);
+}
+
+/** Fetch the current PERSONAL board titles for `(masterLessonId, ownerId)` as a
+ *  set. This is the exact key set `uniq_boards_personal_lesson_title`
+ *  `(master_core_lesson_event_id, owner_id, title) WHERE scope='personal'`
+ *  guards. Re-queried on EVERY caller invocation, so a loop that inserts several
+ *  boards in sequence (e.g. `copySandboxBoardsToLesson`, whose default
+ *  whiteboards are all titled "Whiteboard") sees the titles it inserted earlier
+ *  in the same loop — the per-call re-query is what makes the in-loop case safe
+ *  without the caller tracking state. */
+async function personalTitleSet(
+  client: ServerClient,
+  masterLessonId: string,
+  ownerId: string,
+): Promise<Set<string>> {
+  const res = await client
+    .from("boards")
+    .select("title")
+    .eq("scope", "personal")
+    .eq("master_core_lesson_event_id", masterLessonId)
+    .eq("owner_id", ownerId);
+  const rows = unwrap(res, "list personal titles for lesson") as {
+    title: string;
+  }[];
+  return new Set(rows.map((r) => r.title));
+}
+
+/** Return a collision-free title for a PERSONAL, lesson-attached board, so an
+ *  insert/update never violates `uniq_boards_personal_lesson_title`. The unique
+ *  index only applies to lesson-attached personal boards
+ *  (`master_core_lesson_event_id IS NOT NULL`), so a sandbox/lesson-less board
+ *  (`masterLessonId == null`) or an owner-less row needs no suffixing and the
+ *  desired title passes through unchanged.
+ *
+ *  `sequence` selects the candidate forms: the default appends " (2)", " (3)", …
+ *  on collision; `duplicateBoard` passes `copySequence` for the
+ *  "… (copy)", "… (copy 2)", … convention. */
+async function uniquePersonalTitle(
+  client: ServerClient,
+  masterLessonId: string | null,
+  ownerId: string | null,
+  desiredTitle: string,
+  sequence: (n: number) => string = suffixSequence(desiredTitle),
+): Promise<string> {
+  // No index applies off-lesson or without an owner → first candidate as-is.
+  if (masterLessonId == null || ownerId == null) return sequence(1);
+  const taken = await personalTitleSet(client, masterLessonId, ownerId);
+  return firstFreeTitle(taken, sequence);
+}
+
+/** Team-scope twin of `uniquePersonalTitle`, guarding
+ *  `uniq_boards_team_lesson_title` `(master_core_lesson_event_id, title) WHERE
+ *  scope='team'`. Re-queries the lesson's current team titles each call. Off
+ *  lesson the index does not apply, so the first candidate passes through. */
+async function uniqueTeamTitle(
+  client: ServerClient,
+  masterLessonId: string | null,
+  desiredTitle: string,
+  sequence: (n: number) => string = suffixSequence(desiredTitle),
+): Promise<string> {
+  if (masterLessonId == null) return sequence(1);
+  const res = await client
+    .from("boards")
+    .select("title")
+    .eq("scope", "team")
+    .eq("master_core_lesson_event_id", masterLessonId);
+  const rows = unwrap(res, "list team titles for lesson") as {
+    title: string;
+  }[];
+  return firstFreeTitle(new Set(rows.map((r) => r.title)), sequence);
+}
+
 /** Materialize a board's pages — the `pages` jsonb when present, else a single
  *  implicit page 0 built from the board's flat `widgets` (mirrors the mock's
  *  `pagesOf`). Never mutates the board. */
@@ -498,6 +594,17 @@ async function commitPages(
   //    current widget rows, then insert page-0 in order (id-stable: page-0
   //    widgets already carry stable ids, which we preserve so links survive).
   //    Names are stripped on the insert via `widgetToRow` (privacy invariant).
+  //
+  //    PRIVACY INDUCTION (audit Finding 7): the structure-only invariant holds
+  //    here even though `commitPages` does NOT re-strip the `pages` jsonb it just
+  //    wrote in step 1. Every write path that puts a widget into `pages` already
+  //    strips names at the boundary — `upsertWidgetOnPage` calls `stripNames` on
+  //    config/state before the widget enters the page set, `copyBoardContent`
+  //    copies from boards that were themselves written through stripped paths,
+  //    and `persistWidgetPatch` only ever patches canvas/appearance (never
+  //    config/state). So by induction over the write paths the `pages` jsonb is
+  //    already name-free, and `widgetToRow` re-stripping on the page-0 mirror
+  //    insert below is belt-and-suspenders, not the sole guard.
   const del = await client.from("widgets").delete().eq("board_id", boardId);
   if (del.error) {
     throw new Error(
@@ -573,9 +680,12 @@ async function findWidget(
   throw new Error(`Widget not found: ${widgetId}`);
 }
 
-/** Clamp a free-form canvas width to the handoff's 230–640 range. */
+/** Clamp a free-form canvas width to the handoff's 230–640 range. A non-finite
+ *  input (NaN/±Infinity — e.g. a bad resize delta) would survive `Math.round`
+ *  and `Math.min`/`Math.max` as NaN and poison the persisted `canvas.w`, so fall
+ *  back to a sane default width (320) when the input is not finite. */
 function clampWidth(w: number): number {
-  return Math.min(640, Math.max(230, Math.round(w)));
+  return Number.isFinite(w) ? Math.min(640, Math.max(230, Math.round(w))) : 320;
 }
 
 // ── Id bridge (mock slugs ↔ db uuids) ─────────────────────────────────────────
@@ -685,6 +795,18 @@ export const supabaseTeachSource: TeachDataSource = {
       // (mirrors the mock's setForLesson fallback). The default builder yields
       // domain boards; insert them as the team set, then return the persisted
       // rows so caller-visible ids are the real db uuids.
+      //
+      // KNOWN LOW RISK (audit Finding 5): this is a check-then-act race — two
+      // teachers opening the SAME lesson for the very first time at the same
+      // instant could both observe an empty set and both run `seedDefaultTeamSet`,
+      // producing a duplicated team set. It is not a unique-index violation
+      // (seeded team titles are distinct per set, but a 2nd full set re-uses the
+      // same titles and WOULD hit `uniq_boards_team_lesson_title` — so the loser
+      // of the race fails its insert and surfaces an error rather than silently
+      // duplicating). Accepted for the single-beta-teacher launch (one provisioned
+      // teacher → the concurrent-first-open window effectively cannot occur). The
+      // durable fix is an atomic seed (stored procedure / `on conflict do nothing`
+      // upsert), deferred with the push-to-team atomicity finding.
       return seedDefaultTeamSet(client, lesson);
     }
 
@@ -713,9 +835,21 @@ export const supabaseTeachSource: TeachDataSource = {
     const nextOrder = await nextLessonOrder(client, lesson, input.scope, owner);
     // Re-index a default "Board N" title to the authoritative next slot so two
     // stale creates don't collide on a tab label; a custom title is untouched.
-    const title = /^Board \d+$/.test(input.title)
+    const baseTitle = /^Board \d+$/.test(input.title)
       ? `Board ${nextOrder + 1}`
       : input.title;
+    // Guarantee a collision-free title against the per-lesson unique index for
+    // this scope (`uniq_boards_personal_lesson_title` /
+    // `uniq_boards_team_lesson_title`). This fixes the `copySandboxBoardsToLesson`
+    // loop, which deletes the old personal set then re-inserts the sandbox board
+    // titles VERBATIM — and the default sandbox whiteboards are all titled
+    // "Whiteboard", so the 2nd insert would otherwise collide. The helpers
+    // re-query each call, so titles inserted earlier in that same loop are
+    // accounted for. Off-lesson boards (`lesson == null`) need no suffix.
+    const title =
+      input.scope === "personal"
+        ? await uniquePersonalTitle(client, lesson, owner, baseTitle)
+        : await uniqueTeamTitle(client, lesson, baseTitle);
 
     const insert = await client
       .from("boards")
@@ -926,6 +1060,27 @@ export const supabaseTeachSource: TeachDataSource = {
     // pushed boards as the new team set. Done as a sequence of awaited calls
     // (supabase-js has no client-side multi-statement transaction; a stored
     // procedure is the lead's option for true atomicity — noted as a finding).
+    //
+    // PRE-VALIDATE TITLES BEFORE THE DESTRUCTIVE DELETE (audit Finding 4). The
+    // re-insert loop must NOT be able to throw on a title collision against
+    // `uniq_boards_team_lesson_title` AFTER the team set is gone — that would
+    // leave the lesson with its team boards deleted but not repopulated. So we
+    // load every source up front and resolve a collision-free title for each,
+    // de-duplicating WITHIN the pushed set with the team suffix sequence (" (2)",
+    // " (3)", …). The delete wipes the whole prior team set for this lesson, so
+    // the only collisions that can remain are among the pushed boards themselves
+    // (e.g. two default whiteboards both titled "Whiteboard"); resolving them
+    // in-memory against an accumulating `taken` set is exact + needs no DB read
+    // of the about-to-be-deleted rows. Titles are fully fixed before any write.
+    const sources: Board[] = [];
+    for (const id of boardIds) sources.push(await loadBoard(client, id));
+    const takenTitles = new Set<string>();
+    const resolvedTitles = sources.map((source) => {
+      const title = firstFreeTitle(takenTitles, suffixSequence(source.title));
+      takenTitles.add(title);
+      return title;
+    });
+
     const del = await client
       .from("boards")
       .delete()
@@ -937,15 +1092,15 @@ export const supabaseTeachSource: TeachDataSource = {
       );
     }
     const pushed: Board[] = [];
-    for (let order = 0; order < boardIds.length; order += 1) {
-      const source = await loadBoard(client, boardIds[order]);
+    for (let order = 0; order < sources.length; order += 1) {
+      const source = sources[order];
       const ins = await client
         .from("boards")
         .insert({
           master_core_lesson_event_id: lesson,
           owner_id: null,
           scope: "team",
-          title: source.title,
+          title: resolvedTitles[order],
           display_order_within_lesson: order,
           template_id: source.templateId,
           grade_level_id: source.gradeLevelId,
@@ -1023,13 +1178,26 @@ export const supabaseTeachSource: TeachDataSource = {
       "personal",
       owner,
     );
+    // Derive a collision-free copy title via the shared helper + the "… (copy)",
+    // "… (copy 2)", … sequence, so duplicating a lesson-attached board twice
+    // doesn't violate `uniq_boards_personal_lesson_title`. The helper re-queries
+    // the lesson's current personal titles, so the 2nd duplicate sees the first
+    // copy and lands on "… (copy 2)". Off-lesson (a library-pulled board with a
+    // null masterLessonId) the index doesn't apply and the title passes through.
+    const title = await uniquePersonalTitle(
+      client,
+      source.masterLessonId,
+      owner,
+      `${source.title} (copy)`,
+      copySequence(source.title),
+    );
     const ins = await client
       .from("boards")
       .insert({
         master_core_lesson_event_id: source.masterLessonId,
         owner_id: owner,
         scope: "personal",
-        title: `${source.title} (copy)`,
+        title,
         display_order_within_lesson: nextOrder,
         template_id: source.templateId,
         grade_level_id: source.gradeLevelId,
@@ -1657,8 +1825,12 @@ function widgetPatchToRow(
   if (patch.state !== undefined) row.state = stripNames(patch.state ?? {});
   if (patch.persistence !== undefined)
     row.persistence_override = patch.persistence;
-  if (patch.gradeLevelId !== undefined)
-    row.grade_level_id = resolveGradeId(patch.gradeLevelId);
+  // NOTE: `gradeLevelId` is deliberately NOT written here. The `widgets` table
+  // has no `grade_level_id` column (it is denormalized onto the widget at READ
+  // time by `rowToWidget`/`rowToBoard`, stamped from the owning board's grade).
+  // Writing a non-existent column makes PostgREST reject the whole UPDATE with
+  // PGRST204 ("column not found"), so a benign widget patch that happens to
+  // carry `gradeLevelId` would fail. Grade lives on the board, not the widget.
   return row;
 }
 
