@@ -144,9 +144,15 @@ export interface TeachDataSource {
   /**
    * Boards that auto-surface in a context (the tag = assignment behaviour):
    * the owner's boards whose tags match `ctx` (see `boardMatchesContext`),
-   * UNION the matching Team-Library boards.
+   * UNION the matching Team-Library boards FOR `gradeLevelId`. The grade is a
+   * required scope so a teacher never sees another grade's published boards
+   * auto-surfacing in their context (the Team-Library read is grade-scoped).
    */
-  listBoardsForContext(ctx: BoardContext, ownerId: string): Promise<Board[]>;
+  listBoardsForContext(
+    ctx: BoardContext,
+    ownerId: string,
+    gradeLevelId: string,
+  ): Promise<Board[]>;
 
   /**
    * Publish a COPY of one of the owner's boards to the shared Team Library

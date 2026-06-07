@@ -538,14 +538,19 @@ export const mockTeachSource: TeachDataSource = {
     return cloneBoard(board);
   },
 
-  async listBoardsForContext(ctx, ownerId) {
+  async listBoardsForContext(ctx, ownerId, gradeLevelId) {
     const owner = resolveOwnerId(ownerId);
     const context = ctx as BoardContext;
     return boards
       .filter((b) => {
         const mine =
           b.scope === "personal" && b.ownerId === owner && b.ephemeral !== true;
-        const teamLib = b.libraryVisibility === "team";
+        // Team-Library candidates are grade-scoped: a published board only
+        // auto-surfaces for its own grade (parity with the Supabase query's
+        // `.eq("grade_level_id", …)` filter). The owner's own personal boards
+        // stay owner-scoped (a teacher's grade is implied by their boards).
+        const teamLib =
+          b.libraryVisibility === "team" && b.gradeLevelId === gradeLevelId;
         if (!mine && !teamLib) return false;
         return boardMatchesContext(b, context);
       })

@@ -85,6 +85,11 @@ export interface TeachLeftPanelProps {
    *  when absent the "Browse widget library" entry is hidden. Wired by the
    *  TeachWorkspace lead to the existing Widget Library overlay. */
   onOpenWidgetLibrary?: () => void;
+  // ── Owner identity (Finding 3 fix) ─────────────────────────────────────────
+  // Threaded from TeachWorkspace so BoardsModule receives the correct flag-aware
+  // owner id instead of the hard-coded `ME.id` slug.
+  /** The current teacher's owner id (null while the auth session loads). */
+  ownerId: string | null;
 }
 
 // ── A sortable tab ─────────────────────────────────────────────────────────────
@@ -195,6 +200,7 @@ function ModuleBody({
   boardsLoading,
   boardsGradeLevelId,
   reloadBoards,
+  ownerId,
 }: {
   moduleId: TeachModuleId;
   state: TeachWorkspaceState;
@@ -203,6 +209,10 @@ function ModuleBody({
   boardsLoading?: boolean;
   boardsGradeLevelId?: string;
   reloadBoards: () => Promise<Board[]>;
+  // ── Owner identity (Finding 3 fix) ─────────────────────────────────────────
+  // Threaded from TeachWorkspace so BoardsModule receives the correct
+  // flag-aware owner id instead of the hard-coded `ME.id` slug.
+  ownerId: string | null;
 }): ReactNode {
   switch (moduleId) {
     case "lessons":
@@ -225,6 +235,7 @@ function ModuleBody({
           loading={boardsLoading}
           gradeLevelId={boardsGradeLevelId}
           reloadBoards={reloadBoards}
+          ownerId={ownerId}
         />
       );
     case "notes":
@@ -254,6 +265,7 @@ export function TeachLeftPanel({
   boardsGradeLevelId,
   reloadBoards,
   onOpenWidgetLibrary,
+  ownerId,
 }: TeachLeftPanelProps): ReactNode {
   // The docked tool-widget stack — the panel-bar "+" docks tools into it.
   const dockedTools = useDockedTools();
@@ -412,6 +424,7 @@ export function TeachLeftPanel({
             boardsLoading={boardsLoading}
             boardsGradeLevelId={boardsGradeLevelId}
             reloadBoards={reloadBoards}
+            ownerId={ownerId}
           />
         ) : (
           <p className={styles.muted}>

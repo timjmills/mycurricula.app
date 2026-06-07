@@ -1230,6 +1230,9 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
               boardsGradeLevelId={boardGradeId(activeBoard)}
               reloadBoards={reloadBoards}
               onOpenWidgetLibrary={() => setLibraryOverlay("widgets")}
+              // Finding 3 fix: thread the flag-aware owner id so BoardsModule
+              // never uses the hard-coded `ME.id` slug under the live flag.
+              ownerId={ownerId}
             />
           ) : null}
 
@@ -1454,6 +1457,10 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                       dispatch({ type: "selectBoard", boardId: board.id });
                       setLibraryOverlay(null);
                     }}
+                    // Finding 3 fix: thread the flag-aware owner id so library
+                    // operations never use the hard-coded `ME.id` slug under
+                    // the live flag.
+                    ownerId={ownerId}
                   />
                 ) : (
                   <WidgetLibrary

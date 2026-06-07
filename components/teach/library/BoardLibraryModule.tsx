@@ -41,7 +41,7 @@ import type {
   BoardTagKind,
   RepeatSchedule,
 } from "@/lib/types";
-import { ME, TEACHER_BY_ID } from "@/lib/mock/teachers";
+import { TEACHER_BY_ID } from "@/lib/mock/teachers";
 import { teachClient as teach } from "@/lib/teach/client";
 import { MAX_BOARDS_PER_TEACHER, BoardCapError } from "@/lib/teach/queries";
 import {
@@ -118,10 +118,19 @@ const USE_FILTERS: readonly UseFilter[] = [
 // ── Props ────────────────────────────────────────────────────────────────────
 
 export interface BoardLibraryModuleProps {
-  /** Grade whose Team Library is shown. Defaults to the mock grade. */
+  /** Grade whose Team Library is shown. Threaded from TeachWorkspace; may be
+   *  undefined briefly under the live flag while the grade resolves (the team
+   *  list waits for it rather than passing a mock slug to a uuid column). */
   gradeLevelId?: string;
   /** Parent wires opening a board into the workspace. */
   onOpenBoard?: (board: Board) => void;
+  // ── Owner identity (Finding 3 fix) ─────────────────────────────────────────
+  // Threaded from TeachWorkspace: `ME.id` under the mock flag, `currentUser.id`
+  // (auth uid) under the live flag. Null briefly while the session resolves; the
+  // data-load effect and all mutation handlers guard on it so a non-uuid slug
+  // never reaches a uuid/RLS column.
+  /** The current teacher's owner id (null while the auth session loads). */
+  ownerId: string | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -176,11 +185,10 @@ function applyScope(list: Board[], scope: LibraryScope): Board[] {
 // ── BoardLibraryModule ───────────────────────────────────────────────────────
 
 export function BoardLibraryModule({
-  gradeLevelId = "g5",
+  gradeLevelId,
   onOpenBoard,
+  ownerId,
 }: BoardLibraryModuleProps): ReactNode {
-  const ownerId = ME.id;
-
   const [tab, setTab] = useState<Tab>("mine");
   const [scope, setScope] = useState<LibraryScope>("all");
   const [query, setQuery] = useState("");
@@ -205,12 +213,29 @@ export function BoardLibraryModule({
 
   // ── Load ────────────────────────────────────────────────────────────────
   const refresh = useCallback(async (): Promise<void> => {
+    // Guard: skip the load until the owner is resolved (auth not yet available
+    // or mock path misconfigured). Show an empty, non-loading state so the UI
+    // stays consistent; the effect below re-runs when ownerId becomes non-null.
+    if (!ownerId) {
+      setLoading(false);
+      setBoards([]);
+      return;
+    }
     setLoading(true);
     try {
-      const [list, count] = await Promise.all([
+      // The Team Library query needs a resolved grade. Under the live flag the
+      // grade resolves a tick after ownerId, so gradeLevelId can briefly be
+      // undefined; passing the old "g5" mock slug to resolveGradeId would throw
+      // (audit L4). Skip the team list until the grade arrives — the effect
+      // re-runs (gradeLevelId is in the deps). "mine" never needs a grade.
+      const listPromise =
         tab === "mine"
           ? teach.listMyBoards(ownerId)
-          : teach.listTeamLibraryBoards(gradeLevelId),
+          : gradeLevelId
+            ? teach.listTeamLibraryBoards(gradeLevelId)
+            : Promise.resolve([] as Board[]);
+      const [list, count] = await Promise.all([
+        listPromise,
         teach.countMyBoards(ownerId),
       ]);
       setBoards(list);
@@ -285,6 +310,13 @@ export function BoardLibraryModule({
   // ── Derived: the Team Library strip (always the team set, capped to 4) ────
   const [teamStrip, setTeamStrip] = useState<Board[]>([]);
   useEffect(() => {
+    // Wait for a resolved grade before querying the Team Library (audit L4): under
+    // the live flag gradeLevelId is briefly undefined, and a mock slug would throw
+    // in resolveGradeId. The effect re-runs when the grade arrives.
+    if (!gradeLevelId) {
+      setTeamStrip([]);
+      return;
+    }
     let alive = true;
     void teach.listTeamLibraryBoards(gradeLevelId).then((list) => {
       if (alive) setTeamStrip(list.slice(0, 4));
@@ -304,6 +336,8 @@ export function BoardLibraryModule({
 
   const handleDuplicate = useCallback(
     async (board: Board): Promise<void> => {
+      // Guard: owner must be resolved before writing a new repo row.
+      if (!ownerId) return;
       setCapNotice(false);
       try {
         await teach.duplicateBoard(board.id, ownerId);
@@ -318,6 +352,9 @@ export function BoardLibraryModule({
 
   const handlePublish = useCallback(
     async (board: Board): Promise<void> => {
+      // Guard: publish writes the owner id into a uuid/RLS column; skip until
+      // the real auth uid is resolved (audit finding #18).
+      if (!ownerId) return;
       await teach.publishBoardToTeamLibrary(board.id, ownerId);
       await refresh();
     },
@@ -326,6 +363,8 @@ export function BoardLibraryModule({
 
   const handleAddToMine = useCallback(
     async (board: Board): Promise<void> => {
+      // Guard: owner must be resolved before copying a team board to mine.
+      if (!ownerId) return;
       setCapNotice(false);
       try {
         await teach.copyTeamBoardToMine(board.id, ownerId);

@@ -754,30 +754,36 @@ function resolveGradeId(gradeLevelId: string): string {
   );
 }
 
-/** Resolve a lesson's real grade uuid from the master event row (the FK target
- *  of `boards.master_core_lesson_event_id`). Used when seeding the default team
- *  set, where no caller-supplied grade is available — never the mock slug. */
+/** Resolve a lesson's real grade uuid via the `teach_grade_for_lesson` RPC. Grade
+ *  does NOT live on the master event row — it lives on the lesson's UNIT, and the
+ *  RPC walks lesson→unit→grade (the same path RLS uses). Reading the (nonexistent)
+ *  `master_core_lesson_events.grade_level_id` column directly would error under
+ *  Supabase, so every caller (createBoard / createBlankBoard / seedDefaultTeamSet)
+ *  routes the lesson→grade resolution through this helper. Used both when seeding
+ *  the default team set (no caller-supplied grade available) AND to DERIVE the
+ *  grade for any lesson-attached board, so the new grade-integrity trigger
+ *  (trg_boards_lesson_grade) can never reject a mismatched (lesson, grade) pair. */
 async function gradeIdForLesson(
   client: ServerClient,
   lessonUuid: string,
 ): Promise<string> {
-  const res = await client
-    .from("master_core_lesson_events")
-    .select("grade_level_id")
-    .eq("id", lessonUuid)
-    .maybeSingle();
+  const res = await client.rpc("teach_grade_for_lesson", {
+    p_lesson: lessonUuid,
+  });
   if (res.error) {
     throw new Error(
       `Teach repository lesson grade lookup failed: ${res.error.message}`,
     );
   }
-  const row = res.data as { grade_level_id: string | null } | null;
-  if (!row?.grade_level_id) {
+  // The RPC returns the grade uuid as a scalar (null when the lesson has no
+  // resolvable unit→grade chain). An empty string is treated the same as null.
+  const grade = res.data as string | null;
+  if (!grade) {
     throw new Error(
-      `Teach repository cannot seed boards: lesson ${lessonUuid} has no grade_level_id.`,
+      `Teach repository cannot resolve grade: lesson ${lessonUuid} has no resolvable grade.`,
     );
   }
-  return row.grade_level_id;
+  return grade;
 }
 
 // ── Implementation ────────────────────────────────────────────────────────────
@@ -856,6 +862,16 @@ export const supabaseTeachSource: TeachDataSource = {
         ? await uniquePersonalTitle(client, lesson, owner, baseTitle)
         : await uniqueTeamTitle(client, lesson, baseTitle);
 
+    // Grade MUST be derived from the lesson when one is attached — the new
+    // grade-integrity trigger (trg_boards_lesson_grade) rejects any board whose
+    // stamped grade differs from its lesson's grade, regardless of what the
+    // caller supplied. Only a lesson-LESS board (sandbox/library copy) falls back
+    // to the caller-supplied grade (validated as a uuid by resolveGradeId).
+    const gradeLevelId =
+      lesson != null
+        ? await gradeIdForLesson(client, lesson)
+        : resolveGradeId(input.gradeLevelId);
+
     const insert = await client
       .from("boards")
       .insert({
@@ -865,7 +881,7 @@ export const supabaseTeachSource: TeachDataSource = {
         title,
         display_order_within_lesson: nextOrder,
         template_id: input.templateId ?? null,
-        grade_level_id: resolveGradeId(input.gradeLevelId),
+        grade_level_id: gradeLevelId,
         // The 5.31 cosmetic/structural columns are left to their DB defaults
         // (`whiteboard`/`ephemeral` → false, `library_visibility` → 'private',
         // the jsonb fields → null) — exactly as the mock's `createBoard` leaves
@@ -890,6 +906,43 @@ export const supabaseTeachSource: TeachDataSource = {
   async updateBoard(boardId, patch) {
     const client = await sb();
     const row = boardPatchToRow(patch);
+    // TITLE DE-DUP ON RENAME (audit Finding 8): a raw title write bypasses the
+    // per-lesson unique-title indexes (`uniq_boards_personal_lesson_title` /
+    // `uniq_boards_team_lesson_title`), so a rename that collides with a sibling
+    // would throw. When the patch changes the title AND the board is
+    // lesson-attached (the only case the indexes guard), resolve a collision-free
+    // title against the board's siblings EXCLUDING itself (`.neq("id", boardId)`),
+    // then override the row's title. Excluding the board's own row also makes a
+    // no-op/near-self rename safe (renaming "Warm-Up" → "Warm-Up" stays as-is
+    // instead of bumping to "Warm-Up (2)"). `boardPatchToRow` stays pure — the
+    // de-dup lives here. The mock has no unique index so it renames freely; this
+    // is the Supabase-only guard that preserves that behaviour without erroring.
+    if (patch.title !== undefined) {
+      const board = await loadBoard(client, boardId);
+      if (board.masterLessonId != null) {
+        const lesson = resolveLessonId(board.masterLessonId);
+        // Mirror personalTitleSet / uniqueTeamTitle, but exclude this board's own
+        // row so it never collides with itself. Personal adds the owner filter.
+        let q = client
+          .from("boards")
+          .select("title")
+          .eq("scope", board.scope)
+          .eq("master_core_lesson_event_id", lesson)
+          .neq("id", boardId);
+        if (board.scope === "personal") {
+          q =
+            board.ownerId == null
+              ? q.is("owner_id", null)
+              : q.eq("owner_id", board.ownerId);
+        }
+        const sib = await q;
+        const rows = unwrap(sib, "list sibling titles for rename") as {
+          title: string;
+        }[];
+        const taken = new Set(rows.map((r) => r.title));
+        row.title = firstFreeTitle(taken, suffixSequence(patch.title));
+      }
+    }
     if (Object.keys(row).length > 0) {
       const res = await client.from("boards").update(row).eq("id", boardId);
       if (res.error) {
@@ -971,12 +1024,80 @@ export const supabaseTeachSource: TeachDataSource = {
 
   async updateWidget(widgetId, patch) {
     const client = await sb();
+    // PAGE-AWARE — but ONLY when the board already has an explicit `pages` jsonb.
+    // A board with pages treats the jsonb as authoritative and IGNORES the flat
+    // `widgets` table on read (see `rowToBoard`), so an edit there must go through
+    // the page model (Finding 4). A FLAT (single-page) board must NOT be pushed
+    // through `commitPages`: that would persist a `pages` jsonb for it, after which
+    // reads switch to the jsonb and the still-flat `upsertWidget` embed path (the
+    // Resources-panel "open in board" / drag-to-cell) goes invisible and is wiped
+    // by the next commitPages (audit H1). The mock keeps page-0 in sync via array
+    // aliasing and never materializes pages for a single-page board, so a flat
+    // board here takes the direct widgets-table write (mock parity).
+    const hit = await findWidget(client, widgetId);
+    if (hit.board.pages && hit.board.pages.length > 0) {
+      // Build the updated domain Widget from ONLY the present patch fields.
+      // config/state are name-stripped before entering the persisted page set
+      // (privacy invariant — see the induction comment in commitPages / the mock).
+      const updated: Widget = {
+        ...hit.widget,
+        ...(patch.type !== undefined ? { type: patch.type } : {}),
+        ...(patch.title !== undefined ? { title: patch.title } : {}),
+        ...(patch.position !== undefined
+          ? { position: { ...patch.position } }
+          : {}),
+        ...(patch.canvas !== undefined
+          ? { canvas: patch.canvas ? { ...patch.canvas } : undefined }
+          : {}),
+        ...(patch.appearance !== undefined
+          ? {
+              appearance: patch.appearance
+                ? { ...patch.appearance }
+                : undefined,
+            }
+          : {}),
+        ...(patch.displayOrder !== undefined
+          ? { displayOrder: patch.displayOrder }
+          : {}),
+        ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}),
+        ...(patch.config !== undefined
+          ? { config: stripNames(patch.config ?? {}) }
+          : {}),
+        ...(patch.state !== undefined
+          ? { state: stripNames(patch.state ?? {}) }
+          : {}),
+        ...(patch.persistence !== undefined
+          ? { persistence: patch.persistence }
+          : {}),
+      };
+      const updatedPages = pagesOf(hit.board).map((p) =>
+        p.id === hit.page.id
+          ? {
+              ...p,
+              widgets: p.widgets.map((w) => (w.id === widgetId ? updated : w)),
+            }
+          : p,
+      );
+      await commitPages(client, hit.board.id, updatedPages);
+      // Reload so the returned widget matches the persisted row (commitPages
+      // re-stamps grade + ensures a canvas on read).
+      const reloaded = await loadBoard(client, hit.board.id);
+      for (const page of pagesOf(reloaded)) {
+        const w = page.widgets.find((x) => x.id === widgetId);
+        if (w) return w;
+      }
+      // Should be unreachable — we just wrote this widget back.
+      throw new Error(`Widget not found after update: ${widgetId}`);
+    }
+    // Flat board: update the widget-table row directly (widgetPatchToRow applies
+    // the privacy stripNames on config/state). No `pages` jsonb is written, so the
+    // board stays single-page and the flat embed path stays consistent.
     const row = widgetPatchToRow(patch);
     if (Object.keys(row).length > 0) {
-      const res = await client.from("widgets").update(row).eq("id", widgetId);
-      if (res.error) {
+      const upd = await client.from("widgets").update(row).eq("id", widgetId);
+      if (upd.error) {
         throw new Error(
-          `Teach repository update widget failed: ${res.error.message}`,
+          `Teach repository update widget failed: ${upd.error.message}`,
         );
       }
     }
@@ -997,10 +1118,36 @@ export const supabaseTeachSource: TeachDataSource = {
 
   async deleteWidget(widgetId) {
     const client = await sb();
-    const res = await client.from("widgets").delete().eq("id", widgetId);
-    if (res.error) {
+    // Idempotent (mock parity): a missing widget is a silent no-op, not an error
+    // (delete should be safe to retry / double-fire). findWidget throws
+    // "Widget not found" when the widget is gone — swallow exactly that, rethrow
+    // anything else (a real query failure).
+    let hit: Awaited<ReturnType<typeof findWidget>>;
+    try {
+      hit = await findWidget(client, widgetId);
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("Widget not found"))
+        return;
+      throw e;
+    }
+    // PAGE-AWARE only when the board already has explicit pages (Finding 4): drop
+    // the widget from its owning page via commitPages (so a non-page-0 widget in
+    // the authoritative jsonb is actually removed). A FLAT board takes the direct
+    // table delete — routing it through commitPages would materialize a `pages`
+    // jsonb and desync the flat `upsertWidget` embed path (audit H1).
+    if (hit.board.pages && hit.board.pages.length > 0) {
+      const prunedPages = pagesOf(hit.board).map((p) =>
+        p.id === hit.page.id
+          ? { ...p, widgets: p.widgets.filter((w) => w.id !== widgetId) }
+          : p,
+      );
+      await commitPages(client, hit.board.id, prunedPages);
+      return;
+    }
+    const del = await client.from("widgets").delete().eq("id", widgetId);
+    if (del.error) {
       throw new Error(
-        `Teach repository delete widget failed: ${res.error.message}`,
+        `Teach repository delete widget failed: ${del.error.message}`,
       );
     }
   },
@@ -1060,23 +1207,34 @@ export const supabaseTeachSource: TeachDataSource = {
   // ── Push to team (plan §13.1 displacement) ────────────────────────────────
   async pushBoardsToTeam(masterLessonId, boardIds) {
     const client = await sb();
+    // Pushing an EMPTY selection must never wipe the lesson's existing team set
+    // (the RPC's first act is to delete it). Nothing to displace → return early.
+    // (The BoardsModule caller already guards this; this is the repo-side guard.)
+    if (boardIds.length === 0) return [];
     const lesson = resolveLessonId(masterLessonId);
-    // Displacement: delete the lesson's existing team set, then re-insert the
-    // pushed boards as the new team set. Done as a sequence of awaited calls
-    // (supabase-js has no client-side multi-statement transaction; a stored
-    // procedure is the lead's option for true atomicity — noted as a finding).
+    // ATOMIC DISPLACEMENT (audit Finding 5). The §13.1 push DELETES the lesson's
+    // existing team set then re-inserts the pushed boards as the new team set.
+    // The old impl ran this as a delete followed by a per-board insert loop —
+    // a failure AFTER the delete left the team with NO boards (data loss). We now
+    // do the whole displacement through the `teach_replace_team_set` RPC, whose
+    // plpgsql body is ONE transaction (delete + bulk board insert + bulk page-0
+    // widget mirror insert), so a partial failure rolls everything back. The RPC
+    // is SECURITY INVOKER: the caller's RLS still gates every row (it only adds
+    // atomicity, never privilege), and the boards insert fires
+    // trg_boards_lesson_grade, so a mis-stamped grade rolls the whole thing back.
     //
-    // PRE-VALIDATE TITLES BEFORE THE DESTRUCTIVE DELETE (audit Finding 4). The
-    // re-insert loop must NOT be able to throw on a title collision against
-    // `uniq_boards_team_lesson_title` AFTER the team set is gone — that would
-    // leave the lesson with its team boards deleted but not repopulated. So we
-    // load every source up front and resolve a collision-free title for each,
-    // de-duplicating WITHIN the pushed set with the team suffix sequence (" (2)",
-    // " (3)", …). The delete wipes the whole prior team set for this lesson, so
-    // the only collisions that can remain are among the pushed boards themselves
-    // (e.g. two default whiteboards both titled "Whiteboard"); resolving them
-    // in-memory against an accumulating `taken` set is exact + needs no DB read
-    // of the about-to-be-deleted rows. Titles are fully fixed before any write.
+    // The app prepares the FULL payloads here (all id-minting + name-stripping +
+    // page/widget mapping stays in TS, where it is unit-tested); the RPC is a dumb
+    // atomic writer. This replicates `copyBoardContent`'s id-minting in memory
+    // instead of issuing per-board DB calls.
+    //
+    // PRE-VALIDATE TITLES (audit Finding 4 — kept). The new team set must not
+    // collide on `uniq_boards_team_lesson_title`. The RPC's delete wipes the whole
+    // prior team set for this lesson in the same transaction, so the only
+    // collisions that can remain are among the pushed boards themselves (e.g. two
+    // default whiteboards both titled "Whiteboard"); resolving them in-memory
+    // against an accumulating `taken` set with the team suffix sequence (" (2)",
+    // " (3)", …) is exact + needs no DB read of the about-to-be-deleted rows.
     const sources: Board[] = [];
     for (const id of boardIds) sources.push(await loadBoard(client, id));
     const takenTitles = new Set<string>();
@@ -1086,48 +1244,119 @@ export const supabaseTeachSource: TeachDataSource = {
       return title;
     });
 
-    const del = await client
-      .from("boards")
-      .delete()
-      .eq("master_core_lesson_event_id", lesson)
-      .eq("scope", "team");
-    if (del.error) {
-      throw new Error(
-        `Teach repository push-to-team (clear) failed: ${del.error.message}`,
-      );
-    }
-    const pushed: Board[] = [];
+    // Build the board + widget payloads (snake_case keys) entirely in memory.
+    const boardPayloads: Record<string, unknown>[] = [];
+    const widgetPayloads: Record<string, unknown>[] = [];
     for (let order = 0; order < sources.length; order += 1) {
       const source = sources[order];
-      const ins = await client
-        .from("boards")
-        .insert({
-          master_core_lesson_event_id: lesson,
-          owner_id: null,
-          scope: "team",
-          title: resolvedTitles[order],
-          display_order_within_lesson: order,
-          template_id: source.templateId,
-          grade_level_id: source.gradeLevelId,
-          // Carry the source's cosmetic/structural fields onto the team copy.
-          background: source.background ?? null,
-          tags: source.tags ?? null,
-          board_theme: source.boardTheme ?? null,
-          repeat: source.repeat ?? null,
-          whiteboard: source.whiteboard ?? false,
-          // A per-lesson team board is never ephemeral and is not a library copy.
-          ephemeral: false,
-          library_visibility: "private",
-          published_by: null,
-          source_board_id: source.id,
-        })
-        .select(BOARD_COLS)
-        .single();
-      const newRow = unwrap(ins, "push-to-team (insert board)") as BoardRow;
-      await copyBoardContent(client, source, newRow.id);
-      pushed.push(await loadBoard(client, newRow.id));
+      const newBoardId = crypto.randomUUID();
+      // Replicate copyBoardContent's two cases, but capture the mapped widgets so
+      // the page-0 set can ALSO be emitted as the flat-mirror payload.
+      let pagesPayload: BoardPage[] | null;
+      let page0Widgets: Widget[];
+      if (source.pages && source.pages.length > 0) {
+        // MULTI-PAGE: re-mint every page id + widget id, keep the domain shape
+        // `rowToBoard` reads back (id/boardId/type/title/position/canvas/
+        // appearance/displayOrder/pinned/config/state/persistence). gradeLevelId
+        // + ensureCanvas are re-applied on READ, so we need not set them here, but
+        // we DO keep canvas/appearance when present. Names are stripped now so the
+        // `pages` jsonb the RPC stores is already structure-only.
+        const newPages: BoardPage[] = source.pages
+          .slice()
+          .sort((a, b) => a.order - b.order)
+          .map((p, i) => ({
+            id: newPageId(),
+            order: i,
+            title: p.title,
+            widgets: p.widgets.map((w, j) => ({
+              ...w,
+              id: crypto.randomUUID(),
+              boardId: newBoardId,
+              displayOrder: j,
+              position: { ...w.position },
+              canvas: w.canvas ? { ...w.canvas } : undefined,
+              appearance: w.appearance ? { ...w.appearance } : undefined,
+              config: stripNames(w.config ?? {}),
+              state: stripNames(w.state ?? {}),
+            })),
+          }));
+        pagesPayload = newPages;
+        page0Widgets = newPages[0]?.widgets ?? [];
+        // The page-0 widgets become the flat mirror — KEEP the id just minted so
+        // the flat row matches the `pages` jsonb page-0 widget exactly.
+        page0Widgets.forEach((w, idx) => {
+          widgetPayloads.push({
+            ...widgetToRow({ ...w, boardId: newBoardId }),
+            id: w.id,
+            display_order_within_board: idx,
+          });
+        });
+      } else {
+        // FLAT (no pages): the board payload carries no pages jsonb; each source
+        // widget becomes a flat-mirror row with a FRESH id (avoids a PK collision
+        // and keeps the copy independent). widgetToRow strips names.
+        pagesPayload = null;
+        page0Widgets = [];
+        source.widgets.forEach((w, idx) => {
+          widgetPayloads.push({
+            ...widgetToRow({ ...w, boardId: newBoardId }),
+            id: crypto.randomUUID(),
+            display_order_within_board: idx,
+          });
+        });
+      }
+      // The board row payload — every column the migration's INSERT lists, with
+      // the NOT NULL columns explicitly set. master_core_lesson_event_id === the
+      // RPC's p_lesson; owner_id null (team scope).
+      boardPayloads.push({
+        id: newBoardId,
+        grade_level_id: source.gradeLevelId,
+        subject_id: null,
+        master_core_lesson_event_id: lesson,
+        owner_id: null,
+        scope: "team",
+        title: resolvedTitles[order],
+        tint: null,
+        display_order_within_lesson: order,
+        template_id: source.templateId ?? null,
+        board_theme: source.boardTheme ?? null,
+        repeat: source.repeat ?? null,
+        tags: source.tags ?? null,
+        background: source.background ?? null,
+        whiteboard: source.whiteboard ?? false,
+        // A per-lesson team board is never ephemeral and is not a library copy.
+        ephemeral: false,
+        library_visibility: "private",
+        published_by: null,
+        source_board_id: source.id,
+        pages: pagesPayload,
+      });
     }
-    return pushed;
+
+    // One atomic call: delete the old team set + bulk-insert the new boards and
+    // their page-0 widget mirror. A failure rolls the entire transaction back, so
+    // the lesson never ends up with its team boards deleted but not repopulated.
+    const res = await client.rpc("teach_replace_team_set", {
+      p_lesson: lesson,
+      p_boards: boardPayloads,
+      p_widgets: widgetPayloads,
+    });
+    if (res.error) {
+      throw new Error(
+        `Teach repository push-to-team failed: ${res.error.message}`,
+      );
+    }
+
+    // Reload + return the new team set in display order (same return shape as
+    // before: the persisted Board[] for this lesson's team scope).
+    const reload = await client
+      .from("boards")
+      .select(BOARD_COLS)
+      .eq("master_core_lesson_event_id", lesson)
+      .eq("scope", "team")
+      .order("display_order_within_lesson", { ascending: true });
+    const rows = unwrap(reload, "push-to-team (reload)") as BoardRow[];
+    return hydrateBoards(client, rows);
   },
 
   // ── Boards Library ─────────────────────────────────────────────────────────
@@ -1239,6 +1468,13 @@ export const supabaseTeachSource: TeachDataSource = {
     // `keepBoard` (so a capped teacher can still scratch on a throwaway). No
     // assertUnderCap here — the cap is enforced at keep (mock parity).
     const nextOrder = await nextLessonOrder(client, lesson, "personal", owner);
+    // Same lesson-present→derive rule as createBoard: a lesson-attached whiteboard
+    // must carry the lesson's grade (the trigger rejects a mismatch); a lesson-less
+    // sandbox whiteboard falls back to the caller-supplied (uuid) grade.
+    const gradeLevelId =
+      lesson != null
+        ? await gradeIdForLesson(client, lesson)
+        : resolveGradeId(input.gradeLevelId);
     const ins = await client
       .from("boards")
       .insert({
@@ -1248,7 +1484,7 @@ export const supabaseTeachSource: TeachDataSource = {
         title: input.title ?? "Whiteboard",
         display_order_within_lesson: nextOrder,
         template_id: null,
-        grade_level_id: resolveGradeId(input.gradeLevelId),
+        grade_level_id: gradeLevelId,
         background: null,
         tags: [],
         whiteboard: true,
@@ -1302,14 +1538,18 @@ export const supabaseTeachSource: TeachDataSource = {
     return loadBoard(client, boardId);
   },
 
-  async listBoardsForContext(ctx, ownerId) {
+  async listBoardsForContext(ctx, ownerId, gradeLevelId) {
     const client = await sb();
     const owner = resolveOwnerId(ownerId);
     const context = ctx as BoardContext;
-    // Auto-surface candidates: the owner's KEPT personal boards + every published
-    // Team-Library board, run through the SAME `boardMatchesContext` predicate
-    // the mock uses (tags now persist, so matching is live). Personal ephemeral
-    // boards are excluded (mock parity).
+    // Auto-surface candidates: the owner's KEPT personal boards + the published
+    // Team-Library boards FOR THIS GRADE (audit Finding 9 — the team-library read
+    // was previously grade-unscoped, so another grade's published boards could
+    // auto-surface), run through the SAME `boardMatchesContext` predicate the mock
+    // uses (tags now persist, so matching is live). Personal ephemeral boards are
+    // excluded (mock parity). The personal query stays owner-scoped — a teacher's
+    // own boards imply their grade, so no grade filter is needed (and not adding
+    // one keeps a teacher's cross-grade personal boards reachable as today).
     const personal = await client
       .from("boards")
       .select(BOARD_COLS)
@@ -1319,7 +1559,8 @@ export const supabaseTeachSource: TeachDataSource = {
     const teamLib = await client
       .from("boards")
       .select(BOARD_COLS)
-      .eq("library_visibility", "team");
+      .eq("library_visibility", "team")
+      .eq("grade_level_id", resolveGradeId(gradeLevelId));
     const personalRows = unwrap(
       personal,
       "context personal boards",
@@ -1338,11 +1579,33 @@ export const supabaseTeachSource: TeachDataSource = {
 
   async publishBoardToTeamLibrary(boardId, ownerId) {
     const client = await sb();
-    // Resolve THEN assert the publisher is a bare uuid: it is written into the
-    // `published_by` column AND interpolation-adjacent provenance, so a non-uuid
-    // is rejected up front (filter-injection / RLS-corruption defense).
+    // Resolve THEN assert the caller-supplied owner is a bare uuid: it is used in
+    // the ownership cross-check below + (defensively) compared to the source, so a
+    // non-uuid is rejected up front (filter-injection / RLS-corruption defense).
     const owner = assertUuid(resolveOwnerId(ownerId), "ownerId");
     const source = await loadBoard(client, boardId);
+    // PUBLISH OWNERSHIP (audit Finding 7): only the teacher's OWN personal board
+    // may be published — never a team board, a team-library copy, or someone
+    // else's. RLS already guarantees a *readable* personal board is owned by
+    // auth.uid() (the personal-board policy is owner-scoped), so a personal board
+    // that loadBoard returned IS the caller's; we still assert scope + ownerId
+    // explicitly here so the rule is enforced in-app (not only by RLS) and so a
+    // team/library source is rejected with a clear message rather than silently
+    // publishing a board the caller doesn't own. The mock trusts the caller; this
+    // is the Supabase-side guard that makes the (mock-intended) "publish your own
+    // board" rule actually hold.
+    if (source.scope !== "personal" || source.ownerId == null) {
+      throw new Error(
+        "Only your own personal board can be published to the Team Library",
+      );
+    }
+    // DERIVE published_by from the verified source owner (NOT the caller arg), so
+    // provenance records the true owner even if the caller passed a stale/foreign
+    // id. Defense-in-depth: the caller-supplied owner must match the source owner
+    // (RLS makes them equal — auth.uid() — so a mismatch is a caller bug).
+    if (owner !== source.ownerId) {
+      throw new Error("publish owner mismatch");
+    }
     // A published board is a lesson-DETACHED, team-owned COPY placed in the Team
     // Library (library_visibility = 'team'). It does NOT count toward the
     // publisher's cap (team-owned, not 'private'), and it records provenance.
@@ -1364,7 +1627,8 @@ export const supabaseTeachSource: TeachDataSource = {
         whiteboard: source.whiteboard ?? false,
         ephemeral: false,
         library_visibility: "team",
-        published_by: owner,
+        // Provenance derived from the verified source owner, not the caller arg.
+        published_by: assertUuid(source.ownerId, "publishedBy"),
         source_board_id: source.id,
       })
       .select(BOARD_COLS)

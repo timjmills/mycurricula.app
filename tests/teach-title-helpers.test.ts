@@ -80,7 +80,8 @@ describe("clampWidth (canvas width 230–640, NaN-safe)", () => {
   it("+Infinity → 320", () => expect(clampWidth(Infinity)).toBe(320));
   it("-Infinity → 320", () => expect(clampWidth(-Infinity)).toBe(320));
   it("below range clamps up to 230", () => expect(clampWidth(10)).toBe(230));
-  it("above range clamps down to 640", () => expect(clampWidth(9999)).toBe(640));
+  it("above range clamps down to 640", () =>
+    expect(clampWidth(9999)).toBe(640));
   it("in-range value is rounded", () => expect(clampWidth(412.6)).toBe(413));
   it("boundaries pass through", () => {
     expect(clampWidth(230)).toBe(230);

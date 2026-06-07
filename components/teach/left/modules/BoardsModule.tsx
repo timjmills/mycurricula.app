@@ -41,7 +41,6 @@ import { Button, FutureControl, Tooltip } from "@/components/ui";
 import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { useConsequenceToast } from "@/lib/consequence-toast";
-import { ME } from "@/lib/mock";
 import { teachClient as teach } from "@/lib/teach/client";
 import type { Board } from "@/lib/types";
 import type { TeachWorkspaceAction } from "@/components/teach/TeachWorkspace";
@@ -72,6 +71,12 @@ export interface BoardsModuleProps {
   gradeLevelId?: string;
   /** Re-read the active set after a mutating repo call (returns the fresh set). */
   reloadBoards: () => Promise<Board[]>;
+  // ── Owner identity (Finding 3 fix) ─────────────────────────────────────────
+  // Threaded from TeachWorkspace: `ME.id` under the mock flag, `currentUser.id`
+  // (auth uid) under the live flag. Null briefly while the session resolves; all
+  // repo calls guard on it so a non-uuid slug never reaches a uuid/RLS column.
+  /** The current teacher's owner id (null while the auth session loads). */
+  ownerId: string | null;
 }
 
 // ── A sortable board thumbnail row ─────────────────────────────────────────────
@@ -161,6 +166,7 @@ export function BoardsModule({
   loading = false,
   gradeLevelId,
   reloadBoards,
+  ownerId,
 }: BoardsModuleProps): ReactNode {
   const { lessons } = usePlanner();
   const { setSelectedLessonId } = useAppState();
@@ -170,8 +176,6 @@ export function BoardsModule({
   const [confirmPush, setConfirmPush] = useState(false);
   // Sandbox "pin to lesson" picker visibility.
   const [pinning, setPinning] = useState(false);
-
-  const ownerId = ME.id;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -187,6 +191,9 @@ export function BoardsModule({
   async function handleReorder(event: DragEndEvent): Promise<void> {
     const { active, over } = event;
     if (!over || active.id === over.id || !activeLessonId) return;
+    // Guard: never call the repo with a null owner (auth not yet resolved or mock
+    // path misconfigured); drop the reorder silently so nothing throws.
+    if (!ownerId) return;
     const oldIndex = boards.findIndex((b) => b.id === active.id);
     const newIndex = boards.findIndex((b) => b.id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
@@ -203,6 +210,9 @@ export function BoardsModule({
 
   async function handleAddBoard(): Promise<void> {
     if (!activeLessonId) return;
+    // Guard: owner must be resolved before we write a new board row (audit
+    // finding #18 — slug in a uuid/RLS column breaks row-level security).
+    if (!ownerId) return;
     const created = await teach.createBoard({
       masterLessonId: activeLessonId,
       ownerId,
@@ -253,6 +263,8 @@ export function BoardsModule({
   async function copySandboxBoardsToLesson(
     lessonId: string,
   ): Promise<string | null> {
+    // Guard: owner must be resolved; if not, bail (auth not yet available).
+    if (!ownerId) return null;
     // Remove any existing PERSONAL set for the target lesson so we don't stack
     // two personal sets (the repo enforces one personal set per teacher, §13.1).
     const existing = await teach.listBoardsForLesson(lessonId, ownerId);
@@ -302,6 +314,8 @@ export function BoardsModule({
   }
 
   async function handlePinToLesson(lessonId: string): Promise<void> {
+    // Guard: bail if the owner hasn't resolved yet (auth not available).
+    if (!ownerId) return;
     // Warn before overwriting an existing personal set for the chosen lesson.
     const existing = await teach.listBoardsForLesson(lessonId, ownerId);
     const hasPersonal = existing.some(
