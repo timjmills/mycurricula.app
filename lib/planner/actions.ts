@@ -46,6 +46,16 @@ export async function plannerDispatch<M extends keyof PlannerDataSource>(
   args: Parameters<PlannerDataSource[M]>,
 ): Promise<Awaited<ReturnType<PlannerDataSource[M]>>> {
   const src = source();
+  // SECURITY: see teachDispatch — a `'use server'` boundary (HTTP endpoint) with
+  // a runtime-erased generic, so `method` is an attacker-controlled string. Only
+  // dispatch to an OWN, callable property of the source object literal; fail
+  // closed otherwise.
+  if (
+    !Object.prototype.hasOwnProperty.call(src, method) ||
+    typeof src[method] !== "function"
+  ) {
+    throw new Error(`plannerDispatch: unknown method "${String(method)}"`);
+  }
   const fn = src[method] as (
     ...a: Parameters<PlannerDataSource[M]>
   ) => Promise<Awaited<ReturnType<PlannerDataSource[M]>>>;
