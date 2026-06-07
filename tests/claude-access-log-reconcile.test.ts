@@ -52,9 +52,10 @@ describe("claude_access_log reconcile — the schema audit() writes", () => {
     // add-if-not-exists BEFORE drop-not-null so a sparse drifted table can't error.
     const reasonAdd = sql.search(/add column if not exists reason text/i);
     const reasonDrop = sql.search(/alter column reason drop not null/i);
-    expect(reasonAdd, "reason add-if-not-exists must be present").toBeGreaterThan(
-      -1,
-    );
+    expect(
+      reasonAdd,
+      "reason add-if-not-exists must be present",
+    ).toBeGreaterThan(-1);
     expect(reasonDrop, "reason drop-not-null must be present").toBeGreaterThan(
       -1,
     );
