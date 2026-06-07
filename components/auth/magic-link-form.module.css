@@ -1,0 +1,168 @@
+/* magic-link-form.module.css — email magic-link sign-in form.
+ *
+ * All color / type / spacing via var(--token) only. No hex, no px font sizes.
+ * Tailwind is not used here — this file is the sole visual owner.
+ */
+
+/* ── Form container ─────────────────────────────────────────────────────── */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+/* ── Label ──────────────────────────────────────────────────────────────── */
+
+.label {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-align: left;
+}
+
+/* ── Email input ────────────────────────────────────────────────────────── */
+
+.input {
+  width: 100%;
+  /* 44px visual height → ≥44px touch target at all tiers */
+  height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-warm);
+  font-family: var(--font-sans);
+  font-size: var(--t-13);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  box-sizing: border-box;
+}
+
+.input::placeholder {
+  color: var(--faint);
+}
+
+.input:focus {
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 3px var(--brand-50);
+}
+
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Submit button — full-width override ────────────────────────────────── */
+
+.submitBtn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+/* ── Hint line ──────────────────────────────────────────────────────────── */
+
+.hint {
+  margin: 0;
+  font-size: var(--t-11);
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── Error / rate-limit notice ──────────────────────────────────────────── */
+
+.error {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: var(--r-md);
+  background: var(--danger-tint);
+  color: var(--danger);
+  font-size: var(--t-12);
+  font-weight: 600;
+  text-align: left;
+}
+
+/* ── Sent / confirmation state ──────────────────────────────────────────── */
+
+.sent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 8px 8px;
+  text-align: center;
+}
+
+.sentIcon {
+  font-size: var(--t-28);
+  line-height: 1;
+}
+
+.sentHeading {
+  margin: 0;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-16);
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.sentBody {
+  margin: 0;
+  font-size: var(--t-13);
+  line-height: 1.5;
+  color: var(--body);
+}
+
+.sentEmail {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.resendRow {
+  margin: 0;
+  font-size: var(--t-12);
+  color: var(--muted);
+}
+
+/* Inline text button — visually a link, not a button shape. */
+.resendBtn {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--brand-500);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  /* 44px touch target via block height — keeps the line flow intact */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.resendBtn:hover {
+  color: var(--brand-600);
+}
+
+.resendBtn:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .input {
+    transition: none;
+  }
+}

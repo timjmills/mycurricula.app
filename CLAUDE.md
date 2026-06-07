@@ -323,11 +323,57 @@ intended behavior. Re-run the gate after fixes until Codex outputs
 
 **If the gate cannot run** (Codex not installed, not authenticated, sandbox
 denied by local policy, network unavailable, etc.), do not bypass the
-restriction or send code through another path. Report the blocker to the user
-and fall back to the strongest available local verification — typically
-`npm run lint && npx tsc --noEmit && npm run build`, the responsive probe
-script (`node scripts/probe-uxa.mjs`), and a manual diff re-read against the
-review-prompt checklist.
+restriction or send code through another path. Report the blocker to the user,
+then do BOTH of the following — neither substitutes for the other:
+
+1. **Mandatory adversarial review — run by whichever reviewer is the more
+   rigorous for the change.** The gate's defining property is INDEPENDENT
+   adversarial review — a reviewer that did not author the code. With Codex
+   gone, choose the substitute that best preserves that, by rigor:
+   - **An independent review agent** (a freshly spawned agent that did NOT write
+     the diff) is the closest substitute for Codex: clean eyes, none of the
+     author's blind spots. Prefer it for security / auth / data-handling /
+     migration / RLS / privilege / public-interface changes, where independence
+     matters most.
+   - **Your own self-administered review** brings full intent + cross-change
+     integration context. Prefer it when that context is the scarce thing, or
+     when spawning an agent isn't practical.
+   - **Both** is the most rigorous, and is REQUIRED for high-consequence changes
+     (auth, RLS/privileges, data migrations — anything that can leak tenants or
+     lock users out): the agent supplies independence, the self-review supplies
+     context.
+   - If the two are genuinely equally good for the change at hand, either alone
+     suffices — pick one and move on.
+
+   **Invariants regardless of who reviews:**
+   - The reviewer must be INDEPENDENT of the author. An implementation agent
+     reviewing its OWN diff does NOT count (no marking your own homework); a
+     fresh review agent — or the orchestrator reviewing an agent's output —
+     does.
+   - Adopt the reviewer persona ("strict, skeptical Senior Security & QA
+     Engineer"), read the full diff (`git diff` + `git diff --cached`; for
+     already-committed work, the commit range under review), and report findings
+     in the gate's format — file/line, severity (Critical / High / Medium /
+     Low), the concrete failure scenario, a suggested fix. Hunt for logic
+     errors, security flaws, race conditions, unhandled edge cases, broken error
+     handling, and missing/wrong tests. NOT satisfied by lint/tsc/build alone.
+   - The orchestrator OWNS the outcome: critically validate every finding (never
+     rubber-stamp an agent's `NO BLOCKING ISSUES`), fix every legitimate
+     Critical and High before committing, and justify any dismissed finding.
+     Conclude with `NO BLOCKING ISSUES` or the remaining justified Low/Medium
+     items.
+   - State on the record which reviewer(s) ran (self / independent agent / both)
+     and that Codex was unavailable, so the substitution is auditable.
+
+   **This applies on every cloud / remote (Claude Code on the web) session**,
+   where Codex is not installed and cannot act as the gate — there, this review
+   IS the gate, and it runs for every logic / security / data-handling /
+   public-interface change, every time, before the commit lands.
+
+2. **Local verification stack**, on top of the self-review — typically
+   `npm run lint && npx tsc --noEmit && npm run build`, the responsive probe
+   script (`node scripts/probe-uxa.mjs`), and the relevant test suite
+   (`npm run test`).
 
 ### Known sandbox limitations + mitigations (Windows, 2026-05-28)
 

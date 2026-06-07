@@ -53,6 +53,12 @@ const TABS: readonly SettingsTab[] = [
     scope: "team",
   },
   {
+    slug: "team",
+    label: "Team",
+    href: "/settings/team",
+    scope: "team",
+  },
+  {
     slug: "appearance",
     label: "Appearance",
     href: "/settings/appearance",

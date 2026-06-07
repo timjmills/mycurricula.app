@@ -1,9 +1,10 @@
 // login/page.tsx — the sign-in screen.
 //
 // A Server Component rendering a single centered card: the MyCurricula
-// wordmark, a one-line product description, the Google sign-in button, and
-// small print noting sign-in is via Google. There is no separate registration
-// form — Google OAuth handles sign-up and sign-in as one flow.
+// wordmark, a one-line product description, and a tabbed sign-in section
+// offering Google (the fast path) and email magic-link (for teachers who
+// prefer email-only or lack a school Google account). There is no separate
+// registration form — both flows handle sign-up and sign-in as one.
 //
 // app/login lives outside the (planner) route group, so it renders with only
 // the root layout (ThemeProvider + fonts) — no top bar, no side panels.
@@ -11,10 +12,10 @@
 // The OAuth callback route redirects back here with `?error=auth` when a
 // sign-in attempt fails, or `?error=provisioning` when the account signed in
 // successfully but is not allow-listed for any school (fail-closed tenant
-// provisioning, audit #3); each case renders an inline alert above the button.
+// provisioning, audit #3); each case renders an inline alert above the buttons.
 
 import type { ReactNode } from "react";
-import { GoogleSignInButton } from "@/components/auth";
+import { SignInTabs } from "./SignInTabs";
 import styles from "./page.module.css";
 
 interface LoginPageProps {
@@ -70,14 +71,14 @@ export default async function LoginPage({
           </p>
         )}
 
-        {/* ── Google OAuth — sign-up and sign-in are one flow ───────── */}
+        {/* ── Sign-in methods — Google + email magic-link ────────────── */}
         <div className={styles.action}>
-          <GoogleSignInButton next={next} />
+          <SignInTabs next={next} />
         </div>
 
         <p className={styles.fineprint}>
-          MyCurricula uses Google to sign in. No separate account or password to
-          manage — your first sign-in creates your account.
+          Your first sign-in creates your account. No separate registration
+          needed — sign in with Google or a one-click email link.
         </p>
       </section>
     </main>

@@ -1,0 +1,569 @@
+/* TeamPage.module.css — Settings → Team styles.
+ *
+ * Mirrors the centered max-width-1100 column all other settings pages use.
+ * All values via var(--token) — no hex. Responsive at 360 / 768 / 1280.
+ * Touch targets ≥44px on phone/tablet (CLAUDE.md §4 responsive contract).
+ */
+
+/* ── Page shell ───────────────────────────────────────────────────────── */
+
+.page {
+  padding: 24px;
+}
+
+.inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 540px) {
+  .page {
+    padding: 16px;
+  }
+}
+
+/* ── Solo state body ──────────────────────────────────────────────────── */
+
+.soloBody {
+  margin-top: 8px;
+}
+
+/* ── Error banner ─────────────────────────────────────────────────────── */
+
+.errorBanner {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  font-size: var(--t-13);
+  color: var(--catchup);
+  background: var(--catchup-bg);
+  border: 1px solid color-mix(in srgb, var(--catchup) 28%, transparent);
+  border-radius: var(--r-md);
+  line-height: 1.5;
+}
+
+/* ── Member list ──────────────────────────────────────────────────────── */
+
+.memberList {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.memberRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--hairline);
+  min-height: 56px;
+}
+
+.memberRow:first-child {
+  border-top: none;
+}
+
+/* ── Avatar monogram ──────────────────────────────────────────────────── */
+
+.memberAvatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  font-size: var(--t-15);
+  font-weight: 700;
+  color: var(--brand-700);
+  background: var(--brand-50);
+  border: 1px solid var(--brand-200);
+  text-transform: uppercase;
+}
+
+/* ── Member info column ───────────────────────────────────────────────── */
+
+.memberInfo {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.memberName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.memberEmail {
+  font-size: var(--t-12);
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.notebookRoles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.notebookRoleChip {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--t-11);
+  color: var(--body);
+  background: var(--hairline);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+/* ── Admin / you badges ───────────────────────────────────────────────── */
+
+.adminBadge,
+.youBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--r-4);
+  white-space: nowrap;
+}
+
+.adminBadge {
+  background: color-mix(in srgb, var(--important) 12%, white);
+  color: var(--important);
+  border: 1px solid color-mix(in srgb, var(--important) 28%, transparent);
+}
+
+.youBadge {
+  background: var(--hairline);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+/* ── Member actions column ────────────────────────────────────────────── */
+
+.memberActions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.memberRoleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.notebookLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+/* Role dropdown */
+.roleSelect {
+  min-height: 36px;
+  padding: 0 8px;
+  font-family: inherit;
+  font-size: var(--t-12);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  outline: none;
+}
+
+.roleSelect:hover {
+  border-color: var(--brand-300);
+}
+
+.roleSelect:focus-visible {
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 3px var(--brand-50);
+  outline: none;
+}
+
+@media (max-width: 540px) {
+  .memberRow {
+    flex-wrap: wrap;
+  }
+  .memberActions {
+    width: 100%;
+    align-items: flex-start;
+  }
+  .memberRoleRow {
+    justify-content: flex-start;
+  }
+  .roleSelect {
+    min-height: 44px;
+  }
+}
+
+/* ── Seat usage bar ───────────────────────────────────────────────────── */
+
+.seatBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.seatBarTrack {
+  flex: 1 1 auto;
+  height: 6px;
+  background: var(--hairline);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.seatBarFill {
+  height: 100%;
+  background: var(--brand-500);
+  border-radius: 999px;
+  transition: width 200ms ease;
+}
+
+.seatLabel {
+  flex: 0 0 auto;
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seatBarFill {
+    transition: none;
+  }
+}
+
+/* ── Pending invites list ─────────────────────────────────────────────── */
+
+.inviteList {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.inviteRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--hairline);
+  min-height: 56px;
+}
+
+.inviteRow:first-child {
+  border-top: none;
+}
+
+.inviteInfo {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.inviteEmail {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.inviteMeta {
+  font-size: var(--t-12);
+  color: var(--muted);
+}
+
+.muteText {
+  font-style: normal;
+  color: var(--muted);
+}
+
+/* ── Invite form ──────────────────────────────────────────────────────── */
+
+.inviteForm {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.fieldsetLegend {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.radioRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-13);
+  color: var(--ink);
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.radioInput {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--brand-500);
+}
+
+.fieldRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.textInput {
+  min-height: 44px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: var(--t-13);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  outline: none;
+  max-width: 480px;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.textInput:hover {
+  border-color: var(--brand-300);
+}
+
+.textInput:focus-visible {
+  background: var(--surface);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
+  outline: none;
+}
+
+.selectInput {
+  min-height: 44px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: var(--t-13);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  outline: none;
+  cursor: pointer;
+  max-width: 360px;
+}
+
+.selectInput:hover {
+  border-color: var(--brand-300);
+}
+
+.selectInput:focus-visible {
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
+  outline: none;
+}
+
+@media (max-width: 540px) {
+  .textInput,
+  .selectInput {
+    max-width: 100%;
+  }
+}
+
+/* ── Created invite link display ──────────────────────────────────────── */
+
+.linkBox {
+  margin-bottom: 16px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--done) 8%, white);
+  border: 1.5px solid color-mix(in srgb, var(--done) 30%, transparent);
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.linkBoxHeadline {
+  margin: 0;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.linkRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.linkText {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+  color: var(--ink-soft);
+  background: var(--hairline);
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.linkNote {
+  margin: 0;
+  font-size: var(--t-12);
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ── Notebook admin list ──────────────────────────────────────────────── */
+
+.notebookList {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.notebookRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--hairline);
+  min-height: 56px;
+}
+
+.notebookRow:first-child {
+  border-top: none;
+}
+
+.notebookName {
+  flex: 1 1 auto;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notebookActions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+@media (max-width: 540px) {
+  .notebookRow {
+    flex-wrap: wrap;
+  }
+  .notebookActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+.renameForm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.renameForm .textInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.archivedNote {
+  margin: 12px 0 0;
+  font-size: var(--t-12);
+  color: var(--muted);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.createNotebookArea {
+  margin-top: 12px;
+}

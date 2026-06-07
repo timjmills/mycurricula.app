@@ -124,6 +124,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Fail-closed tenant provisioning (audit #3). The service-role admin client
     // upserts the teacher + grade-assignment rows, gated on the email-domain
     // allow-list. A denial means this account is not provisioned for any tenant.
+    // CONVERGENCE (ultraplan Wave 1): this is the single provisioning hook — the
+    // OAuth callback and the Claude bypass call the same `ensureTeacherRecord`,
+    // which branches on `PROVISIONING_MODE` internally.
     const provision = await ensureTeacherRecord(getAdminClient(), {
       id: data.user.id,
       email: data.user.email,

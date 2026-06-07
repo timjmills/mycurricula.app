@@ -1,0 +1,146 @@
+/* components/invite/InviteAccept.module.css — invite acceptance card.
+ *
+ * All color / type / spacing via var(--token). No hex, no px font sizes.
+ * Tailwind is not used here.
+ */
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  padding: 40px 36px;
+  border-radius: var(--r-xl);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--sh-md);
+  width: 100%;
+  max-width: 440px;
+  /* Prevent layout jump while the status transitions */
+  min-height: 280px;
+  justify-content: center;
+}
+
+/* Success variant — green-tinted top border accent */
+.card.success {
+  border-top: 3px solid var(--done);
+}
+
+/* Loading state — slightly dimmed to signal "in progress" */
+.card.loading {
+  opacity: 0.9;
+}
+
+/* ── Icon ────────────────────────────────────────────────────────────────── */
+
+.iconWrap {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon {
+  width: 48px;
+  height: 48px;
+}
+
+/* Spinner — animated rotation. Stops under prefers-reduced-motion (see below). */
+.spinner {
+  width: 40px;
+  height: 40px;
+  color: var(--brand-400);
+  animation: invite-spin 0.9s linear infinite;
+}
+
+@keyframes invite-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Copy ────────────────────────────────────────────────────────────────── */
+
+.heading {
+  margin: 0;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-22);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.body {
+  margin: 0;
+  font-size: var(--t-14);
+  line-height: 1.6;
+  color: var(--body);
+  max-width: 360px;
+}
+
+/* Development-only error detail */
+.devError {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  background: var(--danger-tint);
+  color: var(--danger);
+  font-size: var(--t-11);
+  font-family: var(--font-mono);
+  text-align: left;
+  width: 100%;
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* CTA buttons stretch to card width on all tiers */
+.cta {
+  width: 100%;
+  justify-content: center;
+  /* 48px (lg) ensures ≥44px touch target at every viewport */
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+/* Phone (360–480px): tighten horizontal padding to use full width */
+@media (max-width: 480px) {
+  .card {
+    padding: 28px 20px;
+    border-radius: var(--r-lg);
+  }
+
+  .heading {
+    font-size: var(--t-20);
+  }
+
+  .body {
+    font-size: var(--t-13);
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    opacity: 0.5;
+  }
+
+  .card {
+    opacity: 1;
+  }
+}

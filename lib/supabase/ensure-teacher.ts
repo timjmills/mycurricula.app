@@ -77,6 +77,40 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+// ── Provisioning mode (ultraplan §4 / Wave 1) ─────────────────────────────
+//
+// The app provisions a freshly-authenticated user one of two ways:
+//
+//   • "domain"     — TODAY'S behavior, verbatim: fail-closed enrollment into a
+//                    tenant via the `ALLOWED_TEACHER_EMAIL_DOMAINS` allow-list
+//                    (the school-first model). This is the DEFAULT and the only
+//                    implemented path.
+//   • "individual" — the teacher-first model (ultraplan): every signup gets its
+//                    own private workspace. NOT IMPLEMENTED in Wave 1 — branched
+//                    here as a fail-closed stub so the dispatch wiring exists
+//                    before the real implementation lands (Wave 3).
+//
+// The mode is read ONCE through `provisioningMode()` (a typed reader, not
+// scattered `process.env` reads) so the branch point is single + greppable.
+// Unknown / unset / malformed → "domain", so the default deploy is unchanged.
+
+export type ProvisioningMode = "domain" | "individual";
+
+/**
+ * Resolve the active provisioning mode from `process.env.PROVISIONING_MODE`.
+ *
+ * Only the exact lowercase token `"individual"` selects the individual model;
+ * EVERYTHING else — unset, empty, mixed-case typo, garbage — resolves to
+ * `"domain"`. Failing safe to the current behavior guarantees that a missing or
+ * fat-fingered env var never silently flips a deploy into the (stubbed,
+ * fail-closed) individual path.
+ */
+export function provisioningMode(): ProvisioningMode {
+  return process.env.PROVISIONING_MODE === "individual"
+    ? "individual"
+    : "domain";
+}
+
 /**
  * Parse the email-domain allow-list env var into a domain→schoolId? map.
  *
@@ -146,8 +180,17 @@ export interface EnsureTeacherResult {
 }
 
 /**
- * Idempotently ensure the `teachers` + `teacher_grade_assignments` rows exist
- * for an authenticated auth user. Uses the service-role admin client.
+ * THE single provisioning entry point. Every auth path (Google GSI, OAuth code
+ * callback, Claude bypass) calls this one function — fa68392 already converged
+ * the three call sites onto it, and Wave 1 keeps that convergence: there is no
+ * other provisioning hook (the middleware refreshes the session only; it does
+ * NOT provision). Branch the provisioning STRATEGY here, behind
+ * `provisioningMode()`, so the dispatch lives in exactly one place.
+ *
+ *   • "domain" (default)  → `ensureTeacherDomain` — the existing allow-list
+ *                           behavior, byte-for-byte unchanged.
+ *   • "individual"        → `ensureIndividualWorkspace` — Wave 3; a fail-closed
+ *                           stub for now.
  *
  * Never throws — returns `{ ok: false, reason }` on any failure so the auth
  * flow that calls it can continue (a failed provision must not block login;
@@ -155,6 +198,26 @@ export interface EnsureTeacherResult {
  * later request).
  */
 export async function ensureTeacherRecord(
+  admin: SupabaseClient,
+  user: AuthUserLike,
+): Promise<EnsureTeacherResult> {
+  if (provisioningMode() === "individual") {
+    return ensureIndividualWorkspace(admin, user);
+  }
+  return ensureTeacherDomain(admin, user);
+}
+
+/**
+ * Domain-allow-list provisioning — the school-first model and the DEFAULT.
+ *
+ * This is the original `ensureTeacherRecord` body, moved verbatim behind the
+ * `provisioningMode()` dispatch above with ZERO logic change. In `"domain"`
+ * mode (the default) the call path is identical to before Wave 1.
+ *
+ * Idempotently ensures the `teachers` + `teacher_grade_assignments` rows exist
+ * for an authenticated auth user. Uses the service-role admin client.
+ */
+async function ensureTeacherDomain(
   admin: SupabaseClient,
   user: AuthUserLike,
 ): Promise<EnsureTeacherResult> {
@@ -343,6 +406,143 @@ export async function ensureTeacherRecord(
       };
 
     return { ok: true, teacherId: user.id, gradeLevelId: gradeId };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/**
+ * Individual (teacher-first) provisioning — the lockout-free path (ultraplan
+ * Wave 3, §2/§5).
+ *
+ * When `PROVISIONING_MODE="individual"`, every fresh signup lands in its OWN
+ * private workspace with NO domain check and NO shared-tenant lookup: a hidden
+ * per-team `schools` row + an active grade + the 8 locked subjects + a personal
+ * `school_years` row + a `teachers` row (id = auth uid) + a lead
+ * `teacher_grade_assignments` row + self `subject_team_memberships`
+ * (`can_edit_master=true`, so "solo = Master") + a `teams` row owned by the user
+ * + the owner's `team_memberships` seat.
+ *
+ * ── Atomicity + idempotency live in the DB. ──
+ * All of the above is performed by the `provision_individual_workspace` RPC
+ * (migration 20260606130000) inside a SINGLE transaction: a partial failure
+ * rolls back every insert (no orphan rows), and a re-run / double signup is a
+ * no-op that returns the existing workspace (the RPC guards on an already-owned
+ * team). This wrapper therefore stays thin — it just invokes the RPC with the
+ * service-role admin client (required: the user has no `teachers` row yet, so it
+ * cannot write any RLS-gated row itself) and maps the result.
+ *
+ * Never throws — returns `{ ok: false, reason }` on any failure, matching
+ * `ensureTeacherDomain`, so a failed provision degrades to denied/empty data
+ * rather than blocking login.
+ */
+export async function ensureIndividualWorkspace(
+  admin: SupabaseClient,
+  user: AuthUserLike,
+): Promise<EnsureTeacherResult> {
+  if (!user?.id) return { ok: false, reason: "missing auth user id" };
+
+  try {
+    // ── Already provisioned? Return early; do NOT call the provisioning RPC. ──
+    // provision_individual_workspace is fail-closed (guard #2): for ANY existing
+    // teachers row that does not OWN a team — i.e. every INVITED member and every
+    // backfilled non-owner teammate — it RAISES. Calling it on each sign-in would
+    // surface that raise as a hard, fail-closed login failure and lock teammates
+    // out. An existing teachers row means the account is already set up (owner OR
+    // member); resolve the grade to land on and return. The RPC is reserved for
+    // brand-new accounts (no teachers row yet).
+    const { data: existing, error: existingErr } = await admin
+      .from("teachers")
+      .select("default_grade_level_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (existingErr) {
+      return {
+        ok: false,
+        reason: `ensureIndividualWorkspace: teacher lookup failed: ${existingErr.message}`,
+      };
+    }
+    if (existing) {
+      // Land on the teacher's default grade if set, else any grade they are
+      // assigned to (an invited member always holds a TGA from redeem/backfill;
+      // the owner holds one from provisioning/backfill).
+      let gradeLevelId =
+        ((existing as Record<string, unknown>).default_grade_level_id as
+          | string
+          | null
+          | undefined) ?? undefined;
+      if (!gradeLevelId) {
+        const { data: tga, error: tgaErr } = await admin
+          .from("teacher_grade_assignments")
+          .select("grade_level_id")
+          .eq("teacher_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        // Distinguish a transient read failure from the genuine "no grade" end
+        // state below, so a one-off denial is diagnosable in logs (audit Low).
+        if (tgaErr) {
+          return {
+            ok: false,
+            reason: `ensureIndividualWorkspace: grade lookup failed: ${tgaErr.message}`,
+          };
+        }
+        gradeLevelId =
+          ((tga as Record<string, unknown> | null)?.grade_level_id as
+            | string
+            | undefined) ?? undefined;
+      }
+      if (!gradeLevelId) {
+        return {
+          ok: false,
+          reason: "ensureIndividualWorkspace: existing teacher has no grade",
+        };
+      }
+      return { ok: true, teacherId: user.id, gradeLevelId };
+    }
+
+    const email = (user.email ?? "").trim();
+    // Display name = email local-part (same derivation as the domain path); the
+    // RPC clamps/falls back to "Teacher" if this is empty.
+    const displayName = (email.split("@")[0] || "Teacher").slice(0, 120);
+
+    // The RPC does ALL the work atomically + idempotently. It returns one row
+    // ({ teacher_id, grade_level_id }) on success.
+    const { data, error } = await admin.rpc("provision_individual_workspace", {
+      p_uid: user.id,
+      p_email: email,
+      p_display_name: displayName,
+    });
+    if (error) {
+      return {
+        ok: false,
+        reason: `provision_individual_workspace: ${error.message}`,
+      };
+    }
+
+    // `returns table(...)` surfaces as an array of rows over PostgREST. Accept
+    // either an array (take the first row) or a bare object, defensively.
+    const row = Array.isArray(data) ? data[0] : data;
+    const gradeLevelId =
+      row && typeof row === "object"
+        ? ((row as Record<string, unknown>).grade_level_id as
+            | string
+            | undefined)
+        : undefined;
+
+    // The teacher row is keyed to the auth uid; the grade comes from the RPC.
+    // A successful RPC that returns no grade id is treated as a failure so a
+    // caller never proceeds with a half-resolved workspace.
+    if (!gradeLevelId) {
+      return {
+        ok: false,
+        reason: "provision_individual_workspace: no grade returned",
+      };
+    }
+
+    return { ok: true, teacherId: user.id, gradeLevelId };
   } catch (err) {
     return {
       ok: false,

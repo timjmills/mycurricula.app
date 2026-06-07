@@ -1,0 +1,243 @@
+/* NotebookSwitcher.module.css — workspace + notebook switcher chrome.
+ *
+ * Lives at the bottom of the SideNav brand block. Three visual states:
+ *
+ *   1. Single notebook  — a quiet, non-interactive label pair (workspace /
+ *      notebook name). No affordance; recedes to ambient context.
+ *   2. Multi-notebook   — the label pair PLUS a dropdown button. On click, a
+ *      small dropdown lists active notebooks + the "＋ New" link.
+ *   3. Dropdown open    — the list renders as a floating surface portalled to
+ *      document.body so it escapes the SideNav's overflow clipping.
+ *
+ * Tokens only — no hex, no hard-coded px font sizes (var(--t-NN)). All spacing
+ * from the 4px base grid, same idiom as SideNav.module.css.
+ */
+
+/* ── Outer wrapper ─────────────────────────────────────────────────────── */
+.root {
+  /* Sits below the brand block; padding mirrors the brand area left-edge
+     so the text aligns with the brand wordmark. */
+  padding: 0 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* ── Workspace label ───────────────────────────────────────────────────── */
+/* Ultra-quiet ambient caption. Teachers almost never need to change workspaces,
+   so this is informational only — same visual weight as .navsec in SideNav. */
+.workspaceLabel {
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 0 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+/* ── Notebook trigger (static + interactive variants) ──────────────────── */
+/* Static: a plain non-interactive span. Interactive: a <button>.
+   Both share the base geometry so the SideNav width doesn't jump. */
+.notebookStatic,
+.notebookBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 3px;
+  border-radius: var(--r-8);
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 30px;
+}
+
+/* The static variant is purely presentational. */
+.notebookStatic {
+  cursor: default;
+  /* No background or border — it is ambient chrome, not interactive. */
+}
+
+/* The interactive button variant. */
+.notebookBtn {
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.notebookBtn:hover {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--sh-xs);
+}
+
+.notebookBtn:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.notebookBtn[aria-expanded="true"] {
+  background: var(--brand-50);
+  border-color: var(--brand-200);
+}
+
+/* ── Notebook name text ──────────────────────────────────────────────────── */
+.notebookName {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-soft);
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+/* Chevron icon — points down when closed, up when open. */
+.chevron {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform 0.14s ease;
+}
+
+.chevronUp {
+  transform: rotate(180deg);
+}
+
+/* ── Dropdown surface ──────────────────────────────────────────────────── */
+/* Portalled to document.body so it escapes SideNav's overflow clipping.
+   Position is set inline via JS (getBoundingClientRect of the trigger). */
+.dropdown {
+  position: fixed;
+  z-index: 50; /* above z-rail(20) + z-topbar(30) + z-banner(40) */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow:
+    0 4px 16px rgba(28, 27, 46, 0.1),
+    0 1px 3px rgba(28, 27, 46, 0.06);
+  padding: 4px 0;
+  min-width: 180px;
+  /* Animate in with a gentle fade+slide. Respects prefers-reduced-motion
+     via the @media rule below. */
+  animation: nbDropIn 0.14s ease;
+}
+
+@keyframes nbDropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown {
+    animation: none;
+  }
+}
+
+/* ── Dropdown items ─────────────────────────────────────────────────────── */
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+  border-radius: 0;
+  transition: background 0.1s ease;
+}
+
+.dropdownItem:hover {
+  background: var(--hairline);
+  color: var(--ink);
+}
+
+.dropdownItem:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+}
+
+/* Active / selected notebook — brand tint so the teacher knows where they are. */
+.dropdownItemActive {
+  color: var(--brand-700);
+  background: var(--brand-50);
+}
+
+.dropdownItemActive:hover {
+  background: var(--brand-100);
+}
+
+/* Check icon next to the active item. */
+.checkIcon {
+  flex: 0 0 auto;
+  color: var(--brand-600);
+}
+
+/* Spacer dot for non-active items so text aligns with the active row. */
+.dotIcon {
+  flex: 0 0 auto;
+  width: 16px; /* matches check icon width */
+}
+
+/* Divider before the "＋ New notebook" link. */
+.dropdownDivider {
+  height: 1px;
+  background: var(--hairline);
+  margin: 4px 0;
+}
+
+/* "＋ New notebook" link — honey-tinted to signal it is an additive action. */
+.newNotebookLink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--honey-600);
+  text-decoration: none;
+  border-radius: 0;
+  transition: background 0.1s ease;
+}
+
+.newNotebookLink:hover {
+  background: var(--honey-50);
+  color: var(--honey-600);
+}
+
+.newNotebookLink:focus-visible {
+  outline: 2px solid var(--honey-500);
+  outline-offset: -2px;
+}
+
+/* ── Collapsed (icon-only) SideNav — hide text parts, keep icon trigger ──
+   At ≤900px the SideNav collapses to 64px icon-only mode (SideNav.module.css).
+   The switcher hides entirely at that width because there is no room for even
+   an icon-only version without disrupting the nav icon column alignment.
+   The active notebook name is still visible via the SideNav brand's .brandSub
+   text — but that also hides at ≤900px, so the switcher is purely desktop.
+   A teacher on phone/tablet navigates via the More menu (tab strip). */
+@media (max-width: 900px) {
+  .root {
+    display: none;
+  }
+}

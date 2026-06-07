@@ -144,9 +144,42 @@ Re-run the review after fixes until Claude Code reports `NO BLOCKING ISSUES`, or
 until only justified Low/Medium items remain.
 
 If local policy, sandboxing, authentication, or CLI availability prevents the
-review command from running, do not bypass the restriction or send code through
-another path. Report the blocker and the safest available local verification
-instead.
+review command from running (for example, the `claude` CLI is unavailable in the
+environment), do not bypass the restriction or send code through another path.
+Report the blocker, then do BOTH of the following — neither substitutes for the
+other:
+
+1. **Mandatory adversarial review — run by whichever reviewer is the more
+   rigorous for the change.** The gate's defining property is INDEPENDENT
+   adversarial review — a reviewer that did not author the code. When the
+   primary reviewer is unavailable, choose the substitute that best preserves
+   that, by rigor:
+   - **An independent review pass** that did NOT author the diff (e.g. a freshly
+     spawned review agent) is the closest substitute: clean eyes, none of the
+     author's blind spots. Prefer it for security / auth / data-handling /
+     migration / privilege / public-interface changes.
+   - **Your own self-administered review** brings full intent + integration
+     context. Prefer it when that context is scarce or an independent pass isn't
+     practical.
+   - **Both** is the most rigorous, and is REQUIRED for high-consequence changes
+     (auth, RLS/privileges, data migrations — tenant-leak or lockout risks).
+   - If the two are genuinely equally good for the change at hand, either alone
+     suffices — pick one.
+
+   Regardless of who reviews: the reviewer must be INDEPENDENT of the author (an
+   implementation pass reviewing its OWN diff does not count); adopt the "strict,
+   skeptical Senior Security & QA Engineer" persona; read the full diff; and
+   report file/line, severity (Critical / High / Medium / Low), the concrete
+   failure scenario, and a fix. NOT satisfied by lint/typecheck/build alone. You
+   OWN the outcome — critically validate every finding (never rubber-stamp a
+   `NO BLOCKING ISSUES`), fix every legitimate Critical and High before
+   committing, justify any dismissal, and conclude with `NO BLOCKING ISSUES` (or
+   the remaining justified Low/Medium items). State plainly which reviewer(s) ran
+   and that the primary gate was unavailable, so the substitution is on the
+   record.
+
+2. **Local verification stack**, on top of the self-review — the project's lint,
+   typecheck, build, and the relevant test suite.
 
 ## Sandbox Discipline
 

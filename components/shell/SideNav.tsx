@@ -15,6 +15,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
+import { NotebookSwitcher } from "@/components/nav";
 import styles from "./SideNav.module.css";
 
 interface NavItem {
@@ -81,6 +82,12 @@ export function SideNav(): ReactNode {
           )}
         </span>
       </Link>
+
+      {/* W-E: workspace + notebook switcher (below the brand block).
+          Recedes to a quiet label when there is only one active notebook;
+          becomes an interactive dropdown when ≥2 notebooks exist.
+          Hides at ≤900px (icon-only SideNav) — no room in the 64px rail. */}
+      <NotebookSwitcher />
 
       {SECTIONS.map((section) => (
         <div key={section.label ?? "main"}>
