@@ -688,6 +688,11 @@ function clampWidth(w: number): number {
   return Number.isFinite(w) ? Math.min(640, Math.max(230, Math.round(w))) : 320;
 }
 
+// Pure helpers exported for unit testing only (regression-protect the
+// title-collision + width-clamp logic that guards the unique indexes and the
+// persisted canvas). Usage stays module-internal; this export is testability.
+export { clampWidth, firstFreeTitle, suffixSequence, copySequence };
+
 // ── Id bridge (mock slugs ↔ db uuids) ─────────────────────────────────────────
 // The Teach board rows key on UUID columns (`master_core_lesson_event_id` is a
 // FK to the planner's core_lesson_events.id; `owner_id`/`grade_level_id` are
