@@ -614,14 +614,16 @@ async function commitPages(
     .sort((a, b) => a.order - b.order)
     .map((p, i) => ({ ...p, order: i }));
   // PRIVACY (audit H3): strip names from EVERY widget's config/state across ALL
-  // pages before the pages jsonb is persisted. commitPages is the single chokepoint
-  // every page write funnels through (upsert/update/delete widget, add/delete/
-  // reorder page, copyBoardContent), so centralizing the strip here keeps the pages
-  // jsonb structure-only even if a source board (legacy / imported / directly
-  // written) carried names — closing the gap where `copyBoardContent` re-minted
-  // multi-page widgets but copied their config/state verbatim. stripNames is
-  // recursive + idempotent, so paths that already stripped at their boundary are
-  // unaffected.
+  // pages before the pages jsonb is persisted. commitPages is the chokepoint for
+  // page writes that change the widget SET or its config/state (upsert/update/
+  // delete widget, add/delete/reorder page, copyBoardContent), so centralizing the
+  // strip here keeps the pages jsonb structure-only even if a source board (legacy
+  // / imported / directly written) carried names — closing the gap where
+  // `copyBoardContent` re-minted multi-page widgets but copied their config/state
+  // verbatim. (persistWidgetPatch writes pages WITHOUT this path, but it patches
+  // only canvas/appearance — never config/state — so it introduces no names.)
+  // stripNames is recursive + idempotent, so paths that already stripped at their
+  // boundary are unaffected.
   const cleanPages: BoardPage[] = sorted.map((p) => ({
     ...p,
     widgets: p.widgets.map((w) => ({
@@ -719,7 +721,7 @@ function clampWidth(w: number): number {
 // Pure helpers exported for unit testing only (regression-protect the
 // title-collision + width-clamp logic that guards the unique indexes and the
 // persisted canvas). Usage stays module-internal; this export is testability.
-export { clampWidth, firstFreeTitle, suffixSequence, copySequence };
+export { clampWidth, firstFreeTitle, suffixSequence, copySequence, stripNames };
 
 // ── Id bridge (mock slugs ↔ db uuids) ─────────────────────────────────────────
 // The Teach board rows key on UUID columns (`master_core_lesson_event_id` is a

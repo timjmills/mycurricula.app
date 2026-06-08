@@ -10,6 +10,7 @@ import {
   firstFreeTitle,
   suffixSequence,
   copySequence,
+  stripNames,
 } from "../lib/teach/supabase-source";
 
 describe("suffixSequence + firstFreeTitle (personal/team title de-dup)", () => {
@@ -118,5 +119,36 @@ describe("pushBoardsToTeam in-memory title resolution (composed primitives)", ()
     const out = resolve(["A", "A (2)", "A"]);
     expect(out).toEqual(["A", "A (2)", "A (3)"]);
     expect(new Set(out).size).toBe(out.length);
+  });
+});
+
+describe("stripNames (recursive structure-only privacy strip — audit F10/H3)", () => {
+  it("drops top-level name-bearing keys, keeps structure", () => {
+    expect(stripNames({ names: ["a", "b"], count: 3 })).toEqual({ count: 3 });
+  });
+  it("drops name-bearing keys nested in objects AND arrays at any depth", () => {
+    expect(
+      stripNames({ groups: [{ id: "g1", members: ["x", "y"] }], slots: 2 }),
+    ).toEqual({ groups: [{ id: "g1" }], slots: 2 });
+  });
+  it("strips every NAME_BEARING_KEY (case-insensitive)", () => {
+    expect(
+      stripNames({
+        Names: 1,
+        ROSTER: 2,
+        students: 3,
+        studentNames: 4,
+        Members: 5,
+        keep: 6,
+      }),
+    ).toEqual({ keep: 6 });
+  });
+  it("leaves non-name structure untouched", () => {
+    const input = { layout: { cols: 2, labels: ["A", "B"] }, slots: 4 };
+    expect(stripNames(input)).toEqual(input);
+  });
+  it("does not descend into non-plain objects (no throw / no data loss)", () => {
+    const when = new Date("2026-01-01T00:00:00.000Z");
+    expect(stripNames({ when, members: ["z"] })).toEqual({ when });
   });
 });
