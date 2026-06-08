@@ -680,7 +680,19 @@ export function RichTextEditor({
       value !== lastWrittenRef.current &&
       value !== lastEmittedRef.current
     ) {
-      el.innerHTML = value;
+      // Defence-in-depth at the EDIT sink. `value` is teacher-authored and,
+      // under the forking model, may have reached storage OUTSIDE this editor's
+      // sanitizing emit (e.g. a hostile client writing raw HTML straight to the
+      // row). Sanitize before it touches the live contentEditable so a stored
+      // <img onerror>/<script>/unsafe-src payload can't execute the moment a
+      // teammate OPENS the card to edit it. The render sinks already re-sanitize;
+      // this closes the last raw-innerHTML path. For already-clean stored values
+      // it's effectively idempotent — embeds are emitted wrapper-less, so nothing
+      // structural changes here. We keep the RAW incoming `value` in
+      // lastWrittenRef so the parent's echo is still recognised and skipped (no
+      // caret-reset loop); only a genuine external change resets the caret, which
+      // is acceptable because the content itself changed underneath the teacher.
+      el.innerHTML = sanitizeHtml(value);
       lastWrittenRef.current = value;
     }
     setEmpty(isEditorEmpty(el));

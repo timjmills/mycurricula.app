@@ -1,0 +1,169 @@
+/* PreviewAnnotation.module.css — the live-only "draw on the enlarged resource"
+ * surface. All colour/radii/type via app/tokens.css var(); no hex. */
+
+/* The positioned media box. The AnnotationLayer (position:absolute; inset:0)
+   locks to exactly this box, so ink sits over the media and nothing else. */
+.box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  min-height: 0;
+}
+
+/* ── Floating toolbar ───────────────────────────────────────────────────────
+   Pinned to the top of the media box, centered, over the annotation canvas
+   (which sits at z-index 2 inside the box). */
+.toolbar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100% - 20px);
+  padding: var(--r-6) var(--r-10);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+  box-shadow: var(--shadow-card);
+}
+
+.tools {
+  flex: none;
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 22px;
+  background: var(--border);
+}
+
+/* ── Colour swatches ──────────────────────────────────────────────────────── */
+
+.swatches {
+  display: flex;
+  align-items: center;
+  gap: var(--r-4);
+}
+
+.swatch {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+}
+
+/* ≥44px hit area on touch via an invisible pad. */
+.swatch::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+}
+
+.swatch:hover {
+  border-color: var(--brand-300);
+}
+
+.swatchActive {
+  border-color: var(--paper);
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.swatch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+/* ── Stroke width ─────────────────────────────────────────────────────────── */
+
+.widths {
+  display: flex;
+  align-items: center;
+  gap: var(--r-2);
+}
+
+.width {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--r-8);
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink-700);
+}
+
+.width::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.width:hover {
+  background: var(--hairline);
+}
+
+.widthActive {
+  background: var(--brand-50);
+  border-color: var(--brand-200);
+  color: var(--brand-600);
+}
+
+.widthActive .widthDot {
+  background: var(--brand-600);
+}
+
+.width:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.widthDot {
+  display: block;
+  min-width: 2px;
+  min-height: 2px;
+  border-radius: var(--r-pill);
+  background: var(--ink-700);
+}
+
+/* ── Phone: bigger touch targets on the swatch/width controls ─────────────── */
+
+@media (max-width: 640px) {
+  .swatch {
+    width: 28px;
+    height: 28px;
+  }
+
+  .width {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .swatch,
+  .width {
+    transition: none;
+  }
+}

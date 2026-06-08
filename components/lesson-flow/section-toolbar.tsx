@@ -19,7 +19,7 @@
 //   • Delete         — trash icon (destructive tint on hover; disabled
 //                      when this is the lesson's last section).
 //
-// The OLD Padlet-style hero — the "Add an image, video, link, or file"
+// The OLD card-wall hero — the "Add an image, video, link, or file"
 // caption and the four media tiles (Upload / Photo / Video / Link) — is
 // GONE from this popup. Adding resources is now handled app-wide by the
 // shared <ResourceComposer> (see components/daily/ResourceComposer). The

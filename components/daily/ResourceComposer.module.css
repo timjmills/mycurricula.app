@@ -1,4 +1,4 @@
-/* ResourceComposer.module.css — the centered Padlet-style "Add resource"
+/* ResourceComposer.module.css — the centered card-wall "Add resource"
    dialog opened from the Resources panel header.
 
    Anatomy:
@@ -63,10 +63,10 @@
 }
 
 /* ── Panel ──────────────────────────────────────────────────────────────── */
-/* A centered card. Padlet's "Add card" sits a hair narrower than the
-   default save-target-dialog so the tool grid + routing pills don't
-   wrap awkwardly on a 480px display. Comfortable padding + a generous
-   gap between sections — restraint > density. */
+/* A centered "add card" — a hair narrower than the default
+   save-target-dialog so the tool grid + routing pills don't wrap awkwardly
+   on a 480px display. Comfortable padding + a generous gap between sections
+   — restraint > density. */
 
 .panel {
   width: 100%;
@@ -372,7 +372,7 @@
 
 /* ── All tools button ─────────────────────────────────────────────────── */
 /* Small horizontal button sitting BELOW the four primary tiles. Opens
-   the AllToolsMenu sub-view (Lesson Padlet, YouTube, Camera, etc.).
+   the AllToolsMenu sub-view (Card wall, YouTube, Camera, etc.).
    Quieter visual weight than the tool tiles so it reads as "more" not
    as another primary action. */
 
@@ -550,6 +550,24 @@
   border-color: var(--brand-300);
 }
 
+/* Notecard / note-editing mode wraps a full RichTextEditor. The editor brings
+   its own chrome; this is just a bordered field surface so it reads as an input
+   and the docked toolbar has a box to anchor to. */
+.notecardBody {
+  position: relative;
+  width: 100%;
+  min-height: 96px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r-sm);
+  transition: border-color 140ms ease;
+}
+
+.notecardBody:focus-within {
+  border-color: var(--brand-300);
+}
+
 /* ── Captured items zone ───────────────────────────────────────────────── */
 /* The strip + the note editor sit on a single soft tint so they read as
    ONE captured-items zone, not two arbitrary stacked blocks. A faint
@@ -659,8 +677,7 @@
 }
 
 /* Tiny accent dot next to the label when the chip has a saved note.
-   Reads as a "this has been annotated" badge — Padlet uses a small
-   caption icon for the same affordance. Picks up the subject color via
+   Reads as a "this has a note" badge. Picks up the subject color via
    --c (inherited from the panel's .cp-subj class) so the dot quietly
    echoes the Add button's hue. */
 .capturedChipNoteDot {

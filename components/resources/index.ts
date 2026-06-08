@@ -5,3 +5,5 @@ export { ImageLightbox } from "./ImageLightbox";
 export type { ImageLightboxProps } from "./ImageLightbox";
 export { ResourcePreview } from "./ResourcePreview";
 export type { ResourcePreviewProps } from "./ResourcePreview";
+export { PreviewAnnotation } from "./PreviewAnnotation";
+export type { PreviewAnnotationProps } from "./PreviewAnnotation";

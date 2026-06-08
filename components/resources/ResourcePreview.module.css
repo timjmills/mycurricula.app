@@ -29,6 +29,11 @@
   outline: none;
 }
 
+/* The split notecard layout is wider so the carousel + notes both breathe. */
+.dialogSplit {
+  max-width: min(1120px, 95vw);
+}
+
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
 .header {
@@ -267,6 +272,151 @@
   color: var(--body);
 }
 
+/* ── Split notecard body (media carousel left, notes right) ─────────────────
+   Mirrors NotecardFullscreen's layout, hosted inline here so every enlarge
+   path is one modal. On phone the two panes stack (media on top, notes below). */
+
+.split {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  /* Media gets the larger share; notes a readable column. */
+  grid-template-columns: 1.4fr 1fr;
+}
+
+.mediaPane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--surface-warm);
+  overflow: auto;
+}
+
+/* The annotation box wrapping the carousel — caps width so a tall portrait
+   item doesn't blow past the dialog. */
+.mediaAnnotate {
+  width: 100%;
+  max-width: 720px;
+}
+
+.carousel {
+  width: 100%;
+}
+
+.notesPane {
+  min-width: 0;
+  min-height: 0;
+  padding: 20px 22px;
+  border-left: 1px solid var(--border);
+  background: var(--paper);
+  overflow: auto;
+}
+
+/* The annotation box wrapping a single iframe body — keep it 16:9-shaped so the
+   floating toolbar lands over the frame, not over empty padding. */
+.frameAnnotate {
+  width: 100%;
+  max-width: 880px;
+}
+
+/* ── Notes prose ────────────────────────────────────────────────────────────
+   Re-enable formatting for sanitized teacher HTML (Tailwind preflight zeroes
+   lists/headings globally). Scoped to .notes so it never leaks elsewhere. */
+
+.notes {
+  font-family: var(--font-sans);
+  font-size: var(--t-14);
+  line-height: 1.6;
+  color: var(--body);
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.notes p {
+  margin: 0 0 0.6em;
+}
+
+.notes p:last-child {
+  margin-bottom: 0;
+}
+
+.notes ul,
+.notes ol {
+  margin: 0.5em 0;
+  padding-left: var(--t-24);
+}
+
+.notes ul {
+  list-style: disc;
+}
+
+.notes ol {
+  list-style: decimal;
+}
+
+.notes li {
+  margin: 3px 0;
+}
+
+.notes h1,
+.notes h2,
+.notes h3,
+.notes h4,
+.notes h5,
+.notes h6 {
+  margin: 0.7em 0 0.35em;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink-900);
+}
+
+.notes h1 {
+  font-size: var(--t-20);
+}
+
+.notes h2 {
+  font-size: var(--t-18);
+}
+
+.notes h3 {
+  font-size: var(--t-16);
+}
+
+.notes a {
+  color: var(--brand-500);
+  text-decoration: underline;
+}
+
+.notes a:hover {
+  color: var(--brand-600);
+}
+
+.notes blockquote {
+  margin: 0.6em 0;
+  padding-left: 14px;
+  border-left: 3px solid var(--border);
+  color: var(--ink-700);
+}
+
+/* Inline media a teacher embeds into the notes (sanitizer permits safe
+   img/iframe) must not overflow the notes column. */
+.notes img,
+.notes iframe {
+  max-width: 100%;
+}
+
+.emptyMedia,
+.emptyNotes {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--t-13);
+  color: var(--muted);
+  text-align: center;
+}
+
 /* ── Phone: full-bleed-ish dialog, bigger touch targets ─────────────────── */
 
 @media (max-width: 480px) {
@@ -288,6 +438,20 @@
 
   .closeBtn {
     width: 44px;
+  }
+}
+
+/* Stack the split panes below the tablet breakpoint (media on top, notes
+   below) so neither column gets crushed on a narrow viewport. */
+@media (max-width: 640px) {
+  .split {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .notesPane {
+    border-left: 0;
+    border-top: 1px solid var(--border);
   }
 }
 

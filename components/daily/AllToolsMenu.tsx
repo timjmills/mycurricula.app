@@ -4,9 +4,9 @@
 // opens when the teacher hits the "All tools" button in its main view.
 //
 // Visual: a 3-column scrollable grid of soft pastel tool tiles, grouped
-// into four named sections — mirrors Padlet's "All Tools" panel (Image
-// 15 in the owner's reference) but stripped of the AI surfaces, which
-// are out of phase per CLAUDE.md §6.
+// into four named sections — a card-wall "All Tools" palette (Image 15 in
+// the owner's reference) but stripped of the AI surfaces, which are out of
+// phase per CLAUDE.md §6.
 //
 // ── How it composes with ResourceComposer ────────────────────────────
 // The menu does NOT model its own modal. ResourceComposer hosts it
@@ -18,7 +18,7 @@
 // the standard tools use. There is no separate scrim or dialog frame.
 //
 // ── Tile categories ──────────────────────────────────────────────────
-// Web & Files:    Lesson Padlet · Upload · Link · Web search (stub)
+// Web & Files:    Card wall · Upload · Link · Web search (stub)
 // Camera & Media: Camera · Photo album · Image search (stub) · GIF (stub)
 // Recordings:     Video · Audio · Screen · Draw  (all stubs — Phase 1B+)
 // Embeds & Lists: YouTube · Spotify (stub) · Location (stub) · Poll (stub)
@@ -30,8 +30,8 @@
 // ── (works) vs (stub) tiles ──────────────────────────────────────────
 // "Works" tiles produce a synthetic resource through the composer's
 // existing capture flow:
-//   • Lesson Padlet → addLink("New Lesson board") — uses our own brand
-//     wording ("Lesson" instead of "Padlet") per the owner's note.
+//   • Card wall     → addLink("New resource board") — a neutral
+//     sticky-note-style board (no third-party brand wording).
 //   • Upload        → triggers the composer's file picker.
 //   • Link          → opens the composer's inline URL row.
 //   • Camera        → uses an inline <input capture="environment">; on
@@ -79,7 +79,7 @@ import styles from "./AllToolsMenu.module.css";
 export interface AllToolsMenuProps {
   /** Returns to the composer's normal four-tile body. */
   onBack: () => void;
-  /** Append one captured item (single Lesson-Padlet / single YouTube). */
+  /** Append one captured item (single card-wall / single YouTube). */
   onAddItem: (item: Omit<CapturedItem, "id">) => void;
   /** Append many captured items (Upload / Photo / Camera). */
   onAddItems: (items: CapturedItem[]) => void;
@@ -169,11 +169,11 @@ export function AllToolsMenu({
     setStubNotice(`${label} — coming soon.`);
   }, []);
 
-  /** Lesson Padlet — adds a single `link`-typed item with our brand
-   *  wording. The teacher can rename it via the composer title field
-   *  or by adding a per-item note. */
-  const onLessonPadlet = useCallback(() => {
-    onAddItem({ type: "link", label: "New Lesson board" });
+  /** Card wall — adds a single `link`-typed item for a neutral, sticky-note
+   *  style resource board. The teacher can rename it via the composer title
+   *  field or by adding a per-item note. */
+  const onCardWall = useCallback(() => {
+    onAddItem({ type: "link", label: "New resource board" });
   }, [onAddItem]);
 
   /** Triggers the hidden multi-file input. */
@@ -292,14 +292,14 @@ export function AllToolsMenu({
 
   const webFiles: TileDescriptor[] = [
     {
-      id: "lesson-padlet",
-      label: "Lesson Padlet",
+      id: "card-wall",
+      label: "Card wall",
       works: true,
       isNew: true,
       bgVar: "--hlp-aqua",
       iconVar: "--hl-aqua",
       icon: <BoardIcon />,
-      onClick: onLessonPadlet,
+      onClick: onCardWall,
     },
     {
       id: "upload",

@@ -3,7 +3,7 @@
 // ResourcesPanel.tsx — the Daily view right-rail "Resources" panel.
 //
 // A WHITE card at the top of the right rail that gives a teacher a quick,
-// Padlet-style glance at the resources tied to the lesson they have open.
+// card-wall glance at the resources tied to the lesson they have open.
 // Two presentation modes share a single filtered set:
 //
 //   • grid (default) — a 2-column responsive grid of subject-tinted tiles.
@@ -53,15 +53,17 @@
 //   • The panel container is a white CARD: var(--paper) fill, 1px
 //     var(--ink-150) hairline border, var(--shadow-card) lift.
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent as ReactDragEvent, ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Lesson, LessonResource } from "@/lib/types";
 import type { SectionResource } from "@/lib/lesson-flow";
 import { ResourceTile } from "@/components/lesson-flow";
 import { ResourcePreview } from "@/components/resources";
+import { NotecardCard } from "@/components/notecards";
+import { hasNotes, isNotecard } from "@/lib/notecards";
 import { usePlanner } from "@/lib/planner-store";
-import { lessonResources } from "@/lib/lesson-resources";
+import { lessonResourceRefs } from "@/lib/lesson-resources";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
 import { Button, Tooltip } from "@/components/ui";
 import type { PanelDragHandleProps } from "./RightRail";
@@ -69,8 +71,33 @@ import {
   ResourceComposer,
   fileToCapturedItem,
   type CapturedItem,
+  type ResourceComposerEditTarget,
 } from "./ResourceComposer";
 import styles from "./ResourcesPanel.module.css";
+
+/** True when a resource should render as a notecard (a flip gallery +
+ *  expandable notes) rather than a plain tile: a dedicated notecard, anything
+ *  carrying a gallery, or anything carrying rich notes. Single-media resources
+ *  with no gallery and no notes stay plain tiles (unchanged). */
+function isNotecardish(resource: LessonResource): boolean {
+  return (
+    isNotecard(resource) ||
+    (resource.gallery?.length ?? 0) > 0 ||
+    hasNotes(resource)
+  );
+}
+
+/** A resource paired with the PROVENANCE needed to route an "add/edit note"
+ *  patch back to its row: the lesson + section it lives on, or a whole-lesson
+ *  array index when it has no section. */
+interface AggregatedResource {
+  resource: SectionResource;
+  lessonId: string;
+  /** Owning section id, or null for a whole-lesson (Lesson.resources) entry. */
+  sectionId: string | null;
+  /** Index into Lesson.resources for a whole-lesson entry (sectionId === null). */
+  lessonResourceIndex?: number;
+}
 
 // ── Grip + chevron + back icons (rail-driven controls) ──────────────────
 // Rendered only when ResourcesPanel is mounted inside <RightRail>, which
@@ -507,14 +534,11 @@ function ResourceListRow({
 }
 
 // ── Tile overflow ("···") wrapper ────────────────────────────────────────
-// The Padlet-style "···" overflow button sits at the top-right of every
-// tile. ResourceTile already lays its own collapse/remove controls there
-// (top: 6px, right: 6px); we DON'T edit ResourceTile, so this wrapper
-// overlays a separate "···" chip a little above those — same chip
-// vocabulary, distinct affordance. Phase 1A: it is a stub that does
-// nothing on click; mouse + keyboard reach work so the design reads as
-// complete in the static screenshot AND can be wired later without
-// changing the shape.
+// The "···" overflow button sits at the top-left corner of every tile.
+// ResourceTile already lays its own collapse/remove controls at top: 6px /
+// right: 6px; we DON'T edit ResourceTile, so this wrapper overlays a separate
+// "···" chip clear of those — same chip vocabulary, distinct affordance. Its
+// menu's one action opens the composer to add / edit notes on the resource.
 
 function OverflowIcon(): ReactNode {
   return (
@@ -547,6 +571,9 @@ interface TileWithOverflowProps {
   onStackClick?: () => void;
   /** Open this resource in the shared preview modal (click-to-enlarge). */
   onActivate?: () => void;
+  /** Open the composer to add / edit notes (a body + extra gallery) on this
+   *  resource. Drives the "···" overflow menu's single action. */
+  onEditNote?: () => void;
 }
 
 function TileWithOverflow({
@@ -554,6 +581,7 @@ function TileWithOverflow({
   stackCount,
   onStackClick,
   onActivate,
+  onEditNote,
 }: TileWithOverflowProps): ReactNode {
   // ResourceTile requires onCollapse + onRemove; this panel is read-only,
   // so both are no-ops — edits live in the LessonFlow section editor on
@@ -615,26 +643,126 @@ function TileWithOverflow({
           </span>
         </Tooltip>
       )}
-      {/* The "···" overflow button — visual stub for Phase 1A. Sits over
-          the tile's top-right corner; positioning is tuned so it lands
-          clear of ResourceTile's collapse + remove chips (which sit at
-          top: 6px right: 6px / 36px). Hidden on a stack tile because the
-          whole wrapper IS the click target there. */}
-      {!isStack && (
-        <Button
-          variant="icon"
-          iconAriaLabel={`More actions for ${resource.label || resource.type}`}
-          className={styles.tileMenuBtn}
-          tooltip={`Open menu for "${resource.label || resource.type}" — rename, replace, or detach this resource`}
-          onClick={(e) => {
-            // The stub click is contained — don't bubble into a future
-            // tile-click handler when one lands.
-            e.stopPropagation();
-          }}
-        >
-          <OverflowIcon />
-        </Button>
+      {/* The "···" overflow menu. Sits over the tile's top-right corner;
+          positioning is tuned so it lands clear of ResourceTile's collapse +
+          remove chips (which sit at top: 6px right: 6px / 36px). Hidden on a
+          stack tile because the whole wrapper IS the click target there. Its
+          one action opens the composer to add / edit notes on this resource. */}
+      {!isStack && onEditNote && (
+        <OverflowMenu
+          resource={resource}
+          hasNote={hasNotes(resource)}
+          onEditNote={onEditNote}
+        />
       )}
+    </div>
+  );
+}
+
+// ── OverflowMenu — the tile "···" menu (add / edit note) ─────────────────────
+// A small popover anchored to the tile's "···" chip. Phase 1A exposes a single
+// action — "Add note" / "Edit note" — which opens the composer in
+// add-notes-to-this-resource mode. Click-outside + Escape close it; the trigger
+// stops propagation so opening the menu never triggers the tile's enlarge.
+
+function OverflowMenu({
+  resource,
+  hasNote,
+  onEditNote,
+}: {
+  resource: SectionResource;
+  hasNote: boolean;
+  onEditNote: () => void;
+}): ReactNode {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const label = resource.label || resource.type;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent): void => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className={styles.tileMenuWrap}>
+      <Button
+        variant="icon"
+        iconAriaLabel={`More actions for ${label}`}
+        className={styles.tileMenuBtn}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        tooltip={`Open the menu for "${label}" — add formatted notes or extra media to this resource`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+      >
+        <OverflowIcon />
+      </Button>
+      {open && (
+        <div
+          className={styles.tileMenu}
+          role="menu"
+          aria-label={`Actions for ${label}`}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.tileMenuItem}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+              onEditNote();
+            }}
+          >
+            {hasNote ? "Edit note" : "Add note"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── NotecardTile — a notecard rendered in the panel grid ─────────────────────
+// Wraps NotecardCard (flip gallery + expandable notes). Enlarge / fullscreen
+// both open the shared ResourcePreview (which routes notecards to the split
+// view). A "···" overflow menu adds the same add/edit-note action as a plain
+// tile so notes can be revised in place.
+
+function NotecardTile({
+  agg,
+  onEnlarge,
+  onEditNote,
+}: {
+  agg: AggregatedResource;
+  onEnlarge: () => void;
+  onEditNote: () => void;
+}): ReactNode {
+  return (
+    <div className={styles.notecardWrap}>
+      <NotecardCard
+        resource={agg.resource}
+        onEnlarge={onEnlarge}
+        onOpenFullscreen={onEnlarge}
+      />
+      <OverflowMenu
+        resource={agg.resource}
+        hasNote={hasNotes(agg.resource)}
+        onEditNote={onEditNote}
+      />
     </div>
   );
 }
@@ -728,6 +856,11 @@ export function ResourcesPanel({
   const [composerOpen, setComposerOpen] = useState<boolean>(false);
   const [pendingItems, setPendingItems] = useState<CapturedItem[]>([]);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
+  // When set, the composer opens in "add/edit notes on THIS resource" mode
+  // (notecard mode + a locked edit target) so any existing resource can gain
+  // a rich `body` / extra `gallery` media. Null = the normal "add" composer.
+  const [editTarget, setEditTarget] =
+    useState<ResourceComposerEditTarget | null>(null);
 
   // Routing destination for the composer. In day mode it's the selected
   // lesson; in week mode we fall back to the first lesson in the week (the
@@ -736,12 +869,27 @@ export function ResourcesPanel({
   const composerLesson: Lesson | null = lesson ?? lessons?.[0] ?? null;
 
   const openComposer = useCallback((): void => {
+    setEditTarget(null);
     setComposerOpen(true);
   }, []);
 
   const closeComposer = useCallback((): void => {
     setComposerOpen(false);
     setPendingItems([]);
+    setEditTarget(null);
+  }, []);
+
+  // Open the composer to add / edit notes on an existing aggregated resource.
+  const openNoteEditor = useCallback((agg: AggregatedResource): void => {
+    setPendingItems([]);
+    setEditTarget({
+      lessonId: agg.lessonId,
+      sectionId: agg.sectionId,
+      resourceId: agg.resource.id,
+      lessonResourceIndex: agg.lessonResourceIndex,
+      resource: agg.resource,
+    });
+    setComposerOpen(true);
   }, []);
 
   // ── Multi-file drag-drop on the panel ────────────────────────────────
@@ -790,7 +938,7 @@ export function ResourcesPanel({
   // `getSections` — avoiding the "conditional value changes every
   // render" lint warning that derived `sections` outside the memo would
   // produce.
-  const { getSections } = usePlanner();
+  const { getSections, getLesson } = usePlanner();
 
   // ── Aggregation ──────────────────────────────────────────────────────
   // DAY mode:
@@ -810,23 +958,31 @@ export function ResourcesPanel({
   //   same resource authored in two lessons surfaces once per lesson
   //   (the synthesized `lesson:<id>:res:<i>` key is already lesson-scoped)
   //   so a week-aggregate glance is accurate.
-  const combined = useMemo<SectionResource[]>(() => {
+  const combined = useMemo<AggregatedResource[]>(() => {
     /**
      * Push one lesson's resources into `out` via the canonical helper,
-     * deduplicating on id. Lesson-level resources (no native id on the
-     * type) receive a synthesized id so React keys + dedup both work.
+     * deduplicating on id. Each entry carries its PROVENANCE (lessonId +
+     * sectionId, or a whole-lesson index) so the "add/edit note" action can
+     * route a patch back to the exact row. Lesson-level resources (no native
+     * id on the type) receive a synthesized id so React keys + dedup work.
      */
     function appendLesson(
       l: Lesson,
       seen: Set<string>,
-      out: SectionResource[],
+      out: AggregatedResource[],
     ): void {
-      // Section-level resources — the canonical source per BUG-006.
-      const sectionRefs = lessonResources(getSections(l.id));
-      for (const r of sectionRefs) {
-        if (seen.has(r.id)) continue;
-        seen.add(r.id);
-        out.push(r);
+      // Section-level resources — the canonical source per BUG-006. Using
+      // lessonResourceRefs (not the id-less lessonResources) keeps the owning
+      // sectionId paired with each resource for the edit-note route.
+      const sectionRefs = lessonResourceRefs(getSections(l.id));
+      for (const ref of sectionRefs) {
+        if (seen.has(ref.resource.id)) continue;
+        seen.add(ref.resource.id);
+        out.push({
+          resource: ref.resource,
+          lessonId: l.id,
+          sectionId: ref.sectionId,
+        });
       }
       // Lesson-level resources (Lesson.resources) — synthesize an id so
       // they participate in the same dedup contract as section resources.
@@ -837,12 +993,17 @@ export function ResourcesPanel({
         const id = `lesson:${l.id}:res:${i}`;
         if (seen.has(id)) return;
         seen.add(id);
-        out.push({ ...r, id });
+        out.push({
+          resource: { ...r, id },
+          lessonId: l.id,
+          sectionId: null,
+          lessonResourceIndex: i,
+        });
       });
     }
 
     const seen = new Set<string>();
-    const out: SectionResource[] = [];
+    const out: AggregatedResource[] = [];
 
     if (mode === "week") {
       // Week mode — aggregate across every supplied lesson. An empty
@@ -860,8 +1021,8 @@ export function ResourcesPanel({
   }, [mode, lesson, lessons, getSections]);
 
   // Filtered subset for the active tab.
-  const visibleResources = useMemo<SectionResource[]>(
-    () => combined.filter((r) => acceptByCategory(r, category)),
+  const visibleResources = useMemo<AggregatedResource[]>(
+    () => combined.filter((a) => acceptByCategory(a.resource, category)),
     [combined, category],
   );
 
@@ -941,17 +1102,29 @@ export function ResourcesPanel({
           {emptyCategoryScope}.
         </p>
       ) : viewMode === "grid" ? (
-        // Grid mode — ResourceTile thumbnails wrapped with the "···"
-        // overflow stub. The tile body itself is unmodified; the wrapper
-        // only adds the Padlet-style menu chip.
+        // Grid mode — notecard resources (gallery + notes) render as a
+        // NotecardCard (flip gallery + expandable notes); everything else
+        // keeps the ResourceTile thumbnail wrapped with the "···" menu. Both
+        // open the shared preview on enlarge and expose an "add/edit note"
+        // action so any resource can gain a body/gallery.
         <div className={styles.grid}>
-          {visibleResources.map((resource) => (
-            <TileWithOverflow
-              key={resource.id}
-              resource={resource}
-              onActivate={() => setPreviewResource(resource)}
-            />
-          ))}
+          {visibleResources.map((agg) =>
+            isNotecardish(agg.resource) ? (
+              <NotecardTile
+                key={agg.resource.id}
+                agg={agg}
+                onEnlarge={() => setPreviewResource(agg.resource)}
+                onEditNote={() => openNoteEditor(agg)}
+              />
+            ) : (
+              <TileWithOverflow
+                key={agg.resource.id}
+                resource={agg.resource}
+                onActivate={() => setPreviewResource(agg.resource)}
+                onEditNote={() => openNoteEditor(agg)}
+              />
+            ),
+          )}
         </div>
       ) : (
         // List mode — "Resource quick access" stack: a small chrome label
@@ -962,11 +1135,11 @@ export function ResourcesPanel({
             <span>Resource quick access</span>
           </div>
           <ul className={styles.list}>
-            {visibleResources.map((resource) => (
-              <li key={resource.id} className={styles.listItem}>
+            {visibleResources.map((agg) => (
+              <li key={agg.resource.id} className={styles.listItem}>
                 <ResourceListRow
-                  resource={resource}
-                  onActivate={() => setPreviewResource(resource)}
+                  resource={agg.resource}
+                  onActivate={() => setPreviewResource(agg.resource)}
                 />
               </li>
             ))}
@@ -1170,20 +1343,30 @@ export function ResourcesPanel({
         )}
       </AnimatePresence>
 
-      {/* Shared Padlet-style add-resource composer — opens from the "+"
-          button in the header OR from a multi-file drop onto the panel.
-          `composerLesson` is the routing default (selected lesson in day
-          mode; first week lesson in week mode); the teacher can re-route
-          via the composer's pickers. `initialItems` pre-populates the
-          captured-items strip when files were dropped onto the panel. */}
-      {composerLesson && (
-        <ResourceComposer
-          open={composerOpen}
-          lesson={composerLesson}
-          initialItems={pendingItems.length > 0 ? pendingItems : undefined}
-          onClose={closeComposer}
-        />
-      )}
+      {/* Shared add-resource composer — opens from the "+" button in the
+          header, a multi-file drop onto the panel, OR a tile's "Add/Edit
+          note" action (editTarget set → notecard edit mode). `composerLesson`
+          is the routing default for the ADD path; in EDIT mode we resolve the
+          resource's own lesson so the patch + any upload land on the right
+          event. `initialItems` pre-populates the strip on a panel drop. */}
+      {(() => {
+        // In edit mode route to the resource's own lesson; else the add-path
+        // default. Fall back to composerLesson if the id can't be resolved.
+        const launchLesson = editTarget
+          ? (getLesson(editTarget.lessonId) ?? composerLesson)
+          : composerLesson;
+        if (!launchLesson) return null;
+        return (
+          <ResourceComposer
+            open={composerOpen}
+            lesson={launchLesson}
+            mode={editTarget ? "notecard" : "resource"}
+            editResource={editTarget ?? undefined}
+            initialItems={pendingItems.length > 0 ? pendingItems : undefined}
+            onClose={closeComposer}
+          />
+        );
+      })()}
 
       {/* Shared click-to-enlarge modal — opened from a grid tile or a list
           row. Renders the right large preview for every resource kind

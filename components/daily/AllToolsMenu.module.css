@@ -1,7 +1,7 @@
 /* AllToolsMenu.module.css — the "All tools" expanded grid revealed when the
-   teacher hits "All tools" inside ResourceComposer. Visually echoes the
-   Padlet "All Tools" panel: a scrollable 3-column grid of soft pastel
-   tool tiles, grouped into named sections with hairline dividers.
+   teacher hits "All tools" inside ResourceComposer. A card-wall "All Tools"
+   palette: a scrollable 3-column grid of soft pastel tool tiles, grouped into
+   named sections with hairline dividers.
 
    Lives INSIDE the ResourceComposer panel: it replaces the body (title +
    tool grid + body + captured strip + routing) while open. A small
@@ -240,9 +240,9 @@
 }
 
 /* "New" / "Soon" micro-pills — sit top-right of the tile. The NEW badge
-   is a firm dark pill so the genuinely-new functional tiles (Lesson
-   Padlet, YouTube) catch the eye; the SOON badge is quieter — same shape,
-   muted neutral fill, so it reads as a label not an attention-grab. */
+   is a firm dark pill so the genuinely-new functional tiles (Card wall,
+   YouTube) catch the eye; the SOON badge is quieter — same shape, muted
+   neutral fill, so it reads as a label not an attention-grab. */
 
 .badge {
   position: absolute;

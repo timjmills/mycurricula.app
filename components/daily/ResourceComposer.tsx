@@ -1,6 +1,6 @@
 "use client";
 
-// ResourceComposer.tsx — the Padlet-style "Add resource" dialog that the
+// ResourceComposer.tsx — the card-wall "Add resource" dialog that the
 // Daily view's Resources panel opens when the teacher hits the "+" in the
 // panel header (or, in "add more photos" mode, taps a photo-stack tile).
 //
@@ -93,7 +93,9 @@ import {
   type HostedUploadResult,
 } from "@/lib/resource-upload";
 import { renderPdfThumbnail } from "@/lib/pdf-thumbnail";
+import { makeNotecard } from "@/lib/notecards";
 import { ResourceEmbed } from "@/components/resources";
+import { RichTextEditor } from "@/components/rich-text";
 import { AllToolsMenu } from "./AllToolsMenu";
 import styles from "./ResourceComposer.module.css";
 
@@ -107,18 +109,12 @@ export interface CapturedItem {
   type: LessonResource["type"];
   /** Human label — filename, URL, or "Pasted image" fallback. */
   label: string;
-  /** Optional per-resource teacher note. Padlet lets you write a caption
-   *  under each post; we offer the same: clicking a captured chip reveals
-   *  a small textarea where the teacher can write a one-liner for THIS
-   *  resource. Default empty.
-   *
-   *  STORAGE FALLBACK — the planner store's LessonResource shape has only
-   *  `type` + `label` (no separate notes/description field). To avoid a
-   *  data-model change for a Phase-1A feature, the composer concatenates
-   *  the note onto the resource's label on Add ("filename.pdf — note
-   *  text"). When the store grows a richer LessonResource shape, lift the
-   *  note out of the label and into its own column. */
-  note?: string;
+  /** Optional per-resource rich-text note. Each captured chip can reveal a
+   *  RichTextEditor where the teacher writes formatted notes (links, lists,
+   *  inline images) for THIS resource. Persisted to the resource's `body`
+   *  field on Add (NOT folded onto the label — the model now carries `body`
+   *  on every resource). Default empty. Stored as sanitized HTML. */
+  body?: string;
   /** Real URL (embed source for links; `blob:` for in-session files). */
   url?: string;
   /** Fine-grained provider from parseResourceUrl or mime detection. */
@@ -152,6 +148,46 @@ export interface ResourceComposerCommit {
   type: LessonResource["type"];
 }
 
+/**
+ * What the composer is BEING USED FOR — the caller's intent. This drives both
+ * the body the dialog renders AND how `handleAdd` commits.
+ *
+ *   • "resource" (default) — the historical flow: capture one-or-more media /
+ *     links and attach them as N separate LessonResources at the routed
+ *     destination. Each captured chip can carry its own rich-text `body` note.
+ *
+ *   • "notecard" — capture media that become ONE notecard's flip-through
+ *     `gallery`, plus a single top-level RichTextEditor for the notecard's
+ *     `body`. On Add this commits exactly ONE resource via
+ *     `makeNotecard({ label, gallery, body })` — never N separate resources.
+ */
+export type ResourceComposerMode = "resource" | "notecard";
+
+/**
+ * Locator for "add / edit notes on an EXISTING resource" mode. When supplied
+ * (alongside `mode="notecard"`), the composer does NOT create a new resource:
+ * it opens pre-filled with the resource's current `body` (and label), locks
+ * routing to the resource's existing home, and on Add PATCHES that resource —
+ * setting its `body` (and merging any newly-captured media into its `gallery`)
+ * via `editSectionResource` (section route) or `editLesson` (whole-lesson
+ * route). This is the "add a notecard/note to any existing resource" path.
+ */
+export interface ResourceComposerEditTarget {
+  /** The lesson the resource lives on. */
+  lessonId: string;
+  /** The section the resource lives in, or null for a whole-lesson resource. */
+  sectionId: string | null;
+  /** The resource's stable id (SectionResource.id, or the synthesized
+   *  `lesson:<id>:res:<i>` id for a whole-lesson resource — see below). */
+  resourceId: string;
+  /** For a whole-lesson resource (no real section id), the index into
+   *  `lesson.resources` so the patch can target the right array slot. The
+   *  synthesized id alone isn't enough to locate the row in `editLesson`. */
+  lessonResourceIndex?: number;
+  /** The resource being edited — seeds the title + body editor. */
+  resource: LessonResource;
+}
+
 /** Public API for ResourceComposer. Stable — the section-wiring agent
  *  imports this and the component will not change shape after first pass. */
 export interface ResourceComposerProps {
@@ -160,6 +196,22 @@ export interface ResourceComposerProps {
   /** The lesson the composer was launched from. Drives the default routing
    *  AND the week scope for the Lesson picker. */
   lesson: Lesson;
+  /**
+   * What the composer is for (see ResourceComposerMode). Defaults to
+   * "resource" so every existing caller keeps its current behavior. Pass
+   * "notecard" to build a single notecard (gallery + rich body), or pair
+   * "notecard" with `editResource` to add/edit notes on an existing resource.
+   */
+  mode?: ResourceComposerMode;
+  /**
+   * "Add / edit notes on THIS existing resource" target. When set the composer
+   * patches the existing resource's `body`/`gallery` instead of creating a new
+   * one, and routing is locked to the resource's home. Requires `mode` to be
+   * "notecard" (a note IS the notecard capability on a normal card); a caller
+   * that passes `editResource` without setting mode gets notecard mode
+   * implicitly. Ignored when undefined.
+   */
+  editResource?: ResourceComposerEditTarget;
   /** Optional initial section id — when launched from a section's "+",
    *  this section is preselected (instead of "Whole lesson"). */
   initialSectionId?: string;
@@ -286,12 +338,21 @@ export function fileToCapturedItem(file: File): CapturedItem {
 export function ResourceComposer({
   open,
   lesson,
+  mode = "resource",
+  editResource,
   initialSectionId,
   initialItems,
   lockRouting = false,
   onClose,
   onCommitted,
 }: ResourceComposerProps): ReactNode {
+  // Passing an editResource implies notecard mode (a note IS the notecard
+  // capability on a normal card), so a caller can omit `mode` when editing.
+  // Routing is always locked when editing an existing resource — its home is
+  // fixed — so we OR it into the lockRouting the caller passed.
+  const isNotecardMode = mode === "notecard" || editResource != null;
+  const isEditMode = editResource != null;
+  const routingLocked = lockRouting || isEditMode;
   // ── Cross-agent label contract ───────────────────────────────────────
   // useLabels() ships from lib/labels.tsx (another agent). If the module
   // resolves it returns the configured captions; the default it returns
@@ -317,6 +378,7 @@ export function ResourceComposer({
     lessons,
     getSections,
     addSectionResource,
+    editSectionResource,
     editLesson,
     getLesson,
     subjects,
@@ -329,7 +391,7 @@ export function ResourceComposer({
   const [linkValue, setLinkValue] = useState<string>("");
   const [searchOpen, setSearchOpen] = useState<boolean>(false);
   /** Switches the composer body to the "All tools" expanded grid (the
-   *  Padlet-style menu). Returning sets this back to false. */
+   *  card-wall tool menu). Returning sets this back to false. */
   const [allToolsOpen, setAllToolsOpen] = useState<boolean>(false);
   const [items, setItems] = useState<CapturedItem[]>([]);
   /** Which captured-chip is currently showing its note textarea. Null =
@@ -380,8 +442,12 @@ export function ResourceComposer({
     uploadedRef.current = new Map();
     pdfRenderedRef.current = new Set();
 
-    setTitle("");
-    setBody("");
+    // In edit mode, seed the title + rich body from the resource being edited
+    // and route to its existing home; otherwise start blank at the launching
+    // lesson. The notecard body is the shared `body` state (a RichTextEditor in
+    // notecard mode); in resource mode `body` stays the plain description field.
+    setTitle(editResource ? (editResource.resource.label ?? "") : "");
+    setBody(editResource ? (editResource.resource.body ?? "") : "");
     setLinkOpen(false);
     setLinkValue("");
     setSearchOpen(false);
@@ -394,8 +460,10 @@ export function ResourceComposer({
     setUploadError(null);
     setSubjectId(lesson.subject);
     setUnitId(lesson.unit);
-    setLessonId(lesson.id);
-    setSectionId(initialSectionId ?? "");
+    setLessonId(editResource ? editResource.lessonId : lesson.id);
+    setSectionId(
+      editResource ? (editResource.sectionId ?? "") : (initialSectionId ?? ""),
+    );
     setOpenPicker(null);
 
     // Move focus into the dialog on the next frame so the panel is mounted.
@@ -563,7 +631,7 @@ export function ResourceComposer({
   // valid match in the new subject. Skipped if the current selection is
   // still valid (so picking the same subject is a no-op).
   useEffect(() => {
-    if (lockRouting) return;
+    if (routingLocked) return;
     const validUnit = unitOptions.find((u) => u.id === unitId);
     if (validUnit) return;
     const first = unitOptions[0];
@@ -575,7 +643,7 @@ export function ResourceComposer({
 
   // When unit changes, snap lesson + section.
   useEffect(() => {
-    if (lockRouting) return;
+    if (routingLocked) return;
     const validLesson = lessonOptions.find((l) => l.id === lessonId);
     if (validLesson) return;
     const first = lessonOptions[0];
@@ -671,10 +739,13 @@ export function ResourceComposer({
     setNoteOpenId((cur) => (cur === id ? null : cur));
   }, []);
 
-  /** Update one captured item's note. Called on blur of the per-chip
-   *  textarea so we don't re-render the whole strip on every keystroke. */
-  const setItemNote = useCallback((id: string, note: string) => {
-    setItems((prev) => prev.map((c) => (c.id === id ? { ...c, note } : c)));
+  /** Update one captured item's rich-text note (→ resource.body). Driven by
+   *  the per-chip RichTextEditor's onChange, which already emits sanitized
+   *  HTML; we store it verbatim and re-sanitize again on render. */
+  const setItemBody = useCallback((id: string, html: string) => {
+    setItems((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, body: html } : c)),
+    );
   }, []);
 
   /** Toggle the per-chip note editor. Clicking the chip itself opens or
@@ -908,19 +979,71 @@ export function ResourceComposer({
     [addItem, addItems, enrichWebsiteLink],
   );
 
+  // ── Inline-image resolver for the rich-text body editor ──────────────
+  // The RichTextEditor calls this when the teacher inserts an inline image.
+  // Backend mode → upload the picked file to R2 and return its served URL
+  // (/api/resources/{id}) so it persists + reaches the team. Mock/session
+  // mode → return a `data:` URL read from the file so the image renders in
+  // this session (the body string carries the data URL through the JSONB
+  // seam unchanged). Returns null (cancels insertion) on cancel/failure.
+  // sanitizeHtml() drops an unsafe src at emit regardless.
+  const requestBodyImageUrl = useCallback((): Promise<string | null> => {
+    return new Promise<string | null>((resolve) => {
+      if (typeof document === "undefined") {
+        resolve(null);
+        return;
+      }
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) {
+          resolve(null);
+          return;
+        }
+        if (backendOn) {
+          // Persist the inline image to R2 at the destination lesson's event.
+          const owner = resourceOwnerEvent(getLesson(lessonId) ?? lesson);
+          uploadHostedFile({ owner, file, displayLabel: file.name })
+            .then((res) => resolve(res.url))
+            .catch(() => resolve(null));
+          return;
+        }
+        // Session mode — embed as a data: URL so it renders without a backend.
+        const reader = new FileReader();
+        reader.onload = () =>
+          resolve(typeof reader.result === "string" ? reader.result : null);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    });
+  }, [backendOn, getLesson, lessonId, lesson]);
+
   // ── Add (commit) ─────────────────────────────────────────────────────
-  // Translate every captured item into a planner-store dispatch at the
-  // resolved destination. Whole-lesson destinations use editLesson with a
-  // fresh resources array; section destinations dispatch one
-  // addSectionResource per item.
+  // Three commit shapes, by mode:
+  //   • resource mode — translate every captured item into a separate
+  //     LessonResource at the routed destination (each carrying its own rich
+  //     `body` note). Whole-lesson → editLesson; section → addSectionResource.
+  //   • notecard CREATE — commit exactly ONE makeNotecard({label, gallery,
+  //     body}); captured media become the gallery.
+  //   • notecard EDIT (editResource) — patch the existing resource's
+  //     body/gallery in place via editSectionResource / editLesson.
 
   const canAdd = useMemo(() => {
-    // The Add button is enabled once we have at least one captured item
-    // OR a title (which on its own would create a labelless "link" stub —
-    // we mirror Padlet's "title alone is enough" behaviour). Body alone
-    // does NOT enable Add — there's nothing to attach a body to.
+    // Resource mode: at least one captured item OR a title (a title alone
+    // creates a labelled "link" stub). Notecard/edit mode: a title, captured
+    // media, OR non-empty rich body is enough — a notes-only card is valid.
+    if (isNotecardMode) {
+      return (
+        items.length > 0 ||
+        title.trim().length > 0 ||
+        body.replace(/<[^>]*>/g, "").trim().length > 0
+      );
+    }
     return items.length > 0 || title.trim().length > 0;
-  }, [items, title]);
+  }, [isNotecardMode, items, title, body]);
 
   const handleAdd = useCallback(async () => {
     if (!canAdd || uploading) return;
@@ -931,25 +1054,8 @@ export function ResourceComposer({
     const destLessonId = destLesson.id;
     const destSectionId = sectionId || null;
 
-    // If the teacher hasn't captured anything but typed a title, we
-    // create a single "link" placeholder so the destination gains
-    // something to render. This mirrors how a Padlet card with only a
-    // title still exists as a card.
-    //
-    // Per-item notes are folded onto the label here ("filename.pdf —
-    // note text"). See the storage-fallback comment on CapturedItem.note:
-    // until LessonResource gains a `note` field, the label is the only
-    // place a note can survive the round-trip into the planner store.
-    const labelWithNote = (label: string, note?: string): string => {
-      const trimmed = (note ?? "").trim();
-      if (!trimmed) return label;
-      // Use an em-dash separator with a single space on either side so a
-      // future migration can split on " — " with reasonable confidence.
-      return `${label} — ${trimmed}`;
-    };
-
-    // The new commit shape carries the full LessonResource payload —
-    // url/provider/displayMode/etc. — so a captured embed survives the
+    // The commit shape carries the full LessonResource payload —
+    // url/provider/displayMode/body/etc. — so a captured embed survives the
     // round-trip into the planner store. Fields are undefined for the
     // "title-only stub" path, which the store + renderer tolerate.
     type CommitShape = {
@@ -963,19 +1069,23 @@ export function ResourceComposer({
       sizeBytes?: number;
       thumbnailUrl?: string;
       resourceId?: string;
+      /** Per-resource rich-text note → LessonResource.body (sanitized HTML). */
+      body?: string;
       /** Transient: the File to upload, its blob URL, and the source
        *  CapturedItem id (upload-cache key). Never dispatched. */
       __file?: File;
       __blobUrl?: string;
       __id?: string;
     };
+    // In notecard mode the captured items become the card's GALLERY, so the
+    // "title-only" stub is never minted (a notes-only / title-only notecard is
+    // valid and built from `body`/`title` directly). In resource mode an empty
+    // capture with a typed title still mints a single labelled link stub.
     const toCommit: CommitShape[] =
       items.length > 0
         ? items.map((it) => ({
             type: it.type,
-            // Prefer the per-item label; the dialog's title only steers
-            // the first item so multi-item adds keep their per-file names.
-            label: labelWithNote(it.label, it.note),
+            label: it.label,
             url: it.url,
             provider: it.provider,
             displayMode: it.displayMode,
@@ -983,22 +1093,23 @@ export function ResourceComposer({
             mimeType: it.mimeType,
             sizeBytes: it.sizeBytes,
             thumbnailUrl: it.thumbnailUrl,
+            // Per-item rich note → the resource's body (notecard capability on
+            // a normal card). Only carried in resource mode; notecard mode uses
+            // the single top-level body instead.
+            body: isNotecardMode ? undefined : it.body,
             __file: it.file,
             __blobUrl: it.url?.startsWith("blob:") ? it.url : undefined,
             __id: it.id,
           }))
-        : [{ type: "link", label: title.trim() || "New resource" }];
+        : isNotecardMode
+          ? []
+          : [{ type: "link", label: title.trim() || "New resource" }];
 
-    // Steering: if a Title was typed AND we have a single captured item,
-    // use the title as the label (Padlet behaviour — title = card name).
-    // Re-fold the note onto the title so the per-resource note still
-    // survives the title-override path.
-    if (toCommit.length === 1 && title.trim()) {
-      const onlyItem = items[0];
-      toCommit[0] = {
-        ...toCommit[0],
-        label: labelWithNote(title.trim(), onlyItem?.note),
-      };
+    // Steering (resource mode, single item): a typed Title overrides the lone
+    // item's label (title = card name). Notecard mode uses the title as the
+    // notecard's label directly, so it never rewrites a captured item here.
+    if (!isNotecardMode && toCommit.length === 1 && title.trim()) {
+      toCommit[0] = { ...toCommit[0], label: title.trim() };
     }
 
     // ── Backend persistence (team-shared at the master event) ────────────
@@ -1056,39 +1167,81 @@ export function ResourceComposer({
       }
     }
 
-    if (destSectionId) {
-      // Section route — one addSectionResource per item. The new
-      // signature accepts a Partial<SectionResource> shape so url +
-      // provider + displayMode + the rest flow into the store.
-      for (const r of toCommit) {
-        addSectionResource(destLessonId, destSectionId, {
-          type: r.type,
-          label: r.label,
-          url: r.url,
-          provider: r.provider,
-          displayMode: r.displayMode,
-          linkText: r.linkText,
-          mimeType: r.mimeType,
-          sizeBytes: r.sizeBytes,
-          thumbnailUrl: r.thumbnailUrl,
-          resourceId: r.resourceId,
+    // Map an uploaded CommitShape to a clean LessonResource (drops the
+    // transient __* fields). Shared by every commit path below.
+    const toResource = (r: CommitShape): LessonResource => ({
+      type: r.type,
+      label: r.label,
+      url: r.url,
+      provider: r.provider,
+      displayMode: r.displayMode,
+      linkText: r.linkText,
+      mimeType: r.mimeType,
+      sizeBytes: r.sizeBytes,
+      thumbnailUrl: r.thumbnailUrl,
+      resourceId: r.resourceId,
+      ...(r.body && r.body.trim() ? { body: r.body } : {}),
+    });
+
+    if (isNotecardMode) {
+      // ── Notecard commit — ONE resource (create or edit), never N ──────────
+      // Captured media become the gallery; the single top-level rich body is
+      // the notes. A title falls back to a generic notecard name in makeNotecard.
+      const newGallery: LessonResource[] = toCommit.map(toResource);
+      const labelInput = title.trim();
+
+      if (isEditMode && editResource) {
+        // EDIT — patch the existing resource's body (+ append any newly-captured
+        // media to its gallery). We DON'T overwrite the existing gallery; new
+        // media is added after what's already there. Editing notes on a plain
+        // resource promotes it to carry `body` without changing its type.
+        const existing = editResource.resource;
+        const mergedGallery = [...(existing.gallery ?? []), ...newGallery];
+        const patch: Partial<LessonResource> = {
+          ...(body.trim() ? { body } : { body: "" }),
+          ...(mergedGallery.length > 0 ? { gallery: mergedGallery } : {}),
+        };
+        if (editResource.sectionId) {
+          editSectionResource(
+            destLessonId,
+            editResource.sectionId,
+            editResource.resourceId,
+            patch,
+          );
+        } else {
+          // Whole-lesson resource — patch the array slot by index (the
+          // synthesized id can't locate the row inside editLesson).
+          const idx = editResource.lessonResourceIndex ?? -1;
+          const nextResources = destLesson.resources.map((res, i) =>
+            i === idx ? { ...res, ...patch } : res,
+          );
+          editLesson(destLessonId, { resources: nextResources });
+        }
+      } else {
+        // CREATE — one new notecard at the routed destination.
+        const notecard = makeNotecard({
+          label: labelInput,
+          gallery: newGallery,
+          body,
         });
+        if (destSectionId) {
+          addSectionResource(destLessonId, destSectionId, notecard);
+        } else {
+          editLesson(destLessonId, {
+            resources: [...destLesson.resources, notecard],
+          });
+        }
+      }
+    } else if (destSectionId) {
+      // Section route — one addSectionResource per item. The signature accepts
+      // a Partial<SectionResource> shape so url + provider + body + the rest
+      // flow into the store.
+      for (const r of toCommit) {
+        addSectionResource(destLessonId, destSectionId, toResource(r));
       }
     } else {
       // Whole-lesson route — merge into lesson.resources via editLesson.
-      // Same full LessonResource shape as the section route.
-      const newResources: LessonResource[] = toCommit.map((r) => ({
-        type: r.type,
-        label: r.label,
-        url: r.url,
-        provider: r.provider,
-        displayMode: r.displayMode,
-        linkText: r.linkText,
-        mimeType: r.mimeType,
-        sizeBytes: r.sizeBytes,
-        thumbnailUrl: r.thumbnailUrl,
-        resourceId: r.resourceId,
-      }));
+      const newResources: LessonResource[] = toCommit.map(toResource);
       editLesson(destLessonId, {
         resources: [...destLesson.resources, ...newResources],
       });
@@ -1097,21 +1250,22 @@ export function ResourceComposer({
     // Protect only blobs that REMAIN the committed url (mock-mode / session
     // files). Uploaded files now point at /api/resources/{id}, so their blob
     // is freed by the close-time leak guard. Without this a session-only
-    // image/PDF tile would point at a revoked blob and render blank.
+    // image/PDF tile would point at a revoked blob and render blank. This
+    // covers notecard gallery media too (their blob is the gallery item url).
     for (const r of toCommit) {
       if (r.__blobUrl) committedUrlsRef.current.add(r.__blobUrl);
     }
 
     // Report back to the caller (the Resources panel uses this to register
-    // photo-stacks). Picks the predominant type — when items are uniform
-    // (the only path that produces a stack) it'll be that type; mixed
-    // batches still report SOMETHING reasonable.
+    // photo-stacks). Notecard mode commits exactly one resource.
     if (onCommitted) {
-      const headType = toCommit[0]?.type ?? "link";
+      const headType = isNotecardMode
+        ? "notecard"
+        : (toCommit[0]?.type ?? "link");
       onCommitted({
         lessonId: destLessonId,
         sectionId: destSectionId,
-        count: toCommit.length,
+        count: isNotecardMode ? 1 : toCommit.length,
         type: headType,
       });
     }
@@ -1121,6 +1275,10 @@ export function ResourceComposer({
     canAdd,
     uploading,
     backendOn,
+    isNotecardMode,
+    isEditMode,
+    editResource,
+    body,
     items,
     title,
     lessonId,
@@ -1128,6 +1286,7 @@ export function ResourceComposer({
     getLesson,
     lesson,
     addSectionResource,
+    editSectionResource,
     editLesson,
     onClose,
     onCommitted,
@@ -1216,7 +1375,13 @@ export function ResourceComposer({
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
-        title="Add a resource dialog — capture links, files, videos, and docs, then pick which lesson and section to attach them to"
+        title={
+          isEditMode
+            ? "Add notes dialog — write formatted notes (and add media) to this resource"
+            : isNotecardMode
+              ? "New notecard dialog — gather photos and files into a card, then write its notes"
+              : "Add a resource dialog — capture links, files, videos, and docs, then pick which lesson and section to attach them to"
+        }
         className={`${styles.panel} cp-subj ${subjectId}`}
         onKeyDown={handleKeyDown}
         onPaste={onDialogPaste}
@@ -1233,7 +1398,11 @@ export function ResourceComposer({
             <CloseIcon />
           </Button>
           <span id={headingId} className={styles.srOnly}>
-            Add a resource
+            {isEditMode
+              ? "Add notes to this resource"
+              : isNotecardMode
+                ? "Create a notecard"
+                : "Add a resource"}
           </span>
           <Button
             variant="primary"
@@ -1254,7 +1423,7 @@ export function ResourceComposer({
         {/* ── Main composer body OR the "All tools" expanded grid ───── */}
         {/* The dialog has two states: the standard composer (title +
             4-tile grid + body + chips + routing) and the AllToolsMenu
-            sub-view (Padlet-style 3-column tool grid). The top bar
+            sub-view (card-wall 3-column tool grid). The top bar
             (× / Add) stays visible in both so the teacher can commit
             captured items even while the All-Tools view is open. */}
         {allToolsOpen ? (
@@ -1277,11 +1446,22 @@ export function ResourceComposer({
               ref={titleInputRef}
               type="text"
               className={styles.titleInput}
-              placeholder="Title"
+              placeholder={isNotecardMode ? "Notecard title" : "Title"}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              aria-label="Resource title"
+              aria-label={isNotecardMode ? "Notecard title" : "Resource title"}
             />
+
+            {/* Notecard-mode intro — names what the captured media + notes
+                become so the single-resource commit is unsurprising. In edit
+                mode it explains the patch-in-place behavior instead. */}
+            {isNotecardMode && (
+              <p className={styles.caption} role="note">
+                {isEditMode
+                  ? "Add formatted notes (and extra media) to this resource. Your changes save to the card."
+                  : "Photos and files you add become this card’s flip-through gallery; write the notes below."}
+              </p>
+            )}
 
             {/* ── Tool grid: Upload · Photo · Link · Search ─────────────────
                 Each tile carries a pastel hue from the highlighter pen
@@ -1339,7 +1519,7 @@ export function ResourceComposer({
             {/* ── All tools button ───────────────────────────────────────── */}
             {/* Opens the AllToolsMenu sub-view. The four primary tiles above
             cover the 80% case; this button exposes the long-tail tool
-            palette (Lesson Padlet, YouTube, Camera, etc.) without
+            palette (Card wall, YouTube, Camera, etc.) without
             cluttering the standard composer. */}
             <Button
               variant="ghost"
@@ -1453,15 +1633,31 @@ export function ResourceComposer({
               </p>
             )}
 
-            {/* ── Body textarea ──────────────────────────────────────────── */}
-            <textarea
-              className={styles.bodyArea}
-              placeholder="Write something to describe the resource…"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              aria-label="Resource description"
-              rows={3}
-            />
+            {/* ── Body ───────────────────────────────────────────────────────
+                Notecard mode: a full RichTextEditor whose HTML becomes the
+                notecard's `body` (formatted notes + links + inline images).
+                Resource mode: the original plain description textarea (its
+                per-resource notes are written through each chip's editor). */}
+            {isNotecardMode ? (
+              <div className={styles.notecardBody}>
+                <RichTextEditor
+                  value={body}
+                  onChange={setBody}
+                  placeholder="Write the notes for this card — formatting, links, and images all work…"
+                  ariaLabel="Notecard notes"
+                  onRequestImageUrl={requestBodyImageUrl}
+                />
+              </div>
+            ) : (
+              <textarea
+                className={styles.bodyArea}
+                placeholder="Write something to describe the resource…"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                aria-label="Resource description"
+                rows={3}
+              />
+            )}
 
             {/* ── Limits banner ──────────────────────────────────────────── */}
             {/* Per Tim's brief: ≤10 files (PDF/DOCX/RTF) + ≤10 images per
@@ -1495,11 +1691,12 @@ export function ResourceComposer({
               })()}
 
             {/* ── Captured items strip + paste status ────────────────────── */}
-            {/* Each chip is a button — tapping it opens a small textarea
-            below the strip where the teacher writes a note for THAT
-            resource (Padlet's "post caption" affordance). Clicking the
-            same chip again closes the note editor. The note saves on
-            blur to keep keystrokes off the items-array. */}
+            {/* In resource mode each chip is a button — tapping it opens a
+            rich-text note editor below the strip where the teacher writes
+            formatted notes (→ resource.body) for THAT resource. Clicking the
+            same chip again closes the editor. In notecard mode the chips are
+            static labels (the captured media are the card's gallery; notes
+            live in the single top-level editor). */}
             {(items.length > 0 || pastedStatus || rejectionStatus) && (
               <div className={styles.capturedWrap}>
                 {items.length > 0 && (
@@ -1509,7 +1706,11 @@ export function ResourceComposer({
                   >
                     {items.map((item) => {
                       const noteOpen = noteOpenId === item.id;
-                      const hasNote = (item.note ?? "").trim().length > 0;
+                      // Strip tags to decide "has a note" so an empty <p></p>
+                      // from the rich editor doesn't light the dot.
+                      const hasNote =
+                        (item.body ?? "").replace(/<[^>]*>/g, "").trim()
+                          .length > 0;
                       return (
                         <li
                           key={item.id}
@@ -1517,29 +1718,13 @@ export function ResourceComposer({
                             noteOpen ? styles.capturedChipActive : ""
                           }`}
                         >
-                          <Tooltip
-                            content={
-                              hasNote
-                                ? `Edit the note attached to ${item.label} — the note shows up on the lesson card alongside the resource.`
-                                : `Add a short note to ${item.label} so the team knows how to use it.`
-                            }
-                            side="top"
-                          >
-                            <button
-                              type="button"
+                          {isNotecardMode ? (
+                            // Notecard mode — the chip is a static label (its
+                            // notes live in the single top-level body editor,
+                            // not per-item). Still shows the type glyph + name.
+                            <span
                               className={styles.capturedChipBody}
-                              onClick={() => toggleNote(item.id)}
-                              aria-expanded={noteOpen}
-                              title={
-                                hasNote
-                                  ? `Edit the note attached to ${item.label}`
-                                  : `Add a short note to ${item.label} so the team knows how to use it`
-                              }
-                              aria-label={
-                                hasNote
-                                  ? `Edit note for ${item.label}`
-                                  : `Add note for ${item.label}`
-                              }
+                              title={`${item.label} — part of this notecard's gallery`}
                             >
                               <span
                                 className={styles.capturedChipIcon}
@@ -1553,15 +1738,54 @@ export function ResourceComposer({
                               >
                                 {item.label}
                               </span>
-                              {hasNote && (
+                            </span>
+                          ) : (
+                            <Tooltip
+                              content={
+                                hasNote
+                                  ? `Edit the note attached to ${item.label} — the note shows up on the lesson card alongside the resource.`
+                                  : `Add a short note to ${item.label} so the team knows how to use it.`
+                              }
+                              side="top"
+                            >
+                              <button
+                                type="button"
+                                className={styles.capturedChipBody}
+                                onClick={() => toggleNote(item.id)}
+                                aria-expanded={noteOpen}
+                                title={
+                                  hasNote
+                                    ? `Edit the note attached to ${item.label}`
+                                    : `Add a short note to ${item.label} so the team knows how to use it`
+                                }
+                                aria-label={
+                                  hasNote
+                                    ? `Edit note for ${item.label}`
+                                    : `Add note for ${item.label}`
+                                }
+                              >
                                 <span
-                                  className={styles.capturedChipNoteDot}
-                                  aria-label="Has note"
-                                  title="Has note"
-                                />
-                              )}
-                            </button>
-                          </Tooltip>
+                                  className={styles.capturedChipIcon}
+                                  aria-hidden="true"
+                                >
+                                  <CapturedTypeIcon type={item.type} />
+                                </span>
+                                <span
+                                  className={styles.capturedChipLabel}
+                                  title={item.label}
+                                >
+                                  {item.label}
+                                </span>
+                                {hasNote && (
+                                  <span
+                                    className={styles.capturedChipNoteDot}
+                                    aria-label="Has note"
+                                    title="Has note"
+                                  />
+                                )}
+                              </button>
+                            </Tooltip>
+                          )}
                           <Tooltip
                             content={`Remove ${item.label} from the captured list — it won't be attached to the lesson.`}
                             side="top"
@@ -1655,8 +1879,12 @@ export function ResourceComposer({
 
                 {/* The note editor for the currently-open chip. Sits BELOW
                 the strip so a single editor handles all chips (saves
-                vertical space and keeps the chip row scannable). */}
-                {noteOpenId &&
+                vertical space and keeps the chip row scannable). A full
+                RichTextEditor writes to the resource's `body` (formatted
+                notes + links + inline images). Only in resource mode —
+                notecard mode uses the single top-level body editor instead. */}
+                {!isNotecardMode &&
+                  noteOpenId &&
                   items.find((c) => c.id === noteOpenId) &&
                   (() => {
                     const item = items.find((c) => c.id === noteOpenId)!;
@@ -1666,28 +1894,19 @@ export function ResourceComposer({
                         role="group"
                         aria-label={`Note for ${item.label}`}
                       >
-                        <label
-                          className={styles.noteEditorLabel}
-                          htmlFor={`note-${item.id}`}
-                        >
+                        <span className={styles.noteEditorLabel}>
                           Note for <strong>{item.label}</strong>
-                        </label>
-                        <textarea
-                          id={`note-${item.id}`}
-                          className={styles.noteArea}
+                        </span>
+                        <RichTextEditor
+                          value={item.body ?? ""}
+                          onChange={(html) => setItemBody(item.id, html)}
                           placeholder="Write a note for this resource…"
-                          // Uncontrolled-ish: we save on blur via setItemNote
-                          // so the strip doesn't re-render per keystroke.
-                          // Defaulting to the stored note keeps the editor
-                          // hydrated when the teacher re-opens the chip.
-                          defaultValue={item.note ?? ""}
-                          onBlur={(e) => setItemNote(item.id, e.target.value)}
-                          rows={2}
-                          aria-label={`Note text for ${item.label}`}
+                          ariaLabel={`Note text for ${item.label}`}
+                          onRequestImageUrl={requestBodyImageUrl}
                         />
                         <p className={styles.noteHint}>
-                          Saved when you click away. The note will appear next
-                          to the resource label.
+                          Formatted notes, links, and images save with this
+                          resource and show on its card.
                         </p>
                       </div>
                     );
@@ -1733,7 +1952,7 @@ export function ResourceComposer({
                   label={labels.subject}
                   value={selectedSubject?.name ?? ""}
                   open={openPicker === "subject"}
-                  disabled={lockRouting}
+                  disabled={routingLocked}
                   onToggle={() =>
                     setOpenPicker(openPicker === "subject" ? null : "subject")
                   }
@@ -1754,7 +1973,7 @@ export function ResourceComposer({
                   label={labels.unit}
                   value={unitOptions.find((u) => u.id === unitId)?.name ?? ""}
                   open={openPicker === "unit"}
-                  disabled={lockRouting || unitOptions.length === 0}
+                  disabled={routingLocked || unitOptions.length === 0}
                   onToggle={() =>
                     setOpenPicker(openPicker === "unit" ? null : "unit")
                   }
@@ -1774,7 +1993,7 @@ export function ResourceComposer({
                   label={labels.lesson}
                   value={selectedLesson?.title ?? ""}
                   open={openPicker === "lesson"}
-                  disabled={lockRouting || lessonOptions.length === 0}
+                  disabled={routingLocked || lessonOptions.length === 0}
                   onToggle={() =>
                     setOpenPicker(openPicker === "lesson" ? null : "lesson")
                   }
@@ -1800,7 +2019,7 @@ export function ResourceComposer({
                       : "Whole lesson"
                   }
                   open={openPicker === "section"}
-                  disabled={lockRouting}
+                  disabled={routingLocked}
                   onToggle={() =>
                     setOpenPicker(openPicker === "section" ? null : "section")
                   }
