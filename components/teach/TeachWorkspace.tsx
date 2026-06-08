@@ -1451,6 +1451,10 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                   <BoardLibraryModule
                     gradeLevelId={boardGradeId(activeBoard)}
                     onOpenBoard={(board) => {
+                      // Close the overlay up front so a rapid second click can't
+                      // pull another copy / re-fire while the first call is in
+                      // flight (review Low: duplicate copies on double-click).
+                      setLibraryOverlay(null);
                       void (async () => {
                         // A board already attached to a lesson (a My Board for a
                         // lesson) → just navigate to it.
@@ -1460,15 +1464,21 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                             lessonId: board.masterLessonId,
                           });
                           dispatch({ type: "selectBoard", boardId: board.id });
-                          setLibraryOverlay(null);
                           return;
                         }
                         // Lesson-DETACHED library board (Team Library / a detached
                         // My Board): PULL A COPY INTO THE CURRENT LESSON (audit
                         // F11). Dispatching selectLesson(null) would clear the
-                        // workspace, so instead add a personal copy to the lesson
-                        // in view and select it.
-                        if (activeLessonId != null && ownerId != null) {
+                        // workspace, so add a personal copy to the lesson in view +
+                        // select it. Guarded on !sandbox: in the sandbox there is no
+                        // real lesson to attach to (reloadBoards reads the sandbox
+                        // scope), so a sandbox open falls through to the My Boards
+                        // pull below (review Low: latent sandbox+lesson mismatch).
+                        if (
+                          activeLessonId != null &&
+                          !state.sandbox &&
+                          ownerId != null
+                        ) {
                           const copy = await teach.copyBoardToLesson(
                             board.id,
                             activeLessonId,
@@ -1476,14 +1486,12 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                           );
                           await reloadBoards();
                           dispatch({ type: "selectBoard", boardId: copy.id });
-                          setLibraryOverlay(null);
                           return;
                         }
                         // No lesson in view (e.g. sandbox) → fall back to pulling a
                         // detached copy into My Boards so the action still succeeds.
                         if (ownerId != null) {
                           await teach.copyTeamBoardToMine(board.id, ownerId);
-                          setLibraryOverlay(null);
                         }
                       })();
                     }}

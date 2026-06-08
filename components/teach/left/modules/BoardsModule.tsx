@@ -220,17 +220,34 @@ export function BoardsModule({
     // is added to the active lesson.
     const targetLesson = sandbox ? SANDBOX_LESSON_ID : activeLessonId;
     if (!targetLesson) return;
-    const created = await teach.createBoard({
-      masterLessonId: targetLesson,
-      ownerId,
-      scope: "personal",
-      title: `Board ${boards.length + 1}`,
-      displayOrderWithinLesson: boards.length,
-      templateId: null,
-      gradeLevelId: gradeLevelId ?? boards[0]?.gradeLevelId ?? "g5",
-    });
-    await reloadBoards();
-    dispatch({ type: "selectBoard", boardId: created.id });
+    // A SANDBOX board is lesson-less, so the repo stamps its grade from the value
+    // we pass (resolveGradeId) — it MUST be a resolved grade uuid, never the "g5"
+    // mock slug, under the live flag (review Medium). If the grade hasn't resolved
+    // yet (e.g. an empty sandbox before getActiveGradeLevelId lands) bail quietly
+    // rather than send a slug into a uuid column. A lesson-attached board IGNORES
+    // this value (createBoard derives the grade from the lesson), so the "g5"
+    // fallback below is inert on that path.
+    const resolvedGrade = gradeLevelId ?? boards[0]?.gradeLevelId;
+    if (sandbox && !resolvedGrade) return;
+    try {
+      const created = await teach.createBoard({
+        masterLessonId: targetLesson,
+        ownerId,
+        scope: "personal",
+        title: `Board ${boards.length + 1}`,
+        displayOrderWithinLesson: boards.length,
+        templateId: null,
+        gradeLevelId: resolvedGrade ?? "g5",
+      });
+      await reloadBoards();
+      dispatch({ type: "selectBoard", boardId: created.id });
+    } catch {
+      // onClick doesn't await, so surface a failure as a toast rather than an
+      // unhandled rejection with no feedback (review Medium).
+      showConsequence({
+        message: "Couldn't add a board just now — please try again.",
+      });
+    }
   }
 
   // ── Push-to-team (DESTRUCTIVE + team-wide displacement, §13.1) ────────────
