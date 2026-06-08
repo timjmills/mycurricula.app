@@ -47,6 +47,7 @@ const TYPE_META: Record<LessonResource["type"], TypeMeta> = {
   doc: { label: "Doc", glyph: "⊟" },
   pdf: { label: "PDF", glyph: "⊞" },
   image: { label: "Image", glyph: "⊡" },
+  notecard: { label: "Note", glyph: "❏" },
 };
 
 // Sort order of resource types when grouping "By type".
@@ -58,6 +59,7 @@ const TYPE_SORT_ORDER: Record<LessonResource["type"], number> = {
   image: 4,
   website: 5,
   link: 6,
+  notecard: 7,
 };
 
 // Chip order — the "All" sentinel is prepended in the UI.
@@ -69,6 +71,7 @@ const CHIP_TYPES: LessonResource["type"][] = [
   "doc",
   "pdf",
   "image",
+  "notecard",
 ];
 
 // Maximum rows shown before pagination (beta+1).

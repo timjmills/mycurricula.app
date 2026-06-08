@@ -51,7 +51,15 @@ export interface Unit {
  *  is optional so the existing mock fixtures stay valid; views fall back
  *  to the synthetic glyph render when `url` is absent. */
 export interface LessonResource {
-  type: "slides" | "pdf" | "doc" | "image" | "youtube" | "website" | "link";
+  type:
+    | "slides"
+    | "pdf"
+    | "doc"
+    | "image"
+    | "youtube"
+    | "website"
+    | "link"
+    | "notecard";
   label: string;
   /** Real URL — embed source, link target, or R2 signed-GET endpoint. When
    *  absent, this is a legacy/placeholder fixture row. */
@@ -79,6 +87,15 @@ export interface LessonResource {
   previewDescription?: string;
   /** Server-side row id — present after the row has been persisted. */
   resourceId?: string;
+  /** Rich-text HTML notes attached to ANY resource (sanitized before render).
+   *  This is the "add formatted text + links to a card" capability; a
+   *  `type:"notecard"` resource uses it as its primary written content. */
+  body?: string;
+  /** Ordered flip-through media for a stack or notecard. Each item is itself a
+   *  LessonResource (image / video / pdf / embed / link), so a gallery can mix
+   *  any resource type. `gallery[0]` is the poster. Flat by convention —
+   *  gallery items never carry their own `gallery`. */
+  gallery?: LessonResource[];
 }
 
 /** Provider tag computed from the resource URL — narrows the renderer's

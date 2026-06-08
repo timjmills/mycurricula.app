@@ -298,6 +298,7 @@ const TYPE_TAGS: Record<LessonResource["type"], TypeTag> = {
   youtube: { label: "VIDEO", tagClass: "rowVideo" },
   website: { label: "WEB", tagClass: "rowWeb" },
   link: { label: "LINK", tagClass: "rowLink" },
+  notecard: { label: "NOTE", tagClass: "rowLink" },
 };
 
 // ── Synthetic URL preview ────────────────────────────────────────────────
