@@ -162,40 +162,56 @@ create trigger trg_boards_lesson_grade
 
 
 -- #############################################################################
--- ## SECTION 4 — teach_replace_team_set: atomic displacement  (Blocker 4)
+-- ## SECTION 4 — teach_replace_lesson_set: validated atomic displacement
 -- #############################################################################
--- The §13.1 "push to team" repository operation DELETES the lesson's existing
--- team set and re-inserts the pushed set. Done as separate client calls, a
--- mid-sequence failure wiped the team's boards with no replacement. This wraps
--- the whole displacement in one transaction (a plpgsql function body IS the
--- transaction boundary).
+-- The §13.1 "push to team" repository op (and the sandbox-pin "replace my
+-- personal set" op) DELETE a lesson's existing set for a (scope, owner) and
+-- re-insert the new set. Done as separate client calls, a mid-sequence failure
+-- wiped the set with no replacement. This wraps the whole displacement in ONE
+-- transaction (a plpgsql function body IS the transaction boundary) and serves
+-- BOTH the team set (scope='team', owner=null) and a teacher's personal set
+-- (scope='personal', owner=auth.uid()).
+--
+-- VALIDATE-BEFORE-DELETE (audit F2). This RPC is a `'use server'`-reachable +
+-- directly-PostgREST-callable endpoint. RLS gates each row, but RLS PERMITS a
+-- team member to delete the team set, so a direct call with p_boards=[] would
+-- delete the set and insert nothing — wiping it. And a crafted payload could
+-- target a different lesson/scope/owner than intended. So we VALIDATE the whole
+-- payload first and RAISE (rolling back, before any delete) unless it is a
+-- well-formed replacement for exactly (p_lesson, p_scope, p_owner):
+--   * p_boards is a non-empty array;
+--   * (p_scope, p_owner) is a legal pair (team⇒null owner, personal⇒non-null);
+--   * every board targets (p_lesson, p_scope, p_owner);
+--   * every widget's board_id is one of the boards in this set (no smuggling a
+--     widget onto a board outside the replacement).
 --
 -- CONTRACT (the app prepares the payloads so all id-minting + name-stripping +
--- page/widget mapping stays in TS, where it is unit-tested; this function is a
--- DUMB atomic writer):
---   p_lesson  uuid   — the master lesson whose team set is being replaced.
---   p_boards  jsonb  — array of board row objects (snake_case keys matching the
---                      boards columns). MUST include every NOT NULL column:
---                      id, grade_level_id, scope ('team'), title,
---                      display_order_within_lesson, whiteboard, ephemeral,
---                      library_visibility. master_core_lesson_event_id must equal
---                      p_lesson. owner_id must be null (team scope).
---   p_widgets jsonb  — array of widget row objects (snake_case) for the page-0
---                      mirror, board_id pointing at the new board ids, id supplied
---                      so the flat mirror matches each board's `pages` jsonb.
+-- page/widget mapping stays in TS, where it is unit-tested; this is the atomic
+-- writer):
+--   p_lesson  uuid        — the master lesson whose (scope,owner) set is replaced.
+--   p_scope   board_scope — 'team' or 'personal'.
+--   p_owner   uuid        — null for team; the owning teacher (auth.uid()) for
+--                           personal.
+--   p_boards  jsonb       — array of board row objects (snake_case keys = boards
+--                           columns); every NOT NULL column must be present.
+--   p_widgets jsonb       — array of widget row objects (snake_case) for the
+--                           page-0 mirror, board_id ∈ p_boards ids, id supplied so
+--                           the flat mirror matches each board's `pages` jsonb.
 --
--- SECURITY INVOKER: every statement below is gated by the caller's RLS
--- (boards_delete / boards_insert require can_read_grade; widgets inherit the
--- board policy). The function adds atomicity ONLY — never service-role privilege.
--- The boards insert also fires trg_boards_lesson_grade, so a mis-stamped grade in
--- the payload is rejected and the whole transaction rolls back (delete included).
+-- SECURITY INVOKER: every statement is gated by the caller's RLS (boards_delete /
+-- boards_insert require can_read_grade / owner=auth.uid(); widgets inherit the
+-- board policy). The function adds atomicity + payload validation ONLY — never
+-- service-role privilege. The boards insert also fires trg_boards_lesson_grade,
+-- so a mis-stamped grade rolls the whole transaction back (delete included).
 --
 -- jsonb_populate_recordset(null::<table>, …) types each object against the table
 -- rowtype (coercing uuids / jsonb / booleans / ints); the explicit INSERT column
 -- lists OMIT created_at/updated_at so their column defaults apply.
 -- ---------------------------------------------------------------------------
-create or replace function teach_replace_team_set(
+create or replace function teach_replace_lesson_set(
   p_lesson  uuid,
+  p_scope   board_scope,
+  p_owner   uuid,
   p_boards  jsonb,
   p_widgets jsonb
 )
@@ -204,10 +220,54 @@ language plpgsql
 security invoker
 set search_path = public
 as $$
+declare
+  v_board_ids uuid[];
 begin
+  -- ── Validate the payload BEFORE any delete (audit F2) ─────────────────────
+  if p_boards is null
+     or jsonb_typeof(p_boards) <> 'array'
+     or jsonb_array_length(p_boards) = 0 then
+    raise exception 'teach_replace_lesson_set: p_boards must be a non-empty array';
+  end if;
+  if p_scope = 'team' and p_owner is not null then
+    raise exception 'teach_replace_lesson_set: team scope must have a null owner';
+  end if;
+  if p_scope = 'personal' and p_owner is null then
+    raise exception 'teach_replace_lesson_set: personal scope requires an owner';
+  end if;
+  -- Every board must target exactly (p_lesson, p_scope, p_owner).
+  if exists (
+    select 1
+      from jsonb_populate_recordset(null::boards, p_boards) b
+     where b.master_core_lesson_event_id is distinct from p_lesson
+        or b.scope is distinct from p_scope
+        or b.owner_id is distinct from p_owner
+  ) then
+    raise exception
+      'teach_replace_lesson_set: every board must match (lesson=%, scope=%, owner=%)',
+      p_lesson, p_scope, p_owner;
+  end if;
+  -- Collect the set's board ids; every widget must belong to one of them.
+  select array_agg(b.id)
+    into v_board_ids
+    from jsonb_populate_recordset(null::boards, p_boards) b;
+  if p_widgets is not null
+     and jsonb_typeof(p_widgets) = 'array'
+     and exists (
+       select 1
+         from jsonb_populate_recordset(null::widgets, p_widgets) w
+        where w.board_id is null
+           or not (w.board_id = any (v_board_ids))
+     ) then
+    raise exception
+      'teach_replace_lesson_set: every widget board_id must be one of the inserted boards';
+  end if;
+
+  -- ── Atomic displacement ───────────────────────────────────────────────────
   delete from boards
    where master_core_lesson_event_id = p_lesson
-     and scope = 'team';
+     and scope = p_scope
+     and owner_id is not distinct from p_owner;
 
   insert into boards (
     id, grade_level_id, subject_id, master_core_lesson_event_id, owner_id, scope,
@@ -236,7 +296,7 @@ begin
 end;
 $$;
 
-grant execute on function teach_replace_team_set(uuid, jsonb, jsonb) to authenticated;
+grant execute on function teach_replace_lesson_set(uuid, board_scope, uuid, jsonb, jsonb) to authenticated;
 
 
 -- =============================================================================

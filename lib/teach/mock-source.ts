@@ -84,6 +84,36 @@ function cloneWidgetsOnto(source: Board, boardId: string): Widget[] {
   }));
 }
 
+/** Re-mint a source board's PAGES onto a new board id with fresh page + widget
+ *  ids (the FULL-PAGE copy `replacePersonalSetForLesson` makes). Returns
+ *  undefined when the source has no explicit pages (a flat board — its widgets
+ *  are copied via `cloneWidgetsOnto` instead). Mirrors the Supabase adapter's
+ *  copyBoardContent / buildLessonSetPayloads page re-minting so the two repos
+ *  copy a multi-page board identically. */
+function clonePagesOnto(
+  source: Board,
+  boardId: string,
+): BoardPage[] | undefined {
+  if (!source.pages || source.pages.length === 0) return undefined;
+  return source.pages
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((p, i) => ({
+      ...p,
+      id: nextId("pg"),
+      order: i,
+      widgets: p.widgets.map((w, j) => ({
+        ...w,
+        id: nextId("w"),
+        boardId,
+        displayOrder: j,
+        position: { ...w.position },
+        canvas: w.canvas ? { ...w.canvas } : undefined,
+        appearance: w.appearance ? { ...w.appearance } : undefined,
+      })),
+    }));
+}
+
 /** The owner's KEPT boards (personal scope, this owner, not ephemeral, not a
  *  published Team-Library copy). This is exactly what the 50-cap counts and what
  *  the "My Boards" library lists. */
@@ -153,7 +183,16 @@ function clampWidth(w: number): number {
 // ── Id bridge (mock slugs ↔ db uuids) ───────────────────────────────────────
 
 /** Resolve a lesson identifier to the canonical id the store keys on. v1 is the
- *  identity map (slugs are already canonical); Phase 4 maps slug → uuid here. */
+ *  identity map (slugs are already canonical); Phase 4 maps slug → uuid here.
+ *
+ *  SANDBOX SENTINEL: the UI's SANDBOX_LESSON_ID ("sandbox") is just an opaque key
+ *  here — it never matches a real board's masterLessonId, so the sandbox set is
+ *  simply whatever the UI creates under that key (no special-casing needed). The
+ *  Supabase adapter, by contrast, MAPS the sentinel to lesson-LESS ephemeral
+ *  personal boards (master_core_lesson_event_id IS NULL, ephemeral=true), because
+ *  a fake-uuid lesson id would resolve to no lesson and the grade-from-lesson
+ *  lookup would throw. That domain divergence is UI-irrelevant — both repos
+ *  return/insert the teacher's sandbox set under the same key. */
 export function resolveLessonId(lessonId: string): string {
   return lessonId;
 }
@@ -402,6 +441,61 @@ export const mockTeachSource: TeachDataSource = {
       pushed.push(copy);
     });
     return pushed.map(cloneBoard);
+  },
+
+  async replacePersonalSetForLesson(masterLessonId, ownerId, sourceBoardIds) {
+    // Sandbox-pin write path (the personal twin of pushBoardsToTeam). Empty
+    // selection → no-op so the existing set is never wiped (parity with the
+    // Supabase guard).
+    if (sourceBoardIds.length === 0) return [];
+    const lesson = resolveLessonId(masterLessonId);
+    const owner = resolveOwnerId(ownerId);
+    // Displacement: drop the owner's existing PERSONAL set for this lesson…
+    for (let i = boards.length - 1; i >= 0; i -= 1) {
+      const b = boards[i];
+      if (
+        b.masterLessonId === lesson &&
+        b.scope === "personal" &&
+        b.ownerId === owner
+      ) {
+        boards.splice(i, 1);
+      }
+    }
+    // …then insert independent FULL-PAGE copies of the sources as the new set
+    // (fresh board/page/widget ids so the sandbox originals are untouched). A
+    // multi-page source is re-minted via clonePagesOnto + commitPages (which
+    // mirrors page-0 onto the flat `widgets`); a flat source uses cloneWidgetsOnto.
+    const now = new Date().toISOString();
+    const replaced: Board[] = [];
+    sourceBoardIds.forEach((sourceId, order) => {
+      const source = boards.find((b) => b.id === sourceId);
+      if (!source) return;
+      const id = nextId("b");
+      const pages = clonePagesOnto(source, id);
+      const copy: Board = {
+        ...cloneBoard(source),
+        id,
+        ownerId: owner,
+        scope: "personal",
+        masterLessonId: lesson,
+        displayOrderWithinLesson: order,
+        // A pinned set board is a kept personal board, never ephemeral / a
+        // library copy; it records its provenance.
+        ephemeral: false,
+        libraryVisibility: "private",
+        publishedBy: null,
+        sourceBoardId: source.id,
+        createdAt: now,
+        updatedAt: now,
+        // For a flat source, copy the widgets directly; for a multi-page source,
+        // commitPages below overrides `widgets` with the re-minted page-0 mirror.
+        widgets: cloneWidgetsOnto(source, id),
+      };
+      if (pages) commitPages(copy, pages);
+      boards.push(copy);
+      replaced.push(copy);
+    });
+    return replaced.map(cloneBoard);
   },
 
   // ── Boards Library ─────────────────────────────────────────────────────────

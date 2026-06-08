@@ -33,6 +33,24 @@ import { mockTeachSource } from "./mock-source";
 export { BoardCapError, MAX_BOARDS_PER_TEACHER } from "./limits";
 
 /**
+ * Sentinel master-lesson id for the EPHEMERAL sandbox set (plan §4a). The Teach
+ * UI uses this opaque string as the repo key for "boards built without a lesson
+ * attached" — `listBoardsForLesson(SANDBOX_LESSON_ID, owner)` /
+ * `createBoard({ masterLessonId: SANDBOX_LESSON_ID, … })` return/insert the
+ * teacher's lesson-LESS ephemeral personal boards. It is NOT a real lesson:
+ *   - the MOCK source treats it as an ordinary (never-seeded) opaque key — its
+ *     filter `b.masterLessonId === "sandbox"` simply never matches a real board,
+ *     so the sandbox set is whatever the UI creates under this key;
+ *   - the SUPABASE source maps it to lesson-less ephemeral personal boards
+ *     (`master_core_lesson_event_id IS NULL`, `ephemeral = true`), because under
+ *     Supabase a fake-uuid lesson id would resolve to no lesson and the
+ *     grade-from-lesson lookup would throw.
+ * Sharing the sentinel here (instead of a private const in each repo + the UI)
+ * keeps the UI, the mock, and the Supabase adapter agreeing on the one key.
+ */
+export const SANDBOX_LESSON_ID = "sandbox";
+
+/**
  * The repository contract for Teach board data. Every method is async
  * (Promise-returning) so the mock and the future Supabase implementation share
  * one signature — the UI awaits both identically.
@@ -94,6 +112,25 @@ export interface TeachDataSource {
   pushBoardsToTeam(
     masterLessonId: string,
     boardIds: string[],
+  ): Promise<Board[]>;
+
+  /**
+   * Atomically REPLACE the owner's PERSONAL set for a lesson with independent
+   * FULL-PAGE copies of `sourceBoardIds` (the sandbox-pin write path: the
+   * teacher arranges boards in the lesson-less sandbox, then "pins" that set as
+   * their personal copy for a real lesson). The personal twin of
+   * `pushBoardsToTeam`: it deletes the owner's existing personal set for the
+   * lesson then inserts fresh-id copies of the sources, in `sourceBoardIds`
+   * order, in one operation (Supabase routes the delete+insert through the
+   * `teach_replace_lesson_set` RPC so a mid-sequence failure rolls back rather
+   * than leaving the teacher's set wiped). An empty `sourceBoardIds` is a no-op
+   * (returns `[]`) — it never wipes the existing set. Returns the new personal
+   * set in order.
+   */
+  replacePersonalSetForLesson(
+    masterLessonId: string,
+    ownerId: string,
+    sourceBoardIds: string[],
   ): Promise<Board[]>;
 
   // ── Boards Library (the reusable-board catalog) ────────────────────────────

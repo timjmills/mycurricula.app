@@ -265,36 +265,21 @@ export function BoardsModule({
   ): Promise<string | null> {
     // Guard: owner must be resolved; if not, bail (auth not yet available).
     if (!ownerId) return null;
-    // Remove any existing PERSONAL set for the target lesson so we don't stack
-    // two personal sets (the repo enforces one personal set per teacher, §13.1).
-    const existing = await teach.listBoardsForLesson(lessonId, ownerId);
-    const existingPersonal = existing.filter(
-      (b) => b.scope === "personal" && b.ownerId === ownerId,
+    // ATOMIC + FULL-PAGE replacement (audit F5). Replace the lesson's personal set
+    // with copies of the sandbox boards in ONE repo call. The old impl deleted the
+    // existing set then re-created each board from `src.widgets` only — which (a)
+    // lost any non-page-0 pages/widgets of a multi-page sandbox board, and (b) was
+    // non-atomic, so a failure mid-loop could leave the teacher with a half-wiped
+    // personal set. `replacePersonalSetForLesson` deletes + inserts FULL-PAGE
+    // copies atomically (teach_replace_lesson_set, validated + transactional), so
+    // it is all-or-nothing and preserves every page. Returns the new set in order;
+    // the first board is the one to select.
+    const replaced = await teach.replacePersonalSetForLesson(
+      lessonId,
+      ownerId,
+      boards.map((b) => b.id),
     );
-    for (const b of existingPersonal) {
-      await teach.deleteBoard(b.id);
-    }
-    // Re-create each sandbox board (and its widgets) on the target lesson.
-    let firstId: string | null = null;
-    for (let i = 0; i < boards.length; i += 1) {
-      const src = boards[i];
-      const created = await teach.createBoard({
-        masterLessonId: lessonId,
-        ownerId,
-        scope: "personal",
-        title: src.title,
-        displayOrderWithinLesson: i,
-        templateId: src.templateId ?? null,
-        gradeLevelId: src.gradeLevelId,
-        // Widgets carry STRUCTURE only (§11.4); copy them onto the new board.
-        widgets: src.widgets.map((w) => ({
-          ...w,
-          position: { ...w.position },
-        })),
-      });
-      if (firstId == null) firstId = created.id;
-    }
-    return firstId;
+    return replaced[0]?.id ?? null;
   }
 
   /** Finalize a pin: copy boards onto the lesson, exit sandbox, select it. */
