@@ -525,21 +525,44 @@ export const mockTeachSource: TeachDataSource = {
     if (sourceBoardIds.length === 0) return [];
     const lesson = resolveLessonId(masterLessonId);
     const owner = resolveOwnerId(ownerId);
-    // BUILD-BEFORE-DELETE: resolve every source and build the full list of
-    // replacement Board copies in memory FIRST. The destructive splice happens
-    // ONLY after every replacement is ready.
-    // MISSING-SOURCE GUARD (mirrors Supabase's `loadBoard` which throws on a
-    // missing/unreadable id): if ANY sourceBoardId is not found, THROW before
-    // deleting anything so a stale id never silently shrinks the set.
+    // De-dupe ids (a repeated id would mint multiple copies) — parity with the
+    // Supabase H1 fix. Then resolve + VALIDATE every source up front: each must be
+    // the caller's OWN sandbox board (personal, owned, lesson-less, ephemeral) —
+    // mirrors the Supabase missing-source throw (M7) + source validation (M2). All
+    // throwing happens BEFORE the destructive splice below, so a bad input never
+    // shrinks/wipes the set.
+    const ids = [...new Set(sourceBoardIds)];
+    const sources = ids.map((sourceId) => {
+      const source = boards.find((b) => b.id === sourceId);
+      if (!source) throw new Error(`Board not found: ${sourceId}`);
+      if (
+        source.scope !== "personal" ||
+        source.ownerId !== owner ||
+        source.masterLessonId != null ||
+        source.ephemeral !== true
+      ) {
+        throw new Error(
+          "replacePersonalSetForLesson: sources must be your own sandbox boards (lesson-less, ephemeral, personal)",
+        );
+      }
+      return source;
+    });
+    // CAP (parity with Supabase H1): pinned boards become KEPT personal boards that
+    // count toward MAX_BOARDS_PER_TEACHER (the sandbox sources are ephemeral =
+    // uncapped). Net kept after = (current kept) − (this lesson's old kept set,
+    // which is replaced) + (new set).
+    const keptTotal = myBoards(owner).length;
+    const oldLessonKept = myBoards(owner).filter(
+      (b) => b.masterLessonId === lesson,
+    ).length;
+    if (keptTotal - oldLessonKept + sources.length > MAX_BOARDS_PER_TEACHER) {
+      throw new BoardCapError();
+    }
+    // BUILD-BEFORE-DELETE: build the full replacement list in memory FIRST; the
+    // destructive splice happens ONLY after every replacement is ready.
     const now = new Date().toISOString();
     const replaced: Board[] = [];
-    for (const sourceId of sourceBoardIds) {
-      if (!boards.find((b) => b.id === sourceId)) {
-        throw new Error(`Board not found: ${sourceId}`);
-      }
-    }
-    sourceBoardIds.forEach((sourceId, order) => {
-      const source = boards.find((b) => b.id === sourceId)!;
+    sources.forEach((source, order) => {
       const id = nextId("b");
       const pages = clonePagesOnto(source, id);
       const copy: Board = {
