@@ -92,6 +92,7 @@ import {
   ResourceUploadError,
   type HostedUploadResult,
 } from "@/lib/resource-upload";
+import { renderPdfThumbnail } from "@/lib/pdf-thumbnail";
 import { ResourceEmbed } from "@/components/resources";
 import { AllToolsMenu } from "./AllToolsMenu";
 import styles from "./ResourceComposer.module.css";
@@ -377,6 +378,7 @@ export function ResourceComposer({
     // leak guard can reclaim anything that was abandoned (not committed) then.
     committedUrlsRef.current = new Set<string>();
     uploadedRef.current = new Map();
+    pdfRenderedRef.current = new Set();
 
     setTitle("");
     setBody("");
@@ -426,6 +428,9 @@ export function ResourceComposer({
   // (which would duplicate the R2 object + row and eat the count quota).
   const uploadedRef = useRef<Map<string, HostedUploadResult>>(new Map());
 
+  // Per-item guard so each captured PDF's first-page poster renders only once.
+  const pdfRenderedRef = useRef<Set<string>>(new Set());
+
   const itemsRef = useRef<CapturedItem[]>(items);
   useEffect(() => {
     itemsRef.current = items;
@@ -472,6 +477,41 @@ export function ResourceComposer({
     const t = setTimeout(() => setRejectionStatus(null), 6000);
     return () => clearTimeout(t);
   }, [rejectionStatus]);
+
+  // ── PDF first-page posters ───────────────────────────────────────────
+  // Render a real first-page thumbnail for every captured PDF (client-side,
+  // from the file's bytes — no server job, no CORS). Patches the item's
+  // thumbnailUrl when it resolves so the captured strip + the eventual tile
+  // show the page; on failure the PDF keeps its icon poster. Guarded per item
+  // so it runs once, and it covers BOTH the picker and the drag-drop
+  // (initialItems) capture paths since both land in `items`.
+  useEffect(() => {
+    for (const it of items) {
+      const isPdf = it.provider === "pdf" || it.type === "pdf";
+      if (
+        !isPdf ||
+        !it.file ||
+        it.thumbnailUrl ||
+        pdfRenderedRef.current.has(it.id)
+      ) {
+        continue;
+      }
+      pdfRenderedRef.current.add(it.id);
+      const file = it.file;
+      const id = it.id;
+      renderPdfThumbnail(file)
+        .then((thumbnailUrl) => {
+          setItems((prev) =>
+            prev.map((c) =>
+              c.id === id && !c.thumbnailUrl ? { ...c, thumbnailUrl } : c,
+            ),
+          );
+        })
+        .catch(() => {
+          // Best-effort — keep the icon poster on any render failure.
+        });
+    }
+  }, [items]);
 
   // ── Derived: available units / lessons for the pickers ───────────────
   // Units come from the SUBJECT_BY_ID → UNITS map; we walk the planner
@@ -995,7 +1035,10 @@ export function ResourceComposer({
           r.mimeType = result.mimeType;
           r.sizeBytes = result.sizeBytes;
           // Image tiles read thumbnailUrl ?? url; the served url IS the image.
-          r.thumbnailUrl = result.provider === "image" ? result.url : undefined;
+          // For non-images keep any client-rendered poster we already have
+          // (e.g. the PDF first-page data URL) instead of clobbering it.
+          r.thumbnailUrl =
+            result.provider === "image" ? result.url : r.thumbnailUrl;
           // The blob is no longer the resource's url — let it be revoked.
           r.__blobUrl = undefined;
         }),
