@@ -45,6 +45,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import { parseResourceUrl } from "@/lib/resource-embed";
 import styles from "./rich-text-editor.module.css";
 
 // ── Public contract ─────────────────────────────────────────────────────────
@@ -95,6 +96,20 @@ export interface RichTextEditorProps {
    * unchanged. (The Weekly view relies on that floating behavior.)
    */
   dockTarget?: React.RefObject<HTMLElement | null>;
+  /**
+   * Resolve the source for an inline image, DECOUPLED from storage. When the
+   * teacher presses the "Insert image" toolbar button, the editor calls this
+   * (if provided) and inserts an <img> pointing at the returned URL — typically
+   * a hosted resource path such as `/api/resources/{id}` or a `data:`/`blob:`
+   * preview URL the parent produced after an upload. Returning `null`
+   * (or a rejected promise) cancels the insertion silently.
+   *
+   * The parent owns upload / URL resolution entirely; the editor never touches
+   * storage. When this prop is OMITTED the button falls back to prompting the
+   * teacher for an image URL (the original behavior). Either way the inserted
+   * markup is sanitized on emit — an unsafe src is dropped by sanitizeHtml().
+   */
+  onRequestImageUrl?: () => Promise<string | null>;
 }
 
 // ── Toolbar data ─────────────────────────────────────────────────────────────
@@ -433,6 +448,59 @@ function isEditorEmpty(el: HTMLElement): boolean {
   return inner === "" || /^(<br\s*\/?>|<div><br\s*\/?><\/div>)$/i.test(inner);
 }
 
+// ── Inline-media insertion helpers ────────────────────────────────────────────
+//
+// We build a small HTML fragment and inject it with execCommand('insertHTML').
+// The injected markup is NOT trusted-by-construction — it is teacher-supplied —
+// so it always flows back out through sanitizeHtml() on the next emit, which is
+// the authoritative gate (strips an unsafe <img src>, removes a non-trusted-host
+// <iframe>, and force-hardens a trusted one). The escaping + structure below is
+// belt-and-braces so the LIVE DOM we hand the browser is already well-formed and
+// can't break out of the attribute it's placed in.
+
+/** Escape a string for safe interpolation into a double-quoted HTML attribute.
+ *  Defence-in-depth only — sanitizeHtml() re-validates everything on emit. */
+function escapeAttr(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/** Build the HTML for an inline image. `alt` defaults to empty (decorative);
+ *  callers may pass a label. The src is escaped here and re-validated by the
+ *  sanitizer on emit, so an unsafe scheme never survives to storage/render. */
+function buildImageHtml(src: string, alt = ""): string {
+  return `<img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}" loading="lazy" />`;
+}
+
+/**
+ * Build the HTML for an inline embed (YouTube / Vimeo / Google) given an
+ * already-parsed, embeddable URL. We emit the iframe with the SAME safe sandbox
+ * / allow / referrerpolicy the app's React <iframe> renderers ship
+ * (components/resources/ResourceEmbed.tsx) — and the sanitizer re-forces these
+ * exact values on emit, so an embed that round-trips through storage is
+ * hardened identically. The wrapper is a non-editable block (contentEditable
+ * lives in the live DOM only; the attribute is dropped by the sanitizer and is
+ * not needed at render sites) so the caret treats the embed as one atomic unit
+ * and a click lands in the player rather than splitting the frame. A trailing
+ * <p><br></p> gives the teacher a place to keep typing after the embed.
+ */
+function buildEmbedHtml(embedUrl: string, title: string): string {
+  const safeUrl = escapeAttr(embedUrl);
+  const safeTitle = escapeAttr(title);
+  return (
+    `<div class="${styles.embedBlock}" contenteditable="false">` +
+    `<iframe src="${safeUrl}" title="${safeTitle}" loading="lazy" ` +
+    `allow="autoplay; encrypted-media; picture-in-picture; fullscreen" ` +
+    `referrerpolicy="no-referrer" ` +
+    `sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation" ` +
+    `allowfullscreen></iframe>` +
+    `</div><p><br></p>`
+  );
+}
+
 // ── Toolbar sub-components ────────────────────────────────────────────────────
 
 interface ToolbarButtonProps {
@@ -543,6 +611,7 @@ export function RichTextEditor({
   ariaLabel,
   autoFocus = false,
   dockTarget,
+  onRequestImageUrl,
 }: RichTextEditorProps): ReactNode {
   // Docked mode is active whenever a dockTarget ref is supplied. When false,
   // every code path below behaves exactly as it did before this prop existed.
@@ -552,6 +621,17 @@ export function RichTextEditor({
 
   // Last value we wrote into the DOM — used to avoid caret-resetting writes.
   const lastWrittenRef = useRef<string>("");
+
+  // Last value we EMITTED upward (already sanitized). The parent echoes this
+  // straight back as `value`, so the sync effect uses it to recognise our own
+  // change and skip the DOM rewrite that would reset the caret. This matters
+  // for inline media: sanitizeHtml() is NOT idempotent on an <img>/<iframe>
+  // (it drops `loading`, the embed's `contenteditable`, reorders iframe attrs),
+  // so the raw live DOM never equals the sanitized echo — without this guard
+  // the effect would clobber the caret AND strip the embed's contenteditable
+  // wrapper on the very next render. Compared against lastWrittenRef (raw DOM)
+  // this tracks the clean string instead.
+  const lastEmittedRef = useRef<string>("");
 
   // Toolbar visibility & position (viewport-relative, for position:fixed).
   const [toolbarVisible, setToolbarVisible] = useState(false);
@@ -587,8 +667,19 @@ export function RichTextEditor({
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
-    // Write on first mount regardless; afterwards only if externally changed.
-    if (el.innerHTML !== value && value !== lastWrittenRef.current) {
+    // Write on first mount regardless; afterwards only when the value changed
+    // EXTERNALLY (not by our own emit). Two guards:
+    //   • value !== lastWrittenRef.current — the value differs from the raw DOM
+    //     we last wrote (covers plain text, where sanitize is idempotent).
+    //   • value !== lastEmittedRef.current — the value is not the sanitized
+    //     echo of our own last emit. Required because sanitizeHtml is NOT
+    //     idempotent on inline media, so the echo never equals the raw DOM and
+    //     the first guard alone would wrongly trigger a caret-resetting rewrite.
+    if (
+      el.innerHTML !== value &&
+      value !== lastWrittenRef.current &&
+      value !== lastEmittedRef.current
+    ) {
       el.innerHTML = value;
       lastWrittenRef.current = value;
     }
@@ -751,7 +842,11 @@ export function RichTextEditor({
   // sanitized string. Render sites re-sanitize as defence in depth.
   const emitChange = useCallback(
     (rawHtml: string) => {
-      onChange(sanitizeHtml(rawHtml));
+      const clean = sanitizeHtml(rawHtml);
+      // Remember the clean value so the value→DOM sync effect recognises the
+      // parent's echo of our own change and skips the caret-resetting rewrite.
+      lastEmittedRef.current = clean;
+      onChange(clean);
     },
     [onChange],
   );
@@ -972,27 +1067,125 @@ export function RichTextEditor({
     [emitChange],
   );
 
+  // ── Insert raw HTML at a (possibly stale) caret position ────────────────
+  // Restores a previously-saved Range, focuses the editor, runs
+  // execCommand('insertHTML'), then emits the sanitized result. Used by the
+  // image + embed inserts. Saving/restoring the Range matters because both
+  // paths surrender focus first — `onRequestImageUrl` awaits async parent work,
+  // and the embed prompt steals focus — which collapses the live selection.
+  const insertHtmlAtSavedRange = useCallback(
+    (html: string, savedRange: Range | null) => {
+      const el = editorRef.current;
+      if (!el) return;
+      const sel = window.getSelection();
+      if (savedRange && sel) {
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
+      }
+      el.focus();
+      // If the restored caret somehow landed outside the editor (e.g. the saved
+      // range's node was removed), drop it at the end so we never inject the
+      // fragment into another element.
+      const cur = window.getSelection();
+      if (!cur || cur.rangeCount === 0 || !el.contains(cur.anchorNode)) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        cur?.removeAllRanges();
+        cur?.addRange(range);
+      }
+      exec("insertHTML", html);
+      const next = el.innerHTML;
+      lastWrittenRef.current = next;
+      emitChange(next);
+      setEmpty(isEditorEmpty(el));
+    },
+    [emitChange],
+  );
+
+  // ── Insert image ────────────────────────────────────────────────────────
+  // Storage-decoupled: when the parent supplies onRequestImageUrl we ask IT for
+  // the src (upload / resolution happens entirely in the parent) and insert an
+  // <img> at the caret. Without the prop we fall back to prompting for a URL —
+  // the original behavior. The src is sanitized on emit, so an unsafe value is
+  // dropped regardless of which path produced it.
   const applyImage = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      // Snapshot the caret BEFORE any focus loss (prompt or async resolver).
+      const sel = window.getSelection();
+      const savedRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+
+      if (onRequestImageUrl) {
+        // Parent-driven path. Await the resolver, then insert. Errors and a
+        // null result both cancel silently — the parent owns user feedback.
+        void onRequestImageUrl()
+          .then((url) => {
+            if (!url || !url.trim()) return;
+            insertHtmlAtSavedRange(buildImageHtml(url.trim()), savedRange);
+          })
+          .catch(() => {
+            /* parent surfaces upload failures; nothing to insert */
+          });
+        return;
+      }
+
+      // Fallback: prompt for a URL (original behavior).
+      const url = window.prompt("Enter image URL:", "https://");
+      if (!url || !url.trim()) return;
+      insertHtmlAtSavedRange(buildImageHtml(url.trim()), savedRange);
+    },
+    [onRequestImageUrl, insertHtmlAtSavedRange],
+  );
+
+  // ── Insert embed (YouTube / Vimeo / Google) ─────────────────────────────
+  // Prompt for a URL, run it through parseResourceUrl, and insert a sanitized
+  // iframe when the URL maps to an embeddable trusted host. A non-embeddable
+  // URL (arbitrary website, unsupported host) falls back to inserting a plain
+  // hyperlink so the teacher's intent isn't lost — the sanitizer would strip a
+  // foreign-origin iframe anyway, so we never even build one.
+  const applyEmbed = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       const sel = window.getSelection();
       const savedRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
 
-      const url = window.prompt("Enter image URL:", "https://");
-      if (!url || !url.trim()) return;
+      const raw = window.prompt(
+        "Paste a video or embed link (YouTube, Vimeo, Google Docs/Slides/Drive):",
+        "https://",
+      );
+      if (!raw || !raw.trim()) return;
 
+      const parsed = parseResourceUrl(raw.trim());
+      if (parsed.kind === "embed" && parsed.embedUrl) {
+        // Embeddable trusted host → sandboxed iframe.
+        insertHtmlAtSavedRange(
+          buildEmbedHtml(parsed.embedUrl, parsed.displayName),
+          savedRange,
+        );
+        return;
+      }
+      if (parsed.kind === "image" && parsed.embedUrl) {
+        // A direct image URL pasted into the embed field → inline image.
+        insertHtmlAtSavedRange(
+          buildImageHtml(parsed.embedUrl, parsed.displayName),
+          savedRange,
+        );
+        return;
+      }
+      // Not embeddable — insert a safe hyperlink instead of silently failing.
+      // createLink only runs over a selection/caret; restore the range first.
       if (savedRange && sel) {
         sel.removeAllRanges();
         sel.addRange(savedRange);
       }
-
       editorRef.current?.focus();
-      exec("insertImage", url.trim());
+      exec("createLink", raw.trim());
       const html = editorRef.current?.innerHTML ?? "";
       lastWrittenRef.current = html;
       emitChange(html);
     },
-    [emitChange],
+    [insertHtmlAtSavedRange, emitChange],
   );
 
   // ── Checklist (best-effort) ─────────────────────────────────────────
@@ -1337,11 +1530,19 @@ export function RichTextEditor({
             </ToolbarButton>
 
             <ToolbarButton
-              label="Insert image"
+              label="Insert image — add a picture inline in your notes"
               active={false}
               onMouseDown={applyImage}
             >
               <span className={styles.iconInsert}>🖼</span>
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Insert embed — paste a YouTube, Vimeo or Google link to drop the player into your notes"
+              active={false}
+              onMouseDown={applyEmbed}
+            >
+              <span className={styles.iconEmbed}>▶</span>
             </ToolbarButton>
 
             <span className={styles.divider} aria-hidden />

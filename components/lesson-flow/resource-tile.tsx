@@ -27,11 +27,35 @@
 // is read off the inherited .cp-subj cascade so a tile never invents a color.
 
 import type { ReactNode } from "react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { SectionResource } from "@/lib/lesson-flow";
 import { Button } from "@/components/ui";
 import { ResourceEmbed } from "@/components/resources";
+import {
+  isNotecard,
+  isStack,
+  galleryCount,
+  notecardPoster,
+} from "@/lib/notecards";
+import { renderPdfThumbnail } from "@/lib/pdf-thumbnail";
 import styles from "./resource-tile.module.css";
+
+// ── Hosted-PDF render-on-view cache ──────────────────────────────────────────
+// PDFs uploaded BEFORE the capture-time thumbnail existed carry a url but no
+// thumbnailUrl. The poster renders their first page on demand (PDF.js, via the
+// same-origin ?raw=1 byte proxy) the first time a tile is shown. Results are
+// memoized module-wide, keyed by the resource's stable id (or its url as a
+// fallback), so a given PDF renders ONCE per session no matter how many tiles
+// reference it. The value is the page's `data:` URL, or `null` once a render
+// has failed — `null` is a sentinel that pins the icon fallback and stops us
+// retrying a PDF that can't be rendered (corrupt / encrypted / fetch error).
+const pdfPosterCache = new Map<string, string | null>();
+
+/** Stable cache key for a hosted-PDF poster: prefer the persisted row id, fall
+ *  back to the url (always present on the render-on-view path). */
+function pdfPosterKey(resource: SectionResource): string {
+  return resource.resourceId ?? resource.url ?? "";
+}
 
 // ── Props ────────────────────────────────────────────────────────────────
 
@@ -177,10 +201,19 @@ export function ResourceTile({
 }
 
 // ── PosterFace ─────────────────────────────────────────────────────────────
-// The static poster shown inside an `onActivate` (panel) tile: a real
-// thumbnail when we have one (OG image, YouTube poster, or an uploaded
-// image's own url), otherwise the synthetic per-kind artwork + glyph. A
-// video poster gets the play-button overlay so it still reads as "video".
+// The static poster shown inside an `onActivate` (panel) tile. In priority
+// order it shows:
+//   1. a NOTECARD poster — the first gallery item's thumbnail/url, with a
+//      "stack of N" badge for a multi-item gallery, or a note-styled synthetic
+//      poster for a notes-only card;
+//   2. a HOSTED-PDF first page rendered on view — for an already-uploaded PDF
+//      that has a url but no stored thumbnail (new uploads carry one already);
+//   3. a real thumbnail when we have one (OG image, YouTube poster, or an
+//      uploaded image's own url);
+//   4. the synthetic per-kind artwork + glyph.
+// A video poster gets the play-button overlay so it still reads as "video".
+// Every branch is defensive: a render-on-view fetch never throws, and any
+// failure falls back to the synthetic poster (4).
 
 function PosterFace({
   resource,
@@ -189,31 +222,174 @@ function PosterFace({
   resource: SectionResource;
   kind: FrameKind;
 }): ReactNode {
+  // 1) Notecard / gallery card → poster image + optional stack badge.
+  if (isNotecard(resource) || resource.gallery) {
+    return <NotecardPoster resource={resource} />;
+  }
+
+  // 2) Already-uploaded hosted PDF with no stored thumbnail → render page 1 on
+  //    view (PDF.js over the same-origin ?raw=1 stream).
+  const isHostedPdf =
+    (resource.provider === "pdf" || resource.type === "pdf") &&
+    !resource.thumbnailUrl &&
+    typeof resource.url === "string" &&
+    resource.url.startsWith("/api/resources/");
+  if (isHostedPdf) {
+    return <HostedPdfPoster resource={resource} kind={kind} />;
+  }
+
+  // 3) A real thumbnail (or an image's own url).
   const posterSrc =
     resource.thumbnailUrl ??
     (resource.provider === "image" ? resource.url : undefined);
+  if (posterSrc) {
+    return <PosterImage src={posterSrc} kind={kind} />;
+  }
+
+  // 4) Synthetic per-kind artwork + glyph.
+  return <SyntheticPoster type={resource.type} kind={kind} />;
+}
+
+// ── Poster building blocks ───────────────────────────────────────────────────
+
+/** A real poster `<img>` covering the frame, with the video play overlay when
+ *  the tile reads as a video. `src` may be a data: URL or an /api/resources/{id}
+ *  endpoint — both are CSP-allowed by img-src. */
+function PosterImage({
+  src,
+  kind,
+}: {
+  src: string;
+  kind: FrameKind;
+}): ReactNode {
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" loading="lazy" className={styles.poster} />
+      {kind === "video" && (
+        <span className={styles.posterPlay} aria-hidden="true">
+          <BigResourceIcon type="youtube" />
+        </span>
+      )}
+    </>
+  );
+}
+
+/** The synthetic per-kind artwork + centered glyph — the always-available
+ *  fallback poster. */
+function SyntheticPoster({
+  type,
+  kind,
+}: {
+  type: SectionResource["type"];
+  kind: FrameKind;
+}): ReactNode {
+  return (
+    <>
+      <FrameArtwork kind={kind} />
+      <span className={styles.bigIcon} aria-hidden="true">
+        <BigResourceIcon type={type} />
+      </span>
+    </>
+  );
+}
+
+/** Render-on-view poster for an already-uploaded hosted PDF. Fetches the PDF's
+ *  bytes from the same-origin `?raw=1` proxy and rasterizes page 1 to a data:
+ *  URL via PDF.js. The result is memoized in `pdfPosterCache` so it renders
+ *  once per session; on ANY failure it pins the icon fallback (cache `null`)
+ *  and never retries. Defensive throughout — the effect can never throw out. */
+function HostedPdfPoster({
+  resource,
+  kind,
+}: {
+  resource: SectionResource;
+  kind: FrameKind;
+}): ReactNode {
+  const key = pdfPosterKey(resource);
+  // Seed from the cache so a previously-rendered PDF paints immediately and
+  // doesn't flash the icon. `undefined` = not yet attempted; a string = the
+  // rendered data: URL; `null` = render failed (keep the icon).
+  const [posterSrc, setPosterSrc] = useState<string | undefined>(() => {
+    const cached = pdfPosterCache.get(key);
+    return cached ?? undefined;
+  });
+
+  useEffect(() => {
+    // Nothing to fetch without a url, and never re-attempt a key we've already
+    // resolved (a data: URL) or marked failed (null) in the module cache.
+    const url = resource.url;
+    if (!url || pdfPosterCache.has(key)) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${url}?raw=1`);
+        if (!res.ok) throw new Error(`raw fetch failed: ${res.status}`);
+        const blob = await res.blob();
+        const dataUrl = await renderPdfThumbnail(blob);
+        pdfPosterCache.set(key, dataUrl);
+        if (!cancelled) setPosterSrc(dataUrl);
+      } catch {
+        // Best-effort: pin the icon fallback so we don't retry, and leave the
+        // synthetic poster showing.
+        pdfPosterCache.set(key, null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [key, resource.url]);
+
+  // Once rendered, show the page image; until then (or on failure) the
+  // synthetic document poster stands in.
+  if (posterSrc) {
+    return <PosterImage src={posterSrc} kind={kind} />;
+  }
+  return <SyntheticPoster type={resource.type} kind={kind} />;
+}
+
+// ── Notecard poster ──────────────────────────────────────────────────────────
+// A notecard / gallery card's poster: the first gallery item's image, with a
+// "stack of N" badge when the gallery holds more than one item. A notes-only
+// notecard (no gallery media) gets a distinct note-styled synthetic poster so
+// it still reads as "a card with written notes".
+
+function NotecardPoster({
+  resource,
+}: {
+  resource: SectionResource;
+}): ReactNode {
+  const poster = notecardPoster(resource);
+  const posterSrc = poster?.thumbnailUrl ?? poster?.url;
+  const count = galleryCount(resource);
 
   if (posterSrc) {
     return (
       <>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={posterSrc} alt="" loading="lazy" className={styles.poster} />
-        {kind === "video" && (
-          <span className={styles.posterPlay} aria-hidden="true">
-            <BigResourceIcon type="youtube" />
+        {/* Stack indicator — a small "N" badge marking a flip-through gallery. */}
+        {isStack(resource) && (
+          <span
+            className={styles.stackBadge}
+            aria-label={`Stack of ${count} items`}
+          >
+            <StackIcon />
+            <span className={styles.stackCount}>{count}</span>
           </span>
         )}
       </>
     );
   }
 
+  // Notes-only notecard → a note-styled synthetic poster (ruled "lines" on a
+  // soft card), not the generic document glyph.
   return (
-    <>
-      <FrameArtwork kind={kind} />
-      <span className={styles.bigIcon} aria-hidden="true">
-        <BigResourceIcon type={resource.type} />
-      </span>
-    </>
+    <span className={styles.notePoster} aria-hidden="true">
+      <NoteGlyph />
+    </span>
   );
 }
 
@@ -579,6 +755,50 @@ function RemoveIcon(): ReactNode {
     >
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+// ── Notecard glyphs ──────────────────────────────────────────────────────────
+
+/** Stacked-cards glyph for the "stack of N" badge — two offset rectangles. */
+function StackIcon(): ReactNode {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="8" y="3" width="13" height="13" rx="2" />
+      <path d="M16 16v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3" />
+    </svg>
+  );
+}
+
+/** Note glyph for a notes-only notecard poster — a page with text lines. */
+function NoteGlyph(): ReactNode {
+  return (
+    <svg
+      width="34"
+      height="34"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 4a2 2 0 0 1 2-2h8l6 6v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="8" y1="13" x2="16" y2="13" />
+      <line x1="8" y1="17" x2="13" y2="17" />
     </svg>
   );
 }
