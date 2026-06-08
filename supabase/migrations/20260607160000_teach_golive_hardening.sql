@@ -219,6 +219,27 @@ create trigger trg_boards_lesson_grade
 -- exist"), regardless of how/when this file first reached a given database. On a
 -- fresh apply this is a harmless no-op (the legacy function is only ever created by
 -- an earlier in-place version of THIS file).
+-- teach_valid_pages — shape guard for a board's `pages` jsonb (audit M5): a
+-- grade-authorized caller could otherwise persist malformed pages (e.g. `widgets`
+-- not an array) that crash readers (rowToBoard's pages.map(... p.widgets.map ...))
+-- — a DoS on a SHARED team board. Accept null (flat board) or an array whose every
+-- element is an object with `widgets` null/absent or an array. Used by both RPCs.
+create or replace function teach_valid_pages(p jsonb)
+returns boolean
+language sql
+immutable
+as $$
+  select p is null or (
+    jsonb_typeof(p) = 'array'
+    and not exists (
+      select 1
+        from jsonb_array_elements(p) pg
+       where jsonb_typeof(pg) <> 'object'
+          or (pg ? 'widgets' and jsonb_typeof(pg -> 'widgets') not in ('array', 'null'))
+    )
+  );
+$$;
+
 drop function if exists teach_replace_team_set(uuid, jsonb, jsonb);
 
 create or replace function teach_replace_lesson_set(
@@ -236,6 +257,20 @@ as $$
 declare
   v_board_ids uuid[];
 begin
+  -- Serialize concurrent replacements of the SAME (lesson, scope, owner) set
+  -- (audit M4). Without it two concurrent replaces can MERGE into a union: under
+  -- READ COMMITTED a DELETE that blocked on the other txn's row locks re-checks
+  -- only the rows it ORIGINALLY scanned, so it won't remove the rows the other txn
+  -- inserted after this one's snapshot — leaving both sets. A transaction-scoped
+  -- advisory lock makes the 2nd caller wait for the 1st to fully commit (it then
+  -- deletes the 1st's inserts → clean last-writer-wins). Auto-released at tx end.
+  perform pg_advisory_xact_lock(
+    hashtextextended(
+      'teach_replace_lesson_set:' || p_lesson::text || ':' || p_scope::text
+        || ':' || coalesce(p_owner::text, ''),
+      0
+    )
+  );
   -- ── Validate the payload BEFORE any delete (audit F2) ─────────────────────
   if p_boards is null
      or jsonb_typeof(p_boards) <> 'array'
@@ -259,6 +294,16 @@ begin
     raise exception
       'teach_replace_lesson_set: every board must match (lesson=%, scope=%, owner=%)',
       p_lesson, p_scope, p_owner;
+  end if;
+  -- Every board's `pages` jsonb must be a well-formed BoardPage[] (audit M5), so a
+  -- malformed shared-board payload can't crash other teachers' reads.
+  if exists (
+    select 1
+      from jsonb_populate_recordset(null::boards, p_boards) b
+     where not teach_valid_pages(b.pages)
+  ) then
+    raise exception
+      'teach_replace_lesson_set: a board has a malformed pages payload (expected a BoardPage[])';
   end if;
   -- p_widgets MUST be an array (possibly empty). A SQL null would SKIP the
   -- membership check below AND insert zero mirror rows after the delete, leaving a
@@ -360,8 +405,19 @@ security invoker
 set search_path = public
 as $$
 begin
+  -- Serialize concurrent page-commits to the SAME board (audit M4, same union
+  -- hazard as teach_replace_lesson_set): a transaction-scoped advisory lock so two
+  -- concurrent commits to one board can't merge their widget mirrors.
+  perform pg_advisory_xact_lock(
+    hashtextextended('teach_commit_board_pages:' || p_board::text, 0)
+  );
   if p_widgets is null or jsonb_typeof(p_widgets) <> 'array' then
     raise exception 'teach_commit_board_pages: p_widgets must be an array';
+  end if;
+  -- The pages payload must be a well-formed BoardPage[] (audit M5) so a malformed
+  -- shared-board commit can't crash other teachers' reads.
+  if not teach_valid_pages(p_pages) then
+    raise exception 'teach_commit_board_pages: p_pages must be a BoardPage[] (or null)';
   end if;
   if exists (
     select 1

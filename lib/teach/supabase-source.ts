@@ -1464,8 +1464,61 @@ export const supabaseTeachSource: TeachDataSource = {
     const client = await sb();
     const owner = resolveOwnerId(ownerId);
     const lesson = resolveLessonId(masterLessonId);
+    // De-dupe source ids — buildLessonSetPayloads mints a NEW board id per entry,
+    // so a repeated id would create multiple copies of the same sandbox board
+    // (audit H1). One copy per distinct source.
+    const ids = [...new Set(sourceBoardIds)];
     const sources: Board[] = [];
-    for (const id of sourceBoardIds) sources.push(await loadBoard(client, id));
+    for (const id of ids) sources.push(await loadBoard(client, id));
+
+    // SOURCE VALIDATION (audit M2): only the caller's OWN sandbox boards may be
+    // pinned — lesson-less, ephemeral, personal, owned by the caller (exactly what
+    // createBoard's sandbox branch produces). RLS already bounds loadBoard to the
+    // caller's readable boards, but without this an explicit server-action call
+    // could replace the lesson's personal set with copies of team / library /
+    // other-lesson boards.
+    for (const source of sources) {
+      if (
+        source.scope !== "personal" ||
+        source.ownerId !== owner ||
+        source.masterLessonId !== null ||
+        source.ephemeral !== true
+      ) {
+        throw new Error(
+          "replacePersonalSetForLesson: sources must be your own sandbox boards (lesson-less, ephemeral, personal)",
+        );
+      }
+    }
+
+    // CAP (audit H1): the pinned boards become KEPT (non-ephemeral) personal boards
+    // that count toward MAX_BOARDS_PER_TEACHER (the sandbox sources are ephemeral =
+    // uncapped, so this is the moment the cap must be enforced). The op REPLACES the
+    // lesson's existing personal set, so the net kept count AFTER =
+    // (current kept) − (this lesson's old kept set, which is deleted) + (new set).
+    const keptCol = () =>
+      client
+        .from("boards")
+        .select("id", { count: "exact", head: true })
+        .eq("scope", "personal")
+        .eq("owner_id", owner)
+        .eq("ephemeral", false)
+        .neq("library_visibility", "team");
+    const [keptTotalRes, oldLessonRes] = await Promise.all([
+      keptCol(),
+      keptCol().eq("master_core_lesson_event_id", lesson),
+    ]);
+    if (keptTotalRes.error || oldLessonRes.error) {
+      throw new Error(
+        `Teach repository replace-personal-set (cap count) failed: ${
+          (keptTotalRes.error ?? oldLessonRes.error)?.message
+        }`,
+      );
+    }
+    const keptAfter =
+      (keptTotalRes.count ?? 0) - (oldLessonRes.count ?? 0) + sources.length;
+    if (keptAfter > MAX_BOARDS_PER_TEACHER) {
+      throw new BoardCapError();
+    }
 
     // Resolve collision-free titles against `uniq_boards_personal_lesson_title`.
     // The RPC's delete clears this owner's prior personal set for the lesson in
@@ -2087,7 +2140,22 @@ async function persistWidgetPatch(
   };
   const onPage0 = page.order === 0;
   if (onPage0) {
-    // Fast path: update the widget-table row directly.
+    if (board.pages && board.pages.length > 0) {
+      // ATOMIC (audit M3): a page-0 widget on an EXPLICIT-PAGE board lives in BOTH
+      // the flat mirror AND the pages jsonb. Writing them as two separate calls
+      // risked a desync on partial failure (the mirror moved while the jsonb stayed
+      // stale, so the move/resize was "lost" on read). Route through commitPages,
+      // which writes the pages jsonb + replaces the page-0 mirror in ONE
+      // transaction (teach_commit_board_pages), so the two always move together.
+      const pages = board.pages.map((p) => ({
+        ...p,
+        widgets: p.widgets.map((w) => (w.id === widget.id ? updated : w)),
+      }));
+      await commitPages(client, board.id, pages);
+      return { ...updated, gradeLevelId: board.gradeLevelId };
+    }
+    // FLAT (single-page) board: the direct widget-table update IS the whole write
+    // (no pages jsonb to keep in sync); bump the board's updated_at alongside.
     const row = widgetPatchToRow(patch);
     const res = await client
       .from("widgets")
@@ -2096,34 +2164,14 @@ async function persistWidgetPatch(
       .select(WIDGET_COLS)
       .single();
     const widgetRow = unwrap(res, "persist widget patch (table)") as WidgetRow;
-    // Keep the `pages` jsonb in sync when the board carries explicit pages, so a
-    // later page read sees the same canvas/appearance (the table is page-0's
-    // mirror, but the jsonb is authoritative for the page model).
-    if (board.pages && board.pages.length > 0) {
-      const pages = board.pages.map((p) => ({
-        ...p,
-        widgets: p.widgets.map((w) => (w.id === widget.id ? updated : w)),
-      }));
-      const upd = await client
-        .from("boards")
-        .update({ pages, updated_at: new Date().toISOString() })
-        .eq("id", board.id);
-      if (upd.error) {
-        throw new Error(
-          `Teach repository persist widget patch (page sync) failed: ${upd.error.message}`,
-        );
-      }
-    } else {
-      // Single-page board: just bump the board's updated_at.
-      const upd = await client
-        .from("boards")
-        .update({ updated_at: new Date().toISOString() })
-        .eq("id", board.id);
-      if (upd.error) {
-        throw new Error(
-          `Teach repository persist widget patch (touch board) failed: ${upd.error.message}`,
-        );
-      }
+    const upd = await client
+      .from("boards")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", board.id);
+    if (upd.error) {
+      throw new Error(
+        `Teach repository persist widget patch (touch board) failed: ${upd.error.message}`,
+      );
     }
     return { ...rowToWidget(widgetRow), gradeLevelId: board.gradeLevelId };
   }

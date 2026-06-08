@@ -33,6 +33,7 @@ import { boardMatchesContext, type BoardContext } from "./board-tags";
 import { ensureCanvas } from "./board-migrate";
 import { BoardCapError, MAX_BOARDS_PER_TEACHER } from "./limits";
 import type { TeachDataSource } from "./queries";
+import { SANDBOX_LESSON_ID } from "./queries";
 
 // ── Mutable in-memory store ─────────────────────────────────────────────────
 // Cloned from the fixtures so editing the live store never mutates the exported
@@ -185,14 +186,12 @@ function clampWidth(w: number): number {
 /** Resolve a lesson identifier to the canonical id the store keys on. v1 is the
  *  identity map (slugs are already canonical); Phase 4 maps slug → uuid here.
  *
- *  SANDBOX SENTINEL: the UI's SANDBOX_LESSON_ID ("sandbox") is just an opaque key
- *  here — it never matches a real board's masterLessonId, so the sandbox set is
- *  simply whatever the UI creates under that key (no special-casing needed). The
- *  Supabase adapter, by contrast, MAPS the sentinel to lesson-LESS ephemeral
- *  personal boards (master_core_lesson_event_id IS NULL, ephemeral=true), because
- *  a fake-uuid lesson id would resolve to no lesson and the grade-from-lesson
- *  lookup would throw. That domain divergence is UI-irrelevant — both repos
- *  return/insert the teacher's sandbox set under the same key. */
+ *  SANDBOX SENTINEL: `listBoardsForLesson`, `createBoard`, and `createBlankBoard`
+ *  each special-case SANDBOX_LESSON_ID BEFORE calling this helper — the sentinel
+ *  is handled as a lesson-LESS ephemeral personal board (masterLessonId == null,
+ *  ephemeral = true, no cap check, no default-team-set seed) to mirror the
+ *  Supabase implementation's audit-F4 behaviour. This helper is only reached for
+ *  REAL lesson ids, so the identity map is correct here. */
 export function resolveLessonId(lessonId: string): string {
   return lessonId;
 }
@@ -242,13 +241,39 @@ function setForLesson(masterLessonId: string, ownerId: string): Board[] {
 
 export const mockTeachSource: TeachDataSource = {
   async listBoardsForLesson(masterLessonId, ownerId) {
+    // SANDBOX SENTINEL (mirrors Supabase audit F4). The "sandbox" key is NOT a
+    // real lesson — return the owner's lesson-LESS ephemeral personal boards
+    // only (scope personal, this owner, masterLessonId == null, ephemeral ===
+    // true), ordered by displayOrderWithinLesson. Never seed the default team
+    // set for the sentinel — the sandbox is a private scratch surface.
+    if (masterLessonId === SANDBOX_LESSON_ID) {
+      const owner = resolveOwnerId(ownerId);
+      return boards
+        .filter(
+          (b) =>
+            b.scope === "personal" &&
+            b.ownerId === owner &&
+            b.masterLessonId == null &&
+            b.ephemeral === true,
+        )
+        .slice()
+        .sort((a, b) => a.displayOrderWithinLesson - b.displayOrderWithinLesson)
+        .map(cloneBoard);
+    }
     return setForLesson(masterLessonId, ownerId).map(cloneBoard);
   },
 
   async createBoard(input) {
+    // SANDBOX SENTINEL (mirrors Supabase audit F4). `createBoard({ masterLessonId:
+    // SANDBOX_LESSON_ID, … })` creates a lesson-LESS ephemeral scratch board: treat
+    // the sentinel like masterLessonId == null (so the board is stored lesson-less),
+    // force ephemeral = true, and SKIP assertUnderCap (sandbox boards are uncapped
+    // and disposable — same as createBlankBoard's ephemeral path).
+    const isSandbox = input.masterLessonId === SANDBOX_LESSON_ID;
     // A new PERSONAL board counts toward the owner's cap (the user's "50 total,
-    // must delete"); team-set boards (per-lesson fallback) are uncapped.
-    if (input.scope === "personal" && input.ownerId != null) {
+    // must delete"); team-set boards (per-lesson fallback) are uncapped, and an
+    // ephemeral SANDBOX board is uncapped too.
+    if (input.scope === "personal" && input.ownerId != null && !isSandbox) {
       assertUnderCap(resolveOwnerId(input.ownerId));
     }
     const id = nextId("b");
@@ -258,7 +283,7 @@ export const mockTeachSource: TeachDataSource = {
     // caller-supplied length can't collide on `displayOrderWithinLesson` or the
     // default "Board N" title. The Supabase impl computes the same from rows.
     const lesson =
-      input.masterLessonId == null
+      input.masterLessonId == null || isSandbox
         ? null
         : resolveLessonId(input.masterLessonId);
     const owner = input.ownerId == null ? null : resolveOwnerId(input.ownerId);
@@ -280,12 +305,17 @@ export const mockTeachSource: TeachDataSource = {
       : input.title;
     const board: Board = {
       id,
-      masterLessonId: input.masterLessonId,
+      // Sandbox boards are stored lesson-LESS (masterLessonId = null); a real
+      // lesson id is stored verbatim for lesson-attached boards.
+      masterLessonId: isSandbox ? null : (input.masterLessonId ?? null),
       ownerId: input.ownerId ?? null,
       scope: input.scope,
       title,
       displayOrderWithinLesson: nextOrder,
       templateId: input.templateId ?? null,
+      // Sandbox boards are forced ephemeral so they never count toward the cap
+      // (mirrors Supabase's `...(isSandbox ? { ephemeral: true } : {})`).
+      ...(isSandbox ? { ephemeral: true } : {}),
       gradeLevelId: input.gradeLevelId ?? MOCK_GRADE_LEVEL_ID,
       widgets: (input.widgets ?? []).map((w) => ({ ...w, boardId: id })),
       createdAt: now,
@@ -497,14 +527,19 @@ export const mockTeachSource: TeachDataSource = {
     const owner = resolveOwnerId(ownerId);
     // BUILD-BEFORE-DELETE: resolve every source and build the full list of
     // replacement Board copies in memory FIRST. The destructive splice happens
-    // ONLY after every replacement is ready, so a missing/stale source id (or
-    // a source that was itself in the old personal set) can never leave the
-    // lesson in a partially-wiped state.
+    // ONLY after every replacement is ready.
+    // MISSING-SOURCE GUARD (mirrors Supabase's `loadBoard` which throws on a
+    // missing/unreadable id): if ANY sourceBoardId is not found, THROW before
+    // deleting anything so a stale id never silently shrinks the set.
     const now = new Date().toISOString();
     const replaced: Board[] = [];
+    for (const sourceId of sourceBoardIds) {
+      if (!boards.find((b) => b.id === sourceId)) {
+        throw new Error(`Board not found: ${sourceId}`);
+      }
+    }
     sourceBoardIds.forEach((sourceId, order) => {
-      const source = boards.find((b) => b.id === sourceId);
-      if (!source) return;
+      const source = boards.find((b) => b.id === sourceId)!;
       const id = nextId("b");
       const pages = clonePagesOnto(source, id);
       const copy: Board = {
@@ -618,8 +653,11 @@ export const mockTeachSource: TeachDataSource = {
     const owner = resolveOwnerId(input.ownerId);
     const id = nextId("b");
     const now = new Date().toISOString();
+    // SANDBOX SENTINEL (mirrors Supabase audit F4): treat the "sandbox" key
+    // the same as a null lesson — the board is stored lesson-LESS. No cap check
+    // is performed here for any path (cap is enforced at keepBoard, mock parity).
     const lesson =
-      input.masterLessonId == null
+      input.masterLessonId == null || input.masterLessonId === SANDBOX_LESSON_ID
         ? null
         : resolveLessonId(input.masterLessonId);
     // Ordered after the lesson's current personal siblings so it lands at the

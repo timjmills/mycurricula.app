@@ -44,6 +44,7 @@ import type {
 import { TEACHER_BY_ID } from "@/lib/mock/teachers";
 import { teachClient as teach } from "@/lib/teach/client";
 import { MAX_BOARDS_PER_TEACHER, BoardCapError } from "@/lib/teach/queries";
+import { useConsequenceToast } from "@/lib/consequence-toast";
 import {
   boardHasTag,
   tagDisplayLabel,
@@ -189,6 +190,8 @@ export function BoardLibraryModule({
   onOpenBoard,
   ownerId,
 }: BoardLibraryModuleProps): ReactNode {
+  const { showConsequence } = useConsequenceToast();
+
   const [tab, setTab] = useState<Tab>("mine");
   const [scope, setScope] = useState<LibraryScope>("all");
   const [query, setQuery] = useState("");
@@ -343,11 +346,22 @@ export function BoardLibraryModule({
         await teach.duplicateBoard(board.id, ownerId);
         await refresh();
       } catch (err) {
-        if (err instanceof BoardCapError) setCapNotice(true);
-        else throw err;
+        // Detect the cap robustly: under the live flag Next.js redacts the error
+        // class across the Server Action boundary, so `instanceof` alone is not
+        // reliable. Check the `.name` property as a fallback (M8).
+        if (
+          err instanceof BoardCapError ||
+          (err as { name?: string } | null)?.name === "BoardCapError"
+        ) {
+          setCapNotice(true);
+        } else {
+          showConsequence({
+            message: "Couldn't do that just now — please try again.",
+          });
+        }
       }
     },
-    [ownerId, refresh],
+    [ownerId, refresh, showConsequence],
   );
 
   const handlePublish = useCallback(
@@ -355,10 +369,26 @@ export function BoardLibraryModule({
       // Guard: publish writes the owner id into a uuid/RLS column; skip until
       // the real auth uid is resolved (audit finding #18).
       if (!ownerId) return;
-      await teach.publishBoardToTeamLibrary(board.id, ownerId);
-      await refresh();
+      try {
+        await teach.publishBoardToTeamLibrary(board.id, ownerId);
+        await refresh();
+      } catch (err) {
+        // Publish can throw the "only your own personal board" ownership error
+        // under the live flag. Surface feedback rather than letting it reject
+        // unhandled from this fire-and-forget callback (M8).
+        if (
+          err instanceof BoardCapError ||
+          (err as { name?: string } | null)?.name === "BoardCapError"
+        ) {
+          setCapNotice(true);
+        } else {
+          showConsequence({
+            message: "Couldn't do that just now — please try again.",
+          });
+        }
+      }
     },
-    [ownerId, refresh],
+    [ownerId, refresh, showConsequence],
   );
 
   const handleAddToMine = useCallback(
@@ -370,11 +400,22 @@ export function BoardLibraryModule({
         await teach.copyTeamBoardToMine(board.id, ownerId);
         await refresh();
       } catch (err) {
-        if (err instanceof BoardCapError) setCapNotice(true);
-        else throw err;
+        // Detect the cap robustly: under the live flag Next.js redacts the error
+        // class across the Server Action boundary, so `instanceof` alone is not
+        // reliable. Check the `.name` property as a fallback (M8).
+        if (
+          err instanceof BoardCapError ||
+          (err as { name?: string } | null)?.name === "BoardCapError"
+        ) {
+          setCapNotice(true);
+        } else {
+          showConsequence({
+            message: "Couldn't do that just now — please try again.",
+          });
+        }
       }
     },
-    [ownerId, refresh],
+    [ownerId, refresh, showConsequence],
   );
 
   const handleDelete = useCallback(
