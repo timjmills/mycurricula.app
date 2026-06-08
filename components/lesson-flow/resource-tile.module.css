@@ -126,6 +126,47 @@
   z-index: 1;
 }
 
+/* ── Poster-mode tile (onActivate / read-only Resources panel) ─────────── */
+/* The whole frame becomes a button that opens the ResourcePreview modal. We
+   reset the native button chrome and reuse the .frame fill/tints; a real
+   thumbnail (when present) covers the frame, otherwise the synthetic artwork
+   + glyph render exactly as in the default tile. */
+.activateFrame {
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.activateFrame:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+/* Real thumbnail poster — covers the frame. */
+.poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Play-button overlay drawn over a video poster. */
+.posterPlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 1;
+  color: var(--hl-red);
+  pointer-events: none;
+}
+
 /* ── Collapse + remove controls ──────────────────────────────────────── */
 /* Both pinned to the frame's top-right. Small paper chips so they read on
    any frame fill (light tint or dark video plate). */

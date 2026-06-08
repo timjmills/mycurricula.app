@@ -47,6 +47,15 @@ export interface ResourceTileProps {
   onCollapse: () => void;
   /** Remove the resource from its section. */
   onRemove: () => void;
+  /**
+   * Optional "open the big preview" handler. When supplied (the read-only
+   * Resources panel passes it), the WHOLE tile becomes a single button that
+   * fires this instead of rendering a live inline embed — so one click target
+   * covers the tile (an inline <iframe> would otherwise swallow the click) and
+   * the modal owns the enlarged view. The collapse/remove controls are omitted
+   * in this mode (the panel is glance-and-open; edits live in LessonFlow).
+   */
+  onActivate?: () => void;
 }
 
 // ── Frame "kind" — groups the seven resource types into four frame looks ──
@@ -79,9 +88,35 @@ export function ResourceTile({
   resource,
   onCollapse,
   onRemove,
+  onActivate,
 }: ResourceTileProps): ReactNode {
   const kind = frameKindFor(resource.type);
   const label = resource.label || resource.type;
+
+  // Read-only "open the preview" mode (Resources panel). The whole frame is
+  // one button showing a static poster; clicking opens the ResourcePreview
+  // modal. No live embed, no collapse/remove controls.
+  if (onActivate) {
+    return (
+      <figure className={styles.tile} data-frame={kind}>
+        <button
+          type="button"
+          className={`${styles.frame} ${styles.activateFrame}`}
+          onClick={onActivate}
+          aria-label={`Open preview: ${label}`}
+        >
+          <PosterFace resource={resource} kind={kind} />
+        </button>
+        <figcaption className={styles.caption}>
+          <span className={styles.captionIcon} aria-hidden="true">
+            <SmallResourceIcon type={resource.type} />
+          </span>
+          <span className={styles.captionLabel}>{label}</span>
+          <span className={styles.captionType}>{resource.type}</span>
+        </figcaption>
+      </figure>
+    );
+  }
 
   return (
     <figure className={styles.tile} data-frame={kind}>
@@ -138,6 +173,47 @@ export function ResourceTile({
         <span className={styles.captionType}>{resource.type}</span>
       </figcaption>
     </figure>
+  );
+}
+
+// ── PosterFace ─────────────────────────────────────────────────────────────
+// The static poster shown inside an `onActivate` (panel) tile: a real
+// thumbnail when we have one (OG image, YouTube poster, or an uploaded
+// image's own url), otherwise the synthetic per-kind artwork + glyph. A
+// video poster gets the play-button overlay so it still reads as "video".
+
+function PosterFace({
+  resource,
+  kind,
+}: {
+  resource: SectionResource;
+  kind: FrameKind;
+}): ReactNode {
+  const posterSrc =
+    resource.thumbnailUrl ??
+    (resource.provider === "image" ? resource.url : undefined);
+
+  if (posterSrc) {
+    return (
+      <>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={posterSrc} alt="" loading="lazy" className={styles.poster} />
+        {kind === "video" && (
+          <span className={styles.posterPlay} aria-hidden="true">
+            <BigResourceIcon type="youtube" />
+          </span>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <FrameArtwork kind={kind} />
+      <span className={styles.bigIcon} aria-hidden="true">
+        <BigResourceIcon type={resource.type} />
+      </span>
+    </>
   );
 }
 

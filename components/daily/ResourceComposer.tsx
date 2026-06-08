@@ -353,6 +353,10 @@ export function ResourceComposer({
 
     previousFocusRef.current = document.activeElement as HTMLElement | null;
 
+    // Fresh session — forget the previous open's committed blob URLs so the
+    // leak guard can reclaim anything that was abandoned (not committed) then.
+    committedUrlsRef.current = new Set<string>();
+
     setTitle("");
     setBody("");
     setLinkOpen(false);
@@ -387,16 +391,29 @@ export function ResourceComposer({
   // We keep a ref to the latest items array so the cleanup effect can
   // revoke without listing `items` in its deps (which would re-fire on
   // every keystroke).
+  // URLs we've already handed to the planner store on Add. The leak guard
+  // below must NOT revoke these — the committed resource still points at the
+  // blob for the rest of the session, so revoking it would leave the
+  // just-added image/PDF tile rendering a dead `blob:` (the "thumbnail
+  // doesn't show after adding" bug). Reset on every re-open.
+  const committedUrlsRef = useRef<Set<string>>(new Set<string>());
+
   const itemsRef = useRef<CapturedItem[]>(items);
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
   useEffect(() => {
     if (open) return;
-    // The dialog just closed — revoke every blob URL we created during
-    // this session so the browser frees the underlying File objects.
+    // The dialog just closed — revoke every blob URL we created during this
+    // session EXCEPT the ones already committed to the store on Add (those
+    // must stay alive so the resource's tile/preview keeps rendering).
     for (const item of itemsRef.current) {
-      if (item.url?.startsWith("blob:")) URL.revokeObjectURL(item.url);
+      if (
+        item.url?.startsWith("blob:") &&
+        !committedUrlsRef.current.has(item.url)
+      ) {
+        URL.revokeObjectURL(item.url);
+      }
     }
   }, [open]);
 
@@ -656,6 +673,37 @@ export function ResourceComposer({
   }, []);
   const onSearchClick = useCallback(() => setSearchOpen((v) => !v), []);
 
+  /** Best-effort OG enrichment for a plain website link. The browser can't
+   *  read another origin's OG tags directly (CORS), so we ask our own
+   *  SSRF-guarded `/api/og-preview` route. On success we patch the matching
+   *  captured chip with a real thumbnail so the tile/preview shows a card
+   *  instead of a bare domain. Every failure is swallowed — the link still
+   *  works without a thumbnail, in line with the session-only model. */
+  const enrichWebsiteLink = useCallback((url: string): void => {
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/og-preview?url=${encodeURIComponent(url)}`,
+        );
+        if (!res.ok) return;
+        const og = (await res.json()) as { thumbnailUrl?: string };
+        if (!og.thumbnailUrl) return;
+        // Patch by URL match (a given URL is captured at most once). Only
+        // fill a thumbnail we don't already have, and never clobber an item
+        // the teacher meanwhile removed (the map is a no-op if it's gone).
+        setItems((prev) =>
+          prev.map((c) =>
+            c.url === url && c.provider === "website" && !c.thumbnailUrl
+              ? { ...c, thumbnailUrl: og.thumbnailUrl }
+              : c,
+          ),
+        );
+      } catch {
+        // best-effort — ignore network / parse failures.
+      }
+    })();
+  }, []);
+
   /** Confirm the inline URL: parse it through `parseResourceUrl` so the
    *  captured chip carries a real `provider`, `thumbnailUrl`, and
    *  `displayName`, then append a link item and clear the field. */
@@ -686,8 +734,10 @@ export function ResourceComposer({
       // the chip lets the teacher flip to literal/hyperlink.
       displayMode: "thumbnail",
     });
+    // Generic websites have no cheaply-derivable thumbnail — fetch one.
+    if (parsed.provider === "website") enrichWebsiteLink(raw);
     setLinkValue("");
-  }, [linkValue, addItem]);
+  }, [linkValue, addItem, enrichWebsiteLink]);
 
   const onLinkKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -772,6 +822,7 @@ export function ResourceComposer({
           thumbnailUrl: parsed.thumbnailUrl ?? undefined,
           displayMode: "thumbnail",
         });
+        if (parsed.provider === "website") enrichWebsiteLink(raw);
         setPastedStatus("Pasted link");
         return;
       }
@@ -784,7 +835,7 @@ export function ResourceComposer({
         setPastedStatus("Pasted text");
       }
     },
-    [addItem, addItems],
+    [addItem, addItems, enrichWebsiteLink],
   );
 
   // ── Add (commit) ─────────────────────────────────────────────────────
@@ -905,6 +956,13 @@ export function ResourceComposer({
       editLesson(destLessonId, {
         resources: [...destLesson.resources, ...newResources],
       });
+    }
+
+    // Claim every blob URL we just handed to the store so the close-time
+    // leak guard skips it (see committedUrlsRef). Without this the freshly
+    // added image/PDF tile would point at a revoked blob and render blank.
+    for (const it of items) {
+      if (it.url?.startsWith("blob:")) committedUrlsRef.current.add(it.url);
     }
 
     // Report back to the caller (the Resources panel uses this to register

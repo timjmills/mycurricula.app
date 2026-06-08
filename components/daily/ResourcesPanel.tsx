@@ -59,6 +59,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Lesson, LessonResource } from "@/lib/types";
 import type { SectionResource } from "@/lib/lesson-flow";
 import { ResourceTile } from "@/components/lesson-flow";
+import { ResourcePreview } from "@/components/resources";
 import { usePlanner } from "@/lib/planner-store";
 import { lessonResources } from "@/lib/lesson-resources";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
@@ -340,6 +341,23 @@ function synthUrl(type: LessonResource["type"], label: string): string {
   }
 }
 
+/** Pretty, human-readable form of a REAL resource url for the list row's
+ *  second line. Blob URLs (session-only uploads) read as "Uploaded file"
+ *  rather than an opaque `blob:` string. */
+function prettyUrl(raw: string): string {
+  if (raw.startsWith("blob:")) return "Uploaded file";
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.replace(/^www\./, "");
+    return (host + u.pathname).replace(/\/$/, "").slice(0, 48) || host;
+  } catch {
+    return raw
+      .replace(/^https?:\/\//i, "")
+      .replace(/^www\./i, "")
+      .slice(0, 48);
+  }
+}
+
 // ── Paperclip glyph for the "Resource quick access" list header ─────────
 function PaperclipIcon(): ReactNode {
   return (
@@ -439,8 +457,11 @@ function ResourceTypeIcon({
 
 function ResourceListRow({
   resource,
+  onActivate,
 }: {
   resource: SectionResource;
+  /** Open the resource in the shared preview modal. */
+  onActivate: () => void;
 }): ReactNode {
   // Pull the type-tag descriptor; every kind in LessonResource["type"] is
   // covered in TYPE_TAGS, so the fallback is just defensive.
@@ -449,27 +470,22 @@ function ResourceListRow({
     tagClass: "rowLink",
   };
   const label = resource.label || resource.type;
-  const url = synthUrl(resource.type, label);
-
-  // Phase 1A: open the synthetic URL in a new tab as the click affordance.
-  // No real resource exists behind it; a real backend will replace the
-  // synthesized href with the stored one without changing this handler.
-  const handleClick = (): void => {
-    if (typeof window === "undefined") return;
-    const href = url === "—" ? null : `https://${url}`;
-    if (href) {
-      window.open(href, "_blank", "noopener,noreferrer");
-    }
-  };
+  // Show the resource's REAL url when it has one; only fall back to the
+  // synthetic preview string for legacy fixtures with no url. (Previously
+  // this ALWAYS synthesized a url and opened that fabricated link — so a
+  // real resource opened a bogus address. Now clicking opens the preview.)
+  const url = resource.url
+    ? prettyUrl(resource.url)
+    : synthUrl(resource.type, label);
 
   return (
     <Tooltip content={`${tag.label} — ${label}`} side="left">
       <button
         type="button"
         className={`${styles.resourceRow} ${styles[tag.tagClass] ?? ""}`}
-        aria-label={`${tag.label}: ${label}`}
+        aria-label={`Open ${tag.label}: ${label}`}
         title={`${tag.label} — ${label}`}
-        onClick={handleClick}
+        onClick={onActivate}
       >
         {/* Left chip — 32×32 pastel SQUARE with the type glyph centered.
           The pastel pair comes from the .row<Type> class on this button. */}
@@ -528,12 +544,15 @@ interface TileWithOverflowProps {
   stackCount?: number;
   /** Fired when a stack tile is clicked — opens the composer in append mode. */
   onStackClick?: () => void;
+  /** Open this resource in the shared preview modal (click-to-enlarge). */
+  onActivate?: () => void;
 }
 
 function TileWithOverflow({
   resource,
   stackCount,
   onStackClick,
+  onActivate,
 }: TileWithOverflowProps): ReactNode {
   // ResourceTile requires onCollapse + onRemove; this panel is read-only,
   // so both are no-ops — edits live in the LessonFlow section editor on
@@ -569,7 +588,15 @@ function TileWithOverflow({
           <span className={styles.stackGhost2} aria-hidden="true" />
         </>
       )}
-      <ResourceTile resource={resource} onCollapse={noop} onRemove={noop} />
+      {/* Regular tiles become a click-to-enlarge poster (onActivate). Stack
+          tiles keep their "add more photos" wrapper click, so we don't also
+          wire the inner tile to the preview there. */}
+      <ResourceTile
+        resource={resource}
+        onCollapse={noop}
+        onRemove={noop}
+        onActivate={isStack ? undefined : onActivate}
+      />
       {/* Photo-stack count badge — small chip in the top-left corner
           indicating how many photos are bundled into the stack. */}
       {isStack && (
@@ -686,6 +713,10 @@ export function ResourcesPanel({
   // toggle and the aggregation scope are independent concerns.
   const [category, setCategory] = useState<ResourceCategory>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  // The resource currently open in the shared click-to-enlarge modal, or
+  // null when the modal is closed. Set from a grid tile or a list row.
+  const [previewResource, setPreviewResource] =
+    useState<SectionResource | null>(null);
 
   // ── Composer + drag-drop state ───────────────────────────────────────
   // The "+" trigger in the panel header and a drop of one-or-more files
@@ -914,7 +945,11 @@ export function ResourcesPanel({
         // only adds the Padlet-style menu chip.
         <div className={styles.grid}>
           {visibleResources.map((resource) => (
-            <TileWithOverflow key={resource.id} resource={resource} />
+            <TileWithOverflow
+              key={resource.id}
+              resource={resource}
+              onActivate={() => setPreviewResource(resource)}
+            />
           ))}
         </div>
       ) : (
@@ -928,7 +963,10 @@ export function ResourcesPanel({
           <ul className={styles.list}>
             {visibleResources.map((resource) => (
               <li key={resource.id} className={styles.listItem}>
-                <ResourceListRow resource={resource} />
+                <ResourceListRow
+                  resource={resource}
+                  onActivate={() => setPreviewResource(resource)}
+                />
               </li>
             ))}
           </ul>
@@ -1143,6 +1181,17 @@ export function ResourcesPanel({
           lesson={composerLesson}
           initialItems={pendingItems.length > 0 ? pendingItems : undefined}
           onClose={closeComposer}
+        />
+      )}
+
+      {/* Shared click-to-enlarge modal — opened from a grid tile or a list
+          row. Renders the right large preview for every resource kind
+          (image / iframe-embeddable / video / link) with open + download
+          actions, and a graceful fallback when nothing can be previewed. */}
+      {previewResource && (
+        <ResourcePreview
+          resource={previewResource}
+          onClose={() => setPreviewResource(null)}
         />
       )}
     </section>
