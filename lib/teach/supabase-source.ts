@@ -613,49 +613,43 @@ async function commitPages(
     .slice()
     .sort((a, b) => a.order - b.order)
     .map((p, i) => ({ ...p, order: i }));
-  const page0 = sorted[0]?.widgets ?? [];
-  // 1) Write the pages jsonb + bump updated_at on the board row.
-  const upd = await client
-    .from("boards")
-    .update({ pages: sorted, updated_at: new Date().toISOString() })
-    .eq("id", boardId);
-  if (upd.error) {
+  // PRIVACY (audit H3): strip names from EVERY widget's config/state across ALL
+  // pages before the pages jsonb is persisted. commitPages is the single chokepoint
+  // every page write funnels through (upsert/update/delete widget, add/delete/
+  // reorder page, copyBoardContent), so centralizing the strip here keeps the pages
+  // jsonb structure-only even if a source board (legacy / imported / directly
+  // written) carried names — closing the gap where `copyBoardContent` re-minted
+  // multi-page widgets but copied their config/state verbatim. stripNames is
+  // recursive + idempotent, so paths that already stripped at their boundary are
+  // unaffected.
+  const cleanPages: BoardPage[] = sorted.map((p) => ({
+    ...p,
+    widgets: p.widgets.map((w) => ({
+      ...w,
+      config: stripNames(w.config ?? {}),
+      state: stripNames(w.state ?? {}),
+    })),
+  }));
+  const page0 = cleanPages[0]?.widgets ?? [];
+  // The page-0 widget mirror rows. `widgetToRow` carries the widget's id (so the
+  // flat row matches the pages jsonb) and re-strips config/state.
+  const widgetRows = page0.map((w, i) => ({
+    ...widgetToRow({ ...w, boardId }),
+    display_order_within_board: i,
+  }));
+  // ATOMIC (audit M6): write the pages jsonb AND replace the page-0 widget mirror
+  // in ONE transaction via the RPC, so a mid-sequence failure can no longer leave
+  // the mirror stale/empty relative to the authoritative pages. SECURITY INVOKER —
+  // the caller's RLS still gates the board update + widget writes (no privilege).
+  const res = await client.rpc("teach_commit_board_pages", {
+    p_board: boardId,
+    p_pages: cleanPages,
+    p_widgets: widgetRows,
+  });
+  if (res.error) {
     throw new Error(
-      `Teach repository commit pages (board) failed: ${upd.error.message}`,
+      `Teach repository commit pages failed: ${res.error.message}`,
     );
-  }
-  // 2) Replace the flat widget mirror with page-0's widgets. Delete the board's
-  //    current widget rows, then insert page-0 in order (id-stable: page-0
-  //    widgets already carry stable ids, which we preserve so links survive).
-  //    Names are stripped on the insert via `widgetToRow` (privacy invariant).
-  //
-  //    PRIVACY INDUCTION (audit Finding 7): the structure-only invariant holds
-  //    here even though `commitPages` does NOT re-strip the `pages` jsonb it just
-  //    wrote in step 1. Every write path that puts a widget into `pages` already
-  //    strips names at the boundary — `upsertWidgetOnPage` calls `stripNames` on
-  //    config/state before the widget enters the page set, `copyBoardContent`
-  //    copies from boards that were themselves written through stripped paths,
-  //    and `persistWidgetPatch` only ever patches canvas/appearance (never
-  //    config/state). So by induction over the write paths the `pages` jsonb is
-  //    already name-free, and `widgetToRow` re-stripping on the page-0 mirror
-  //    insert below is belt-and-suspenders, not the sole guard.
-  const del = await client.from("widgets").delete().eq("board_id", boardId);
-  if (del.error) {
-    throw new Error(
-      `Teach repository commit pages (clear widgets) failed: ${del.error.message}`,
-    );
-  }
-  if (page0.length > 0) {
-    const rows = page0.map((w, i) => ({
-      ...widgetToRow({ ...w, boardId }),
-      display_order_within_board: i,
-    }));
-    const ins = await client.from("widgets").insert(rows);
-    if (ins.error) {
-      throw new Error(
-        `Teach repository commit pages (insert widgets) failed: ${ins.error.message}`,
-      );
-    }
   }
 }
 
@@ -1389,10 +1383,12 @@ export const supabaseTeachSource: TeachDataSource = {
     // board belonging to a different lesson can't be smuggled into THIS lesson's
     // team set. Throw a clear error if any source fails the check.
     for (const source of sources) {
-      if (
-        source.scope !== "personal" ||
-        source.masterLessonId !== masterLessonId
-      ) {
+      // Compare against the RESOLVED lesson uuid (`lesson`), NOT the raw caller
+      // value (`masterLessonId`): when the planner is still mock while Teach runs
+      // on Supabase, the caller passes a slug (e.g. "m-12-0") but the loaded boards
+      // carry the resolved uuid — comparing the raw value would reject every valid
+      // push (audit H2).
+      if (source.scope !== "personal" || source.masterLessonId !== lesson) {
         throw new Error(
           "pushBoardsToTeam: every source must be one of your personal boards for this lesson",
         );

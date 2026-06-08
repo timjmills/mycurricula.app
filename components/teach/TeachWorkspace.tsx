@@ -47,6 +47,7 @@ import { toTeachResource } from "@/lib/teach/toTeachResource";
 import { ME } from "@/lib/mock/teachers";
 import { teachClient as teach } from "@/lib/teach/client";
 import { SANDBOX_LESSON_ID } from "@/lib/teach/queries";
+import { useConsequenceToast } from "@/lib/consequence-toast";
 import { plannerClient } from "@/lib/planner/client";
 import {
   BOARD_LAYOUT_GRID,
@@ -244,7 +245,11 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   const sensors = useDndSensors();
   const { lessons, getSections } = usePlanner();
   const { week, selectedDay, currentUser } = useAppState();
+  const { showConsequence } = useConsequenceToast();
 
+  // Guards onOpenBoard against re-entrant clicks while a pull-copy is in flight, so
+  // a double-click can't pull two copies / consume two cap slots (review Low).
+  const openingBoardRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const resourceContainerRef = useRef<HTMLDivElement>(null);
 
@@ -681,7 +686,12 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
 
   // ── Chrome callbacks ───────────────────────────────────────────────────────
   const handleAddBoard = useCallback(async (): Promise<void> => {
-    if (activeLessonId == null) return;
+    // In SANDBOX mode there is no active lesson — a board hangs off the sentinel
+    // (the repo treats it as a lesson-less ephemeral scratch board, audit F4). This
+    // chrome handler previously bailed on the null lesson, so "Add Board" did
+    // nothing in the sandbox (audit H4); route it through the sentinel instead.
+    const targetLesson = state.sandbox ? SANDBOX_LESSON_ID : activeLessonId;
+    if (targetLesson == null) return;
     // Resolve the grade id (real uuid under the flag, mock slug flag-OFF). When
     // the flag is ON and the grade hasn't resolved yet we MUST NOT write a slug
     // into the uuid/RLS column — skip the create until identity is ready (audit
@@ -690,7 +700,7 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     const gradeLevelId = boardGradeId(activeBoard);
     if (ownerId == null || gradeLevelId == null) return;
     await teach.createBoard({
-      masterLessonId: activeLessonId,
+      masterLessonId: targetLesson,
       ownerId,
       scope: "personal",
       title: `Board ${boards.length + 1}`,
@@ -703,6 +713,7 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     if (created) dispatch({ type: "selectBoard", boardId: created.id });
   }, [
     activeLessonId,
+    state.sandbox,
     ownerId,
     boards.length,
     activeBoard,
@@ -1451,47 +1462,72 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                   <BoardLibraryModule
                     gradeLevelId={boardGradeId(activeBoard)}
                     onOpenBoard={(board) => {
-                      // Close the overlay up front so a rapid second click can't
-                      // pull another copy / re-fire while the first call is in
-                      // flight (review Low: duplicate copies on double-click).
-                      setLibraryOverlay(null);
+                      // Ignore re-entrant clicks while a pull-copy is in flight so a
+                      // double-click can't pull two copies / consume two cap slots
+                      // (review Low). The overlay stays OPEN until the work succeeds
+                      // (or a failure is surfaced) so a cap/RLS/network error is not
+                      // swallowed (audit M9).
+                      if (openingBoardRef.current) return;
+                      openingBoardRef.current = true;
                       void (async () => {
-                        // A board already attached to a lesson (a My Board for a
-                        // lesson) → just navigate to it.
-                        if (board.masterLessonId != null) {
-                          dispatch({
-                            type: "selectLesson",
-                            lessonId: board.masterLessonId,
+                        try {
+                          // A board already attached to a lesson (a My Board for a
+                          // lesson) → just navigate to it.
+                          if (board.masterLessonId != null) {
+                            dispatch({
+                              type: "selectLesson",
+                              lessonId: board.masterLessonId,
+                            });
+                            dispatch({
+                              type: "selectBoard",
+                              boardId: board.id,
+                            });
+                            setLibraryOverlay(null);
+                            return;
+                          }
+                          // Lesson-DETACHED library board (Team Library / a detached
+                          // My Board): PULL A COPY INTO THE CURRENT LESSON (audit
+                          // F11). selectLesson(null) would clear the workspace, so
+                          // add a personal copy to the lesson in view + select it.
+                          // Guarded on !sandbox: in the sandbox there is no real
+                          // lesson to attach to (reloadBoards reads the sandbox
+                          // scope), so a sandbox open falls through to the My Boards
+                          // pull below (review Low: latent sandbox+lesson mismatch).
+                          if (
+                            activeLessonId != null &&
+                            !state.sandbox &&
+                            ownerId != null
+                          ) {
+                            const copy = await teach.copyBoardToLesson(
+                              board.id,
+                              activeLessonId,
+                              ownerId,
+                            );
+                            await reloadBoards();
+                            dispatch({ type: "selectBoard", boardId: copy.id });
+                            setLibraryOverlay(null);
+                            return;
+                          }
+                          // No lesson in view (e.g. sandbox) → fall back to pulling a
+                          // detached copy into My Boards so the action still succeeds.
+                          if (ownerId != null) {
+                            await teach.copyTeamBoardToMine(board.id, ownerId);
+                            setLibraryOverlay(null);
+                          }
+                        } catch (err) {
+                          // Surface the failure (e.g. the board-cap limit) instead of
+                          // a silent unhandled rejection; keep the overlay OPEN so the
+                          // teacher can delete a board / pick another and retry
+                          // (audit M9).
+                          showConsequence({
+                            message:
+                              err instanceof Error &&
+                              err.name === "BoardCapError"
+                                ? err.message
+                                : "Couldn't add that board just now — please try again.",
                           });
-                          dispatch({ type: "selectBoard", boardId: board.id });
-                          return;
-                        }
-                        // Lesson-DETACHED library board (Team Library / a detached
-                        // My Board): PULL A COPY INTO THE CURRENT LESSON (audit
-                        // F11). Dispatching selectLesson(null) would clear the
-                        // workspace, so add a personal copy to the lesson in view +
-                        // select it. Guarded on !sandbox: in the sandbox there is no
-                        // real lesson to attach to (reloadBoards reads the sandbox
-                        // scope), so a sandbox open falls through to the My Boards
-                        // pull below (review Low: latent sandbox+lesson mismatch).
-                        if (
-                          activeLessonId != null &&
-                          !state.sandbox &&
-                          ownerId != null
-                        ) {
-                          const copy = await teach.copyBoardToLesson(
-                            board.id,
-                            activeLessonId,
-                            ownerId,
-                          );
-                          await reloadBoards();
-                          dispatch({ type: "selectBoard", boardId: copy.id });
-                          return;
-                        }
-                        // No lesson in view (e.g. sandbox) → fall back to pulling a
-                        // detached copy into My Boards so the action still succeeds.
-                        if (ownerId != null) {
-                          await teach.copyTeamBoardToMine(board.id, ownerId);
+                        } finally {
+                          openingBoardRef.current = false;
                         }
                       })();
                     }}

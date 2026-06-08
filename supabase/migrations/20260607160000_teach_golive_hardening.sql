@@ -260,18 +260,22 @@ begin
       'teach_replace_lesson_set: every board must match (lesson=%, scope=%, owner=%)',
       p_lesson, p_scope, p_owner;
   end if;
+  -- p_widgets MUST be an array (possibly empty). A SQL null would SKIP the
+  -- membership check below AND insert zero mirror rows after the delete, leaving a
+  -- board with widgets in its pages jsonb but an empty flat mirror (audit M5).
+  if p_widgets is null or jsonb_typeof(p_widgets) <> 'array' then
+    raise exception 'teach_replace_lesson_set: p_widgets must be an array';
+  end if;
   -- Collect the set's board ids; every widget must belong to one of them.
   select array_agg(b.id)
     into v_board_ids
     from jsonb_populate_recordset(null::boards, p_boards) b;
-  if p_widgets is not null
-     and jsonb_typeof(p_widgets) = 'array'
-     and exists (
-       select 1
-         from jsonb_populate_recordset(null::widgets, p_widgets) w
-        where w.board_id is null
-           or not (w.board_id = any (v_board_ids))
-     ) then
+  if exists (
+    select 1
+      from jsonb_populate_recordset(null::widgets, p_widgets) w
+     where w.board_id is null
+        or not (w.board_id = any (v_board_ids))
+  ) then
     raise exception
       'teach_replace_lesson_set: every widget board_id must be one of the inserted boards';
   end if;
@@ -292,7 +296,17 @@ begin
     b.id, b.grade_level_id, b.subject_id, b.master_core_lesson_event_id,
     b.owner_id, b.scope, b.title, b.tint, b.display_order_within_lesson,
     b.template_id, b.pages, b.board_theme, b.repeat, b.tags, b.background,
-    b.whiteboard, b.ephemeral, b.library_visibility, b.published_by,
+    b.whiteboard,
+    -- ENFORCE per-lesson-set invariants regardless of the payload (audit H1): a
+    -- board in a lesson's team/personal set is NEVER ephemeral, NEVER a Team
+    -- Library entry, and carries no publish provenance. Hard-coding these (instead
+    -- of selecting b.ephemeral / b.library_visibility / b.published_by) blocks a
+    -- direct authenticated RPC caller from spoofing library_visibility='team' or
+    -- published_by, or smuggling an ephemeral board, through this path — publishing
+    -- to the Team Library only ever happens via the guarded
+    -- publishBoardToTeamLibrary. (source_board_id stays caller-set: a benign,
+    -- nullable provenance pointer.)
+    false, 'private', null,
     b.source_board_id
   from jsonb_populate_recordset(null::boards, p_boards) b;
 
@@ -310,6 +324,75 @@ end;
 $$;
 
 grant execute on function teach_replace_lesson_set(uuid, board_scope, uuid, jsonb, jsonb) to authenticated;
+
+
+-- #############################################################################
+-- ## SECTION 5 — teach_commit_board_pages: atomic page commit  (audit H3 + M6)
+-- #############################################################################
+-- A board's authoritative content is its `pages` jsonb; the flat `widgets` table
+-- is a page-0 MIRROR (grid-era readers + nextWidgetOrder). The app's `commitPages`
+-- helper writes BOTH — the pages jsonb, then a full replace of the widget mirror.
+-- Run as separate PostgREST calls a mid-sequence failure could leave the mirror
+-- stale/empty (audit M6). This wraps the page write + mirror replace in ONE
+-- transaction. SECURITY INVOKER: the board update + widget delete/insert are gated
+-- by the caller's RLS (boards_update / widgets_write), so it adds atomicity, never
+-- privilege. The page-write does NOT touch grade_level_id / master_core_lesson_
+-- event_id, so trg_boards_lesson_grade does not fire.
+--
+-- PRIVACY (audit H3): commitPages is the single chokepoint EVERY page write funnels
+-- through (upsert/update/delete widget, add/delete/reorder page, copyBoardContent),
+-- so stripping names there + this RPC's membership guard keep the persisted pages
+-- AND mirror structure-only. The app strips config/state at the boundary; every
+-- widget's board_id MUST equal p_board (no smuggling a widget onto another board).
+--   p_board   uuid  — the board whose pages are committed.
+--   p_pages   jsonb — the authoritative BoardPage[] (names already stripped).
+--   p_widgets jsonb — the page-0 widget mirror rows (snake_case; ids match the pages
+--                     jsonb; names already stripped).
+-- ---------------------------------------------------------------------------
+create or replace function teach_commit_board_pages(
+  p_board   uuid,
+  p_pages   jsonb,
+  p_widgets jsonb
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  if p_widgets is null or jsonb_typeof(p_widgets) <> 'array' then
+    raise exception 'teach_commit_board_pages: p_widgets must be an array';
+  end if;
+  if exists (
+    select 1
+      from jsonb_populate_recordset(null::widgets, p_widgets) w
+     where w.board_id is distinct from p_board
+  ) then
+    raise exception
+      'teach_commit_board_pages: every widget board_id must equal p_board';
+  end if;
+
+  update boards
+     set pages = p_pages,
+         updated_at = now()
+   where id = p_board;
+
+  delete from widgets where board_id = p_board;
+
+  insert into widgets (
+    id, board_id, type, title, grid_row, grid_col, grid_rowspan, grid_colspan,
+    display_order_within_board, pinned, config, state, persistence_override,
+    canvas, appearance
+  )
+  select
+    w.id, w.board_id, w.type, w.title, w.grid_row, w.grid_col, w.grid_rowspan,
+    w.grid_colspan, w.display_order_within_board, w.pinned, w.config, w.state,
+    w.persistence_override, w.canvas, w.appearance
+  from jsonb_populate_recordset(null::widgets, p_widgets) w;
+end;
+$$;
+
+grant execute on function teach_commit_board_pages(uuid, jsonb, jsonb) to authenticated;
 
 
 -- =============================================================================

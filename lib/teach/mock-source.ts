@@ -344,26 +344,71 @@ export const mockTeachSource: TeachDataSource = {
   },
 
   async updateWidget(widgetId, patch) {
-    for (const board of boards) {
-      const widget = board.widgets.find((w) => w.id === widgetId);
-      if (widget) {
-        Object.assign(widget, patch);
-        if (patch.position) widget.position = { ...patch.position };
-        board.updatedAt = new Date().toISOString();
-        return { ...widget, position: { ...widget.position } };
+    // PAGE-AWARE — mirrors the Supabase updateWidget semantics: a board with an
+    // explicit `pages` jsonb is authoritative (widget edits go through
+    // commitPages so page-2+ widgets are actually updated); a flat board takes
+    // the direct array mutation (no pages jsonb is materialized, keeping the
+    // flat upsertWidget embed path consistent — Supabase audit H1).
+    const hit = findWidget(widgetId);
+    if (!hit) throw new Error(`Widget not found: ${widgetId}`);
+    if (hit.board.pages && hit.board.pages.length > 0) {
+      const updatedPages = pagesOf(hit.board).map((p) =>
+        p.id === hit.page.id
+          ? {
+              ...p,
+              widgets: p.widgets.map((w) =>
+                w.id === widgetId
+                  ? {
+                      ...w,
+                      ...patch,
+                      ...(patch.position
+                        ? { position: { ...patch.position } }
+                        : {}),
+                    }
+                  : w,
+              ),
+            }
+          : p,
+      );
+      commitPages(hit.board, updatedPages);
+      // Re-locate the updated widget from the now-committed pages so the
+      // returned value matches the authoritative store (mirrors Supabase reload).
+      for (const page of pagesOf(hit.board)) {
+        const w = page.widgets.find((x) => x.id === widgetId);
+        if (w) return { ...w, position: { ...w.position } };
       }
+      // Unreachable — we just wrote the widget back.
+      throw new Error(`Widget not found after update: ${widgetId}`);
     }
-    throw new Error(`Widget not found: ${widgetId}`);
+    // Flat board: mutate in-place (no pages jsonb materialised).
+    Object.assign(hit.widget, patch);
+    if (patch.position) hit.widget.position = { ...patch.position };
+    hit.board.updatedAt = new Date().toISOString();
+    return { ...hit.widget, position: { ...hit.widget.position } };
   },
 
   async deleteWidget(widgetId) {
-    for (const board of boards) {
-      const idx = board.widgets.findIndex((w) => w.id === widgetId);
-      if (idx >= 0) {
-        board.widgets.splice(idx, 1);
-        board.updatedAt = new Date().toISOString();
-        return;
-      }
+    // PAGE-AWARE — mirrors the Supabase deleteWidget semantics: a board with
+    // explicit pages drops the widget via commitPages (so non-page-0 widgets in
+    // the authoritative jsonb are actually removed); a flat board splices the
+    // flat array directly (audit H1 — no pages jsonb should be materialised).
+    // Missing widget is a silent no-op (idempotent, same as Supabase).
+    const hit = findWidget(widgetId);
+    if (!hit) return;
+    if (hit.board.pages && hit.board.pages.length > 0) {
+      const prunedPages = pagesOf(hit.board).map((p) =>
+        p.id === hit.page.id
+          ? { ...p, widgets: p.widgets.filter((w) => w.id !== widgetId) }
+          : p,
+      );
+      commitPages(hit.board, prunedPages);
+      return;
+    }
+    // Flat board: splice from the flat array + stamp updatedAt.
+    const idx = hit.board.widgets.findIndex((w) => w.id === widgetId);
+    if (idx >= 0) {
+      hit.board.widgets.splice(idx, 1);
+      hit.board.updatedAt = new Date().toISOString();
     }
   },
 
@@ -450,21 +495,11 @@ export const mockTeachSource: TeachDataSource = {
     if (sourceBoardIds.length === 0) return [];
     const lesson = resolveLessonId(masterLessonId);
     const owner = resolveOwnerId(ownerId);
-    // Displacement: drop the owner's existing PERSONAL set for this lesson…
-    for (let i = boards.length - 1; i >= 0; i -= 1) {
-      const b = boards[i];
-      if (
-        b.masterLessonId === lesson &&
-        b.scope === "personal" &&
-        b.ownerId === owner
-      ) {
-        boards.splice(i, 1);
-      }
-    }
-    // …then insert independent FULL-PAGE copies of the sources as the new set
-    // (fresh board/page/widget ids so the sandbox originals are untouched). A
-    // multi-page source is re-minted via clonePagesOnto + commitPages (which
-    // mirrors page-0 onto the flat `widgets`); a flat source uses cloneWidgetsOnto.
+    // BUILD-BEFORE-DELETE: resolve every source and build the full list of
+    // replacement Board copies in memory FIRST. The destructive splice happens
+    // ONLY after every replacement is ready, so a missing/stale source id (or
+    // a source that was itself in the old personal set) can never leave the
+    // lesson in a partially-wiped state.
     const now = new Date().toISOString();
     const replaced: Board[] = [];
     sourceBoardIds.forEach((sourceId, order) => {
@@ -492,9 +527,23 @@ export const mockTeachSource: TeachDataSource = {
         widgets: cloneWidgetsOnto(source, id),
       };
       if (pages) commitPages(copy, pages);
-      boards.push(copy);
       replaced.push(copy);
     });
+    // Displacement: drop the owner's existing PERSONAL set for this lesson only
+    // AFTER all replacements are built — guarantees an atomic swap with no
+    // partial-wipe window even when a source id is stale or self-referential.
+    for (let i = boards.length - 1; i >= 0; i -= 1) {
+      const b = boards[i];
+      if (
+        b.masterLessonId === lesson &&
+        b.scope === "personal" &&
+        b.ownerId === owner
+      ) {
+        boards.splice(i, 1);
+      }
+    }
+    // Now push the fully-built copies into the live store.
+    boards.push(...replaced);
     return replaced.map(cloneBoard);
   },
 
