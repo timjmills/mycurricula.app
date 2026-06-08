@@ -77,33 +77,63 @@
    interactive regions. */
 .collapsedChip {
   display: flex;
-  align-items: center;
+  /* flex-start so the completion box + drag handle align to the title's first
+     line now that the chip carries a multi-line title + preview stack. */
+  align-items: flex-start;
   gap: 6px;
-  /* Dense title-only chips: a single thin band carrying just the title + the
-     completion box. Single-line at ~18px so the grid stays compact. */
+  /* A compact band carrying the title + a 2-line lesson preview. min-height
+     keeps short (preview-less) chips from collapsing too thin. */
   min-height: 18px;
   /* Inline padding clears the 5px fork stripe on the card root's start edge. */
   padding: 2px 7px 2px 8px;
   cursor: pointer;
 }
 
-/* Lesson title — the focal text of the chip (v1.3: weight 700, --ink).
-   Clamped to 2 lines so a long title can never blow the chip's uniform height
-   open; overflow-wrap breaks unbroken tokens (URLs) rather than overflowing. */
-.collapsedTitle {
+/* Title + preview stack — the text column of the chip. Takes the flexible
+   width so the completion box + drag handle stay pinned to the trailing edge. */
+.collapsedText {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Lesson title — the focal text of the chip (v1.3: weight 700, --ink).
+   Clamped to 1 line; overflow-wrap breaks unbroken tokens (URLs) rather than
+   overflowing. Left-aligned so it reads as a stack with the preview below. */
+.collapsedTitle {
   min-width: 0;
   margin: 0;
   font-size: var(--t-12);
   font-weight: 700;
   line-height: 1.2;
   color: var(--ink);
-  text-align: center;
+  text-align: start;
   text-wrap: pretty;
   overflow-wrap: anywhere;
-  /* Single line — the dense chip stays short; full title is in the detail panel. */
+  /* Single line — the title stays short; the preview carries the detail. */
   display: -webkit-box;
   -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Lesson preview — a muted 2-line summary under the title, bringing back the
+   at-a-glance lesson text on the resting weekly chip. Clamped to 2 lines so it
+   can never blow the cell height open; the full text lives in the expanded /
+   detail view, and the native title= surfaces it on hover. */
+.collapsedPreview {
+  margin: 0;
+  font-size: var(--t-11);
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--ink-700);
+  text-align: start;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

@@ -331,6 +331,26 @@ export function WeeklyLessonCard({
   // taller preview body instead — see the `.bodyFill` class below.
   const hasPager = Boolean(deck) && (deck?.total ?? 0) > 1;
 
+  // ── Collapsed-chip preview ─────────────────────────────────────────────
+  // The resting weekly chip shows a 2-line lesson preview under the title.
+  // `previewText` is an isomorphic plain-text projection used for the presence
+  // guard and the hover tooltip. We deliberately do NOT use stripHtml() here:
+  // it returns raw HTML during SSR (no `document`) but DOM-stripped text on the
+  // client, so a markup-only preview ("<p></p>") would render the node on the
+  // server yet omit it on the client — a hydration mismatch on the prerendered
+  // /weekly route. A tag-stripping regex runs identically in both runtimes.
+  // (The rendered preview itself uses the isomorphic, sanitized `safePreview`.)
+  // The 2000-char cap keeps the strip linear: /<[^>]*>/g is O(n²) on a long run
+  // of unmatched "<". Today `lesson.preview` is always RTE/sanitizer output (no
+  // raw "<" survives), but the cap future-proofs the SSR thread against a
+  // Phase-1B writer that might bypass that invariant. A preview is a short
+  // summary, so the cap never truncates real content.
+  const previewText = (lesson.preview ?? "")
+    .slice(0, 2000)
+    .replace(/<[^>]*>/g, "")
+    .trim();
+  const hasPreview = previewText.length > 0;
+
   // ── Stripe — solid by default, dashed when personally modified ────────────
   // The stripe sits behind the header band via z-index but still reads
   // through the 5px gap at the card's inline-start edge.
@@ -797,46 +817,62 @@ export function WeeklyLessonCard({
                 tabIndex={-1}
                 aria-label={`Open lesson details: ${stripHtml(lesson.title)}`}
               >
-                <h3
-                  className={styles.collapsedTitle}
-                  style={{
-                    textDecoration: done ? "line-through" : "none",
-                    textDecorationColor:
-                      "color-mix(in oklch, var(--ink) 40%, transparent)",
-                  }}
-                >
-                  {editingField === "title" ? (
-                    <RichEditorWrapper
-                      onCommit={commitEdit}
-                      onCancel={cancelEdit}
-                      className={styles.richEditorTitle}
-                    >
-                      <RichTextEditor
-                        value={draftValue}
-                        onChange={handleTitleChange}
-                        autoFocus
-                        singleLine
-                        ariaLabel="Edit lesson title"
+                <div className={styles.collapsedText}>
+                  <h3
+                    className={styles.collapsedTitle}
+                    style={{
+                      textDecoration: done ? "line-through" : "none",
+                      textDecorationColor:
+                        "color-mix(in oklch, var(--ink) 40%, transparent)",
+                    }}
+                  >
+                    {editingField === "title" ? (
+                      <RichEditorWrapper
+                        onCommit={commitEdit}
+                        onCancel={cancelEdit}
+                        className={styles.richEditorTitle}
+                      >
+                        <RichTextEditor
+                          value={draftValue}
+                          onChange={handleTitleChange}
+                          autoFocus
+                          singleLine
+                          ariaLabel="Edit lesson title"
+                        />
+                      </RichEditorWrapper>
+                    ) : (
+                      <span
+                        className={styles.editableText}
+                        tabIndex={0}
+                        role="button"
+                        aria-label="Edit lesson title"
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => openEditor("title", e)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "F2")
+                            openEditor("title", e);
+                        }}
+                        title={stripHtml(lesson.title)}
+                        // eslint-disable-next-line react/no-danger
+                        dangerouslySetInnerHTML={{ __html: safeTitle }}
                       />
-                    </RichEditorWrapper>
-                  ) : (
-                    <span
-                      className={styles.editableText}
-                      tabIndex={0}
-                      role="button"
-                      aria-label="Edit lesson title"
-                      onClick={(e) => e.stopPropagation()}
-                      onDoubleClick={(e) => openEditor("title", e)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === "F2")
-                          openEditor("title", e);
-                      }}
-                      title={stripHtml(lesson.title)}
+                    )}
+                  </h3>
+
+                  {/* Lesson preview — a muted 2-line summary under the title so
+                      the resting chip shows some lesson text at a glance again.
+                      Display-only: clicks/double-clicks bubble to the chip / card
+                      (expand inline / open detail panel) exactly like the title
+                      area, and editing still happens in the expanded view. */}
+                  {hasPreview && (
+                    <p
+                      className={styles.collapsedPreview}
+                      title={previewText}
                       // eslint-disable-next-line react/no-danger
-                      dangerouslySetInnerHTML={{ __html: safeTitle }}
+                      dangerouslySetInnerHTML={{ __html: safePreview }}
                     />
                   )}
-                </h3>
+                </div>
 
                 {/* Completion checkbox — restored on the chip so a lesson can be
                     marked done without opening the detail panel. Click toggles
