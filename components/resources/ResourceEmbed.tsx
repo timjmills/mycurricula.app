@@ -267,11 +267,18 @@ function LinkEmbed({
   );
 }
 
-/** True only for http(s) and blob: URLs — the schemes safe to feed into an
- *  <iframe> src or an <a href>. Blocks javascript:, data:, and other
- *  dangerous schemes regardless of upstream validation. */
+/** True for http(s), blob:, and same-origin root-relative ("/…") URLs — the
+ *  schemes safe to feed into an <iframe> src or an <a href>. Root-relative is
+ *  allowed for hosted files served via /api/resources/{id}; protocol-relative
+ *  "//host" is rejected (it resolves to a foreign origin). Blocks javascript:,
+ *  data:, and other dangerous schemes regardless of upstream validation. */
 function isSafeUrl(url: string | undefined): url is string {
-  return !!url && /^(https?|blob):/i.test(url);
+  if (!url) return false;
+  if (/^(https?|blob):/i.test(url)) return true;
+  // Same-origin root-relative path (e.g. /api/resources/{id}). Reject
+  // protocol-relative ("//host") and backslash tricks ("/\host") that
+  // browsers normalize to a foreign origin.
+  return /^\/(?![/\\])/.test(url);
 }
 
 function safeHost(url: string | undefined): string {

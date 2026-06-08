@@ -90,8 +90,10 @@ export function ResourcePreview({
 
   const kind = previewKindFor(resource);
   const url = resource.url;
-  const isHttp = !!url && /^https?:\/\//i.test(url);
   const isBlob = !!url && url.startsWith("blob:");
+  // "Open in new tab" is offered for any safe non-blob URL — http(s) links
+  // AND hosted files served via the root-relative /api/resources/{id}.
+  const canOpenInTab = isSafeUrl(url) && !isBlob;
   const title = resource.label || resource.type;
 
   // Clicking the backdrop (but not the dialog surface) closes.
@@ -122,7 +124,7 @@ export function ResourcePreview({
             <span className={styles.typePill}>{resource.type}</span>
           </div>
           <div className={styles.actions}>
-            {isHttp && (
+            {canOpenInTab && (
               <a
                 href={url}
                 target="_blank"
@@ -279,11 +281,17 @@ function PreviewBody({
   );
 }
 
-/** True only for http(s) and blob: URLs — the schemes safe to place in an
- *  <iframe>/<img>/<video> src or an <a href>. Guards against javascript:,
- *  data:, and other dangerous schemes regardless of upstream validation. */
+/** True for http(s), blob:, and same-origin root-relative ("/…") URLs — the
+ *  schemes safe to place in an <iframe>/<img>/<video> src or an <a href>.
+ *  Root-relative is allowed for hosted files served via /api/resources/{id};
+ *  protocol-relative "//host" is rejected. Blocks javascript:, data:, etc. */
 function isSafeUrl(url: string | undefined): url is string {
-  return !!url && /^(https?|blob):/i.test(url);
+  if (!url) return false;
+  if (/^(https?|blob):/i.test(url)) return true;
+  // Same-origin root-relative path (e.g. /api/resources/{id}). Reject
+  // protocol-relative ("//host") and backslash tricks ("/\host") that
+  // browsers normalize to a foreign origin.
+  return /^\/(?![/\\])/.test(url);
 }
 
 function safeHost(url: string | undefined): string {

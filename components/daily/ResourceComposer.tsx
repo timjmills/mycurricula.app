@@ -85,6 +85,13 @@ import { usePlanner } from "@/lib/planner-store";
 import { useLabels } from "@/lib/labels";
 import { Button, Tooltip } from "@/components/ui";
 import { parseResourceUrl } from "@/lib/resource-embed";
+import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
+import {
+  resourceOwnerEvent,
+  uploadHostedFile,
+  ResourceUploadError,
+  type HostedUploadResult,
+} from "@/lib/resource-upload";
 import { ResourceEmbed } from "@/components/resources";
 import { AllToolsMenu } from "./AllToolsMenu";
 import styles from "./ResourceComposer.module.css";
@@ -124,6 +131,9 @@ export interface CapturedItem {
   thumbnailUrl?: string;
   /** Set true for file items so the limits banner can bucket them. */
   isFile?: boolean;
+  /** The underlying File, kept so a backend-mode Add can upload the bytes to
+   *  R2. Absent for links / title-only stubs. Not persisted anywhere. */
+  file?: File;
 }
 
 /** Summary of what landed in the planner doc on Add — handed back to
@@ -266,6 +276,7 @@ export function fileToCapturedItem(file: File): CapturedItem {
     mimeType: file.type,
     sizeBytes: file.size,
     isFile: true,
+    file,
   };
 }
 
@@ -332,6 +343,15 @@ export function ResourceComposer({
    *  refused at capture time (size cap, mime allowlist, or the per-
    *  lesson count cap). Auto-clears after 6 s. */
   const [rejectionStatus, setRejectionStatus] = useState<string | null>(null);
+  /** True while hosted-file uploads to R2 are in flight (backend mode). */
+  const [uploading, setUploading] = useState<boolean>(false);
+  /** Inline error when a hosted-file upload fails — keeps the dialog open so
+   *  the teacher can retry or remove the offending file. */
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  // Whether the planner Supabase seam is on. When true, file uploads persist
+  // to R2 + the resources table; when false the composer keeps its
+  // session-only blob behavior (mock / local).
+  const backendOn = isPlannerSupabaseConfigured();
 
   // Routing pills — initialize from the launching lesson + (optional) section.
   // The Section pill carries the special value "" to mean "Whole lesson".
@@ -356,6 +376,7 @@ export function ResourceComposer({
     // Fresh session — forget the previous open's committed blob URLs so the
     // leak guard can reclaim anything that was abandoned (not committed) then.
     committedUrlsRef.current = new Set<string>();
+    uploadedRef.current = new Map();
 
     setTitle("");
     setBody("");
@@ -367,6 +388,8 @@ export function ResourceComposer({
     setItems(initialItems ?? []);
     setPastedStatus(null);
     setRejectionStatus(null);
+    setUploading(false);
+    setUploadError(null);
     setSubjectId(lesson.subject);
     setUnitId(lesson.unit);
     setLessonId(lesson.id);
@@ -397,6 +420,11 @@ export function ResourceComposer({
   // just-added image/PDF tile rendering a dead `blob:` (the "thumbnail
   // doesn't show after adding" bug). Reset on every re-open.
   const committedUrlsRef = useRef<Set<string>>(new Set<string>());
+
+  // Cache of completed hosted-file uploads, keyed by CapturedItem id, so a
+  // retry after a partial failure reuses results instead of re-uploading
+  // (which would duplicate the R2 object + row and eat the count quota).
+  const uploadedRef = useRef<Map<string, HostedUploadResult>>(new Map());
 
   const itemsRef = useRef<CapturedItem[]>(items);
   useEffect(() => {
@@ -654,6 +682,7 @@ export function ResourceComposer({
           mimeType: f.type,
           sizeBytes: f.size,
           isFile: true,
+          file: f,
         });
       }
       addItems(captured);
@@ -781,6 +810,7 @@ export function ResourceComposer({
           mimeType: f.type,
           sizeBytes: f.size,
           isFile: true,
+          file: f,
         }));
         addItems(captured);
         setPastedStatus(
@@ -852,8 +882,8 @@ export function ResourceComposer({
     return items.length > 0 || title.trim().length > 0;
   }, [items, title]);
 
-  const handleAdd = useCallback(() => {
-    if (!canAdd) return;
+  const handleAdd = useCallback(async () => {
+    if (!canAdd || uploading) return;
 
     // Resolve the destination lesson; fall back to the launching lesson
     // if the picker somehow ended up with a stale id.
@@ -892,6 +922,12 @@ export function ResourceComposer({
       mimeType?: string;
       sizeBytes?: number;
       thumbnailUrl?: string;
+      resourceId?: string;
+      /** Transient: the File to upload, its blob URL, and the source
+       *  CapturedItem id (upload-cache key). Never dispatched. */
+      __file?: File;
+      __blobUrl?: string;
+      __id?: string;
     };
     const toCommit: CommitShape[] =
       items.length > 0
@@ -907,6 +943,9 @@ export function ResourceComposer({
             mimeType: it.mimeType,
             sizeBytes: it.sizeBytes,
             thumbnailUrl: it.thumbnailUrl,
+            __file: it.file,
+            __blobUrl: it.url?.startsWith("blob:") ? it.url : undefined,
+            __id: it.id,
           }))
         : [{ type: "link", label: title.trim() || "New resource" }];
 
@@ -920,6 +959,58 @@ export function ResourceComposer({
         ...toCommit[0],
         label: labelWithNote(title.trim(), onlyItem?.note),
       };
+    }
+
+    // ── Backend persistence (team-shared at the master event) ────────────
+    // When the planner Supabase seam is on, push every FILE item to R2 and
+    // rewrite its url -> /api/resources/{id} (+ resourceId) so it PERSISTS and
+    // reaches the team. Links / title-only stubs are untouched (they persist
+    // via the section/lesson JSONB seam). With the flag off we keep the
+    // session-only blob behavior — no network call, no change.
+    if (backendOn && toCommit.some((r) => r.__file)) {
+      setUploadError(null);
+      setUploading(true);
+      const owner = resourceOwnerEvent(destLesson);
+      // Upload every file item, reusing any result already cached from a prior
+      // attempt so a RETRY never re-uploads a file that already succeeded
+      // (which would duplicate the R2 object + resources row and eat the
+      // per-event count quota). allSettled — not all — so one failure doesn't
+      // abandon the in-flight successes: they finish, cache, and commit on the
+      // next click.
+      const fileEntries = toCommit.filter((r) => r.__file);
+      const settled = await Promise.allSettled(
+        fileEntries.map(async (r) => {
+          const cached = r.__id ? uploadedRef.current.get(r.__id) : undefined;
+          const result =
+            cached ??
+            (await uploadHostedFile({
+              owner,
+              file: r.__file as File,
+              displayLabel: r.label,
+            }));
+          if (r.__id && !cached) uploadedRef.current.set(r.__id, result);
+          r.url = result.url;
+          r.resourceId = result.resourceId;
+          r.provider = result.provider;
+          r.mimeType = result.mimeType;
+          r.sizeBytes = result.sizeBytes;
+          // Image tiles read thumbnailUrl ?? url; the served url IS the image.
+          r.thumbnailUrl = result.provider === "image" ? result.url : undefined;
+          // The blob is no longer the resource's url — let it be revoked.
+          r.__blobUrl = undefined;
+        }),
+      );
+      setUploading(false);
+      const failure = settled.find((s) => s.status === "rejected");
+      if (failure) {
+        const reason = (failure as PromiseRejectedResult).reason;
+        setUploadError(
+          reason instanceof ResourceUploadError
+            ? reason.message
+            : "Couldn't upload your file. Please try again.",
+        );
+        return; // dialog stays open; succeeded uploads are cached for retry
+      }
     }
 
     if (destSectionId) {
@@ -937,6 +1028,7 @@ export function ResourceComposer({
           mimeType: r.mimeType,
           sizeBytes: r.sizeBytes,
           thumbnailUrl: r.thumbnailUrl,
+          resourceId: r.resourceId,
         });
       }
     } else {
@@ -952,17 +1044,19 @@ export function ResourceComposer({
         mimeType: r.mimeType,
         sizeBytes: r.sizeBytes,
         thumbnailUrl: r.thumbnailUrl,
+        resourceId: r.resourceId,
       }));
       editLesson(destLessonId, {
         resources: [...destLesson.resources, ...newResources],
       });
     }
 
-    // Claim every blob URL we just handed to the store so the close-time
-    // leak guard skips it (see committedUrlsRef). Without this the freshly
-    // added image/PDF tile would point at a revoked blob and render blank.
-    for (const it of items) {
-      if (it.url?.startsWith("blob:")) committedUrlsRef.current.add(it.url);
+    // Protect only blobs that REMAIN the committed url (mock-mode / session
+    // files). Uploaded files now point at /api/resources/{id}, so their blob
+    // is freed by the close-time leak guard. Without this a session-only
+    // image/PDF tile would point at a revoked blob and render blank.
+    for (const r of toCommit) {
+      if (r.__blobUrl) committedUrlsRef.current.add(r.__blobUrl);
     }
 
     // Report back to the caller (the Resources panel uses this to register
@@ -982,6 +1076,8 @@ export function ResourceComposer({
     onClose();
   }, [
     canAdd,
+    uploading,
+    backendOn,
     items,
     title,
     lessonId,
@@ -1100,11 +1196,15 @@ export function ResourceComposer({
             variant="primary"
             size="sm"
             className={styles.addBtn}
-            tooltip="Attach every captured resource to the chosen lesson for this session — files aren't uploaded to the server yet, so they won't survive a reload or reach your team until backend sync is on"
+            tooltip={
+              backendOn
+                ? "Attach every captured resource to this lesson — files upload to your team's storage; links and notes save to the plan"
+                : "Attach every captured resource to the chosen lesson for this session — files aren't uploaded to the server yet, so they won't survive a reload or reach your team until backend sync is on"
+            }
             onClick={handleAdd}
-            disabled={!canAdd}
+            disabled={!canAdd || uploading}
           >
-            Add
+            {uploading ? "Adding…" : "Add"}
           </Button>
         </header>
 
@@ -1281,15 +1381,34 @@ export function ResourceComposer({
                 inline so the Add button never implies a durable, team-visible
                 save. Mirrors the InstanceRename "saved on this device for now"
                 precedent. */}
-            <p
-              className={styles.caption}
-              style={{ color: "var(--catchup, #b45309)" }}
-              role="note"
-            >
-              Attached for this session only — files aren&rsquo;t uploaded to
-              the server yet, so they won&rsquo;t survive a reload or reach your
-              team until backend sync is on.
-            </p>
+            {backendOn ? (
+              <p className={styles.caption} role="note">
+                Files upload to your team&rsquo;s storage; links and notes save
+                to the lesson.
+              </p>
+            ) : (
+              <p
+                className={styles.caption}
+                style={{ color: "var(--catchup, #b45309)" }}
+                role="note"
+              >
+                Attached for this session only — files aren&rsquo;t uploaded to
+                the server yet, so they won&rsquo;t survive a reload or reach
+                your team until backend sync is on.
+              </p>
+            )}
+
+            {/* Inline upload failure — keeps the dialog open so the teacher
+                can retry or remove the offending file. */}
+            {uploadError && (
+              <p
+                className={styles.caption}
+                style={{ color: "var(--catchup, #b45309)" }}
+                role="alert"
+              >
+                {uploadError}
+              </p>
+            )}
 
             {/* ── Body textarea ──────────────────────────────────────────── */}
             <textarea

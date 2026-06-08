@@ -202,11 +202,18 @@ export function AllToolsMenu({
       if (!files || files.length === 0) return;
       const captured: CapturedItem[] = [];
       for (let i = 0; i < files.length; i += 1) {
-        if (!files[i].type.startsWith("image/")) continue;
+        const f = files[i];
+        if (!f.type.startsWith("image/")) continue;
         captured.push({
           id: `cap-${Date.now().toString(36)}-${i}`,
           type: "image",
-          label: files[i].name || "Photo",
+          label: f.name || "Photo",
+          url: URL.createObjectURL(f),
+          provider: "image",
+          mimeType: f.type,
+          sizeBytes: f.size,
+          isFile: true,
+          file: f,
         });
       }
       onAddItems(captured);
@@ -224,11 +231,18 @@ export function AllToolsMenu({
       if (!files || files.length === 0) return;
       const captured: CapturedItem[] = [];
       for (let i = 0; i < files.length; i += 1) {
-        if (!files[i].type.startsWith("image/")) continue;
+        const f = files[i];
+        if (!f.type.startsWith("image/")) continue;
         captured.push({
           id: `cap-${Date.now().toString(36)}-${i}`,
           type: "image",
-          label: files[i].name || "Camera photo",
+          label: f.name || "Camera photo",
+          url: URL.createObjectURL(f),
+          provider: "image",
+          mimeType: f.type,
+          sizeBytes: f.size,
+          isFile: true,
+          file: f,
         });
       }
       onAddItems(captured);
