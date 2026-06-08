@@ -202,6 +202,19 @@ export interface TeachDataSource {
    * Counts toward the cap → throws `BoardCapError` at the limit.
    */
   copyTeamBoardToMine(boardId: string, ownerId: string): Promise<Board>;
+  /**
+   * Pull a board (e.g. a Team-Library board, or any lesson-detached library
+   * board) into a SPECIFIC lesson as a private personal copy — lesson-attached,
+   * fresh ids, FULL pages. The "open a library board" → add-it-to-the-lesson-in-
+   * view path. The copy's grade is derived from the target lesson and its title
+   * de-duplicated against that lesson's personal set. Counts toward the cap →
+   * throws `BoardCapError` at the limit.
+   */
+  copyBoardToLesson(
+    boardId: string,
+    masterLessonId: string,
+    ownerId: string,
+  ): Promise<Board>;
 
   // ── 5.31 redesign: appearance, repeat, free-form canvas, pages ─────────────
   /** Set a board's global appearance theme (the Board Theme panel write path).

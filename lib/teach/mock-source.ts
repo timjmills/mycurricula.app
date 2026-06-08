@@ -707,6 +707,45 @@ export const mockTeachSource: TeachDataSource = {
     return cloneBoard(copy);
   },
 
+  async copyBoardToLesson(boardId, masterLessonId, ownerId) {
+    const owner = resolveOwnerId(ownerId);
+    const lesson = resolveLessonId(masterLessonId);
+    const source = boards.find((b) => b.id === boardId);
+    if (!source) throw new Error(`Board not found: ${boardId}`);
+    assertUnderCap(owner);
+    const id = nextId("b");
+    const now = new Date().toISOString();
+    // A lesson-ATTACHED private copy (FULL pages) — the "open a library board into
+    // the lesson in view" path (F11). Unlike copyTeamBoardToMine (detached), this
+    // sets masterLessonId so the board joins the lesson's personal set. Mirrors the
+    // Supabase copyBoardToLesson (full-page re-mint via clonePagesOnto+commitPages).
+    const order = boards.filter(
+      (b) =>
+        b.masterLessonId === lesson &&
+        b.scope === "personal" &&
+        b.ownerId === owner,
+    ).length;
+    const pages = clonePagesOnto(source, id);
+    const copy: Board = {
+      ...cloneBoard(source),
+      id,
+      masterLessonId: lesson,
+      ownerId: owner,
+      scope: "personal",
+      displayOrderWithinLesson: order,
+      libraryVisibility: "private",
+      publishedBy: null,
+      ephemeral: undefined,
+      sourceBoardId: source.id,
+      widgets: cloneWidgetsOnto(source, id),
+      createdAt: now,
+      updatedAt: now,
+    };
+    if (pages) commitPages(copy, pages);
+    boards.push(copy);
+    return cloneBoard(copy);
+  },
+
   // ── 5.31: appearance, repeat, free-form canvas, pages ──────────────────────
 
   async setBoardTheme(boardId, theme) {

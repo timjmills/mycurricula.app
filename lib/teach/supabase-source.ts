@@ -1856,6 +1856,54 @@ export const supabaseTeachSource: TeachDataSource = {
     return loadBoard(client, newRow.id);
   },
 
+  async copyBoardToLesson(boardId, masterLessonId, ownerId) {
+    const client = await sb();
+    const owner = resolveOwnerId(ownerId);
+    const lesson = resolveLessonId(masterLessonId);
+    const source = await loadBoard(client, boardId);
+    await assertUnderCap(client, owner);
+    // "Open a library board" → add it to the lesson currently in view (audit F11).
+    // Unlike copyTeamBoardToMine (a lesson-DETACHED pull into My Boards), this
+    // ATTACHES the copy to the target lesson as the teacher's personal board.
+    // Grade is DERIVED from the lesson (trg_boards_lesson_grade requires the
+    // stamped grade to equal the lesson's), and the title is de-duped against the
+    // lesson's personal set so `uniq_boards_personal_lesson_title` can't reject it.
+    const grade = await gradeIdForLesson(client, lesson);
+    const nextOrder = await nextLessonOrder(client, lesson, "personal", owner);
+    const title = await uniquePersonalTitle(
+      client,
+      lesson,
+      owner,
+      source.title,
+    );
+    const ins = await client
+      .from("boards")
+      .insert({
+        master_core_lesson_event_id: lesson,
+        owner_id: owner,
+        scope: "personal",
+        title,
+        display_order_within_lesson: nextOrder,
+        template_id: source.templateId,
+        grade_level_id: grade,
+        background: source.background ?? null,
+        tags: source.tags ?? null,
+        board_theme: source.boardTheme ?? null,
+        repeat: source.repeat ?? null,
+        whiteboard: source.whiteboard ?? false,
+        ephemeral: false,
+        library_visibility: "private",
+        published_by: null,
+        source_board_id: source.id,
+      })
+      .select(BOARD_COLS)
+      .single();
+    const newRow = unwrap(ins, "copy board to lesson") as BoardRow;
+    // Roll back the just-created copy if the content copy fails (audit F8).
+    await copyBoardContentOrRollback(client, source, newRow.id);
+    return loadBoard(client, newRow.id);
+  },
+
   // ── 5.31: appearance, repeat, free-form canvas, pages ──────────────────────
   async setBoardTheme(boardId: string, theme: ThemeOverride) {
     const client = await sb();

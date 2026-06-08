@@ -46,6 +46,7 @@ import { shoutboxForDay } from "@/lib/mock";
 import { toTeachResource } from "@/lib/teach/toTeachResource";
 import { ME } from "@/lib/mock/teachers";
 import { teachClient as teach } from "@/lib/teach/client";
+import { SANDBOX_LESSON_ID } from "@/lib/teach/queries";
 import { plannerClient } from "@/lib/planner/client";
 import {
   BOARD_LAYOUT_GRID,
@@ -115,13 +116,13 @@ export interface TeachWorkspaceProps {
 // lands on a populated preview (Wave-2 wiring requirement 1).
 const DEFAULT_LESSON_ID = "m-12-0";
 
-// Sandbox (lesson-less) board scope. Sandbox boards still need a real,
-// repo-backed board to build on (plan §4a / §4.4 "Add your first widget"), so
-// they hang off a stable sentinel lesson id. Nothing reaches a *planner* lesson
-// until the teacher pins/saves the sandbox (BoardsModule §4a flows); this id is
-// purely the repository key for the ephemeral set. Distinct per-mount is NOT
-// wanted — keeping it stable lets the same sandbox set survive tab switches.
-const SANDBOX_LESSON_ID = "sandbox";
+// Sandbox (lesson-less) board scope: the repository key for the teacher's
+// lesson-less ephemeral scratch boards. The sentinel's single source of truth is
+// the data contract (SANDBOX_LESSON_ID in lib/teach/queries.ts) so the UI and the
+// repo agree; the repo maps it to lesson-less ephemeral personal boards (audit
+// F4). Nothing reaches a *planner* lesson until the teacher pins/saves the sandbox
+// (BoardsModule §4a flows); keeping it stable lets the sandbox set survive tab
+// switches.
 
 // Whether the Teach surface persists to Supabase (the same flag the client
 // facade in lib/teach/client.ts branches on). When OFF the workspace keeps the
@@ -1450,12 +1451,41 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                   <BoardLibraryModule
                     gradeLevelId={boardGradeId(activeBoard)}
                     onOpenBoard={(board) => {
-                      dispatch({
-                        type: "selectLesson",
-                        lessonId: board.masterLessonId,
-                      });
-                      dispatch({ type: "selectBoard", boardId: board.id });
-                      setLibraryOverlay(null);
+                      void (async () => {
+                        // A board already attached to a lesson (a My Board for a
+                        // lesson) → just navigate to it.
+                        if (board.masterLessonId != null) {
+                          dispatch({
+                            type: "selectLesson",
+                            lessonId: board.masterLessonId,
+                          });
+                          dispatch({ type: "selectBoard", boardId: board.id });
+                          setLibraryOverlay(null);
+                          return;
+                        }
+                        // Lesson-DETACHED library board (Team Library / a detached
+                        // My Board): PULL A COPY INTO THE CURRENT LESSON (audit
+                        // F11). Dispatching selectLesson(null) would clear the
+                        // workspace, so instead add a personal copy to the lesson
+                        // in view and select it.
+                        if (activeLessonId != null && ownerId != null) {
+                          const copy = await teach.copyBoardToLesson(
+                            board.id,
+                            activeLessonId,
+                            ownerId,
+                          );
+                          await reloadBoards();
+                          dispatch({ type: "selectBoard", boardId: copy.id });
+                          setLibraryOverlay(null);
+                          return;
+                        }
+                        // No lesson in view (e.g. sandbox) → fall back to pulling a
+                        // detached copy into My Boards so the action still succeeds.
+                        if (ownerId != null) {
+                          await teach.copyTeamBoardToMine(board.id, ownerId);
+                          setLibraryOverlay(null);
+                        }
+                      })();
                     }}
                     // Finding 3 fix: thread the flag-aware owner id so library
                     // operations never use the hard-coded `ME.id` slug under

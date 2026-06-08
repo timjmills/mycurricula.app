@@ -42,6 +42,7 @@ import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { useConsequenceToast } from "@/lib/consequence-toast";
 import { teachClient as teach } from "@/lib/teach/client";
+import { SANDBOX_LESSON_ID } from "@/lib/teach/queries";
 import type { Board } from "@/lib/types";
 import type { TeachWorkspaceAction } from "@/components/teach/TeachWorkspace";
 import { PlusIcon, ShareIcon, PinIcon } from "../icons";
@@ -209,12 +210,18 @@ export function BoardsModule({
   }
 
   async function handleAddBoard(): Promise<void> {
-    if (!activeLessonId) return;
     // Guard: owner must be resolved before we write a new board row (audit
     // finding #18 — slug in a uuid/RLS column breaks row-level security).
     if (!ownerId) return;
+    // In SANDBOX mode there is no active lesson — a sandbox board hangs off the
+    // sentinel lesson id, which the repo treats as a lesson-less ephemeral scratch
+    // board (audit F4 / review note #5: this previously bailed on the null lesson,
+    // so a teacher could not add a board while in the sandbox). Otherwise the board
+    // is added to the active lesson.
+    const targetLesson = sandbox ? SANDBOX_LESSON_ID : activeLessonId;
+    if (!targetLesson) return;
     const created = await teach.createBoard({
-      masterLessonId: activeLessonId,
+      masterLessonId: targetLesson,
       ownerId,
       scope: "personal",
       title: `Board ${boards.length + 1}`,
