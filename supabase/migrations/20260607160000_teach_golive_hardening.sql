@@ -39,11 +39,15 @@
 --      so default-team-set seeding would have errored under Supabase.
 --   4. pushBoardsToTeam's team-set displacement (plan §13.1: delete the lesson's
 --      team set, then re-insert the pushed set) ran as SEPARATE PostgREST calls —
---      a failure after the delete left the team with NO boards. FIX:
---      `teach_replace_team_set()`, a SECURITY INVOKER function (so the caller's
---      RLS still gates every row — this only adds atomicity, never privilege)
---      that does the delete + bulk insert of boards and their page-0 widget
---      mirror in ONE transaction.
+--      a failure after the delete left the team with NO boards, AND a direct call
+--      with an empty/crafted payload could wipe or spoof a set. FIX:
+--      `teach_replace_lesson_set()`, a SECURITY INVOKER function (so the caller's
+--      RLS still gates every row — this only adds atomicity, never privilege) that
+--      VALIDATES the payload BEFORE the delete, then does the delete + bulk insert
+--      of boards and their page-0 widget mirror in ONE transaction. It generalizes
+--      to both the team set (scope='team') and a teacher's personal set
+--      (scope='personal'); the legacy unvalidated `teach_replace_team_set` is
+--      dropped (SECTION 4).
 --
 -- PRIVACY (plan §11.4) is untouched: names are stripped at the app boundary
 -- (widgetToRow / stripNames) before any payload reaches these functions; the RPC
@@ -208,6 +212,15 @@ create trigger trg_boards_lesson_grade
 -- rowtype (coercing uuids / jsonb / booleans / ints); the explicit INSERT column
 -- lists OMIT created_at/updated_at so their column defaults apply.
 -- ---------------------------------------------------------------------------
+-- Idempotency / cleanup (external review #1). This migration was edited in place to
+-- RENAME the original `teach_replace_team_set(uuid,jsonb,jsonb)` → the validated
+-- `teach_replace_lesson_set`. Drop the legacy signature UNCONDITIONALLY so it can
+-- never linger as an unguarded, deletes-before-validate RPC ("old function must not
+-- exist"), regardless of how/when this file first reached a given database. On a
+-- fresh apply this is a harmless no-op (the legacy function is only ever created by
+-- an earlier in-place version of THIS file).
+drop function if exists teach_replace_team_set(uuid, jsonb, jsonb);
+
 create or replace function teach_replace_lesson_set(
   p_lesson  uuid,
   p_scope   board_scope,
