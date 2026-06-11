@@ -81,15 +81,7 @@ import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip } from "@/components/ui";
-import { LessonAgendaNav } from "./LessonAgendaNav";
 import detailStyles from "./lesson-detail.module.css";
-
-// ── Agenda-navigator visibility persistence ──────────────────────────────
-// The sticky section navigator beside the lesson flow (6.11.26 redesign)
-// can be hidden per-teacher. SSR-safe: default ON for the server render;
-// the saved preference loads post-mount.
-
-const AGENDA_NAV_KEY = "mycurricula:daily-agenda-nav-on";
 
 // ── Completion checkbox (status-aware) ───────────────────────────────────
 
@@ -230,49 +222,8 @@ export function LessonDetail({
   // hosting the lesson flow + notes. The docked RichTextEditor toolbar
   // centers itself on this element and pins near its bottom edge. We
   // forward the ref to <LessonFlow dockTarget={cellRef}> and to the notes
-  // RichTextEditor. The agenda navigator also scans + scrollspies this
-  // container.
+  // RichTextEditor.
   const cellRef = useRef<HTMLDivElement | null>(null);
-
-  // ── Narrow-workspace measurement ──────────────────────────────────────
-  // The agenda navigator stacks above the flow when the detail column is
-  // narrow. JS-measured (ResizeObserver on the body cell) instead of a
-  // container query — container-type on the scroll container would make
-  // it the containing block for the fixed-position ResourceComposer
-  // rendered inside <LessonFlow>, breaking that dialog.
-  const [workspaceNarrow, setWorkspaceNarrow] = useState(false);
-  useEffect(() => {
-    const el = cellRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setWorkspaceNarrow(entry.contentRect.width < 560);
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // ── Agenda navigator visibility (per-teacher, persisted) ─────────────
-  const [agendaNavOn, setAgendaNavOn] = useState(true);
-  useEffect(() => {
-    try {
-      setAgendaNavOn(window.localStorage.getItem(AGENDA_NAV_KEY) !== "0");
-    } catch {
-      // Storage unavailable — keep the default (on).
-    }
-  }, []);
-  function toggleAgendaNav(): void {
-    setAgendaNavOn((v) => {
-      const next = !v;
-      try {
-        window.localStorage.setItem(AGENDA_NAV_KEY, next ? "1" : "0");
-      } catch {
-        // Storage unavailable — the choice simply won't persist.
-      }
-      return next;
-    });
-  }
 
   // ── "My notes" scroll target ─────────────────────────────────────────
   // The action-row "Lesson notes" button scrolls this section into view
@@ -785,63 +736,22 @@ export function LessonDetail({
             </div>
           </div>
 
-          {/* ── Lesson workspace — agenda navigator + lesson flow ───────
-              (6.11.26 redesign §6.) A sticky numbered section navigator
-              sits beside the flow: click to jump, scrollspy highlights
-              the section under the reading line, and the toggle hides it
-              for teachers who want full-width text. The navigator is
-              DOM-driven off the flow's data-flow-section anchors so it
-              follows add / remove / reorder / rename automatically.
-              LessonFlow itself is unchanged: key resets dnd drag state
-              when the selected lesson changes; modified drives the fork
-              stripe; dockTarget threads the docked-toolbar ref through
-              to every section editor. */}
-          <div className={detailStyles.agendaBar}>
-            <Tooltip
-              content="Show or hide the section navigator — the numbered map of this lesson's flow that follows along as you scroll"
-              side="top"
-              tooltipId="lesson-detail-agenda-toggle"
-            >
-              <button
-                type="button"
-                className={detailStyles.agendaToggle}
-                aria-pressed={agendaNavOn}
-                onClick={toggleAgendaNav}
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="4" width="18" height="16" rx="2" />
-                  <line x1="9" y1="4" x2="9" y2="20" />
-                </svg>
-                {agendaNavOn ? "Hide navigation" : "Show navigation"}
-              </button>
-            </Tooltip>
-          </div>
-          <div
-            className={`${detailStyles.workspace} ${
-              agendaNavOn ? "" : detailStyles.workspaceNavOff
-            } ${workspaceNarrow ? detailStyles.workspaceNarrow : ""}`}
-          >
-            {agendaNavOn && (
-              <LessonAgendaNav scrollRef={cellRef} lessonId={lesson.id} />
-            )}
-            <div className={detailStyles.flowWrap}>
-              <LessonFlow
-                key={lesson.id}
-                lessonId={lesson.id}
-                modified={lesson.modified}
-                dockTarget={cellRef}
-              />
-            </div>
+          {/* ── Lesson Flow — structured section editor ─────────────────
+              Sits directly on the white body — no bordered/shaded box,
+              just normal vertical breathing room. The other agent owns
+              the lesson flow internals (sections + per-section
+              resources); this wrapper just gives the flow its place in
+              the column. key resets dnd drag state when the selected
+              lesson changes. modified drives the fork stripe (dashed
+              when personally modified). dockTarget threads the docked-
+              toolbar ref through to every section editor. */}
+          <div className={detailStyles.flowWrap}>
+            <LessonFlow
+              key={lesson.id}
+              lessonId={lesson.id}
+              modified={lesson.modified}
+              dockTarget={cellRef}
+            />
           </div>
 
           {/* Standards row deliberately omitted here — <LessonFlow> already

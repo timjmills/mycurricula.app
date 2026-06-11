@@ -441,16 +441,6 @@ const SortableSection = memo(function SortableSection({
       className={[styles.row, isDragging ? styles.rowDragging : ""]
         .filter(Boolean)
         .join(" ")}
-      // DOM anchors for the Daily view's agenda navigator
-      // (components/daily/LessonAgendaNav) — it scans the rendered rows
-      // so it never duplicates this file's canonical-row resolution.
-      // tabIndex -1: the navigator moves focus here after a jump so
-      // keyboard / screen-reader users continue from the section they
-      // chose (never tab-reachable; programmatic focus only).
-      data-flow-section={rowId}
-      data-flow-title={canonical.title}
-      data-flow-index={canonical.index}
-      tabIndex={-1}
     >
       {/* Drag-compact chip (only meaningful for store-backed rows). */}
       {isCompact && storeSection && chipContent}
