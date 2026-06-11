@@ -1,0 +1,356 @@
+/* phase-resources.module.css — per-phase tagged resources as resChip rows
+ * (6.11.26 design_handoff_daily_view §7; prototype CSS ~679-710 + ~298-306).
+ *
+ *   .phaseRes        → block under the phase body; hairline top border
+ *   .phaseResHead    → folder icon + "RESOURCES" + .phaseResNote + "+ Add"
+ *   .resChipList     → vertical stack (single-column, full-width — holds at
+ *                      360px with no page-level horizontal scroll)
+ *   .resChip         → grip · 40×40 .resChipThumb (--rc tint) · meta ·
+ *                      .resChipOpen · hover-revealed .resChipDel
+ *
+ * `--rc` is set inline per chip from resourceChipColor() in
+ * phase-resources.tsx — always an existing bright TOKEN (never a hex).
+ * Tint recipe (prototype ~689): bg color-mix(in oklch, --rc 12%, --surface);
+ * border 22%; icon at full --rc strength.
+ *
+ * Transitions ≤ .14s; reduced motion collapses them to near-instant.
+ */
+
+/* ── Block ───────────────────────────────────────────────────────────── */
+.phaseRes {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+}
+
+/* ── Head row (prototype ~682-684) ───────────────────────────────────── */
+.phaseResHead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px;
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.phaseResHead svg {
+  flex: 0 0 auto;
+}
+
+/* "tagged to this phase" — quiet note; margin-right:auto pushes the "+ Add"
+   trigger to the row's right edge (prototype margin: 0 auto 0 8px). */
+.phaseResNote {
+  margin: 0 auto 0 8px;
+  font-size: var(--t-11);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--faint);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "+ Add" — routes into the shared ResourceComposer. Small text affordance;
+   ≥44px effective target via padding + negative margin. */
+.phaseResAdd {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 8px 10px;
+  margin: -8px -4px -8px 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-6);
+  font-family: inherit;
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.phaseResAdd:hover:not(:disabled) {
+  background: var(--brand-50);
+  color: var(--brand-600);
+}
+
+.phaseResAdd:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.phaseResAdd:disabled {
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+/* ── Chip list (prototype ~685) ──────────────────────────────────────── */
+.resChipList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: var(--r-sm);
+  transition: background 0.14s ease;
+}
+
+/* A chip from another phase is hovering over this list. */
+.resChipListOver {
+  background: var(--brand-50);
+}
+
+/* Quiet empty placeholder — also the drop target for cross-phase moves. */
+.resChipEmpty {
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
+  font-size: var(--t-12);
+  color: var(--faint);
+}
+
+/* ── Chip row (prototype ~686-688) ───────────────────────────────────── */
+.resChip {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 10px 8px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  min-width: 0;
+  transition:
+    box-shadow 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.resChip:hover {
+  box-shadow: var(--sh-xs);
+  border-color: var(--border-cool);
+}
+
+/* Sortable placeholder while this chip rides the DragOverlay. */
+.resChipDragging {
+  opacity: 0.35;
+}
+
+/* The DragOverlay ghost — the chip look, floating. */
+.resChipGhost {
+  box-shadow: var(--sh-lg);
+  opacity: 0.97;
+  cursor: grabbing;
+  width: 280px;
+  max-width: 70vw;
+}
+
+/* ── Chip drag grip (prototype .resChip .dragGrip{opacity:.55}) ──────── */
+.chipGrip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 28px;
+  /* ≥44px effective target via padding + negative margin. */
+  padding: 8px 10px;
+  margin: -8px -10px;
+  box-sizing: content-box;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-xs);
+  color: var(--muted);
+  opacity: 0.55;
+  cursor: grab;
+  touch-action: none;
+  transition:
+    opacity 0.1s ease,
+    color 0.1s ease;
+}
+
+.chipGrip:hover {
+  opacity: 1;
+  color: var(--ink-soft);
+}
+
+.chipGrip:active {
+  cursor: grabbing;
+}
+
+.chipGrip:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+}
+
+/* ── Thumb — 40×40, --rc tinted (prototype ~689-690) ─────────────────── */
+.resChipThumb {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-xs);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--rc, var(--brand-600));
+  background: color-mix(
+    in oklch,
+    var(--rc, var(--brand-500)) 12%,
+    var(--surface)
+  );
+  border: 1px solid
+    color-mix(in oklch, var(--rc, var(--brand-500)) 22%, transparent);
+}
+
+/* ── Meta — title + type line (prototype ~691-693) ───────────────────── */
+.resChipMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.resChipTitle {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: text;
+  border-radius: 3px;
+}
+
+/* Focused title un-truncates + shows the brand-200 outline (prototype ~284). */
+.resChipTitle:focus-visible {
+  white-space: normal;
+  overflow: visible;
+  outline: 2px solid var(--brand-200);
+  outline-offset: 1px;
+}
+
+/* Inline rename input — same type as the title. */
+.resChipTitleInput {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.25;
+  padding: 0;
+  border-radius: 3px;
+}
+
+.resChipTitleInput:focus {
+  outline: 2px solid var(--brand-200);
+  outline-offset: 1px;
+}
+
+.resChipType {
+  font-size: var(--t-11);
+  color: var(--muted);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Open — 30px bordered square (prototype ~694-696) ────────────────── */
+.resChipOpen {
+  position: relative;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-xs);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    color 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.resChipOpen:hover {
+  color: var(--brand-600);
+  border-color: var(--brand-300);
+}
+
+.resChipOpen:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+/* ≥44px effective touch target. */
+.resChipOpen::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+
+/* ── Delete — hover-revealed (prototype ~303-306) ────────────────────── */
+.resChipDel {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-xs);
+  display: grid;
+  place-items: center;
+  color: var(--faint);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  /* ≥44px effective target. */
+  padding: 8px;
+  margin: -8px;
+  box-sizing: content-box;
+  transition:
+    opacity 0.14s ease,
+    background 0.14s ease,
+    color 0.14s ease;
+}
+
+.resChip:hover .resChipDel,
+.resChip:focus-within .resChipDel {
+  opacity: 1;
+  color: var(--muted);
+}
+
+.resChipDel:hover {
+  color: var(--urgent);
+  background: var(--urgent-bg);
+}
+
+.resChipDel:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--brand-500);
+  outline-offset: 0;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .resChipList,
+  .resChip,
+  .chipGrip,
+  .resChipOpen,
+  .resChipDel,
+  .phaseResAdd {
+    transition-duration: 0.001ms !important;
+  }
+}

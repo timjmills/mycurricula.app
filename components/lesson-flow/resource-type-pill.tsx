@@ -1,8 +1,9 @@
 "use client";
 
-// resource-type-pill.tsx — the small TYPE PILL shown beside each resource in
-// the "More resources" sub-list (expanded SectionResources card) and the
-// "Resource quick access" minimized card.
+// resource-type-pill.tsx — the small TYPE PILL shown beside a resource row.
+// Its original host (the SectionResources card) was replaced by the 6.11.26
+// phase/resChip presentation; the pill survives as a standalone primitive
+// consumed by the Daily planning tabs.
 //
 // NOT migrated to Badge primitive — by design.
 //
