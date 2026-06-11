@@ -79,49 +79,17 @@ import {
   type SaveTarget,
 } from "./source";
 import { buildReverseIndex, slugToUuid } from "./id-bridge";
-import { createClient } from "../supabase/server";
+import {
+  makeUnwrap,
+  makeUnwrapMaybe,
+  sb,
+  type ServerClient,
+} from "../supabase/helpers";
 
-// ── Supabase client helper ───────────────────────────────────────────────────
-// The server client is async (it awaits `cookies()`), so every method resolves
-// it first. Resolving per call keeps the request-scoped auth session correct.
+// ── Supabase client helpers (shared, see lib/supabase/helpers.ts) ────────────
 
-type ServerClient = Awaited<ReturnType<typeof createClient>>;
-
-async function sb(): Promise<ServerClient> {
-  return createClient();
-}
-
-/** Wrap a supabase-js `{ data, error }` envelope: throw a descriptive Error on
- *  `error`, otherwise return `data`. Centralises the error-handling contract so
- *  every call site stays terse and no error is silently swallowed. */
-function unwrap<T>(
-  result: { data: T | null; error: { message: string } | null },
-  context: string,
-): T {
-  if (result.error) {
-    throw new Error(
-      `Planner repository ${context} failed: ${result.error.message}`,
-    );
-  }
-  if (result.data == null) {
-    throw new Error(`Planner repository ${context} returned no data.`);
-  }
-  return result.data;
-}
-
-/** Like `unwrap`, but tolerates a null `data` (for `.maybeSingle()` reads where
- *  "no row" is a valid answer). Still throws on a transport/SQL error. */
-function unwrapMaybe<T>(
-  result: { data: T | null; error: { message: string } | null },
-  context: string,
-): T | null {
-  if (result.error) {
-    throw new Error(
-      `Planner repository ${context} failed: ${result.error.message}`,
-    );
-  }
-  return result.data;
-}
+const unwrap = makeUnwrap("Planner repository");
+const unwrapMaybe = makeUnwrapMaybe("Planner repository");
 
 // ── Chunked `.in(...)` lookups ────────────────────────────────────────────────
 // A PostgREST `.in("col", ids)` serializes every id into the request URL, so a
