@@ -932,7 +932,23 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
   // state (panel placement, active tabs, collapse/pin, column widths)
   // persists under one localStorage key; `[` / `]` toggle the side
   // columns. See components/daily/dock.
-  const dock = useDockLayout();
+  //
+  // The `[` / `]` shortcuts only arm while the dock columns are actually
+  // visible: grid mode AND a viewport above the 720px single-pane fold
+  // (Dock.module.css). Otherwise they'd silently toggle invisible dock
+  // state and starve the global week-navigation shortcuts that share the
+  // same keys. SSR-safe: assume wide until the post-mount measure.
+  const [narrowViewport, setNarrowViewport] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 720px)");
+    const update = (): void => setNarrowViewport(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const dock = useDockLayout({
+    keyboardEnabled: viewMode !== "list" && !narrowViewport,
+  });
 
   // Controlled side-panel tab — the dock's collapsed icon rail deep-opens
   // a specific inner tab (Resources / To-do / Chat). RightRail remains the

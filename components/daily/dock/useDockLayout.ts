@@ -59,7 +59,18 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
 }
 
-export function useDockLayout(): DockLayoutApi {
+export interface UseDockLayoutOptions {
+  /** Gate for the `[` / `]` shortcuts. Pass false whenever the dock
+   *  columns are not actually visible (List mode, or the ≤720px
+   *  single-pane layout) — otherwise the keys would silently mutate
+   *  invisible dock state AND block the global week-navigation
+   *  shortcuts that bind the same keys. Defaults to true. */
+  keyboardEnabled?: boolean;
+}
+
+export function useDockLayout({
+  keyboardEnabled = true,
+}: UseDockLayoutOptions = {}): DockLayoutApi {
   const [layout, setLayout] = useState<DockLayoutState>(defaultDockLayout);
   const hydratedRef = useRef(false);
 
@@ -241,7 +252,10 @@ export function useDockLayout(): DockLayoutApi {
   // the same keys and now yield on e.defaultPrevented — see
   // lib/use-keyboard-shortcuts.ts) never double-fire on /daily. The
   // e.repeat guard keeps a held key from rapid-toggling the column.
+  // Skipped entirely while `keyboardEnabled` is false so the week-nav
+  // shortcuts keep working when the dock columns are not on screen.
   useEffect(() => {
+    if (!keyboardEnabled) return;
     function onKeyDown(e: KeyboardEvent): void {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.repeat) return;
@@ -256,7 +270,7 @@ export function useDockLayout(): DockLayoutApi {
     }
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [toggleSide]);
+  }, [toggleSide, keyboardEnabled]);
 
   return {
     layout,
