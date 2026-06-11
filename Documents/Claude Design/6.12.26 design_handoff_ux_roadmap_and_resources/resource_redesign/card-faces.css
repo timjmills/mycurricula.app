@@ -1,0 +1,184 @@
+/* Card faces — resource & notecard, on the canonical Weekly-card recipe
+   (BUILD_STANDARD §2) in the app's default VIVID style:
+     · subject tint fills the card (--cl via the .cp-subj cascade)
+     · stronger --c-surface-strong header band holding icon tile + title
+     · 4px subject-deep left border, var(--r-12), subject hairline border
+     · var(--shadow-card), DM Sans titles, Jakarta body
+   --wash = teacher's per-card override (any --subj-N-tint, or --paper for
+   white). The header band + left stripe stay subject-locked.
+   Spacing: strict 4·8·12·16·24 scale. */
+
+.cfc{
+  --wash: var(--c-surface); /* vivid default: subject tint fills the body */
+  width:248px; background:var(--wash);
+  border:1px solid var(--c-border);
+  border-left:4px solid var(--cd);
+  border-radius:var(--r-12); overflow:hidden;
+  box-shadow:var(--shadow-card);
+  display:flex; flex-direction:column; position:relative; text-align:left;
+  transition:box-shadow .12s ease, transform .12s ease;
+}
+.cfc:hover{box-shadow:var(--shadow-card-hover); transform:translateY(-1px);}
+@media (prefers-reduced-motion:reduce){.cfc, .cfc-kebab{transition:none;} .cfc:hover{transform:none;}}
+
+/* ── Header band — subject-locked, stronger tint over the body ── */
+.cfc-head{
+  display:flex; align-items:flex-start; gap:8px;
+  background:var(--c-surface-strong);
+  border-bottom:1px solid var(--c-border);
+  padding:12px 36px 12px 12px; position:relative;
+}
+.cfc-ic{
+  width:28px; height:28px; border-radius:var(--r-sm); flex:0 0 auto;
+  background:var(--paper); color:var(--cd);
+  display:grid; place-items:center; box-shadow:var(--sh-xs);
+}
+.cfc-ic svg{width:14px; height:14px;}
+.cfc-hgroup{min-width:0; flex:1;}
+.cfc-meta{font-size:var(--t-10); font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--cd); opacity:.72; margin-bottom:2px;}
+.cfc-title{font-family:var(--font-display-sm); font-size:var(--t-14); font-weight:700; line-height:1.25; color:var(--cd);}
+.cfc-subtitle{font-size:var(--t-11); font-weight:500; color:var(--cd); opacity:.65; margin-top:2px;}
+
+/* kebab — hover-revealed (BUILD_STANDARD §9), ≥44 inflated hit */
+.cfc-kebab{
+  position:absolute; top:10px; right:8px; width:28px; height:28px;
+  display:grid; place-items:center; border-radius:var(--r-xs);
+  color:var(--cd); opacity:0; transition:opacity .12s ease;
+}
+.cfc:hover .cfc-kebab, .cfc:focus-within .cfc-kebab{opacity:1;}
+@media (hover:none){.cfc-kebab{opacity:1;}}
+.cfc-kebab:hover{background:color-mix(in srgb, var(--cd) 12%, transparent);}
+.cfc-kebab svg{width:15px; height:15px;}
+.cfc-kebab::after{content:""; position:absolute; inset:-8px;}
+
+/* ── Preview — inset white frame on the tinted body, uniform height ── */
+.cfc-preview{
+  margin:12px 12px 0; height:120px; flex:0 0 auto;
+  background:var(--paper); border:1px solid var(--c-border);
+  border-radius:var(--r-sm); box-shadow:var(--sh-xs);
+  position:relative; overflow:hidden; cursor:zoom-in;
+}
+.cfc-preview img{width:100%; height:100%; object-fit:cover; display:block;}
+
+/* caption under preview */
+.cfc-caption{padding:8px 12px 0; font-size:var(--t-11); line-height:1.45; color:var(--ink-500);}
+
+/* ── Notes on a resource — 3-line clamp + …more ── */
+.cfc-notes{padding:8px 12px 0; font-size:var(--t-12); line-height:1.5; color:var(--ink-700);}
+.cfc-notes .tx{display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+.cfc-more{font-size:var(--t-11); font-weight:700; color:var(--cd); margin-top:4px; display:inline-block; min-height:24px;}
+.cfc-more:hover{text-decoration:underline;}
+
+/* ── Footer — source identity left, chips right ── */
+.cfc-foot{display:flex; align-items:center; gap:6px; padding:8px 12px 12px; margin-top:auto;}
+.cfc-src{
+  display:inline-flex; align-items:center; gap:6px; min-width:0;
+  background:var(--paper); border:1px solid var(--c-border); border-radius:var(--r-pill);
+  padding:3px 10px 3px 4px; font-size:var(--t-11); font-weight:600; color:var(--ink-700);
+}
+.cfc-src .fv{width:16px; height:16px; border-radius:50%; display:grid; place-items:center; font-size:8px; font-weight:800; color:var(--paper); flex:0 0 auto;}
+.cfc-src .dm{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.cfc-type{
+  margin-left:auto; flex:0 0 auto;
+  font-size:var(--t-10); font-weight:800; letter-spacing:.08em;
+  color:var(--cd); background:color-mix(in srgb, var(--cd) 10%, transparent);
+  border-radius:var(--r-pill); padding:3px 8px;
+}
+.cfc-noteFlag{
+  display:inline-flex; align-items:center; gap:4px; flex:0 0 auto;
+  font-size:var(--t-10); font-weight:800; color:var(--honey-600);
+  background:var(--honey-100); border-radius:var(--r-pill); padding:3px 8px;
+}
+.cfc-noteFlag svg{width:11px; height:11px;}
+
+/* ── Notecard body — rich text, clamped with fade + Read more ── */
+.cfc-body{position:relative; padding:12px 12px 0; font-size:var(--t-12); line-height:1.55; color:var(--ink-700); max-height:232px; overflow:hidden;}
+.cfc-body.clamped::after{content:""; position:absolute; left:0; right:0; bottom:0; height:40px; background:linear-gradient(to bottom, transparent, var(--wash));}
+.cfc-body h4{font-family:var(--font-display-sm); font-size:var(--t-12); font-weight:800; color:var(--ink-900); margin:12px 0 4px;}
+.cfc-body h4:first-child{margin-top:0;}
+.cfc-body p{margin:0 0 8px;}
+.cfc-body ul{margin:4px 0 8px; padding-left:16px;}
+.cfc-body li{margin:0 0 4px;}
+.cfc-body a{color:var(--brand-600); font-weight:600; text-decoration:underline; text-decoration-color:var(--brand-200); text-underline-offset:2px; cursor:pointer;}
+.cfc-body mark{background:var(--hlp-lemon); color:inherit; padding:0 2px; border-radius:2px;}
+.cfc-readmore{display:inline-flex; align-items:center; gap:4px; margin:4px 12px 0; min-height:28px; font-size:var(--t-11); font-weight:700; color:var(--cd); position:relative; z-index:1;}
+.cfc-readmore svg{width:12px; height:12px;}
+.cfc-readmore:hover{text-decoration:underline;}
+.cfc-readmore::after{content:""; position:absolute; inset:-8px;}
+
+/* checklist rows inside notecard text */
+.cfc-check{display:flex; align-items:flex-start; gap:8px; margin:0 0 4px;}
+.cfc-check .bx{width:14px; height:14px; margin-top:2px; border:1.5px solid var(--ink-300); border-radius:4px; flex:0 0 auto; display:grid; place-items:center; color:var(--paper); background:var(--paper);}
+.cfc-check.on .bx{background:var(--done); border-color:var(--done);}
+.cfc-check.on .bx svg{width:9px; height:9px;}
+.cfc-check.on span:last-child{color:var(--ink-400); text-decoration:line-through; text-decoration-color:var(--ink-300);}
+
+/* inline image in the text flow — same inset-frame language as previews */
+.cfc-inlineImg{margin:4px 0 8px; height:64px; border-radius:var(--r-xs); border:1px solid var(--c-border); background:var(--paper); overflow:hidden; position:relative; box-shadow:var(--sh-xs);}
+.cfc-inlineImg img{width:100%; height:100%; object-fit:cover; display:block;}
+
+/* ── Mock previews (stand-ins for live thumbnails) ── */
+.cfm-ixl{position:absolute; inset:0; padding:12px; font-size:11px; line-height:1.4; color:var(--ink-800); background:var(--paper);}
+.cfm-ixl .q{display:flex; align-items:flex-start; gap:6px; margin-bottom:8px;}
+.cfm-ixl .q svg{width:12px; height:12px; margin-top:1px; color:#2196f3; flex:0 0 auto;}
+.cfm-ixl .model{display:flex; margin:0 0 8px 18px; border-radius:4px; overflow:hidden;}
+.cfm-ixl .model .seg{height:36px; display:grid; place-items:center; font-size:10px; font-weight:700; color:rgba(0,0,0,.55);}
+.cfm-ixl .submit{display:inline-block; margin-left:18px; padding:4px 16px; background:#59b210; color:#fff; font-weight:700; font-size:10px; border-radius:4px;}
+.cfm-sheet{position:absolute; inset:0; background:var(--paper); padding:10px 14px; color:var(--ink-800);}
+.cfm-sheet .t{text-align:center; font-weight:800; font-size:11px; margin-bottom:2px;}
+.cfm-sheet .s{text-align:center; font-size:8px; color:var(--ink-400); margin-bottom:6px;}
+.cfm-sheet table{width:100%; border-collapse:collapse; margin-bottom:6px;}
+.cfm-sheet td{border:1px solid var(--ink-200); height:14px; font-size:8px; text-align:center; color:var(--ink-500);}
+.cfm-sheet td:first-child{background:var(--ink-100); font-weight:700;}
+.cfm-video{position:absolute; inset:0; background:#23262e; display:grid; place-items:center;}
+.cfm-video .pb{width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.92); display:grid; place-items:center; color:#23262e;}
+.cfm-video .pb svg{width:16px; height:16px; margin-left:2px;}
+.cfm-video .dur{position:absolute; right:8px; bottom:8px; padding:2px 6px; background:rgba(0,0,0,.72); color:#fff; font-size:9px; font-weight:700; border-radius:4px;}
+
+/* designed link-card fallback — never a broken frame */
+.cfm-link{position:absolute; inset:0; background:var(--surface-warm); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:12px; text-align:center;}
+.cfm-link .ini{width:40px; height:40px; border-radius:10px; display:grid; place-items:center; font-size:18px; font-weight:800; color:var(--paper); box-shadow:var(--sh-xs); margin-bottom:4px;}
+.cfm-link .dom{font-size:var(--t-12); font-weight:700; color:var(--ink-900);}
+.cfm-link .url{font-size:var(--t-10); color:var(--ink-400); max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+/* striped placeholder for user-supplied imagery */
+.cfm-photo{position:absolute; inset:0; background:repeating-linear-gradient(45deg, var(--ink-100) 0 8px, var(--surface-warm) 8px 16px); display:grid; place-items:center;}
+.cfm-photo span{font-family:var(--font-mono); font-size:10px; color:var(--ink-700); background:color-mix(in srgb, var(--paper) 85%, transparent); padding:4px 8px; border-radius:4px;}
+
+/* ── Card ⋯ menu ── */
+.cfc-menu{width:216px; background:var(--paper); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-popover); padding:4px;}
+.cfc-menuItem{display:flex; align-items:center; gap:8px; width:100%; padding:8px 12px; border-radius:var(--r-xs); font-size:var(--t-12); font-weight:600; color:var(--ink-700); min-height:36px; text-align:left;}
+.cfc-menuItem:hover{background:var(--hairline); color:var(--ink-900);}
+.cfc-menuItem svg{width:14px; height:14px; color:var(--ink-400); flex:0 0 auto;}
+.cfc-menuItem.danger{color:var(--danger);}
+.cfc-menuItem.danger svg{color:currentColor;}
+.cfc-menuSep{height:1px; background:var(--hairline); margin:4px 8px;}
+.cfc-menuLbl{padding:8px 12px 4px; font-size:var(--t-10); font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-400);}
+.cfc-swatches{display:grid; grid-template-columns:repeat(6, 24px); gap:8px; padding:4px 12px 8px;}
+.cfc-sw{width:24px; height:24px; border-radius:50%; border:1px solid var(--ink-200); position:relative;}
+.cfc-sw::after{content:""; position:absolute; inset:-8px;}
+.cfc-sw.on{outline:2px solid var(--ink-900); outline-offset:2px;}
+.cfc-sw.subj{background:var(--c-surface); border-color:var(--c);}
+
+/* ── Lightbox (one click) ── */
+.cfc-lightbox{border-radius:var(--r-lg); overflow:hidden; background:rgba(28,27,46,.55); padding:24px;}
+.cfc-lbCard{background:var(--paper); border-radius:var(--r-12); border-left:4px solid var(--cd); box-shadow:var(--sh-lg); overflow:hidden; display:flex; flex-direction:column;}
+.cfc-lbHead{display:flex; align-items:center; gap:8px; padding:8px 8px 8px 16px; background:var(--c-surface-strong); border-bottom:1px solid var(--c-border);}
+.cfc-lbTitle{font-family:var(--font-display-sm); font-size:var(--t-15); font-weight:700; color:var(--cd); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.cfc-lbHead .rn-iconBtn{color:var(--cd);}
+.cfc-lbHead .rn-iconBtn:hover{background:color-mix(in srgb, var(--cd) 12%, transparent); color:var(--cd);}
+.cfc-lbStage{position:relative; height:256px; background:#23262e;}
+.cfc-lbTools{position:absolute; left:50%; transform:translateX(-50%); bottom:12px; display:flex; gap:4px; padding:4px; background:rgba(20,20,30,.82); border-radius:var(--r-pill);}
+.cfc-lbTools button{width:32px; height:32px; border-radius:50%; display:grid; place-items:center; color:#cdd3e0; position:relative;}
+.cfc-lbTools button.on{background:var(--brand-500); color:#fff;}
+.cfc-lbTools button:hover{color:#fff;}
+.cfc-lbTools svg{width:14px; height:14px;}
+.cfc-lbTools button::after{content:""; position:absolute; inset:-6px;}
+.cfc-lbFoot{display:flex; align-items:center; gap:12px; padding:12px 16px; font-size:var(--t-11); color:var(--ink-400);}
+.cfc-lbHint{margin-left:auto; display:inline-flex; align-items:center; gap:4px; font-weight:700; color:var(--ink-700); background:var(--surface-warm); border:1px solid var(--hairline); border-radius:var(--r-pill); padding:4px 12px; white-space:nowrap;}
+.cfc-lbHint svg{width:12px; height:12px;}
+
+/* artboard helper rows */
+.cf-row{display:flex; gap:16px; align-items:flex-start;}
+.cf-col{display:flex; flex-direction:column; gap:8px;}
+.cf-lblRow{font-size:var(--t-10); font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-400); margin:0 0 8px;}
+.cf-lbl{font-size:var(--t-10); font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-400); text-align:center;}

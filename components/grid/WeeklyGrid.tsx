@@ -93,6 +93,7 @@ import {
   useDndSensors,
 } from "@/lib/collapse-on-drag";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
+import { useSubjectOrder, type MoveDirection } from "@/lib/subject-order";
 import { GridCell } from "./GridCell";
 import { resolveCellShade } from "./unitShading";
 import type { CellShade } from "./unitShading";
@@ -135,7 +136,47 @@ export function WeeklyGrid(): ReactNode {
     subjects,
     subjectById,
     activeUnitBySubject,
+    // The resolved grade id ("g5" under the mock flag, a uuid under the backend
+    // flag). Used to grade-namespace the personal subject-order so one grade's
+    // arrangement never bleeds into another (CLAUDE.md: never assume one grade).
+    activeGradeId,
   } = usePlanner();
+
+  // ── Per-teacher subject-row order (Weekly view only) ───────────────────────
+  // The 8 subjects + their colors are LOCKED team-wide (CLAUDE.md §4); only the
+  // DISPLAY ORDER of the rows is a personal preference. `useSubjectOrder`
+  // persists that order to localStorage (Supabase per-user later) and reconciles
+  // it against the live catalog so a stale save never drops or invents a
+  // subject. SSR-safe: server + first paint use the canonical catalog order, the
+  // saved order applies post-mount (see lib/subject-order.ts).
+  const catalogOrder = useMemo(() => subjects.map((s) => s.id), [subjects]);
+  const { order: subjectOrder, move: moveSubject } = useSubjectOrder({
+    catalogOrder,
+    scopeKey: activeGradeId,
+  });
+
+  // The catalog subjects re-sorted by the teacher's saved order. This is the
+  // ONE list every subject-row iteration below consumes (bucketing, row render,
+  // keyboard-nav row count, shift-click flat list) so they stay in lock-step —
+  // a desync would land keyboard focus / range-selection on the wrong row.
+  // `subjectById` lookups elsewhere are id-keyed and order-agnostic, so they
+  // need no change. Unknown/new ids can't appear here: reconcileOrder guarantees
+  // `subjectOrder` is exactly a permutation of the catalog ids.
+  const orderedSubjects = useMemo<Subject[]>(() => {
+    const byId = new Map(subjects.map((s) => [s.id, s] as const));
+    const out: Subject[] = [];
+    for (const id of subjectOrder) {
+      const s = byId.get(id);
+      if (s) out.push(s);
+    }
+    // Safety net: if somehow a catalog subject wasn't covered by the order
+    // (shouldn't happen — reconcileOrder appends missing ids), append it so a
+    // subject is NEVER dropped from the grid.
+    for (const s of subjects) {
+      if (!subjectOrder.includes(s.id)) out.push(s);
+    }
+    return out;
+  }, [subjects, subjectOrder]);
 
   // ── Inline expansion state ─────────────────────────────────────────────────
   // UI state only — expansion is not part of history.
@@ -143,6 +184,14 @@ export function WeeklyGrid(): ReactNode {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   // Snapshot captured at drag-start; restored on drop / cancel (spec §3.6).
   const expandedSnapshotRef = useRef<Set<string> | null>(null);
+  // Tracks the PREVIOUS value of the app-state `selectedLessonId` so the
+  // expansion-sync effect (below) can detect a selection that was cleared
+  // EXTERNALLY — i.e. by the WeeklyShell drawer's close button / backdrop /
+  // Esc on a narrow viewport, which clears the selection without routing
+  // through handleSelect. When that happens we collapse exactly the card that
+  // had been opened by the click, so the panel and the inline chip close
+  // together. Starts at the live value so the first render sees no transition.
+  const prevSelectedLessonIdRef = useRef<string | null>(selectedLessonId);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [maximizedCell, setMaximizedCell] = useState<string | null>(null);
@@ -261,7 +310,7 @@ export function WeeklyGrid(): ReactNode {
   // Declared after bySubjectDay to avoid the temporal dead zone.
   const flatWeekLessons = useMemo<Lesson[]>(() => {
     const result: Lesson[] = [];
-    for (const subject of subjects) {
+    for (const subject of orderedSubjects) {
       for (let d = 0; d < DAY_COUNT; d++) {
         for (const lesson of bySubjectDay[subject.id]?.[d] ?? []) {
           result.push(lesson);
@@ -269,12 +318,15 @@ export function WeeklyGrid(): ReactNode {
       }
     }
     return result;
-  }, [bySubjectDay, DAY_COUNT, subjects]);
+  }, [bySubjectDay, DAY_COUNT, orderedSubjects]);
 
   // ── Keyboard navigation ────────────────────────────────────────────────────
   const expandCell = useCallback(
     (pos: CellPos) => {
-      const subject = subjects[pos.row];
+      // Index the SAME ordered list the rows render from, so keyboard
+      // activation lands on the visually-correct subject row.
+      const subject = orderedSubjects[pos.row];
+      if (!subject) return;
       const cellLessons = bySubjectDay[subject.id]?.[pos.col] ?? [];
       if (cellLessons.length === 0) return;
       setExpandedIds((prev) => {
@@ -284,7 +336,7 @@ export function WeeklyGrid(): ReactNode {
       });
       setSelectedId(cellLessons[0].id);
     },
-    [bySubjectDay, subjects],
+    [bySubjectDay, orderedSubjects],
   );
 
   const collapseAll = useCallback(() => {
@@ -292,11 +344,41 @@ export function WeeklyGrid(): ReactNode {
   }, []);
 
   const gridNav = useGridNavigation({
-    rowCount: subjects.length,
+    rowCount: orderedSubjects.length,
     colCount: DAY_COUNT,
     onActivate: expandCell,
     onCollapse: collapseAll,
   });
+
+  // ── Collapse the inline chip when the selection is cleared externally ─────
+  // handleSelect keeps `selectedLessonId` (app-state) and `expandedIds`
+  // (local) in lock-step on click: opening adds the id + selects it; clicking
+  // the same card again removes the id + deselects. But the panel can ALSO be
+  // dismissed from OUTSIDE the grid — on narrow viewports the WeeklyShell
+  // overlay drawer's close button / backdrop / Esc clears `selectedLessonId`
+  // directly (it never calls handleSelect). Without this effect that path
+  // would leave the inline chip expanded after the panel closed — a desync.
+  //
+  // Fix: when `selectedLessonId` transitions FROM a concrete id TO null, undo
+  // exactly the expansion that the matching click had added — remove just that
+  // one id from `expandedIds`. We do NOT collapse on a transition to a
+  // DIFFERENT id (clicking lesson Y while X is open intentionally leaves X
+  // expanded and only re-scopes the panel), and we only remove the id if it is
+  // still expanded (so we never fight a card the teacher kept open via the
+  // keyboard expandCell path). This keeps multi-expand intact while making
+  // "close the panel ⇒ collapse the card" hold for the external-close path.
+  useEffect(() => {
+    const prev = prevSelectedLessonIdRef.current;
+    prevSelectedLessonIdRef.current = selectedLessonId;
+    if (selectedLessonId === null && prev !== null) {
+      setExpandedIds((curr) => {
+        if (!curr.has(prev)) return curr;
+        const next = new Set(curr);
+        next.delete(prev);
+        return next;
+      });
+    }
+  }, [selectedLessonId]);
 
   // ── Esc clears bulk selection ─────────────────────────────────────────────
   useEffect(() => {
@@ -412,6 +494,31 @@ export function WeeklyGrid(): ReactNode {
       else next.add(lessonId);
       return next;
     });
+  }
+
+  function handleCanvasClick(e: React.MouseEvent<HTMLDivElement>): void {
+    // A click that lands on the grid canvas itself — not on a card, an
+    // interactive control, or a multi-lesson cell's maximize surface — is
+    // "click off": clear the bulk selection (BIG-1), collapse every expanded
+    // card, and close the lesson DETAIL panel so the combined open state from
+    // handleSelect unwinds as one gesture. Card clicks bubble up here (the
+    // card root doesn't stopPropagation on plain clicks), so the closest()
+    // guard is what keeps a select from immediately undoing itself.
+    clearBulkSelection();
+    const target = e.target as HTMLElement;
+    if (
+      target.closest(
+        '[data-planner-item], button, a, input, textarea, select, ' +
+          '[role="button"], [role="menu"], [role="menuitem"], ' +
+          // A multi-lesson cell's empty space toggles its maximize state
+          // (GridCell.handleCellClick) — that gesture is not a click-off.
+          '[role="gridcell"][aria-expanded]',
+      )
+    )
+      return;
+    setSelectedId(null);
+    setExpandedIds((prev) => (prev.size === 0 ? prev : new Set()));
+    if (selectedLessonId !== null) setSelectedLessonId(null);
   }
 
   function handleActivateDetail(lessonId: string): void {
@@ -609,10 +716,10 @@ export function WeeklyGrid(): ReactNode {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        {/* BIG-1: clicking the empty scroll canvas (not a card) clears the
-            bulk selection. The grid's own cells stopPropagation on card
-            clicks so only a genuine canvas click reaches this handler. */}
-        <div className={styles.scroll} onClick={clearBulkSelection}>
+        {/* Clicking the empty scroll canvas (not a card / control) clears
+            the bulk selection (BIG-1) AND collapses + deselects any open
+            lesson, closing its detail panel — see handleCanvasClick. */}
+        <div className={styles.scroll} onClick={handleCanvasClick}>
           <div
             className={styles.grid}
             role="grid"
@@ -711,7 +818,7 @@ export function WeeklyGrid(): ReactNode {
                 {`No ${pluralize(labels.lesson).toLowerCase()} planned for ${labels.week.toLowerCase()} ${week} yet.`}
               </div>
             )}
-            {subjects.map((subject, rowIdx) => (
+            {orderedSubjects.map((subject, rowIdx) => (
               <SubjectRow
                 key={subject.id}
                 rowIndex={rowIdx}
@@ -720,6 +827,12 @@ export function WeeklyGrid(): ReactNode {
                 activeUnit={activeUnitBySubject[subject.id]}
                 cells={bySubjectDay[subject.id]}
                 dayCount={DAY_COUNT}
+                // Row-reorder affordance (move-up / move-down). `isFirst` /
+                // `isLast` disable the button that would run off the ends; the
+                // disabled-state tooltip then explains WHY (CLAUDE.md §4).
+                isFirst={rowIdx === 0}
+                isLast={rowIdx === orderedSubjects.length - 1}
+                onMoveSubject={moveSubject}
                 style={style}
                 dragState={dragState}
                 density={density}
@@ -848,6 +961,12 @@ interface SubjectRowProps {
   cells: Lesson[][];
   /** Number of day columns — derived from the configured school week. */
   dayCount: number;
+  /** True for the top row — its "move up" button is disabled. */
+  isFirst: boolean;
+  /** True for the bottom row — its "move down" button is disabled. */
+  isLast: boolean;
+  /** Reorder this subject's row up/down by one slot (personal preference). */
+  onMoveSubject: (id: SubjectId, dir: MoveDirection) => void;
   style: ReturnType<typeof useTheme>["style"];
   // viewMode is no longer threaded through the grid — the Grid/List axis is
   // resolved by WeeklyShell, which renders WeeklyGrid only in "grid" mode.
@@ -888,6 +1007,9 @@ function SubjectRow({
   activeUnit,
   cells,
   dayCount,
+  isFirst,
+  isLast,
+  onMoveSubject,
   style,
   dragState,
   density,
@@ -920,8 +1042,15 @@ function SubjectRow({
 
   return (
     <>
-      {/* Subject label — anchored chrome, never collapses (spec §3.5) */}
-      <div className={`${styles.subjectHead} cp-subj ${subjectId}`}>
+      {/* Subject label — anchored chrome, never collapses (spec §3.5).
+          Carries the per-teacher row-reorder controls (move up / move down).
+          The controls are hidden at rest and revealed on row hover or keyboard
+          focus (see .subjectReorder in the CSS module) so they don't add
+          long-term visual noise — discoverability without clutter. */}
+      <div
+        className={`${styles.subjectHead} cp-subj ${subjectId}`}
+        title={`Reorder the ${subject.name} row in your Weekly view (your view only)`}
+      >
         <span
           className={styles.subjectTile}
           style={{ background: color.tile, color: color.deep }}
@@ -931,6 +1060,69 @@ function SubjectRow({
         </span>
         <span className={styles.subjectName} style={{ color: color.deep }}>
           {subject.name}
+        </span>
+
+        {/* Row-reorder controls — accessible move-up / move-down buttons.
+            Chosen over a second drag-and-drop context: the grid's subject-label
+            cells are NOT contiguous DOM siblings (each SubjectRow emits its
+            label cell + N day cells interleaved across the CSS-grid rows), so a
+            vertical SortableContext over the label column would fight the grid
+            layout and risk entangling with the lesson DnD's closestCenter
+            overlay. Discrete buttons are self-contained, fully keyboard-driven,
+            and cannot collide with the lesson drag. Each carries a W2-B3
+            dismissible onboarding tooltip; the disabled end-row button keeps its
+            tooltip to explain WHY it's disabled (CLAUDE.md §4). */}
+        <span className={styles.subjectReorder}>
+          <Tooltip
+            content={
+              isFirst
+                ? `${subject.name} is already the top row.`
+                : `Move the ${subject.name} row up — changes only your view, not the team's.`
+            }
+            tooltipId="weekly-subject-move-up"
+            side="right"
+          >
+            <button
+              type="button"
+              className={styles.reorderBtn}
+              disabled={isFirst}
+              aria-label={`Move ${subject.name} row up`}
+              // stopPropagation: the scroll canvas's onClick clears the bulk
+              // selection on any click that reaches it (empty-canvas semantics).
+              // Reordering a row is not a canvas click — it must not wipe a
+              // teacher's in-progress bulk selection.
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveSubject(subjectId, "up");
+              }}
+            >
+              <span aria-hidden="true">↑</span>
+            </button>
+          </Tooltip>
+          <Tooltip
+            content={
+              isLast
+                ? `${subject.name} is already the bottom row.`
+                : `Move the ${subject.name} row down — changes only your view, not the team's.`
+            }
+            tooltipId="weekly-subject-move-down"
+            side="right"
+          >
+            <button
+              type="button"
+              className={styles.reorderBtn}
+              disabled={isLast}
+              aria-label={`Move ${subject.name} row down`}
+              // See the "up" button — keep a click off the canvas's
+              // clear-bulk-selection handler.
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveSubject(subjectId, "down");
+              }}
+            >
+              <span aria-hidden="true">↓</span>
+            </button>
+          </Tooltip>
         </span>
       </div>
 

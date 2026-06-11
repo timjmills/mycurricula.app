@@ -375,6 +375,136 @@
   text-overflow: ellipsis;
 }
 
+/* ── Subject-row reorder controls (per-teacher view order) ───────────────────
+ *
+ * Move-up / move-down buttons that re-order the subject ROWS in the teacher's
+ * own Weekly view (CLAUDE.md §4: the 8 subjects + colors are team-locked; only
+ * the display order is a personal preference). Chosen over a second DnD context
+ * so they can't entangle with the lesson drag-and-drop (see WeeklyGrid.tsx).
+ *
+ * Discoverability without clutter: hidden at rest, revealed when the row is
+ * hovered or when either button takes keyboard focus. `margin-left: auto`
+ * parks the cluster at the trailing edge of the sticky label cell.
+ */
+.subjectReorder {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: auto;
+  /* Pull up so the cluster aligns with the top-aligned subject name rather
+     than floating below it in a tall row. */
+  margin-top: 1px;
+  /* Hidden at rest — revealed on hover/focus below. opacity (not display)
+     keeps the buttons focusable via keyboard Tab even before they're visible,
+     and the :focus-within rule then paints them. */
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+/* Reveal on row hover or when a control inside is focused (keyboard path). */
+.subjectHead:hover .subjectReorder,
+.subjectReorder:focus-within {
+  opacity: 1;
+}
+
+/* Always reveal under reduced motion is not required, but ensure no animation
+   surprises: the opacity transition already respects the user's setting via
+   the short, non-essential fade. */
+
+.reorderBtn {
+  /* Positioning context for the ::before hit-area expander below. */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Compact visual chip — fits the narrow 132px label column. The clickable
+     region is grown to the ≥44px touch-target minimum (CLAUDE.md §4) by the
+     ::before pseudo, so the chip stays small without pushing rows apart. */
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-500);
+  line-height: 1;
+  font-size: var(--t-11);
+  box-shadow: var(--sh-xs);
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
+}
+
+/* Invisible hit-area expander centered on the 18px chip. Grows the tap/click
+   target to 44px WIDE so touch users hit it easily, while capping the HEIGHT at
+   22px so the two stacked buttons' hit areas tile cleanly instead of
+   overlapping (an overlap would make an ambiguous tap between them). The button
+   keeps pointer-events so the click still lands on the right control. */
+.reorderBtn::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+}
+
+.reorderBtn:hover:not(:disabled) {
+  border-color: var(--brand-300);
+  color: var(--brand-600);
+  background: var(--brand-50);
+}
+
+.reorderBtn:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.reorderBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Touch / coarse-pointer: discoverability + real 44px targets ──────────────
+ *
+ * Touch devices have no hover, so the hover-reveal above would leave the
+ * reorder controls invisible AND undiscoverable. On a coarse / no-hover pointer
+ * we therefore:
+ *   • keep the cluster permanently visible (opacity:1),
+ *   • DROP it onto its own row BELOW the tile+name (the header wraps) so the
+ *     44px buttons never compete with the subject name for horizontal space in
+ *     the narrow 132px label column — the Codex-flagged crowding risk, and
+ *   • lay the two buttons out HORIZONTALLY at a genuine 44×44 touch target
+ *     each (CLAUDE.md §4) with spacing so the targets don't overlap.
+ * The ::before hit-expander is redundant at this size, so it collapses to the
+ * button bounds. The subject row is already tall (min-height 232px on the day
+ * cells), so the extra control row fits without crowding. */
+@media (hover: none), (pointer: coarse) {
+  .subjectHead {
+    /* Let the reorder cluster wrap to its own line under the tile + name. */
+    flex-wrap: wrap;
+  }
+  .subjectReorder {
+    opacity: 1;
+    /* Full-width second row, buttons laid out left-to-right. */
+    flex-direction: row;
+    flex-basis: 100%;
+    margin-left: 0;
+    margin-top: 6px;
+    gap: 8px;
+  }
+  .reorderBtn {
+    width: 44px;
+    height: 44px;
+    font-size: var(--t-13);
+  }
+  .reorderBtn::before {
+    /* Button is already a full 44×44 target — no expander needed. */
+    display: none;
+  }
+}
+
 /* ── Day / subject cell ─────────────────────────────────────────────── */
 .cell {
   display: flex;
