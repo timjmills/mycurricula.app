@@ -16,3 +16,8 @@ export { Shoutbox } from "./Shoutbox";
 // chrome; the global filter pane is suppressed for Daily.
 export { IconRail } from "./IconRail";
 export { PaneSplitter } from "./PaneSplitter";
+// UX roadmap item 03 — orientation anchors. NowLine is the 1px indigo
+// "now" line for a minute-proportional day body; TodayJumpButton is the
+// persistent "jump back to today" affordance for the Daily header.
+export { NowLine } from "./NowLine";
+export { TodayJumpButton } from "./TodayJumpButton";

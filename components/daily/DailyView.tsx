@@ -118,7 +118,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
-import { dateNumberForWeekDay, notesForDay } from "@/lib/mock";
+import { dateForWeekDay, dateNumberForWeekDay, notesForDay } from "@/lib/mock";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useDayHoliday, useHolidaysByDay } from "@/lib/use-day-holiday";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
@@ -132,6 +132,7 @@ import { RightRail } from "./RightRail";
 import { PaneSplitter } from "./PaneSplitter";
 import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
+import { TodayJumpButton } from "./TodayJumpButton";
 import { Button, EmptyState, PageHeader, Tooltip } from "@/components/ui";
 import { DailyList } from "@/components/list/DailyList";
 import { ScheduleDayPane } from "@/components/schedule";
@@ -1225,9 +1226,21 @@ export interface DailyViewProps {
    *  navigation thereafter is normal. (W1-V5 — closes Subject→Daily
    *  cross-route trust gap.) */
   initialLessonId?: string;
+  /** Seed the day pane's date from a `/daily?date=YYYY-MM-DD` deep-link
+   *  (UX roadmap item 07). Already validated by parseDailyParams in the
+   *  route page — a local calendar date string, never a UTC instant.
+   *  Applied once on mount, mirroring the initialLessonId pattern above;
+   *  a resolving `lesson` param takes precedence (it pins its own
+   *  week + day). Prop added by the deep-links wave — the seam is this
+   *  signature + the one seed effect below; everything else in this file
+   *  is owned elsewhere. */
+  initialDate?: string;
 }
 
-export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
+export function DailyView({
+  initialLessonId,
+  initialDate,
+}: DailyViewProps = {}): ReactNode {
   const router = useRouter();
   // selectedDay is shared planner state — the top bar may also change it.
   // viewMode drives the list vs. grid rendering choice.
@@ -1300,6 +1313,52 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
     router.replace("/daily", { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialLessonId]);
+
+  // Once-only sync of week + selectedDay to a `/daily?date=YYYY-MM-DD`
+  // deep link (UX roadmap item 07) — the sibling of the lesson seed above,
+  // and skipped whenever that seed resolves (a lesson pins its own week +
+  // day; the date on a copied link is derived FROM the lesson anyway).
+  // The date→(week, day) math inverts lib/mock/calendar.ts dateForWeekDay:
+  // anchor = Week 1 day 0, calendar weeks advance by 7 days regardless of
+  // the configured school week. Dates falling on a non-school weekday
+  // (e.g. a Friday at a Sun–Thu school) clamp to the week's last school
+  // day; dates before the year's anchor degrade to the default view.
+  useEffect(() => {
+    if (!initialDate) return;
+    if (initialLessonId && lessons.some((l) => l.id === initialLessonId)) {
+      // The lesson seed above owns the navigation AND the URL cleanup.
+      return;
+    }
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(initialDate);
+    if (m) {
+      // Local-midnight Date — the codebase deliberately avoids UTC date math
+      // (see lib/use-academic-year.ts) so the calendar day stays stable.
+      const target = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      const anchor = dateForWeekDay(1, 0);
+      // Math.round absorbs DST hour drift between two local midnights.
+      const diffDays = Math.round(
+        (target.getTime() - anchor.getTime()) / 86_400_000,
+      );
+      const targetWeek = Math.floor(diffDays / 7) + 1;
+      // Same 1–99 sanity bound the weekly link parser enforces (MAX_WEEK in
+      // lib/deep-links.ts): a date decades past the anchor parses fine but
+      // would write an absurd week into shared app state. Out-of-range —
+      // like a pre-anchor date — degrades to the default view (§4a L2).
+      if (diffDays >= 0 && targetWeek <= 99) {
+        const dayIndex = Math.min(
+          diffDays % 7,
+          Math.max(weekdays.length - 1, 0),
+        );
+        if (targetWeek !== week) setWeek(targetWeek);
+        if (dayIndex !== selectedDay) setSelectedDay(dayIndex);
+      }
+    }
+    // Strip the consumed params on EVERY path — valid, malformed, and
+    // out-of-range alike (§4a L2) — exactly once, so a bad date never
+    // leaves a dead query string in the address bar.
+    router.replace("/daily", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDate]);
 
   // Collapse-all toggle — default expanded. UI-only, never persisted.
   const [collapsedAll, setCollapsedAll] = useState(false);
@@ -1789,9 +1848,12 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
               modes; placing it here inside the lesson-list column would
               hide it in list mode. */}
 
-          {/* ── WEEK eyebrow ───────────────────────────────────── */}
-          <div className={styles.leftPaneEyebrow}>
-            {labels.week} {week}
+          {/* ── WEEK eyebrow + Today jump (roadmap 03) ─────────── */}
+          <div className={styles.leftPaneEyebrowRow}>
+            <div className={styles.leftPaneEyebrow}>
+              {labels.week} {week}
+            </div>
+            <TodayJumpButton />
           </div>
 
           {/* ── Week strip: one pill per configured school-week day ─ */}

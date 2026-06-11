@@ -3,36 +3,42 @@
 // ScheduleColumn.tsx — one day of the multi-column timeline: a sticky
 // day-header strip over a fixed-height column body that hosts the hour
 // gridlines, the day's ScheduleBlocks, and (when today) the live
-// ScheduleNowLine.
+// <NowLine> (the shared roadmap-03 component from components/daily;
+// the legacy schedule-local now-line component was deleted).
 //
 // The column body is the size hatch for everything inside: it is
 // DAY_HEIGHT_PX tall, has the muted `--ink-50` background that visually
 // recedes behind the colored blocks, and clips overflow so the blocks
 // can extend "off the edge" of the visible window without leaking.
 //
-// Now-line behavior:
-//   • Mounted only when the column represents today AND the live
-//     now-minute falls inside the rendered window. The day-of-week check
-//     uses the prop-supplied `day` so non-today columns never burn an
-//     interval.
-//   • Production swaps `nowMinuteMock()` for `minuteOfDay(useNowTick())`.
+// Today / now signals (review finding M3 — one clock, no mocks):
+//   • Header emphasis derives from the REAL clock + the CONFIGURED school
+//     week via lib/now-anchor's todayColumnIndex — never the old
+//     frozen-Monday mock in lib/schedule-data. SSR-safe per the WeeklyGrid
+//     useTodayColumnIndex house pattern: null initial state (no emphasis
+//     in the server HTML), real value in a post-mount effect, 60s re-check
+//     so the emphasis migrates at midnight. Off-school-day → null → no
+//     emphasis anywhere.
+//   • The now-line is <NowLine day={day}>, which self-gates (today +
+//     holiday + in-window) and owns the only 30s minute-tick — it arms its
+//     interval ONLY when this column is today, so this component runs no
+//     useNowTick of its own (review finding L6): header emphasis is
+//     day-granular and the 60s today-sync below covers it.
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   DAY_HEIGHT_PX,
   HOUR_COUNT,
   PX_PER_MIN,
   getDayBlocks,
-  isMinuteWithinDay,
-  nowMinuteMock,
-  todayDayIndex,
 } from "@/lib/schedule-data";
 import { WEEK_DAYS_SHORT } from "@/lib/mock";
 import { dateNumberForWeekDay } from "@/lib/mock/calendar";
 import { useAppState } from "@/lib/app-state";
-import { useNowTick } from "@/lib/use-now-tick";
+import { useSchoolWeek } from "@/lib/use-school-week";
+import { todayColumnIndex } from "@/lib/now-anchor";
+import { NowLine } from "@/components/daily";
 import { ScheduleBlock } from "./ScheduleBlock";
-import { ScheduleNowLine } from "./ScheduleNowLine";
 import styles from "./ScheduleColumn.module.css";
 
 export interface ScheduleColumnProps {
@@ -58,13 +64,22 @@ export function ScheduleColumn({
   compact = false,
 }: ScheduleColumnProps): ReactNode {
   const { week } = useAppState();
-  const isToday = day === todayDayIndex();
+  const { days: schoolWeekDays } = useSchoolWeek();
 
-  // Live now-tick — only enabled for today's column. The hook is SSR-safe.
-  // TODO: production should use `minuteOfDay(useNowTick({ enabled: isToday }))`.
-  useNowTick({ enabled: isToday });
-  const nowMin = nowMinuteMock();
-  const showNowLine = isToday && isMinuteWithinDay(nowMin);
+  // ── Today resolution — SSR-safe house pattern (findings M3/M4) ──────────
+  // Initial null → server HTML carries no emphasis; the real clock answer
+  // lands post-mount. setState with the same index bails out, so the 60s
+  // re-check only re-renders when the answer actually changes (midnight).
+  const [todayIdx, setTodayIdx] = useState<number | null>(null);
+  useEffect(() => {
+    const sync = (): void => {
+      setTodayIdx(todayColumnIndex(new Date(), schoolWeekDays));
+    };
+    sync();
+    const id = window.setInterval(sync, 60_000);
+    return () => window.clearInterval(id);
+  }, [schoolWeekDays]);
+  const isToday = todayIdx !== null && todayIdx === day;
 
   const allBlocks = getDayBlocks(day);
   const blocks = showNonAcademic
@@ -112,7 +127,7 @@ export function ScheduleColumn({
           blocks.map((block) => <ScheduleBlock key={block.id} block={block} />)
         )}
 
-        {showNowLine && <ScheduleNowLine nowMin={nowMin} />}
+        <NowLine day={day} />
       </div>
     </div>
   );

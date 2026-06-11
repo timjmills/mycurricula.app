@@ -226,6 +226,55 @@
   color: var(--brand-600);
 }
 
+/* ── Today emphasis (UX roadmap item 03) ────────────────────────────────
+ * Quiet, two-part treatment for today's column on the CURRENT week:
+ *   .dayHeadTodayChip — a small "Today" label chip in the column header.
+ *   .todayColumn      — a faint --surface-warm wash across every subject
+ *                       row of the column (grid-placed like
+ *                       .holidayColumn; pointer-events:none).
+ * No saturated color anywhere — subject color stays the loudest voice.
+ * No transitions, so no reduced-motion branch is needed. */
+
+.dayHeadTodayChip {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+  padding: 1px 7px;
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--brand-600);
+  background: var(--brand-50);
+  border: 1px solid var(--brand-100);
+  border-radius: 999px;
+  white-space: nowrap;
+  /* The header row is baseline-aligned; keep the pill on the text line. */
+  align-self: center;
+}
+
+.todayColumn {
+  /* Placed by inline style: gridRow "2 / -1", gridColumn todayIdx+2 —
+     same placement trick as .holidayColumn below. Sits above the cell
+     background but below the lesson cards, so the warm tint reads as a
+     column wash without muting the cards themselves. */
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  /* Faint warm wash — --surface-warm at partial strength so the subject
+     cell shading underneath still reads. */
+  background: color-mix(in srgb, var(--surface-warm) 60%, transparent);
+  border-radius: var(--r-8);
+}
+
+/* Print: the today emphasis is live-screen orientation only — a printed
+   plan is reused across days, so a baked-in "Today" would be stale. */
+@media print {
+  .todayColumn,
+  .dayHeadTodayChip {
+    display: none;
+  }
+}
+
 .dayHeadDate {
   font-size: var(--t-12);
   font-weight: 400;

@@ -530,6 +530,17 @@
   overflow: hidden;
 }
 
+/* Eyebrow + Today-jump row (roadmap 03). The button hugs the right edge
+   so the eyebrow keeps its established left alignment. */
+.leftPaneEyebrowRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 12px;
+  flex-shrink: 0;
+}
+
 /* "WEEK 12" eyebrow at the very top of the column. */
 .leftPaneEyebrow {
   padding: 14px 16px 6px;

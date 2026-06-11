@@ -1,0 +1,45 @@
+/* NowLine — the 1px indigo "now" line + time chip on the Daily day pane.
+   Indigo = var(--brand-500), "the v1.3 functional indigo" per the
+   established precedent in WeeklyGrid.module.css (bulk-select ring):
+   subject-neutral, carries functional meaning, never a subject color.
+   No hex anywhere (CLAUDE.md §4). Quiet by design: a 1px hairline + a
+   small chip — subject color stays the loudest voice on the pane.
+
+   The line is positioned by inline `top` (minutes → px via the shared
+   lib/schedule-data geometry); the host pane must be position:relative.
+   No transitions anywhere in this file, so no reduced-motion branch is
+   needed — the 30s tick moves the line sub-pixel amounts. */
+
+.line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  /* The spec's "1px indigo now line". */
+  border-top: 1px solid var(--brand-500);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.chip {
+  position: absolute;
+  left: 0;
+  top: -9px; /* mechanical nudge: centers the 18px chip on the 1px line */
+  padding: 1px 7px;
+  background: var(--brand-500);
+  color: var(--paper);
+  border-radius: var(--r-pill);
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* Hard rule from the item-03 spec: the now line is invisible in print. */
+@media print {
+  .line {
+    display: none;
+  }
+}
