@@ -31,23 +31,34 @@
 //     margin-right: auto;` — flush-left, NOT `margin: 0 auto`.
 //   • 32px left gutter from the pane edge, 24px right gutter before the
 //     right rail.
-//   • Title, "I CAN" line, action row, lesson flow, standards, and notes
-//     all line up to the same 32px left gutter.
+//   • Title, action row, planning tabs, and lesson flow all line up to
+//     the same 32px left gutter.
 //   • The "+ Add section" + "Edit lesson flow / template" controls live
 //     inside <LessonFlow> and remain centered (the only centered
 //     controls per the spec).
 //
+// PLANNING TABS (6.11.26 design_handoff_daily_view §6). Between the title
+// block and the lesson-flow/agenda area sits <PlanningTabs> — the tabbed
+// Objective / Standards / Lesson notes / Differentiation (+ Chat +
+// Resources) panel. It REPLACED two body sections that used to live here:
+//   • the "I CAN" objective line under the title → the Objective pane
+//     (an always-editable rich-text field bound to lesson.objective);
+//   • the bottom "My notes" section → the Lesson notes pane (the notes
+//     state + coalesced store writes moved into PlanningTabs wholesale).
+//
 // Action row (spec §5 retained):
 //   LEFT  → [☐ Mark done] (cycle button) + [🔖 Add status] (stub).
-//   RIGHT → [📤 Lesson notes] button that SCROLLS the "My notes"
-//           section into view. Print + overflow are NO LONGER here —
-//           they now live in the header band's right region per §1.
+//   RIGHT → [📤 Lesson notes] button that ACTIVATES the planning panel's
+//           Lesson-notes tab (via the PlanningTabsHandle) and focuses its
+//           editor. Print + overflow are NO LONGER here — they now live
+//           in the header band's right region per §1.
 //
-// DOUBLE-CLICK-TO-EDIT (preserved). The lesson TITLE and the "I CAN"
-// OBJECTIVE render as static text and swap to a RichTextEditor only on
-// double-click (or Enter / F2 on the focused text). Commits on blur,
-// cancels on Escape via RichEditorWrapper — the WeeklyLessonCard pattern.
-// <LessonFlow> owns the section headings + bodies.
+// DOUBLE-CLICK-TO-EDIT (title only). The lesson TITLE renders as static
+// text and swaps to a RichTextEditor on double-click (or Enter / F2 on
+// the focused text). Commits on blur, cancels on Escape via
+// RichEditorWrapper — the WeeklyLessonCard pattern. The objective's
+// editor moved into the planning panel's Objective pane. <LessonFlow>
+// owns the section headings + bodies.
 //
 // The `cp-subj ${subj.cls}` wrapper is KEPT so the --c / --cl / --cd
 // custom-property cascade flows into the header band, the action row,
@@ -59,19 +70,19 @@
 // DOCKED RICH-TEXT TOOLBAR (consume only). A sibling agent docks the
 // RichTextEditor toolbar at bottom-center of a target element. This file
 // owns the target: `cellRef` is attached to the scrollable detail body
-// region (the "cell" that hosts the title, objective, action row, lesson
-// flow + notes). It is passed to <LessonFlow dockTarget={cellRef} /> and
-// to the notes RichTextEditor's `dockTarget` prop.
+// region (the "cell" that hosts the title, action row, planning tabs and
+// lesson flow). It is passed to <LessonFlow dockTarget={cellRef} /> and
+// to <PlanningTabs dockTarget={cellRef} /> for the pane editors.
 //
 // Store wiring (planner-store):
 //   sections  — managed inside <LessonFlow> via usePlanner(); never local.
 //   title     — written via editLesson with coalesce.
-//   objective — written via editLesson with coalesce; the editor edits
-//               only the trailing text WITHOUT the "I can" prefix, which
-//               is re-attached on commit.
-//   notes     — written via editLesson with coalesce.
+//   objective — edited in <PlanningTabs>' Objective pane (coalesced
+//               editLesson writes live there now).
+//   notes     — edited in <PlanningTabs>' Lesson-notes pane (moved from
+//               this file's former bottom "My notes" section).
 //   completion— cycleStatus() calls onToggleComplete (never forks).
-// UI-only state (editingField, draftValue) stays local — not persisted.
+// UI-only state (titleEditing, draftTitle) stays local — not persisted.
 
 import { useState, useEffect, useRef } from "react";
 import type { ReactNode, SyntheticEvent } from "react";
@@ -82,6 +93,8 @@ import { RichTextEditor } from "@/components/rich-text";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip } from "@/components/ui";
 import { LessonAgendaNav } from "./LessonAgendaNav";
+import { PlanningTabs } from "./planning-tabs";
+import type { PlanningTabsHandle } from "./planning-tabs";
 import detailStyles from "./lesson-detail.module.css";
 
 // ── Agenda-navigator visibility persistence ──────────────────────────────
@@ -274,143 +287,61 @@ export function LessonDetail({
     });
   }
 
-  // ── "My notes" scroll target ─────────────────────────────────────────
-  // The action-row "Lesson notes" button scrolls this section into view
-  // so a teacher reading the lesson plan can jump straight to their
-  // personal notes without manually scrolling. The notes section stays
-  // where it is in the document; this is a navigation affordance, not a
-  // popover.
-  const notesRef = useRef<HTMLDivElement | null>(null);
+  // ── Planning tabs handle ──────────────────────────────────────────────
+  // The action-row "Lesson notes" button activates the planning panel's
+  // Lesson-notes tab (re-adding it if the teacher closed it), scrolls the
+  // panel into view, and focuses its editor — the jump the old
+  // scroll-to-notes affordance provided, now that notes live in a pane.
+  const planTabsRef = useRef<PlanningTabsHandle | null>(null);
 
-  function scrollToNotes(): void {
-    const el = notesRef.current;
-    if (!el) return;
-    // smooth scroll into view — block: 'start' lines the section heading up
-    // near the top of the scroll container so the editor below is visible.
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-    // Move focus into the notes editor so a keyboard user lands ready to
-    // type. The notes RichTextEditor exposes a [contenteditable] element;
-    // querying inside the section is sufficient and avoids coupling refs.
-    const editable = el.querySelector<HTMLElement>('[contenteditable="true"]');
-    // Defer focus by a tick so the smooth-scroll animation can begin first
-    // (focusing immediately would jump-scroll on some browsers).
-    if (editable) {
-      window.setTimeout(() => editable.focus(), 80);
-    }
+  function openLessonNotes(): void {
+    planTabsRef.current?.activate("notes", { focus: true });
   }
 
-  // ── Teacher notes — derived from store lesson; displayed in local editor.
-  // notesHtml is kept in local state so the RichTextEditor can drive it
-  // synchronously; on each onChange we immediately coalesce-commit to store.
-  // The notes section is ALWAYS visible — there is no hover-to-reveal blur.
-  const [notesHtml, setNotesHtml] = useState<string>(lesson.notes ?? "");
+  // ── Double-click-to-edit: title ───────────────────────────────────────
+  // Pure local UI state; the draft is committed to the store on blur via
+  // editLesson (coalesced). The title commits straight through editLesson
+  // with no Personal/Master dialog — deliberate parity with the planning
+  // panel's pane editors. (The objective's editor lives in <PlanningTabs>.)
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState<string>("");
 
-  // Track whether the notes editor is currently focused so external store
-  // updates (undo/redo, other views) don't overwrite mid-edit content.
-  const notesEditingRef = useRef(false);
-
-  // When the selected lesson changes, seed the notes editor from the new
-  // lesson's notes field. Sections are store-managed and automatically
-  // reflect the new lessonId without local reset.
+  // A new lesson resets any open title editor so a stale draft can never
+  // bleed into the freshly-selected lesson.
   useEffect(() => {
-    setNotesHtml(lesson.notes ?? "");
-    notesEditingRef.current = false;
-  }, [lesson.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // When the store's notes value changes (e.g. undo/redo from another view)
-  // while this lesson is still selected, reseed the editor — but only if
-  // the teacher is not actively typing (guard against overwriting mid-edit).
-  const storeNotes = lesson.notes ?? "";
-  useEffect(() => {
-    if (!notesEditingRef.current) {
-      setNotesHtml(storeNotes);
-    }
-  }, [storeNotes]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Commit notes to the store on every editor change with coalescing so a
-  // continuous typing burst collapses to one undo step.
-  function handleNotesChange(html: string): void {
-    notesEditingRef.current = true; // teacher is actively typing
-    setNotesHtml(html);
-    editLesson(
-      lesson.id,
-      { notes: html },
-      { key: `lesson:${lesson.id}:notes`, ts: Date.now() },
-    );
-  }
-
-  // When the notes editor loses focus, clear the editing guard so that
-  // subsequent undo/redo can reseed the editor to the authoritative store
-  // value.
-  function handleNotesBlur(): void {
-    notesEditingRef.current = false;
-  }
-
-  // ── Double-click-to-edit: title + "I can" objective ──────────────────
-  // Only ONE of the two editors can be open at a time. Pure local UI
-  // state; the draft is committed to the store on blur via editLesson
-  // (coalesced). Title/objective commit straight through editLesson with
-  // no Personal/Master dialog — deliberate parity with the "My notes"
-  // editor in the Daily view.
-  type EditableField = "title" | "objective";
-  const [editingField, setEditingField] = useState<EditableField | null>(null);
-  const [draftValue, setDraftValue] = useState<string>("");
-
-  // The objective is stored WITH an "I can" prefix; the band label already
-  // says "I CAN", so the editor edits only the trailing text. This strips
-  // the prefix for editing; it is re-attached on commit.
-  const objectiveBody = (lesson.objective ?? "").replace(/^I can\s+/i, "");
-
-  // A new lesson resets any open title/objective editor so a stale draft
-  // can never bleed into the freshly-selected lesson.
-  useEffect(() => {
-    setEditingField(null);
-    setDraftValue("");
+    setTitleEditing(false);
+    setDraftTitle("");
   }, [lesson.id]);
 
-  // Open a field's editor, seeding the draft from the lesson's current
+  // Open the title editor, seeding the draft from the lesson's current
   // value. The double-click / Enter event is stopped so it never bubbles.
-  function openEditor(field: EditableField, e?: SyntheticEvent): void {
+  function openEditor(e?: SyntheticEvent): void {
     e?.stopPropagation();
     e?.preventDefault();
-    setEditingField(field);
-    setDraftValue(field === "title" ? lesson.title : objectiveBody);
+    setTitleEditing(true);
+    setDraftTitle(lesson.title);
   }
 
-  // Commit the open editor's draft through editLesson with a coalesce key
-  // (typing burst = one undo step), mirroring handleNotesChange. A no-op
-  // when nothing changed. The objective re-gains its "I can " prefix so the
-  // stored shape is unchanged.
+  // Commit the draft through editLesson with a coalesce key (typing burst
+  // = one undo step). A no-op when nothing changed.
   function commitEdit(): void {
-    if (!editingField) return;
-    const trimmed = draftValue.trim();
-    if (editingField === "title") {
-      if (trimmed !== (lesson.title ?? "")) {
-        editLesson(
-          lesson.id,
-          { title: trimmed },
-          { key: `lesson:${lesson.id}:title`, ts: Date.now() },
-        );
-      }
-    } else {
-      // Re-attach the "I can " prefix unless the field was cleared entirely.
-      const nextObjective = trimmed ? `I can ${trimmed}` : "";
-      if (nextObjective !== (lesson.objective ?? "")) {
-        editLesson(
-          lesson.id,
-          { objective: nextObjective },
-          { key: `lesson:${lesson.id}:objective`, ts: Date.now() },
-        );
-      }
+    if (!titleEditing) return;
+    const trimmed = draftTitle.trim();
+    if (trimmed !== (lesson.title ?? "")) {
+      editLesson(
+        lesson.id,
+        { title: trimmed },
+        { key: `lesson:${lesson.id}:title`, ts: Date.now() },
+      );
     }
-    setEditingField(null);
-    setDraftValue("");
+    setTitleEditing(false);
+    setDraftTitle("");
   }
 
   // Cancel the open editor without saving — discards the draft.
   function cancelEdit(): void {
-    setEditingField(null);
-    setDraftValue("");
+    setTitleEditing(false);
+    setDraftTitle("");
   }
 
   // Cycle: not_done → done → partial → not_done.
@@ -562,11 +493,11 @@ export function LessonDetail({
               the SAME `openEditor("title")` the dbl-click path uses. */}
           <div className={detailStyles.titleRow}>
             <h2 className={detailStyles.title}>
-              {editingField === "title" ? (
+              {titleEditing ? (
                 <RichEditorWrapper onCommit={commitEdit} onCancel={cancelEdit}>
                   <RichTextEditor
-                    value={draftValue}
-                    onChange={setDraftValue}
+                    value={draftTitle}
+                    onChange={setDraftTitle}
                     autoFocus
                     singleLine
                     placeholder="Lesson title…"
@@ -584,10 +515,9 @@ export function LessonDetail({
                     tabIndex={0}
                     role="button"
                     aria-label="Edit lesson title"
-                    onDoubleClick={(e) => openEditor("title", e)}
+                    onDoubleClick={(e) => openEditor(e)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === "F2")
-                        openEditor("title", e);
+                      if (e.key === "Enter" || e.key === "F2") openEditor(e);
                     }}
                     title="Double-click or press Enter to edit"
                   >
@@ -596,7 +526,7 @@ export function LessonDetail({
                 </Tooltip>
               )}
             </h2>
-            {editingField !== "title" && (
+            {!titleEditing && (
               <Tooltip
                 content="Edit the lesson title — saved into your personal copy."
                 side="top"
@@ -606,7 +536,7 @@ export function LessonDetail({
                   type="button"
                   className={detailStyles.editPencil}
                   aria-label="Edit lesson title"
-                  onClick={(e) => openEditor("title", e)}
+                  onClick={(e) => openEditor(e)}
                 >
                   <PencilIcon />
                 </button>
@@ -614,73 +544,9 @@ export function LessonDetail({
             )}
           </div>
 
-          {/* ── "I Can" objective — quiet single line, no box ──────────
-              Double-click-to-edit, like the title. The editor edits only
-              the trailing objective text — the "I CAN" label supplies
-              the prefix, which commitEdit re-attaches. Always rendered
-              (even when empty) so a teacher can add an objective to a
-              lesson that lacks one. Kept per spec §5.
-
-              W3-C5: the pencil button sits OUTSIDE the `<p>` in the flex
-              row wrapper so its hover/focus-within reveal scopes to the
-              whole objective row, and so it never lives inside any future
-              W2-B1 ring on the objective text itself. */}
-          <div className={detailStyles.objectiveRow}>
-            <p className={detailStyles.objective}>
-              <span className={detailStyles.objectiveLabel}>I can</span>
-              {editingField === "objective" ? (
-                <RichEditorWrapper onCommit={commitEdit} onCancel={cancelEdit}>
-                  <RichTextEditor
-                    value={draftValue}
-                    onChange={setDraftValue}
-                    autoFocus
-                    singleLine
-                    placeholder="state the lesson objective…"
-                    ariaLabel="Edit lesson objective"
-                    dockTarget={cellRef}
-                  />
-                </RichEditorWrapper>
-              ) : (
-                <Tooltip
-                  content="Double-click or press Enter to edit the I-can objective — saved into your personal copy."
-                  side="top"
-                >
-                  <span
-                    className={`${detailStyles.objectiveText} ${detailStyles.editableText} ${
-                      objectiveBody ? "" : detailStyles.objectiveEmpty
-                    }`}
-                    tabIndex={0}
-                    role="button"
-                    aria-label="Edit lesson objective"
-                    onDoubleClick={(e) => openEditor("objective", e)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === "F2")
-                        openEditor("objective", e);
-                    }}
-                    title="Double-click or press Enter to edit"
-                  >
-                    {objectiveBody || "Add a lesson objective"}
-                  </span>
-                </Tooltip>
-              )}
-            </p>
-            {editingField !== "objective" && (
-              <Tooltip
-                content="Edit the I-can objective — saved into your personal copy."
-                side="top"
-                tooltipId="lesson-detail-edit-objective"
-              >
-                <button
-                  type="button"
-                  className={detailStyles.editPencil}
-                  aria-label="Edit lesson objective"
-                  onClick={(e) => openEditor("objective", e)}
-                >
-                  <PencilIcon />
-                </button>
-              </Tooltip>
-            )}
-          </div>
+          {/* The "I CAN" objective line that used to sit here moved into
+              the planning panel's Objective pane (6.11.26 handoff §6) —
+              see <PlanningTabs> below the action row. */}
 
           {/* ── Action row ────────────────────────────────────────────
               Compact icon+label buttons (spec §5). Left cluster groups
@@ -744,18 +610,18 @@ export function LessonDetail({
               </Button>
             </div>
             <div className={detailStyles.actionRight}>
-              {/* Lesson notes — scrolls the My-notes section into view and
-                  focuses the editor. The section itself stays where it is
-                  in the document; this is a jump-link, not a popover.
-                  Styled as a quieter trailing link (no border) per spec
-                  §5's "Lesson notes link on the far right". */}
+              {/* Lesson notes — activates the planning panel's Lesson-notes
+                  tab (re-adding it if closed) and focuses its editor. This
+                  is a jump into the panel, not a popover. Styled as a
+                  quieter trailing link (no border) per spec §5's "Lesson
+                  notes link on the far right". */}
               <Button
                 variant="ghost"
                 size="sm"
                 className={detailStyles.notesLink}
-                onClick={scrollToNotes}
-                aria-label="Jump to lesson notes"
-                tooltip="Scroll down to the My-notes editor and focus the textarea — fastest way to jot a private reminder for yourself"
+                onClick={openLessonNotes}
+                aria-label="Open lesson notes"
+                tooltip="Open the Lesson-notes tool in the planning panel and focus its editor — fastest way to jot a private reminder for yourself"
                 leadingIcon={
                   <svg
                     width="14"
@@ -784,6 +650,21 @@ export function LessonDetail({
               </Button>
             </div>
           </div>
+
+          {/* ── Planning tabs — Objective / Standards / Lesson notes /
+              Differentiation (+ Chat + Resources) ───────────────────────
+              (6.11.26 redesign §6.) The tabbed planning panel sits between
+              the title block and the lesson-flow/agenda area. It owns the
+              objective + notes editing (formerly body sections here) and
+              the read-only Standards + Resources surfaces; tools are
+              reorderable, closable, and re-addable, and the arrangement
+              persists per-teacher. planTabsRef lets the action row's
+              "Lesson notes" button jump straight to the Notes pane. */}
+          <PlanningTabs
+            ref={planTabsRef}
+            lesson={lesson}
+            dockTarget={cellRef}
+          />
 
           {/* ── Lesson workspace — agenda navigator + lesson flow ───────
               (6.11.26 redesign §6.) A sticky numbered section navigator
@@ -844,34 +725,11 @@ export function LessonDetail({
             </div>
           </div>
 
-          {/* Standards row deliberately omitted here — <LessonFlow> already
-              renders a "Standards" canonical row (index 1) via
-              `helperOverride`, so a duplicate section in this body would (a)
-              show the same data twice and (b) produce a "Standards{count}"
-              screen-reader concatenation when the count chip lived inside
-              the heading. The LessonFlow row is the canonical surface. */}
-
-          {/* ── My notes — always-visible editable rich text ────────────
-              Always rendered (not gated on lesson.notes) so teachers can
-              add notes to any lesson. There is no hover-to-reveal blur.
-              `notesRef` is the scroll target for the action-row "Lesson
-              notes" button above. */}
-          <section
-            className={detailStyles.section}
-            onBlurCapture={handleNotesBlur}
-            ref={notesRef}
-          >
-            <h3 className={detailStyles.sectionHead}>My notes</h3>
-            <div className={detailStyles.notesWrap}>
-              <RichTextEditor
-                value={notesHtml}
-                onChange={handleNotesChange}
-                placeholder="Add private notes for yourself…"
-                ariaLabel="Teacher notes"
-                dockTarget={cellRef}
-              />
-            </div>
-          </section>
+          {/* Standards section deliberately omitted here — the planning
+              panel's Standards pane (above) is the canonical read surface
+              for this lesson's tagged standards. The bottom "My notes"
+              section that used to close the body moved into the panel's
+              Lesson-notes pane. */}
         </div>
       </div>
     </div>
