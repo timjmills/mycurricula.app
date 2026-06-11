@@ -46,6 +46,7 @@ const SECTIONS: NavSection[] = [
     items: [
       { label: "Catch-up", href: "/catch-up", icon: <FlagIcon /> },
       { label: "Schedule", href: "/schedule", icon: <ClockIcon /> },
+      { label: "Archive", href: "/archive", icon: <ArchiveIcon /> },
       { label: "Teach", href: "/teach", icon: <PresentIcon /> },
     ],
   },
@@ -223,6 +224,16 @@ function PresentIcon(): ReactNode {
     <svg {...svgProps()}>
       <rect x="3" y="4" width="18" height="12" rx="2" />
       <path d="M12 16v4M8 20h8" />
+    </svg>
+  );
+}
+// Archive box — a lidded crate, for the Curriculum Archive (sealed years).
+function ArchiveIcon(): ReactNode {
+  return (
+    <svg {...svgProps()}>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+      <path d="M10 12h4" />
     </svg>
   );
 }
