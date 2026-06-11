@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UX roadmap — needed changes</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--canvas);
+    font-family:var(--font-sans);
+    color:var(--body);
+    -webkit-font-smoothing:antialiased;
+  }
+  /* page atmospheric mesh — barely-there */
+  .mesh{
+    position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(560px 420px at 8% -4%, rgba(244,183,64,.07), transparent 70%),
+      radial-gradient(640px 480px at 96% 0%, rgba(145,122,199,.06), transparent 70%),
+      radial-gradient(560px 440px at 92% 100%, rgba(122,199,155,.06), transparent 70%);
+  }
+  .page{
+    position:relative;z-index:1;
+    max-width:880px;margin:0 auto;
+    padding:var(--s16) var(--s8) var(--s16);
+  }
+
+  /* ── header ─────────────────────────────── */
+  .eyebrow{
+    font-family:var(--label-font);font-weight:var(--label-weight);
+    font-size:var(--label-size);letter-spacing:var(--label-track);
+    text-transform:uppercase;color:var(--honey-600);
+    margin-bottom:var(--s3);
+  }
+  h1{
+    font-family:var(--h1-font);font-weight:var(--h1-weight);
+    font-size:36px;line-height:1.12;letter-spacing:-.02em;
+    color:var(--ink);margin-bottom:var(--s4);text-wrap:pretty;
+  }
+  .intro{
+    font-size:var(--bodyL-size);line-height:var(--bodyL-line);
+    color:var(--body);max-width:64ch;text-wrap:pretty;
+  }
+  .meta-row{
+    display:flex;flex-wrap:wrap;gap:var(--s2);
+    margin-top:var(--s5);
+  }
+  .meta-chip{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:var(--small-size);font-weight:600;color:var(--ink-soft);
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--r-pill);padding:6px 14px;
+  }
+  .meta-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--brand-500);flex:none;}
+
+  /* ── summary table ──────────────────────── */
+  .section-label{
+    font-family:var(--label-font);font-weight:var(--label-weight);
+    font-size:var(--label-size);letter-spacing:var(--label-track);
+    text-transform:uppercase;color:var(--muted);
+    margin:var(--s16) 0 var(--s4);
+  }
+  .summary{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--r-lg);box-shadow:var(--sh-sm);
+    overflow:hidden;
+  }
+  .summary table{width:100%;border-collapse:collapse;font-size:var(--body-size);}
+  .summary th{
+    font-family:var(--label-font);font-weight:var(--label-weight);
+    font-size:var(--label-size);letter-spacing:var(--label-track);
+    text-transform:uppercase;color:var(--muted);
+    text-align:left;padding:14px 18px;
+    border-bottom:1px solid var(--hairline);
+    background:var(--surface-warm);
+  }
+  .summary td{
+    padding:13px 18px;border-bottom:1px solid var(--hairline);
+    vertical-align:middle;color:var(--ink-soft);
+  }
+  .summary tr:last-child td{border-bottom:none;}
+  .summary td a{
+    color:var(--ink);font-weight:600;text-decoration:none;
+  }
+  .summary td a:hover{color:var(--brand-600);}
+  .summary .num{color:var(--faint);font-weight:700;font-variant-numeric:tabular-nums;width:1%;}
+
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:12px;font-weight:700;
+    border-radius:var(--r-pill);padding:3px 11px;white-space:nowrap;
+  }
+  .pill .dot{width:6px;height:6px;border-radius:50%;flex:none;}
+  .pill.p1{background:var(--warn-tint);color:#9A6A0C;}
+  .pill.p1 .dot{background:var(--honey-500);}
+  .pill.p2{background:var(--progress-tint);color:var(--brand-700);}
+  .pill.p2 .dot{background:var(--brand-500);}
+  .pill.p3{background:var(--idle-tint);color:#6B6A80;}
+  .pill.p3 .dot{background:var(--idle);}
+  .pill.phase{background:transparent;border:1px solid var(--border);color:var(--muted);font-weight:600;}
+  .effort{font-variant-numeric:tabular-nums;font-weight:700;color:var(--muted);font-size:12px;}
+
+  /* ── feature cards ──────────────────────── */
+  .feature{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--r-lg);box-shadow:var(--sh-sm);
+    padding:var(--s8);margin-bottom:var(--s6);
+    scroll-margin-top:24px;
+  }
+  .feature-head{
+    display:flex;align-items:flex-start;justify-content:space-between;
+    gap:var(--s4);margin-bottom:var(--s2);
+  }
+  .feature-head h2{
+    font-family:var(--h2-font);font-weight:var(--h2-weight);
+    font-size:var(--h2-size);line-height:var(--h2-line);
+    letter-spacing:var(--h2-track);color:var(--ink);text-wrap:pretty;
+  }
+  .feature-head .kicker{
+    font-family:var(--label-font);font-weight:var(--label-weight);
+    font-size:var(--label-size);letter-spacing:var(--label-track);
+    text-transform:uppercase;color:var(--faint);
+    display:block;margin-bottom:6px;
+  }
+  .feature-head .pills{display:flex;gap:var(--s2);flex:none;padding-top:2px;}
+  .why{
+    font-size:var(--body-size);line-height:var(--body-line);
+    color:var(--body);max-width:66ch;text-wrap:pretty;
+  }
+  .feature h3{
+    font-family:var(--label-font);font-weight:var(--label-weight);
+    font-size:var(--label-size);letter-spacing:var(--label-track);
+    text-transform:uppercase;color:var(--muted);
+    margin:var(--s6) 0 var(--s3);
+  }
+  .feature ul{
+    list-style:none;display:flex;flex-direction:column;gap:10px;
+    font-size:var(--body-size);line-height:var(--body-line);color:var(--ink-soft);
+  }
+  .feature ul li{
+    position:relative;padding-left:20px;text-wrap:pretty;
+  }
+  .feature ul li::before{
+    content:"";position:absolute;left:2px;top:8px;
+    width:6px;height:6px;border-radius:50%;background:var(--brand-300);
+  }
+  .feature ul.criteria li::before{
+    background:transparent;border:1.5px solid var(--done);
+    width:8px;height:8px;top:6px;left:0;border-radius:3px;
+  }
+  .feature .surfaces{
+    display:flex;flex-wrap:wrap;gap:var(--s2);
+  }
+  .surface-chip{
+    font-size:12px;font-weight:600;color:var(--ink-soft);
+    background:var(--surface-warm);border:1px solid var(--border);
+    border-radius:var(--r-sm);padding:5px 11px;
+  }
+  .dep{
+    margin-top:var(--s5);padding-top:var(--s4);
+    border-top:1px solid var(--hairline);
+    font-size:var(--small-size);line-height:var(--small-line);color:var(--muted);
+  }
+  .dep strong{color:var(--ink-soft);font-weight:700;}
+  code{
+    font-family:var(--font-mono);font-size:.9em;
+    background:var(--hairline);border-radius:5px;padding:1px 6px;color:var(--ink-soft);
+  }
+
+  /* ── sequencing plan ────────────────────── */
+  .plan{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s4);
+  }
+  .plan-col{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--r-lg);box-shadow:var(--sh-xs);padding:var(--s5);
+  }
+  .plan-col h3{
+    font-family:var(--h3-font);font-weight:var(--h3-weight);
+    font-size:15px;color:var(--ink);margin-bottom:4px;
+  }
+  .plan-col .when{
+    font-size:12px;font-weight:600;color:var(--muted);margin-bottom:var(--s4);
+  }
+  .plan-col ol{
+    list-style:none;display:flex;flex-direction:column;gap:8px;
+    font-size:var(--small-size);line-height:var(--small-line);color:var(--ink-soft);
+  }
+  .plan-col ol li{display:flex;gap:8px;align-items:baseline;}
+  .plan-col ol li .n{
+    font-weight:800;font-size:11px;color:var(--faint);
+    font-variant-numeric:tabular-nums;flex:none;width:18px;
+  }
+  .plan-col.now{border-color:var(--honey-200);background:var(--surface-warm);}
+  .plan-col.now h3{color:var(--honey-600);}
+
+  footer{
+    margin-top:var(--s16);padding-top:var(--s6);
+    border-top:1px solid var(--border);
+    font-size:var(--small-size);color:var(--muted);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:var(--s2);
+  }
+
+  /* ── responsive ─────────────────────────── */
+  @media (max-width:900px){
+    .page{padding:var(--s12) var(--s6);}
+    .plan{grid-template-columns:1fr;}
+  }
+  @media (max-width:560px){
+    .page{padding:var(--s8) var(--s4);}
+    h1{font-size:28px;}
+    .feature{padding:var(--s5);}
+    .feature-head{flex-direction:column;gap:var(--s3);}
+    .summary{overflow-x:auto;}
+    .summary table{min-width:560px;}
+  }
+
+  /* ── print ──────────────────────────────── */
+  @media print{
+    .mesh{display:none;}
+    body{background:#fff;}
+    .feature,.summary,.plan-col{box-shadow:none;break-inside:avoid;}
+    .page{padding:0;max-width:none;}
+  }
+</style>
+</head>
+<body>
+<div class="mesh"></div>
+<div class="page">
+
+  <header data-screen-label="Header">
+    <p class="eyebrow">mycurricula.app · UX roadmap · June 11, 2026</p>
+    <h1>Needed changes — nine UX features, planned</h1>
+    <p class="intro">Improvements identified after the Phase 1A ship. Each is specced with its
+    priority, build phase, affected surfaces, and acceptance criteria. Two are pure design
+    problems Phase 1B will need answered (fork diff, undo toasts); three are cheap polish that
+    can land now; the rest ride the Supabase wave.</p>
+    <div class="meta-row">
+      <span class="meta-chip"><span class="dot" style="background:var(--honey-500);"></span>P1 — design now</span>
+      <span class="meta-chip"><span class="dot"></span>P2 — spec now, build 1B</span>
+      <span class="meta-chip"><span class="dot" style="background:var(--idle);"></span>P3 — after 1B lands</span>
+    </div>
+  </header>
+
+  <p class="section-label">At a glance</p>
+  <div class="summary" data-screen-label="Summary table">
+    <table>
+      <thead>
+        <tr><th></th><th>Change</th><th>Priority</th><th>Phase</th><th>Effort</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="num">01</td><td><a href="#fork-diff">Fork diff view</a></td><td><span class="pill p1"><span class="dot"></span>P1</span></td><td><span class="pill phase">1B</span></td><td><span class="effort">L</span></td></tr>
+        <tr><td class="num">02</td><td><a href="#undo-toasts">Undo toasts</a></td><td><span class="pill p1"><span class="dot"></span>P1</span></td><td><span class="pill phase">1A.5</span></td><td><span class="effort">M</span></td></tr>
+        <tr><td class="num">03</td><td><a href="#now-anchor">"Now" anchor</a></td><td><span class="pill p1"><span class="dot"></span>P1</span></td><td><span class="pill phase">1A.5</span></td><td><span class="effort">S</span></td></tr>
+        <tr><td class="num">04</td><td><a href="#command-palette">Command palette (⌘K)</a></td><td><span class="pill p2"><span class="dot"></span>P2</span></td><td><span class="pill phase">1B</span></td><td><span class="effort">M</span></td></tr>
+        <tr><td class="num">05</td><td><a href="#holiday-drag">Holiday-aware drag &amp; drop</a></td><td><span class="pill p2"><span class="dot"></span>P2</span></td><td><span class="pill phase">1B</span></td><td><span class="effort">M</span></td></tr>
+        <tr><td class="num">06</td><td><a href="#bulk-shift">Bulk shift</a></td><td><span class="pill p2"><span class="dot"></span>P2</span></td><td><span class="pill phase">1B</span></td><td><span class="effort">M</span></td></tr>
+        <tr><td class="num">07</td><td><a href="#deep-links">Deep links</a></td><td><span class="pill p2"><span class="dot"></span>P2</span></td><td><span class="pill phase">1A.5</span></td><td><span class="effort">S</span></td></tr>
+        <tr><td class="num">08</td><td><a href="#skeletons">Skeleton loading states</a></td><td><span class="pill p2"><span class="dot"></span>P2</span></td><td><span class="pill phase">1B gate</span></td><td><span class="effort">S</span></td></tr>
+        <tr><td class="num">09</td><td><a href="#team-signals">Quiet team signals</a></td><td><span class="pill p3"><span class="dot"></span>P3</span></td><td><span class="pill phase">1B+</span></td><td><span class="effort">M</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="section-label">Specifications</p>
+
+  <!-- 01 · Fork diff -->
+  <article class="feature" id="fork-diff" data-screen-label="01 Fork diff view" data-comment-anchor="rm-fork-diff">
+    <div class="feature-head">
+      <div>
+        <span class="kicker">01 · Forking model</span>
+        <h2>Fork diff view — "What's different from Master?"</h2>
+      </div>
+      <div class="pills"><span class="pill p1"><span class="dot"></span>P1</span><span class="pill phase">Phase 1B</span></div>
+    </div>
+    <p class="why">The three-tier stripe system tells a teacher <em>that</em> a lesson diverged,
+    but not <em>what</em> changed. A diff on the lesson detail turns the git metaphor into a
+    usable tool — the single biggest payoff on the product's core differentiator.</p>
+    <h3>Design spec</h3>
+    <ul>
+      <li>Entry point: a "Compare with Team Curriculum" action on any modified lesson — in the lesson detail header and the card's overflow menu. Never shown on unedited lessons.</li>
+      <li>Inline diff, not side-by-side, as the default: changed fields render old → new within the lesson detail layout the teacher already knows. Side-by-side is a secondary toggle for long content fields.</li>
+      <li>Field-level granularity: title, objective, materials, flow steps, standards, and scheduling (day/order) each diff independently. A moved-only lesson shows just the scheduling row.</li>
+      <li>Diff coloring uses the semantic layer, not subject colors: removed in <code>--danger-tint</code>, added in <code>--done-tint</code> — consistent on every subject.</li>
+      <li>Two actions, both undoable (see 02): <strong>Revert to Team version</strong> (drops the fork) and <strong>Propose to Team</strong> (opens Master mode pre-filled with the personal version; the existing red banner is the safety mechanism — no confirm dialog).</li>
+      <li>Per-field revert on hover for surgical un-forking, mirroring the hover-revealed-controls pattern from the Weekly card.</li>
+    </ul>
+    <h3>Surfaces affected</h3>
+    <div class="surfaces">
+      <span class="surface-chip">Daily · lesson detail</span>
+      <span class="surface-chip">Weekly · card menu</span>
+      <span class="surface-chip">Catch-up · triage rows</span>
+    </div>
+    <h3>Acceptance criteria</h3>
+    <ul class="criteria">
+      <li>A teacher can see every divergent field of a modified lesson in under two clicks from the Weekly grid.</li>
+      <li>Revert (whole-lesson and per-field) restores the Master value and updates the stripe/pill state immediately, with undo.</li>
+      <li>Propose to Team never writes to Master without the explicit toggle + banner flow.</li>
+      <li>Diff renders correctly for all three divergence tiers: modified, moved, both.</li>
+    </ul>
+    <p class="dep"><strong>Depends on:</strong> Supabase persistence of fork lineage (Phase 1B).
+    <strong>Design now:</strong> the diff layout and the revert/propose interaction are pure
+    design problems — prototype before the backend lands.</p>
+  </article>
+
+  <!-- 02 · Undo toasts -->
+  <article class="feature" id="undo-toasts" data-screen-label="02 Undo toasts" data-comment-anchor="rm-undo-toasts">
+    <div class="feature-head">
+      <div>
+        <span class="kicker">02 · Safety without friction</span>
+        <h2>Undo toasts instead of irreversibility</h2>
+      </div>
+      <div class="pills"><span class="pill p1"><span class="dot"></span>P1</span><span class="pill phase">Phase 1A.5</span></div>
+    </div>
+    <p class="why">The product correctly avoids confirm dialogs — the complement to "no friction
+    going in" is "easy way back out." A consistent undo toast makes lazy forking feel safe
+    rather than mysterious.</p>
+    <h3>Design spec</h3>
+    <ul>
+      <li>One toast component, bottom-center, white surface with hairline border and <code>--sh-md</code>; a single text line + an "Undo" text button. Auto-dismisses after 6 seconds; timer pauses on hover/focus.</li>
+      <li>Fires on: lesson move ("Moved to Tuesday — Undo"), completion toggle, first-time fork ("Saved to your personal plan — Undo"), revert, and bulk shift (see 06).</li>
+      <li>First-time fork copy doubles as just-in-time education — it is the moment the forking model explains itself. Voice: sticky-note brief.</li>
+      <li>Only one toast visible at a time; a new action replaces the previous toast (last-in wins). No stacking, no notification center.</li>
+      <li>Keyboard: <code>⌘Z</code> / <code>Ctrl+Z</code> triggers the live toast's undo while it is visible.</li>
+      <li>Respects <code>prefers-reduced-motion</code>: fades without sliding.</li>
+    </ul>
+    <h3>Surfaces affected</h3>
+    <div class="surfaces">
+      <span class="surface-chip">Global · app shell</span>
+      <span class="surface-chip">Weekly</span>
+      <span class="surface-chip">Daily</span>
+      <span class="surface-chip">Catch-up</span>
+    </div>
+    <h3>Acceptance criteria</h3>
+    <ul class="criteria">
+      <li>Every destructive or state-changing gesture in Weekly/Daily/Catch-up offers undo for ≥6 seconds.</li>
+      <li>Undo of a first-time fork removes the personal copy entirely — stripe returns to solid, pill disappears.</li>
+      <li>Toast never obscures the drag target area or sticky chrome at any viewport tier; ≥44px hit target on the Undo action.</li>
+    </ul>
+    <p class="dep"><strong>Depends on:</strong> nothing — works against client state today, then
+    becomes the optimistic-update surface when Supabase lands. Build the pattern once, before 1B.</p>
+  </article>
+
+  <!-- 03 · Now anchor -->
+  <article class="feature" id="now-anchor" data-screen-label="03 Now anchor" data-comment-anchor="rm-now-anchor">
+    <div class="feature-head">
+      <div>
+        <span class="kicker">03 · Orientation</span>
+        <h2>A "now" anchor on Weekly and Daily</h2>
+      </div>
+      <div class="pills"><span class="pill p1"><span class="dot"></span>P1</span><span class="pill phase">Phase 1A.5</span></div>
+    </div>
+    <p class="why">The core job is "what are we teaching this week, and where am I in the plan?"
+    The UI should answer <em>where am I</em> without scrolling.</p>
+    <h3>Design spec</h3>
+    <ul>
+      <li>Weekly grid: today's column gets a quiet emphasis — a "Today" label chip in the column header and a faint warm wash (<code>--surface-warm</code>) on the column. No saturated color; subject color stays the loudest voice.</li>
+      <li>Daily view: on load, the day pane positions to the current period (container scroll, never <code>scrollIntoView</code>). A 1px indigo "now" line with a small time chip sits at the current time.</li>
+      <li>The now line derives its position from the teacher's configured schedule — including rotating A/B cycles — never from a hard-coded timetable.</li>
+      <li>Off-hours and non-school days: no line; the Today chip alone carries orientation. Holidays (once rendered) suppress both.</li>
+      <li>A persistent "Today" button in the view header jumps back when the teacher has navigated away — same affordance on Weekly (current week) and Year (current month).</li>
+    </ul>
+    <h3>Surfaces affected</h3>
+    <div class="surfaces">
+      <span class="surface-chip">Weekly · grid header + column</span>
+      <span class="surface-chip">Daily · day pane</span>
+      <span class="surface-chip">Year · roadmap</span>
+    </div>
+    <h3>Acceptance criteria</h3>
+    <ul class="criteria">
+      <li>Opening /daily during school hours lands the current period in view with zero scrolling.</li>
+      <li>Today emphasis derives from the configured school week — correct on Sun–Thu, Mon–Fri, and custom weeks.</li>
+      <li>The now line is invisible in print output.</li>
+    </ul>
+    <p class="dep"><strong>Depends on:</strong> nothing — schedule config already exists in
+    Phase 1A. Smallest item on this list; ship first.</p>
+  </article>
+
+  <!-- 04 · Command palette -->
+  <article class="feature" id="command-palette" data-screen-label="04 Command palette" data-comment-anchor="rm-command-palette">
+    <div class="feature-head">
+      <div>
+        <span class="kicker">04 · Navigation</span>
+        <h2>Command palette / quick jump (⌘K)</h2>
+      </div>
+      <div class="pills"><span class="pill p2"><span class="dot"></span>P2</span><span class="pill phase">Phase 1B</span></div>
+    </div>
+    <p class="why">"Filter everywhere" is a core principle; a palette that jumps to
+    <em>Week 14 · Math</em>, a unit, a standard, or a settings page makes the whole app feel
+    fast. Teachers planning on Sunday night are power users.</p>
+    <h3>Design spec</h3>
+    <ul>
+      <li>Opens with <code>⌘K</code> / <code>Ctrl+K</code> or the search affordance in the top bar. Centered overlay, <code>--r-xl</code> panel, <code>--sh-lg</code>, pill-shaped input.</li>
+      <li>Result groups in order: <strong>Jump to</strong> (weeks, units, lessons), <strong>Views</strong>, <strong>Standards</strong>, <strong>Settings</strong>. Lesson results carry their subject color as a leading dot — color stays navigation.</li>
+      <li>Query grammar matches the domain vocabulary: "week 14", "math unit 3", "CCSS 5.NBT.5", "ramadan timetable". Middle-dot result format: <em>Week 14 · Math · Multiply by 2-digit numbers</em>.</li>
+      <li>Recent destinations shown on empty query — the palette doubles as "recently viewed."</li>
+      <li>Fully keyboard-driven: arrows + Enter; Esc closes. Focus returns to the invoking element.</li>
+      <li>Phone/tablet: same surface presented as a full-height sheet from the search icon; no keyboard shortcut dependency.</li>
+    </ul>
+    <h3>Surfaces affected</h3>
+    <div class="surfaces">
+      <span class="surface-chip">Global · top bar</span>
+      <span class="surface-chip">All views · destinations</span>
+    </div>
+    <h3>Acceptance criteria</h3>
+    <ul class="criteria">
+      <li>Any week, unit, lesson, or settings page reachable in ≤3 keystrokes + Enter from anywhere.</li>
+      <li>Results respect grade scoping and the Personal/Master viewing mode.</li>
+      <li>Works at all three viewport tiers; touch path requires no hardware keyboard.</li>
+    </ul>
+    <p class="dep"><strong>Depends on:</strong> deep links (07) for destinations; search index is
+    trivial against mock data, real with Supabase. Pairs naturally with the 1B wave.</p>
+  </article>
+
+  <!-- 05 · Holiday-aware drag -->
+  <article class="feature" id="holiday-drag" data-screen-label="05 Holiday-aware drag and drop" data-comment-anchor="rm-holiday-drag">
+    <div class="feature-head">
+      <div>
+        <span class="kicker">05 · Scheduling integrity</span>
+        <h2>Holiday- and conflict-aware drag &amp; drop</h2>
+      </div>
+      <div class="pills"><span class="pill p2"><span class="dot"></span>P2</span><span class="pill phase">Phase 1B</span></div>
+    </div>
+    <p class="why">Dropping a lesson on a holiday or non-school day should offer "next
+    instructional day" rather than failing silently. Pairs with the Phase 1B holiday work.</p>
+    <h3>Design spec</h3>
+    <ul>
+      <li>Non-instructional columns (holidays, weekends in view, half-days without the relevant period) render as inert drop targets: hatched <code>--hairline</code> wash, no-drop cursor, drag ghost dims.</li>
+      <li>On an attempted drop, a small inline affordance offers <strong>"Move to next school day →"</strong> — one tap accepts; anything else cancels. No modal.</li>
+      <li>"Next instructional day" is computed from the configured school week + holiday calendar + rotation cycle — the lesson lands on the next day where its subject actually meets.</li>
+      <li>Same logic guards programmatic moves: catch-up reflow and bulk shift (06) skip non-instructional days automatically.</li>
+      <li>Every assisted move fires an undo toast (02) naming the landing day.</li>
+    </ul>
+    <h3>Surfaces affected</h3>
+    <div class="surfaces">
+      <span class="surface-chip">Weekly · drag layer</span>
+      <span class="surface-chip">Daily · reorder</span>
+      <span class="surface-chip">Catch-up · reflow</span>
+    </div>
+    <h3>Acceptance criteria</h3>
+    <ul class="criteria">
+      <li>No gesture can ever schedule a lesson on a non-instructional day.</li>
+      <li>The assist correctly accounts for custom school weeks, holidays, and A/B rotation.</li>
+      <li>Inert-day treatment passes AA contrast and is distinguishable without color alone.</li>
+    </ul>
+    <p class="dep"><strong>Depends on:</strong> holidays rendering on Weekly/Daily (Phase 1B) and
+    the rotation-cycle engine. Undo toast (02) is a prerequisite for the assist UX.</p>
+  </article>
+
+  <!-- 06 · Bulk shift -->
+  <article class="feature" id="bulk-shift" data-screen-label="06 Bulk shift" data-comment-anchor="rm-bulk-shift">
+    <div class="feature-head">
+      <div>
+        <span class="kicker">06 · Catch-up gesture</span>
+        <h2>Bulk shift — move many lessons at once</h2>
+      </div>
+      <div class="pills"><span class="pill p2"><span class="dot"></span>P2</span><span class="pill phase">Phase 1B</span></div>
+    </div>
+    <p class="why">Select a range of lessons — or a whole subject-week — and push everything
+    forward N instructional days. This is the real-world catch-up gesture; doing it card-by-card
+    is painful.</p>
+    <h3>Design spec</h3>
+    <ul>
+      <li>Entry: a "Select" mode from the Weekly toolbar and from Catch-up. Cards gain quiet checkboxes; shift-click selects a range; the subject lane header selects its whole week.</li>
+      <li>A bottom action bar (replacing the toast position while active) shows the count and one primary action: <strong>"Shift → next school day"</strong>, with a stepper for N days.</li>
+      <li>Shift counts <em>instructional</em> days per the school week + holidays + rotation — never calendar days.</li>
+      <li>Preview before commit: target days highlight in the grid as the stepper changes, so the teacher sees the landing pattern before confirming.</li>
+      <li>In Personal mode a bulk shift forks moved lessons lazily (move-tier stripe); in Master mode it follows the banner-gated flow. One undo toast covers the whole batch.</li>
+      <li>Phone: selection via long-press; action bar is thumb-reachable, ≥44px targets.</li>
+    </ul>
+    <h3>Surfaces affected</h3>
+    <div class="surfaces">
+      <span class="surface-chip">Weekly · toolbar + grid</span>
+      <span class="surface-chip">Catch-up · triage</span>
+    </div>
+    <h3>Acceptance criteria</h3>
+    <ul class="criteria">
+      <li>A teacher can move a full subject-week forward one school day in ≤4 interactions.</li>
+      <li>A single undo reverses the entire batch.</li>
+      <li>Shifted lessons show the correct move-tier visual (solid stripe + move arrow) per lesson.</li>
+    </ul>
+    <p class="dep"><strong>Depends on:</strong> holiday-aware scheduling (05) and undo toasts (02).
+    Catch-up rules in Settings define the default N.</p>
+  </article>
+
+  <!-- 07 · Deep links -->
+  <article class="feature" id="deep-links" data-screen-label="07 Deep links" data-comment-anchor="rm-deep-links">
+    <div class="feature-head">
+      <div>
+        <span class="kicker">07 · Collaboration</span>
+        <h2>Deep links to every week, unit, and lesson</h2>
+      </div>
+      <div class="pills"><span class="pill p2"><span class="dot"></span>P2</span><span class="pill phase">Phase 1A.5</span></div>
+    </div>
+    <p class="why">A teacher should be able to paste "look at Week 14 math" into the team chat.
+    Mostly routing discipline, big collaboration payoff.</p>
+    <h3>Design spec</h3>
+    <ul>
+      <li>URL scheme extends existing routes: <code>/weekly?week=14&amp;subject=math</code>, <code>/daily?date=2026-09-14&amp;lesson=…</code>, <code>/subject/math#unit-3</code>. Grade scoping is always a parameter, never assumed.</li>
+      <li>Opening a lesson deep link lands on the right view with the lesson detail open and the card brought into view (container scroll).</li>
+      <li>A "Copy link" action in every lesson/unit overflow menu and in the lesson detail header; confirmation via the toast (02): "Link copied".</li>
+      <li>Links resolve in the viewer's own mode: Personal-first viewing means I see <em>my</em> version of your lesson — with the divergence stripe telling me if ours differ. The diff view (01) is one click away.</li>
+      <li>State worth sharing goes in the URL; ephemeral state (open menus, selection) does not.</li>
+    </ul>
+    <h3>Surfaces affected</h3>
+    <div class="surfaces">
+      <span class="surface-chip">Routing · all views</span>
+      <span class="surface-chip">Card + detail menus</span>
+    </div>
+    <h3>Acceptance criteria</h3>
+    <ul class="criteria">
+      <li>Every week, unit, and lesson has a stable URL that survives refresh and restores view state.</li>
+      <li>Copy-link is reachable in ≤2 clicks from any lesson card.</li>
+      <li>Links shared between teachers respect each viewer's Personal-first resolution.</li>
+    </ul>
+    <p class="dep"><strong>Depends on:</strong> nothing for routing; auth-gated resolution
+    arrives with Supabase. Do the URL scheme now — the command palette (04) builds on it.</p>
+  </article>
+
+  <!-- 08 · Skeletons -->
+  <article class="feature" id="skeletons" data-screen-label="08 Skeleton states" data-comment-anchor="rm-skeletons">
+    <div class="feature-head">
+      <div>
+        <span class="kicker">08 · Perceived performance</span>
+        <h2>Skeleton states matching card geometry</h2>
+      </div>
+      <div class="pills"><span class="pill p2"><span class="dot"></span>P2</span><span class="pill phase">1B gate</span></div>
+    </div>
+    <p class="why">When Supabase lands, loading should paint the Weekly grid's exact card shapes
+    in subject-surface tints — not spinners. Cheap to spec now, painful to retrofit.</p>
+    <h3>Design spec</h3>
+    <ul>
+      <li>One skeleton per canonical primitive: Weekly card, Daily lesson row, Year roadmap bar, Subject unit card. Each matches its real component's dimensions, radius, and left-stripe slot exactly — no layout shift on data arrival.</li>
+      <li>Fill is neutral <code>--idle-tint</code> with a slow shimmer; where the subject is already known from route context (e.g. a subject page), the skeleton uses that subject's <code>--c-surface</code> so color-as-navigation holds even while loading.</li>
+      <li>Shimmer disabled under <code>prefers-reduced-motion</code> — static tint only.</li>
+      <li>Counts mirror reality: the Weekly skeleton paints the configured school-week columns and typical per-day card counts, not a generic 5×3.</li>
+      <li>Spinners are reserved for in-place actions (a saving button); never for view loads.</li>
+    </ul>
+    <h3>Surfaces affected</h3>
+    <div class="surfaces">
+      <span class="surface-chip">Weekly</span>
+      <span class="surface-chip">Daily</span>
+      <span class="surface-chip">Year</span>
+      <span class="surface-chip">Subject</span>
+    </div>
+    <h3>Acceptance criteria</h3>
+    <ul class="criteria">
+      <li>Zero cumulative layout shift between skeleton and loaded state on the four primary views.</li>
+      <li>Skeleton column count derives from the configured school week.</li>
+      <li>No spinner appears on any full-view load path.</li>
+    </ul>
+    <p class="dep"><strong>Depends on:</strong> nothing to design; only matters once real network
+    latency exists. Spec it as part of each primitive in <code>components/ui/</code> before the
+    1B wiring starts.</p>
+  </article>
+
+  <!-- 09 · Team signals -->
+  <article class="feature" id="team-signals" data-screen-label="09 Quiet team signals" data-comment-anchor="rm-team-signals">
+    <div class="feature-head">
+      <div>
+        <span class="kicker">09 · Ambient awareness</span>
+        <h2>Quiet team signals</h2>
+      </div>
+      <div class="pills"><span class="pill p3"><span class="dot"></span>P3</span><span class="pill phase">Phase 1B+</span></div>
+    </div>
+    <p class="why">Tiny avatar dots on a lesson showing which teammates forked or completed it.
+    No feed, no notifications — just ambient awareness that supports the team-planning story.</p>
+    <h3>Design spec</h3>
+    <ul>
+      <li>On the lesson detail (not the grid card — the grid stays clean): a row of ≤6 dawn-gradient initial avatars, 18px, with state — solid ring = completed, dashed ring = forked. Hover/long-press names the teacher and state.</li>
+      <li>Master-mode view of a lesson may show an aggregate line: "3 of 5 teachers completed · 2 forked" — a planning signal for the team lead, phrased as information, never as pressure.</li>
+      <li>Hard restraint: no counts on grid cards, no feed, no push notifications, no "activity" tab. If a signal needs attention, it belongs in Catch-up.</li>
+      <li>Per-school setting to disable team signals entirely (some teams won't want visibility of pace differences).</li>
+    </ul>
+    <h3>Surfaces affected</h3>
+    <div class="surfaces">
+      <span class="surface-chip">Daily · lesson detail</span>
+      <span class="surface-chip">Master mode · lesson detail</span>
+    </div>
+    <h3>Acceptance criteria</h3>
+    <ul class="criteria">
+      <li>Grid cards remain visually unchanged — signals live in the detail surface only.</li>
+      <li>States update via realtime subscription without reload.</li>
+      <li>The per-school off switch removes every signal surface, including the aggregate line.</li>
+    </ul>
+    <p class="dep"><strong>Depends on:</strong> Supabase realtime + multi-teacher rows — strictly
+    after the 1B wave is stable. Lowest urgency on this list; highest sensitivity. Validate with
+    the beta team before building.</p>
+  </article>
+
+  <!-- Sequencing -->
+  <p class="section-label">Sequencing plan</p>
+  <div class="plan" data-screen-label="Sequencing plan">
+    <div class="plan-col now">
+      <h3>Design &amp; ship now</h3>
+      <p class="when">Phase 1A.5 — against mock data</p>
+      <ol>
+        <li><span class="n">03</span><span>"Now" anchor — smallest, ship first</span></li>
+        <li><span class="n">02</span><span>Undo toast pattern — build once, reuse everywhere</span></li>
+        <li><span class="n">07</span><span>Deep-link URL scheme — routing discipline</span></li>
+        <li><span class="n">01</span><span>Fork diff — prototype the layout + interactions</span></li>
+      </ol>
+    </div>
+    <div class="plan-col">
+      <h3>Build with the 1B wave</h3>
+      <p class="when">Supabase + multi-school config</p>
+      <ol>
+        <li><span class="n">08</span><span>Skeletons — gate the 1B wiring on them</span></li>
+        <li><span class="n">01</span><span>Fork diff — wire to persisted lineage</span></li>
+        <li><span class="n">05</span><span>Holiday-aware drag — with holiday rendering</span></li>
+        <li><span class="n">06</span><span>Bulk shift — after 05 lands</span></li>
+        <li><span class="n">04</span><span>Command palette — on top of deep links</span></li>
+      </ol>
+    </div>
+    <div class="plan-col">
+      <h3>After 1B is stable</h3>
+      <p class="when">Validate with the beta team first</p>
+      <ol>
+        <li><span class="n">09</span><span>Quiet team signals — realtime, opt-out per school</span></li>
+      </ol>
+    </div>
+  </div>
+
+  <footer>
+    <span>mycurricula.app · UX roadmap — needed changes</span>
+    <span>Sources: CLAUDE.md §1–§6 · BUILD_STANDARD.md · v1.3 design system</span>
+  </footer>
+
+</div>
+</body>
+</html>
