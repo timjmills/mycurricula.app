@@ -542,6 +542,56 @@
   margin: var(--t-2, 2px) 0;
 }
 
+/* ── Inline media inside the editor (images + embeds) ───────────────────────────
+   Notecard bodies can carry inline images and safe embeds (YouTube / Vimeo /
+   Google), inserted via the toolbar. Both must stay within the editor's content
+   width at every viewport tier — never forcing document-level horizontal scroll
+   (CLAUDE.md responsive contract). Tailwind's preflight already sets img to
+   block + max-width:100%, but we re-assert it scoped to the editor so the rule
+   is explicit and survives reset changes. */
+.editor img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--r-sm);
+  /* Center standalone images and give them vertical breathing room. */
+  margin: var(--t-8, 8px) auto;
+}
+
+/* Embed wrapper — a non-editable atomic block holding the iframe. Constrained
+   to a comfortable reading width and kept 16:9 via aspect-ratio so the frame
+   scales fluidly without overflowing on phones. */
+.embedBlock {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 16 / 9;
+  margin: var(--t-10) 0;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--ink-100);
+  /* Hairline frame so the embed reads as a distinct object in the text flow. */
+  border: var(--line);
+}
+
+.embedBlock iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* The play-glyph for the "Insert embed" toolbar button. Force text (not emoji)
+   presentation so it reads as a crisp triangle that inherits the white toolbar
+   color, matching the other text-glyph buttons rather than the emoji inserts. */
+.iconEmbed {
+  font-size: var(--t-13);
+  line-height: 1;
+  font-variant-emoji: text;
+}
+
 /* ── Text-size picker popover ──────────────────────────────────────────────────
    Mirrors the font-family picker: a single-column list of size options. Each
    option previews its own size so the choice is visible at a glance. */

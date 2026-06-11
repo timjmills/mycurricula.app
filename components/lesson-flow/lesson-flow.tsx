@@ -107,6 +107,7 @@ import { SectionResources } from "./section-resources";
 // add-tiles popup. Imported from the deep path because the daily barrel
 // does not re-export it yet — agreed cross-agent contract.
 import { ResourceComposer } from "@/components/daily/ResourceComposer";
+import type { ResourceComposerEditTarget } from "@/components/daily/ResourceComposer";
 import styles from "./lesson-flow.module.css";
 
 // ── Body placeholder text (spec §3.4) ────────────────────────────────────
@@ -236,6 +237,10 @@ interface SortableSectionProps {
   onMoveDown: (id: string) => void;
   onRemove: (id: string) => void;
   onOpenComposer: (id: string) => void;
+  onOpenNoteEditor: (
+    sectionId: string,
+    editResource: ResourceComposerEditTarget,
+  ) => void;
   onDuplicate: (id: string) => void;
   onToggleWebsite: (id: string) => void;
   websiteVisible: boolean;
@@ -267,6 +272,7 @@ const SortableSection = memo(function SortableSection({
   onMoveDown,
   onRemove,
   onOpenComposer,
+  onOpenNoteEditor,
   onDuplicate,
   onToggleWebsite,
   websiteVisible,
@@ -384,6 +390,34 @@ const SortableSection = memo(function SortableSection({
   const resourcesPool: SectionResource[] = storeSection
     ? storeSection.resources
     : lessonResources;
+
+  // Build the composer edit-target for a resource in THIS row and hand it up.
+  // A store-backed section routes the patch to its sectionId; the virtual
+  // Standards row's resources are whole-lesson, so we route to sectionId:null
+  // and recover the array index from the synthesized `lesson:<id>:res:<i>` id.
+  const handleEditNote = useCallback(
+    (resource: SectionResource): void => {
+      if (storeSection) {
+        onOpenNoteEditor(storeSection.id, {
+          lessonId,
+          sectionId: storeSection.id,
+          resourceId: resource.id,
+          resource,
+        });
+        return;
+      }
+      const m = /:res:(\d+)$/.exec(resource.id);
+      const index = m ? Number(m[1]) : undefined;
+      onOpenNoteEditor("", {
+        lessonId,
+        sectionId: null,
+        resourceId: resource.id,
+        lessonResourceIndex: index,
+        resource,
+      });
+    },
+    [storeSection, lessonId, onOpenNoteEditor],
+  );
 
   // The collapse-on-drag chip (sections 2–6 ride this when a drag is active).
   // Virtual rows never enter compact density (they're not sortable), so the
@@ -660,6 +694,7 @@ const SortableSection = memo(function SortableSection({
                       onAdd={
                         storeSection ? () => onOpenComposer(rowId) : undefined
                       }
+                      onEditNote={handleEditNote}
                     />
                   </div>
                 </div>
@@ -709,9 +744,14 @@ export function LessonFlow({
   const lessonResources: SectionResource[] = useMemo(() => {
     if (!lesson) return [];
     return lesson.resources.map((r, idx) => ({
+      // Spread the FULL resource (url, provider, body, gallery, thumbnailUrl, …)
+      // — NOT just type/label. A downstream "Edit note" reads this resource's
+      // existing gallery/body to re-merge on patch; a stripped object would make
+      // the patch overwrite (drop) a pre-existing whole-lesson gallery (M1 data
+      // loss). LessonResource has no runtime `id`; synthesize a stable one from
+      // the index so SectionResource keys stay stable across rerenders.
+      ...r,
       id: `lesson:${lesson.id}:res:${idx}`,
-      type: r.type,
-      label: r.label,
     }));
   }, [lesson]);
 
@@ -910,14 +950,30 @@ export function LessonFlow({
   }, []);
 
   // ── ResourceComposer state ──────────────────────────────────────────
+  // `sectionId` is the destination for the ADD path. `editResource`, when set,
+  // flips the composer into "add/edit notes on THIS resource" mode (notecard
+  // mode + locked routing) so any existing section/lesson resource can gain a
+  // rich `body` / extra gallery media.
   const [composerTarget, setComposerTarget] = useState<{
     sectionId: string;
+    editResource?: ResourceComposerEditTarget;
   } | null>(null);
 
   const handleOpenComposer = useCallback((sectionId: string): void => {
     setComposerTarget({ sectionId });
     setOpenMenuSectionId(null);
   }, []);
+
+  // Open the composer to add / edit notes on an existing resource. `sectionId`
+  // is "" for a whole-lesson (Standards row) resource — the composer reads the
+  // edit target's own sectionId/index, not this field, when editing.
+  const handleOpenNoteEditor = useCallback(
+    (sectionId: string, editResource: ResourceComposerEditTarget): void => {
+      setComposerTarget({ sectionId, editResource });
+      setOpenMenuSectionId(null);
+    },
+    [],
+  );
 
   const closeComposer = useCallback((): void => {
     setComposerTarget(null);
@@ -1104,6 +1160,7 @@ export function LessonFlow({
                   onToggleMenu={toggleSectionMenu}
                   onCloseMenu={closeSectionMenu}
                   onOpenComposer={handleOpenComposer}
+                  onOpenNoteEditor={handleOpenNoteEditor}
                   isCollapsed={collapsedSections.has(id)}
                   onToggleCollapsed={toggleCollapsed}
                   dockTarget={dockTarget}
@@ -1164,10 +1221,12 @@ export function LessonFlow({
         </Button>
       </div>
 
-      {/* ── ResourceComposer — shared "Add resource" dialog ─────────── */}
+      {/* ── ResourceComposer — shared "Add resource" / "Add note" dialog ── */}
       <ResourceComposer
         open={composerTarget !== null && lesson !== undefined}
         lesson={lesson!}
+        mode={composerTarget?.editResource ? "notecard" : "resource"}
+        editResource={composerTarget?.editResource}
         initialSectionId={composerTarget?.sectionId}
         onClose={closeComposer}
       />

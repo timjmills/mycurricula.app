@@ -101,7 +101,13 @@ function IframeEmbed({
   // src points at the watch page which sets X-Frame-Options: sameorigin
   // and refuses to load.
   const parsed = resource.url ? parseResourceUrl(resource.url) : null;
-  const src = parsed?.embedUrl ?? resource.url ?? "";
+  const rawSrc = parsed?.embedUrl ?? resource.url ?? "";
+  // Defense-in-depth: never point the iframe at a non-http(s)/blob scheme
+  // (javascript:, data:, …). Unreachable via normal input today (the composer
+  // forces provider="website" for any non-http scheme and parseResourceUrl
+  // only embeds http(s)), but a crafted/imported row must not get a
+  // script-capable frame. about:blank renders inert.
+  const src = isSafeUrl(rawSrc) ? rawSrc : "about:blank";
   return (
     <div className={[styles.aspect, styles[`v_${variant}`]].join(" ")}>
       <iframe
@@ -202,10 +208,13 @@ function LinkEmbed({
   displayMode: "literal" | "hyperlink" | "thumbnail";
   variant: "tile" | "row" | "card";
 }): ReactNode {
+  // Only expose an anchor target for safe schemes; a dangerous scheme
+  // (javascript:, data:, …) yields an inert anchor (no href / no navigation).
+  const safeHref = isSafeUrl(resource.url) ? resource.url : undefined;
   if (displayMode === "literal") {
     return (
       <a
-        href={resource.url}
+        href={safeHref}
         target="_blank"
         rel="noopener noreferrer"
         className={styles.literal}
@@ -217,7 +226,7 @@ function LinkEmbed({
   if (displayMode === "hyperlink") {
     return (
       <a
-        href={resource.url}
+        href={safeHref}
         target="_blank"
         rel="noopener noreferrer"
         className={styles.hyperlink}
@@ -229,7 +238,7 @@ function LinkEmbed({
   // thumbnail (OG card)
   return (
     <a
-      href={resource.url}
+      href={safeHref}
       target="_blank"
       rel="noopener noreferrer"
       className={[styles.ogCard, styles[`v_${variant}`]].join(" ")}
@@ -256,6 +265,20 @@ function LinkEmbed({
       </span>
     </a>
   );
+}
+
+/** True for http(s), blob:, and same-origin root-relative ("/…") URLs — the
+ *  schemes safe to feed into an <iframe> src or an <a href>. Root-relative is
+ *  allowed for hosted files served via /api/resources/{id}; protocol-relative
+ *  "//host" is rejected (it resolves to a foreign origin). Blocks javascript:,
+ *  data:, and other dangerous schemes regardless of upstream validation. */
+function isSafeUrl(url: string | undefined): url is string {
+  if (!url) return false;
+  if (/^(https?|blob):/i.test(url)) return true;
+  // Same-origin root-relative path (e.g. /api/resources/{id}). Reject
+  // protocol-relative ("//host") and backslash tricks ("/\host") that
+  // browsers normalize to a foreign origin.
+  return /^\/(?![/\\])/.test(url);
 }
 
 function safeHost(url: string | undefined): string {

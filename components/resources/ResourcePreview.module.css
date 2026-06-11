@@ -1,0 +1,471 @@
+/* ResourcePreview.module.css — the universal click-to-enlarge modal.
+ *
+ * All color/radii/type come from app/tokens.css via var(); the only literal
+ * is the translucent backdrop scrim (mirrors ImageLightbox's inline style —
+ * there is no token for a dim overlay). */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.78);
+  overflow: auto;
+  animation: fade 140ms ease-out;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: min(960px, 94vw);
+  max-height: 92vh;
+  background: var(--paper);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  outline: none;
+}
+
+/* The split notecard layout is wider so the carousel + notes both breathe. */
+.dialogSplit {
+  max-width: min(1120px, 95vw);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--paper);
+}
+
+.titleWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.title {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink-900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.typePill {
+  flex: 0 0 auto;
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--ink-100);
+  color: var(--ink-700);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  color: var(--ink-700);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.actionBtn:hover {
+  background: var(--surface-warm);
+}
+
+.actionBtn:focus-visible,
+.closeBtn:focus-visible,
+.openBtn:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.closeBtn {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  color: var(--ink-700);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.closeBtn:hover {
+  background: var(--surface-warm);
+}
+
+/* ── Body ───────────────────────────────────────────────────────────────── */
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  overflow: auto;
+  background: var(--surface-warm);
+}
+
+.image {
+  display: block;
+  max-width: 100%;
+  max-height: calc(92vh - 120px);
+  object-fit: contain;
+  border-radius: var(--r-sm);
+}
+
+.frame {
+  position: relative;
+  width: 100%;
+  max-width: 880px;
+  aspect-ratio: 16 / 9;
+  background: var(--ink-900);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.video {
+  display: block;
+  width: 100%;
+  max-width: 880px;
+  max-height: calc(92vh - 120px);
+  background: var(--ink-900);
+  border-radius: var(--r-sm);
+}
+
+.audioWrap {
+  width: 100%;
+  max-width: 520px;
+  padding: 24px 8px;
+}
+
+.audio {
+  width: 100%;
+}
+
+/* ── Link / website fallback card ───────────────────────────────────────── */
+
+.linkCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  max-width: 520px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--paper);
+}
+
+.linkThumb {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+}
+
+.linkThumbFallback {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--r-sm);
+  background: var(--surface-warm);
+  color: var(--muted);
+}
+
+.linkTitle {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink-900);
+}
+
+.linkDesc {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--body);
+}
+
+.linkDomain {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.openBtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 10px 18px;
+  border-radius: var(--r-sm);
+  background: var(--brand-500);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.openBtn:hover {
+  background: var(--brand-600);
+}
+
+/* ── No-preview fallback ─────────────────────────────────────────────────── */
+
+.fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 24px;
+  color: var(--muted);
+}
+
+.fallbackText {
+  margin: 0;
+  font-size: 14px;
+  color: var(--body);
+}
+
+/* ── Split notecard body (media carousel left, notes right) ─────────────────
+   Mirrors NotecardFullscreen's layout, hosted inline here so every enlarge
+   path is one modal. On phone the two panes stack (media on top, notes below). */
+
+.split {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  /* Media gets the larger share; notes a readable column. */
+  grid-template-columns: 1.4fr 1fr;
+}
+
+.mediaPane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--surface-warm);
+  overflow: auto;
+}
+
+/* The annotation box wrapping the carousel — caps width so a tall portrait
+   item doesn't blow past the dialog. */
+.mediaAnnotate {
+  width: 100%;
+  max-width: 720px;
+}
+
+.carousel {
+  width: 100%;
+}
+
+.notesPane {
+  min-width: 0;
+  min-height: 0;
+  padding: 20px 22px;
+  border-left: 1px solid var(--border);
+  background: var(--paper);
+  overflow: auto;
+}
+
+/* The annotation box wrapping a single iframe body — keep it 16:9-shaped so the
+   floating toolbar lands over the frame, not over empty padding. */
+.frameAnnotate {
+  width: 100%;
+  max-width: 880px;
+}
+
+/* ── Notes prose ────────────────────────────────────────────────────────────
+   Re-enable formatting for sanitized teacher HTML (Tailwind preflight zeroes
+   lists/headings globally). Scoped to .notes so it never leaks elsewhere. */
+
+.notes {
+  font-family: var(--font-sans);
+  font-size: var(--t-14);
+  line-height: 1.6;
+  color: var(--body);
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.notes p {
+  margin: 0 0 0.6em;
+}
+
+.notes p:last-child {
+  margin-bottom: 0;
+}
+
+.notes ul,
+.notes ol {
+  margin: 0.5em 0;
+  padding-left: var(--t-24);
+}
+
+.notes ul {
+  list-style: disc;
+}
+
+.notes ol {
+  list-style: decimal;
+}
+
+.notes li {
+  margin: 3px 0;
+}
+
+.notes h1,
+.notes h2,
+.notes h3,
+.notes h4,
+.notes h5,
+.notes h6 {
+  margin: 0.7em 0 0.35em;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink-900);
+}
+
+.notes h1 {
+  font-size: var(--t-20);
+}
+
+.notes h2 {
+  font-size: var(--t-18);
+}
+
+.notes h3 {
+  font-size: var(--t-16);
+}
+
+.notes a {
+  color: var(--brand-500);
+  text-decoration: underline;
+}
+
+.notes a:hover {
+  color: var(--brand-600);
+}
+
+.notes blockquote {
+  margin: 0.6em 0;
+  padding-left: 14px;
+  border-left: 3px solid var(--border);
+  color: var(--ink-700);
+}
+
+/* Inline media a teacher embeds into the notes (sanitizer permits safe
+   img/iframe) must not overflow the notes column. */
+.notes img,
+.notes iframe {
+  max-width: 100%;
+}
+
+.emptyMedia,
+.emptyNotes {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--t-13);
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── Phone: full-bleed-ish dialog, bigger touch targets ─────────────────── */
+
+@media (max-width: 480px) {
+  .backdrop {
+    padding: 0;
+    place-items: stretch;
+  }
+
+  .dialog {
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .actionBtn,
+  .closeBtn {
+    min-height: 44px;
+  }
+
+  .closeBtn {
+    width: 44px;
+  }
+}
+
+/* Stack the split panes below the tablet breakpoint (media on top, notes
+   below) so neither column gets crushed on a narrow viewport. */
+@media (max-width: 640px) {
+  .split {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .notesPane {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop {
+    animation: none;
+  }
+}

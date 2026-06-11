@@ -43,11 +43,25 @@
 
 import type { ReactNode } from "react";
 import { memo, useCallback, useEffect, useId, useState } from "react";
+import type { LessonResource } from "@/lib/types";
 import type { SectionResource } from "@/lib/lesson-flow";
-import { Button, FutureControl } from "@/components/ui";
-import { ResourceEmbed } from "@/components/resources";
+import { Button, FutureControl, Tooltip } from "@/components/ui";
+import { ResourceEmbed, ResourcePreview } from "@/components/resources";
+import { NotecardCard } from "@/components/notecards";
+import { hasNotes, isNotecard } from "@/lib/notecards";
 import { ResourceTypePill } from "./resource-type-pill";
 import styles from "./section-resources.module.css";
+
+/** True when a resource should render as a notecard (flip gallery + notes)
+ *  rather than a plain thumbnail: a dedicated notecard, anything with a
+ *  gallery, or anything with rich notes. */
+function isNotecardish(resource: LessonResource): boolean {
+  return (
+    isNotecard(resource) ||
+    (resource.gallery?.length ?? 0) > 0 ||
+    hasNotes(resource)
+  );
+}
 
 // ── localStorage key + helpers ───────────────────────────────────────────
 // One JSON blob `{ [lessonId:sectionId]: true }` records which (lesson,
@@ -102,6 +116,10 @@ export interface SectionResourcesProps {
   /** Fire the shared ResourceComposer to add a new resource to this section.
    *  Optional — when undefined the "+ Add" affordances render disabled. */
   onAdd?: () => void;
+  /** Open the composer to add / edit notes (a body + extra gallery) on one of
+   *  this section's resources. Optional — when undefined the note affordance
+   *  is hidden. */
+  onEditNote?: (resource: SectionResource) => void;
 }
 
 // ── Spec §4.2 — primary 2×2 card fills (EXACT HEX VALUES) ───────────────
@@ -126,9 +144,15 @@ export const SectionResources = memo(function SectionResources({
   sectionId,
   resources,
   onAdd,
+  onEditNote,
 }: SectionResourcesProps): ReactNode {
   // Persistence key combining lesson + section ids.
   const storageKey = `${lessonId}:${sectionId}`;
+
+  // The resource currently open in the shared click-to-enlarge modal (a tile
+  // click or a notecard's enlarge/fullscreen affordance), or null when closed.
+  const [previewResource, setPreviewResource] =
+    useState<SectionResource | null>(null);
 
   // ── State + post-mount hydration (SSR-safe) ─────────────────────────
   // We DELIBERATELY start with `minimized: false` so the server-rendered HTML
@@ -163,13 +187,56 @@ export const SectionResources = memo(function SectionResources({
     });
   }, [storageKey]);
 
-  // Split the resource pool into the primary 2×2 grid (first 4) and the
+  // Notecard resources (gallery + notes) render as full NotecardCards at the
+  // top of the card; plain single-media resources keep the spec's 2×2 / list
+  // layout below. Order within each bucket is preserved.
+  const notecards = resources.filter((r) => isNotecardish(r));
+  const plain = resources.filter((r) => !isNotecardish(r));
+
+  // Split the PLAIN pool into the primary 2×2 grid (first 4) and the
   // "More resources" tail (everything else).
-  const primary = resources.slice(0, 4);
-  const more = resources.slice(4);
+  const primary = plain.slice(0, 4);
+  const more = plain.slice(4);
 
   // A stable id for ARIA wiring (header → body section).
   const bodyId = useId();
+
+  // The notecard strip — shared between the expanded + minimized states. Each
+  // card's enlarge / fullscreen opens the shared preview (notecard split view).
+  const notecardStrip =
+    notecards.length > 0 ? (
+      <div className={styles.notecardStrip}>
+        {notecards.map((res) => (
+          <div key={res.id} className={styles.notecardItem}>
+            <NotecardCard
+              resource={res}
+              onEnlarge={() => setPreviewResource(res)}
+              onOpenFullscreen={() => setPreviewResource(res)}
+            />
+            {onEditNote && (
+              <div className={styles.notecardActions}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onEditNote(res)}
+                  tooltip="Edit this card's notes or add more media — opens the note editor"
+                >
+                  Edit note
+                </Button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    ) : null;
+
+  // The shared enlarge modal — mounted once, opened from any tile / notecard.
+  const preview = previewResource ? (
+    <ResourcePreview
+      resource={previewResource}
+      onClose={() => setPreviewResource(null)}
+    />
+  ) : null;
 
   // ── Minimized state — "Resource quick access" card ──────────────────
   if (minimized) {
@@ -188,21 +255,29 @@ export const SectionResources = memo(function SectionResources({
           <ToggleButton minimized={true} onClick={toggle} />
         </header>
 
-        {/* List rows — one per resource. The 22×22 icon square uses the
+        {/* Notecards first (full cards with flip gallery + notes). */}
+        {notecardStrip}
+
+        {/* List rows — one per PLAIN resource. The 22×22 icon square uses the
             per-type fill from spec §4.3 (exact hex). */}
-        {resources.length > 0 ? (
+        {plain.length > 0 ? (
           <ul
             id={bodyId}
             className={styles.miniList}
             aria-label="Resources for this section"
           >
-            {resources.map((res) => (
-              <MinimizedRow key={res.id} resource={res} />
+            {plain.map((res) => (
+              <MinimizedRow
+                key={res.id}
+                resource={res}
+                onActivate={() => setPreviewResource(res)}
+                onEditNote={onEditNote ? () => onEditNote(res) : undefined}
+              />
             ))}
           </ul>
-        ) : (
+        ) : notecards.length === 0 ? (
           <p className={styles.miniEmpty}>No resources yet.</p>
-        )}
+        ) : null}
 
         {/* Footer — "+ Add quick resource". The dashed top border lives in
             CSS, not as a separate <hr>, so it tracks the card's padding. */}
@@ -218,6 +293,7 @@ export const SectionResources = memo(function SectionResources({
         >
           Add quick resource
         </Button>
+        {preview}
       </section>
     );
   }
@@ -232,9 +308,12 @@ export const SectionResources = memo(function SectionResources({
         <ToggleButton minimized={false} onClick={toggle} />
       </header>
 
-      {/* Primary 2×2 grid. Missing slots simply don't render — we never paint
-          empty placeholder cards (the spec only describes the four populated
-          slots; quieter to omit unfilled ones). */}
+      {/* Notecards first (full cards with flip gallery + notes). */}
+      {notecardStrip}
+
+      {/* Primary 2×2 grid of PLAIN resources. Missing slots simply don't
+          render — we never paint empty placeholder cards (the spec only
+          describes the four populated slots; quieter to omit unfilled ones). */}
       {primary.length > 0 && (
         <div
           id={bodyId}
@@ -247,6 +326,8 @@ export const SectionResources = memo(function SectionResources({
               key={res.id}
               resource={res}
               fill={PRIMARY_SLOT_FILLS[idx] ?? PRIMARY_SLOT_FILLS[0]}
+              onActivate={() => setPreviewResource(res)}
+              onEditNote={onEditNote ? () => onEditNote(res) : undefined}
             />
           ))}
         </div>
@@ -272,7 +353,12 @@ export const SectionResources = memo(function SectionResources({
           <h4 className={styles.moreHeaderLabel}>More resources</h4>
           <ul className={styles.moreList} aria-label="More resources">
             {more.map((res) => (
-              <MoreRow key={res.id} resource={res} />
+              <MoreRow
+                key={res.id}
+                resource={res}
+                onActivate={() => setPreviewResource(res)}
+                onEditNote={onEditNote ? () => onEditNote(res) : undefined}
+              />
             ))}
           </ul>
           {/* "Show more" — placeholder for Phase 1A (the "more" list is
@@ -287,6 +373,7 @@ export const SectionResources = memo(function SectionResources({
           />
         </div>
       )}
+      {preview}
     </section>
   );
 });
@@ -296,13 +383,42 @@ export const SectionResources = memo(function SectionResources({
 function PrimaryCard({
   resource,
   fill,
+  onActivate,
+  onEditNote,
 }: {
   resource: SectionResource;
   fill: string;
+  /** Open this resource in the shared enlarge preview. */
+  onActivate?: () => void;
+  /** Open the composer to add / edit notes on this resource. */
+  onEditNote?: () => void;
 }): ReactNode {
+  // A small "note" affordance pinned to the card corner (when wired). Stops
+  // propagation so it never also triggers the card's enlarge.
+  const noteBtn = onEditNote ? (
+    <Tooltip
+      content="Add formatted notes or extra media to this resource — opens the note editor"
+      side="top"
+    >
+      <button
+        type="button"
+        className={styles.noteChip}
+        onClick={(e) => {
+          e.stopPropagation();
+          onEditNote();
+        }}
+        aria-label={`Add or edit notes for ${resource.label}`}
+      >
+        <NoteGlyph />
+      </button>
+    </Tooltip>
+  ) : null;
+
   // When a real URL is attached, the embed primitive owns the card interior —
   // the colored card chrome (the §4.2 fill) still wraps it so the slot color
-  // stays load-bearing. Otherwise we fall back to the synthetic glyph render.
+  // stays load-bearing. We pass onClick to the embed so a click opens the
+  // unified ResourcePreview (instead of the per-type lightbox). Otherwise we
+  // fall back to the synthetic glyph render in a button that opens the preview.
   if (resource.url) {
     return (
       <article
@@ -310,7 +426,12 @@ function PrimaryCard({
         style={{ background: fill }}
         role="listitem"
       >
-        <ResourceEmbed resource={resource} variant="tile" />
+        <ResourceEmbed
+          resource={resource}
+          variant="tile"
+          onClick={onActivate}
+        />
+        {noteBtn}
       </article>
     );
   }
@@ -324,63 +445,139 @@ function PrimaryCard({
       style={{ background: fill }}
       role="listitem"
     >
-      <span className={styles.primaryCardIcon} aria-hidden="true">
-        <PrimaryCardIcon type={resource.type} />
-      </span>
-      <span className={styles.primaryCardTitle}>{resource.label}</span>
+      <button
+        type="button"
+        className={styles.primaryCardButton}
+        onClick={onActivate}
+        disabled={!onActivate}
+        aria-label={`Open ${resource.label}`}
+      >
+        <span className={styles.primaryCardIcon} aria-hidden="true">
+          <PrimaryCardIcon type={resource.type} />
+        </span>
+        <span className={styles.primaryCardTitle}>{resource.label}</span>
+      </button>
+      {noteBtn}
     </article>
   );
 }
 
 // ── MoreRow — one row of the "More resources" sub-panel ─────────────────
+// The icon + title form a button that opens the shared enlarge preview; the
+// type pill and an optional "note" chip sit alongside.
 
-function MoreRow({ resource }: { resource: SectionResource }): ReactNode {
+function MoreRow({
+  resource,
+  onActivate,
+  onEditNote,
+}: {
+  resource: SectionResource;
+  onActivate?: () => void;
+  onEditNote?: () => void;
+}): ReactNode {
   return (
     <li className={styles.moreRow}>
-      {resource.url ? (
-        <span className={styles.moreRowIcon}>
-          <ResourceEmbed resource={resource} variant="row" />
-        </span>
-      ) : (
-        <span className={styles.moreRowIcon} aria-hidden="true">
-          <MoreRowIcon type={resource.type} />
-        </span>
-      )}
-      <span className={styles.moreRowTitle}>{resource.label}</span>
+      <button
+        type="button"
+        className={styles.moreRowMain}
+        onClick={onActivate}
+        disabled={!onActivate}
+        aria-label={`Open ${resource.label}`}
+      >
+        {resource.url ? (
+          <span className={styles.moreRowIcon}>
+            <ResourceEmbed resource={resource} variant="row" />
+          </span>
+        ) : (
+          <span className={styles.moreRowIcon} aria-hidden="true">
+            <MoreRowIcon type={resource.type} />
+          </span>
+        )}
+        <span className={styles.moreRowTitle}>{resource.label}</span>
+      </button>
       <ResourceTypePill type={resource.type} />
+      {onEditNote && <RowNoteButton resource={resource} onClick={onEditNote} />}
     </li>
   );
 }
 
 // ── MinimizedRow — one row of the "Resource quick access" list ──────────
 
-function MinimizedRow({ resource }: { resource: SectionResource }): ReactNode {
+function MinimizedRow({
+  resource,
+  onActivate,
+  onEditNote,
+}: {
+  resource: SectionResource;
+  onActivate?: () => void;
+  onEditNote?: () => void;
+}): ReactNode {
   return (
     <li className={styles.miniRow}>
-      {resource.url ? (
-        <span
-          className={styles.miniRowIconSquare}
-          data-kind={miniKindFor(resource.type)}
-        >
-          <ResourceEmbed resource={resource} variant="row" />
+      <button
+        type="button"
+        className={styles.miniRowMain}
+        onClick={onActivate}
+        disabled={!onActivate}
+        aria-label={`Open ${resource.label}`}
+      >
+        {resource.url ? (
+          <span
+            className={styles.miniRowIconSquare}
+            data-kind={miniKindFor(resource.type)}
+          >
+            <ResourceEmbed resource={resource} variant="row" />
+          </span>
+        ) : (
+          <span
+            className={styles.miniRowIconSquare}
+            data-kind={miniKindFor(resource.type)}
+            aria-hidden="true"
+          >
+            <MiniRowIcon type={resource.type} />
+          </span>
+        )}
+        <span className={styles.miniRowStack}>
+          <span className={styles.miniRowTitle}>{resource.label}</span>
+          <span className={styles.miniRowSubtitle}>
+            {resource.url
+              ? realHostname(resource.url)
+              : urlPreviewFor(resource)}
+          </span>
         </span>
-      ) : (
-        <span
-          className={styles.miniRowIconSquare}
-          data-kind={miniKindFor(resource.type)}
-          aria-hidden="true"
-        >
-          <MiniRowIcon type={resource.type} />
-        </span>
-      )}
-      <span className={styles.miniRowStack}>
-        <span className={styles.miniRowTitle}>{resource.label}</span>
-        <span className={styles.miniRowSubtitle}>
-          {resource.url ? realHostname(resource.url) : urlPreviewFor(resource)}
-        </span>
-      </span>
+      </button>
       <ResourceTypePill type={resource.type} />
+      {onEditNote && <RowNoteButton resource={resource} onClick={onEditNote} />}
     </li>
+  );
+}
+
+// ── RowNoteButton — the "add/edit note" chip shared by the list rows ────────
+
+function RowNoteButton({
+  resource,
+  onClick,
+}: {
+  resource: SectionResource;
+  onClick: () => void;
+}): ReactNode {
+  return (
+    <Tooltip
+      content="Add formatted notes or extra media to this resource — opens the note editor"
+      side="left"
+    >
+      <button
+        type="button"
+        className={styles.noteChip}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        aria-label={`Add or edit notes for ${resource.label}`}
+      >
+        <NoteGlyph />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -537,6 +734,26 @@ function PlusGlyph(): ReactNode {
     >
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+/** Note / pencil-on-card glyph for the "add/edit note" affordance. */
+function NoteGlyph(): ReactNode {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
     </svg>
   );
 }

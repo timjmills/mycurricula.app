@@ -529,6 +529,73 @@
   outline-offset: 2px;
 }
 
+/* ── Tile "···" overflow menu (add / edit note) ──────────────────────────── */
+/* The wrap is positioned so the button keeps its corner pin while the popover
+   anchors beneath it. */
+.tileMenuWrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.tileMenuWrap .tileMenuBtn {
+  /* Re-pin the button relative to the wrap (which itself sits at the tile's
+     top-left corner) so it lands exactly where the old standalone chip did. */
+  top: 6px;
+  left: 6px;
+}
+
+.tileMenu {
+  position: absolute;
+  top: 34px;
+  left: 6px;
+  z-index: 5;
+  min-width: 132px;
+  padding: 4px;
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+}
+
+.tileMenuItem {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--ink-900);
+  font-size: var(--t-13);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.tileMenuItem:hover {
+  background: var(--surface-warm);
+}
+
+.tileMenuItem:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+}
+
+/* ── Notecard tile wrapper (grid mode) ───────────────────────────────────── */
+/* Positioned so the shared "···" overflow menu can pin to the top-left corner,
+   matching the plain-tile affordance. */
+.notecardWrap {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.notecardWrap > :global(article) {
+  flex: 1;
+  min-width: 0;
+}
+
 /* ── Resource list rows (mode = "list", "Resource quick access" layout) ──
    The list view is restyled to read like Image 17:
    stack of two-line rows — pastel square chip on the left, label + small

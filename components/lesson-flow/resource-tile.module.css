@@ -126,6 +126,85 @@
   z-index: 1;
 }
 
+/* ── Poster-mode tile (onActivate / read-only Resources panel) ─────────── */
+/* The whole frame becomes a button that opens the ResourcePreview modal. We
+   reset the native button chrome and reuse the .frame fill/tints; a real
+   thumbnail (when present) covers the frame, otherwise the synthetic artwork
+   + glyph render exactly as in the default tile. */
+.activateFrame {
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.activateFrame:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+/* Real thumbnail poster — covers the frame. */
+.poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Play-button overlay drawn over a video poster. */
+.posterPlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 1;
+  color: var(--hl-red);
+  pointer-events: none;
+}
+
+/* ── Notecard poster extras ──────────────────────────────────────────────── */
+/* "Stack of N" badge — pinned to the poster's bottom-right over a gallery
+   poster image. A small paper chip (icon + count) so it reads on any image.
+   pointer-events:none — the whole frame is already the activate button. */
+.stackBadge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: var(--r-4);
+  border: 1px solid color-mix(in oklch, var(--ink) 12%, transparent);
+  background: color-mix(in oklch, var(--surface) 88%, transparent);
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.stackCount {
+  font-size: var(--t-10);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Notes-only notecard poster — a soft "note" surface with a centered note
+   glyph (no gallery media to show). Uses the cheese pastel as a quiet paper
+   tint so it reads as a written card, distinct from the document tints. */
+.notePoster {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--hlp-cheese);
+  color: color-mix(in oklch, var(--hl-cheese) 60%, var(--ink));
+}
+
 /* ── Collapse + remove controls ──────────────────────────────────────── */
 /* Both pinned to the frame's top-right. Small paper chips so they read on
    any frame fill (light tint or dark video plate). */

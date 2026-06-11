@@ -171,6 +171,7 @@ const RES_ICON: Record<LessonResource["type"], IconName> = {
   doc: "doc",
   website: "website",
   link: "link",
+  notecard: "doc",
 };
 
 const RES_TINT: Record<LessonResource["type"], { bg: string; fg: string }> = {
@@ -196,6 +197,10 @@ const RES_TINT: Record<LessonResource["type"], { bg: string; fg: string }> = {
     fg: "var(--grammar-deep)",
   },
   link: { bg: "var(--ink-100)", fg: "var(--ink-500)" },
+  notecard: {
+    bg: "color-mix(in oklch, var(--important) 18%, white)",
+    fg: "var(--important)",
+  },
 };
 
 const RES_LABEL: Record<LessonResource["type"], string> = {
@@ -206,6 +211,7 @@ const RES_LABEL: Record<LessonResource["type"], string> = {
   doc: "Doc",
   website: "Website",
   link: "Link",
+  notecard: "Note",
 };
 
 interface ResourceTypeRowProps {

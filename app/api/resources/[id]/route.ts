@@ -3,6 +3,10 @@
 // GET    /api/resources/[id]                 — link rows: 200 JSON.
 //                                              Hosted files: 302 to R2 signed
 //                                              inline URL (default ?inline=1).
+//                                              ?raw=1: STREAM the bytes back
+//                                              same-origin (no redirect) so
+//                                              client-side PDF.js can read them
+//                                              without a cross-origin fetch.
 // DELETE /api/resources/[id]                 — drop the row. (R2 cleanup is
 //                                              best-effort, handled out-of-band.)
 // PATCH  /api/resources/[id]                 — update display_mode | link_text |
@@ -38,8 +42,48 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     Array.isArray(data.r2_object_keys) &&
     data.r2_object_keys.length > 0
   ) {
+    const key = data.r2_object_keys[0] as string;
+
+    // ?raw=1 → SAME-ORIGIN byte stream. The default path 302-redirects the
+    // browser to the R2 signed URL, but a cross-origin fetch() from client-side
+    // PDF.js would be blocked by CORS. So when the PDF renderer needs the bytes
+    // it asks for ?raw=1: the server fetches the signed URL itself and streams
+    // the response body straight back from this same origin. The object key
+    // comes from the DB row (server-controlled), never client input, so there
+    // is no SSRF surface; RLS already gated the row read above, so authz is
+    // unchanged. We deliberately do NOT set inline disposition here — this is a
+    // data fetch (PDF.js reads an ArrayBuffer), not a browser preview.
+    if (req.nextUrl.searchParams.get("raw") === "1") {
+      const signed = await presignGet(key, { expiresSeconds: 3600 });
+      let upstream: Response;
+      try {
+        upstream = await fetch(signed);
+      } catch {
+        return NextResponse.json({ error: "fetch_failed" }, { status: 502 });
+      }
+      if (!upstream.ok || !upstream.body) {
+        return NextResponse.json({ error: "fetch_failed" }, { status: 502 });
+      }
+
+      // Content-Type from the row's VERIFIED mime_type (set server-side from a
+      // HEAD on upload — never the client's claim). Fall back to a generic
+      // binary type so PDF.js / <img> can still sniff via the bytes.
+      const headers = new Headers({
+        "Content-Type":
+          (data.mime_type as string | null) ?? "application/octet-stream",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, max-age=300",
+      });
+      // Pass Content-Length through when R2 reports it, so the client can show
+      // progress / size the buffer; omit it otherwise (chunked is fine).
+      const len = upstream.headers.get("content-length");
+      if (len) headers.set("Content-Length", len);
+
+      return new NextResponse(upstream.body, { status: 200, headers });
+    }
+
     const inline = req.nextUrl.searchParams.get("inline") !== "0";
-    const url = await presignGet(data.r2_object_keys[0] as string, {
+    const url = await presignGet(key, {
       inline,
       filename: data.original_filename ?? undefined,
       expiresSeconds: 3600,

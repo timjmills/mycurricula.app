@@ -3,7 +3,7 @@
 // ResourcesModule.tsx — the Teach right panel's Resources module
 // (docs/teach-view-plan.md §3.1, §6, T8).
 //
-// A Padlet-style grid/list of the ACTIVE lesson's resources. Unlike the Daily
+// A card-wall grid/list of the ACTIVE lesson's resources. Unlike the Daily
 // ResourcesPanel (which is glance-and-open), the Teach Resources module is the
 // drag SOURCE for T8: every card carries a `TeachResourceDragData` payload so a
 // teacher can drag it straight onto a board cell (Agent C resolves the drop).

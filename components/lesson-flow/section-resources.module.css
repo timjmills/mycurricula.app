@@ -111,6 +111,7 @@
    Card fill (one of the 4 EXACT HEX VALUES per spec) is applied INLINE in
    the TS — this rule only owns layout + type + the stroke color. */
 .primaryCard {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -441,12 +442,138 @@
   cursor: not-allowed;
 }
 
+/* ── Notecard strip (gallery + notes resources) ──────────────────────────── */
+/* Notecard resources render as full NotecardCards stacked above the spec's
+   2×2 / list layout for plain resources. */
+.notecardStrip {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.notecardItem {
+  min-width: 0;
+}
+
+.notecardActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* ── Clickable wrappers (open the enlarge preview) ───────────────────────── */
+/* The synthetic primary card + both list rows wrap their content in a button
+   that opens the shared ResourcePreview. Reset native button chrome so the
+   spec visuals are preserved. */
+.primaryCardButton {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.primaryCardButton:disabled {
+  cursor: default;
+}
+
+.primaryCardButton:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+.moreRowMain,
+.miniRowMain {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.miniRowMain {
+  gap: 10px;
+}
+
+.moreRowMain:disabled,
+.miniRowMain:disabled {
+  cursor: default;
+}
+
+.moreRowMain:focus-visible,
+.miniRowMain:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* ── "Add/edit note" chip ────────────────────────────────────────────────── */
+/* A small square affordance on a resource card / row that opens the composer
+   in add-notes mode. ≥44px touch target via an invisible pad. */
+.noteChip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+  color: var(--ink-700);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.noteChip::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+.noteChip:hover {
+  background: var(--paper);
+  color: var(--ink-900);
+}
+
+.noteChip:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+/* The primary card's note chip pins to the top-right corner over the fill.
+   (.primaryCard is position:relative — set on its base rule above.) */
+.primaryCard .noteChip {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
 /* ── Reduced motion ──────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .toggleBtn,
   .expandedAddBtn,
   .miniAddBtn,
-  .showMoreBtn {
+  .showMoreBtn,
+  .noteChip {
     transition-duration: 0.001ms !important;
   }
 }

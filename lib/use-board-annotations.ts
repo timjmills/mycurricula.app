@@ -216,6 +216,17 @@ export interface UseBoardAnnotationsOptions {
   resourceId?: string | null;
   /** Notified after every committing change (persisted shape). */
   onChange?: (annotations: BoardAnnotations) => void;
+  /**
+   * SCRATCH surface — never read from or write to localStorage. The resource /
+   * notecard preview passes this so its ink is genuinely live-only: it can't be
+   * persisted (the product promises preview ink is "never saved"), and a tab
+   * killed mid-draw can't orphan a stroke blob in storage (the random-key
+   * approach alone would leak one dead entry per crashed session). Board
+   * surfaces leave this false/undefined so their ink persists across sessions
+   * (plan §13.5). When true the hook also skips the auth round-trip — there is
+   * no per-user namespace to resolve.
+   */
+  ephemeral?: boolean;
 }
 
 /**
@@ -226,7 +237,13 @@ export interface UseBoardAnnotationsOptions {
 export function useBoardAnnotations(
   options: UseBoardAnnotationsOptions,
 ): UseBoardAnnotationsApi {
-  const { lessonId, boardId, resourceId, onChange } = options;
+  const {
+    lessonId,
+    boardId,
+    resourceId,
+    onChange,
+    ephemeral = false,
+  } = options;
   const subKey = annotationStoreKey(lessonId, boardId, resourceId);
 
   const [state, dispatch] = useReducer(
@@ -246,6 +263,10 @@ export function useBoardAnnotations(
   const [uidVersion, bumpUidVersion] = useReducer((n: number) => n + 1, 0);
 
   useEffect(() => {
+    // Ephemeral surfaces never touch storage, so there is no per-user namespace
+    // to resolve — skip the auth round-trip entirely (also avoids a Supabase
+    // getUser() call every time a preview opens/closes).
+    if (ephemeral) return;
     const supabase = createClient();
     let active = true;
 
@@ -272,7 +293,7 @@ export function useBoardAnnotations(
       active = false;
       data.subscription.unsubscribe();
     };
-  }, []);
+  }, [ephemeral]);
 
   // Canvas + box refs. The box is the CSS-pixel size of the board.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -302,10 +323,12 @@ export function useBoardAnnotations(
     // hydrate effect is declared before the persist effect, so this reset lands
     // before the persist effect re-runs in the same commit.
     hydratedRef.current = false;
-    const stored = readEntry(uidRef.current, subKey);
+    // Ephemeral surfaces never read storage — they always hydrate empty, so the
+    // next preview open starts blank and nothing on disk is ever consulted.
+    const stored = ephemeral ? null : readEntry(uidRef.current, subKey);
     dispatch({ type: "HYDRATE", annotations: stored ?? EMPTY_ANNOTATIONS });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subKey, uidVersion]);
+  }, [subKey, uidVersion, ephemeral]);
 
   // ── rAF-batched repaint ───────────────────────────────────────────────────
   const scheduleRedraw = useCallback(() => {
@@ -342,7 +365,9 @@ export function useBoardAnnotations(
       return;
     }
     const annotations = toAnnotations(stateRef.current);
-    writeEntry(uidRef.current, subKey, annotations);
+    // Ephemeral surfaces never write to disk — the ink lives only in this hook's
+    // in-memory reducer and is gone the moment the component unmounts.
+    if (!ephemeral) writeEntry(uidRef.current, subKey, annotations);
     onChangeRef.current?.(annotations);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.strokes, subKey]);

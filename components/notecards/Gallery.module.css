@@ -1,0 +1,174 @@
+/* Gallery.module.css — flip-through media strip for a notecard's gallery.
+ *
+ * All color/radii/type come from app/tokens.css via var(). The stage holds one
+ * ResourceEmbed at a time; the chevrons + index indicator overlay it. Motion
+ * (the slide fade) is removed under prefers-reduced-motion. */
+
+.gallery {
+  position: relative;
+  width: 100%;
+  /* Focus ring sits OUTSIDE the rounded media frame for the keyboard path. */
+  border-radius: var(--r-md);
+}
+
+.gallery:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+/* ── Stage — the current large item ───────────────────────────────────────── */
+
+.stage {
+  position: relative;
+  width: 100%;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface-warm);
+}
+
+/* When clickable, the whole stage is a single full-bleed button. Reset the
+   native button chrome so only the embed shows. */
+.stageButton,
+.stageStatic {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  /* Subtle entrance per flip — replaced instantly under reduced motion. */
+  animation: slideIn 180ms ease;
+}
+
+.stageStatic {
+  cursor: default;
+}
+
+.stageButton:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+  border-radius: var(--r-md);
+}
+
+/* ── Nav chevrons ─────────────────────────────────────────────────────────── */
+/* Circular translucent buttons floating over the stage's left/right edges.
+   The Button primitive supplies the ≥44px hit area; these rules set the
+   floating circular look + the paper scrim so the glyph reads over any media. */
+
+.navBtn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-pill);
+  /* Paper scrim with a hairline so the chevron reads over a dark video plate
+     or a busy photo alike. */
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  border: 1px solid var(--border);
+  color: var(--ink-900);
+  box-shadow: var(--sh-sm);
+  transition:
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.navBtn:hover {
+  background: var(--paper);
+}
+
+.navPrev {
+  left: 8px;
+}
+
+.navNext {
+  right: 8px;
+}
+
+/* ── Index indicators ─────────────────────────────────────────────────────── */
+
+.dots {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--ink-900) 42%, transparent);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background 120ms ease;
+}
+
+.dot:hover {
+  transform: scale(1.25);
+}
+
+.dotActive {
+  background: var(--paper);
+  transform: scale(1.15);
+}
+
+.counter {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--ink-900) 52%, transparent);
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: var(--t-11);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Phone: larger touch targets on the chevrons ──────────────────────────── */
+
+@media (max-width: 640px) {
+  .navBtn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* ── Motion ───────────────────────────────────────────────────────────────── */
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stageButton,
+  .stageStatic {
+    animation: none;
+  }
+
+  .navBtn,
+  .dot,
+  .dotActive {
+    transition: none;
+  }
+}
