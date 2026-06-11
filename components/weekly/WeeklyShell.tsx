@@ -846,30 +846,58 @@ export function WeeklyShell(): ReactNode {
   const railMode: "day" | "week" = selectedLesson !== null ? "day" : "week";
 
   // ── W3-C3 — drawer open signal + close handler ────────────────────────
-  // The drawer is "open" when either of the existing rail-panel flags is
-  // true AND we're in drawer mode (≤1280px viewport). The two flags are
-  // mutually exclusive (toggleTodoPanel / toggleCommentsPanel each close
-  // the other — see lib/app-state.tsx) so this OR cleanly tracks "is any
-  // rail-panel toggle on?".
+  // The drawer is "open" when we're in drawer mode (≤1280px viewport) AND
+  // any of THREE triggers is active:
+  //   • todoPanelOpen / commentsPanelOpen — the GlobalRail To-dos / Shoutbox
+  //     icons. These two flags are mutually exclusive (toggleTodoPanel /
+  //     toggleCommentsPanel each close the other — see lib/app-state.tsx).
+  //   • selectedLessonId !== null AND !isNarrow — a lesson card was clicked
+  //     in the GRID. On desktop the inline rail simply re-scopes to the
+  //     lesson; in the 901–1280 band the Grid still renders but the inline
+  //     rail is `display: none`, so the SAME lesson-scoped content has to
+  //     surface through this overlay drawer instead. Without this term,
+  //     clicking a card in that band expanded the chip but showed no panel
+  //     (the original bug). The drawer's content is already lesson-scoped —
+  //     it receives `selectedLesson` / `railMode` and forwards them to
+  //     <RightRail>, which renders the lesson's detail + resources when a
+  //     lesson is present (mode="day"), exactly like the inline rail.
+  //     The `!isNarrow` guard is load-bearing: at ≤900px the Grid is replaced
+  //     by <WeeklyList>, whose row click sets `selectedLessonId` purely to
+  //     hand off focus to the Daily view (router.push("/daily")). Without the
+  //     guard that transient selection would flash this drawer open for a
+  //     frame before navigation unmounts the shell. So the lesson term only
+  //     fires in the Grid band, never in the List fallback. The To-do /
+  //     Shoutbox terms stay ungated — those icons are reachable at every
+  //     narrow width.
   //
-  // The close handler flips BOTH back to false. We can't just call one
-  // toggle (it would only close the active one if it happens to be the
-  // open one, and flip the other on by accident). The two togglers each
-  // run their setState through a functional updater, so we read whichever
-  // is currently true and toggle that one (this leaves the other already-
-  // false flag untouched). Defensive: if both happened to be true
-  // (shouldn't happen given the mutual exclusion, but the contract isn't
-  // enforced by the type system), we toggle both.
-  const drawerOpen = drawerMode && (todoPanelOpen || commentsPanelOpen);
+  // The close handler clears ALL THREE triggers so the drawer can't re-open
+  // itself on the next render:
+  //   • flips both panel flags back to false (keeps the rail icons'
+  //     aria-pressed state honest). We toggle whichever is currently true;
+  //     defensively toggling both if (against the mutual-exclusion contract)
+  //     both were set.
+  //   • clears selectedLessonId so a drawer opened by a lesson selection also
+  //     deselects on close. WeeklyGrid keys its inline card expansion off the
+  //     selection transition-to-null (see its sync effect), so clearing the
+  //     selection here ALSO collapses the expanded card — close ⇒ panel
+  //     closed AND card collapsed, the required end state.
+  const drawerOpen =
+    drawerMode &&
+    (todoPanelOpen ||
+      commentsPanelOpen ||
+      (selectedLessonId !== null && !isNarrow));
 
   const handleDrawerClose = useCallback((): void => {
     if (todoPanelOpen) toggleTodoPanel();
     if (commentsPanelOpen) toggleCommentsPanel();
+    if (selectedLessonId !== null) setSelectedLessonId(null);
   }, [
     todoPanelOpen,
     commentsPanelOpen,
+    selectedLessonId,
     toggleTodoPanel,
     toggleCommentsPanel,
+    setSelectedLessonId,
   ]);
 
   // ── Dynamic grid template ─────────────────────────────────────────────

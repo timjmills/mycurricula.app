@@ -143,6 +143,14 @@ export function WeeklyGrid(): ReactNode {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   // Snapshot captured at drag-start; restored on drop / cancel (spec §3.6).
   const expandedSnapshotRef = useRef<Set<string> | null>(null);
+  // Tracks the PREVIOUS value of the app-state `selectedLessonId` so the
+  // expansion-sync effect (below) can detect a selection that was cleared
+  // EXTERNALLY — i.e. by the WeeklyShell drawer's close button / backdrop /
+  // Esc on a narrow viewport, which clears the selection without routing
+  // through handleSelect. When that happens we collapse exactly the card that
+  // had been opened by the click, so the panel and the inline chip close
+  // together. Starts at the live value so the first render sees no transition.
+  const prevSelectedLessonIdRef = useRef<string | null>(selectedLessonId);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [maximizedCell, setMaximizedCell] = useState<string | null>(null);
@@ -297,6 +305,36 @@ export function WeeklyGrid(): ReactNode {
     onActivate: expandCell,
     onCollapse: collapseAll,
   });
+
+  // ── Collapse the inline chip when the selection is cleared externally ─────
+  // handleSelect keeps `selectedLessonId` (app-state) and `expandedIds`
+  // (local) in lock-step on click: opening adds the id + selects it; clicking
+  // the same card again removes the id + deselects. But the panel can ALSO be
+  // dismissed from OUTSIDE the grid — on narrow viewports the WeeklyShell
+  // overlay drawer's close button / backdrop / Esc clears `selectedLessonId`
+  // directly (it never calls handleSelect). Without this effect that path
+  // would leave the inline chip expanded after the panel closed — a desync.
+  //
+  // Fix: when `selectedLessonId` transitions FROM a concrete id TO null, undo
+  // exactly the expansion that the matching click had added — remove just that
+  // one id from `expandedIds`. We do NOT collapse on a transition to a
+  // DIFFERENT id (clicking lesson Y while X is open intentionally leaves X
+  // expanded and only re-scopes the panel), and we only remove the id if it is
+  // still expanded (so we never fight a card the teacher kept open via the
+  // keyboard expandCell path). This keeps multi-expand intact while making
+  // "close the panel ⇒ collapse the card" hold for the external-close path.
+  useEffect(() => {
+    const prev = prevSelectedLessonIdRef.current;
+    prevSelectedLessonIdRef.current = selectedLessonId;
+    if (selectedLessonId === null && prev !== null) {
+      setExpandedIds((curr) => {
+        if (!curr.has(prev)) return curr;
+        const next = new Set(curr);
+        next.delete(prev);
+        return next;
+      });
+    }
+  }, [selectedLessonId]);
 
   // ── Esc clears bulk selection ─────────────────────────────────────────────
   useEffect(() => {
