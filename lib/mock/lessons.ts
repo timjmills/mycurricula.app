@@ -7,6 +7,7 @@
 
 import type {
   Lesson,
+  LessonDifferentiation,
   LessonResource,
   LessonStatus,
   LessonMoved,
@@ -37,6 +38,7 @@ interface LessonInput {
   preview: string;
   directions?: string;
   notes?: string;
+  differentiation?: LessonDifferentiation;
   resources?: LessonResource[];
   standards?: string[];
   isPersonal?: boolean;
@@ -61,6 +63,7 @@ function L(o: LessonInput): Lesson {
     preview: o.preview,
     directions: o.directions ?? o.preview,
     notes: o.notes ?? "",
+    differentiation: o.differentiation,
     resources: o.resources ?? [],
     standards: o.standards ?? [],
     week: o.week ?? CURRENT_WEEK,
@@ -244,6 +247,15 @@ export const LESSONS: Lesson[] = [
     // NOTE (finding #20): scrubbed student names from this shared fixture.
     notes:
       "Pull aside the small group still on the array model for a quick reteach.",
+    // Mirrors the 6.11.26 handoff's Differentiation tab example content.
+    differentiation: {
+      support:
+        "Pre-cut fraction strips and sentence frames: “___ wholes shared by ___ is ___.”",
+      onLevel:
+        "Model with a bar diagram, then write the matching division equation independently.",
+      extension:
+        "Problems where the answer is greater than one whole; rename as a mixed number.",
+    },
     resources: [
       { type: "slides", label: "Lesson 23 deck" },
       { type: "doc", label: "Exit ticket" },
