@@ -375,6 +375,11 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
+  /* NO container-type here — inline-size containment would make this
+     element the containing block for position:fixed descendants, which
+     breaks the (non-portaled) ResourceComposer dialog rendered inside
+     <LessonFlow>. The agenda-navigator stacking is JS-measured instead
+     (a ResizeObserver in LessonDetail toggles .workspaceNarrow). */
 }
 
 /* ── Readable content column — LEFT-aligned (spec §2) ────────────────────
@@ -761,13 +766,200 @@
   outline-offset: 1px;
 }
 
+/* ── Lesson workspace — agenda navigator + lesson flow ──────────────────
+   (6.11.26 redesign §6.) Two-column grid: the sticky numbered section
+   navigator on the left, the lesson flow filling the rest. Hiding the
+   navigator (the .agendaBar toggle) collapses to one column. When the
+   center column is narrow (the dock columns are teacher-resizable), the
+   navigator stacks ABOVE the flow as a horizontally scrolling strip —
+   a container query, since the column width is independent of the
+   viewport. */
+.workspace {
+  display: grid;
+  grid-template-columns: 184px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.workspaceNavOff {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* The toggle row above the workspace — right-aligned, quiet chrome. */
+.agendaBar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.agendaToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+/* Touch devices: pad up to the ≥44px target rule (the detail card's
+   zoom: 0.8 shrinks rendered sizes, so the layout box compensates). */
+@media (hover: none) {
+  .agendaToggle {
+    min-height: 56px;
+    padding: 10px 14px;
+  }
+}
+
+.agendaToggle:hover {
+  color: var(--brand-600);
+  border-color: var(--brand-300);
+}
+
+.agendaToggle:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+/* Sticky inside the scrollable detail body (.body is the scroll
+   ancestor), so the navigator rides along while the flow scrolls. */
+.agendaNav {
+  position: sticky;
+  top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding-top: 2px;
+  min-width: 0;
+}
+
+.agendaItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition:
+    border-color 0.14s ease,
+    background 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+.agendaItem:hover {
+  border-color: var(--brand-300);
+  background: var(--brand-50);
+}
+
+.agendaItem:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.agendaNum {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: var(--t-13);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--ink-100);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.agendaName {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agendaChev {
+  color: var(--faint);
+  flex-shrink: 0;
+  display: inline-flex;
+  transition: transform 0.14s ease;
+}
+
+.agendaItemActive {
+  border-color: var(--brand-500);
+  background: var(--brand-50);
+  box-shadow: var(--sh-sm);
+}
+
+.agendaItemActive .agendaNum {
+  background: var(--brand-100);
+  color: var(--brand-700);
+  border-color: var(--brand-300);
+}
+
+.agendaItemActive .agendaName {
+  color: var(--brand-700);
+}
+
+.agendaItemActive .agendaChev {
+  transform: rotate(90deg);
+  color: var(--brand-500);
+}
+
+/* Narrow center column → the navigator stacks above the flow as a
+   horizontal strip. The dock columns resize independently of the
+   viewport, so this is keyed on a JS-measured class (a ResizeObserver
+   in LessonDetail watches the body cell's width) rather than a media
+   query — and rather than a container query, which would impose
+   containment on the scroll container and break the fixed-position
+   ResourceComposer rendered inside the flow. */
+.workspaceNarrow {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 13px;
+}
+
+.workspaceNarrow .agendaNav {
+  position: static;
+  flex-direction: row;
+  overflow-x: auto;
+  gap: 8px;
+  padding: 2px 1px 8px;
+  scrollbar-width: thin;
+}
+
+.workspaceNarrow .agendaItem {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 148px;
+}
+
+.workspaceNarrow .agendaItem .agendaChev {
+  display: none;
+}
+
 /* ── Lesson Flow container ──────────────────────────────────────────────
    <LessonFlow> sits directly on the white body — no bordered or shaded
    box. Just normal vertical breathing room above it. The other agent
    owns the lesson flow internals (sections / per-section resources);
    this wrapper just gives the flow its place in the column. */
 .flowWrap {
-  margin-top: 22px;
+  margin-top: 0;
+  min-width: 0;
 }
 
 /* ── Section blocks (standards / notes) ─────────────────────────────────
@@ -886,7 +1078,13 @@
   .markDone,
   .actionBtn,
   .notesLink,
-  .editPencil {
+  .editPencil,
+  .agendaItem,
+  .agendaChev {
     transition: none;
+  }
+
+  .agendaItemActive .agendaChev {
+    transform: none;
   }
 }
