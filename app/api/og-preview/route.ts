@@ -237,6 +237,22 @@ async function readCapped(res: Response, cap: number): Promise<string> {
   return new TextDecoder("utf-8").decode(merged);
 }
 
+/**
+ * Resolve a raw OG image value against the page's final URL and return it only
+ * when it is an absolute http(s) URL. Anything else (relative, `data:`,
+ * `javascript:`, unparseable) yields undefined so it never reaches the client.
+ */
+function safeHttpThumb(raw: string | undefined, base: URL): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const u = new URL(raw, base);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
+  } catch {
+    // unparseable — drop it
+  }
+  return undefined;
+}
+
 export async function GET(req: NextRequest) {
   const target = req.nextUrl.searchParams.get("url");
   if (!target) {
@@ -283,7 +299,14 @@ export async function GET(req: NextRequest) {
       metaProp("og:description") ??
       metaProp("twitter:description") ??
       metaProp("description");
-    const thumbnailUrl = metaProp("og:image") ?? metaProp("twitter:image");
+    // The image URL comes from attacker-controllable page metadata. Resolve it
+    // against the final URL and keep it ONLY when it is an absolute http(s)
+    // URL — drop `javascript:`/`data:`/relative-to-internal forms before they
+    // ever reach a client `<img src>` (defence in depth alongside the client's
+    // SAFE_IMG_SRC gate). We do not fetch it server-side, so this is purely an
+    // output-sanitization step, not a second SSRF hop.
+    const rawThumb = metaProp("og:image") ?? metaProp("twitter:image");
+    const thumbnailUrl = safeHttpThumb(rawThumb, result.finalUrl);
 
     const domain = startUrl.hostname.replace(/^www\./, "");
 
