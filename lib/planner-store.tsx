@@ -77,6 +77,7 @@ import {
   LESSON_TEMPLATE_BY_ID,
   DEFAULT_LESSON_TEMPLATE_ID,
 } from "@/lib/lesson-templates";
+import { detectFirstFork } from "@/lib/undo-toast-messages";
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -170,6 +171,18 @@ export interface LastChange {
   lessonIds: string[];
   /** Section id, if a section mutation was the cause. */
   sectionId?: string;
+  /**
+   * True when THIS action lazily forked an affected lesson for the first
+   * time — it transitioned from unforked (`modified !== true` and not
+   * previously `isPersonal`) to personally forked (`modified === true` AND
+   * `isPersonal === true`). Computed in the history reducer by diffing the
+   * previous and next documents (see detectFirstFork in
+   * lib/undo-toast-messages.ts). Consumed by the UndoToastBridge to fire the
+   * forking-model education toast (UX roadmap item 02). Never set on
+   * undo/redo/hydrate, and structurally impossible for setLessonStatus —
+   * completion never forks (CLAUDE.md §2).
+   */
+  firstFork?: boolean;
 }
 
 // ── Actions ────────────────────────────────────────────────────────────────
@@ -1283,6 +1296,24 @@ function historyReducer(
   // Derive lastChange before touching history.
   const lastChange = buildLastChange(action);
 
+  // First-fork detection (roadmap 02): both the previous doc (present) and
+  // the next doc are in scope here, so this is the one place that can see an
+  // affected lesson transition from unforked to personally forked by THIS
+  // action. Only Personal-mode flows ever set the modified+isPersonal pair on
+  // an existing lesson (the lazy fork — e.g. setSaveTarget "personal");
+  // Master/Team-mode writes never touch the forking metadata, so a detected
+  // transition implies Personal mode. setLessonStatus rewrites only `status`,
+  // so completion can never trip this (CLAUDE.md: completion never forks).
+  if (
+    detectFirstFork(
+      state.history.present.lessons,
+      nextDoc.lessons,
+      lastChange.lessonIds,
+    )
+  ) {
+    lastChange.firstFork = true;
+  }
+
   // ── Coalescing check ─────────────────────────────────────────────────
   // If the incoming action has a coalesceKey AND it matches the previous
   // key AND it fired within COALESCE_WINDOW_MS, update present in place
@@ -1604,6 +1635,17 @@ export interface PlannerValue {
   canUndo: boolean;
   /** True when there is at least one step available to redo. */
   canRedo: boolean;
+  /**
+   * The number of undoable steps currently on the past stack (= past.length).
+   * ADDITIVE — the UndoToastBridge's batch-detection seam (§4a review M2):
+   * a single dispatch advances this by exactly 1, while a bulk gesture that
+   * dispatches N actions in one batch (e.g. WeeklyGrid.handleBulkMove)
+   * advances it by N. The bridge compares successive values to detect a
+   * multi-entry advance and suppress a misleading single-step undo toast.
+   * Note: at HISTORY_LIMIT the past stack is truncated, so an observed jump
+   * can undercount — acceptable until item 06's real batch undo lands.
+   */
+  historyDepth: number;
   /**
    * The human label of the action that WILL be undone next, or null.
    * Use this to render tooltip text like "Undo Move lesson".
@@ -2249,7 +2291,11 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
 
   const addSection = useCallback(
     (lessonId: string, heading?: string) => {
-      const action: AddSectionAction = { type: "addSection", lessonId, heading };
+      const action: AddSectionAction = {
+        type: "addSection",
+        lessonId,
+        heading,
+      };
       dispatchRef.current(action);
       persistSectionAction(action);
     },
@@ -2387,6 +2433,9 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const canRedo = future.length > 0;
   const undoLabel = canUndo ? past[past.length - 1].label : null;
   const redoLabel = canRedo ? future[0].label : null;
+  // ADDITIVE — the UndoToastBridge's batch-detection seam (§4a review M2).
+  // See the PlannerValue doc comment for the contract.
+  const historyDepth = past.length;
 
   // ── Owner-keyed hydration readiness ────────────────────────────────────
   // The reducer's `hydration` is the raw lifecycle for whatever doc is on
@@ -2501,6 +2550,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       redo,
       canUndo,
       canRedo,
+      historyDepth,
       undoLabel,
       redoLabel,
       lastChange,
@@ -2547,6 +2597,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       redo,
       canUndo,
       canRedo,
+      historyDepth,
       undoLabel,
       redoLabel,
       lastChange,

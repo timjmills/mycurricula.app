@@ -49,6 +49,19 @@ export interface UndoToastInput {
 interface UndoToastContextValue {
   /** Show an undo toast. Replaces any visible one (last-in wins). */
   showUndoToast: (t: UndoToastInput) => void;
+  /**
+   * Retire + unmount whatever toast is live (no-op when none).
+   *
+   * WHY (§4a review M1): a toast's Undo fires the store's GENERIC
+   * single-step undo, so the toast is only honest while the history entry
+   * it describes is still the TOP of the undo stack. The moment any
+   * non-toasting mutation advances history (a text edit, section plumbing,
+   * a bulk batch, an undo/redo), a still-visible "Moved to Tuesday" would
+   * silently revert THAT newer step instead. The bridge calls this on every
+   * history advance that does not itself produce a toast, so a visible
+   * toast can never outlive the step it describes.
+   */
+  clearUndoToast: () => void;
 }
 
 const UndoToastContext = createContext<UndoToastContextValue | null>(null);
@@ -84,6 +97,17 @@ export function UndoToastProvider({
     liveKeyRef.current = keyCounterRef.current;
     toastRef.current = t;
     setState({ key: keyCounterRef.current, toast: t });
+  }, []);
+
+  /** Retire + unmount ANY live toast — see the context-value doc for why
+   *  (§4a M1: a toast must never outlive the history step it describes).
+   *  Key-agnostic by design: the caller (the bridge) is reacting to a
+   *  history advance, not to a specific toast, so whatever is visible is
+   *  by definition stale. */
+  const clearUndoToast = useCallback((): void => {
+    liveKeyRef.current = -1; // retire from ⌘Z eligibility
+    toastRef.current = null;
+    setState((prev) => (prev.toast === null ? prev : { ...prev, toast: null }));
   }, []);
 
   /** Retire `key` from ⌘Z eligibility. No-op for any other key. */
@@ -140,8 +164,8 @@ export function UndoToastProvider({
   }, []);
 
   const value = useMemo<UndoToastContextValue>(
-    () => ({ showUndoToast }),
-    [showUndoToast],
+    () => ({ showUndoToast, clearUndoToast }),
+    [showUndoToast, clearUndoToast],
   );
 
   const { key, toast } = state;
@@ -167,4 +191,16 @@ export function useUndoToast(): UndoToastContextValue {
     throw new Error("useUndoToast must be used inside <UndoToastProvider>");
   }
   return ctx;
+}
+
+/**
+ * Provider-OPTIONAL accessor — returns null when no <UndoToastProvider> is
+ * mounted instead of throwing. For surfaces that also render OUTSIDE the
+ * planner shell (e.g. the lesson-card context menu, which the Settings →
+ * Appearance live preview mounts with no providers): they degrade to "no
+ * confirmation toast" rather than crashing. Same additive pattern as
+ * lib/planner-store's useCatalogOptional.
+ */
+export function useUndoToastOptional(): UndoToastContextValue | null {
+  return useContext(UndoToastContext);
 }

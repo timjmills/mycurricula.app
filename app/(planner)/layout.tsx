@@ -12,6 +12,7 @@ import {
   RightPanel,
   SideNav,
   TopBar,
+  UndoToastBridge,
 } from "@/components/shell";
 import styles from "./layout.module.css";
 
@@ -74,6 +75,12 @@ export default function PlannerLayout({
                     {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
                     Mounted as a client leaf so the layout stays a Server Component. */}
                     <GlobalShortcuts />
+                    {/* Roadmap-02 undo-toast bridge: a render-nothing client
+                    leaf that watches the planner store's lastChange and fires
+                    the undo toast for every undoable gesture (move /
+                    completion / first fork / revert). Must sit inside BOTH
+                    PlannerProvider and UndoToastProvider. */}
+                    <UndoToastBridge />
                     {/* v1.3 shell: an app-wide left SideNav (primary navigation,
                     replacing the old top-bar tabs + icon rails) and a content
                     column holding the Team-Curriculum banner, the slimmed top

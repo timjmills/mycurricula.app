@@ -13,3 +13,4 @@ export { RailsDndProvider } from "./RailsDndProvider";
 export { RailAddButton } from "./RailAddButton";
 export { GlobalShortcuts } from "./global-shortcuts";
 export { Clock } from "./Clock";
+export { UndoToastBridge } from "./undo-toast-bridge";
