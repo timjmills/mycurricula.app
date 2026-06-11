@@ -194,15 +194,27 @@ const HOLD_MS = 2000;
 // ── Helpers ───────────────────────────────────────────────────────────────────
 /**
  * Strip HTML tags from a string so that RTE-edited HTML values are safe to
- * use in aria-label / title attributes (plain-text contexts).
- * Runs client-side only; falls back to the raw string during SSR (acceptable
- * because aria-labels are never used server-side for correctness).
+ * use in aria-label / title / em-dash-split contexts (plain-text contexts).
+ *
+ * ISOMORPHIC by design: it must return the SAME value on the server and the
+ * client. The shared header band renders on the SERVER for collapsed cards
+ * (cards start collapsed), and the band's em-dash title split + aria-labels
+ * derive from this function. An earlier `typeof document` DOM-based
+ * implementation returned RAW HTML on the server but DOM-stripped text on the
+ * client, so titleMain/titleSub/safeTitleMain differed between SSR and the
+ * first client paint → a React hydration mismatch on /weekly. The tag-stripping
+ * regex runs identically in both runtimes, eliminating the mismatch. This is
+ * the same projection `previewText` already uses; the 2000-char cap keeps the
+ * `/<[^>]*>/g` pass linear (O(n²) worst case on a long run of unmatched "<").
  */
 function stripHtml(html: string): string {
-  if (typeof document === "undefined") return html;
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-  return tmp.textContent ?? tmp.innerText ?? html;
+  // No .trim(): the em-dash title split walks the RAW html counting visible
+  // (non-tag) characters to find the separator offset, and compares that count
+  // against indexOf on THIS function's output. Trimming here would shift the
+  // plain-text indices out of step with the raw-html visible-char walk and
+  // mis-slice titles that carry leading whitespace. Tag-stripping + the 2000
+  // cap are all that's needed for SSR↔client isomorphism (mirrors previewText).
+  return (html ?? "").slice(0, 2000).replace(/<[^>]*>/g, "");
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -383,11 +395,13 @@ export function WeeklyLessonCard({
 
   const cardSurface: CSSProperties = {
     position: "relative",
-    // Collapsed title-only chips carry the subject's Vivid tint gradient — the
-    // "preview tree" look — so each chip reads by subject at a glance. The
-    // expanded card keeps a neutral (paper) body so its colored header band has
-    // maximum contrast. Quiet/Calm styles stay neutral (white + stripe).
-    background: !isCompact && !expanded && isVivid ? color.bg : "var(--paper)",
+    // Both collapsed AND expanded cards keep a neutral (paper) root: the
+    // redesigned collapsed card is a "mini" of the expanded one, so it carries
+    // the SAME subtle subject-tinted header band over an off-white body rather
+    // than the old full-bleed sticky-note tint. The band (bandTint) and the
+    // body (`--surface`) supply the only color; the root stays paper in every
+    // style so the header/body zones read cleanly. Quiet/Calm unchanged.
+    background: "var(--paper)",
     border: selected
       ? `1.5px solid ${color.stripe}`
       : isVivid
@@ -408,10 +422,16 @@ export function WeeklyLessonCard({
   };
 
   // ── Header band ───────────────────────────────────────────────────────────
-  // The band paints with the subject's original Vivid card gradient — a
-  // confident colored zone above the neutral (paper) body. A color-matched
-  // hard border + drop shadow keep the header/body boundary unmistakable.
-  const bandSeparatorColor = `color-mix(in oklch, ${color.stripe} 55%, transparent)`;
+  // The band is now SHARED between the collapsed and expanded states: a
+  // teacher sees the same subtle subject-tinted header in both, and only the
+  // body below it changes (preview text collapsed → full sections expanded).
+  // Per the approved design the tint is deliberately SUBTLE — a soft wash of
+  // the subject's light fill (`color.cl`) over the neutral surface — rather
+  // than the deep `color.gradient` the old expanded band used. This reads as
+  // "subject-tinted header over off-white body" the same way collapsed and
+  // expanded, which is the design contract for the redesigned card.
+  const bandSeparatorColor = `color-mix(in oklch, ${color.stripe} 45%, transparent)`;
+  const bandTint = `color-mix(in oklch, ${color.cl} 72%, var(--surface))`;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -548,7 +568,6 @@ export function WeeklyLessonCard({
   // be trusted. Run each through sanitizeHtml() (strict DOMPurify allowlist)
   // before injection. Memoized so the work only re-runs when the source HTML
   // changes, not on every render.
-  const safeTitle = useMemo(() => sanitizeHtml(lesson.title), [lesson.title]);
   const safeTitleMain = useMemo(() => sanitizeHtml(titleMain), [titleMain]);
   const safePreview = useMemo(
     () => sanitizeHtml(lesson.preview),
@@ -659,7 +678,7 @@ export function WeeklyLessonCard({
       // to 88px+ (full). Instead the compact↔full switch is an instant DOM
       // reflow; only the rich content inside uses AnimatePresence
       // (height: 0→auto) so text renders at its correct font-size every frame.
-      className={`cp-subj ${subject.cls} ${styles.card} ${isCompact ? styles.cardCompact : ""} ${!isCompact && !expanded ? styles.cardCollapsed : ""}`}
+      className={`cp-subj ${subject.cls} ${styles.card} ${isCompact ? styles.cardCompact : ""}`}
       data-style={style}
       // Scroll-into-view anchor — present in BOTH compact and full density
       // so scrollPlannerItemIntoView() always finds this card after a move or
@@ -792,185 +811,44 @@ export function WeeklyLessonCard({
             transition={collapseTransition}
             style={{ overflow: "hidden" }}
           >
-            {/* ── Collapsed chip — TITLE ONLY (uniform across subjects) ─────────
-                The collapsed weekly chip shows just the lesson title, a thin
-                subject-color left stripe (the fork-stripe rendered above), a
-                minimal status dot, and the drag handle. Subject name, time,
-                preview text, and the standards/tasks footer have moved to the
-                lesson DETAIL panel (WeeklyShell right-rail / WeeklyRailDrawer),
-                opened by clicking the chip → setSelectedLessonId(lesson.id).
-                Clicking anywhere on the chip selects it (handled by the card
-                root onClick → onSelect). The drag handle is the only drag
-                affordance; double-click on the title still opens inline edit. */}
-            {!expanded && (
-              <div
-                className={styles.collapsedChip}
-                // Clicking the chip opens the lesson DETAIL panel. The grid
-                // wires onSelect → setSelectedLessonId(lesson.id), which the
-                // WeeklyShell right-rail / WeeklyRailDrawer read to render the
-                // existing detail surface. An open editor swallows the click.
-                onClick={() => {
-                  if (editingField) return;
-                  onSelect?.(lesson.id);
-                }}
-                role="button"
-                tabIndex={-1}
-                aria-label={`Open lesson details: ${stripHtml(lesson.title)}`}
-              >
-                <div className={styles.collapsedText}>
-                  <h3
-                    className={styles.collapsedTitle}
-                    style={{
-                      textDecoration: done ? "line-through" : "none",
-                      textDecorationColor:
-                        "color-mix(in oklch, var(--ink) 40%, transparent)",
-                    }}
-                  >
-                    {editingField === "title" ? (
-                      <RichEditorWrapper
-                        onCommit={commitEdit}
-                        onCancel={cancelEdit}
-                        className={styles.richEditorTitle}
-                      >
-                        <RichTextEditor
-                          value={draftValue}
-                          onChange={handleTitleChange}
-                          autoFocus
-                          singleLine
-                          ariaLabel="Edit lesson title"
-                        />
-                      </RichEditorWrapper>
-                    ) : (
-                      <span
-                        className={styles.editableText}
-                        tabIndex={0}
-                        role="button"
-                        aria-label="Edit lesson title"
-                        onClick={(e) => e.stopPropagation()}
-                        onDoubleClick={(e) => openEditor("title", e)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === "F2")
-                            openEditor("title", e);
-                        }}
-                        title={stripHtml(lesson.title)}
-                        // eslint-disable-next-line react/no-danger
-                        dangerouslySetInnerHTML={{ __html: safeTitle }}
-                      />
-                    )}
-                  </h3>
-
-                  {/* Lesson preview — a muted 2-line summary under the title so
-                      the resting chip shows some lesson text at a glance again.
-                      Display-only: clicks/double-clicks bubble to the chip / card
-                      (expand inline / open detail panel) exactly like the title
-                      area, and editing still happens in the expanded view. */}
-                  {hasPreview && (
-                    <p
-                      className={styles.collapsedPreview}
-                      title={previewText}
-                      // eslint-disable-next-line react/no-danger
-                      dangerouslySetInnerHTML={{ __html: safePreview }}
-                    />
-                  )}
-                </div>
-
-                {/* Completion checkbox — restored on the chip so a lesson can be
-                    marked done without opening the detail panel. Click toggles
-                    done ⇄ not_done (never forks, per the planner store). Stops
-                    propagation so it doesn't open the detail panel. Subject
-                    color fills the box when done; partial shows a half-tint. */}
-                <button
-                  type="button"
-                  className={styles.collapsedCheck}
-                  data-done={done ? "true" : undefined}
-                  aria-label={
-                    done ? "Mark lesson not done" : "Mark lesson done"
-                  }
-                  aria-pressed={done}
-                  title={done ? "Mark not done" : "Mark done"}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setLessonStatus(lesson.id, done ? "not_done" : "done");
-                  }}
-                  style={{
-                    background: done
-                      ? color.stripe
-                      : lesson.status === "partial"
-                        ? `color-mix(in oklch, ${color.stripe} 30%, var(--surface))`
-                        : "var(--surface)",
-                    borderColor: done
-                      ? color.stripe
-                      : lesson.status === "partial"
-                        ? color.stripe
-                        : "var(--ink-300)",
-                  }}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="m5 13 4 4 10-11" />
-                  </svg>
-                </button>
-
-                {/* Drag handle — preserves drag-to-reschedule. Hidden at rest,
-                    revealed on hover/focus; 44px touch target via .affordance. */}
-                {dragHandleProps && (
-                  <Tooltip
-                    content="Drag to move this lesson to a different day or column — moves are personal unless you explicitly save them to the Team Curriculum."
-                    side="top"
-                  >
-                    <span
-                      {...dragHandleProps}
-                      data-drag-handle
-                      className={`${styles.affordance} ${styles.dragHandle} ${styles.collapsedHandle}`}
-                      title="Drag to move this lesson"
-                      aria-label="Drag to move this lesson"
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ cursor: "grab", ...dragHandleProps.style }}
-                    >
-                      <span aria-hidden className={styles.affordanceVisual}>
-                        <Icon name="drag" size={13} />
-                      </span>
-                    </span>
-                  </Tooltip>
-                )}
-              </div>
-            )}
-
-            {/* ── Expanded layout — full header band + body ────────────────────
-                Reached via the grid's keyboard navigation (Enter on a focused
-                cell) or programmatically; the inline expanded view preserves
-                the rich editing surface (sections, resources, standards). */}
-            {expanded && (
-              <>
-                {/* ── Header band ─────────────────────────────────────────────────── */}
-                {/* Deeply-tinted subject fill (noticeably deeper than the body) with
-          deep text (`--cd`). Always tinted regardless of the style axis —
-          this is the Weekly-view design contract. The hard bottom border plus
-          drop shadow make the header/body boundary unmistakable at a glance.
-          The band carries: subject name, time label, move/modified indicators,
-          drag handle, ⋯ affordance, and the lesson title below them. */}
-                <div
-                  className={styles.band}
-                  style={{
-                    background: color.gradient,
-                    borderBottom: `2px solid ${bandSeparatorColor}`,
-                    boxShadow: `0 2px 6px color-mix(in oklch, ${color.stripe} 18%, transparent)`,
-                  }}
-                  onClick={toggleExpand}
-                  role="button"
-                  tabIndex={-1}
-                  aria-label={expanded ? "Collapse lesson" : "Expand lesson"}
-                >
-                  {/* BUG-002: Band is split into two rows to prevent overflow when
+            {/* ── Shared header band (collapsed AND expanded) ──────────────────
+                The header band is identical in both states — a SUBTLE
+                subject-tinted zone (bandTint: a soft wash of color.cl over the
+                surface) carrying, on its top row: the completion check, the
+                "Subject | time" meta line, the drag handle, and the ⋯ menu;
+                below that the dominant lesson title (clamped to a fixed line
+                count for uniform band height) and the em-dash subtitle. The
+                ONLY thing that changes between collapsed and expanded is the
+                BODY below this band (preview text → full sections), exactly as
+                the approved redesign specifies. The band has a fixed min-height
+                and a 1-line title clamp so it never grows/shrinks between
+                lessons regardless of title length or subtitle/status presence.
+                Clicking the band toggles expand/collapse (toggleExpand). */}
+            <div
+              className={styles.band}
+              // data-has-status drives extra right-padding on the title/subtitle
+              // (see .module.css) so the absolutely-positioned .bandStatusRow
+              // (moved-arrow / MODIFIED) can never paint over or intercept clicks
+              // on the right edge of a long 1-line title (fix #4a).
+              data-has-status={
+                lesson.moved || lesson.modified ? "true" : undefined
+              }
+              // data-has-subtitle switches the title clamp: WITHOUT an em-dash
+              // qualifier the title gets 2 lines; WITH one it gets 1 line + the
+              // 1-line subtitle below (a 2-line-total header either way). The
+              // band's fixed min-height keeps every header the same height
+              // regardless of which layout applies (uniform-sizing, fix #2).
+              data-has-subtitle={titleSub ? "true" : undefined}
+              style={{
+                background: bandTint,
+                borderBottom: `2px solid ${bandSeparatorColor}`,
+              }}
+              onClick={toggleExpand}
+              role="button"
+              tabIndex={-1}
+              aria-label={expanded ? "Collapse lesson" : "Expand lesson"}
+            >
+              {/* BUG-002: Band is split into two rows to prevent overflow when
               status indicators accumulate. Row 1 always renders; Row 2 appears
               only when the card carries moved/modified state. Fixed affordances
               (drag handle, ⋯ menu) are pinned to the trailing edge of Row 1 so
@@ -979,664 +857,678 @@ export function WeeklyLessonCard({
               Row 1: [code badge] [check] [subject · time — flex:1] [affordances]
               Row 2: [moved indicator?] [Modified pill?]  — conditional            */}
 
-                  {/* ── Band row 1: identity + fixed affordances ─────────────────── */}
-                  <div className={styles.bandTop}>
-                    {/* Completion check — always on top of the faded state so it's
+              {/* ── Band row 1: identity + fixed affordances ─────────────────── */}
+              <div className={styles.bandTop}>
+                {/* Completion check — always on top of the faded state so it's
               reachable even when done=true. */}
-                    <div
-                      className={styles.bandCheckWrap}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <CompletionCheck
-                        status={lesson.status}
-                        size={15}
-                        onCycle={cycleComplete}
-                        label={`Mark "${stripHtml(lesson.title)}" — current status ${lesson.status}`}
-                      />
-                    </div>
+                <div
+                  className={styles.bandCheckWrap}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <CompletionCheck
+                    status={lesson.status}
+                    size={15}
+                    onCycle={cycleComplete}
+                    label={`Mark "${stripHtml(lesson.title)}" — current status ${lesson.status}`}
+                  />
+                </div>
 
-                    {/* Subject · time — single muted metadata line (Option 1).
+                {/* Subject · time — single muted metadata line (Option 1).
               No uppercase, no pill. The card's color background already
               signals subject; this line is just a quiet label reference.
               Color inherits color.cd from the band gradient context so
               the text is readable on any subject's tint without hardcoding. */}
-                    <div
-                      className={styles.bandMeta}
-                      style={{ color: color.cd }}
-                    >
-                      <span className={styles.bandSubject}>{subject.name}</span>
-                      <span className={styles.bandMetaSep} aria-hidden />
-                      <span className={styles.bandTime}>{timeLabel}</span>
-                    </div>
+                <div className={styles.bandMeta} style={{ color: color.cd }}>
+                  <span className={styles.bandSubject}>{subject.name}</span>
+                  <span className={styles.bandMetaSep} aria-hidden />
+                  <span className={styles.bandTime}>{timeLabel}</span>
+                </div>
 
-                    {/* Affordances: drag handle (always shown) + ⋯ menu.
+                {/* Affordances: drag handle (always shown) + ⋯ menu.
               Pinned to trailing edge of Row 1 so they never overlap with
               the moved/modified indicators that live in Row 2. */}
-                    <div
-                      className={styles.bandControls}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <span className={styles.affordanceRow}>
-                        {dragHandleProps && (
-                          <span
-                            {...dragHandleProps}
-                            data-drag-handle
-                            className={`${styles.affordance} ${styles.dragHandle}`}
-                            title="Drag to move this lesson"
-                            aria-label="Drag to move this lesson"
-                            role="button"
-                            tabIndex={0}
-                            style={{ cursor: "grab", ...dragHandleProps.style }}
-                          >
-                            <span
-                              aria-hidden
-                              className={styles.affordanceVisual}
-                            >
-                              <Icon name="drag" size={13} />
-                            </span>
-                          </span>
-                        )}
-                        <Tooltip
-                          content="Open the lesson menu — mark status, relocate, duplicate, save as template, save to Team Curriculum, or archive"
-                          side="top"
-                        >
-                          <Button
-                            variant="icon"
-                            size="sm"
-                            iconAriaLabel="More actions"
-                            className={styles.affordance}
-                            onClick={handleAffordance}
-                            aria-haspopup="menu"
-                            tooltip="Open the lesson actions menu"
-                          >
-                            <span className={styles.affordanceVisual}>
-                              <Icon name="dots" size={11} />
-                            </span>
-                          </Button>
-                        </Tooltip>
+                <div
+                  className={styles.bandControls}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className={styles.affordanceRow}>
+                    {dragHandleProps && (
+                      <span
+                        {...dragHandleProps}
+                        data-drag-handle
+                        className={`${styles.affordance} ${styles.dragHandle}`}
+                        title="Drag to move this lesson"
+                        aria-label="Drag to move this lesson"
+                        role="button"
+                        tabIndex={0}
+                        style={{ cursor: "grab", ...dragHandleProps.style }}
+                      >
+                        <span aria-hidden className={styles.affordanceVisual}>
+                          <Icon name="drag" size={13} />
+                        </span>
                       </span>
-                    </div>
-                  </div>
+                    )}
+                    <Tooltip
+                      content="Open the lesson menu — mark status, relocate, duplicate, save as template, save to Team Curriculum, or archive"
+                      side="top"
+                    >
+                      <Button
+                        variant="icon"
+                        size="sm"
+                        iconAriaLabel="More actions"
+                        className={styles.affordance}
+                        onClick={handleAffordance}
+                        aria-haspopup="menu"
+                        tooltip="Open the lesson actions menu"
+                      >
+                        <span className={styles.affordanceVisual}>
+                          <Icon name="dots" size={11} />
+                        </span>
+                      </Button>
+                    </Tooltip>
+                  </span>
+                </div>
+              </div>
 
-                  {/* ── Band row 2: status indicators (conditional) ───────────────── */}
-                  {/* Rendered only when the card carries move or modification state
+              {/* ── Band row 2: status indicators (conditional) ───────────────── */}
+              {/* Rendered only when the card carries move or modification state
               so the row takes no space for clean, unmodified lessons.
               Each element is flex:0 0 auto so they never grow or wrap into
               each other. */}
-                  {(lesson.moved || lesson.modified) && (
-                    <div
-                      className={styles.bandStatusRow}
-                      onClick={(e) => e.stopPropagation()}
+              {(lesson.moved || lesson.modified) && (
+                <div
+                  className={styles.bandStatusRow}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {lesson.moved && (
+                    <Tooltip
+                      content={
+                        lesson.moved === "across-weeks"
+                          ? "This lesson was moved across weeks in your personal copy — the Team Curriculum version still lives in the original slot."
+                          : "This lesson was moved within the week in your personal copy — the Team Curriculum version still lives in the original slot."
+                      }
+                      side="top"
                     >
-                      {lesson.moved && (
-                        <Tooltip
-                          content={
-                            lesson.moved === "across-weeks"
-                              ? "This lesson was moved across weeks in your personal copy — the Team Curriculum version still lives in the original slot."
-                              : "This lesson was moved within the week in your personal copy — the Team Curriculum version still lives in the original slot."
-                          }
-                          side="top"
-                        >
-                          <span
-                            className={styles.indicator}
-                            title={
-                              lesson.moved === "across-weeks"
-                                ? "Moved across weeks in your personal copy"
-                                : "Moved within the week in your personal copy"
-                            }
-                            aria-label={
-                              lesson.moved === "across-weeks"
-                                ? "Moved across weeks"
-                                : "Moved within the week"
-                            }
-                            tabIndex={0}
-                            style={{
-                              background: color.stripe,
-                              color: "var(--paper)",
-                            }}
-                          >
-                            {lesson.moved === "across-weeks" ? "⤴" : "↔"}
-                          </span>
-                        </Tooltip>
-                      )}
-                      {lesson.modified && (
-                        // MED-7: richer tooltip describing what changed and who.
-                        // The Lesson model carries no actor/timestamp fields — ME.name
-                        // is the viewing teacher (best-effort). If moved, include
-                        // the day the lesson was moved from so the tooltip is
-                        // actionable ("Moved Sun→Mon by Lena Haddad").
-                        // Note: lesson.day is the CURRENT day; prior placement is
-                        // not stored, so we describe the type of move only.
-                        <Tooltip
-                          content={
-                            lesson.moved === "across-weeks"
-                              ? `Moved to another week by ${ME.name} · personally modified from Team Curriculum`
-                              : lesson.moved === "same-week"
-                                ? `Moved to ${WEEK_DAYS[lesson.day] ?? "another day"} by ${ME.name} · personally modified from Team Curriculum`
-                                : `Personally modified from the Team Curriculum by ${ME.name}`
-                          }
-                          side="top"
-                        >
-                          <Badge variant="warn" size="sm">
-                            MODIFIED
-                          </Badge>
-                        </Tooltip>
-                      )}
-                    </div>
+                      <span
+                        className={styles.indicator}
+                        title={
+                          lesson.moved === "across-weeks"
+                            ? "Moved across weeks in your personal copy"
+                            : "Moved within the week in your personal copy"
+                        }
+                        aria-label={
+                          lesson.moved === "across-weeks"
+                            ? "Moved across weeks"
+                            : "Moved within the week"
+                        }
+                        tabIndex={0}
+                        style={{
+                          background: color.stripe,
+                          color: "var(--paper)",
+                        }}
+                      >
+                        {lesson.moved === "across-weeks" ? "⤴" : "↔"}
+                      </span>
+                    </Tooltip>
                   )}
+                  {lesson.modified && (
+                    // MED-7: richer tooltip describing what changed and who.
+                    // The Lesson model carries no actor/timestamp fields — ME.name
+                    // is the viewing teacher (best-effort). If moved, include
+                    // the day the lesson was moved from so the tooltip is
+                    // actionable ("Moved Sun→Mon by Lena Haddad").
+                    // Note: lesson.day is the CURRENT day; prior placement is
+                    // not stored, so we describe the type of move only.
+                    <Tooltip
+                      content={
+                        lesson.moved === "across-weeks"
+                          ? `Moved to another week by ${ME.name} · personally modified from Team Curriculum`
+                          : lesson.moved === "same-week"
+                            ? `Moved to ${WEEK_DAYS[lesson.day] ?? "another day"} by ${ME.name} · personally modified from Team Curriculum`
+                            : `Personally modified from the Team Curriculum by ${ME.name}`
+                      }
+                      side="top"
+                    >
+                      <Badge variant="warn" size="sm">
+                        MODIFIED
+                      </Badge>
+                    </Tooltip>
+                  )}
+                </div>
+              )}
 
-                  {/* Lesson title — dominant headline of the band (t-16 / weight 700).
+              {/* Lesson title — dominant headline of the band (t-16 / weight 700).
             The eye-catch: larger and bolder than the metadata line above.
             If the title contains an em-dash split (" — "), titleMain is the
             body of the title; the qualifier appears as a muted subtitle
             (.bandTitleSub) below. When editing, the editor shows the full
             canonical HTML so the teacher edits the complete string.
             Double-click enters inline rich-text edit mode (suppresses expand). */}
-                  <h3
-                    className={styles.bandTitle}
-                    style={{
-                      color: color.cd,
-                      textDecoration: done ? "line-through" : "none",
-                      textDecorationColor: `color-mix(in oklch, ${color.cd} 40%, transparent)`,
-                    }}
+              <h3
+                className={styles.bandTitle}
+                style={{
+                  color: color.cd,
+                  textDecoration: done ? "line-through" : "none",
+                  textDecorationColor: `color-mix(in oklch, ${color.cd} 40%, transparent)`,
+                }}
+              >
+                {editingField === "title" ? (
+                  <RichEditorWrapper
+                    onCommit={commitEdit}
+                    onCancel={cancelEdit}
+                    className={styles.richEditorTitle}
                   >
-                    {editingField === "title" ? (
-                      <RichEditorWrapper
-                        onCommit={commitEdit}
-                        onCancel={cancelEdit}
-                        className={styles.richEditorTitle}
-                      >
-                        <RichTextEditor
-                          value={draftValue}
-                          onChange={handleTitleChange}
-                          autoFocus
-                          singleLine
-                          ariaLabel="Edit lesson title"
-                        />
-                      </RichEditorWrapper>
-                    ) : (
+                    <RichTextEditor
+                      value={draftValue}
+                      onChange={handleTitleChange}
+                      autoFocus
+                      singleLine
+                      ariaLabel="Edit lesson title"
+                    />
+                  </RichEditorWrapper>
+                ) : (
+                  <span
+                    className={styles.editableText}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Edit lesson title"
+                    // SINGLE click intentionally BUBBLES to the band's
+                    // toggleExpand (requirement #1/#2: clicking the most obvious
+                    // target — the title — must expand the card and open the
+                    // side panel). DOUBLE click still enters inline edit, and
+                    // Enter/F2 still edit via the keyboard. We do NOT
+                    // stopPropagation on the single click here.
+                    onDoubleClick={(e) => openEditor("title", e)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === "F2")
+                        openEditor("title", e);
+                    }}
+                    // POLISH-007/QW-7: full title in tooltip so teachers can
+                    // read the complete text when the 1-line clamp truncates it.
+                    title={stripHtml(lesson.title)}
+                    // eslint-disable-next-line react/no-danger
+                    dangerouslySetInnerHTML={{ __html: safeTitleMain }}
+                  />
+                )}
+              </h3>
+              {/* Em-dash subtitle (qualifier after the em-dash in the title).
+              Rendered ONLY when a qualifier exists (and not while editing the
+              title). The header stays uniform-height NOT by reserving a blank
+              subtitle line, but because the title block is always 2 lines tall:
+              WITHOUT a subtitle the title clamps to 2 lines; WITH one the title
+              clamps to 1 line and the subtitle fills the 2nd line. The band fixed
+              min-height (see .band in .module.css) pins both layouts to the same
+              height (fix #2). aria-hidden because the card root aria-label already
+              carries the full title via the isomorphic stripHtml. */}
+              {titleSub && editingField !== "title" && (
+                <span
+                  className={styles.bandTitleSub}
+                  style={{ color: color.cd }}
+                  aria-hidden="true"
+                >
+                  {titleSub}
+                </span>
+              )}
+
+              {/* Caret — indicates expand state, positioned at bottom-right of band */}
+              <span
+                aria-hidden
+                className={`${styles.caret} ${expanded ? styles.caretOpen : ""}`}
+              >
+                <Icon name="chevronD" size={11} />
+              </span>
+            </div>
+
+            {/* ── Card body ───────────────────────────────────────────────────── */}
+            {/* Collapsed body grows to fill the remaining cell height via
+            `.bodyFill` (flex: 1) so the card always reaches the bottom of its
+            grid slot. Expanded body keeps its natural height — the expanded
+            card may grow taller than the cell, which is intentional.
+            Interaction contract: in the COLLAPSED state the off-white preview
+            body is part of the card's click-to-expand target — clicking the
+            empty body area toggles expand, exactly like clicking the band. The
+            editable preview span, pager, and checkbox stopPropagation so they
+            never trigger the toggle. We only wire the toggle when collapsed:
+            in the expanded state the body hosts reorderable sections + footer
+            buttons, so a body-area click must NOT collapse the card. */}
+            <div
+              className={`${styles.body} ${!expanded ? styles.bodyFill : ""}`}
+              onClick={!expanded ? toggleExpand : undefined}
+              // The collapsed body is a click-to-expand target, but the BAND is
+              // the single ARIA-announced "Expand lesson" affordance (fix #4b —
+              // no duplicate announcement). So instead of role="button" +
+              // aria-label here we use data-card-interactive, which (a) is
+              // matched by GridCell's maximize-ignore selector — so a body click
+              // never also toggles the cell maximize — and (b) carries no role,
+              // so a screen reader hears "Expand lesson" exactly once (the band).
+              data-card-interactive={!expanded ? "true" : undefined}
+            >
+              {/* Collapsed: preview text (fills the taller body). Expanded:
+            full section rows. Double-click on the preview enters edit mode. */}
+              {!expanded ? (
+                <p
+                  className={`${styles.preview} ${
+                    hasPager ? "" : styles.previewFill
+                  }`}
+                  style={{ color: "var(--ink-900)" }}
+                >
+                  {editingField === "preview" ? (
+                    <RichEditorWrapper
+                      onCommit={commitEdit}
+                      onCancel={cancelEdit}
+                      className={styles.richEditorBody}
+                    >
+                      <RichTextEditor
+                        value={draftValue}
+                        onChange={setDraftValue}
+                        autoFocus
+                        placeholder="Lesson preview…"
+                        ariaLabel="Edit lesson preview"
+                      />
+                    </RichEditorWrapper>
+                  ) : (
+                    <Tooltip
+                      content="Double-click or press Enter to edit the lesson preview — saved into your personal copy."
+                      side="top"
+                    >
                       <span
                         className={styles.editableText}
                         tabIndex={0}
                         role="button"
-                        aria-label="Edit lesson title"
-                        // Swallow the single click so it never reaches the card/band
-                        // expand handler — clicking text must not resize the cell.
-                        onClick={(e) => e.stopPropagation()}
-                        onDoubleClick={(e) => openEditor("title", e)}
+                        aria-label="Edit lesson preview"
+                        // SINGLE click intentionally BUBBLES to the body's
+                        // toggleExpand (requirement #1/#2: clicking the preview
+                        // text expands the card + opens the side panel). DOUBLE
+                        // click still enters inline edit; Enter/F2 still edit via
+                        // the keyboard. No stopPropagation on the single click.
+                        onDoubleClick={(e) => openEditor("preview", e)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === "F2")
-                            openEditor("title", e);
+                            openEditor("preview", e);
                         }}
-                        // POLISH-007/QW-7: full title in tooltip so teachers can
-                        // read the complete text when the 2-line clamp truncates it.
-                        title={stripHtml(lesson.title)}
+                        // When the clamped preview truncates, the native
+                        // tooltip surfaces the full plain-text (previewText);
+                        // otherwise it explains the double-click-to-edit
+                        // affordance.
+                        title={
+                          hasPreview
+                            ? previewText
+                            : "Double-click or press Enter to edit the lesson preview"
+                        }
                         // eslint-disable-next-line react/no-danger
-                        dangerouslySetInnerHTML={{ __html: safeTitleMain }}
+                        dangerouslySetInnerHTML={{ __html: safePreview }}
                       />
-                    )}
-                  </h3>
-                  {/* Em-dash subtitle — the qualifier after " — " in the title.
-              aria-hidden because the aria-label on the card root already uses
-              the full title (stripHtml), so screen-reader users hear it intact. */}
-                  {titleSub && editingField !== "title" && (
-                    <span
-                      className={styles.bandTitleSub}
-                      style={{ color: color.cd }}
-                      aria-hidden="true"
-                    >
-                      {titleSub}
-                    </span>
+                    </Tooltip>
                   )}
+                </p>
+              ) : (
+                <div className={styles.sections}>
+                  {/*
+                   * Reorderable sections — iterate sectionOrder so the teacher can
+                   * drag-to-reorder via 2-second hold (matching the card's own
+                   * hold-to-drag threshold). Absent sections (objective when blank,
+                   * tasks when there are none, notes when blank) are skipped.
+                   * Each ReorderableSectionRow:
+                   *   • owns a separate 2-second hold timer that arms draggable
+                   *   • calls stopPropagation on all pointer events so the card-level
+                   *     hold timer never fires during a section hold
+                   *   • exposes move-up / move-down buttons for keyboard access
+                   */}
+                  {sectionOrder.map((key, idx) => {
+                    // ── Skip absent sections ──────────────────────────────────────
+                    if (key === "objective" && !lesson.objective) return null;
+                    if (key === "tasks" && !hasTasks) return null;
+                    if (
+                      key === "notes" &&
+                      !lesson.notes &&
+                      editingField !== "notes"
+                    )
+                      return null;
 
-                  {/* Caret — indicates expand state, positioned at bottom-right of band */}
-                  <span
-                    aria-hidden
-                    className={`${styles.caret} ${expanded ? styles.caretOpen : ""}`}
-                  >
-                    <Icon name="chevronD" size={11} />
-                  </span>
-                </div>
+                    // ── Visible index for keyboard move buttons ───────────────────
+                    // We need the count of actually-visible sections to decide whether
+                    // move-up / move-down are at the boundary.
+                    const visibleKeys = sectionOrder.filter((k) => {
+                      if (k === "objective" && !lesson.objective) return false;
+                      if (k === "tasks" && !hasTasks) return false;
+                      if (
+                        k === "notes" &&
+                        !lesson.notes &&
+                        editingField !== "notes"
+                      )
+                        return false;
+                      return true;
+                    });
+                    const visibleIdx = visibleKeys.indexOf(key);
+                    const visibleCount = visibleKeys.length;
 
-                {/* ── Card body ───────────────────────────────────────────────────── */}
-                {/* Collapsed body grows to fill the remaining cell height via
-            `.bodyFill` (flex: 1) so the card always reaches the bottom of its
-            grid slot. Expanded body keeps its natural height — the expanded
-            card may grow taller than the cell, which is intentional. */}
-                <div
-                  className={`${styles.body} ${!expanded ? styles.bodyFill : ""}`}
-                >
-                  {/* Collapsed: preview text (fills the taller body). Expanded:
-            full section rows. Double-click on the preview enters edit mode. */}
-                  {!expanded ? (
-                    <p
-                      className={`${styles.preview} ${
-                        hasPager ? "" : styles.previewFill
-                      }`}
-                      style={{ color: "var(--ink-900)" }}
-                    >
-                      {editingField === "preview" ? (
-                        <RichEditorWrapper
-                          onCommit={commitEdit}
-                          onCancel={cancelEdit}
-                          className={styles.richEditorBody}
-                        >
-                          <RichTextEditor
-                            value={draftValue}
-                            onChange={setDraftValue}
-                            autoFocus
-                            placeholder="Lesson preview…"
-                            ariaLabel="Edit lesson preview"
-                          />
-                        </RichEditorWrapper>
-                      ) : (
-                        <Tooltip
-                          content="Double-click or press Enter to edit the lesson preview — saved into your personal copy."
-                          side="top"
-                        >
-                          <span
-                            className={styles.editableText}
+                    // ── Section content ───────────────────────────────────────────
+                    let sectionLabel = "";
+                    let sectionContent: React.ReactNode = null;
+
+                    if (key === "objective") {
+                      sectionLabel = "I Can";
+                      sectionContent =
+                        editingField === "objective" ? (
+                          <RichEditorWrapper
+                            onCommit={commitEdit}
+                            onCancel={cancelEdit}
+                            className={styles.richEditorBody}
+                          >
+                            <RichTextEditor
+                              value={draftValue}
+                              onChange={setDraftValue}
+                              autoFocus
+                              placeholder="I can…"
+                              ariaLabel="Edit lesson objective"
+                            />
+                          </RichEditorWrapper>
+                        ) : (
+                          <p
+                            className={`${styles.sectionText} ${styles.editableText}`}
+                            style={{
+                              fontStyle: "italic",
+                              color: "var(--ink-900)",
+                            }}
                             tabIndex={0}
                             role="button"
-                            aria-label="Edit lesson preview"
+                            aria-label="Edit lesson objective"
                             onClick={(e) => e.stopPropagation()}
-                            onDoubleClick={(e) => openEditor("preview", e)}
+                            onDoubleClick={(e) => openEditor("objective", e)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === "F2")
-                                openEditor("preview", e);
+                                openEditor("objective", e);
                             }}
-                            title="Double-click or press Enter to edit the lesson preview"
+                            title="Double-click or press Enter to edit the I-can objective"
                             // eslint-disable-next-line react/no-danger
-                            dangerouslySetInnerHTML={{ __html: safePreview }}
+                            dangerouslySetInnerHTML={{
+                              __html: safeObjectiveBody,
+                            }}
                           />
-                        </Tooltip>
-                      )}
-                    </p>
-                  ) : (
-                    <div className={styles.sections}>
-                      {/*
-                       * Reorderable sections — iterate sectionOrder so the teacher can
-                       * drag-to-reorder via 2-second hold (matching the card's own
-                       * hold-to-drag threshold). Absent sections (objective when blank,
-                       * tasks when there are none, notes when blank) are skipped.
-                       * Each ReorderableSectionRow:
-                       *   • owns a separate 2-second hold timer that arms draggable
-                       *   • calls stopPropagation on all pointer events so the card-level
-                       *     hold timer never fires during a section hold
-                       *   • exposes move-up / move-down buttons for keyboard access
-                       */}
-                      {sectionOrder.map((key, idx) => {
-                        // ── Skip absent sections ──────────────────────────────────────
-                        if (key === "objective" && !lesson.objective)
-                          return null;
-                        if (key === "tasks" && !hasTasks) return null;
-                        if (
-                          key === "notes" &&
-                          !lesson.notes &&
-                          editingField !== "notes"
-                        )
-                          return null;
-
-                        // ── Visible index for keyboard move buttons ───────────────────
-                        // We need the count of actually-visible sections to decide whether
-                        // move-up / move-down are at the boundary.
-                        const visibleKeys = sectionOrder.filter((k) => {
-                          if (k === "objective" && !lesson.objective)
-                            return false;
-                          if (k === "tasks" && !hasTasks) return false;
-                          if (
-                            k === "notes" &&
-                            !lesson.notes &&
-                            editingField !== "notes"
-                          )
-                            return false;
-                          return true;
-                        });
-                        const visibleIdx = visibleKeys.indexOf(key);
-                        const visibleCount = visibleKeys.length;
-
-                        // ── Section content ───────────────────────────────────────────
-                        let sectionLabel = "";
-                        let sectionContent: React.ReactNode = null;
-
-                        if (key === "objective") {
-                          sectionLabel = "I Can";
-                          sectionContent =
-                            editingField === "objective" ? (
-                              <RichEditorWrapper
-                                onCommit={commitEdit}
-                                onCancel={cancelEdit}
-                                className={styles.richEditorBody}
-                              >
-                                <RichTextEditor
-                                  value={draftValue}
-                                  onChange={setDraftValue}
-                                  autoFocus
-                                  placeholder="I can…"
-                                  ariaLabel="Edit lesson objective"
-                                />
-                              </RichEditorWrapper>
-                            ) : (
-                              <p
-                                className={`${styles.sectionText} ${styles.editableText}`}
-                                style={{
-                                  fontStyle: "italic",
-                                  color: "var(--ink-900)",
-                                }}
-                                tabIndex={0}
-                                role="button"
-                                aria-label="Edit lesson objective"
-                                onClick={(e) => e.stopPropagation()}
-                                onDoubleClick={(e) =>
-                                  openEditor("objective", e)
-                                }
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === "F2")
-                                    openEditor("objective", e);
-                                }}
-                                title="Double-click or press Enter to edit the I-can objective"
-                                // eslint-disable-next-line react/no-danger
-                                dangerouslySetInnerHTML={{
-                                  __html: safeObjectiveBody,
-                                }}
-                              />
-                            );
-                        } else if (key === "directions") {
-                          sectionLabel = "Directions";
-                          sectionContent =
-                            editingField === "directions" ? (
-                              <RichEditorWrapper
-                                onCommit={commitEdit}
-                                onCancel={cancelEdit}
-                                className={styles.richEditorBody}
-                              >
-                                <RichTextEditor
-                                  value={draftValue}
-                                  onChange={setDraftValue}
-                                  autoFocus
-                                  placeholder="Directions…"
-                                  ariaLabel="Edit lesson directions"
-                                />
-                              </RichEditorWrapper>
-                            ) : (
-                              <p
-                                className={`${styles.sectionText} ${styles.editableText}`}
-                                style={{ color: "var(--ink-900)" }}
-                                tabIndex={0}
-                                role="button"
-                                aria-label="Edit lesson directions"
-                                onClick={(e) => e.stopPropagation()}
-                                onDoubleClick={(e) =>
-                                  openEditor("directions", e)
-                                }
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === "F2")
-                                    openEditor("directions", e);
-                                }}
-                                title="Double-click or press Enter to edit the directions"
-                                // eslint-disable-next-line react/no-danger
-                                dangerouslySetInnerHTML={{
-                                  __html: safeDirections,
-                                }}
-                              />
-                            );
-                        } else if (key === "notes") {
-                          sectionLabel = "Notes";
-                          sectionContent = (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                leadingIcon={<Icon name="eye" size={11} />}
-                                className={styles.notesToggle}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setNotesOpen((v) => !v);
-                                }}
-                                aria-expanded={notesOpen}
-                                tooltip={
-                                  notesOpen
-                                    ? "Hide the team's private notes for this lesson"
-                                    : "Reveal the team's private teaching notes — context only fellow teachers see"
-                                }
-                              >
-                                {notesOpen
-                                  ? "Hide teacher notes"
-                                  : "Show teacher notes"}
-                              </Button>
-                              {notesOpen &&
-                                (editingField === "notes" ? (
-                                  <RichEditorWrapper
-                                    onCommit={commitEdit}
-                                    onCancel={cancelEdit}
-                                    className={`${styles.notesBody} ${styles.richEditorBody}`}
-                                  >
-                                    <RichTextEditor
-                                      value={draftValue}
-                                      onChange={setDraftValue}
-                                      autoFocus
-                                      placeholder="Teacher notes…"
-                                      ariaLabel="Edit teacher notes"
-                                    />
-                                  </RichEditorWrapper>
-                                ) : (
-                                  <p
-                                    className={`${styles.notesBody} ${styles.editableText}`}
-                                    tabIndex={0}
-                                    role="button"
-                                    aria-label="Edit teacher notes"
-                                    onClick={(e) => e.stopPropagation()}
-                                    onDoubleClick={(e) =>
-                                      openEditor("notes", e)
-                                    }
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter" || e.key === "F2")
-                                        openEditor("notes", e);
-                                    }}
-                                    title="Double-click or press Enter to edit the teacher notes"
-                                    // eslint-disable-next-line react/no-danger
-                                    dangerouslySetInnerHTML={{
-                                      __html: safeNotes,
-                                    }}
-                                  />
-                                ))}
-                            </>
-                          );
-                        } else if (key === "tasks") {
-                          sectionLabel = `${lesson.tasks.length} Tasks`;
-                          sectionContent = (
-                            <div className={styles.taskList}>
-                              {lesson.tasks.map((task) => (
-                                <TaskRow
-                                  key={task.id}
-                                  task={{
-                                    ...task,
-                                    status: taskStatus[task.id] ?? task.status,
-                                  }}
-                                  parentSubject={lesson.subject}
-                                  onCycle={(next) => {
-                                    setTaskStatus((prev) => ({
-                                      ...prev,
-                                      [task.id]: next,
-                                    }));
-                                    onContextAction?.(
-                                      "mark-status",
-                                      lesson.id,
-                                      {
-                                        status: next,
-                                        taskId: task.id,
-                                      },
-                                    );
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          );
-                        } else if (key === "resources") {
-                          sectionLabel = "Resources";
-                          sectionContent = (
-                            // BUG-006: use canonical section-derived resources so
-                            // card, right-rail, and daily detail all agree.
-                            <ResourceList resources={sectionResources} />
-                          );
-                        } else if (key === "standards") {
-                          sectionLabel = "Standards";
-                          sectionContent = (
-                            <StandardsList codes={lesson.standards} />
-                          );
-                        }
-
-                        return (
-                          <ReorderableSectionRow
-                            key={key}
-                            sectionKey={key}
-                            label={sectionLabel}
-                            accent={color.cl}
-                            ink={color.cd}
-                            setSectionOrder={setSectionOrder}
-                            visibleIdx={visibleIdx}
-                            visibleCount={visibleCount}
-                            visibleKeys={visibleKeys}
-                            originalIdx={idx}
-                          >
-                            {sectionContent}
-                          </ReorderableSectionRow>
                         );
-                      })}
+                    } else if (key === "directions") {
+                      sectionLabel = "Directions";
+                      sectionContent =
+                        editingField === "directions" ? (
+                          <RichEditorWrapper
+                            onCommit={commitEdit}
+                            onCancel={cancelEdit}
+                            className={styles.richEditorBody}
+                          >
+                            <RichTextEditor
+                              value={draftValue}
+                              onChange={setDraftValue}
+                              autoFocus
+                              placeholder="Directions…"
+                              ariaLabel="Edit lesson directions"
+                            />
+                          </RichEditorWrapper>
+                        ) : (
+                          <p
+                            className={`${styles.sectionText} ${styles.editableText}`}
+                            style={{ color: "var(--ink-900)" }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label="Edit lesson directions"
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => openEditor("directions", e)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === "F2")
+                                openEditor("directions", e);
+                            }}
+                            title="Double-click or press Enter to edit the directions"
+                            // eslint-disable-next-line react/no-danger
+                            dangerouslySetInnerHTML={{
+                              __html: safeDirections,
+                            }}
+                          />
+                        );
+                    } else if (key === "notes") {
+                      sectionLabel = "Notes";
+                      sectionContent = (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            leadingIcon={<Icon name="eye" size={11} />}
+                            className={styles.notesToggle}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNotesOpen((v) => !v);
+                            }}
+                            aria-expanded={notesOpen}
+                            tooltip={
+                              notesOpen
+                                ? "Hide the team's private notes for this lesson"
+                                : "Reveal the team's private teaching notes — context only fellow teachers see"
+                            }
+                          >
+                            {notesOpen
+                              ? "Hide teacher notes"
+                              : "Show teacher notes"}
+                          </Button>
+                          {notesOpen &&
+                            (editingField === "notes" ? (
+                              <RichEditorWrapper
+                                onCommit={commitEdit}
+                                onCancel={cancelEdit}
+                                className={`${styles.notesBody} ${styles.richEditorBody}`}
+                              >
+                                <RichTextEditor
+                                  value={draftValue}
+                                  onChange={setDraftValue}
+                                  autoFocus
+                                  placeholder="Teacher notes…"
+                                  ariaLabel="Edit teacher notes"
+                                />
+                              </RichEditorWrapper>
+                            ) : (
+                              <p
+                                className={`${styles.notesBody} ${styles.editableText}`}
+                                tabIndex={0}
+                                role="button"
+                                aria-label="Edit teacher notes"
+                                onClick={(e) => e.stopPropagation()}
+                                onDoubleClick={(e) => openEditor("notes", e)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === "F2")
+                                    openEditor("notes", e);
+                                }}
+                                title="Double-click or press Enter to edit the teacher notes"
+                                // eslint-disable-next-line react/no-danger
+                                dangerouslySetInnerHTML={{
+                                  __html: safeNotes,
+                                }}
+                              />
+                            ))}
+                        </>
+                      );
+                    } else if (key === "tasks") {
+                      sectionLabel = `${lesson.tasks.length} Tasks`;
+                      sectionContent = (
+                        <div className={styles.taskList}>
+                          {lesson.tasks.map((task) => (
+                            <TaskRow
+                              key={task.id}
+                              task={{
+                                ...task,
+                                status: taskStatus[task.id] ?? task.status,
+                              }}
+                              parentSubject={lesson.subject}
+                              onCycle={(next) => {
+                                setTaskStatus((prev) => ({
+                                  ...prev,
+                                  [task.id]: next,
+                                }));
+                                onContextAction?.("mark-status", lesson.id, {
+                                  status: next,
+                                  taskId: task.id,
+                                });
+                              }}
+                            />
+                          ))}
+                        </div>
+                      );
+                    } else if (key === "resources") {
+                      sectionLabel = "Resources";
+                      sectionContent = (
+                        // BUG-006: use canonical section-derived resources so
+                        // card, right-rail, and daily detail all agree.
+                        <ResourceList resources={sectionResources} />
+                      );
+                    } else if (key === "standards") {
+                      sectionLabel = "Standards";
+                      sectionContent = (
+                        <StandardsList codes={lesson.standards} />
+                      );
+                    }
 
-                      {/* Footer affordances — "+ Add section" / "+ Add resource" / "Edit Template".
+                    return (
+                      <ReorderableSectionRow
+                        key={key}
+                        sectionKey={key}
+                        label={sectionLabel}
+                        accent={color.cl}
+                        ink={color.cd}
+                        setSectionOrder={setSectionOrder}
+                        visibleIdx={visibleIdx}
+                        visibleCount={visibleCount}
+                        visibleKeys={visibleKeys}
+                        originalIdx={idx}
+                      >
+                        {sectionContent}
+                      </ReorderableSectionRow>
+                    );
+                  })}
+
+                  {/* Footer affordances — "+ Add section" / "+ Add resource" / "Edit Template".
                       POLISH-010/CARD-001: "Add resource" is a persistent keyboard-
                       accessible button so teachers can attach a resource without a
                       mouse hover. It appends a link resource to the first section
                       (the canonical resource container) via addSectionResource — the
                       same action the right-rail and daily detail use (BUG-006). */}
-                      <div className={styles.expandedFooter}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          leadingIcon={<Icon name="plus" size={11} />}
-                          className={styles.footerBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onContextAction?.("add-to-todo", lesson.id);
-                          }}
-                          tooltip="Add a new section to this lesson's flow — useful when your standard template needs an extra step for this topic"
-                        >
-                          Add section
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          leadingIcon={<Icon name="plus" size={11} />}
-                          className={styles.footerBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Attach a new link resource to the first available section.
-                            // If no sections exist yet the store creates a default section.
-                            const sections = getSections(lesson.id);
-                            const targetSectionId =
-                              sections[0]?.id ?? lesson.id;
-                            addSectionResource(lesson.id, targetSectionId, {
-                              type: "link",
-                              label: "New resource",
-                            });
-                          }}
-                          aria-label="Add resource to this lesson"
-                          tooltip="Attach a link, file, or video to this lesson — drops into the first section"
-                        >
-                          Add resource
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={styles.footerBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onContextAction?.("print", lesson.id);
-                          }}
-                          tooltip="Edit the underlying lesson template — sections, default headers, and section colors"
-                        >
-                          Edit Template
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                  <div className={styles.expandedFooter}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leadingIcon={<Icon name="plus" size={11} />}
+                      className={styles.footerBtn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onContextAction?.("add-to-todo", lesson.id);
+                      }}
+                      tooltip="Add a new section to this lesson's flow — useful when your standard template needs an extra step for this topic"
+                    >
+                      Add section
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leadingIcon={<Icon name="plus" size={11} />}
+                      className={styles.footerBtn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Attach a new link resource to the first available section.
+                        // If no sections exist yet the store creates a default section.
+                        const sections = getSections(lesson.id);
+                        const targetSectionId = sections[0]?.id ?? lesson.id;
+                        addSectionResource(lesson.id, targetSectionId, {
+                          type: "link",
+                          label: "New resource",
+                        });
+                      }}
+                      aria-label="Add resource to this lesson"
+                      tooltip="Attach a link, file, or video to this lesson — drops into the first section"
+                    >
+                      Add resource
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={styles.footerBtn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onContextAction?.("print", lesson.id);
+                      }}
+                      tooltip="Edit the underlying lesson template — sections, default headers, and section colors"
+                    >
+                      Edit Template
+                    </Button>
+                  </div>
+                </div>
+              )}
 
-                  {/* ── Collapsed footer — meta chips + carry-over + pending ──────── */}
-                  {!expanded && (
-                    <div className={styles.footer}>
-                      {lesson.standards.length > 0 && (
-                        <StandardsBadge codes={lesson.standards} />
-                      )}
-                      <ResourceTypeRow resources={lesson.resources} dense />
-                      {hasTasks && (
-                        <Tooltip
-                          content={`${lesson.tasks.length} lesson task${lesson.tasks.length === 1 ? "" : "s"} inside this lesson — expand the card to tick them off.`}
-                          side="top"
-                        >
+              {/* ── Collapsed footer — meta chips + carry-over + pending ──────── */}
+              {!expanded && (
+                <div className={styles.footer}>
+                  {lesson.standards.length > 0 && (
+                    <StandardsBadge codes={lesson.standards} />
+                  )}
+                  <ResourceTypeRow resources={lesson.resources} dense />
+                  {hasTasks && (
+                    <Tooltip
+                      content={`${lesson.tasks.length} lesson task${lesson.tasks.length === 1 ? "" : "s"} inside this lesson — expand the card to tick them off.`}
+                      side="top"
+                    >
+                      <span
+                        className={styles.tasksPill}
+                        title={`${lesson.tasks.length} lesson task${lesson.tasks.length === 1 ? "" : "s"} inside this lesson`}
+                        tabIndex={0}
+                        style={{ background: color.cl, color: color.cd }}
+                      >
+                        <Icon name="list" size={9} />
+                        {lesson.tasks.length} tasks
+                      </span>
+                    </Tooltip>
+                  )}
+                  {lesson.commentCount > 0 && (
+                    <Tooltip
+                      content={`${lesson.commentCount} Lesson Comment${lesson.commentCount === 1 ? "" : "s"} from your team — open the card to read them. Lesson Comments live in the Team Shoutbox under the All-comments tab.`}
+                      side="top"
+                    >
+                      <span
+                        className={styles.commentBadge}
+                        title={`${lesson.commentCount} Lesson Comment${lesson.commentCount === 1 ? "" : "s"} from your team`}
+                        tabIndex={0}
+                        style={{
+                          color: isVivid ? color.deep : "var(--ink-500)",
+                        }}
+                      >
+                        <span aria-hidden>💬</span>
+                        {lesson.commentCount}
+                        {lesson.unreadComments > 0 && (
                           <span
-                            className={styles.tasksPill}
-                            title={`${lesson.tasks.length} lesson task${lesson.tasks.length === 1 ? "" : "s"} inside this lesson`}
-                            tabIndex={0}
-                            style={{ background: color.cl, color: color.cd }}
-                          >
-                            <Icon name="list" size={9} />
-                            {lesson.tasks.length} tasks
-                          </span>
-                        </Tooltip>
-                      )}
-                      {lesson.commentCount > 0 && (
-                        <Tooltip
-                          content={`${lesson.commentCount} Lesson Comment${lesson.commentCount === 1 ? "" : "s"} from your team — open the card to read them. Lesson Comments live in the Team Shoutbox under the All-comments tab.`}
-                          side="top"
-                        >
-                          <span
-                            className={styles.commentBadge}
-                            title={`${lesson.commentCount} Lesson Comment${lesson.commentCount === 1 ? "" : "s"} from your team`}
-                            tabIndex={0}
-                            style={{
-                              color: isVivid ? color.deep : "var(--ink-500)",
-                            }}
-                          >
-                            <span aria-hidden>💬</span>
-                            {lesson.commentCount}
-                            {lesson.unreadComments > 0 && (
-                              <span
-                                aria-label={`${lesson.unreadComments} unread`}
-                                className={styles.unreadDot}
-                              />
-                            )}
-                          </span>
-                        </Tooltip>
-                      )}
-                      <div style={{ flex: 1 }} />
-                      {lesson.pendingMaster && (
-                        <span
-                          className={styles.metaPill}
-                          style={{
-                            background: "var(--important-bg)",
-                            color: "var(--important)",
-                          }}
-                        >
-                          Core ↑
-                        </span>
-                      )}
-                      {lesson.status === "carried" && (
-                        <span className={styles.carryLabel}>carry-over</span>
-                      )}
-                      {/* "Why not done" reason — compact alert-icon affordance.
+                            aria-label={`${lesson.unreadComments} unread`}
+                            className={styles.unreadDot}
+                          />
+                        )}
+                      </span>
+                    </Tooltip>
+                  )}
+                  <div style={{ flex: 1 }} />
+                  {lesson.pendingMaster && (
+                    <span
+                      className={styles.metaPill}
+                      style={{
+                        background: "var(--important-bg)",
+                        color: "var(--important)",
+                      }}
+                    >
+                      Core ↑
+                    </span>
+                  )}
+                  {lesson.status === "carried" && (
+                    <span className={styles.carryLabel}>carry-over</span>
+                  )}
+                  {/* "Why not done" reason — compact alert-icon affordance.
                       Opens NotePopover with the reason text. Rendered inline in
                       the footer (not as its own row) so the collapsed card
                       stays bounded inside the fixed-height grid cell. Only
                       mounted when the lesson actually carries a reason. */}
-                      {hasReason && (
-                        <NotePopover reason={lesson.reasonNotDone} />
-                      )}
-                    </div>
-                  )}
+                  {hasReason && <NotePopover reason={lesson.reasonNotDone} />}
                 </div>
-              </>
-            )}
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

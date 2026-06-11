@@ -388,13 +388,24 @@ export function WeeklyGrid(): ReactNode {
   }
 
   function handleSelect(lessonId: string): void {
-    // Plain SINGLE click: expand the chip inline (bring back the lesson
-    // preview). Clicking an already-expanded chip collapses it. The rich
-    // DETAIL surface (right-rail / drawer) now opens on DOUBLE click — see
-    // handleActivateDetail. Selecting also highlights the chip locally
-    // (selectedId) without opening the panel.
+    // Plain SINGLE click: ONE combined toggle — inline expand AND the rich
+    // DETAIL surface (WeeklyShell right-rail / WeeklyRailDrawer, driven by
+    // app-state `selectedLessonId`) open and close TOGETHER.
+    //   • Already expanded  → collapse the chip AND close the panel.
+    //   • Not yet expanded  → expand the chip AND open the panel on this id.
+    // Edge case: when collapsing card X, only clear the panel if it is
+    // currently scoped to X — collapsing X must never close another lesson's
+    // open panel. Opening always retargets the panel to the clicked id, so
+    // the panel follows the most recent click. The local `selectedId` still
+    // drives the ring (read as `selectedLessonId ?? selectedId`).
     clearBulkSelection();
     setSelectedId(lessonId);
+    const isExpanded = expandedIds.has(lessonId);
+    if (isExpanded) {
+      if (selectedLessonId === lessonId) setSelectedLessonId(null);
+    } else {
+      setSelectedLessonId(lessonId);
+    }
     setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(lessonId)) next.delete(lessonId);
@@ -404,12 +415,20 @@ export function WeeklyGrid(): ReactNode {
   }
 
   function handleActivateDetail(lessonId: string): void {
-    // DOUBLE click: open the lesson DETAIL surface (WeeklyShell right-rail /
-    // WeeklyRailDrawer, driven by app-state `selectedLessonId`). The two
-    // single clicks that precede a dblclick net to no inline-expand change.
+    // DOUBLE click / Shift+Enter: FORCE-OPEN (idempotent) — guarantee the
+    // lesson ends up both expanded inline AND with its DETAIL panel open, with
+    // no toggle. This stays correct regardless of what the two single clicks
+    // that precede a dblclick did to the toggle state above: there are no
+    // half-open states because this never closes anything.
     clearBulkSelection();
     setSelectedLessonId(lessonId);
     setSelectedId(lessonId);
+    setExpandedIds((prev) => {
+      if (prev.has(lessonId)) return prev;
+      const next = new Set(prev);
+      next.add(lessonId);
+      return next;
+    });
   }
 
   /**
@@ -575,7 +594,14 @@ export function WeeklyGrid(): ReactNode {
           WeekNavigator above. */}
 
       {/* ── DndContext wraps the entire scrollable grid ──────────────────── */}
+      {/* Stable `id` makes dnd-kit's accessibility ids (DndDescribedBy / live
+          region) DETERMINISTIC across SSR and client. Without it dnd-kit falls
+          back to a non-SSR-safe incrementing counter, so the drag handle's
+          `aria-describedby` differs between server and client render — a React
+          hydration mismatch that surfaced once the shared header band (with its
+          drag handle) began rendering on the server for collapsed cards. */}
       <DndContext
+        id="weekly-grid-dnd"
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}

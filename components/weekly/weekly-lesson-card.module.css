@@ -55,129 +55,15 @@
   min-height: 0;
 }
 
-/* Collapsed (title-only) mode — the weekly grid chip.
-   The card root no longer stretches to fill the 232px cell: a title-only
-   chip should be a compact, uniform band pinned to the TOP of its cell, not
-   a tall box with a lone title floating at the top. `height: auto` cancels
-   the `.card` `height: 100%`; `align-self: start` keeps the chip top-aligned
-   inside the stretched .cardSlot wrapper so every chip across the grid reads
-   at the same compact height — visually uniform regardless of subject. */
-.cardCollapsed {
-  height: auto;
-  align-self: flex-start;
-}
-
-/* ── Collapsed title-only chip (v1.3) ────────────────────────────────────── */
-/* The collapsed weekly chip: a single uniform band whose only persistent
-   content is the lesson title. Subject identity reads from the thin left
-   stripe (rendered inline on the card root); time, subject name, preview,
-   standards, and tasks have all moved to the detail panel (WeeklyRailDrawer),
-   opened on click via setSelectedLessonId. The whole chip is the click
-   target; the drag handle and an inline title editor are the only nested
-   interactive regions. */
-.collapsedChip {
-  display: flex;
-  /* flex-start so the completion box + drag handle align to the title's first
-     line now that the chip carries a multi-line title + preview stack. */
-  align-items: flex-start;
-  gap: 6px;
-  /* A compact band carrying the title + a 2-line lesson preview. min-height
-     keeps short (preview-less) chips from collapsing too thin. */
-  min-height: 18px;
-  /* Inline padding clears the 5px fork stripe on the card root's start edge. */
-  padding: 2px 7px 2px 8px;
-  cursor: pointer;
-}
-
-/* Title + preview stack — the text column of the chip. Takes the flexible
-   width so the completion box + drag handle stay pinned to the trailing edge. */
-.collapsedText {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-/* Lesson title — the focal text of the chip (v1.3: weight 700, --ink).
-   Clamped to 1 line; overflow-wrap breaks unbroken tokens (URLs) rather than
-   overflowing. Left-aligned so it reads as a stack with the preview below. */
-.collapsedTitle {
-  min-width: 0;
-  margin: 0;
-  font-size: var(--t-12);
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--ink);
-  text-align: start;
-  text-wrap: pretty;
-  overflow-wrap: anywhere;
-  /* Single line — the title stays short; the preview carries the detail. */
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* Lesson preview — a muted 2-line summary under the title, bringing back the
-   at-a-glance lesson text on the resting weekly chip. Clamped to 2 lines so it
-   can never blow the cell height open; the full text lives in the expanded /
-   detail view, and the native title= surfaces it on hover. */
-.collapsedPreview {
-  margin: 0;
-  font-size: var(--t-11);
-  font-weight: 400;
-  line-height: 1.3;
-  color: var(--ink-700);
-  text-align: start;
-  text-wrap: pretty;
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* Completion checkbox on the collapsed chip — restores the mark-done control
-   so a teacher can complete a lesson without opening the detail panel. 18px
-   ring; fill + border colors are set inline (subject color when done). The
-   white check fades in only when done. flex:0 so it never shrinks the title. */
-.collapsedCheck {
-  flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1.5px solid var(--ink-300);
-  display: grid;
-  place-items: center;
-  padding: 0;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease;
-}
-.collapsedCheck svg {
-  width: 9px;
-  height: 9px;
-  color: #fff;
-  opacity: 0;
-}
-.collapsedCheck[data-done="true"] svg {
-  opacity: 1;
-}
-.collapsedCheck:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
-}
-
-/* Drag handle on the collapsed chip — hidden at rest, revealed on card
-   hover / focus (inherits the `.affordance` opacity rules below). Keeps the
-   44px touch target; the negative margin trims its layout footprint so the
-   chip band stays compact. */
-.collapsedHandle {
-  flex: 0 0 auto;
-  margin: -8px -4px -8px 0;
-}
+/* Collapsed (mini-of-expanded) mode — the weekly grid card at rest.
+   The redesigned collapsed card is a MINI of the expanded card: the SAME
+   subtle subject-tinted header band sits over an off-white preview body.
+   It must FILL the grid cell uniformly (the cell has a fixed min-height), so
+   — unlike the old title-only "sticky-note" chip — the card root keeps the
+   `.card` `height: 100%` and `align-self: stretch`. Every collapsed card
+   across the grid therefore reads at the same height: a fixed-height header
+   band (see `.band` min-height) + a flexible (clamped) preview body that
+   stretches to the bottom of the cell. No height/align override here. */
 
 /* ── Compact chip layout ─────────────────────────────────────────────────── */
 /* Single-line 28px chip shown during drag. The card root has overflow:visible
@@ -273,7 +159,20 @@
   padding: 8px 10px 8px 13px;
   cursor: pointer;
   position: relative;
-  /* border-bottom and box-shadow are injected inline with subject colors. */
+  /* Fixed band height so the SHARED header reads at the SAME height for every
+     lesson — collapsed and expanded — regardless of title length, subtitle
+     presence, or moved/modified status. The title block is ALWAYS 2 lines (a
+     2-line title when there's no subtitle, else a 1-line title + 1-line
+     subtitle — see .bandTitle / data-has-subtitle), and this min-height is set
+     to the taller of those two layouts so every band settles to exactly the
+     same height (band-height spread = 0px). The status indicators
+     (.bandStatusRow) and the affordance cluster (.bandControls) are absolutely
+     positioned so they never add vertical space either.
+     Mechanical px (8 pad + 28 meta row + 4 gap + ~38 two title lines + 8 pad
+     ≈ 86) — layout math, not a design token, per BUILD_STANDARD §3. */
+  min-height: 88px;
+  flex: 0 0 auto;
+  /* border-bottom is injected inline with the subject separator color. */
 }
 
 /* ── Band top row: check · subject·time · right controls ─────────────────── */
@@ -294,13 +193,22 @@
    Hidden at rest — the dashed left stripe is the at-rest visual cue for
    modified cards. Controls reveal on card hover/focus (Option 2). */
 .bandStatusRow {
+  /* Absolutely positioned so the moved-arrow / MODIFIED indicators NEVER add
+     vertical space to the fixed-height band — the band stays the same height
+     whether or not the lesson is moved/modified (uniform-sizing requirement).
+     Pinned to the band's trailing edge just under the affordance row; the
+     always-on dashed left stripe is the primary at-rest "modified" signal
+     (BUILD_STANDARD §9), so these are a hover-revealed secondary cue. */
+  position: absolute;
+  top: 30px;
+  right: 8px;
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 3px;
   flex-wrap: nowrap;
   opacity: 0;
   transition: opacity 0.12s ease;
+  z-index: 2;
 }
 
 .card:hover .bandStatusRow,
@@ -389,13 +297,25 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Right-side controls: indicators + affordances. */
+/* Right-side controls: drag handle + ⋯ menu.
+   ABSOLUTELY positioned in the band's top-right corner — OUT of the .bandTop
+   flex flow (fix #1). In the narrow grid column the affordance cluster used to
+   reserve ~76px of the flex row, squeezing .bandSubject (the shrinkable,
+   overflow:hidden item) to 0px width so the subject name ("Math") vanished.
+   Lifting it out of flow gives .bandMeta the full remaining width, so
+   "Math | 8:10–9:10" renders complete. The cluster is opacity:0 at rest and
+   revealed on hover/focus (and always-on under @media(hover:none)) via the
+   .affordance rules, matching the target (no controls visible at rest).
+   top/right (4px) keep its revealed glyphs clear of the .bandStatusRow
+   (top:30px) and the bottom-right .caret. */
 .bandControls {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: 4px;
-  flex: 0 0 auto;
-  margin-left: auto;
 }
 
 /* Move-arrow indicator badge. */
@@ -420,8 +340,13 @@
 .affordanceRow {
   display: inline-flex;
   align-items: center;
-  margin: -11px -11px -11px 0;
-  /* Prevent the card's overflow:hidden from clipping the 44px touch targets. */
+  /* No negative margins now that .bandControls is absolutely positioned in the
+     band's top-right corner (fix #1): the cluster no longer needs to collapse a
+     flex-row footprint, and negative margins here would pull the 44px hit boxes
+     up past the card's top edge where overflow:hidden would clip them. The 44px
+     targets are inflated INWARD from the visual glyph (the .affordance box is
+     44px with the glyph centered), so touch/keyboard reach is preserved. */
+  margin: 0;
   overflow: visible;
 }
 
@@ -502,16 +427,43 @@
   overflow-wrap: anywhere;
   /* Leave room for caret (20px) at the right. */
   padding-right: 20px;
-  /* 2-line clamp — keeps the band height bounded. */
+  /* DEFAULT 2-line clamp (fix #2): on a card WITHOUT an em-dash qualifier the
+     title gets two full lines so it isn't over-truncated in the narrow grid
+     column ("Equivalent fractions warm-up" instead of "Equivalent…"). On a card
+     WITH a subtitle the clamp drops to 1 line (see the data-has-subtitle rule
+     below) and the subtitle fills the 2nd line — so the title block is always a
+     2-line block and the band height stays uniform (the band min-height pins
+     both layouts to the same height). The full title is still in the native
+     title= tooltip and the expanded body. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
+/* When an em-dash subtitle is present the title is 1 line + the subtitle is the
+   2nd line — a 2-line-total header that matches the no-subtitle 2-line title,
+   keeping band height uniform (fix #2). */
+.band[data-has-subtitle="true"] .bandTitle {
+  -webkit-line-clamp: 1;
+}
+
+/* On moved/modified cards the .bandStatusRow is painted absolutely at the
+   band's trailing edge. Widen the title's (and subtitle's) right padding so the
+   1-line clamp truncates BEFORE the status cluster, and the status row can never
+   overlap or intercept clicks on the title's right edge (fix #4a). The status
+   row holds at most a 16px move arrow + a ~70px MODIFIED badge, so ~88px clears
+   it; mechanical layout px, not a token (BUILD_STANDARD §3). */
+.band[data-has-status="true"] .bandTitle,
+.band[data-has-status="true"] .bandTitleSub {
+  padding-right: 88px;
+}
+
 /* Em-dash subtitle — the qualifier fragment after ` — ` in the lesson title.
-   Appears below the main title, visually subordinate. Smaller + muted so it
-   reads as a qualifier, not a second headline. */
+   Appears below the main title as the 2nd line of the 2-line title block.
+   Smaller + muted so it reads as a qualifier, not a second headline. Rendered
+   ONLY when a qualifier exists (the band's fixed min-height — not a reserved
+   blank line — keeps the header uniform; fix #2). Single line. */
 .bandTitleSub {
   display: block;
   margin-top: 1px;
@@ -522,7 +474,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  /* Not clamped — single line only (it's a short qualifier by nature). */
+  /* Right padding clears the bottom-right caret. */
   padding-right: 20px;
 }
 
