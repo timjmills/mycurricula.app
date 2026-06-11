@@ -496,6 +496,31 @@ export function WeeklyGrid(): ReactNode {
     });
   }
 
+  function handleCanvasClick(e: React.MouseEvent<HTMLDivElement>): void {
+    // A click that lands on the grid canvas itself — not on a card, an
+    // interactive control, or a multi-lesson cell's maximize surface — is
+    // "click off": clear the bulk selection (BIG-1), collapse every expanded
+    // card, and close the lesson DETAIL panel so the combined open state from
+    // handleSelect unwinds as one gesture. Card clicks bubble up here (the
+    // card root doesn't stopPropagation on plain clicks), so the closest()
+    // guard is what keeps a select from immediately undoing itself.
+    clearBulkSelection();
+    const target = e.target as HTMLElement;
+    if (
+      target.closest(
+        '[data-planner-item], button, a, input, textarea, select, ' +
+          '[role="button"], [role="menu"], [role="menuitem"], ' +
+          // A multi-lesson cell's empty space toggles its maximize state
+          // (GridCell.handleCellClick) — that gesture is not a click-off.
+          '[role="gridcell"][aria-expanded]',
+      )
+    )
+      return;
+    setSelectedId(null);
+    setExpandedIds((prev) => (prev.size === 0 ? prev : new Set()));
+    if (selectedLessonId !== null) setSelectedLessonId(null);
+  }
+
   function handleActivateDetail(lessonId: string): void {
     // DOUBLE click / Shift+Enter: FORCE-OPEN (idempotent) — guarantee the
     // lesson ends up both expanded inline AND with its DETAIL panel open, with
@@ -691,10 +716,10 @@ export function WeeklyGrid(): ReactNode {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        {/* BIG-1: clicking the empty scroll canvas (not a card) clears the
-            bulk selection. The grid's own cells stopPropagation on card
-            clicks so only a genuine canvas click reaches this handler. */}
-        <div className={styles.scroll} onClick={clearBulkSelection}>
+        {/* Clicking the empty scroll canvas (not a card / control) clears
+            the bulk selection (BIG-1) AND collapses + deselects any open
+            lesson, closing its detail panel — see handleCanvasClick. */}
+        <div className={styles.scroll} onClick={handleCanvasClick}>
           <div
             className={styles.grid}
             role="grid"

@@ -32,14 +32,15 @@
 // CSS Modules in right-panel.module.css.
 // All colors and sizing come from CSS custom properties (tokens.css).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { usePathname, useRouter } from "next/navigation";
 import { TODOS, TAG_BY_ID, LESSONS, LESSON_BY_ID } from "@/lib/mock";
 import type { LessonStatus, Subject, SubjectId, Unit } from "@/lib/types";
-import { Tooltip } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
+import { DRAWER_MQ } from "@/components/weekly";
 import styles from "./right-panel.module.css";
 
 // ── Status display helpers ───────────────────────────────────────────────────
@@ -838,11 +839,16 @@ function AllCommentsTab({
 
 function LessonDetailPanel({ lessonId }: { lessonId: string }): ReactNode {
   const { setSelectedLessonId } = useAppState();
+  const router = useRouter();
   // Subject label + standard descriptions come from the planner catalog
   // (catalog migration). Flag OFF these mirror the mock SUBJECT_BY_ID /
   // describeStandard byte-identically; flag ON they track the hydrated grade.
-  const { subjectById, describeStandard } = usePlanner();
-  const lesson = LESSON_BY_ID[lessonId];
+  // The lesson itself resolves from the store first (so backend-hydrated
+  // lessons whose ids aren't in the mock fixture still render) with the
+  // mock map as the flag-OFF fallback.
+  const { subjectById, describeStandard, lessons } = usePlanner();
+  const lesson =
+    lessons.find((l) => l.id === lessonId) ?? LESSON_BY_ID[lessonId];
 
   // Guard: lesson not found (stale id after mock updates).
   if (!lesson) {
@@ -901,6 +907,29 @@ function LessonDetailPanel({ lessonId }: { lessonId: string }): ReactNode {
         >
           <CloseIcon />
         </button>
+      </div>
+
+      {/* Go to lesson — this panel is a read-only summary; full editing
+          (lesson flow, status, resources, notes) lives in the Daily view.
+          Pinned under the header so it never scrolls out of reach. */}
+      <div style={{ padding: "10px 16px 0", flex: "0 0 auto" }}>
+        <Button
+          variant="secondary"
+          size="sm"
+          style={{ width: "100%" }}
+          tooltip="Open this lesson in the Daily view, where you can edit every part of it — directions, resources, notes, and status"
+          onClick={() => {
+            // Hand off via the W1-V5 deep link — /daily resolves ?lesson=
+            // server-side, seeds its selection to THIS lesson (not "first
+            // not-done of the day"), and syncs week + day itself. Clearing
+            // the global selection first unmounts this read-only panel so
+            // Daily doesn't render with a leftover second panel.
+            setSelectedLessonId(null);
+            router.push(`/daily?lesson=${encodeURIComponent(lesson.id)}`);
+          }}
+        >
+          Go to lesson
+        </Button>
       </div>
 
       {/* Scrollable body */}
@@ -1027,17 +1056,46 @@ export function RightPanel(): ReactNode {
   const { todoPanelOpen, commentsPanelOpen, selectedLessonId } = useAppState();
   const pathname = usePathname();
 
-  // ── /weekly gate (W3 carry-over fix) ───────────────────────────────────
+  // ── Weekly drawer-band detection (SSR-safe) ─────────────────────────────
+  // Mirrors WeeklyShell's drawerMode: true on viewports ≤1280px, where the
+  // <WeeklyRailDrawer> overlay owns the lesson-scoped content. Initialized
+  // false so the server render matches the first client paint; the real
+  // value lands in the post-mount effect (selectedLessonId starts null on
+  // load, so the brief default can't flash a panel).
+  const [weeklyDrawerBand, setWeeklyDrawerBand] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(DRAWER_MQ);
+    setWeeklyDrawerBand(mq.matches);
+    const handler = (e: MediaQueryListEvent): void =>
+      setWeeklyDrawerBand(e.matches);
+    if (mq.addEventListener) {
+      mq.addEventListener("change", handler);
+      return () => mq.removeEventListener("change", handler);
+    } else {
+      // Older Safari / Chrome (pre-2020) shipped addListener.
+      mq.addListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
+      return () => mq.removeListener(handler); // eslint-disable-line @typescript-eslint/no-deprecated
+    }
+  }, []);
+
+  // ── /weekly gate (W3 carry-over fix, narrowed) ───────────────────────────
   // On the Weekly view the <WeeklyRailDrawer> overlay is the canonical
-  // surface for the to-do / Shoutbox / lesson-detail rail content — it
-  // mounts on ≤1280px viewports via WeeklyShell. The shell-level
-  // <RightPanel> reads the same `todoPanelOpen` / `commentsPanelOpen`
-  // flags, so without this gate BOTH surfaces would mount when a rail
-  // icon is clicked on Weekly at narrow widths (the shell pops a 320px
-  // column AND the drawer slides in over it). Returning null here on
-  // /weekly leaves the WeeklyRailDrawer as the single source for that
-  // content; every other route keeps the shell panel unchanged.
-  if (pathname?.startsWith("/weekly")) return null;
+  // surface for the to-do / Shoutbox / lesson rail content on ≤1280px
+  // viewports, and the inline RightRail carries the To-do / Chat tabs on
+  // wider ones — so those two flags never mount this shell panel on
+  // /weekly (without the gate BOTH surfaces would pop for one click).
+  // Lesson detail is the exception: on >1280px viewports the inline rail
+  // only re-scopes its Resources list when a card is clicked — there is no
+  // lesson panel at all — so the shell-level LessonDetailPanel mounts here
+  // to be that panel. The drawer-band check keeps the two surfaces
+  // mutually exclusive at ≤1280px.
+  if (pathname?.startsWith("/weekly")) {
+    if (todoPanelOpen || commentsPanelOpen) return null;
+    if (selectedLessonId && !weeklyDrawerBand)
+      return <LessonDetailPanel lessonId={selectedLessonId} />;
+    return null;
+  }
 
   // Priority: to-do > comments > lesson detail > null.
   if (todoPanelOpen) return <TodoPanel />;
