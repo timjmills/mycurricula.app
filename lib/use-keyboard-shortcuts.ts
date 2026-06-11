@@ -80,6 +80,12 @@ export function useKeyboardShortcuts({
   // useCallback on the handler re-creates it when week changes.
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // A more specific surface already claimed this key (e.g. the Daily
+      // dock's capture-phase `[` / `]` side-column toggles). Yield —
+      // two handlers firing on one press silently corrupts state (the
+      // dock collapse would ALSO change the week).
+      if (e.defaultPrevented) return;
+
       const inText = isTextInput(e.target);
 
       // ── ⌘/Ctrl+K — command palette ────────────────────────────────────────
