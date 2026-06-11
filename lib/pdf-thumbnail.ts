@@ -70,8 +70,7 @@ export async function renderPdfThumbnail(
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("2d canvas context unavailable");
 
-    // pdfjs-dist's RenderParameters requires `canvas` alongside `canvasContext`.
-    await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+    await page.render({ canvasContext: ctx, viewport }).promise;
 
     // webp keeps the data URL small; fall back to png if the browser ignores
     // the requested type (toDataURL returns image/png in that case).
