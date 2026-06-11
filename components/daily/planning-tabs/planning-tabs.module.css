@@ -389,6 +389,34 @@
   color: var(--ink-soft);
 }
 
+/* ── Objective pane — "I can" lead-in + single-line editor ──────────────
+   The stored objective keeps the app-wide plain-text "I can " prefix;
+   the label supplies it visually and the editor holds only the trailing
+   text. The label tint rides the pane's --pc accent. */
+.objectiveRow {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.iCanLabel {
+  flex: 0 0 auto;
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--pc, var(--ink-soft));
+  background: color-mix(in srgb, var(--pc, var(--brand-500)) 12%, transparent);
+  padding: 1px 6px;
+  border-radius: var(--r-4);
+}
+
+.objectiveEditor {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* ── Standards pane ─────────────────────────────────────────────────── */
 
 .stdList {

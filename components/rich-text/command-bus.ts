@@ -85,6 +85,14 @@ export interface RichTextCommandTarget {
   queryState(command: RichTextCommand): boolean;
   /** True when `node` is inside this editor's editable region. */
   contains(node: Node): boolean;
+  /**
+   * Whether this editor accepts BLOCK-level commands (formatBlock, lists,
+   * indent/outdent, image insertion). A singleLine editor (e.g. the lesson
+   * title) returns false so an external toolbar can disable those buttons
+   * instead of writing block markup into a field that is rendered as plain
+   * text. Optional — absent means true (multi-line).
+   */
+  supportsBlockCommands?(): boolean;
 }
 
 /**
@@ -196,6 +204,14 @@ export const RichTextCommandBus = {
   queryState(command: RichTextCommand): boolean {
     return activeTarget?.queryState(command) ?? false;
   },
+  /**
+   * True when the active editor accepts block-level commands (formatBlock,
+   * lists, indent/outdent, image insertion). False for single-line targets;
+   * true when no target is held (buttons are disabled then anyway).
+   */
+  supportsBlockCommands(): boolean {
+    return activeTarget?.supportsBlockCommands?.() ?? true;
+  },
   /** True when `node` lives inside the active editor's editable region. */
   targetContains(node: Node): boolean {
     return activeTarget?.contains(node) ?? false;
@@ -234,6 +250,10 @@ export function useRichTextCommandTarget(
   editorRef: RefObject<HTMLElement | null>,
   implRef: RefObject<RichTextCommandImpl>,
   enabled: boolean,
+  /** False for singleLine editors — external toolbars disable their
+   *  block-level buttons (formatBlock, lists, indent, image) against this
+   *  target instead of writing block markup into a one-line field. */
+  supportsBlockCommands = true,
 ): void {
   useEffect(() => {
     if (!enabled) return;
@@ -245,6 +265,7 @@ export function useRichTextCommandTarget(
         implRef.current?.runCommand(command, value),
       requestLink: () => implRef.current?.runLink(),
       requestImage: () => implRef.current?.runImage(),
+      supportsBlockCommands: () => supportsBlockCommands,
       queryState: (command) => {
         // queryCommandState reads the document selection — correct even at a
         // collapsed caret, and still correct while focus momentarily sits on
@@ -285,7 +306,7 @@ export function useRichTextCommandTarget(
       el.removeEventListener("blur", handleBlur);
       unregisterRichTextCommandTarget(target);
     };
-  }, [enabled, editorRef, implRef]);
+  }, [enabled, editorRef, implRef, supportsBlockCommands]);
 }
 
 /**

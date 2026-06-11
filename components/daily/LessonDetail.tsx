@@ -67,12 +67,15 @@
 // hard-coded color. The only color introduced is per-subject through
 // the cascade.
 //
-// DOCKED RICH-TEXT TOOLBAR (consume only). A sibling agent docks the
-// RichTextEditor toolbar at bottom-center of a target element. This file
-// owns the target: `cellRef` is attached to the scrollable detail body
-// region (the "cell" that hosts the title, action row, planning tabs and
-// lesson flow). It is passed to <LessonFlow dockTarget={cellRef} /> and
-// to <PlanningTabs dockTarget={cellRef} /> for the pane editors.
+// STICKY RICH-TEXT TOOLBAR (6.11.26 redesign §6). ONE <RtToolbar> sits as
+// the first child of the scrollable detail body (`cellRef`), sticky at
+// its top edge. Every RichTextEditor in the body — the title editor,
+// the planning-tab panes, and the lesson-flow phase bodies — renders
+// `chromeless` and registers with the shared rich-text command bus
+// while focused, so the single toolbar drives whichever editor the
+// teacher is working in (components/rich-text/command-bus.ts). The
+// per-editor docked toolbar is gone on /daily; other views keep their
+// floating per-selection toolbar.
 //
 // Store wiring (planner-store):
 //   sections  — managed inside <LessonFlow> via usePlanner(); never local.
@@ -88,6 +91,10 @@ import { useState, useEffect, useRef } from "react";
 import type { ReactNode, SyntheticEvent } from "react";
 import type { Lesson } from "@/lib/types";
 import { lessonTime } from "@/lib/mock";
+import { instantiateSections } from "@/lib/lesson-flow";
+import { LESSON_TEMPLATES } from "@/lib/lesson-templates";
+import type { LessonTemplate } from "@/lib/lesson-templates";
+import { useConsequenceToast } from "@/lib/consequence-toast";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
 import { usePlanner } from "@/lib/planner-store";
@@ -95,6 +102,7 @@ import { Button, Tooltip } from "@/components/ui";
 import { LessonAgendaNav } from "./LessonAgendaNav";
 import { PlanningTabs } from "./planning-tabs";
 import type { PlanningTabsHandle } from "./planning-tabs";
+import { RtToolbar } from "./rt-toolbar";
 import detailStyles from "./lesson-detail.module.css";
 
 // ── Agenda-navigator visibility persistence ──────────────────────────────
@@ -235,16 +243,15 @@ export function LessonDetail({
   // Subject metadata comes from the planner store's catalog (frozen API),
   // not lib/mock — safe here, LessonDetail only renders under the (planner)
   // /daily route (PlannerProvider present).
-  const { editLesson, subjectById } = usePlanner();
+  const { editLesson, subjectById, getSections, setSections } = usePlanner();
+  const { showConsequence } = useConsequenceToast();
   const subj = subjectById[lesson.subject];
 
-  // ── Docked-toolbar target ref ────────────────────────────────────────
-  // cellRef is attached to the scrollable detail body region — the "cell"
-  // hosting the lesson flow + notes. The docked RichTextEditor toolbar
-  // centers itself on this element and pins near its bottom edge. We
-  // forward the ref to <LessonFlow dockTarget={cellRef}> and to the notes
-  // RichTextEditor. The agenda navigator also scans + scrollspies this
-  // container.
+  // ── Scroll-body ref ──────────────────────────────────────────────────
+  // cellRef is attached to the scrollable detail body region — the
+  // scroll context the sticky RtToolbar pins to (it renders as this
+  // element's first child) and the container the agenda navigator
+  // scrollspies and scrolls.
   const cellRef = useRef<HTMLDivElement | null>(null);
 
   // ── Narrow-workspace measurement ──────────────────────────────────────
@@ -284,6 +291,45 @@ export function LessonDetail({
         // Storage unavailable — the choice simply won't persist.
       }
       return next;
+    });
+  }
+
+  // ── Templates menu (prototype .tmplBtn/.tmplMenu) ─────────────────────
+  // Lists the built-in lesson-flow templates (lib/lesson-templates).
+  // Applying one REPLACES this lesson's phases with the template's
+  // sections — the lesson's own resources are redistributed across the
+  // new phases by instantiateSections. Destructive, so the trigger
+  // carries a required tooltip and the commit raises a consequence toast
+  // whose Undo restores the previous phase list in one step.
+  const [tmplOpen, setTmplOpen] = useState(false);
+  const tmplMenuRef = useRef<HTMLDivElement | null>(null);
+  const tmplBtnRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!tmplOpen) return;
+    function onPointerDown(e: PointerEvent): void {
+      const t = e.target as Node;
+      if (tmplMenuRef.current?.contains(t)) return;
+      if (tmplBtnRef.current?.contains(t)) return;
+      setTmplOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent): void {
+      if (e.key === "Escape") setTmplOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [tmplOpen]);
+
+  function applyTemplate(template: LessonTemplate): void {
+    const previous = getSections(lesson.id);
+    setSections(lesson.id, instantiateSections(template, lesson.resources));
+    setTmplOpen(false);
+    showConsequence({
+      message: `Applied the "${template.name}" template — this lesson's phases were replaced`,
+      onUndo: () => setSections(lesson.id, previous),
     });
   }
 
@@ -473,11 +519,15 @@ export function LessonDetail({
       </div>
 
       {/* ── Scrollable body / the "cell" region (cellRef target) ────────
-          cellRef is attached HERE — the element the docked rich-text
-          toolbar centers itself on. It hosts the title, objective, action
-          row, lesson flow, standards, and notes. The inner `.column` is
-          now LEFT-ALIGNED to a 32px gutter (spec §2), not centered. */}
+          cellRef is attached HERE — the scroll container the agenda
+          navigator scrollspies, and the sticky RtToolbar's scroll
+          context. The toolbar is the FIRST child so position:sticky pins
+          it to this element's top edge; every RichTextEditor below it
+          renders chromeless and is driven through the shared command
+          bus. The inner `.column` is LEFT-ALIGNED to a 32px gutter
+          (spec §2), not centered. */}
       <div className={detailStyles.body} ref={cellRef}>
+        <RtToolbar />
         <div className={detailStyles.column}>
           {/* ── Title — hero ───────────────────────────────────────────
               Double-click-to-edit (or Enter / F2 on the focused text).
@@ -502,7 +552,7 @@ export function LessonDetail({
                     singleLine
                     placeholder="Lesson title…"
                     ariaLabel="Edit lesson title"
-                    dockTarget={cellRef}
+                    chromeless
                   />
                 </RichEditorWrapper>
               ) : (
@@ -660,52 +710,150 @@ export function LessonDetail({
               reorderable, closable, and re-addable, and the arrangement
               persists per-teacher. planTabsRef lets the action row's
               "Lesson notes" button jump straight to the Notes pane. */}
-          <PlanningTabs
-            ref={planTabsRef}
-            lesson={lesson}
-            dockTarget={cellRef}
-          />
+          <PlanningTabs ref={planTabsRef} lesson={lesson} />
 
           {/* ── Lesson workspace — agenda navigator + lesson flow ───────
-              (6.11.26 redesign §6.) A sticky numbered section navigator
-              sits beside the flow: click to jump, scrollspy highlights
-              the section under the reading line, and the toggle hides it
-              for teachers who want full-width text. The navigator is
-              DOM-driven off the flow's data-flow-section anchors so it
-              follows add / remove / reorder / rename automatically.
-              LessonFlow itself is unchanged: key resets dnd drag state
-              when the selected lesson changes; modified drives the fork
-              stripe; dockTarget threads the docked-toolbar ref through
-              to every section editor. */}
-          <div className={detailStyles.agendaBar}>
-            <Tooltip
-              content="Show or hide the section navigator — the numbered map of this lesson's flow that follows along as you scroll"
-              side="top"
-              tooltipId="lesson-detail-agenda-toggle"
-            >
-              <button
-                type="button"
-                className={detailStyles.agendaToggle}
-                aria-pressed={agendaNavOn}
-                onClick={toggleAgendaNav}
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+              (6.11.26 redesign §6.) The section head carries the
+              "Lesson agenda" title, the Templates menu, and the
+              navigator toggle. Below it, a sticky numbered phase
+              navigator sits beside the flow: click to jump, scrollspy
+              highlights the phase under the reading line, items
+              drag-reorder and rename in place, and the toggle hides the
+              rail for teachers who want full-width text. The navigator
+              reads its items straight from the planner store (the same
+              rows LessonFlow renders), and targets the flow's
+              data-flow-section anchors for scrolling. LessonFlow: key
+              resets dnd drag state when the selected lesson changes;
+              modified drives the fork stripe; chromeless routes every
+              phase-body editor through the sticky toolbar's command
+              bus. */}
+          <div className={detailStyles.agendaSectionHead}>
+            <span className={detailStyles.sectionGrip} aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="9" cy="6" r="1.5" />
+                <circle cx="15" cy="6" r="1.5" />
+                <circle cx="9" cy="12" r="1.5" />
+                <circle cx="15" cy="12" r="1.5" />
+                <circle cx="9" cy="18" r="1.5" />
+                <circle cx="15" cy="18" r="1.5" />
+              </svg>
+            </span>
+            <span className={detailStyles.agendaSectionTitle}>
+              Lesson agenda
+            </span>
+            <div className={detailStyles.agendaActions}>
+              {/* Templates — replaces this lesson's phases with a built-in
+                  lesson-flow shape. Destructive → required tooltip; the
+                  consequence toast (with Undo) confirms the swap. */}
+              <div className={detailStyles.tmplWrap}>
+                <Tooltip
+                  content="Start this lesson's phases from a template — applying one replaces the current phase list (Undo restores it)"
+                  side="top"
+                  required
                 >
-                  <rect x="3" y="4" width="18" height="16" rx="2" />
-                  <line x1="9" y1="4" x2="9" y2="20" />
-                </svg>
-                {agendaNavOn ? "Hide navigation" : "Show navigation"}
-              </button>
-            </Tooltip>
+                  <button
+                    type="button"
+                    ref={tmplBtnRef}
+                    className={detailStyles.tmplBtn}
+                    aria-haspopup="menu"
+                    aria-expanded={tmplOpen}
+                    onClick={() => setTmplOpen((v) => !v)}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z" />
+                      <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z" />
+                    </svg>
+                    Templates
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                </Tooltip>
+                {tmplOpen && (
+                  <div
+                    ref={tmplMenuRef}
+                    className={detailStyles.tmplMenu}
+                    role="menu"
+                    aria-label="Lesson flow templates"
+                  >
+                    <div className={detailStyles.tmplMenuLabel}>
+                      Lesson flow templates
+                    </div>
+                    {LESSON_TEMPLATES.map((template) => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        role="menuitem"
+                        className={detailStyles.tmplMenuItem}
+                        onClick={() => applyTemplate(template)}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z" />
+                          <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z" />
+                        </svg>
+                        {template.name}
+                        <span className={detailStyles.tmShort}>
+                          {template.sections.length}{" "}
+                          {template.sections.length === 1 ? "phase" : "phases"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Tooltip
+                content="Show or hide the section navigator — the numbered map of this lesson's flow that follows along as you scroll"
+                side="top"
+                tooltipId="lesson-detail-agenda-toggle"
+              >
+                <button
+                  type="button"
+                  className={detailStyles.agendaToggle}
+                  aria-pressed={agendaNavOn}
+                  onClick={toggleAgendaNav}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="3" y="4" width="18" height="16" rx="2" />
+                    <line x1="9" y1="4" x2="9" y2="20" />
+                  </svg>
+                  {agendaNavOn ? "Hide navigation" : "Show navigation"}
+                </button>
+              </Tooltip>
+            </div>
           </div>
           <div
             className={`${detailStyles.workspace} ${
@@ -720,7 +868,7 @@ export function LessonDetail({
                 key={lesson.id}
                 lessonId={lesson.id}
                 modified={lesson.modified}
-                dockTarget={cellRef}
+                chromeless
               />
             </div>
           </div>
@@ -745,10 +893,12 @@ export function LessonDetail({
 //                          editor AND the docked toolbar; the relatedTarget
 //                          check distinguishes the two)
 //
-// The RichTextEditor's toolbar is docked (position:fixed, portaled out of
-// this subtree under `.cp-root`), so a focus move INTO the toolbar would
-// otherwise look like a blur "out" — the role="toolbar" containment check
-// keeps the editor open while the teacher clicks a formatting button.
+// The formatting chrome is the sticky RtToolbar at the top of the scroll
+// body — OUTSIDE this subtree — so a keyboard focus move into it would
+// otherwise look like a blur "out". The role="toolbar" containment check
+// keeps the editor open while the teacher operates a formatting button.
+// (Pointer presses on the toolbar preventDefault their mousedown and
+// never blur the editor at all.)
 
 function RichEditorWrapper({
   onCommit,

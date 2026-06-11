@@ -198,6 +198,11 @@ function ClearFormatIcon(): ReactNode {
 const DISABLED_TOOLTIP =
   "Click into any text in the lesson first — these tools format the text you select there";
 
+// Shown on block-level buttons while the focused editor is a single-line
+// field (e.g. the lesson title) — those fields reject block markup.
+const SINGLE_LINE_TOOLTIP =
+  "This field is a single line of text — headings, lists, and pictures aren't available here";
+
 interface RtButtonProps {
   /** Accessible name (aria-label) — matches the prototype's title= text. */
   label: string;
@@ -211,6 +216,12 @@ interface RtButtonProps {
    */
   active?: boolean;
   disabled: boolean;
+  /** Why the button is disabled — overrides the no-editor default when the
+   *  reason is the focused field's capabilities, not the missing focus. */
+  disabledReason?: string;
+  /** The toolbar's single roving tab stop (ARIA toolbar pattern) — arrow
+   *  keys move focus between buttons; Tab leaves the toolbar. */
+  isTabStop?: boolean;
   onActivate: () => void;
   children: ReactNode;
 }
@@ -220,6 +231,8 @@ function RtButton({
   tooltip,
   active,
   disabled,
+  disabledReason,
+  isTabStop = false,
   onActivate,
   children,
 }: RtButtonProps): ReactNode {
@@ -231,9 +244,10 @@ function RtButton({
         .filter(Boolean)
         .join(" ")}
       iconAriaLabel={label}
-      tooltip={disabled ? DISABLED_TOOLTIP : tooltip}
+      tooltip={disabled ? (disabledReason ?? DISABLED_TOOLTIP) : tooltip}
       disabled={disabled}
       aria-pressed={active}
+      tabIndex={isTabStop ? 0 : -1}
       // Selection preservation: never let a button press move focus out of
       // the editor — the command dispatches on click against the live
       // selection. (The container repeats this for clicks landing on gaps.)
@@ -263,13 +277,44 @@ export function RtToolbar({ className }: RtToolbarProps): ReactNode {
   // its formatting state changes, so these per-render reads stay fresh.
   const ready = bus.canExecute();
   const disabled = !ready;
+  // Block-level commands (headings, lists, indent, image) are gated off
+  // while the focused editor is a single-line field — see the capability
+  // advertisement in command-bus.ts.
+  const blockDisabled = disabled || !bus.supportsBlockCommands();
   const isOn = (command: string): boolean =>
     ready ? bus.queryState(command) : false;
+
+  // ARIA toolbar pattern: ONE tab stop (the first button); Left/Right and
+  // Home/End move focus between the enabled buttons.
+  function handleToolbarKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    const buttons = Array.from(
+      e.currentTarget.querySelectorAll<HTMLButtonElement>(
+        "button:not(:disabled)",
+      ),
+    );
+    if (buttons.length === 0) return;
+    const current = buttons.indexOf(
+      document.activeElement as HTMLButtonElement,
+    );
+    let next: HTMLButtonElement | undefined;
+    if (e.key === "Home") next = buttons[0];
+    else if (e.key === "End") next = buttons[buttons.length - 1];
+    else if (e.key === "ArrowRight")
+      next = buttons[(Math.max(current, 0) + 1) % buttons.length];
+    else
+      next =
+        buttons[(Math.max(current, 0) - 1 + buttons.length) % buttons.length];
+    if (!next) return;
+    e.preventDefault();
+    next.focus();
+  }
 
   return (
     <div
       role="toolbar"
       aria-label="Text formatting"
+      onKeyDown={handleToolbarKeyDown}
       // Marks this element for the editors' blur handlers: focus moving into
       // the toolbar keeps the focused editor registered on the command bus.
       {...{ [RICH_TEXT_TOOLBAR_ATTR]: "" }}
@@ -299,6 +344,7 @@ export function RtToolbar({ className }: RtToolbarProps): ReactNode {
         tooltip="Make the selected text bold"
         active={isOn("bold")}
         disabled={disabled}
+        isTabStop
         onActivate={() => bus.executeCommand("bold")}
       >
         <b>B</b>
@@ -337,7 +383,8 @@ export function RtToolbar({ className }: RtToolbarProps): ReactNode {
       <RtButton
         label="Heading"
         tooltip="Turn the current line into a section heading"
-        disabled={disabled}
+        disabled={blockDisabled}
+        disabledReason={ready ? SINGLE_LINE_TOOLTIP : undefined}
         onActivate={() => bus.executeCommand("formatBlock", "h4")}
       >
         H
@@ -345,7 +392,8 @@ export function RtToolbar({ className }: RtToolbarProps): ReactNode {
       <RtButton
         label="Body text"
         tooltip="Turn the current line back into regular body text"
-        disabled={disabled}
+        disabled={blockDisabled}
+        disabledReason={ready ? SINGLE_LINE_TOOLTIP : undefined}
         onActivate={() => bus.executeCommand("formatBlock", "p")}
       >
         ¶
@@ -358,7 +406,8 @@ export function RtToolbar({ className }: RtToolbarProps): ReactNode {
         label="Bulleted list"
         tooltip="Turn the selected lines into a bulleted list"
         active={isOn("insertUnorderedList")}
-        disabled={disabled}
+        disabled={blockDisabled}
+        disabledReason={ready ? SINGLE_LINE_TOOLTIP : undefined}
         onActivate={() => bus.executeCommand("insertUnorderedList")}
       >
         <BulletListIcon />
@@ -367,7 +416,8 @@ export function RtToolbar({ className }: RtToolbarProps): ReactNode {
         label="Numbered list"
         tooltip="Turn the selected lines into a numbered list"
         active={isOn("insertOrderedList")}
-        disabled={disabled}
+        disabled={blockDisabled}
+        disabledReason={ready ? SINGLE_LINE_TOOLTIP : undefined}
         onActivate={() => bus.executeCommand("insertOrderedList")}
       >
         <NumberedListIcon />
@@ -375,7 +425,8 @@ export function RtToolbar({ className }: RtToolbarProps): ReactNode {
       <RtButton
         label="Decrease indent"
         tooltip="Move the selected lines out one level"
-        disabled={disabled}
+        disabled={blockDisabled}
+        disabledReason={ready ? SINGLE_LINE_TOOLTIP : undefined}
         onActivate={() => bus.executeCommand("outdent")}
       >
         <OutdentIcon />
@@ -383,7 +434,8 @@ export function RtToolbar({ className }: RtToolbarProps): ReactNode {
       <RtButton
         label="Increase indent"
         tooltip="Move the selected lines in one level"
-        disabled={disabled}
+        disabled={blockDisabled}
+        disabledReason={ready ? SINGLE_LINE_TOOLTIP : undefined}
         onActivate={() => bus.executeCommand("indent")}
       >
         <IndentIcon />
@@ -403,7 +455,8 @@ export function RtToolbar({ className }: RtToolbarProps): ReactNode {
       <RtButton
         label="Insert image"
         tooltip="Add a picture inline where your cursor is"
-        disabled={disabled}
+        disabled={blockDisabled}
+        disabledReason={ready ? SINGLE_LINE_TOOLTIP : undefined}
         onActivate={() => bus.requestImage()}
       >
         <ImageIcon />

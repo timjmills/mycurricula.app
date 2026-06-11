@@ -84,6 +84,7 @@ import {
 } from "@/lib/collapse-on-drag";
 import { usePlanner } from "@/lib/planner-store";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import { stripHtml, escapeHtml } from "@/lib/html-text";
 import { Button, Tooltip } from "@/components/ui";
 import { RichTextEditor } from "@/components/rich-text";
 import { PhaseResources, ResourceChipGhost } from "./phase-resources";
@@ -133,6 +134,11 @@ export interface LessonFlowProps {
   /** Optional ref to the element the docked rich-text toolbar should center
    *  itself on. Forwarded unchanged to every RichTextEditor. */
   dockTarget?: RefObject<HTMLElement | null>;
+  /** When set, every body RichTextEditor renders chromeless (no toolbar of
+   *  its own) and registers with the shared rich-text command bus so the
+   *  /daily sticky RtToolbar drives it. Chromeless supersedes dockTarget
+   *  inside the editor. Default false. */
+  chromeless?: boolean;
 }
 
 // ── SortablePhase ────────────────────────────────────────────────────────
@@ -165,6 +171,7 @@ interface SortablePhaseProps {
   isCollapsed: boolean;
   onToggleCollapsed: (id: string) => void;
   dockTarget?: RefObject<HTMLElement | null>;
+  chromeless?: boolean;
   // Double-click-to-edit body (state owned by LessonFlow)
   editingBody: boolean;
   draftValue: string;
@@ -192,6 +199,7 @@ const SortablePhase = memo(function SortablePhase({
   isCollapsed,
   onToggleCollapsed,
   dockTarget,
+  chromeless,
   editingBody,
   draftValue,
   onOpenBodyEditor,
@@ -515,6 +523,7 @@ const SortablePhase = memo(function SortablePhase({
                         placeholder={BODY_PLACEHOLDER}
                         ariaLabel={`Plan for phase: ${titleText}`}
                         dockTarget={dockTarget}
+                        chromeless={chromeless}
                       />
                     </RichEditorWrapper>
                   ) : stripHtml(section.body) ? (
@@ -584,6 +593,7 @@ const SortablePhase = memo(function SortablePhase({
 export function LessonFlow({
   lessonId,
   dockTarget,
+  chromeless = false,
 }: LessonFlowProps): ReactNode {
   const {
     lessons,
@@ -671,8 +681,10 @@ export function LessonFlow({
   }, []);
 
   // ── Phase management ────────────────────────────────────────────────
+  // "New phase" is the 6.11.26 spec title (sentence case, not the store
+  // default "New section").
   function addPhase(): void {
-    storeAddSection(lessonId);
+    storeAddSection(lessonId, "New phase");
   }
 
   const removePhase = useCallback(
@@ -722,7 +734,11 @@ export function LessonFlow({
       }
       const n = Number(trimmed);
       if (!Number.isFinite(n) || n < 0) return; // ignore invalid input
-      editSection(lessonId, sectionId, { minutes: Math.round(n) });
+      // Clamp to a sane ceiling — an absurd value (99999999) would distort
+      // the phase head and the agenda navigator's time line.
+      editSection(lessonId, sectionId, {
+        minutes: Math.min(999, Math.round(n)),
+      });
     },
     [lessonId, editSection],
   );
@@ -982,6 +998,7 @@ export function LessonFlow({
                 isCollapsed={collapsedSections.has(section.id)}
                 onToggleCollapsed={toggleCollapsed}
                 dockTarget={dockTarget}
+                chromeless={chromeless}
                 editingBody={editTarget !== null && editTarget === section.id}
                 draftValue={editTarget === section.id ? editDraft : ""}
                 onOpenBodyEditor={openBodyEditor}
@@ -1017,7 +1034,10 @@ export function LessonFlow({
         </DragOverlay>
       </DndContext>
 
-      {/* ── "Add phase" — dashed full-width button after the last phase */}
+      {/* ── "Add phase" — dashed full-width button after the last phase.
+           The "Edit lesson flow / template" stub that used to live here has
+           been removed — the Templates menu now lives in the Daily agenda
+           section head (built in LessonDetail). */}
       <div className={styles.footer}>
         <button
           type="button"
@@ -1028,26 +1048,22 @@ export function LessonFlow({
           <AddIcon />
           Add phase
         </button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={styles.templateBtn}
-          aria-label="Edit lesson flow template (coming soon)"
-          tooltip="Edit the underlying lesson-flow template that controls the default phase list — coming in a later phase"
-        >
-          Edit lesson flow / template
-        </Button>
       </div>
 
-      {/* ── ResourceComposer — shared "Add resource" / "Add note" dialog ── */}
-      <ResourceComposer
-        open={composerTarget !== null && lesson !== undefined}
-        lesson={lesson!}
-        mode={composerTarget?.editResource ? "notecard" : "resource"}
-        editResource={composerTarget?.editResource}
-        initialSectionId={composerTarget?.sectionId}
-        onClose={closeComposer}
-      />
+      {/* ── ResourceComposer — shared "Add resource" / "Add note" dialog ──
+          Render-gated on the resolved lesson: the composer evaluates
+          lesson fields before its own `open` early-return, so an
+          unresolvable lessonId must not reach it at all. */}
+      {lesson && (
+        <ResourceComposer
+          open={composerTarget !== null}
+          lesson={lesson}
+          mode={composerTarget?.editResource ? "notecard" : "resource"}
+          editResource={composerTarget?.editResource}
+          initialSectionId={composerTarget?.sectionId}
+          onClose={closeComposer}
+        />
+      )}
     </div>
   );
 }
@@ -1091,35 +1107,9 @@ function RichEditorWrapper({
   );
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-/** Strip tags and decode the basic entities for PLAIN-TEXT display of a
- *  rich-text heading/body. Decodes `&amp;` LAST so double-escaped sequences
- *  round-trip correctly with `escapeHtml` below. */
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, "")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .trim();
-}
-
-/** Escape plain text for storage in the rich-text heading field. The rename
- *  input is plain-text by design (the handoff's phase titles are plain
- *  18px/700 ink), so any markup the old heading carried is replaced by the
- *  typed text. */
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+// stripHtml / escapeHtml live in lib/html-text.ts — ONE escape/decode
+// contract shared with the agenda navigator's rename-in-place, so a rename
+// through either surface round-trips identically.
 
 // ── Icons ────────────────────────────────────────────────────────────────
 

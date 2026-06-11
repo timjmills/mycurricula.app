@@ -556,7 +556,9 @@
   background: var(--surface);
 }
 
-/* ── Footer — "Add phase" + quiet template stub ──────────────────────── */
+/* ── Footer — "Add phase" dashed button ──────────────────────────────── */
+/* align-items: stretch keeps the button full-width; gap is inert with a
+   single child but preserved so a future sibling drops in cleanly. */
 .footer {
   display: flex;
   flex-direction: column;
@@ -601,40 +603,6 @@
   outline-offset: 2px;
 }
 
-/* Secondary, quiet template stub — small text link (preserved placeholder
-   for the later Lesson Templates editor). */
-.templateBtn {
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 8px;
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: var(--t-11);
-  font-weight: 500;
-  color: var(--muted);
-  cursor: pointer;
-  white-space: nowrap;
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  text-underline-offset: 2px;
-  transition:
-    color 0.1s ease,
-    text-decoration-color 0.1s ease;
-}
-
-.templateBtn:hover {
-  color: var(--ink-soft);
-  text-decoration-color: var(--faint);
-}
-
-.templateBtn:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
-}
-
 /* ── Reduced motion ──────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .phase,
@@ -648,8 +616,7 @@
   .dragGrip,
   .teachText,
   .globalToggleBtn,
-  .addPhaseBtn,
-  .templateBtn {
+  .addPhaseBtn {
     transition-duration: 0.001ms !important;
   }
 }

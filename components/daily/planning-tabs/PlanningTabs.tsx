@@ -42,8 +42,15 @@
 //
 // Store wiring (planner-store) — same coalesced-editLesson pattern the
 // host LessonDetail uses for its title editor:
-//   objective       → editLesson(id, { objective }, coalesced) — the pane
-//                     edits the FULL stored objective text.
+//   objective       → editLesson(id, { objective }, coalesced). The STORED
+//                     value keeps the app-wide "I can …" convention: the
+//                     pane shows an "I can" lead-in label, the singleLine
+//                     editor edits only the trailing text, and the commit
+//                     re-attaches the plain-text prefix — exactly the old
+//                     I-CAN line's contract, so every other objective
+//                     consumer (weekly/lesson cards' /^I can/ strip, the
+//                     plain-text renders in right-panel / SubjectView /
+//                     Teach) keeps working.
 //   notes           → editLesson(id, { notes }, coalesced). This pane is
 //                     the former bottom "My notes" section of LessonDetail,
 //                     moved here wholesale (state + store-sync + guards).
@@ -56,6 +63,12 @@
 //   resources       → read-only lesson.resources rows (ResourceTypePill
 //                     from the lesson-flow barrel + label + type).
 //
+// Rich-text toolbars — pane editors are chromeless (no per-editor docked
+// toolbar). They register with the shared command bus on focus, and the
+// one sticky RtToolbar mounted at the top of LessonDetail's scroll body
+// drives whichever editor currently has focus via that bus. See
+// components/rich-text/command-bus.ts for the bus contract.
+//
 // The host activates a tool programmatically (the action-row "Lesson
 // notes" button) through the forwarded PlanningTabsHandle.
 
@@ -67,13 +80,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type {
-  CSSProperties,
-  DragEvent,
-  KeyboardEvent,
-  ReactNode,
-  RefObject,
-} from "react";
+import type { CSSProperties, DragEvent, KeyboardEvent, ReactNode } from "react";
 import type { Lesson, LessonDifferentiation } from "@/lib/types";
 import { describeStandard } from "@/lib/mock";
 import { usePlanner } from "@/lib/planner-store";
@@ -81,31 +88,20 @@ import { RichTextEditor } from "@/components/rich-text";
 import { ResourceTypePill } from "@/components/lesson-flow";
 import { Tooltip } from "@/components/ui";
 import { Shoutbox } from "../Shoutbox";
+import {
+  TOOL_KEYS,
+  defaultPlanningTabsState,
+  readPlanningTabs,
+  writePlanningTabs,
+} from "./planning-tabs-state";
+import type { PlanningTabsState, PlanningToolKey } from "./planning-tabs-state";
 import styles from "./planning-tabs.module.css";
 
 // ── Tool model ───────────────────────────────────────────────────────────
-
-export type PlanningToolKey =
-  | "objective"
-  | "standards"
-  | "notes"
-  | "diff"
-  | "chat"
-  | "resources";
-
-/** Fixed identity order — the canonical tool sequence, also the "+" menu
- *  listing order. The teacher's own arrangement lives in persisted state. */
-const TOOL_KEYS: readonly PlanningToolKey[] = [
-  "objective",
-  "standards",
-  "notes",
-  "diff",
-  "chat",
-  "resources",
-];
-
-/** Chat + Resources start hidden — addable via the "+" menu. */
-const DEFAULT_HIDDEN: readonly PlanningToolKey[] = ["chat", "resources"];
+// The tool vocabulary + persisted-arrangement model (state shape, defaults,
+// normalize, localStorage read/write) live in ./planning-tabs-state.ts —
+// pure data, unit-tested in tests/planning-tabs-state.test.ts. This file
+// owns only the presentation metadata and behavior.
 
 /** Per-tool label (sentence case per the design system) + `--pc` accent. */
 const TOOL_META: Record<PlanningToolKey, { label: string; color: string }> = {
@@ -117,89 +113,12 @@ const TOOL_META: Record<PlanningToolKey, { label: string; color: string }> = {
   resources: { label: "Resources", color: "var(--explorers-bright)" },
 };
 
-// ── Persistence (dock-model discipline) ──────────────────────────────────
-
-/** Persisted shape: the teacher's tool arrangement. `order` is always a
- *  permutation of all six tools (hidden tools keep their slot so re-adding
- *  restores a tool where it was); `hidden` is the closed set; `active` is
- *  the open pane. */
-export interface PlanningTabsState {
-  order: PlanningToolKey[];
-  hidden: PlanningToolKey[];
-  active: PlanningToolKey | null;
-}
-
-export const PLAN_TABS_KEY = "cc_daily_plantabs_v1";
-
-function defaultPlanningTabsState(): PlanningTabsState {
-  return {
-    order: [...TOOL_KEYS],
-    hidden: [...DEFAULT_HIDDEN],
-    active: "objective",
-  };
-}
-
-function isToolKey(v: unknown): v is PlanningToolKey {
-  return typeof v === "string" && (TOOL_KEYS as readonly string[]).includes(v);
-}
-
-/** Normalize a parsed candidate into a valid state:
- *  - `order` is a permutation of all six tools (unknowns/dupes dropped,
- *    missing tools appended in canonical order);
- *  - `hidden` ⊆ tools, deduped;
- *  - `active` must be a VISIBLE tool — else the first visible, else null. */
-export function normalizePlanningTabs(raw: unknown): PlanningTabsState {
-  const base = defaultPlanningTabsState();
-  if (typeof raw !== "object" || raw === null) return base;
-  const c = raw as Record<string, unknown>;
-
-  const order: PlanningToolKey[] = [];
-  if (Array.isArray(c.order)) {
-    for (const k of c.order) {
-      if (isToolKey(k) && !order.includes(k)) order.push(k);
-    }
-  }
-  for (const k of TOOL_KEYS) if (!order.includes(k)) order.push(k);
-
-  const hidden: PlanningToolKey[] = [];
-  if (Array.isArray(c.hidden)) {
-    for (const k of c.hidden) {
-      if (isToolKey(k) && !hidden.includes(k)) hidden.push(k);
-    }
-  } else {
-    hidden.push(...DEFAULT_HIDDEN);
-  }
-
-  const visible = order.filter((k) => !hidden.includes(k));
-  const active =
-    isToolKey(c.active) && visible.includes(c.active)
-      ? c.active
-      : (visible[0] ?? null);
-
-  return { order, hidden, active };
-}
-
-/** Read the saved state, or the default. SSR-guarded. */
-function readPlanningTabs(): PlanningTabsState {
-  if (typeof window === "undefined") return defaultPlanningTabsState();
-  try {
-    const raw = window.localStorage.getItem(PLAN_TABS_KEY);
-    if (!raw) return defaultPlanningTabsState();
-    return normalizePlanningTabs(JSON.parse(raw) as unknown);
-  } catch {
-    // Corrupt or unavailable storage — fall back to the defaults.
-    return defaultPlanningTabsState();
-  }
-}
-
-/** Persist the state. Non-fatal on failure. */
-function writePlanningTabs(state: PlanningTabsState): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(PLAN_TABS_KEY, JSON.stringify(state));
-  } catch {
-    // Storage full / unavailable — the arrangement simply won't persist.
-  }
+/** Strip the app-wide plain-text "I can " objective prefix for editing.
+ *  The Objective pane edits only the trailing text; the commit re-attaches
+ *  the prefix (see handleObjectiveChange) so the stored shape never
+ *  changes. Mirrors the regex the weekly/lesson cards use for display. */
+function stripICanPrefix(html: string): string {
+  return html.replace(/^I can\s+/i, "");
 }
 
 // ── Icons — stroke-based, currentColor, from the design handoff ──────────
@@ -356,15 +275,12 @@ export interface PlanningTabsHandle {
 
 export interface PlanningTabsProps {
   lesson: Lesson;
-  /** Docked rich-text toolbar target — threaded into every pane editor
-   *  (the host's scrollable detail body, same ref <LessonFlow> gets). */
-  dockTarget?: RefObject<HTMLElement | null>;
 }
 
 // ── Component ────────────────────────────────────────────────────────────
 
 export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
-  function PlanningTabs({ lesson, dockTarget }, ref): ReactNode {
+  function PlanningTabs({ lesson }, ref): ReactNode {
     const { editLesson } = usePlanner();
     const uid = useId();
 
@@ -527,8 +443,13 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
     // synchronously; every change coalesce-commits to the store; an
     // editing guard stops external store updates (undo/redo) from
     // overwriting mid-edit content; the editor reseeds on lesson change.
+    // The stored objective carries a PLAIN-TEXT "I can " prefix (the
+    // app-wide convention) — the editor holds only the trailing text and
+    // the prefix is re-attached on commit, so downstream consumers that
+    // strip /^I can\s+/i or render the objective as plain text keep their
+    // contract.
     const [objectiveHtml, setObjectiveHtml] = useState<string>(
-      lesson.objective ?? "",
+      stripICanPrefix(lesson.objective ?? ""),
     );
     const objectiveEditingRef = useRef(false);
 
@@ -550,7 +471,7 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
     // When the selected lesson changes, reseed every editor from the new
     // lesson's fields and clear the editing guards.
     useEffect(() => {
-      setObjectiveHtml(lesson.objective ?? "");
+      setObjectiveHtml(stripICanPrefix(lesson.objective ?? ""));
       setNotesHtml(lesson.notes ?? "");
       setDiffHtml(lesson.differentiation ?? emptyDiff);
       objectiveEditingRef.current = false;
@@ -563,7 +484,8 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
     // if the teacher is not actively typing in it.
     const storeObjective = lesson.objective ?? "";
     useEffect(() => {
-      if (!objectiveEditingRef.current) setObjectiveHtml(storeObjective);
+      if (!objectiveEditingRef.current)
+        setObjectiveHtml(stripICanPrefix(storeObjective));
     }, [storeObjective]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const storeNotes = lesson.notes ?? "";
@@ -579,9 +501,12 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
     function handleObjectiveChange(html: string): void {
       objectiveEditingRef.current = true;
       setObjectiveHtml(html);
+      // Re-attach the "I can " prefix unless the field was cleared — the
+      // stored shape stays identical to the old I-CAN line's commits.
+      const trimmed = html.trim();
       editLesson(
         lesson.id,
-        { objective: html },
+        { objective: trimmed ? `I can ${trimmed}` : "" },
         { key: `lesson:${lesson.id}:objective`, ts: Date.now() },
       );
     }
@@ -615,20 +540,30 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
     function renderPaneContent(tool: PlanningToolKey): ReactNode {
       switch (tool) {
         case "objective":
+          // singleLine + the "I can" lead-in: the editor edits only the
+          // trailing objective text (the prefix is re-attached on commit),
+          // and Enter can't introduce block markup into a field other
+          // surfaces render as a single plain-text line.
           return (
             <div
-              className={styles.paneEditor}
+              className={`${styles.paneEditor} ${styles.objectiveRow}`}
               onBlurCapture={() => {
                 objectiveEditingRef.current = false;
               }}
             >
-              <RichTextEditor
-                value={objectiveHtml}
-                onChange={handleObjectiveChange}
-                placeholder="Add a lesson objective…"
-                ariaLabel="Lesson objective"
-                dockTarget={dockTarget}
-              />
+              <span className={styles.iCanLabel} aria-hidden="true">
+                I can
+              </span>
+              <div className={styles.objectiveEditor}>
+                <RichTextEditor
+                  value={objectiveHtml}
+                  onChange={handleObjectiveChange}
+                  singleLine
+                  placeholder="state the lesson objective…"
+                  ariaLabel="Lesson objective (completes “I can …”)"
+                  chromeless
+                />
+              </div>
             </div>
           );
         case "standards":
@@ -661,7 +596,7 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
                 onChange={handleNotesChange}
                 placeholder="Add private notes for yourself…"
                 ariaLabel="Teacher notes"
-                dockTarget={dockTarget}
+                chromeless
               />
             </div>
           );
@@ -688,7 +623,7 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
                       onChange={(html) => handleDiffChange(tier, html)}
                       placeholder={`Plan the ${label.toLowerCase()} tier…`}
                       ariaLabel={`Differentiation — ${label}`}
-                      dockTarget={dockTarget}
+                      chromeless
                     />
                   </div>
                 </div>

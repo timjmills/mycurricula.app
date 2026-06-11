@@ -127,9 +127,15 @@ export const PhaseResources = memo(function PhaseResources({
   onRenameResource,
   onRemoveResource,
 }: PhaseResourcesProps): ReactNode {
-  // The resource currently open in the shared enlarge preview, or null.
-  const [previewResource, setPreviewResource] =
-    useState<SectionResource | null>(null);
+  // The resource currently open in the shared enlarge preview — held BY ID
+  // and resolved from props each render, so a rename while the modal is
+  // open shows live data and a removal closes the modal instead of
+  // displaying a stale snapshot.
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const previewResource =
+    previewId != null
+      ? (resources.find((r) => r.id === previewId) ?? null)
+      : null;
 
   // The whole list is a droppable so a chip can land on an EMPTY phase.
   const { setNodeRef, isOver } = useDroppable({
@@ -176,7 +182,7 @@ export const PhaseResources = memo(function PhaseResources({
             <ResourceChip
               key={resource.id}
               resource={resource}
-              onOpenPreview={() => setPreviewResource(resource)}
+              onOpenPreview={() => setPreviewId(resource.id)}
               onEditNote={onEditNote ? () => onEditNote(resource) : undefined}
               onRename={(label) => onRenameResource(resource.id, label)}
               onRemove={() => onRemoveResource(resource.id)}
@@ -195,7 +201,7 @@ export const PhaseResources = memo(function PhaseResources({
       {previewResource && (
         <ResourcePreview
           resource={previewResource}
-          onClose={() => setPreviewResource(null)}
+          onClose={() => setPreviewId(null)}
         />
       )}
     </div>

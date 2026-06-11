@@ -408,12 +408,13 @@
   flex-direction: column;
 }
 
-/* ── Title row + Objective row — edit-affordance flex containers ────────
-   W3-C5: each editable text (title + I-can objective) sits inside a
-   flex row that also carries a visible PENCIL button. The pencil is
-   OUTSIDE the editable element itself so its hover/focus reveal scopes
-   to the whole row, and so it never falls inside any W2-B1 team-mode
-   edit-cue ring drawn on the text element.
+/* ── Title row — edit-affordance flex container ─────────────────────────
+   W3-C5: the editable title sits inside a flex row that also carries a
+   visible PENCIL button. The pencil is OUTSIDE the editable element
+   itself so its hover/focus reveal scopes to the whole row, and so it
+   never falls inside any W2-B1 team-mode edit-cue ring drawn on the
+   text element. (The "I can" objective row that used to share this
+   pattern moved into the planning panel's Objective pane.)
 
    Reveal behavior (see `.editPencil` below):
      • Desktop (>480px): pencil opacity 0 by default; opacity 1 when the
@@ -440,28 +441,6 @@
 .titleRow > .title {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-.objectiveRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  margin-top: 10px;
-}
-
-/* Same flex behavior for the objective paragraph — it expands to fill
-   the row, leaving the pencil pinned to the trailing edge. */
-.objectiveRow > .objective {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-/* The objective `<p>` carried its own `margin-top: 10px`; now that the
-   row supplies that spacing, neutralize the paragraph's top margin so
-   the row gap is the only vertical lift. */
-.objectiveRow .objective {
-  margin-top: 0;
 }
 
 /* ── Visible pencil edit affordance (W3-C5) ─────────────────────────────
@@ -500,9 +479,7 @@
 }
 
 .titleRow:hover .editPencil,
-.titleRow:focus-within .editPencil,
-.objectiveRow:hover .editPencil,
-.objectiveRow:focus-within .editPencil {
+.titleRow:focus-within .editPencil {
   opacity: 1;
 }
 
@@ -573,59 +550,18 @@
   background: color-mix(in srgb, currentColor 7%, transparent);
 }
 
-/* An empty objective shows a quiet, muted placeholder prompt — still a
-   double-click target so a teacher can add an objective to a lesson
-   that lacks one. */
-.objectiveEmpty {
-  color: var(--muted);
-  font-style: italic;
-}
-
 /* ── Rich-text editor hosting ────────────────────────────────────────────
    RichEditorWrapper — the shell hosting a RichTextEditor while the title
-   or objective is being edited. The editor's toolbar is docked
-   (position:fixed, portaled) and escapes this subtree; the wrapper just
-   occupies the field's normal flow box so the editor sits exactly where
-   the static text was. */
+   is being edited. The wrapper just occupies the field's normal flow box
+   so the editor sits exactly where the static text was; the sticky
+   RtToolbar at the top of the scroll body supplies the formatting
+   chrome (the editor renders chromeless). */
 .richEditorWrap {
   position: relative;
   display: inline-block;
   width: 100%;
   min-width: 0;
   vertical-align: top;
-}
-
-/* ── "I Can" objective — a quiet single line, no box ─────────────────────
-   `overflow-wrap: anywhere` keeps long objective text from blowing out
-   the readable column when the pane is narrow. A small lift below the
-   larger title hero keeps the objective on the same paragraph rhythm. */
-.objective {
-  margin: 10px 0 0;
-  font-size: var(--t-13);
-  line-height: 1.55;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-/* Small uppercase "I CAN" label in the subject color, inline with the
-   objective text. The label takes a faint subject-light pill wash so it
-   reads as a quiet highlighter pen mark on the page — the spec calls
-   for "the highlighter pill on I CAN" (kept from the previous build per
-   spec §5). */
-.objectiveLabel {
-  font-size: var(--t-11);
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: var(--cd, var(--ink-soft));
-  background: var(--cl, var(--hairline));
-  padding: 1px 6px;
-  border-radius: var(--r-4);
-  margin-right: 7px;
-}
-
-.objectiveText {
-  color: var(--ink-soft);
 }
 
 /* ── Action row ──────────────────────────────────────────────────────────
@@ -785,11 +721,160 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* The toggle row above the workspace — right-aligned, quiet chrome. */
-.agendaBar {
+/* ── Agenda section head (prototype .agendaSectionHead) ─────────────────
+   Drag grip (decorative) · "Lesson agenda" display title · right-aligned
+   actions cluster (Templates menu + Hide-navigation toggle). */
+.agendaSectionHead {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 26px 0 14px;
+}
+
+.sectionGrip {
+  display: inline-flex;
+  color: var(--faint);
+  opacity: 0.6;
+}
+
+.sectionGrip svg {
+  width: 14px;
+  height: 14px;
+}
+
+.agendaSectionTitle {
+  font-family: var(--font-display-sm);
+  font-size: var(--t-18);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.agendaActions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Templates menu (prototype .tmplWrap/.tmplBtn/.tmplMenu) ────────────
+   The button shares the agendaToggle's quiet-chrome recipe; the menu is
+   an absolutely-positioned popover listing the built-in lesson-flow
+   templates. Production addition: the menu scrolls past ~7 items (the
+   built-in library is larger than the prototype's sample list). */
+.tmplWrap {
+  position: relative;
+}
+
+.tmplBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+@media (hover: none) {
+  .tmplBtn {
+    min-height: 56px;
+    padding: 10px 14px;
+  }
+}
+
+.tmplBtn:hover {
+  color: var(--brand-600);
+  border-color: var(--brand-300);
+}
+
+.tmplBtn:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.tmplBtn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tmplMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 236px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
+  padding: 6px;
+}
+
+.tmplMenuLabel {
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 8px 10px 4px;
+}
+
+.tmplMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  min-height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-sm);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+@media (hover: none) {
+  .tmplMenuItem {
+    min-height: 48px;
+  }
+}
+
+.tmplMenuItem:hover {
+  background: var(--hairline);
+}
+
+.tmplMenuItem:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+}
+
+.tmplMenuItem svg {
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+/* Phase-count suffix on a template row, pushed to the trailing edge. */
+.tmShort {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--faint);
+  white-space: nowrap;
 }
 
 .agendaToggle {
@@ -827,10 +912,17 @@
 }
 
 /* Sticky inside the scrollable detail body (.body is the scroll
-   ancestor), so the navigator rides along while the flow scrolls. */
+   ancestor), so the navigator rides along while the flow scrolls.
+   top: 52px clears the sticky RtToolbar pinned at the top of the same
+   scroll context (prototype value). That assumes a ONE-ROW toolbar:
+   below 720px the toolbar's hint is hidden and its ~14 buttons need
+   ≈500px, while this sticky nav only exists while the JS-measured
+   content width is ≥560px (narrower flips .workspaceNarrow, which makes
+   the nav static) — so the toolbar cannot wrap while this offset is in
+   effect. Revisit if buttons are added to the toolbar. */
 .agendaNav {
   position: sticky;
-  top: 8px;
+  top: 52px;
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -850,10 +942,22 @@
   background: var(--surface);
   color: var(--ink-soft);
   cursor: pointer;
+  user-select: none;
   transition:
     border-color 0.14s ease,
     background 0.14s ease,
     box-shadow 0.14s ease;
+}
+
+/* Items are drag-reorderable — the grab cursor advertises it
+   (prototype `[draggable="true"]` rules). Renaming flips draggable off,
+   so the text cursor wins inside the input. */
+.agendaItem[draggable="true"] {
+  cursor: grab;
+}
+
+.agendaItem[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .agendaItem:hover {
@@ -864,6 +968,20 @@
 .agendaItem:focus-visible {
   outline: 2px solid var(--brand-500);
   outline-offset: 1px;
+}
+
+/* Touch devices: pad up to the ≥44px target rule (the detail card's
+   zoom: 0.8 shrinks rendered sizes, so the layout box compensates). */
+@media (hover: none) {
+  .agendaItem {
+    min-height: 60px;
+  }
+}
+
+/* The item mid-drag (prototype .agDragging). */
+.agendaItemDragging {
+  opacity: 0.45;
+  box-shadow: var(--sh-md);
 }
 
 .agendaNum {
@@ -881,8 +999,18 @@
   flex-shrink: 0;
 }
 
-.agendaName {
+/* Two-line text block: phase name above, minutes below (the time line
+   is simply not rendered when a phase has no minutes — the handoff's
+   optional-minutes rule, no dangling separator). */
+.agendaText {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.agendaName {
+  display: block;
   min-width: 0;
   font-size: var(--t-13);
   font-weight: 700;
@@ -891,6 +1019,34 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.agendaTime {
+  display: block;
+  font-size: var(--t-11);
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Inline rename input — swapped in for the name on double-click / F2.
+   Same metrics as the static name; brand focus ring per the prototype's
+   contenteditable focus rules. */
+.agendaNameInput {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+  border-radius: var(--r-4);
+  outline: 2px solid var(--brand-200);
+  outline-offset: 1px;
+  cursor: text;
 }
 
 .agendaChev {
@@ -921,6 +1077,74 @@
   color: var(--brand-500);
 }
 
+/* A completed phase tints its number circle with the done tokens. */
+.agendaItemDone .agendaNum {
+  background: var(--done-tint);
+  color: var(--done);
+  border-color: color-mix(in oklch, var(--done) 30%, transparent);
+}
+
+/* ── "Add phase" nav item (prototype .agendaAdd) ────────────────────────
+   Dashed quiet row closing the navigator; appends a phase through the
+   same store action as the flow's footer button. */
+.agendaAdd {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--t-12);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.14s ease,
+    color 0.14s ease,
+    background 0.14s ease;
+}
+
+@media (hover: none) {
+  .agendaAdd {
+    min-height: 60px;
+  }
+}
+
+.agendaAdd:hover {
+  border-color: var(--brand-300);
+  color: var(--brand-600);
+  background: var(--brand-50);
+}
+
+.agendaAdd:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.agendaAddIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border);
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.agendaAdd:hover .agendaAddIcon {
+  border-color: var(--brand-300);
+  color: var(--brand-600);
+}
+
+.agendaAddIcon svg {
+  width: 15px;
+  height: 15px;
+}
+
 /* Narrow center column → the navigator stacks above the flow as a
    horizontal strip. The dock columns resize independently of the
    viewport, so this is keyed on a JS-measured class (a ResizeObserver
@@ -942,7 +1166,8 @@
   scrollbar-width: thin;
 }
 
-.workspaceNarrow .agendaItem {
+.workspaceNarrow .agendaItem,
+.workspaceNarrow .agendaAdd {
   flex: 0 0 auto;
   width: auto;
   min-width: 148px;
@@ -962,114 +1187,6 @@
   min-width: 0;
 }
 
-/* ── Section blocks (standards / notes) ─────────────────────────────────
-   Clean content on white. Generous, even space between each block so
-   the panel reads with a calm vertical rhythm. */
-.section {
-  margin-top: 28px;
-}
-
-/* Section heading — bold subject-color text seated in a little BANNER,
-   the same highlighter treatment as <LessonFlow>'s section headings so
-   the whole detail panel reads consistently. Echoes the Weekly card's
-   `.band`:
-     • the band is a subject-light highlighter wash (var(--cl)) with the
-       same long horizontal fade tail as the lesson-flow headings — it
-       shrink-wraps to the heading text (`inline-flex` + `width:
-       fit-content`) rather than stretching the full row, so it stays a
-       banner, not a full-width bar;
-     • a faint vertical subject wash gives it gentle banner weight;
-     • a single multi-layer box-shadow carries a 2px inset colored SEAM
-       at the bottom edge plus a soft subject-tinted DROP SHADOW falling
-       DOWNWARD into the white body.
-   All color via the --c / --cd / --cl cascade; no hard-coded values. */
-.sectionHead {
-  display: inline-flex;
-  max-width: 100%;
-  min-width: 0;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin: 0 0 13px;
-  padding: 3px min(9em, 28%) 4px 9px;
-  font-family: var(--font-display-sm);
-  font-size: var(--t-14);
-  font-weight: 800;
-  letter-spacing: -0.1px;
-  color: var(--cd, var(--ink));
-  border-radius: var(--r-xs);
-  background:
-    linear-gradient(
-      to right,
-      var(--cl, var(--hairline)) 0,
-      var(--cl, var(--hairline)) calc(100% - min(8.4em, 26%)),
-      transparent 100%
-    ),
-    linear-gradient(
-      to bottom,
-      transparent 0,
-      color-mix(in oklch, var(--cd, var(--faint)) 7%, transparent) 100%
-    );
-  box-shadow:
-    inset 0 -2px 0 0
-      color-mix(in oklch, var(--cd, var(--faint)) 32%, transparent),
-    0 1px 4px color-mix(in oklch, var(--cd, var(--faint)) 12%, transparent);
-}
-
-/* Small count suffix beside a heading — quieter than the heading itself. */
-.sectionCount {
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: color-mix(in oklch, var(--cd, var(--muted)) 60%, transparent);
-}
-
-/* ── Teacher notes editor wrapper ───────────────────────────────────────
-   The notes are ALWAYS visible — there is no hover-to-reveal blur. The
-   editor sits directly on the white body, no border, no fill. */
-.notesWrap {
-  /* Plain flow box; nothing to style beyond its place in the column. */
-}
-
-/* ── Standards — inline rows on white, no filled box ────────────────────
-   A code chip (the only small fill — it reads as a label, matching the
-   subject-tint chip language used elsewhere) followed by the
-   description directly on the white surface. */
-.standardsList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.standardItem {
-  display: flex;
-  gap: 9px;
-  /* Keep the row flex-shrinkable so very long standards descriptions
-     wrap instead of pushing the column wider. */
-  min-width: 0;
-}
-
-/* Subject-tinted standard code chip — a small content accent. */
-.standardCode {
-  font-size: var(--t-11);
-  font-weight: 600;
-  color: var(--cd, var(--ink-soft));
-  background: var(--cl, var(--hairline));
-  padding: 2px 6px;
-  border-radius: var(--r-4);
-  flex-shrink: 0;
-  height: fit-content;
-  margin-top: 1px;
-}
-
-.standardDesc {
-  flex: 1 1 0;
-  min-width: 0;
-  font-size: var(--t-12);
-  color: var(--ink-soft);
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
-
 /* ── Reduced motion ──────────────────────────────────────────────────────
    Transitions stripped to near-instant under prefers-reduced-motion. */
 @media (prefers-reduced-motion: reduce) {
@@ -1080,7 +1197,10 @@
   .notesLink,
   .editPencil,
   .agendaItem,
-  .agendaChev {
+  .agendaAdd,
+  .agendaChev,
+  .agendaToggle,
+  .tmplBtn {
     transition: none;
   }
 

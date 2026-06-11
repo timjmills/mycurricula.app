@@ -734,6 +734,13 @@ export function RichTextEditor({
       // is acceptable because the content itself changed underneath the teacher.
       el.innerHTML = sanitizeHtml(value);
       lastWrittenRef.current = value;
+      // An external rewrite invalidates the last-emit baseline. Without
+      // this, undo (external rewrite to the older value) followed by redo
+      // (back to a value that EQUALS the stale last emit) would skip the
+      // rewrite above and leave a mounted editor showing the undone
+      // content — the next keystroke would then emit the stale DOM and
+      // silently destroy the redone value.
+      lastEmittedRef.current = value;
     }
     setEmpty(isEditorEmpty(el));
   }, [value]);
@@ -1289,7 +1296,9 @@ export function RichTextEditor({
     commandImplRef.current = { runCommand, runLink, runImage };
   });
   // Registers on focus / unregisters on blur. No-op unless chromeless.
-  useRichTextCommandTarget(editorRef, commandImplRef, chromeless);
+  // singleLine editors advertise no block-command support so the external
+  // toolbar disables formatBlock/list/indent/image against them.
+  useRichTextCommandTarget(editorRef, commandImplRef, chromeless, !singleLine);
 
   // ── Insert embed (YouTube / Vimeo / Google) ─────────────────────────────
   // Prompt for a URL, run it through parseResourceUrl, and insert a sanitized
