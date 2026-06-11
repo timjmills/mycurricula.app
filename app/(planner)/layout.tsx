@@ -4,6 +4,7 @@ import { CatchupProvider } from "@/lib/catchup-state";
 import { ConsequenceToastProvider } from "@/lib/consequence-toast";
 import { NotebookProvider } from "@/lib/notebook-state";
 import { PlannerProvider } from "@/lib/planner-store";
+import { UndoToastProvider } from "@/lib/undo-toast";
 import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
   GlobalShortcuts,
@@ -48,67 +49,72 @@ export default function PlannerLayout({
               dismissals, and per-item action overlays.
               ConsequenceToastProvider hosts the W2-B8 toast surface so
               team-scoped settings can fire a transient confirmation
-              naming the team-wide effect. */}
+              naming the team-wide effect.
+              UndoToastProvider hosts the roadmap-02 undo toast for
+              personal planner gestures (move / complete / first fork /
+              revert) and confirmation-only moments ("Link copied"). */}
           <ConsequenceToastProvider>
-            <UnitNotesProvider>
-              <CatchupProvider>
-                {/* Skip-to-content (A11Y-004) — must be the first focusable element
+            <UndoToastProvider>
+              <UnitNotesProvider>
+                <CatchupProvider>
+                  {/* Skip-to-content (A11Y-004) — must be the first focusable element
                   in the DOM so keyboard users reach it before the top-bar chrome. */}
-                <a href="#main-content" className={styles.skipLink}>
-                  Skip to content
-                </a>
-                <div
-                  className="cp-root"
-                  style={{
-                    flex: 1,
-                    minHeight: 0,
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                >
-                  {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
+                  <a href="#main-content" className={styles.skipLink}>
+                    Skip to content
+                  </a>
+                  <div
+                    className="cp-root"
+                    style={{
+                      flex: 1,
+                      minHeight: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
                     Mounted as a client leaf so the layout stays a Server Component. */}
-                  <GlobalShortcuts />
-                  {/* v1.3 shell: an app-wide left SideNav (primary navigation,
+                    <GlobalShortcuts />
+                    {/* v1.3 shell: an app-wide left SideNav (primary navigation,
                     replacing the old top-bar tabs + icon rails) and a content
                     column holding the Team-Curriculum banner, the slimmed top
                     bar, and the body row (left filter panel + canvas + right
                     panel). Teach is a separate route group with its own chrome. */}
-                  <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-                    <SideNav />
-                    <div
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        minHeight: 0,
-                        display: "flex",
-                        flexDirection: "column",
-                      }}
-                    >
-                      {/* Team Curriculum mode heads-up → persistent banner. Renders
+                    <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+                      <SideNav />
+                      <div
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          minHeight: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                        }}
+                      >
+                        {/* Team Curriculum mode heads-up → persistent banner. Renders
                         only while the Team Curriculum edit mode (internal value:
                         "master") is active; pins above the top bar. */}
-                      <MasterBanner />
-                      <TopBar />
-                      <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-                        <main
-                          id="main-content"
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            minHeight: 0,
-                            overflow: "auto",
-                          }}
-                        >
-                          {children}
-                        </main>
-                        <RightPanel />
+                        <MasterBanner />
+                        <TopBar />
+                        <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+                          <main
+                            id="main-content"
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                              minHeight: 0,
+                              overflow: "auto",
+                            }}
+                          >
+                            {children}
+                          </main>
+                          <RightPanel />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </CatchupProvider>
-            </UnitNotesProvider>
+                </CatchupProvider>
+              </UnitNotesProvider>
+            </UndoToastProvider>
           </ConsequenceToastProvider>
         </PlannerProvider>
       </NotebookProvider>

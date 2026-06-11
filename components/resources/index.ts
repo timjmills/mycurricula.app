@@ -7,3 +7,5 @@ export { ResourcePreview } from "./ResourcePreview";
 export type { ResourcePreviewProps } from "./ResourcePreview";
 export { PreviewAnnotation } from "./PreviewAnnotation";
 export type { PreviewAnnotationProps } from "./PreviewAnnotation";
+export { ResourceCardFace } from "./ResourceCardFace";
+export type { ResourceCardFaceProps } from "./ResourceCardFace";

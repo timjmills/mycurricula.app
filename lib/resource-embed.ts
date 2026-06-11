@@ -275,3 +275,96 @@ export function parsedToLegacyType(
       return "website";
   }
 }
+
+// ── canEmbedResource — the single embed authority (6.12.26 redesign P5) ───
+//
+// ONE predicate decides iframe/native-embed vs. the designed link-card
+// fallback. Tiles, the Resources panel, and the preview pane all consult
+// this function, so a blank/broken iframe can never render: when this
+// returns false the caller draws the link card — always a safe render.
+//
+// Fail-closed by construction: any uncertainty (missing url, unknown
+// scheme, a throw anywhere inside) yields false.
+
+/** Why a resource cannot embed. `null` means it CAN embed.
+ *  "unsafe-scheme" = javascript:/data:/file:/protocol-relative — never
+ *  framed; "not-embeddable" = a safe URL that only merits a link card. */
+export type EmbedDenialReason = "no-url" | "unsafe-scheme" | "not-embeddable";
+
+/** Same-origin root-relative path (hosted "/api/resources/{id}" streams).
+ *  Rejects protocol-relative ("//host") and backslash tricks ("/\host")
+ *  that browsers normalize to a foreign origin — same guard as the
+ *  renderer's isSafeUrl in components/resources/ResourceEmbed.tsx. */
+const ROOT_RELATIVE = /^\/(?![/\\])/;
+
+/** True when the mime type / provider says the row is directly renderable
+ *  media (img / video / audio / pdf viewer) rather than an arbitrary page. */
+function isMediaKind(resource: LessonResource): boolean {
+  const mime = resource.mimeType?.toLowerCase() ?? "";
+  if (
+    mime.startsWith("image/") ||
+    mime.startsWith("video/") ||
+    mime.startsWith("audio/") ||
+    mime === "application/pdf"
+  ) {
+    return true;
+  }
+  const p = resource.provider;
+  return p === "image" || p === "video" || p === "audio" || p === "pdf";
+}
+
+/** Shared classifier behind `canEmbedResource` / `embedDenialReason`. */
+function classifyEmbed(resource: LessonResource): EmbedDenialReason | null {
+  // A notecard / gallery container is not itself embeddable — its gallery
+  // items are evaluated per-item by the gallery renderer.
+  if (resource.type === "notecard") return "not-embeddable";
+
+  // Legacy fixture rows carry no URL — synthetic glyph only, never a frame.
+  if (!resource.url) return "no-url";
+  const url = resource.url.trim();
+  if (!url) return "no-url";
+
+  // Hosted rows stream from our own origin ("/api/resources/{id}", with
+  // `resourceId` set). parseResourceUrl rejects non-http(s) input, so
+  // root-relative URLs are handled HERE, before delegating: the same-origin
+  // stream always embeds when it is real media.
+  if (ROOT_RELATIVE.test(url)) {
+    return isMediaKind(resource) ? null : "not-embeddable";
+  }
+
+  // Everything else must be http(s) — javascript:, data:, file:, and
+  // protocol-relative URLs never get a frame (§4a review L8: labeled as
+  // a scheme failure, not a host failure, so fallback copy/telemetry
+  // built on this taxonomy stays truthful).
+  if (!SAFE_SCHEME.test(url)) return "unsafe-scheme";
+
+  // Trusted-provider / direct-media taxonomy (youtube, vimeo, the Google
+  // docs family, direct media extensions ⇒ true; generic website ⇒ false).
+  return parseResourceUrl(url).canEmbed ? null : "not-embeddable";
+}
+
+/**
+ * True only when the renderer can draw REAL embedded content for this
+ * resource — an iframe player/preview or a native img/video/audio/pdf —
+ * never a bare link. False ⇒ render the designed link-card fallback.
+ */
+export function canEmbedResource(resource: LessonResource): boolean {
+  try {
+    return classifyEmbed(resource) === null;
+  } catch {
+    // Fail closed — the link card is always a safe render.
+    return false;
+  }
+}
+
+/** The reason `canEmbedResource` said no, for fallback-card copy/telemetry.
+ *  `null` when the resource can embed. */
+export function embedDenialReason(
+  resource: LessonResource,
+): EmbedDenialReason | null {
+  try {
+    return classifyEmbed(resource);
+  } catch {
+    return "not-embeddable";
+  }
+}

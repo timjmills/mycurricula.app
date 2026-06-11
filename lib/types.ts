@@ -96,6 +96,12 @@ export interface LessonResource {
    *  any resource type. `gallery[0]` is the poster. Flat by convention —
    *  gallery items never carry their own `gallery`. */
   gallery?: LessonResource[];
+  /** Teacher's per-card color override (6.12.26 redesign §0 "card color").
+   *  Absent = subject tint (the vivid default). `"paper"` = white body. A
+   *  number selects that `--subj-<n>-tint` pastel. Only the card BODY is
+   *  washed — the header band + left stripe stay subject-locked. Additive
+   *  and JSONB-safe like `body`/`gallery`. */
+  wash?: "paper" | number;
 }
 
 /** Provider tag computed from the resource URL — narrows the renderer's
