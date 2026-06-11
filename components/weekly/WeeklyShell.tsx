@@ -69,6 +69,25 @@
 // Space lifts, arrows move, Space/Enter drops, Esc cancels. The rail
 // wrapper carries an aria-label. Reduced motion is honored by the consumed
 // components and by the drag ghost (transform: none under reduced-motion).
+//
+// ── Deep links (UX roadmap item 07) ────────────────────────────────────
+// Two halves, both speaking lib/deep-links' frozen scheme:
+//
+//   READ  — app/(planner)/weekly/page.tsx parses `?week=…&subject=…&
+//           lesson=…&grade=…` server-side and passes `initialLink`. A
+//           once-on-mount effect applies it: jump to the week, set the
+//           subject filter, and when a lesson id resolves open its detail
+//           (selectedLessonId → the right rail / drawer) and container-
+//           scroll its card into view via the store's house helper
+//           scrollPlannerItemIntoView (the same mechanism WeeklyGrid uses
+//           for its lastChange effect).
+//   WRITE — as the teacher navigates weeks / changes the subject filter /
+//           opens a lesson detail, an effect mirrors that SHAREABLE state
+//           into the URL with router.replace (never push — no history
+//           spam), skipping when the URL already matches. Ephemeral state
+//           (open menus, panel sizes, selection-free scroll) never enters
+//           the URL, and links never encode Personal/Master mode — each
+//           viewer resolves Personal-first per the forking model.
 
 import {
   Fragment,
@@ -95,6 +114,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useRouter } from "next/navigation";
 import { IconRail, PaneSplitter, RightRail } from "@/components/daily";
 import { WeeklyGrid, WeekNavigator } from "@/components/grid";
 import { WeeklyList } from "@/components/list";
@@ -104,7 +124,8 @@ import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
 import { useAppState } from "@/lib/app-state";
 import { useWeeklyScheduleMode } from "@/lib/weekly-schedule-state";
 import { useDndSensors } from "@/lib/collapse-on-drag";
-import { usePlanner } from "@/lib/planner-store";
+import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
+import { buildWeeklyLink, type WeeklyLink } from "@/lib/deep-links";
 import { CURRENT_WEEK } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
 import styles from "./WeeklyShell.module.css";
@@ -462,7 +483,23 @@ const DRAWER_MQ = "(max-width: 1280px)";
 
 // ── WeeklyShell ──────────────────────────────────────────────────────────
 
-export function WeeklyShell(): ReactNode {
+export interface WeeklyShellProps {
+  /** Parsed `/weekly?week=…` deep link from the route page (UX roadmap
+   *  item 07). Applied ONCE on mount: navigate to the week, set the
+   *  subject filter, and — when `lesson` resolves — open that lesson's
+   *  detail and container-scroll its card into view. Absent on a plain
+   *  `/weekly` visit. */
+  initialLink?: WeeklyLink;
+}
+
+/** buildWeeklyLink throws on a week its own parser rejects (1–99). The
+ *  write-side URL sync guards with the same bounds so a transient or
+ *  out-of-range week state can never crash the effect. */
+function isSyncableWeek(week: number): boolean {
+  return Number.isInteger(week) && week >= 1 && week <= 99;
+}
+
+export function WeeklyShell({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // The active week + day are shared planner state — same source the
   // <WeeklyGrid> already reads. We don't pin a local copy here; the
   // RightRail just needs the current value to scope its Resources +
@@ -486,12 +523,15 @@ export function WeeklyShell(): ReactNode {
     selectedLessonId,
     setSelectedLessonId,
     viewMode,
+    filters,
+    updateFilters,
     todoPanelOpen,
     commentsPanelOpen,
     toggleTodoPanel,
     toggleCommentsPanel,
   } = useAppState();
-  const { lessons } = usePlanner();
+  const { lessons, activeGradeId } = usePlanner();
+  const router = useRouter();
 
   // Inline schedule-mode state (Subject↔Schedule + Lessons-only↔All). Lives
   // in localStorage so a teacher's choice survives across sessions. The
@@ -568,16 +608,16 @@ export function WeeklyShell(): ReactNode {
   //    so it only recomputes when lessons are added/removed. Falls back to
   //    the current week when there are no lessons (empty fixture) so the
   //    navigator never produces NaN bounds. */
-  const { minWeek, maxWeek } = useMemo<{ minWeek: number; maxWeek: number }>(
-    () => {
-      if (lessons.length === 0) {
-        return { minWeek: CURRENT_WEEK, maxWeek: CURRENT_WEEK };
-      }
-      const weeks = lessons.map((l) => l.week);
-      return { minWeek: Math.min(...weeks), maxWeek: Math.max(...weeks) };
-    },
-    [lessons],
-  );
+  const { minWeek, maxWeek } = useMemo<{
+    minWeek: number;
+    maxWeek: number;
+  }>(() => {
+    if (lessons.length === 0) {
+      return { minWeek: CURRENT_WEEK, maxWeek: CURRENT_WEEK };
+    }
+    const weeks = lessons.map((l) => l.week);
+    return { minWeek: Math.min(...weeks), maxWeek: Math.max(...weeks) };
+  }, [lessons]);
 
   // ── Selected lesson object — resolves selectedLessonId → Lesson | null ─
   // When a card is selected the Resources panel scopes to that lesson;
@@ -590,6 +630,101 @@ export function WeeklyShell(): ReactNode {
         : null,
     [selectedLessonId, weekLessons],
   );
+
+  // ── Deep link READ — apply `initialLink` once on mount ────────────────
+  // The lesson card to container-scroll once the target week's grid has
+  // painted. Held as state (not a ref) so the scroll effect below re-runs
+  // when the week's lessons render.
+  const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initialLink) return;
+    // When the link names a lesson that still exists, the LESSON's week is
+    // authoritative — a lesson moved after the link was shared should still
+    // be found (strict-but-forgiving, same spirit as the parsers).
+    //
+    // PHASE-1B: with the Supabase flag ON, `lessons` hydrates async and is
+    // (or may be) EMPTY at mount time — this mount-only resolution would
+    // then misread every `?lesson=` as "gone" and drop the link's lesson
+    // focus. The 1B wave must gate this apply on the store's
+    // hydration-ready signal (resolve `initialLink.lesson` once, after
+    // lessons have loaded) instead of at mount. Mock data is synchronous
+    // today (lib/mock/), so the mount-time read is safe in Phase 1A.
+    const target = initialLink.lesson
+      ? (lessons.find((l) => l.id === initialLink.lesson) ?? null)
+      : null;
+    setWeek(target?.week ?? initialLink.week);
+    if (initialLink.subject) {
+      updateFilters({ subjects: [initialLink.subject] });
+    }
+    if (target) {
+      // Open the detail surface (right rail on desktop, overlay drawer in
+      // the 901–1280 band) and queue the container scroll for when the
+      // card exists in the DOM. An id that does NOT resolve in the store
+      // never reaches setSelectedLessonId / setPendingScrollId — a stale
+      // share degrades to "right week, no selection" (§4a L4).
+      setSelectedLessonId(target.id);
+      setPendingScrollId(target.id);
+    }
+    // Mount-only by design: the link is the page's INITIAL state; later
+    // navigation must never re-apply it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Container-scroll the deep-linked card into view once it is rendered in
+  // the active week. Reuses the store's house scroll mechanism — the same
+  // data-planner-item lookup WeeklyGrid's lastChange effect uses — so the
+  // grid's own scroll container moves, never the document. rAF defers to
+  // after paint so the freshly-switched week has its final layout.
+  useEffect(() => {
+    if (!pendingScrollId) return;
+    if (!weekLessons.some((l) => l.id === pendingScrollId)) {
+      // Target absent from the rendered week (archived / filtered out /
+      // moved between share and open). Once the week has ANY lessons we
+      // know the absence is real rather than a pre-render frame, so clear
+      // the pending id — otherwise this effect re-runs on every
+      // weekLessons identity change forever (§4a L4). An empty week keeps
+      // the id pending so lessons that are still arriving can match.
+      if (weekLessons.length > 0) setPendingScrollId(null);
+      return;
+    }
+    const id = pendingScrollId;
+    const raf = requestAnimationFrame(() => scrollPlannerItemIntoView(id));
+    setPendingScrollId(null);
+    return () => cancelAnimationFrame(raf);
+  }, [pendingScrollId, weekLessons]);
+
+  // ── Deep link WRITE — mirror shareable state into the URL ─────────────
+  // Shareable state ONLY: the active week, the subject filter (when it is
+  // exactly one subject — the only shape the link scheme carries), the
+  // open lesson detail, and the active grade (grade scoping is always an
+  // explicit param, never assumed — CLAUDE.md §1). Ephemeral state (open
+  // menus, panel widths, drag state) stays out. Guards against replace
+  // loops two ways: the first run after mount is skipped (the URL the
+  // teacher loaded is already correct), and a replace only fires when the
+  // built URL differs from what the address bar shows.
+  const skippedFirstUrlSyncRef = useRef(false);
+  useEffect(() => {
+    if (!skippedFirstUrlSyncRef.current) {
+      skippedFirstUrlSyncRef.current = true;
+      return;
+    }
+    if (!isSyncableWeek(week)) return;
+    const subject =
+      filters.subjects.length === 1 ? filters.subjects[0] : undefined;
+    const href = buildWeeklyLink({
+      week,
+      subject,
+      lesson: selectedLesson?.id,
+      grade: activeGradeId ?? undefined,
+    });
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (current !== href) {
+      // replace, never push — week-to-week browsing must not bloat the
+      // Back button; the URL is a live mirror, not a navigation log.
+      router.replace(href, { scroll: false });
+    }
+  }, [week, filters.subjects, selectedLesson, activeGradeId, router]);
 
   // ── Right-rail width — state + post-mount hydration ──────────────────
   // Initialize to the DEFAULT (not localStorage) so the server-rendered

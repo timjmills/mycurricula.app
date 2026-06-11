@@ -76,7 +76,9 @@
 import { useState, useEffect, useRef } from "react";
 import type { ReactNode, SyntheticEvent } from "react";
 import type { Lesson } from "@/lib/types";
-import { lessonTime } from "@/lib/mock";
+import { dateForWeekDay, lessonTime } from "@/lib/mock";
+import { buildDailyLink } from "@/lib/deep-links";
+import { useCopyLink } from "@/lib/use-copy-link";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
 import { usePlanner } from "@/lib/planner-store";
@@ -214,8 +216,33 @@ export function LessonDetail({
   // Subject metadata comes from the planner store's catalog (frozen API),
   // not lib/mock — safe here, LessonDetail only renders under the (planner)
   // /daily route (PlannerProvider present).
-  const { editLesson, subjectById } = usePlanner();
+  const { editLesson, subjectById, activeGradeId } = usePlanner();
   const subj = subjectById[lesson.subject];
+
+  // ── Header copy-link (UX roadmap item 07) ────────────────────────────
+  // Builds the lesson's daily deep link — `/daily?date=YYYY-MM-DD&lesson=…
+  // &grade=…` — via the frozen lib/deep-links builder, then copies it as an
+  // absolute URL with the shared useCopyLink gesture ("Link copied" toast).
+  // The date derives from the lesson's week + day through the same
+  // calendar helper the day strip uses, formatted as LOCAL YYYY-MM-DD
+  // (never toISOString — see lib/use-academic-year.ts). Links never encode
+  // Personal/Master mode: every viewer resolves Personal-first.
+  const copyLink = useCopyLink();
+  function handleCopyLink(): void {
+    const d = dateForWeekDay(lesson.week, lesson.day);
+    const date = [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, "0"),
+      String(d.getDate()).padStart(2, "0"),
+    ].join("-");
+    void copyLink(
+      buildDailyLink({
+        date,
+        lesson: lesson.id,
+        grade: activeGradeId ?? undefined,
+      }),
+    );
+  }
 
   // ── Docked-toolbar target ref ────────────────────────────────────────
   // cellRef is attached to the scrollable detail body region — the "cell"
@@ -445,6 +472,30 @@ export function LessonDetail({
         <div className={detailStyles.bandRight}>
           <p className={detailStyles.bandTime}>{timeLabel}</p>
           <div className={detailStyles.bandIcons}>
+            <Button
+              variant="icon"
+              iconAriaLabel="Copy link to this lesson"
+              className={detailStyles.bandIconBtn}
+              tooltip="Copy a shareable link to this lesson — teammates who open it see their own version of the plan"
+              onClick={handleCopyLink}
+            >
+              {/* Chain-link glyph — copy-link per UX roadmap item 07. */}
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M6.5 9.5 9.5 6.5M7.2 4.4l1.4-1.4a2.5 2.5 0 0 1 3.5 0l.9.9a2.5 2.5 0 0 1 0 3.5l-1.4 1.4M8.8 11.6l-1.4 1.4a2.5 2.5 0 0 1-3.5 0l-.9-.9a2.5 2.5 0 0 1 0-3.5l1.4-1.4"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Button>
             <Button
               variant="icon"
               iconAriaLabel="More options"

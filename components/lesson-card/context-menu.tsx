@@ -25,6 +25,9 @@ import {
 import { useRouter } from "next/navigation";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { Button } from "@/components/ui";
+import { buildWeeklyLink } from "@/lib/deep-links";
+import { useCopyLink } from "@/lib/use-copy-link";
+import { useCatalogOptional } from "@/lib/planner-store";
 import { Icon } from "./icon";
 import { STATUS_LABEL } from "./status";
 // RelocatePicker, CompareToMaster, ArchiveToast are imported by the
@@ -114,6 +117,11 @@ export function LessonContextMenu({
   const [sub, setSub] = useState<Submenu>(null);
   const [pos, setPos] = useState({ x, y });
   const router = useRouter();
+  // Copy-link wiring (UX roadmap item 07). Both hooks are provider-OPTIONAL
+  // because this menu also renders in the Settings → Appearance preview,
+  // which mounts lesson cards with no planner-shell providers.
+  const copyLink = useCopyLink();
+  const { activeGradeId } = useCatalogOptional();
 
   // Clamp the menu inside the viewport once it has measured itself.
   useLayoutEffect(() => {
@@ -177,6 +185,25 @@ export function LessonContextMenu({
         tip: "Switch to Daily view with this lesson opened in the detail pane",
         onSelect: () => {
           router.push(`/daily?lesson=${lesson.id}`);
+          onClose();
+        },
+      },
+      {
+        label: "Copy link",
+        tip: "Copy a shareable link to this lesson — teammates who open it see their own version of the plan",
+        onSelect: () => {
+          // Self-contained like "Open in Daily" above — no onAction round
+          // trip, so every host of this menu gets Copy-link for free.
+          // buildWeeklyLink emits the root-relative deep link; useCopyLink
+          // prepends location.origin and confirms via the undo toast.
+          void copyLink(
+            buildWeeklyLink({
+              week: lesson.week,
+              subject: lesson.subject,
+              lesson: lesson.id,
+              grade: activeGradeId ?? undefined,
+            }),
+          );
           onClose();
         },
       },
