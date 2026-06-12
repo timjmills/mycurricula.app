@@ -45,7 +45,7 @@
 //
 // Right rail (<RightRail>): top to bottom — a Resources panel for the
 //   selected lesson, a Today's to-dos panel, and a Day Shoutbox panel. The
-//   Resources panel reuses <ResourceTile> from "@/components/lesson-flow"
+//   Resources panel renders its own tile faces (see ResourcesPanel.tsx)
 //   for its grid view and offers a list view + category tabs (All / Slides
 //   / Handouts / Tools). The to-dos and shoutbox panels are the same
 //   components that used to live in <LeftRail>, now at home in the right

@@ -3,15 +3,6 @@
 export { LessonFlow } from "./lesson-flow";
 export type { LessonFlowProps } from "./lesson-flow";
 
-// ResourceTile + ResourceLinkPreview are consumed internally by
-// lesson-flow.tsx; exported here so the folder's public surface stays
-// discoverable from one barrel.
-export { ResourceTile, ResourceLinkPreview } from "./resource-tile";
-export type {
-  ResourceTileProps,
-  ResourceLinkPreviewProps,
-} from "./resource-tile";
-
 // SectionResources owns each section's resources area (expanded ↔ minimized
 // states + per-(lesson,section) localStorage persistence).
 export { SectionResources } from "./section-resources";

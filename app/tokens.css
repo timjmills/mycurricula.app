@@ -711,6 +711,15 @@
   --z-rail: 20;
   --z-topbar: 30;
   --z-banner: 40;
+  /* Overlay tiers (6.12.26 resource redesign — additive). Above all sticky
+     chrome (banner = 40), below the undo toast (1200, UndoToast.module.css):
+       --z-drawer        slide-in drawer scrims (Resources drawer)
+       --z-drawer-panel  the drawer panel itself, one above its scrim
+       --z-menu          portaled overflow/context menus — must float over an
+                         open drawer, hence above --z-drawer-panel */
+  --z-drawer: 500;
+  --z-drawer-panel: 501;
+  --z-menu: 1000;
 
   --line: 1px solid var(--ink-150);
   --line-strong: 1px solid var(--ink-200);

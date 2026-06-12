@@ -1,34 +1,19 @@
 "use client";
 
-// resource-type-pill.tsx — the small TYPE PILL shown beside each resource in
-// the "More resources" sub-list (expanded SectionResources card) and the
-// "Resource quick access" minimized card.
+// resource-type-pill.tsx — the small uppercase TYPE TAG shown beside each
+// resource in the "More resources" sub-list (expanded SectionResources card)
+// and the "Resource quick access" minimized card.
 //
-// NOT migrated to Badge primitive — by design.
+// Restyled for the 6.12.26 Resource & Notecard Redesign §2: the tag now
+// wears the handoff's `.rn-typeTag` treatment (quiet muted uppercase word,
+// no colored pill chrome — see resource_redesign/rn.css). The colorful
+// per-type identity moved to the compact rows' 30px type-tinted icon tiles
+// (the th-* token pairs), so the tag itself stays quiet. The component name
+// and props are unchanged for API stability.
 //
-// The Badge primitive uses the semantic palette (success/info/warn/danger/
-// neutral) and derives background + text from design tokens. The resource-
-// type pills use EXACT HEX color pairs mandated by the spec (Plugin
-// Directions §4.4) as the published visual language for resource types:
-//
-//   VIDEO    #fce7f3 / #9d174d
-//   DOCX     #dbeafe / #1e40af
-//   PDF      #fee2e2 / #991b1b
-//   LINK     #f3f4f6 / #374151
-//   SLIDES   #fef3c7 / #92400e
-//   IMAGE    #dcfce7 / #166534
-//
-// These pairs are bespoke, spec-locked, and not expressible through the
-// token system without adding six new token groups. Badge does not accept a
-// raw hex pair; adding a "resource" variant would bleed domain-specific
-// knowledge into a generic primitive. The correct solution (when the design
-// matures) is a subject-neutral ResourceTypePill primitive in components/ui/
-// that accepts a colorway prop — not retrofitting Badge. Until then, this
-// component stays bespoke and explicitly documented as such.
-//
-// The pill is purely decorative — the surrounding resource row already names
-// the resource via its title/URL subtitle, so the pill is just a quick visual
-// type tag. aria-hidden so it never bloats the accessible name.
+// The tag is purely decorative — the surrounding resource row already names
+// the resource via its title, so the tag is just a quick visual type cue.
+// aria-hidden so it never bloats the accessible name.
 
 import type { ReactNode } from "react";
 import type { SectionResource } from "@/lib/lesson-flow";
@@ -81,8 +66,8 @@ function labelFor(kind: PillKind): string {
   }
 }
 
-/** The pill. Plain inline element; `data-kind` keyed for CSS to paint the
- *  exact spec hex color pair. */
+/** The tag. Plain inline element; `data-kind` is kept on the DOM for
+ *  styling hooks / tests even though the redesigned tag is monochrome. */
 export function ResourceTypePill({ type }: ResourceTypePillProps): ReactNode {
   const kind = pillKindFor(type);
   return (

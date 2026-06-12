@@ -34,6 +34,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { ToggleGroup, Tooltip } from "@/components/ui";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
@@ -47,7 +48,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import type { Lesson } from "@/lib/types";
-import { ResourcesPanel } from "./ResourcesPanel";
+import { ResourcesPanel, ResourcesDrawer } from "./ResourcesPanel";
 import { TodayTodos } from "./TodayTodos";
 import { Shoutbox } from "./Shoutbox";
 import { PaneSplitter } from "./PaneSplitter";
@@ -582,6 +583,10 @@ export function RightRail({
       ? "Week resources and day planning"
       : "Lesson resources and day planning";
 
+  // Route flag for the narrow-viewport Resources drawer below — only the
+  // Daily view needs it (Weekly's rail content has WeeklyRailDrawer).
+  const isDailyRoute = usePathname()?.startsWith("/daily") ?? false;
+
   // ── Mode toggle control — rendered in both modes as a compact ToggleGroup.
   // In tabbed mode it sits alongside the tab strip; in stacked mode it appears
   // in a thin header bar above the panels.
@@ -625,6 +630,15 @@ export function RightRail({
       className={`${styles.rail} cp-subj ${subjectClass}`}
       aria-label={railAriaLabel}
     >
+      {/* ── Narrow-viewport drawer (6.12.26 redesign §1) ─────────────────
+          The Daily rail folds away at ≤960px; <ResourcesDrawer> re-surfaces
+          the Resources panel as a right drawer (portaled, so the fold's
+          display:none on this aside can't hide it). Gated to the /daily
+          route (same idiom as right-panel.tsx's /weekly gate) — on Weekly
+          the <WeeklyRailDrawer> already hosts this whole rail in its own
+          drawer at narrow widths, and Weekly flips this rail to mode="day"
+          when a card is selected, so a mode gate alone would double-mount. */}
+      {isDailyRoute && <ResourcesDrawer lesson={lesson} week={week} />}
       {railMode === "tabbed" ? (
         /* ── TABBED mode — MED-5 behavior, unchanged ─────────────────────
            A compact tab strip pins the mode toggle to the right end.

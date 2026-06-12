@@ -1,66 +1,98 @@
 "use client";
 
-// section-resources.tsx — per-section Resources area with EXPANDED ⇄ MINIMIZED
-// toggle (docs/historical/5.20.26 Plugin Directions §4).
+// section-resources.tsx — per-section Resources card with EXPANDED ⇄ MINIMIZED
+// toggle, rebuilt to the 6.12.26 Resource & Notecard Redesign §2
+// (Documents/Claude Design/6.12.26 design_handoff_ux_roadmap_and_resources/
+// resource_redesign/surface-section.jsx + rn.css — the authoritative spec).
 //
 // Each section row gets its own resources card. The card has two states and
 // the teacher flips between them with a small icon button at its top-right:
 //
-//   EXPANDED (§4.2) — a Reference-A card:
-//     • "RESOURCES" header label + minimize toggle.
-//     • Primary 2×2 grid of colored thumbnail cards (large icon + truncated
-//       title). The first FOUR resources in the section's pool populate the
-//       grid; specific spec fills (purple / teal / green / peach) per
-//       position. If fewer than four are available the missing slots simply
-//       don't render — no placeholder card.
-//     • "+ Add resource" centered link.
-//     • "More resources" sub-panel — a stacked list of the remaining
-//       resources (icon + title + colored TYPE PILL on the right) with a
-//       "Show more v" affordance.
+//   EXPANDED (artboard "Expanded · desktop"):
+//     • "RESOURCES" eyebrow + minimize toggle (32px visual, ≥44 hit).
+//     • The KEPT 2×2 colored slot grid (rn.css `.rn-slot.s1–.s4` token
+//       fills — see PRIMARY_SLOT_FILLS): the first FOUR plain resources,
+//       each slot with a
+//       bottom-aligned label and a hover-revealed edit-notes pencil (32px
+//       visual, ::after-inflated ≥44; always visible on touch).
+//     • The NOTECARD COMPACT ROW (`.rn-noteRow`) — one ≥48px row per
+//       notecard-ish resource: honey-50 fill, honey-200 border, 34px poster
+//       thumb (poster image when present, else the honey notecard glyph),
+//       title + "N media · notes" meta, edit + open-full-card buttons. This
+//       REPLACES the old full-NotecardCard strip (redesign P3 — notecards
+//       never enter the grid, and never dominate the section).
+//     • "More resources" compact rows (`.rn-moreList`) for plain resources
+//       beyond the four slots — 30px type-tinted icon tile + label + type
+//       tag + edit-notes pencil.
+//     • The dashed "+ Add resource" row (`.rn-addRes`, ≥44px) opening the
+//       shared ResourceComposer via the existing onAdd seam.
 //
-//   MINIMIZED (§4.3) — a "Resource quick access" card:
-//     • Paperclip icon + label header + expand toggle.
-//     • One row per resource — a colored 22×22 type icon square on the
-//       left, the title + URL preview in the middle, and a TYPE PILL on
-//       the right. 1px ink-100 dividers between rows.
-//     • Footer: "+ Add quick resource" link on a 1px dashed top border.
+//   MINIMIZED (artboard "Minimized quick access"):
+//     • "RESOURCE QUICK ACCESS" eyebrow + expand toggle.
+//     • One compact row per plain resource (same row recipe as "more
+//       resources"), then the identical notecard row(s) — the notecard row
+//       renders the same in both states so the card never "jumps shape"
+//       when toggling — then the dashed "+ Add quick resource" row.
 //
-// State persistence (spec §4.1 / acceptance §10):
-//   The expanded ⇄ minimized state is stored per `(lessonId, sectionId)` in
-//   `localStorage` under the key `myc:resources-minimized:v1`. SSR-safe:
-//   we never touch `localStorage` during the initial render (the SSR pass
-//   defaults to expanded), then a `useEffect` reads the persisted value on
-//   mount and hydrates the actual state. This avoids hydration mismatch.
-//   The same effect wires a `storage` listener so a tab-to-tab toggle stays
-//   in sync.
+// Clicking a slot, a row, or a notecard row opens the shared ResourcePreview
+// (which routes notecards to the fullscreen split view). No iframe ever
+// renders inside a slot or row — slots are flat indexed tints; rows are
+// type-tinted glyph tiles (the th-* token pairs); the only <img> is the
+// notecard row's 34px poster, which falls through a chain — thumbnail →
+// image-like poster url → honey glyph (never a broken image).
+// Legacy url-less fixture rows render from type + label alone — the old
+// synthetic-URL subtitle strings ("youtube.com/watch?v=…") are gone.
+//
+// State persistence (unchanged): the expanded ⇄ minimized state is stored
+// per `(lessonId, sectionId)` in localStorage under
+// `myc:resources-minimized:v1`. SSR-safe — the SSR pass defaults to
+// expanded, then a useEffect hydrates the persisted value on mount and a
+// `storage` listener keeps tabs in sync.
 //
 // Hard rules (spec / task brief):
-//   • EXACT HEX values per spec §4.2 for the 4 primary card fills.
-//   • EXACT HEX values per spec §4.3 for the minimized icon-square colors.
-//   • ALL other color/type/spacing via var(--token).
-//   • ≥44px tap targets on primary actions, WCAG AA contrast, full keyboard
-//     access, prefers-reduced-motion honored via the CSS module.
+//   • ALL color/type/spacing via var(--token) — including the 4 slot fills,
+//     which rn.css paints with existing tokens (see PRIMARY_SLOT_FILLS).
+//   • ≥44px tap targets on every action (hit-area inflation), WCAG AA
+//     contrast, full keyboard access, prefers-reduced-motion honored.
 
 import type { ReactNode } from "react";
 import { memo, useCallback, useEffect, useId, useState } from "react";
 import type { LessonResource } from "@/lib/types";
 import type { SectionResource } from "@/lib/lesson-flow";
-import { Button, FutureControl, Tooltip } from "@/components/ui";
-import { ResourceEmbed, ResourcePreview } from "@/components/resources";
-import { NotecardCard } from "@/components/notecards";
-import { hasNotes, isNotecard } from "@/lib/notecards";
+import { Tooltip } from "@/components/ui";
+import { ResourcePreview } from "@/components/resources";
+import {
+  galleryCount,
+  hasNotes,
+  isNotecard,
+  notecardPoster,
+} from "@/lib/notecards";
 import { ResourceTypePill } from "./resource-type-pill";
 import styles from "./section-resources.module.css";
 
-/** True when a resource should render as a notecard (flip gallery + notes)
- *  rather than a plain thumbnail: a dedicated notecard, anything with a
- *  gallery, or anything with rich notes. */
+/** True when a resource should render as a notecard compact row (poster +
+ *  meta + open-fullscreen) rather than occupying a slot / plain row: a
+ *  dedicated notecard, anything with a gallery, or anything with rich notes.
+ *  Notecards never enter the 2×2 grid (redesign P3). */
 function isNotecardish(resource: LessonResource): boolean {
   return (
     isNotecard(resource) ||
     (resource.gallery?.length ?? 0) > 0 ||
     hasNotes(resource)
   );
+}
+
+/** Gate for the notecard row's poster <img src> — mirrors ResourceCardFace's
+ *  isSafeImgSrc (http(s)/blob, base64 data:image, same-origin root-relative;
+ *  rejects protocol-relative and every script-capable scheme). An unsafe src
+ *  never reaches an <img> — the honey glyph renders instead. */
+function isSafeImgSrc(url: string | undefined): url is string {
+  if (!url) return false;
+  if (/^(https?|blob):/i.test(url)) return true;
+  if (/^data:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml);base64,/i.test(url)) {
+    return true;
+  }
+  return /^\/(?![/\\])/.test(url);
 }
 
 // ── localStorage key + helpers ───────────────────────────────────────────
@@ -111,7 +143,9 @@ export interface SectionResourcesProps {
   lessonId: string;
   /** The section being rendered — half of the persistence key. */
   sectionId: string;
-  /** The resources to surface in this section's panel, in display order. */
+  /** The resources to surface in this section's panel, in display order.
+   *  Sections are the CANONICAL owner of their resources (redesign P1) —
+   *  this list arrives already deduped; nothing merges inside one section. */
   resources: SectionResource[];
   /** Fire the shared ResourceComposer to add a new resource to this section.
    *  Optional — when undefined the "+ Add" affordances render disabled. */
@@ -122,23 +156,25 @@ export interface SectionResourcesProps {
   onEditNote?: (resource: SectionResource) => void;
 }
 
-// ── Spec §4.2 — primary 2×2 card fills (EXACT HEX VALUES) ───────────────
-// The four slot fills per Reference A's Section 1 expanded card. They are
+// ── rn.css `.rn-slot.s1–.s4` — primary 2×2 slot fills (TOKENS) ──────────
+// The four slot fills per the 6.12.26 handoff's authoritative rn.css
+// (resource_redesign/rn.css), which paints `.rn-slot.s1` … `.s4` with
+// EXISTING tokens — so the older exact-hex exemption is obsolete. They are
 // keyed by SLOT INDEX (0..3), not by resource type — the spec assigns each
 // position its own pastel regardless of the resource it carries. The first
-// resource lands in slot 0 (soft purple), the second in slot 1 (soft teal),
+// resource lands in slot 0 (soft purple), the second in slot 1 (soft mint),
 // etc. Beyond slot 3 resources fall through to the "More resources" list.
 const PRIMARY_SLOT_FILLS: ReadonlyArray<string> = [
-  "#f3e8ff", // soft purple — slot 1
-  "#ccfbf1", // soft teal   — slot 2
-  "#dcfce7", // soft green  — slot 3
-  "#fed7aa", // soft peach  — slot 4
+  "var(--wf-purple-bg)", // .rn-slot.s1 — soft purple
+  "var(--board-tint-mint)", // .rn-slot.s2 — soft mint
+  "var(--wf-green-bg)", // .rn-slot.s3 — soft green
+  "var(--wf-orange-bg)", // .rn-slot.s4 — soft orange
 ];
 
 // ── SectionResources ─────────────────────────────────────────────────────
 
-/** Per-section resources area: expanded thumbnail grid OR minimized list,
- *  with a top-right toggle and per-(lesson,section) persistence. */
+/** Per-section resources card: expanded slot grid OR minimized quick-access
+ *  list, with a top-right toggle and per-(lesson,section) persistence. */
 export const SectionResources = memo(function SectionResources({
   lessonId,
   sectionId,
@@ -149,8 +185,9 @@ export const SectionResources = memo(function SectionResources({
   // Persistence key combining lesson + section ids.
   const storageKey = `${lessonId}:${sectionId}`;
 
-  // The resource currently open in the shared click-to-enlarge modal (a tile
-  // click or a notecard's enlarge/fullscreen affordance), or null when closed.
+  // The resource currently open in the shared click-to-enlarge modal (a slot
+  // / row click or a notecard row's open affordance), or null when closed.
+  // ResourcePreview routes notecards to the fullscreen split view itself.
   const [previewResource, setPreviewResource] =
     useState<SectionResource | null>(null);
 
@@ -187,9 +224,9 @@ export const SectionResources = memo(function SectionResources({
     });
   }, [storageKey]);
 
-  // Notecard resources (gallery + notes) render as full NotecardCards at the
-  // top of the card; plain single-media resources keep the spec's 2×2 / list
-  // layout below. Order within each bucket is preserved.
+  // Notecard-ish resources render as compact notecard rows BELOW the grid;
+  // plain single-media resources keep the 2×2 / list layout. Order within
+  // each bucket is preserved.
   const notecards = resources.filter((r) => isNotecardish(r));
   const plain = resources.filter((r) => !isNotecardish(r));
 
@@ -201,36 +238,52 @@ export const SectionResources = memo(function SectionResources({
   // A stable id for ARIA wiring (header → body section).
   const bodyId = useId();
 
-  // The notecard strip — shared between the expanded + minimized states. Each
-  // card's enlarge / fullscreen opens the shared preview (notecard split view).
-  const notecardStrip =
+  // The notecard compact rows — IDENTICAL in both states (the artboard's
+  // "the card never jumps shape when toggling" note). Replaces the old
+  // full-card NotecardCard strip.
+  const noteRows =
     notecards.length > 0 ? (
-      <div className={styles.notecardStrip}>
+      <div className={styles.noteRows}>
         {notecards.map((res) => (
-          <div key={res.id} className={styles.notecardItem}>
-            <NotecardCard
-              resource={res}
-              onEnlarge={() => setPreviewResource(res)}
-              onOpenFullscreen={() => setPreviewResource(res)}
-            />
-            {onEditNote && (
-              <div className={styles.notecardActions}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onEditNote(res)}
-                  tooltip="Edit this card's notes or add more media — opens the note editor"
-                >
-                  Edit note
-                </Button>
-              </div>
-            )}
-          </div>
+          <NotecardRow
+            key={res.id}
+            resource={res}
+            onOpen={() => setPreviewResource(res)}
+            onEditNote={onEditNote ? () => onEditNote(res) : undefined}
+          />
         ))}
       </div>
     ) : null;
 
-  // The shared enlarge modal — mounted once, opened from any tile / notecard.
+  // The dashed add-resource row — shared chrome; only the label differs.
+  const addRow = (
+    <Tooltip
+      content={
+        minimized
+          ? "Attach a quick link, file, or video to this section — opens the resource composer"
+          : "Attach a link, file, video, or doc to this section — opens the resource composer"
+      }
+      tooltipId="lesson-flow.section-resources.add"
+      side="top"
+    >
+      <button
+        type="button"
+        className={styles.addRes}
+        onClick={onAdd}
+        disabled={!onAdd}
+        aria-label={
+          minimized
+            ? "Add a quick resource to this section"
+            : "Add a resource to this section"
+        }
+      >
+        <PlusIcon />
+        {minimized ? "Add quick resource" : "Add resource"}
+      </button>
+    </Tooltip>
+  );
+
+  // The shared enlarge modal — mounted once, opened from any slot / row.
   const preview = previewResource ? (
     <ResourcePreview
       resource={previewResource}
@@ -238,36 +291,27 @@ export const SectionResources = memo(function SectionResources({
     />
   ) : null;
 
-  // ── Minimized state — "Resource quick access" card ──────────────────
+  // ── Minimized state — "Resource quick access" ───────────────────────
   if (minimized) {
     return (
-      <section
-        className={styles.card}
-        aria-labelledby={`${bodyId}-mini-header`}
-      >
-        <header className={styles.miniHeader}>
-          <span className={styles.miniHeaderIcon} aria-hidden="true">
-            <PaperclipIcon />
-          </span>
-          <h3 id={`${bodyId}-mini-header`} className={styles.miniHeaderLabel}>
+      <section className={styles.card} aria-labelledby={`${bodyId}-header`}>
+        <header className={styles.head}>
+          <h3 id={`${bodyId}-header`} className={styles.eyebrow}>
             Resource quick access
           </h3>
           <ToggleButton minimized={true} onClick={toggle} />
         </header>
 
-        {/* Notecards first (full cards with flip gallery + notes). */}
-        {notecardStrip}
-
-        {/* List rows — one per PLAIN resource. The 22×22 icon square uses the
-            per-type fill from spec §4.3 (exact hex). */}
+        {/* Compact rows — one per PLAIN resource (same recipe as the
+            expanded card's "more resources" rows). */}
         {plain.length > 0 ? (
           <ul
             id={bodyId}
-            className={styles.miniList}
+            className={styles.rowList}
             aria-label="Resources for this section"
           >
             {plain.map((res) => (
-              <MinimizedRow
+              <CompactRow
                 key={res.id}
                 resource={res}
                 onActivate={() => setPreviewResource(res)}
@@ -276,53 +320,40 @@ export const SectionResources = memo(function SectionResources({
             ))}
           </ul>
         ) : notecards.length === 0 ? (
-          <p className={styles.miniEmpty}>No resources yet.</p>
+          <p className={styles.empty}>No resources yet.</p>
         ) : null}
 
-        {/* Footer — "+ Add quick resource". The dashed top border lives in
-            CSS, not as a separate <hr>, so it tracks the card's padding. */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className={styles.miniAddBtn}
-          onClick={onAdd}
-          disabled={!onAdd}
-          aria-label="Add a quick resource to this section"
-          tooltip="Attach a quick link, file, or video to this section — students see it on the published lesson"
-          leadingIcon={<PlusGlyph />}
-        >
-          Add quick resource
-        </Button>
+        {/* Notecard rows — identical to the expanded state's. */}
+        {noteRows}
+
+        {addRow}
         {preview}
       </section>
     );
   }
 
-  // ── Expanded state — 2×2 grid + "More resources" list ──────────────
+  // ── Expanded state — 2×2 slot grid + notecard rows + more list ──────
   return (
     <section className={styles.card} aria-labelledby={`${bodyId}-header`}>
-      <header className={styles.expandedHeader}>
-        <h3 id={`${bodyId}-header`} className={styles.expandedHeaderLabel}>
+      <header className={styles.head}>
+        <h3 id={`${bodyId}-header`} className={styles.eyebrow}>
           Resources
         </h3>
         <ToggleButton minimized={false} onClick={toggle} />
       </header>
 
-      {/* Notecards first (full cards with flip gallery + notes). */}
-      {notecardStrip}
-
-      {/* Primary 2×2 grid of PLAIN resources. Missing slots simply don't
-          render — we never paint empty placeholder cards (the spec only
-          describes the four populated slots; quieter to omit unfilled ones). */}
+      {/* Primary 2×2 slot grid of PLAIN resources. Missing slots simply
+          don't render — we never paint empty placeholder slots. Notecards
+          never enter the grid (P3) — the 2×2 keeps its rhythm. */}
       {primary.length > 0 && (
         <div
           id={bodyId}
-          className={styles.primaryGrid}
+          className={styles.grid}
           role="list"
           aria-label="Primary resources"
         >
           {primary.map((res, idx) => (
-            <PrimaryCard
+            <SlotCard
               key={res.id}
               resource={res}
               fill={PRIMARY_SLOT_FILLS[idx] ?? PRIMARY_SLOT_FILLS[0]}
@@ -333,140 +364,212 @@ export const SectionResources = memo(function SectionResources({
         </div>
       )}
 
-      {/* Centered "+ Add resource" link beneath the grid. */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className={styles.expandedAddBtn}
-        onClick={onAdd}
-        disabled={!onAdd}
-        aria-label="Add a resource to this section"
-        tooltip="Attach a link, file, video, or doc to this section — opens the resource picker"
-        leadingIcon={<PlusGlyph />}
-      >
-        Add resource
-      </Button>
+      {/* Notecard compact rows — under the grid, never inside it. */}
+      {noteRows}
 
-      {/* "More resources" sub-panel — only mounted when there are extras. */}
+      {/* "More resources" — compact rows for plain resources beyond the
+          four slots. */}
       {more.length > 0 && (
-        <div className={styles.moreSection}>
-          <h4 className={styles.moreHeaderLabel}>More resources</h4>
-          <ul className={styles.moreList} aria-label="More resources">
-            {more.map((res) => (
-              <MoreRow
-                key={res.id}
-                resource={res}
-                onActivate={() => setPreviewResource(res)}
-                onEditNote={onEditNote ? () => onEditNote(res) : undefined}
-              />
-            ))}
-          </ul>
-          {/* "Show more" — placeholder for Phase 1A (the "more" list is
-              already fully visible). FutureControl gives it the canonical
-              "coming after beta" treatment so it never reads as a broken
-              live button. */}
-          <FutureControl
-            label="Show more"
-            trailingIcon={<ShowMoreChevron />}
-            tooltip="Show more — coming after beta. Will paginate the resource list when sections grow long."
-            className={styles.showMoreBtn}
-          />
-        </div>
+        <ul className={styles.moreList} aria-label="More resources">
+          {more.map((res) => (
+            <CompactRow
+              key={res.id}
+              resource={res}
+              onActivate={() => setPreviewResource(res)}
+              onEditNote={onEditNote ? () => onEditNote(res) : undefined}
+            />
+          ))}
+        </ul>
       )}
+
+      {addRow}
       {preview}
     </section>
   );
 });
 
-// ── PrimaryCard — one of the 4 colored 2×2 grid cards ───────────────────
+// ── SlotCard — one of the 4 colored 2×2 grid slots ───────────────────────
+// A flat indexed-tint slot (the rn.css `.rn-slot.sN` token fill),
+// bottom-aligned label, and a
+// hover-revealed edit-notes pencil pinned top-right. The slot's main area is
+// a button opening the shared ResourcePreview. No thumbnail, no iframe —
+// the slot fill IS the design.
 
-function PrimaryCard({
+function SlotCard({
   resource,
   fill,
   onActivate,
   onEditNote,
 }: {
   resource: SectionResource;
+  /** The rn.css `.rn-slot.sN` token fill (a `var(--token)` string) for this
+   *  slot index (see PRIMARY_SLOT_FILLS). */
   fill: string;
   /** Open this resource in the shared enlarge preview. */
   onActivate?: () => void;
   /** Open the composer to add / edit notes on this resource. */
   onEditNote?: () => void;
 }): ReactNode {
-  // A small "note" affordance pinned to the card corner (when wired). Stops
-  // propagation so it never also triggers the card's enlarge.
-  const noteBtn = onEditNote ? (
-    <Tooltip
-      content="Add formatted notes or extra media to this resource — opens the note editor"
-      side="top"
-    >
-      <button
-        type="button"
-        className={styles.noteChip}
-        onClick={(e) => {
-          e.stopPropagation();
-          onEditNote();
-        }}
-        aria-label={`Add or edit notes for ${resource.label}`}
-      >
-        <NoteGlyph />
-      </button>
-    </Tooltip>
-  ) : null;
-
-  // When a real URL is attached, the embed primitive owns the card interior —
-  // the colored card chrome (the §4.2 fill) still wraps it so the slot color
-  // stays load-bearing. We pass onClick to the embed so a click opens the
-  // unified ResourcePreview (instead of the per-type lightbox). Otherwise we
-  // fall back to the synthetic glyph render in a button that opens the preview.
-  if (resource.url) {
-    return (
-      <article
-        className={styles.primaryCard}
-        style={{ background: fill }}
-        role="listitem"
-      >
-        <ResourceEmbed
-          resource={resource}
-          variant="tile"
-          onClick={onActivate}
-        />
-        {noteBtn}
-      </article>
-    );
-  }
   return (
-    <article
-      className={styles.primaryCard}
-      // Inline `background` carries the spec's exact hex fill — this is the
-      // only place the slot color is applied, so a teacher cannot accidentally
-      // reorder it via CSS. The inline style is the SOURCE OF TRUTH for the
-      // §4.2 colors.
+    <div
+      className={styles.slot}
+      // Inline `background` carries the slot's rn.css token fill — this is
+      // the only place the slot color is applied. The inline style is the
+      // SOURCE OF TRUTH for the `.rn-slot.sN` colors.
       style={{ background: fill }}
       role="listitem"
     >
       <button
         type="button"
-        className={styles.primaryCardButton}
+        className={styles.slotMain}
         onClick={onActivate}
         disabled={!onActivate}
         aria-label={`Open ${resource.label}`}
       >
-        <span className={styles.primaryCardIcon} aria-hidden="true">
-          <PrimaryCardIcon type={resource.type} />
-        </span>
-        <span className={styles.primaryCardTitle}>{resource.label}</span>
+        <span className={styles.slotLabel}>{resource.label}</span>
       </button>
-      {noteBtn}
-    </article>
+      {onEditNote && (
+        <Tooltip
+          content="Add or edit notes for this resource — opens the note editor"
+          tooltipId="lesson-flow.section-resources.slot-edit"
+          side="top"
+        >
+          <button
+            type="button"
+            className={styles.slotEdit}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditNote();
+            }}
+            aria-label={`Add or edit notes for ${resource.label}`}
+          >
+            <PencilIcon />
+          </button>
+        </Tooltip>
+      )}
+    </div>
   );
 }
 
-// ── MoreRow — one row of the "More resources" sub-panel ─────────────────
-// The icon + title form a button that opens the shared enlarge preview; the
-// type pill and an optional "note" chip sit alongside.
+// ── NotecardRow — the compact notecard row (replaces the full-card strip) ──
+// ≥48px row: 34px poster thumb (fallback chain: thumbnail → image-like
+// poster url → honey notecard glyph), title + "N media · notes" meta, an
+// edit-notes pencil, and an open-full-card button. The row body opens the
+// fullscreen too.
 
-function MoreRow({
+function NotecardRow({
+  resource,
+  onOpen,
+  onEditNote,
+}: {
+  resource: SectionResource;
+  /** Open the notecard fullscreen (via the shared ResourcePreview routing). */
+  onOpen: () => void;
+  /** Open the composer to edit this notecard. */
+  onEditNote?: () => void;
+}): ReactNode {
+  const label = resource.label || "Notecard";
+  const poster = notecardPoster(resource);
+
+  // Poster fallback CHAIN (mirrors the panel's TileThumb in
+  // ResourcesPanel.tsx): try the poster's explicit thumbnail first; if it is
+  // unsafe or fails to load, fall to the poster's own url (only when the
+  // poster is image-like AND the url passes the safety gate); when both are
+  // exhausted the honey glyph renders. The failure set describes specific
+  // srcs — when the poster's srcs change (teacher fixed a link, a thumbnail
+  // landed) retry instead of staying demoted until remount.
+  const [failedSrcs, setFailedSrcs] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    setFailedSrcs(new Set());
+  }, [poster?.thumbnailUrl, poster?.url]);
+
+  const candidates: string[] = [];
+  if (poster) {
+    if (isSafeImgSrc(poster.thumbnailUrl)) candidates.push(poster.thumbnailUrl);
+    if (
+      (poster.type === "image" || poster.provider === "image") &&
+      isSafeImgSrc(poster.url)
+    ) {
+      candidates.push(poster.url);
+    }
+  }
+  const posterSrc = candidates.find((c) => !failedSrcs.has(c));
+
+  // Meta line: "N media · notes" (each part only when present).
+  const count = galleryCount(resource);
+  const metaParts: string[] = [];
+  if (count > 0) metaParts.push(`${count} media`);
+  if (hasNotes(resource)) metaParts.push("notes");
+  const meta = metaParts.join(" · ");
+
+  return (
+    <div className={styles.noteRow}>
+      <button
+        type="button"
+        className={styles.noteRowMain}
+        onClick={onOpen}
+        aria-label={`Open notecard: ${label}`}
+      >
+        <span className={styles.notePoster} aria-hidden="true">
+          {posterSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={posterSrc}
+              alt=""
+              loading="lazy"
+              className={styles.notePosterImg}
+              onError={() =>
+                setFailedSrcs((prev) => new Set(prev).add(posterSrc))
+              }
+            />
+          ) : (
+            <NotecardIcon />
+          )}
+        </span>
+        <span className={styles.noteBody}>
+          <span className={styles.noteTitle}>{label}</span>
+          {meta && <span className={styles.noteMeta}>{meta}</span>}
+        </span>
+      </button>
+      {onEditNote && (
+        <Tooltip
+          content="Edit this notecard's notes or media — opens the note editor"
+          tooltipId="lesson-flow.section-resources.note-edit"
+          side="top"
+        >
+          <button
+            type="button"
+            className={`${styles.iconBtn} ${styles.noteEditBtn}`}
+            onClick={onEditNote}
+            aria-label={`Edit notecard: ${label}`}
+          >
+            <PencilIcon />
+          </button>
+        </Tooltip>
+      )}
+      <Tooltip
+        content="Open the full card — flip through its media and read the notes"
+        tooltipId="lesson-flow.section-resources.note-open"
+        side="top"
+      >
+        <button
+          type="button"
+          className={styles.iconBtn}
+          onClick={onOpen}
+          aria-label={`Open full card: ${label}`}
+        >
+          <EnlargeIcon />
+        </button>
+      </Tooltip>
+    </div>
+  );
+}
+
+// ── CompactRow — one "more resources" / quick-access row ─────────────────
+// 30px type-tinted icon tile (th-* token pairs), truncating label, uppercase
+// type tag, and the edit-notes pencil. The icon + label open the preview.
+
+function CompactRow({
   resource,
   onActivate,
   onEditNote,
@@ -476,126 +579,68 @@ function MoreRow({
   onEditNote?: () => void;
 }): ReactNode {
   return (
-    <li className={styles.moreRow}>
+    <li className={styles.row}>
       <button
         type="button"
-        className={styles.moreRowMain}
+        className={styles.rowMain}
         onClick={onActivate}
         disabled={!onActivate}
-        aria-label={`Open ${resource.label}`}
+        // The icon tile + type tag are aria-hidden, so fold a short human
+        // type word into the accessible name — screen-reader users get the
+        // type signal sighted users get from the tinted tile.
+        aria-label={`Open ${resource.label} (${typeWordFor(resource.type)})`}
       >
-        {resource.url ? (
-          <span className={styles.moreRowIcon}>
-            <ResourceEmbed resource={resource} variant="row" />
-          </span>
-        ) : (
-          <span className={styles.moreRowIcon} aria-hidden="true">
-            <MoreRowIcon type={resource.type} />
-          </span>
-        )}
-        <span className={styles.moreRowTitle}>{resource.label}</span>
-      </button>
-      <ResourceTypePill type={resource.type} />
-      {onEditNote && <RowNoteButton resource={resource} onClick={onEditNote} />}
-    </li>
-  );
-}
-
-// ── MinimizedRow — one row of the "Resource quick access" list ──────────
-
-function MinimizedRow({
-  resource,
-  onActivate,
-  onEditNote,
-}: {
-  resource: SectionResource;
-  onActivate?: () => void;
-  onEditNote?: () => void;
-}): ReactNode {
-  return (
-    <li className={styles.miniRow}>
-      <button
-        type="button"
-        className={styles.miniRowMain}
-        onClick={onActivate}
-        disabled={!onActivate}
-        aria-label={`Open ${resource.label}`}
-      >
-        {resource.url ? (
-          <span
-            className={styles.miniRowIconSquare}
-            data-kind={miniKindFor(resource.type)}
-          >
-            <ResourceEmbed resource={resource} variant="row" />
-          </span>
-        ) : (
-          <span
-            className={styles.miniRowIconSquare}
-            data-kind={miniKindFor(resource.type)}
-            aria-hidden="true"
-          >
-            <MiniRowIcon type={resource.type} />
-          </span>
-        )}
-        <span className={styles.miniRowStack}>
-          <span className={styles.miniRowTitle}>{resource.label}</span>
-          <span className={styles.miniRowSubtitle}>
-            {resource.url
-              ? realHostname(resource.url)
-              : urlPreviewFor(resource)}
-          </span>
+        <span
+          className={styles.rowIc}
+          data-kind={thKindFor(resource.type)}
+          aria-hidden="true"
+        >
+          <RowTypeIcon type={resource.type} />
         </span>
+        <span className={styles.rowLabel}>{resource.label}</span>
       </button>
       <ResourceTypePill type={resource.type} />
-      {onEditNote && <RowNoteButton resource={resource} onClick={onEditNote} />}
+      {onEditNote && (
+        <Tooltip
+          content="Add or edit notes for this resource — opens the note editor"
+          tooltipId="lesson-flow.section-resources.row-edit"
+          side="left"
+        >
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditNote();
+            }}
+            aria-label={`Add or edit notes for ${resource.label}`}
+          >
+            <PencilIcon />
+          </button>
+        </Tooltip>
+      )}
     </li>
-  );
-}
-
-// ── RowNoteButton — the "add/edit note" chip shared by the list rows ────────
-
-function RowNoteButton({
-  resource,
-  onClick,
-}: {
-  resource: SectionResource;
-  onClick: () => void;
-}): ReactNode {
-  return (
-    <Tooltip
-      content="Add formatted notes or extra media to this resource — opens the note editor"
-      side="left"
-    >
-      <button
-        type="button"
-        className={styles.noteChip}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick();
-        }}
-        aria-label={`Add or edit notes for ${resource.label}`}
-      >
-        <NoteGlyph />
-      </button>
-    </Tooltip>
   );
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-/** The 4 minimized icon-square colorways from spec §4.3. The kind maps a
- *  stored resource type to the corresponding square fill (video/docx/pdf/
- *  link). Other types fall through to LINK styling per spec. */
-type MiniKind = "video" | "docx" | "pdf" | "link";
+/** Map a resource type to its th-* tinted-tile colorway (the rn.css `th-*`
+ *  pairs, expressed as tokens in the CSS module). */
+type ThKind = "slides" | "pdf" | "doc" | "image" | "link" | "youtube";
 
-function miniKindFor(type: SectionResource["type"]): MiniKind {
+function thKindFor(type: SectionResource["type"]): ThKind {
   switch (type) {
     case "youtube":
-      return "video";
-    case "doc":
-      return "docx";
+      return "youtube";
+    case "slides":
+      return "slides";
     case "pdf":
       return "pdf";
+    case "doc":
+      return "doc";
+    case "image":
+      return "image";
     case "website":
     case "link":
     default:
@@ -603,44 +648,31 @@ function miniKindFor(type: SectionResource["type"]): MiniKind {
   }
 }
 
-/** Build a quick URL/source preview for the minimized row's subtitle. The
- *  prototype's `SectionResource` doesn't carry a URL, so we synthesize a
- *  source string from the type (mirrors the spec's seed data examples:
- *  "youtube.com/watch?v=…", "drive.google.com/…"). */
-function urlPreviewFor(res: SectionResource): string {
-  switch (res.type) {
+/** Short human type word folded into a compact row's accessible name (the
+ *  row's icon tile + type tag are aria-hidden, so without this the type is
+ *  invisible to screen-reader users). */
+function typeWordFor(type: SectionResource["type"]): string {
+  switch (type) {
     case "youtube":
-      return "youtube.com/watch?v=…";
-    case "doc":
-      return "drive.google.com/…";
-    case "pdf":
-      return "drive.google.com/…";
+      return "video";
     case "slides":
-      return "docs.google.com/presentation/…";
+      return "slides";
+    case "pdf":
+      return "PDF";
+    case "doc":
+      return "document";
     case "image":
-      return "drive.google.com/…";
+      return "image";
     case "website":
-      return "example.com";
     case "link":
     default:
-      return "linked resource";
-  }
-}
-
-/** Extract the bare hostname from a real URL for the minimized row's subtitle.
- *  Strips a leading `www.` so the line reads cleanly. Falls back to the
- *  synthetic link-preview string if the URL fails to parse. */
-function realHostname(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return urlPreviewFor({ type: "link" } as SectionResource);
+      return "link";
   }
 }
 
 // ── ToggleButton — the expanded/minimized swap control ──────────────────
-// Button variant="icon" carries the touch target, focus ring, and disabled
-// state. aria-pressed passes through {...rest} to the native <button>.
+// The spec's header icon button: 32px visual, ::after-inflated ≥44, the
+// diagonal-arrows glyph in both states (the tooltip + aria carry direction).
 
 function ToggleButton({
   minimized,
@@ -650,100 +682,39 @@ function ToggleButton({
   onClick: () => void;
 }): ReactNode {
   return (
-    <Button
-      variant="icon"
-      size="sm"
-      className={styles.toggleBtn}
-      onClick={onClick}
-      iconAriaLabel={minimized ? "Expand resources" : "Minimize resources"}
-      tooltip={
+    <Tooltip
+      content={
         minimized
-          ? "Switch to the full 2x2 resource grid for this section"
-          : "Switch to the compact quick-access list — useful when the lesson body is the focus"
+          ? "Expand to the full resource grid for this section"
+          : "Minimize to the compact quick-access list — useful when the lesson body is the focus"
       }
-      // Spec §4.1: aria-pressed reflects the minimized state — pressed=true
-      // when minimized; the label and glyph convey the transition direction.
-      aria-pressed={minimized}
+      tooltipId="lesson-flow.section-resources.toggle"
+      side="top"
     >
-      {minimized ? <ExpandGlyph /> : <MinimizeGlyph />}
-    </Button>
+      <button
+        type="button"
+        className={styles.iconBtn}
+        onClick={onClick}
+        aria-label={minimized ? "Expand resources" : "Minimize resources"}
+        // aria-pressed reflects the minimized state — pressed=true when
+        // minimized; the label conveys the transition direction.
+        aria-pressed={minimized}
+      >
+        <EnlargeIcon />
+      </button>
+    </Tooltip>
   );
 }
 
 // ── Icons ────────────────────────────────────────────────────────────────
-// All small inline SVGs, aria-hidden. Stroked with currentColor so the parent
-// CSS controls color.
+// All inline SVGs from the handoff's icon set (rn-shared.jsx — Lucide-family
+// 24×24, ~2px stroke). aria-hidden; stroked with currentColor so the parent
+// CSS controls color. Sizing comes from the CSS module's svg rules.
 
-/** Two arrows pointing inward — minimize affordance. */
-function MinimizeGlyph(): ReactNode {
+/** Pencil — the add/edit-notes affordance. */
+function PencilIcon(): ReactNode {
   return (
     <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="4 14 10 14 10 20" />
-      <polyline points="20 10 14 10 14 4" />
-      <line x1="14" y1="10" x2="21" y2="3" />
-      <line x1="3" y1="21" x2="10" y2="14" />
-    </svg>
-  );
-}
-
-/** Two arrows pointing outward — expand affordance. */
-function ExpandGlyph(): ReactNode {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="15 3 21 3 21 9" />
-      <polyline points="9 21 3 21 3 15" />
-      <line x1="21" y1="3" x2="14" y2="10" />
-      <line x1="3" y1="21" x2="10" y2="14" />
-    </svg>
-  );
-}
-
-/** "+" glyph used in both "Add resource" affordances. */
-function PlusGlyph(): ReactNode {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  );
-}
-
-/** Note / pencil-on-card glyph for the "add/edit note" affordance. */
-function NoteGlyph(): ReactNode {
-  return (
-    <svg
-      width="13"
-      height="13"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -753,17 +724,48 @@ function NoteGlyph(): ReactNode {
       aria-hidden="true"
     >
       <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
     </svg>
   );
 }
 
-/** Paperclip — the minimized header's lead-in glyph. */
-function PaperclipIcon(): ReactNode {
+/** Diagonal out-arrows — expand / open-full-card / toggle affordance. */
+function EnlargeIcon(): ReactNode {
   return (
     <svg
-      width="14"
-      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+    </svg>
+  );
+}
+
+/** "+" glyph for the dashed add-resource row. */
+function PlusIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+/** Notecard glyph — the honey poster fallback for a notes-only card. */
+function NotecardIcon(): ReactNode {
+  return (
+    <svg
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -772,256 +774,66 @@ function PaperclipIcon(): ReactNode {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d="M7 9h10M7 13h7" />
     </svg>
   );
 }
 
-/** Chevron used by "Show more". Points DOWN. */
-function ShowMoreChevron(): ReactNode {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  );
-}
-
-/** The LARGE icon centered on each primary card. Three glyphs are used per
- *  spec §4.2 (play / paperclip / document); the resource type drives which. */
-function PrimaryCardIcon({
-  type,
-}: {
-  type: SectionResource["type"];
-}): ReactNode {
-  // Spec §4.2 explicitly pairs slot icons with the seed resources. We resolve
-  // by type so a swap of seed data still picks the right glyph:
-  //   youtube       → play
-  //   slides/doc/pdf → document
-  //   link/website  → paperclip
-  //   image         → paperclip (fallback — no image glyph in the spec)
+/** Type glyph centered in a compact row's 30px tinted icon tile. */
+function RowTypeIcon({ type }: { type: SectionResource["type"] }): ReactNode {
+  const common = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
   switch (type) {
     case "youtube":
       return (
-        <svg
-          width="28"
-          height="28"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          {/* Solid play triangle on a circle backdrop. */}
-          <circle cx="12" cy="12" r="11" fillOpacity="0" />
-          <polygon points="9 6 19 12 9 18" />
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C18 4.8 12 4.8 12 4.8s-6 0-7.7.5a2.7 2.7 0 0 0-1.9 1.9A28 28 0 0 0 2 12a28 28 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.7.5 7.7.5 7.7.5s6 0 7.7-.5a2.7 2.7 0 0 0 1.9-1.9A28 28 0 0 0 22 12a28 28 0 0 0-.4-4.8zM10 15.2V8.8L15.2 12z" />
         </svg>
       );
     case "slides":
-    case "pdf":
-    case "doc":
       return (
-        <svg
-          width="26"
-          height="26"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="9" y1="13" x2="15" y2="13" />
-          <line x1="9" y1="17" x2="15" y2="17" />
-        </svg>
-      );
-    case "image":
-    case "website":
-    case "link":
-    default:
-      return (
-        <svg
-          width="26"
-          height="26"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-        </svg>
-      );
-  }
-}
-
-/** 16px neutral-gray icon used in the "More resources" rows (spec §4.2). */
-function MoreRowIcon({ type }: { type: SectionResource["type"] }): ReactNode {
-  switch (type) {
-    case "youtube":
-      return (
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <polygon points="23 7 16 12 23 17 23 7" />
-          <rect x="1" y="5" width="15" height="14" rx="2" />
+        <svg {...common}>
+          <rect x="3" y="4" width="18" height="13" rx="2" />
+          <path d="M12 17v4M8 21h8" />
         </svg>
       );
     case "pdf":
-    case "doc":
-    case "slides":
       return (
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="9" y1="13" x2="15" y2="13" />
-          <line x1="9" y1="17" x2="15" y2="17" />
+        <svg {...common}>
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+          <path d="M14 3v5h5" />
+        </svg>
+      );
+    case "doc":
+      return (
+        <svg {...common}>
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+          <path d="M14 3v5h5M9 13h6M9 17h6" />
         </svg>
       );
     case "image":
       return (
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <polyline points="21 15 16 10 5 21" />
+        <svg {...common}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <circle cx="9" cy="10" r="1.6" />
+          <path d="M21 16l-5-5-8 8" />
         </svg>
       );
     case "website":
     case "link":
     default:
       return (
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-        </svg>
-      );
-  }
-}
-
-/** Icon centered inside the minimized row's 22×22 colored square (spec §4.3).
- *  Stroke color comes from the CSS module per `data-kind`, so this just
- *  renders the glyph outline; the square supplies the color. */
-function MiniRowIcon({ type }: { type: SectionResource["type"] }): ReactNode {
-  // Stroke is currentColor; the square's CSS sets `color` per data-kind so
-  // the glyph picks up the spec's stroke color (e.g. #db2777 for video).
-  switch (type) {
-    case "youtube":
-      return (
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          {/* Filled play triangle — the YouTube tell at small size. */}
-          <polygon points="6 4 20 12 6 20" />
-        </svg>
-      );
-    case "doc":
-    case "pdf":
-    case "slides":
-      return (
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-        </svg>
-      );
-    case "image":
-      return (
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <polyline points="21 15 16 10 5 21" />
-        </svg>
-      );
-    case "website":
-    case "link":
-    default:
-      return (
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        <svg {...common}>
+          <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+          <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
         </svg>
       );
   }
