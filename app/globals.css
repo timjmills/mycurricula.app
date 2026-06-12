@@ -279,3 +279,15 @@ body:has([data-teach-view]) nav:has([data-rail-side]) {
   background: color-mix(in srgb, var(--core-mode) 5%, transparent);
   border-radius: var(--r-6);
 }
+
+/* ── Settings search anchors ──────────────────────────────────────────
+   Scroll targets for the settings search (components/settings/
+   settings-search.tsx). SettingsCard's own anchor wrapper carries its
+   scroll margin in the module; this rule covers the plain
+   [data-settings-anchor] sections (e.g. the relocated Team block on
+   /settings/workspace) so a search jump never hides the section header
+   under the sticky settings chrome. Lives in globals.css because the
+   anchors span multiple module boundaries. */
+[data-settings-anchor] {
+  scroll-margin-top: 96px;
+}

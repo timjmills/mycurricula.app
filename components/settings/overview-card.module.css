@@ -1,0 +1,107 @@
+/* overview-card.module.css — one tile on the /settings overview.
+ *
+ * Whole-card link with a quiet hover lift (~150ms; suppressed under
+ * prefers-reduced-motion). All values via var(--token) — no hex. */
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 92px;
+  padding: 14px 36px 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+  transition:
+    box-shadow 150ms ease,
+    transform 150ms ease,
+    border-color 150ms ease;
+}
+
+.card:hover {
+  border-color: var(--brand-300);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+  .card:hover {
+    transform: none;
+  }
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--t-13);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Scope chips — same visual contract as the sidebar + card chips. */
+.scopeChip {
+  flex: 0 0 auto;
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--r-4);
+  border: 1px solid transparent;
+  line-height: 1;
+}
+
+.scopeChipTeam {
+  background: color-mix(in srgb, var(--core-mode) 12%, white);
+  color: var(--core-mode);
+  border-color: color-mix(in srgb, var(--core-mode) 28%, transparent);
+}
+
+.scopeChipPersonal {
+  background: var(--hairline);
+  color: var(--body);
+  border-color: var(--border);
+}
+
+.summary {
+  font-size: var(--t-12);
+  color: var(--muted);
+  line-height: 1.5;
+  /* Two lines max — summaries should stay glanceable. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.chevron {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: var(--muted);
+}
+
+.card:hover .chevron {
+  color: var(--brand-600);
+}

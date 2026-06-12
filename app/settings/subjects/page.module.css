@@ -1,0 +1,544 @@
+/* Settings → Subjects page styles.
+ *
+ * Mirrors the centered max-width-1100 column the Curriculum + Appearance
+ * pages use so the settings tree reads as one coherent surface. All
+ * values via var(--token) — no hex. Subject color only ever arrives
+ * through the `.cp-subj.<id>` cascade (--c / --cl / --cd); this file
+ * never names a subject color directly.
+ */
+
+.page {
+  padding: 24px;
+}
+
+.inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 540px) {
+  .page {
+    padding: 16px;
+  }
+}
+
+/* ── Shared field idioms (match Settings → Curriculum) ─────────────── */
+
+.fieldLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.fieldHint {
+  margin: 12px 0 0;
+  font-size: var(--t-12);
+  color: var(--muted);
+  line-height: 1.55;
+  text-wrap: pretty;
+  max-width: 64ch;
+}
+
+.textInput {
+  min-height: 44px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: var(--t-13);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+  max-width: 360px;
+  width: 100%;
+}
+
+.textInput:hover {
+  border-color: var(--brand-300);
+}
+
+.textInput:focus-visible {
+  background: var(--surface);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .textInput {
+    transition: none;
+  }
+}
+
+/* ── Roster list + rows ────────────────────────────────────────────────
+   The shared frame for all three rosters (team, visibility, personal,
+   archived): a hairline-divided list inside a bordered panel. Row grid:
+   swatch | name cell (flex) | controls. On phone the controls wrap to a
+   second line, indented to align under the name (swatch 24 + gap 12). */
+
+.rosterList {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.rosterRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 8px 16px;
+  min-height: 56px;
+  border-top: 1px solid var(--hairline);
+  transition: background 120ms ease;
+}
+
+.rosterRow:first-child {
+  border-top: 0;
+}
+
+.rosterRow:hover,
+.rosterRow:focus-within {
+  background: var(--surface-warm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rosterRow {
+    transition: none;
+  }
+}
+
+@media (max-width: 700px) {
+  /* Phone / narrow tablet — swatch + name on the first line, the control
+     cluster wrapping to a full-width second line aligned under the name. */
+  .rosterRow {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 12px;
+  }
+  .rowControls {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding-left: 36px; /* 24px swatch + 12px gap — aligns under the name */
+  }
+
+  /* Rows with a single compact control (a switch, one button) keep the
+     3-column layout on phone — wrapping a lone 44px control to its own
+     line would just waste vertical space. Only the team roster (toggle
+     group + archive button) genuinely needs the wrap above. */
+  .rosterRowInline {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .rosterRowInline .rowControls {
+    grid-column: auto;
+    justify-content: flex-end;
+    padding-left: 0;
+  }
+}
+
+.rowControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.nameCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rowName {
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Hidden / archived entries read as present-but-inactive. */
+.rowNameHidden {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* Secondary line under a name — "was Math", "borrows Math's color". */
+.subNote {
+  font-size: var(--t-11);
+  color: var(--muted);
+}
+
+/* ── Subject swatch chip ───────────────────────────────────────────────
+   Painted entirely by the cp-subj cascade: tint fill (--cl), accent
+   hairline (--c), and an inset 4px left stripe of the accent — a small
+   echo of the Weekly card's subject-deep border. */
+
+.swatch {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--cl);
+  border: 1px solid var(--c);
+  box-shadow: inset 4px 0 0 var(--c);
+}
+
+.swatchDimmed {
+  opacity: 0.55;
+}
+
+/* ── Inline rename (team roster) ─────────────────────────────────────── */
+
+.renameWrap {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.renameButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  /* Visual size stays text-like; padding + negative margin inflate the
+     hit area without disturbing the row's optical alignment. */
+  padding: 10px 8px;
+  margin: -10px -8px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--r-sm);
+  font: inherit;
+  cursor: text;
+  text-align: left;
+}
+
+.renameButton:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.renameLabel {
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.renameButton:hover .renameLabel {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+/* Pencil affordance — hover/focus-revealed on pointer devices (the
+   BUILD_STANDARD §9 hover-reveal pattern), faintly always-on for touch
+   so the edit affordance is never invisible. */
+.renameGlyph {
+  font-size: var(--t-12);
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.renameButton:hover .renameGlyph,
+.renameButton:focus-visible .renameGlyph {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .renameGlyph {
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .renameGlyph {
+    transition: none;
+  }
+}
+
+.renameInput {
+  min-height: 36px;
+  width: 100%;
+  max-width: 280px;
+  padding: 0 8px;
+  font-family: inherit;
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--brand-400);
+  border-radius: var(--r-sm);
+  outline: none;
+  box-shadow: 0 0 0 4px var(--brand-50);
+}
+
+/* ── "I teach this" switch ─────────────────────────────────────────────
+   44×24 visual track; the ::before overlay inflates the hit area to
+   ≥44×44 on every device (CLAUDE.md §4 touch-target rule). */
+
+.switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--border);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.switch::before {
+  content: "";
+  position: absolute;
+  inset: -10px 0;
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.switchThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: 0 1px 2px var(--hairline);
+  transition: transform 120ms ease;
+}
+
+.switchOn {
+  background: var(--brand-500);
+  border-color: var(--brand-500);
+}
+
+.switchOn .switchThumb {
+  transform: translateX(20px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switchThumb {
+    transition: none;
+  }
+}
+
+/* ── Add-subject form (My subjects) ──────────────────────────────────── */
+
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 4px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.addNameField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.swatchFieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.swatchFieldset legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+/* 8 borrowable palettes: 4-up on desktop, 2-up on phone, every chip a
+   full ≥44px target with the subject name as its label. */
+.swatchGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .swatchGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 540px) {
+  .swatchGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.swatchOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-family: inherit;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.swatchOption:hover {
+  border-color: var(--c);
+  color: var(--ink);
+}
+
+.swatchOption:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.swatchOption:active {
+  transform: translateY(1px);
+}
+
+/* Selected = the borrowed family's own tint + accent ring, so the
+   choice previews exactly how the personal subject will paint. */
+.swatchOptionOn {
+  background: var(--cl);
+  border-color: var(--c);
+  box-shadow: inset 0 0 0 1px var(--c);
+  color: var(--cd);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swatchOption {
+    transition: none;
+  }
+  .swatchOption:active {
+    transform: none;
+  }
+}
+
+.swatchOptionChip {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 6px;
+  background: var(--c);
+}
+
+.swatchOptionLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.addAction {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── Archived disclosure ───────────────────────────────────────────── */
+
+.disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  margin-top: 4px;
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-family: inherit;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.disclosure:hover {
+  border-color: var(--brand-300);
+  color: var(--brand-600);
+}
+
+.disclosure:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.disclosureChevron {
+  display: inline-block;
+  transition: transform 160ms ease;
+}
+
+.disclosureChevron[data-open] {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disclosure,
+  .disclosureChevron {
+    transition: none;
+  }
+}
+
+.archivedRegion {
+  margin-top: 12px;
+}
+
+/* ── Empty states ──────────────────────────────────────────────────── */
+
+.emptyNote {
+  font-size: var(--t-13);
+  color: var(--muted);
+  font-style: italic;
+  padding: 16px;
+  margin: 0;
+  text-align: center;
+  list-style: none;
+}

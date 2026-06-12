@@ -1,0 +1,53 @@
+/* settings-header.module.css — the persistent Settings chrome row.
+ *
+ * Sticky at the very top of the settings surface so the exit ✕ (and the
+ * search) stay reachable however deep the teacher scrolls. Kept short —
+ * the responsive contract caps sticky chrome at ~30% of phone viewport
+ * height, and this row + the phone pill strip together stay well under.
+ *
+ * All values via var(--token) — no hex. */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 4; /* above the phone pill strip (z-index: 1) and card content */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 16px 0 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-18);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  flex: 0 0 auto;
+}
+
+/* Search (or future actions) slot — grows to fill, content right-aligned
+   toward the ✕ so the title keeps its anchor on the left. */
+.slot {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.close {
+  flex: 0 0 auto;
+}
+
+/* ── Phone ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .header {
+    min-height: 52px;
+    padding: 0 8px 0 16px;
+  }
+}

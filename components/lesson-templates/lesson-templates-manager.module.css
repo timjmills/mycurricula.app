@@ -232,6 +232,9 @@
 }
 
 .customRowName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: var(--t-13);
   font-weight: 700;
   color: var(--ink);

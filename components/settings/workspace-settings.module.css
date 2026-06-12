@@ -1,0 +1,341 @@
+/* Settings → Workspace & Team management styles.
+ *
+ * Mirrors the centered max-width-1100 column the Curriculum / Appearance /
+ * Team pages use so the settings tree reads as one coherent surface. The
+ * relocated Team section below this stack brings its own .page padding
+ * (components/team/TeamPage.module.css), so .page here keeps bottom
+ * padding at 0 to avoid a double gap between the two halves.
+ *
+ * All values via var(--token) — no hex. Spacing on the 4-8-12-16-24-32
+ * scale (BUILD_STANDARD.md §6). Touch targets ≥44px (§8).
+ */
+
+.page {
+  padding: 24px 24px 0;
+}
+
+.inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Form row (workspace rename / new-notebook name) ─────────────────── */
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.fieldLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.fieldHint {
+  margin: 4px 0 0;
+  font-size: var(--t-12);
+  color: var(--muted);
+  line-height: 1.55;
+  text-wrap: pretty;
+  max-width: 64ch;
+}
+
+.emptyHint {
+  margin: 8px 0 0;
+  font-size: var(--t-13);
+  color: var(--muted);
+  font-style: italic;
+}
+
+.textInput {
+  min-height: 44px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: var(--t-13);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+  max-width: 480px;
+}
+
+.textInput:hover:not(:disabled) {
+  border-color: var(--brand-300);
+}
+
+.textInput:focus-visible {
+  background: var(--surface);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
+  outline: none;
+}
+
+/* Disabled (non-admin) — visually quiet; the tooltip explains why. */
+.textInput:disabled {
+  color: var(--faint);
+  background: var(--surface);
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .textInput {
+    transition: none;
+  }
+}
+
+/* ── Notebook list ────────────────────────────────────────────────────
+   Stacked rows, hairline divider between them — same recipe as the
+   Curriculum page's holiday list so the two team surfaces rhyme. */
+
+.nbList {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.nbRow {
+  display: grid;
+  /* name (flex) | actions */
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px 8px 16px;
+  border-top: 1px solid var(--hairline);
+  /* Row stays comfortably tappable even when the buttons are sm. */
+  min-height: 56px;
+}
+
+.nbRow:first-child {
+  border-top: 0;
+}
+
+.nbName {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nbNameArchived {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.nbActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Inline-rename input replaces the name cell; let it fill the column
+   (the 480px cap is for the standalone form inputs, not row edit). */
+.nbRenameInput {
+  max-width: none;
+  width: 100%;
+}
+
+/* Phone — name (or rename input) on its own row, actions row below so
+   every button keeps a full-size target without crowding. */
+@media (max-width: 540px) {
+  .nbRow {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+  .nbActions {
+    justify-content: flex-start;
+  }
+}
+
+/* ── "+ New notebook" creation row ────────────────────────────────────── */
+
+.newNbForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.newNbRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.newNbRow .textInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 360px;
+}
+
+/* Phone — stack the input over the button; both span the card. */
+@media (max-width: 540px) {
+  .newNbRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .newNbRow .textInput {
+    max-width: 100%;
+  }
+}
+
+/* ── Archived disclosure ──────────────────────────────────────────────── */
+
+.archived {
+  margin-top: 16px;
+}
+
+.archivedSummary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px; /* full-size target on phone/tablet */
+  padding: 0 4px;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-soft);
+  cursor: pointer;
+  border-radius: var(--r-md);
+  list-style: none; /* hide the default marker; we draw our own chevron */
+  user-select: none;
+}
+
+.archivedSummary::-webkit-details-marker {
+  display: none;
+}
+
+.archivedSummary:hover {
+  color: var(--ink);
+}
+
+.archivedSummary:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+/* Custom chevron — a small CSS triangle that rotates when open. */
+.archivedChevron {
+  width: 0;
+  height: 0;
+  border-left: 6px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 120ms ease;
+}
+
+.archived[open] .archivedChevron {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .archivedChevron {
+    transition: none;
+  }
+}
+
+.archivedCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 2px 8px;
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+}
+
+/* ── Default-notebook radio list ──────────────────────────────────────── */
+
+.radioList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  max-width: 480px;
+}
+
+.radioOption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 12px;
+  font-family: inherit;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.radioOption:hover {
+  border-color: var(--brand-300);
+}
+
+.radioOption:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.radioOptionSelected {
+  background: var(--brand-50);
+  border-color: var(--brand-400);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radioOption {
+    transition: none;
+  }
+}
+
+.radioLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 0;
+}
+
+.radioMeta {
+  font-size: var(--t-11);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* ── Phone tighten — match the sibling settings pages ─────────────────── */
+
+@media (max-width: 540px) {
+  .page {
+    padding: 16px 16px 0;
+  }
+}

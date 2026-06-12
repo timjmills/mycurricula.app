@@ -7,6 +7,7 @@ import { PlannerProvider } from "@/lib/planner-store";
 import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
   GlobalShortcuts,
+  LastRouteRecorder,
   MasterBanner,
   RightPanel,
   SideNav,
@@ -69,6 +70,9 @@ export default function PlannerLayout({
                   {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
                     Mounted as a client leaf so the layout stays a Server Component. */}
                   <GlobalShortcuts />
+                  {/* Remembers the active planner route so the Settings X /
+                    Escape can return the teacher exactly where they left. */}
+                  <LastRouteRecorder />
                   {/* v1.3 shell: an app-wide left SideNav (primary navigation,
                     replacing the old top-bar tabs + icon rails) and a content
                     column holding the Team-Curriculum banner, the slimmed top

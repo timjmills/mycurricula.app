@@ -1,0 +1,120 @@
+/* settings-search.module.css — header search combobox.
+ *
+ * Desktop: a quiet pill input right-aligned next to the exit ✕.
+ * Phone:   shrinks but stays visible — search earns its header room.
+ *
+ * All values via var(--token) — no hex. */
+
+.root {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: min(320px, 100%);
+}
+
+.icon {
+  position: absolute;
+  left: 12px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px 0 32px;
+  font-size: var(--t-13);
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  transition: border-color 120ms ease;
+}
+
+.input::placeholder {
+  color: var(--muted);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+  border-color: var(--brand-500);
+}
+
+/* Hide the native WebKit clear/decoration so the pill stays clean. */
+.input::-webkit-search-decoration {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input {
+    transition: none;
+  }
+}
+
+/* ── Results dropdown ─────────────────────────────────────────────────── */
+
+.results {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: min(360px, calc(100vw - 32px));
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-popover);
+  z-index: 8;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.resultActive {
+  background: var(--brand-50);
+}
+
+.resultTitle {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.resultActive .resultTitle {
+  color: var(--brand-700);
+}
+
+.resultPath {
+  font-size: var(--t-11);
+  color: var(--muted);
+}
+
+.empty {
+  display: block;
+  padding: 10px 12px;
+  font-size: var(--t-12);
+  color: var(--muted);
+}
+
+/* ── Phone ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .root {
+    width: min(220px, 100%);
+  }
+
+  .input {
+    min-height: 40px; /* comfortable touch target inside the 52px header */
+  }
+}
