@@ -440,6 +440,139 @@ permission to bypass the gate.
 
 ---
 
+## 4b. Live QA Audit Gate (browser MCP — separate from the code review)
+
+> Mirror image of `AGENTS.md` §"Live QA Audit Gate". Added 2026-06-12,
+> alongside the user-scope `playwright` and `chrome-devtools` MCP servers.
+> A user-wide copy of this rule lives in `~/.claude/CLAUDE.md`, so it
+> applies to every project on this machine, not just this repo.
+
+The §4a code review checks the **diff**; this gate checks the **running
+app**. They are separate gates, and **both run before a build is said to be
+done**. This gate does not involve Codex — Claude Code (or any agent with
+browser tooling) performs it directly.
+
+**Requirement.** For each build, live-interaction-test the affected app
+surfaces in a real browser using one or both of:
+
+- `playwright` MCP (`npx @playwright/mcp@latest`) — navigate, click, type,
+  submit forms, screenshot.
+- `chrome-devtools` MCP (`npx chrome-devtools-mcp@latest`) — the same, plus
+  browser-console messages, network inspection, and device emulation.
+
+Both are registered at user scope (verify with `claude mcp list`). If
+neither is available (e.g. a cloud/remote session), fall back to a local
+Playwright script (`chromium.launch({ channel: "chrome" })`, like the
+`scripts/probe-*.mjs` probes) — the live pass itself is never skipped.
+
+**Scope.** Breadth scales with the build: an app-wide wave gets the full
+audit template below; a focused change gets every surface it touches plus a
+browser-console error check. What never scales away: real clicks in a real
+browser before "done".
+
+**Operational notes.**
+
+- Start the dev server if one isn't already running; use a port ≥3010 when
+  another session may own 3000, and never run `npm run build` while
+  `next dev` is running (it clobbers `.next`).
+- For auth flows, sign in via the claude-login bypass (see
+  `docs/5.24.26 claude-access.md`; localhost needs
+  `PROVISIONING_MODE=individual` in `.env.local`).
+- `QA-REPORT.md` is a working artifact — do not commit it unless asked.
+
+**QA audit prompt** (canonical template):
+
+```text
+Goal: QA audit — code inspection + live visual testing.
+Inspect this codebase and visually test the running website, then produce a
+prioritized report of bugs and improvements.
+
+1. Code inspection. Review the project structure, components, routing, and
+   state management. Flag dead code, error-handling gaps, accessibility
+   issues (missing alt text, labels, focus states), hardcoded values, and
+   obvious performance problems.
+2. Run and visually inspect the site. Start the dev server. Open the site
+   and take screenshots of every page/route. Compare what renders against
+   what the code intends.
+3. Interact like a user. Click every button, link, and menu item. Fill out
+   and submit every form — including with invalid/empty input. Test all
+   interactive features (modals, dropdowns, search, filters, auth flows).
+   Note anything that errors, dead-ends, or behaves unexpectedly. Check the
+   browser console for errors/warnings during all interactions.
+4. Responsive testing. Resize the window to mobile (375px), tablet (768px),
+   and desktop (1440px) widths. Screenshot each. Flag layout breaks,
+   overflow, overlapping elements, unusable touch targets, and hidden
+   content.
+5. Report. Write findings to QA-REPORT.md with: severity
+   (critical/major/minor), description, steps to reproduce, screenshot
+   reference, suspected file/line where applicable, and suggested fix.
+   Separate "bugs" from "improvement ideas." Do not fix anything yet —
+   report only.
+```
+
+**Acting on the report.** The audit is report-only — it never fixes anything
+in the same pass. Triage `QA-REPORT.md` afterwards: an unresolved
+**critical** finding on a surface the build touched means the build is not
+done; majors/minors are fixed or explicitly deferred with the user. (The
+375/768/1440 widths sit inside the §4 responsive tiers — this audit
+supplements the §4 contract, it does not replace it.)
+
+### Visual verification method (A: video · B: screenshots)
+
+Visual verification is mandatory — **never sign off on UI work from code
+review alone; run the site and look at it.** Pick a method by what the
+change is:
+
+**Method A — video + frame-by-frame.** Record the whole browser session,
+then extract and review frames as images.
+- _Use when:_ motion / time-based behavior (animations, transitions,
+  loading/skeleton states, scroll, drag-and-drop); hunting layout shift,
+  flicker, or jank that only shows up _between_ states; auditing a long
+  multi-step flow end-to-end where the journey matters; any
+  post-major-change pass where you want a replayable record as evidence;
+  or a vague "something looks off when I click around" report where you
+  don't yet know where to look.
+- _How:_ run Playwright with video capture (`playwright` MCP with
+  `--save-video=800x600 --output-dir …`, or a local script —
+  `chromium.launch({ channel: "chrome" })`, `recordVideo` on the
+  context). Drive the full flow in one session, narrating each action in
+  your notes. Extract frames:
+
+  ```bash
+  ffmpeg -i session.webm -vf fps=1 frames/frame_%03d.png
+  ```
+
+  Use `fps=2` or higher for fast animations/transitions; `fps=1` is the
+  default. Review frames in sequence; for each anomaly note the frame
+  number, what's wrong, and the action that preceded it. Keep the
+  `.webm` and reference it in the report so a human can replay it.
+- _Cost:_ slower (record → extract → review many images). Don't use it
+  for a single page or one button.
+
+**Method B — screenshot key moments.** Screenshot after each meaningful
+action and assess it before proceeding (this is what the
+`scripts/probe-*.mjs` probes already do).
+- _Use when:_ static / discrete states (layouts, forms, modals,
+  empty/error states, dark mode); responsive checks (screenshot each
+  surface at 375 / 768 / 1440); targeted verification of one specific
+  change; fast fix → screenshot → confirm → next iteration; or
+  console/network-error focus (pair with `chrome-devtools` MCP). Always
+  screenshot before AND after a destructive/state-changing action, and
+  save with descriptive names (`calendar-chips-night-1280.png`).
+- _Cost:_ misses anything that happens _between_ shots (transitions,
+  flicker, races).
+
+**Choosing.** Default to **B** for routine reviews and targeted checks
+(faster, cheaper). Escalate to **A** when behavior over time matters or
+for a full post-major-change audit (B for the spot-checks after the
+fixes). When unsure, start with B and switch to A the moment you see
+something you can't explain from stills. Combining is fine — video for
+the main flow pass, screenshots for responsive and error-state checks.
+Evidence in `QA-REPORT.md` is the frame number + `.webm` path (A) or the
+screenshot filename (B).
+
+---
+
 ## 5. How we work — DO
 
 - **Read the spec before building a screen.** `Documents/Project Files/5.16.26
@@ -459,6 +592,9 @@ planning_document.md` has a screen-by-screen section (§5) and the data model (�
 - **Build the data shapes for infrastructure (audit log, coverage snapshots, roles)
   when the backend lands**, even if there is no UI for them yet.
 - **Run `npm run lint` and `npm run format:check`** before considering work done.
+- **Run the Live QA Audit gate (§4b) before declaring a build done** — real
+  clicks in a real browser via the `playwright` / `chrome-devtools` MCP
+  servers, in addition to (never instead of) the §4a code review.
 - **Verify the responsive contract.** Before declaring a screen done, eyeball it at
   ~400px, ~768px, and ~1280px in DevTools device emulation. Confirm: no
   document-level horizontal scroll, all primary controls reachable, touch
