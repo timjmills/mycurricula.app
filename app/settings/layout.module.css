@@ -1,8 +1,10 @@
-/* Settings layout — sidebar + content shell.
+/* Settings layout — header + sidebar + content shell.
  *
- * Desktop: sidebar pinned left, content fills the remainder.
+ * Desktop: sticky header row on top; grouped sidebar pinned left; content
+ *          fills the remainder.
  * Tablet:  sidebar narrows; content keeps its centered max-width.
- * Phone:   sidebar collapses to a horizontal pill strip above content.
+ * Phone:   sidebar collapses to a horizontal pill strip above content
+ *          (group labels hidden — the strip is one flat scrollable row).
  *
  * All values via var(--token) — no hex. Mirrors the visual feel of the
  * existing settings pages so the sub-page bodies don't have to change.
@@ -40,12 +42,33 @@
   min-width: 0;
 }
 
-/* Sticky wrapper around the tab list + theme strip — sticky lives here
-   (not on the ul) so both stick together instead of the list sliding over
-   the strip on scroll. */
+/* Sticky wrapper around the groups + theme strip — sticky lives here
+   (not on the lists) so everything sticks together instead of the lists
+   sliding over the strip on scroll. Offset clears the sticky header. */
 .sidebarSticky {
   position: sticky;
-  top: 24px;
+  top: 72px;
+}
+
+/* ── Domain groups ─────────────────────────────────────────────────────── */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group + .group {
+  margin-top: 18px;
+}
+
+.groupLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 12px 4px;
 }
 
 .tabList {
@@ -81,9 +104,11 @@
 .tabLabel {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Wrap rather than truncate — "Workspace & Team" should read in full
+     next to its scope chip. The phone pill strip restores nowrap. */
+  white-space: normal;
+  line-height: 1.25;
+  padding: 6px 0;
 }
 
 /* W2-B7 scope chip — "Team" (shared) or "Personal" (this teacher only).
@@ -136,7 +161,7 @@
 }
 
 /* ── Theme quick-switch (sidebar) ──────────────────────────────────────
-   Chip strip below the tab list — see components/appearance/
+   Chip strip below the groups — see components/appearance/
    theme-quick-switch. Hidden on phone where the sidebar is a pill strip
    (the Appearance tab carries the affordance there). */
 
@@ -184,25 +209,44 @@
 
   .sidebar {
     position: sticky;
-    top: 0;
+    /* Sits directly under the 52px settings header. */
+    top: 52px;
     z-index: 1;
     border-right: none;
     border-bottom: 1px solid var(--border);
     padding: 8px 12px;
   }
 
+  /* One flat scrollable row: the sticky wrapper becomes the strip, the
+     groups lay out inline, the group labels disappear. */
   .sidebarSticky {
     position: static;
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .group {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .group + .group {
+    margin-top: 0;
+  }
+
+  .groupLabel {
+    display: none;
   }
 
   .tabList {
     flex-direction: row;
     gap: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    /* Hide the horizontal scrollbar visually but keep panning working */
-    scrollbar-width: thin;
-    -webkit-overflow-scrolling: touch;
   }
 
   .tabItem {
@@ -214,6 +258,11 @@
     padding: 0 14px;
     white-space: nowrap;
     border: 1px solid var(--border);
+  }
+
+  .tabLabel {
+    white-space: nowrap;
+    padding: 0;
   }
 
   .sidebarTheme {

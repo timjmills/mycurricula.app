@@ -14,3 +14,8 @@ export { RailAddButton } from "./RailAddButton";
 export { GlobalShortcuts } from "./global-shortcuts";
 export { Clock } from "./Clock";
 export { UndoToastBridge } from "./undo-toast-bridge";
+export {
+  LastRouteRecorder,
+  readSettingsReturnRoute,
+  SETTINGS_RETURN_KEY,
+} from "./last-route-recorder";

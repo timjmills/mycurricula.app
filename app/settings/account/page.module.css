@@ -1,0 +1,259 @@
+/* Settings → Account page styles.
+ *
+ * Mirrors the centered max-width-1100 column the Appearance / Curriculum /
+ * Catch-up pages use so the settings tree reads as one coherent surface.
+ * All values via var(--token) — no hex. The radio-card recipe matches the
+ * Appearance pickers (theme-picker.module.css) so "choose one of N"
+ * controls look identical everywhere in Settings.
+ */
+
+.page {
+  padding: 24px;
+}
+
+.inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Display-name row ───────────────────────────────────────────────────
+   Input column + live avatar preview side-by-side on desktop/tablet;
+   wraps to a stacked column on phone so the input keeps its full width
+   and the 44px hit target. */
+
+.profileRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.fieldHint {
+  margin: 4px 0 0;
+  font-size: var(--t-12);
+  color: var(--muted);
+  line-height: 1.55;
+  text-wrap: pretty;
+  max-width: 64ch;
+}
+
+.textInput {
+  min-height: 44px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: var(--t-13);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+  max-width: 480px;
+}
+
+.textInput:hover {
+  border-color: var(--brand-300);
+}
+
+.textInput:focus-visible {
+  background: var(--surface);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .textInput {
+    transition: none;
+  }
+}
+
+/* ── Live avatar preview ────────────────────────────────────────────────
+   The same dawn-gradient initials circle the top bar renders
+   (components/shell/top-bar.module.css .avatar), sized up to the 44px
+   touch-target scale and framed in a quiet warm panel so it reads as a
+   preview, not a control. */
+
+.preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.avatarCircle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--grad-dawn);
+  color: var(--on-solid);
+  font-family: var(--font-display-sm);
+  font-size: var(--t-13);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  border: 2px solid var(--surface);
+  box-shadow: var(--sh-xs);
+  flex: 0 0 auto;
+}
+
+.previewText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.previewName {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.previewCaption {
+  font-size: var(--t-11);
+  color: var(--muted);
+}
+
+/* ── Radio-card option grid ─────────────────────────────────────────────
+   The RadioDot + label + description card from the Appearance pickers
+   (theme-picker.module.css .option). Selected state keys off
+   aria-checked; the global .cp-focusable class supplies the
+   focus-visible ring. */
+
+.options {
+  margin-top: 12px;
+  display: grid;
+  /* 200px floor → single column on a 360px phone, two-up on tablet,
+     all four startup options in one row on wide desktop. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  min-height: 44px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    box-shadow 140ms ease,
+    transform 140ms ease,
+    border-color 140ms ease;
+}
+
+.option:hover {
+  border-color: var(--ink-200);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.option:active {
+  transform: translateY(0);
+}
+
+.option[aria-checked="true"] {
+  border: 1.5px solid var(--theme-accent);
+  background: var(--theme-accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .option {
+    transition: none;
+  }
+  .option:hover,
+  .option:active {
+    transform: none;
+  }
+}
+
+.optionText {
+  flex: 1;
+  min-width: 0;
+}
+
+.optionLabel {
+  display: block;
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.optionDesc {
+  display: block;
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  margin-top: 2px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* ── Sign-in & account ──────────────────────────────────────────────── */
+
+.explainer {
+  margin: 4px 0 0;
+  font-size: var(--t-13);
+  line-height: 1.55;
+  color: var(--ink-soft);
+  text-wrap: pretty;
+  max-width: 64ch;
+}
+
+.signRow {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+}
+
+/* ── Phone tighten — match the other settings pages ───────────────── */
+
+@media (max-width: 540px) {
+  .page {
+    padding: 16px;
+  }
+  /* Inputs and the preview panel go full-width so nothing crowds at
+     360–480px and the touch targets stay comfortable. */
+  .textInput {
+    max-width: 100%;
+  }
+  .preview {
+    width: 100%;
+  }
+}

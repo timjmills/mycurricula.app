@@ -1,0 +1,422 @@
+/* Settings → Schedule page styles.
+ *
+ * Mirrors the centered max-width-1100 column the Curriculum + Appearance
+ * pages use so the settings tree reads as one coherent surface. All
+ * values via var(--token) — no hex. Input recipes (surface-warm fill,
+ * warm border, brand focus ring, 44px min-height) match the Curriculum
+ * page so the two forms feel like the same product.
+ *
+ * Responsive contract (BUILD_STANDARD §8):
+ *   Phone  360–480  — block rows stack vertically; day pills + the
+ *                     rotation toggle scroll horizontally inside their
+ *                     own containers (never the document).
+ *   Tablet 600–900  — rows split onto two lines (times+type / detail).
+ *   Desktop 1024+   — one row per block, aligned on a shared grid.
+ */
+
+.page {
+  padding: 24px;
+}
+
+.inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Shared field bits (same recipe as the Curriculum page) ─────────── */
+
+.fieldLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.fieldHint {
+  margin: 8px 0 0;
+  font-size: var(--t-12);
+  color: var(--muted);
+  line-height: 1.55;
+  text-wrap: pretty;
+  max-width: 64ch;
+}
+
+/* ── Horizontal scroller for segmented controls ─────────────────────
+   The rotation toggle (three descriptive labels) and the day pills
+   (up to seven) can outgrow a 360px viewport. Internal element scroll
+   is the sanctioned escape — the document never scrolls sideways.
+   Vertical padding leaves room for the ≤900px ::before hit-area
+   inflation inside ToggleGroup options. */
+
+.toggleScroller,
+.dayScroller {
+  margin-top: 8px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 4px 0 8px;
+  /* Keep the tray's rounded ends visible at the scroll edges */
+  scrollbar-width: thin;
+}
+
+.dayScroller {
+  margin-top: 4px;
+}
+
+/* ── Cycle-length stepper ───────────────────────────────────────────── */
+
+.cycleRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 4px;
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+}
+
+.stepperValue {
+  min-width: 72px;
+  text-align: center;
+  font-size: var(--t-15);
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.stepperUnit {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ── Rotation repeat preview (decorative) ───────────────────────────── */
+
+.cyclePreview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.cycleChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--brand-600);
+  background: var(--brand-50);
+  border: 1px solid var(--brand-300);
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+
+.cycleRepeat {
+  font-size: var(--t-11);
+  font-weight: 600;
+  font-style: italic;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Day-pill "customized" dot ──────────────────────────────────────
+   Marks day pills that already carry custom blocks. Brand (not a
+   subject color) — it's a non-subject signal (BUILD_STANDARD §4). */
+
+.dayDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--brand-500);
+}
+
+/* ── Block list ─────────────────────────────────────────────────────
+   Bordered stack with hairline dividers — same container recipe as the
+   Curriculum page's holiday list. */
+
+.blockList {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* One row: [start–end] [Class|Other] [subject / label] [remove].
+   The validation line is auto-placed (grid-column: 1 / -1) rather than
+   given a template row — an always-declared empty "note" row would add
+   a phantom row-gap below every valid row. */
+.blockRow {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+  grid-template-areas: "time type detail remove";
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 12px 12px 16px;
+  border-top: 1px solid var(--hairline);
+  min-height: 56px;
+}
+
+.blockRow:first-child {
+  border-top: 0;
+}
+
+/* Invalid (end ≤ start) rows get a quiet catch-up-red inset edge —
+   color carries meaning (the row is unsaved), never decoration. */
+.blockRowInvalid {
+  box-shadow: inset 3px 0 0 var(--catchup);
+}
+
+.timePair {
+  grid-area: time;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Safety valve for very narrow phones: the pair wraps rather than
+     forcing the row (or document) to scroll sideways. */
+  flex-wrap: wrap;
+}
+
+.timeDash {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.typeCell {
+  grid-area: type;
+  display: flex;
+  align-items: center;
+}
+
+.detailCell {
+  grid-area: detail;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.removeCell {
+  grid-area: remove;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Validation line — auto-placed into an implicit row spanning every
+   column, so it costs nothing when absent. */
+.rowError,
+.rowIncomplete {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--t-12);
+  line-height: 1.5;
+}
+
+.rowError {
+  color: var(--catchup);
+  font-weight: 600;
+}
+
+.rowIncomplete {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Tablet (≤900px) — two lines: times + type, then detail + remove.
+   Keeps every control full-size without squeezing the subject select. */
+@media (max-width: 900px) {
+  .blockRow {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    grid-template-areas:
+      "time   type"
+      "detail remove";
+    row-gap: 8px;
+  }
+}
+
+/* Phone (≤540px) — full vertical stack; each control spans the row so
+   every touch target keeps its ≥44px height and full width. */
+@media (max-width: 540px) {
+  .blockRow {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "time"
+      "type"
+      "detail"
+      "remove";
+    padding: 12px;
+  }
+  .removeCell {
+    justify-content: flex-start;
+  }
+}
+
+/* ── Inputs (Curriculum-page recipe) ────────────────────────────────── */
+
+.timeInput,
+.select,
+.labelInput {
+  min-height: 44px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: var(--t-13);
+  color: var(--ink);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.timeInput {
+  /* Wide enough for "HH:MM" + the native clock affordance; tabular
+     digits keep the start/end pair visually aligned down the list. */
+  width: 116px;
+  font-variant-numeric: tabular-nums;
+}
+
+.select {
+  cursor: pointer;
+  max-width: 240px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.labelInput {
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: 360px;
+}
+
+@media (max-width: 540px) {
+  .select,
+  .labelInput {
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
+.timeInput:hover,
+.select:hover,
+.labelInput:hover {
+  border-color: var(--brand-300);
+}
+
+.timeInput:focus-visible,
+.select:focus-visible,
+.labelInput:focus-visible {
+  background: var(--surface);
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 4px var(--brand-50);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeInput,
+  .select,
+  .labelInput {
+    transition: none;
+  }
+}
+
+/* ── Unsaved-rows note ──────────────────────────────────────────────── */
+
+.unsavedNote {
+  margin: 8px 0 0;
+  font-size: var(--t-12);
+  color: var(--catchup);
+  line-height: 1.5;
+  max-width: 64ch;
+}
+
+/* ── Actions row (Add block / Copy to all days) ─────────────────────── */
+
+.actionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ── Sample-day panel (empty state) ─────────────────────────────────
+   Quiet dashed container — visually "not yours yet", distinct from the
+   solid-bordered editor list above. */
+
+.samplePanel {
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-warm);
+}
+
+.sampleHint {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--ink-soft);
+  line-height: 1.55;
+  text-wrap: pretty;
+  max-width: 64ch;
+}
+
+.sampleList {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sampleItem {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: var(--t-12);
+  color: var(--muted);
+  min-width: 0;
+}
+
+.sampleTime {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sampleName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* The sample panel's actions reuse .actionsRow */
+
+/* ── Phone tighten — match Curriculum + Appearance pages ────────────── */
+
+@media (max-width: 540px) {
+  .page {
+    padding: 16px;
+  }
+}

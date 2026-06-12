@@ -8,6 +8,7 @@ import { UndoToastProvider } from "@/lib/undo-toast";
 import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
   GlobalShortcuts,
+  LastRouteRecorder,
   MasterBanner,
   RightPanel,
   SideNav,
@@ -75,6 +76,9 @@ export default function PlannerLayout({
                     {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
                     Mounted as a client leaf so the layout stays a Server Component. */}
                     <GlobalShortcuts />
+                    {/* Remembers the active planner route so the Settings X /
+                    Escape can return the teacher exactly where they left. */}
+                    <LastRouteRecorder />
                     {/* Roadmap-02 undo-toast bridge: a render-nothing client
                     leaf that watches the planner store's lastChange and fires
                     the undo toast for every undoable gesture (move /
