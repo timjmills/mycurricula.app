@@ -1,0 +1,685 @@
+/* ArchiveScreen.module.css — "the closed ledger."
+   The live planner is vivid and editable; a finished year is a BOUND, SEALED
+   VOLUME pulled off a shelf — hushed, desaturated, read-only. The current year
+   sits apart at the top as an OPEN volume (full color + CTA); archived years
+   are sealed volumes below, each wearing a wax-seal lock and a page-edge spine
+   of the eight locked subject colors.
+
+   Tokens only (CLAUDE.md §4) — every color/type/spacing decision references a
+   custom property from app/tokens.css. Mechanical layout px (widths, gaps,
+   non-scale radii) are fine; type sizes use the --t-* scale and colors use
+   tokens. The screen is wrapped in .cp-root, so tokens.css already collapses
+   animation/transition under prefers-reduced-motion — but nothing here relies
+   on motion for meaning. */
+
+/* ── Page shell ───────────────────────────────────────────────────────────
+   The planner <main> is an overflow:auto container; this screen is a centered
+   column that scrolls inside it. The atmosphere paints behind the content. */
+.root {
+  position: relative;
+  min-height: 100%;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 32px 72px;
+  background: var(--canvas);
+  isolation: isolate;
+}
+
+/* Atmosphere — a faint warm vignette BEHIND the content (never on a card).
+   Two low-opacity radial washes built from honey/peach tokens via color-mix,
+   anchored top-left/top-right, fading into the cream canvas. pointer-events
+   off; sits on z-0 with content above. */
+.atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 80% at 12% -8%,
+      color-mix(in srgb, var(--honey-200) 38%, transparent) 0%,
+      transparent 52%
+    ),
+    radial-gradient(
+      110% 70% at 100% 0%,
+      color-mix(in srgb, var(--subj-2-tint) 60%, transparent) 0%,
+      transparent 48%
+    );
+}
+
+/* Everything that is not the atmosphere stacks above it. */
+.head,
+.current,
+.shelfSection {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+.head {
+  max-width: 680px;
+  margin-bottom: 28px;
+}
+.kicker {
+  margin: 0 0 8px;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.title {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: var(--t-28);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.subtitle {
+  margin: 0;
+  max-width: 56ch;
+  font-size: var(--t-14);
+  line-height: 1.55;
+  color: var(--body);
+}
+
+/* ── The current year — the OPEN, live volume ──────────────────────────────
+   Full color hero card: white surface, soft border, medium elevation, a thin
+   honey accent bar across the top so it reads "alive / open." */
+.current {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 44px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-md);
+  overflow: hidden;
+}
+/* Honey/brand accent — the "open" glow along the top edge. */
+.current::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--grad-honey);
+  z-index: 2;
+}
+
+/* The page-edge spine on the current card — FULL saturation (no filter). */
+.currentSpine {
+  flex: 0 0 auto;
+}
+
+.currentBody {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 28px 26px;
+}
+
+.eyebrowRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-bottom: 6px;
+}
+/* "Current year" pill with a gentle live dot. */
+.eyebrowLive {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px 4px 9px;
+  border-radius: var(--r-pill);
+  background: var(--done-tint);
+  color: var(--done);
+  font-family: var(--font-display-sm);
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--done);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--done) 50%, transparent);
+  animation: archiveLiveDot 2.4s ease-in-out infinite;
+}
+@keyframes archiveLiveDot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--done) 50%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--done) 0%, transparent);
+  }
+}
+.eyebrowSpan {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.currentYear {
+  margin: 0 0 16px;
+  font-family: var(--font-display);
+  font-size: var(--t-26);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+/* ── Stat rows (shared by the current card + inside cover) ──────────────── */
+.statRow,
+.insideStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+}
+.statRow {
+  margin-bottom: 22px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.statValue {
+  font-family: var(--font-display-sm);
+  font-size: var(--t-20);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+}
+.statLabel {
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.currentActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+/* Primary CTA into the live plan. */
+.openPlanBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: var(--r-pill);
+  background: var(--brand-500);
+  color: var(--on-solid);
+  font-weight: 700;
+  font-size: var(--t-14);
+  text-decoration: none;
+  box-shadow: var(--sh-sm);
+  transition:
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+.openPlanBtn:hover {
+  background: var(--brand-600);
+  box-shadow: var(--sh-brand);
+}
+.openPlanBtn:hover span[aria-hidden] {
+  transform: translateX(2px);
+}
+.openPlanBtn span[aria-hidden] {
+  transition: transform 0.16s ease;
+}
+.openPlanBtn:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+.secondaryLink {
+  font-weight: 700;
+  font-size: var(--t-13);
+  color: var(--brand-600);
+  text-decoration: none;
+  padding: 6px 4px;
+  border-radius: var(--r-sm);
+}
+.secondaryLink:hover {
+  text-decoration: underline;
+}
+.secondaryLink:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+/* ── Shelf section ──────────────────────────────────────────────────────── */
+.shelfSection {
+  margin-top: 8px;
+}
+.shelfHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--hairline);
+}
+.shelfTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-18);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink-soft);
+}
+.shelfCount {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.empty {
+  margin: 0;
+  padding: 28px 24px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface-warm);
+  color: var(--body);
+  font-size: var(--t-14);
+  line-height: 1.55;
+  text-align: center;
+}
+
+/* Responsive grid of sealed volumes — 2-up on desktop, 1 col on phone. */
+.shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+/* ── A sealed volume ───────────────────────────────────────────────────────
+   The bound-book card. DESATURATED (saturate < 1 + a faint warm sepia wash)
+   to read "receded / read-only," with stacked-page depth on the right + bottom
+   edge (offset sliver pseudo-elements in warm border tints, suggesting a thick
+   stack of weeks). A staggered fade-in reveal settles each volume a beat after
+   the previous via --reveal-delay (set per index by the component). */
+.volume {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  /* Sealed = desaturated + a touch of warm sepia. The book "reopens" (color
+     returns) on hover / focus / open. */
+  filter: saturate(0.5) sepia(0.06);
+  /* Stacked-page depth: two stepped slivers cast off the right/bottom edge,
+     in warm border tints, like the cut edges of many bound weeks. */
+  box-shadow:
+    3px 3px 0 0 var(--surface-warm),
+    4px 4px 0 0 var(--border),
+    7px 7px 0 0 var(--surface-warm),
+    8px 8px 0 0 var(--ink-150),
+    var(--sh-sm);
+  transition:
+    filter 0.28s ease,
+    box-shadow 0.28s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease;
+  /* Staggered reveal. --reveal-delay comes from the component (per index). */
+  animation: archiveVolumeIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+@keyframes archiveVolumeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* A faint warm overlay reinforcing the sepia "sealed" cast — eases out on
+   hover/focus/open so the page brightens as the book reopens. */
+.volume::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--honey-100) 28%, transparent);
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  transition: opacity 0.28s ease;
+  z-index: 1;
+}
+
+/* Reopening: ease the desaturation back toward full color, lift the card, and
+   warm overlay clears. :focus-within covers keyboard users on the face button. */
+.volume:hover,
+.volume:focus-within,
+.volumeOpen {
+  filter: saturate(0.92) sepia(0);
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--honey-300) 50%, var(--border));
+  box-shadow:
+    3px 3px 0 0 var(--surface-warm),
+    4px 4px 0 0 var(--border),
+    7px 7px 0 0 var(--surface-warm),
+    8px 8px 0 0 var(--ink-150),
+    var(--sh-md);
+}
+.volume:hover::after,
+.volume:focus-within::after,
+.volumeOpen::after {
+  opacity: 0;
+}
+/* Fully reopened — color returns completely. */
+.volumeOpen {
+  filter: saturate(1) sepia(0);
+}
+
+/* The whole clickable face — a left-aligned flex row, ≥44px tall. */
+.volumeFace {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 44px;
+  padding: 16px 16px 16px 0;
+  text-align: left;
+  border-radius: var(--r-lg);
+}
+.volumeFace:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+/* The page-edge spine on a sealed volume. */
+.volumeSpine {
+  flex: 0 0 auto;
+}
+
+/* Wax-seal lock badge — a small embossed disc, slightly rotated, honey/idle
+   tone, holding the lock glyph. Nudges on reopen. */
+.seal {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: var(--honey-600);
+  background: radial-gradient(
+    circle at 38% 32%,
+    color-mix(in srgb, var(--honey-200) 80%, white) 0%,
+    var(--honey-300) 60%,
+    var(--honey-400) 100%
+  );
+  /* Embossed: a light inner highlight up-left, a soft inner shadow down-right,
+     plus a thin warm rim. */
+  box-shadow:
+    inset 0 1px 1px color-mix(in srgb, white 70%, transparent),
+    inset 0 -2px 3px color-mix(in srgb, var(--honey-600) 35%, transparent),
+    0 1px 2px color-mix(in srgb, var(--honey-600) 25%, transparent);
+  transform: rotate(-7deg);
+  transition:
+    transform 0.24s ease,
+    color 0.24s ease;
+}
+.volume:hover .seal,
+.volume:focus-within .seal,
+.volumeOpen .seal {
+  transform: rotate(2deg) scale(1.04);
+}
+
+/* Meta column — eyebrow, year, span. */
+.volumeMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.archivedEyebrow {
+  font-family: var(--font-display-sm);
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.volumeYear {
+  font-family: var(--font-display);
+  font-size: var(--t-20);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  color: var(--ink-soft);
+}
+.volumeSpan {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Counts (units · lessons). */
+.volumeCounts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  font-size: var(--t-12);
+  color: var(--body);
+  white-space: nowrap;
+}
+.volumeCounts b {
+  font-family: var(--font-display-sm);
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.countDot {
+  color: var(--faint);
+}
+
+/* Open / Close affordance. */
+.volumeChevron {
+  flex: 0 0 auto;
+  padding: 5px 11px;
+  border-radius: var(--r-pill);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--body);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+.volume:hover .volumeChevron,
+.volume:focus-within .volumeChevron,
+.volumeOpen .volumeChevron {
+  background: var(--brand-50);
+  border-color: var(--brand-100);
+  color: var(--brand-700);
+}
+
+/* ── Inside cover — the read-only summary revealed on open ──────────────────
+   The component's markup is fixed (note + stats + legend are direct children of
+   .insideCover, no extra wrapper), so the reveal animates a max-height + opacity
+   on .insideCover itself. Collapsed: 0 height, clipped, fully transparent;
+   opened: a generous max-height (larger than any real content so it never
+   clips) plus a fade-up. Warm secondary surface with a top hairline. */
+.insideCover {
+  position: relative;
+  z-index: 2;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  background: var(--surface-warm);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+  transition:
+    max-height 0.34s ease,
+    opacity 0.26s ease,
+    padding 0.34s ease;
+}
+.volumeOpen .insideCover {
+  /* Roomy ceiling: well above the tallest legend wrap at phone width, so the
+     content is never cut. The animation eases to content height visually
+     because the box-shadow/border below caps the card. */
+  max-height: 460px;
+  opacity: 1;
+  border-top: 1px solid var(--border);
+}
+.insideNote {
+  margin: 0;
+  padding: 16px 18px 0 18px;
+  font-size: var(--t-13);
+  line-height: 1.5;
+  color: var(--body);
+}
+.insideStats {
+  padding: 14px 18px 0 18px;
+  gap: 22px;
+}
+.subjectLegend {
+  list-style: none;
+  margin: 0;
+  padding: 14px 18px 18px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--body);
+}
+.legendSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-4);
+  background: var(--c);
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink-900) 8%, transparent);
+}
+
+/* ── The page-edge spine ────────────────────────────────────────────────────
+   A vertical flex column, small fixed width, full card height; each band is a
+   subject color (var(--c) via .cp-subj.<cls>). The locked-subject page-edge —
+   color carries meaning. Outer corners rounded to nest against the card. */
+.spine {
+  display: flex;
+  flex-direction: column;
+  width: 12px;
+  flex: 0 0 auto;
+  align-self: stretch;
+  overflow: hidden;
+  /* Rounded left edge nesting against the card corner. */
+  border-radius: var(--r-lg) 0 0 var(--r-lg);
+}
+.spineBand {
+  flex: 1;
+  background: var(--c);
+  min-height: 4px;
+}
+/* On the current (open) card the spine sits flush to the rounded card edge. */
+.currentSpine.spine {
+  width: 12px;
+  border-radius: 0;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+/* Tablet — keep the centered column but tighten gutters. */
+@media (max-width: 900px) {
+  .root {
+    padding: 32px 22px 64px;
+  }
+  .current {
+    margin-bottom: 36px;
+  }
+}
+
+/* Phone — single column shelf; current card stacks its spine above a softer
+   body; everything reflows without a horizontal scroll. */
+@media (max-width: 600px) {
+  .root {
+    padding: 26px 16px 56px;
+  }
+  .shelf {
+    grid-template-columns: 1fr;
+  }
+  .current {
+    flex-direction: column;
+  }
+  /* Spine becomes a thin horizontal band of subject colors across the top. */
+  .currentSpine.spine {
+    width: auto;
+    height: 10px;
+    flex-direction: row;
+    align-self: stretch;
+    border-radius: 0;
+  }
+  .currentBody {
+    padding: 20px 20px 22px;
+  }
+  .currentYear {
+    font-size: var(--t-24);
+  }
+  /* Volumes lose some of the stacked depth (no room for the offset) — keep a
+     single sliver so the bound look survives without overflowing the column. */
+  .volume {
+    box-shadow:
+      3px 3px 0 0 var(--surface-warm),
+      4px 4px 0 0 var(--ink-150),
+      var(--sh-sm);
+  }
+  .volume:hover,
+  .volume:focus-within,
+  .volumeOpen {
+    box-shadow:
+      3px 3px 0 0 var(--surface-warm),
+      4px 4px 0 0 var(--ink-150),
+      var(--sh-md);
+  }
+  .volumeFace {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 14px 14px 14px 0;
+  }
+  /* Counts + chevron drop below the meta on the narrowest screens. */
+  .volumeCounts {
+    order: 3;
+    padding-left: 14px;
+  }
+  .volumeChevron {
+    order: 4;
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .statRow,
+  .insideStats {
+    gap: 18px;
+  }
+}

@@ -127,7 +127,7 @@
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--paper);
+  color: var(--on-solid);
   background: var(--catchup);
   padding: 1px 6px;
   border-radius: var(--r-pill);

@@ -101,7 +101,7 @@
   gap: var(--r-8);
   border-radius: var(--r-12);
   background: var(--teach-go);
-  color: var(--paper);
+  color: var(--on-solid);
   font-size: clamp(18px, 4vh, 36px);
   font-weight: 800;
   letter-spacing: -0.01em;
@@ -162,7 +162,7 @@
   border: none;
   border-radius: var(--r-pill);
   background: var(--w-accent);
-  color: var(--paper);
+  color: var(--on-solid);
   font-size: 0.929em;
   font-weight: 800;
   cursor: pointer;

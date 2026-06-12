@@ -70,36 +70,12 @@ import { ensureCanvas } from "./board-migrate";
 import { BoardCapError, MAX_BOARDS_PER_TEACHER } from "./limits";
 import type { TeachDataSource } from "./queries";
 import { SANDBOX_LESSON_ID } from "./queries";
-import { createClient } from "../supabase/server";
+import { makeUnwrap, sb, type ServerClient } from "../supabase/helpers";
 import { slugToUuid } from "../planner/id-bridge";
 
-// ── Supabase client helper ───────────────────────────────────────────────────
-// The server client is async (it awaits `cookies()`), so every method resolves
-// it first. Resolving per call keeps the request-scoped auth session correct.
+// ── Supabase client helpers (shared, see lib/supabase/helpers.ts) ────────────
 
-type ServerClient = Awaited<ReturnType<typeof createClient>>;
-
-async function sb(): Promise<ServerClient> {
-  return createClient();
-}
-
-/** Wrap a supabase-js `{ data, error }` envelope: throw a descriptive Error on
- *  `error`, otherwise return `data`. Centralises the error-handling contract so
- *  every call site stays terse and no error is silently swallowed. */
-function unwrap<T>(
-  result: { data: T | null; error: { message: string } | null },
-  context: string,
-): T {
-  if (result.error) {
-    throw new Error(
-      `Teach repository ${context} failed: ${result.error.message}`,
-    );
-  }
-  if (result.data == null) {
-    throw new Error(`Teach repository ${context} returned no data.`);
-  }
-  return result.data;
-}
+const unwrap = makeUnwrap("Teach repository");
 
 // ── Row shapes (snake_case, as the migration declares them) ───────────────────
 

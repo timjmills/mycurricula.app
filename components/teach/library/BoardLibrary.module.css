@@ -319,7 +319,7 @@
 .filterPillActive {
   background: var(--wf-blue-accent);
   border-color: var(--wf-blue-accent);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .filterKind {

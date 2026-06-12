@@ -1,0 +1,952 @@
+/* Curriculum Planner — Design tokens
+   Grade 5 planning tool. Flat, calm, dense. Color carries meaning.
+
+   Ported from the design handoff (project/tokens.css). This is the single
+   source of truth for visual decisions. Tailwind supplies layout/spacing
+   utilities only — it must NOT define color tokens.
+
+   Two cross-cutting axes flip these tokens at runtime (see lib/theme.tsx):
+     • style       ∈ { quiet, calm, vivid }  → data-style on <html>
+     • paletteType ∈ { normal, highlight }   → data-palette on <html>
+   The subject-color custom properties (--c / --cl / --cd) are injected by
+   the PaletteProvider CSS bridge (lib/palette.tsx), not hard-coded here.
+*/
+
+:root {
+  /* ── Type ─────────────────────────────────────────────────────────────
+     v1.3 Curricula brand families (loaded via next/font in app/layout.tsx):
+       --font-display     Poppins  — large display + H1 (geometric, friendly)
+       --font-display-sm  DM Sans  — H2/H3, card titles (neutral, modern)
+       --font-logo        DM Sans  — the "mycurricula.app" wordmark
+       --font-sans        Plus Jakarta Sans — UI/body/data (clean, professional)
+     Geist remains only as a deep fallback so first paint never blanks. */
+  --font-display:
+    var(--font-poppins), "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --font-display-sm:
+    var(--font-dm-sans), "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-logo:
+    var(--font-dm-sans), "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    var(--font-jakarta), "Plus Jakarta Sans", var(--font-geist-sans),
+    ui-sans-serif, -apple-system, "Segoe UI", "Helvetica Neue", system-ui,
+    sans-serif;
+  --font-mono:
+    var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Size scale (§6.3) */
+  --t-28: 28px;
+  --t-26: 26px;
+  --t-24: 24px;
+  --t-22: 22px;
+  --t-20: 20px;
+  --t-18: 18px;
+  --t-16: 16px;
+  --t-15: 15px; /* day-name / drawer titles (v1.3) */
+  --t-14: 14px; /* lesson titles */
+  --t-13: 13px; /* body */
+  --t-12: 12px;
+  --t-11: 11px; /* standards codes */
+  --t-10: 10px; /* micro labels */
+
+  /* ── Surface neutrals (v1.3 warm register) ────────────────────────────
+     Remapped to the Curricula warm neutrals: ink is a near-black violet
+     (#1C1B2E), light surfaces warm toward the cream canvas. Names are kept
+     (referenced ~4k times) — only the values changed. The v1.3 semantic
+     aliases below (--ink, --body, --canvas, --border …) are the names new
+     work should reach for. */
+  --ink-900: #1c1b2e; /* primary text — near-black violet */
+  --ink-800: #272636; /* (intermediate — some surfaces reference it) */
+  --ink-700: #3a3950; /* secondary — ink-soft */
+  --ink-600: #494862; /* (intermediate — some surfaces reference it) */
+  --ink-500: #57566b; /* tertiary / meta — body */
+  --ink-400: #908fa3; /* muted */
+  --ink-300: #bfbed0; /* faint */
+  --ink-200: #d9d6cc; /* warm light border */
+  --ink-150: #eceae3; /* card / input border (warm) */
+  --ink-100: #f4f2ec; /* hairline (warm) */
+  --ink-50: #fcfaf6; /* cream canvas */
+  --paper: #ffffff;
+
+  /* v1.3 semantic neutral aliases — the brand vocabulary. Use these in new
+     work; they sit alongside the --ink-* scale above (same warm values). */
+  --canvas: #fcfaf6; /* app background — warm cream */
+  --surface: #ffffff; /* cards, panels */
+  --surface-warm: #fffdf8; /* inputs, secondary panels */
+  --ink: #1c1b2e; /* headings */
+  --ink-soft: #3a3950; /* strong UI text */
+  --body: #57566b; /* body copy */
+  --muted: #908fa3; /* secondary text, metadata */
+  --faint: #bfbed0; /* placeholders, disabled */
+  --border: #eceae3; /* card + input borders */
+  --border-cool: #e8eaf2; /* borders next to brand color */
+  --hairline: #f4f2ec; /* internal dividers */
+
+  /* ── Brand · Indigo (functional primary) ──────────────────────────────
+     Actions, links, focus rings, active nav, the "in progress" status. */
+  --brand-50: #eef3ff;
+  --brand-100: #dce6ff;
+  --brand-200: #baccff;
+  --brand-300: #8fa8ff;
+  --brand-400: #6383fb;
+  --brand-500: #3b6cf6; /* default */
+  --brand-600: #2e55db; /* button hover */
+  --brand-700: #2543b0;
+
+  /* ── Accent · Honey (warmth + CTA) ────────────────────────────────────
+     Marketing CTA, highlighted headings, celebration, "needs review". Honey
+     buttons use dark text (#3A2A05) — the yellow is too light for white. */
+  --honey-50: #fff8e7;
+  --honey-100: #ffefc2;
+  --honey-200: #fce095;
+  --honey-300: #f8cc5c;
+  --honey-400: #f4b740; /* default */
+  --honey-500: #e9a526;
+  --honey-600: #c9871a;
+
+  /* Tooltip surface — richer-than-ink-900 near-black + light text. The
+     Tooltip primitive uses these instead of --ink-900 / --paper so we
+     can tune the popup look (translucency, shadow weight) independently
+     of body text color. CLAUDE.md §4 onboarding tooltips. */
+  --tooltip-bg: rgba(10, 10, 12, 0.94);
+  --tooltip-fg: #f5f5f7;
+  --tooltip-shadow:
+    0 12px 32px -8px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.28);
+
+  /* ── Subject scale — v1.3 (15 muted hues, White Rose register) ─────────
+     Each slot has a solid (--subj-N, headers/icons), a tint (--subj-N-tint,
+     fills/lanes/chips) and an ink (--subj-N-ink, AA text on tint). The
+     -bright variant is a more saturated accent used ONLY for chip outlines,
+     icon tiles and dots in the cascade. Assign any subject to any slot; the
+     8 active subjects below map onto these. */
+  --subj-1: #dcc674;
+  --subj-1-tint: #f4efdf;
+  --subj-1-ink: #7a671f; /* gold */
+  --subj-2: #dca574;
+  --subj-2-tint: #f4e9df;
+  --subj-2-ink: #7a491f; /* apricot */
+  --subj-3: #dc8274;
+  --subj-3-tint: #f4e2df;
+  --subj-3-ink: #7a2b1f; /* coral */
+  --subj-4: #cf778d;
+  --subj-4-tint: #f2e1e5;
+  --subj-4-ink: #7a1f36; /* rose */
+  --subj-5: #cf77af;
+  --subj-5-tint: #f2e1ec;
+  --subj-5-ink: #7a1f59; /* pink */
+  --subj-6: #c77ac7;
+  --subj-6-tint: #f0e2f0;
+  --subj-6-ink: #752475; /* magenta */
+  --subj-7: #ab7ac7;
+  --subj-7-tint: #ebe2f0;
+  --subj-7-ink: #572475; /* purple */
+  --subj-8: #917ac7;
+  --subj-8-tint: #e6e2f0;
+  --subj-8-ink: #3c2475; /* violet */
+  --subj-9: #7a7fc7;
+  --subj-9-tint: #e2e3f0;
+  --subj-9-ink: #242975; /* periwinkle */
+  --subj-10: #7a9ec7;
+  --subj-10-tint: #e2e9f0;
+  --subj-10-ink: #244a75; /* blue */
+  --subj-11: #7ab8c7;
+  --subj-11-tint: #e2eef0;
+  --subj-11-ink: #246575; /* cyan */
+  --subj-12: #7ac7b8;
+  --subj-12-tint: #e2f0ee;
+  --subj-12-ink: #247565; /* teal */
+  --subj-13: #7ac79b;
+  --subj-13-tint: #e2f0e8;
+  --subj-13-ink: #247547; /* green */
+  --subj-14: #7ac77a;
+  --subj-14-tint: #e2f0e2;
+  --subj-14-ink: #257425; /* leaf */
+  --subj-15: #9ac77a;
+  --subj-15-tint: #e8f0e2;
+  --subj-15-ink: #467524; /* lime */
+
+  /* Bright chip accents — outlines, icon tiles and dots in the cascade only */
+  --subj-1-bright: #e8bb17;
+  --subj-2-bright: #e87917;
+  --subj-3-bright: #e83317;
+  --subj-4-bright: #e8174b;
+  --subj-5-bright: #e8179b;
+  --subj-6-bright: #d147d1;
+  --subj-7-bright: #9f47d1;
+  --subj-8-bright: #7147d1;
+  --subj-9-bright: #4751d1;
+  --subj-10-bright: #4788d1;
+  --subj-11-bright: #47b6d1;
+  --subj-12-bright: #47d1b6;
+  --subj-13-bright: #47d183;
+  --subj-14-bright: #47d147;
+  --subj-15-bright: #81d147;
+
+  /* ── Subject aliases (team-wide, fixed 8) ─────────────────────────────
+     The 8 locked subjects, re-pointed onto v1.3 slots (authoritative map
+     from the design kit's data.js). `-light` = the slot tint, `-deep` = the
+     slot ink, so the existing `.cp-subj.<id>` classes keep working. These are
+     the STATIC fallback — live subject color is driven by lib/palette-data.ts
+     + the PaletteCssBridge, which overrides --c / --cl / --cd at runtime. */
+  --math: var(--subj-1);
+  --math-light: var(--subj-1-tint);
+  --math-deep: var(--subj-1-ink);
+  --math-bright: var(--subj-1-bright);
+
+  --reading: var(--subj-10);
+  --reading-light: var(--subj-10-tint);
+  --reading-deep: var(--subj-10-ink);
+  --reading-bright: var(--subj-10-bright);
+
+  --writing: var(--subj-2);
+  --writing-light: var(--subj-2-tint);
+  --writing-deep: var(--subj-2-ink);
+  --writing-bright: var(--subj-2-bright);
+
+  --grammar: var(--subj-7);
+  --grammar-light: var(--subj-7-tint);
+  --grammar-deep: var(--subj-7-ink);
+  --grammar-bright: var(--subj-7-bright);
+
+  --spelling: var(--subj-5);
+  --spelling-light: var(--subj-5-tint);
+  --spelling-deep: var(--subj-5-ink);
+  --spelling-bright: var(--subj-5-bright);
+
+  --ufli: var(--subj-3);
+  --ufli-light: var(--subj-3-tint);
+  --ufli-deep: var(--subj-3-ink);
+  --ufli-bright: var(--subj-3-bright);
+
+  --explorers: var(--subj-13);
+  --explorers-light: var(--subj-13-tint);
+  --explorers-deep: var(--subj-13-ink);
+  --explorers-bright: var(--subj-13-bright);
+
+  --sel: var(--subj-9);
+  --sel-light: var(--subj-9-tint);
+  --sel-deep: var(--subj-9-ink);
+  --sel-bright: var(--subj-9-bright);
+
+  /* Grade bands — White Rose years (grade-level tagging, NOT subjects) */
+  --gK: #f6c96a;
+  --gK-tint: #fff1c9;
+  --g1: #e86a5c;
+  --g1-tint: #fadbd5;
+  --g2: #9ab88b;
+  --g2-tint: #dde8d3;
+  --g3: #7a9ac2;
+  --g3-tint: #d5e1ef;
+  --g4: #c291b8;
+  --g4-tint: #ecd7e7;
+  --g5: #8b7fc0;
+  --g5-tint: #dcd7ee;
+
+  /* ── Status / semantic colors ─────────────────────────────────────────
+     v1.3 progress layer — deliberately MORE saturated than subjects so a
+     marker always reads as progress, never as a subject. Green = done,
+     brand blue = in progress, grey = not started, honey = needs review. */
+  --done: #16a06b;
+  --done-tint: #e4f6ee;
+  --progress: #3b6cf6; /* brand blue */
+  --progress-tint: #eef3ff;
+  --idle: #b6b5c6; /* not started */
+  --idle-tint: #f1f0f4;
+  --warn: #e9a526; /* needs review — honey */
+  --warn-tint: #fff8e7;
+  --danger: #ef5a5a;
+  --danger-tint: #fdecec;
+
+  /* Product semantics (kept) — daily-note priorities + catch-up flame. */
+  --urgent: #d92b3c; /* daily-notes urgent (pulse) */
+  --urgent-bg: #fde6e8;
+  --important: #b88300; /* important — yellow/amber */
+  --important-bg: #fdf3d2;
+  --fyi: #1f6fb8;
+  --fyi-bg: #e0eefb;
+  --catchup: #e0431a; /* flame red — catch-up */
+  --catchup-bg: #ffe6dd;
+  /* Core-curriculum mode — soft red/pink, not the dark urgent red.
+     Carries the "this is the shared plan" warning without feeling like
+     an emergency. */
+  --core-mode: #e36b7e;
+  --core-mode-bg: #fde6ea;
+  --core-mode-deep: #9a2e42;
+
+  /* ── Tag palette (distinct from subjects) ─────────────────────────── */
+  /* Pills, not stripes. Brighter, more saturated, no muted shade. */
+  --tag-red: #ef4655;
+  --tag-orange: #f08443;
+  --tag-amber: #e8a91a;
+  --tag-green: #38b85a;
+  --tag-teal: #1ab1a3;
+  --tag-blue: #3580f0;
+  --tag-indigo: #5660d8;
+  --tag-purple: #8b48d4;
+  --tag-pink: #e54b94;
+  --tag-gray: #8b909e;
+
+  /* ── Tag-pill chrome (bg + fg pairs) ──────────────────────────────── */
+  /* Soft pastel fill + deep contrast text, for resource-type pills,
+     mini-row icon squares, and other badge/chip surfaces. These are
+     distinct from the `--tag-*` mid-tones above (which are saturated
+     dots): the pill pairs are the chrome a chip wears, not the chip
+     identity color. Approx Tailwind 100/800 pairs, picked for WCAG AA
+     contrast in their bg/fg combinations. */
+  --tag-pink-bg: #fce7f3;
+  --tag-pink-fg: #9d174d;
+  --tag-blue-bg: #dbeafe;
+  --tag-blue-fg: #1e40af;
+  --tag-red-bg: #fee2e2;
+  --tag-red-fg: #991b1b;
+  --tag-gray-bg: #f3f4f6;
+  --tag-gray-fg: #374151;
+  --tag-amber-bg: #fef3c7;
+  --tag-amber-fg: #92400e;
+  --tag-green-bg: #dcfce7;
+  --tag-green-fg: #166534;
+
+  /* YouTube brand-adjacent red — for the resource-type tint on YouTube
+     rows in the lesson card. Sits alongside `--urgent` / `--fyi` / etc.
+     as a semantic, not a subject color. The deep variant is the text
+     fill; the mid is consumed via `color-mix(... 18%, white)` to make a
+     soft pink-red wash for the row background. */
+  --youtube: #e53935;
+  --youtube-deep: #b71c1c;
+
+  /* ── Highlighter pens ─────────────────────────────────────────────── */
+  /* Bright marker colors + softer pastel tints for the rich-text
+     highlight picker. */
+  --hl-lemon: #ffff77;
+  --hl-lime: #aeff77;
+  --hl-mint: #77ff92;
+  --hl-aqua: #77ffe4;
+  --hl-maya: #77c9ff;
+  --hl-slate: #7777ff;
+  --hl-heliotrope: #c977ff;
+  --hl-violet: #ff77e4;
+  --hl-red: #ff7792;
+  --hl-cheese: #ffae77;
+
+  --hlp-lemon: #fdfdc7;
+  --hlp-lime: #dcfcc7;
+  --hlp-mint: #c7fccf;
+  --hlp-aqua: #c7fcf2;
+  --hlp-maya: #c7e7fc;
+  --hlp-slate: #c7c7fc;
+  --hlp-heliotrope: #e6c7fc;
+  --hlp-violet: #fcc7f2;
+  --hlp-red: #fcc7d0;
+  --hlp-cheese: #fcdcc7;
+
+  /* ── Teach board widget tints ─────────────────────────────────────── */
+  /* Soft pastel washes for widget-tile backgrounds on the Teaching Board
+     (docs/teach-view-plan.md §9). Consistent with the --tag-*-bg family:
+     light, low-saturation surfaces that keep dark ink legible at AA. Used
+     only as informational tile backgrounds — never decoration. */
+  --board-tint-yellow: #fdf6c7;
+  --board-tint-mint: #d6f5e3;
+  --board-tint-sky: #d9ecfd;
+  --board-tint-pink: #fce0ef;
+  --board-tint-lavender: #e8e2fb;
+  --board-tint-peach: #fde6d3;
+
+  /* Teaching-board interactive-widget semantics (Teach Phase 3). Vivid,
+     projector-legible signal colours for the traffic light, work symbols,
+     timer alarm, and sound-level meter. Distinct from the muted --tag-* set. */
+  --traffic-red: #e5404a;
+  --traffic-amber: #f5a623;
+  --traffic-green: #34b96a;
+  --traffic-off: #d4d8e0;
+  --teach-alarm: #e5404a;
+  --teach-go: #34b96a;
+
+  /* ── Teaching-board backgrounds (Teach Phase 3, plan §4.2) ──────────────
+     The classroomscreen-style board background picker: 15 solid colours, 15
+     repeating patterns, and 15 seamless repeating gradients. Each is a single
+     `background` shorthand value (colour, or image + size so it tiles), so a
+     board applies one with `background: var(--teach-bg-<id>)`. Every widget
+     tile sits on `--paper`, so dark ink stays AA-legible over any background.
+     Hex lives here (the token source) — components only reference the vars.
+
+     Supporting hue palette (soft, low-saturation) used by the solids,
+     patterns, and gradients so the family stays harmonious. */
+  --teach-hue-slate: #e3e8ef;
+  --teach-hue-rose: #f6dfe6;
+  --teach-hue-amber: #f8ead0;
+  --teach-hue-lime: #e4f0d4;
+  --teach-hue-teal: #d4efe9;
+  --teach-hue-sky: #d8e9f7;
+  --teach-hue-indigo: #e0e2f5;
+  --teach-hue-violet: #e9e1f3;
+  --teach-hue-ink: #cbd3df;
+
+  /* 15 solid colours — calm, projector-friendly fills. */
+  --teach-bg-solid-1: #ffffff;
+  --teach-bg-solid-2: #f6f7f9;
+  --teach-bg-solid-3: #eef2f7;
+  --teach-bg-solid-4: #fdf6e3;
+  --teach-bg-solid-5: #fcefe8;
+  --teach-bg-solid-6: #fde7ee;
+  --teach-bg-solid-7: #f2e9fb;
+  --teach-bg-solid-8: #e7ecfb;
+  --teach-bg-solid-9: #e2f0fb;
+  --teach-bg-solid-10: #e0f3ee;
+  --teach-bg-solid-11: #eaf4dd;
+  --teach-bg-solid-12: #fbf3d6;
+  --teach-bg-solid-13: #2b3245;
+  --teach-bg-solid-14: #1f2937;
+  --teach-bg-solid-15: #11161f;
+
+  /* 15 repeating patterns — subtle, tileable (size in the shorthand). */
+  --teach-bg-pattern-1:
+    radial-gradient(circle, var(--teach-hue-ink) 1.4px, transparent 1.6px) 0 0 /
+      22px 22px,
+    var(--paper);
+  --teach-bg-pattern-2:
+    radial-gradient(circle, var(--teach-hue-sky) 2px, transparent 2.2px) 0 0 /
+      28px 28px,
+    #f4f8fc;
+  --teach-bg-pattern-3:
+    linear-gradient(var(--teach-hue-slate) 1px, transparent 1px) 0 0 / 26px 26px,
+    linear-gradient(90deg, var(--teach-hue-slate) 1px, transparent 1px) 0 0 /
+      26px 26px,
+    var(--paper);
+  --teach-bg-pattern-4:
+    linear-gradient(var(--teach-hue-sky) 1px, transparent 1px) 0 0 / 26px 26px,
+    #f6fafe;
+  --teach-bg-pattern-5:
+    repeating-linear-gradient(
+      45deg,
+      var(--teach-hue-slate) 0 2px,
+      transparent 2px 14px
+    ),
+    var(--paper);
+  --teach-bg-pattern-6:
+    repeating-linear-gradient(
+      -45deg,
+      var(--teach-hue-rose) 0 2px,
+      transparent 2px 14px
+    ),
+    #fdf6f8;
+  --teach-bg-pattern-7:
+    repeating-linear-gradient(
+      0deg,
+      var(--teach-hue-amber) 0 12px,
+      transparent 12px 24px
+    ),
+    #fffaf0;
+  --teach-bg-pattern-8:
+    repeating-linear-gradient(
+      90deg,
+      var(--teach-hue-teal) 0 12px,
+      transparent 12px 24px
+    ),
+    #f1faf7;
+  --teach-bg-pattern-9:
+    repeating-linear-gradient(
+      45deg,
+      var(--teach-hue-lime) 0 10px,
+      transparent 10px 20px
+    ),
+    #f8fcf0;
+  --teach-bg-pattern-10:
+    radial-gradient(
+        circle at 50% 50%,
+        var(--teach-hue-violet) 0 6px,
+        transparent 7px
+      )
+      0 0 / 30px 30px,
+    #f8f5fc;
+  --teach-bg-pattern-11:
+    radial-gradient(
+        circle at 0 0,
+        var(--teach-hue-indigo) 0 8px,
+        transparent 9px
+      )
+      0 0 / 26px 26px,
+    #f3f4fc;
+  --teach-bg-pattern-12:
+    conic-gradient(
+        from 45deg,
+        var(--teach-hue-slate) 0 25%,
+        transparent 0 50%,
+        var(--teach-hue-slate) 0 75%,
+        transparent 0
+      )
+      0 0 / 28px 28px,
+    var(--paper);
+  --teach-bg-pattern-13:
+    repeating-linear-gradient(
+      45deg,
+      var(--teach-hue-sky) 0 1px,
+      transparent 1px 16px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      var(--teach-hue-sky) 0 1px,
+      transparent 1px 16px
+    ),
+    #f6fafe;
+  --teach-bg-pattern-14:
+    radial-gradient(circle, var(--teach-hue-amber) 1.6px, transparent 1.8px) 0
+      0 / 18px 18px,
+    radial-gradient(circle, var(--teach-hue-amber) 1.6px, transparent 1.8px) 9px
+      9px / 18px 18px,
+    #fffaf0;
+  --teach-bg-pattern-15:
+    repeating-linear-gradient(
+      135deg,
+      var(--teach-hue-violet) 0 3px,
+      transparent 3px 10px
+    ),
+    #f8f5fc;
+
+  /* 15 seamless repeating gradients — tileable bands / weaves / rays. */
+  --teach-bg-gradient-1: repeating-linear-gradient(
+    135deg,
+    #eaf1fb 0 24px,
+    #f4f8fd 24px 48px
+  );
+  --teach-bg-gradient-2: repeating-linear-gradient(
+    45deg,
+    #fdeef3 0 22px,
+    #fbf4f7 22px 44px
+  );
+  --teach-bg-gradient-3: repeating-linear-gradient(
+    90deg,
+    #eef7f1 0 26px,
+    #f6fbf8 26px 52px
+  );
+  --teach-bg-gradient-4: repeating-linear-gradient(
+    0deg,
+    #fff6e2 0 24px,
+    #fffaf0 24px 48px
+  );
+  --teach-bg-gradient-5: repeating-linear-gradient(
+    60deg,
+    #f0ecfb 0 20px,
+    #f7f4fc 20px 40px
+  );
+  --teach-bg-gradient-6: repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      #eef2f8 0deg 18deg,
+      #f7f9fc 18deg 36deg
+    )
+    0 0 / 64px 64px;
+  --teach-bg-gradient-7: repeating-conic-gradient(
+      #f6eef8 0% 25%,
+      #fbf6fc 0% 50%
+    )
+    0 0 / 40px 40px;
+  --teach-bg-gradient-8:
+    repeating-linear-gradient(45deg, #e9f1fa 0 16px, transparent 16px 32px),
+    repeating-linear-gradient(-45deg, #e9f1fa 0 16px, #f5f9fd 16px 32px);
+  --teach-bg-gradient-9: repeating-radial-gradient(
+    circle at 50% 50%,
+    #e7f3ef 0 14px,
+    #f3faf7 14px 28px
+  );
+  --teach-bg-gradient-10: repeating-radial-gradient(
+    circle at 0 0,
+    #eef0fb 0 18px,
+    #f6f7fd 18px 36px
+  );
+  --teach-bg-gradient-11: repeating-linear-gradient(
+    135deg,
+    #fdeede 0 20px,
+    #fef6ec 20px 40px
+  );
+  --teach-bg-gradient-12: repeating-linear-gradient(
+    90deg,
+    #f3eefb 0 14px,
+    #faf6fd 14px 28px
+  );
+  --teach-bg-gradient-13:
+    repeating-linear-gradient(0deg, #e9f2f0 0 18px, transparent 18px 36px),
+    repeating-linear-gradient(90deg, #e9f2f0 0 18px, #f4faf8 18px 36px);
+  --teach-bg-gradient-14: repeating-conic-gradient(
+      from 45deg at 50% 50%,
+      #2d3447 0deg 20deg,
+      #353d52 20deg 40deg
+    )
+    0 0 / 72px 72px;
+  --teach-bg-gradient-15: repeating-linear-gradient(
+    45deg,
+    #232a3a 0 22px,
+    #2b3346 22px 44px
+  );
+
+  /* ── Teach widget visual system (5.31 Boards & Widgets redesign) ────────
+     The pastel-paper widget system from the 5.31 design handoff. Six colour
+     families + three neutrals, each exposing -bg / -chip / -accent / -soft /
+     -line and a -grad gradient (near-white top → family tint). A themeable
+     widget reads these via the --w-* contract (see lib/teach/widget-theme.ts);
+     the appearance editor lets a board theme + per-widget overrides repaint
+     them. Hex lives HERE only — components reference the vars. Exact values
+     ported from the handoff's widgets530.css. Distinct from the older
+     --board-tint-* / --teach-bg-* sets (those drive tile tints + the fullscreen
+     backdrop picker; these drive the new themeable widget surfaces). */
+  --wf-yellow-bg: #fdf5da;
+  --wf-yellow-chip: #f6df84;
+  --wf-yellow-accent: #d99c08;
+  --wf-yellow-soft: #fbeec3;
+  --wf-yellow-line: #f0e3b0;
+  --wf-yellow-grad: linear-gradient(165deg, #fffdf3 0%, #fbf1cf 100%);
+  --wf-green-bg: #eaf6ed;
+  --wf-green-chip: #bce6c6;
+  --wf-green-accent: #1fa85a;
+  --wf-green-soft: #d9f0df;
+  --wf-green-line: #cde9d4;
+  --wf-green-grad: linear-gradient(165deg, #f7fcf9 0%, #e4f3e9 100%);
+  --wf-pink-bg: #fce5ee;
+  --wf-pink-chip: #f7bcd4;
+  --wf-pink-accent: #e84e93;
+  --wf-pink-soft: #fad3e3;
+  --wf-pink-line: #f3c9da;
+  --wf-pink-grad: linear-gradient(165deg, #fef5f9 0%, #fbe0e9 100%);
+  --wf-purple-bg: #f0ecfc;
+  --wf-purple-chip: #d6cbf7;
+  --wf-purple-accent: #7c5cf6;
+  --wf-purple-soft: #e5dcfb;
+  --wf-purple-line: #ddd3f5;
+  --wf-purple-grad: linear-gradient(165deg, #faf8fe 0%, #ede8fb 100%);
+  --wf-orange-bg: #fdeede;
+  --wf-orange-chip: #fbd2ac;
+  --wf-orange-accent: #f2802b;
+  --wf-orange-soft: #fbddc1;
+  --wf-orange-line: #f7d8bc;
+  --wf-orange-grad: linear-gradient(165deg, #fffbf5 0%, #fce8d6 100%);
+  --wf-blue-bg: #e9f1fe;
+  --wf-blue-chip: #c1d9fb;
+  --wf-blue-accent: #2e6be6;
+  --wf-blue-soft: #d8e7fd;
+  --wf-blue-line: #cfe0fb;
+  --wf-blue-grad: linear-gradient(165deg, #f6faff 0%, #e4edfe 100%);
+  /* Neutral theme options (appearance editor): slate / cloud(white) / dark(night) */
+  --wf-slate-bg: #eef0f4;
+  --wf-slate-chip: #e1e5ec;
+  --wf-slate-accent: #5b6478;
+  --wf-slate-soft: #eef0f4;
+  --wf-slate-line: #dde1e8;
+  --wf-slate-grad: linear-gradient(165deg, #f8f9fb 0%, #e9ecf1 100%);
+  --wf-cloud-bg: #f6f7f9;
+  --wf-cloud-chip: #eef0f4;
+  --wf-cloud-accent: #3b4456;
+  --wf-cloud-soft: #f5f7f9;
+  --wf-cloud-line: #e9ebf0;
+  --wf-cloud-grad: linear-gradient(165deg, #ffffff 0%, #f3f5f8 100%);
+  --wf-dark-bg: #1c2333;
+  --wf-dark-chip: #3a435c;
+  --wf-dark-accent: #9db4e8;
+  --wf-dark-soft: #2b3346;
+  --wf-dark-line: #39425a;
+  --wf-dark-grad: linear-gradient(165deg, #262e42 0%, #171d2c 100%);
+  --wf-ink-accent: #101729;
+
+  /* Widget-system fonts (the appearance editor's 5 font options). The actual
+     faces load via next/font in app/layout.tsx, exposing the --font-* vars
+     below; this maps the handoff's keys to those vars with safe fallbacks. */
+  --wf-font-jakarta: var(
+    --font-jakarta,
+    "Plus Jakarta Sans",
+    ui-sans-serif,
+    system-ui,
+    sans-serif
+  );
+  --wf-font-rounded: var(--font-quicksand, "Quicksand", system-ui, sans-serif);
+  --wf-font-serif: Georgia, "Times New Roman", serif;
+  --wf-font-hand: var(--font-caveat, "Caveat", cursive);
+  --wf-font-mono: ui-monospace, Menlo, monospace;
+
+  /* Widget-system radii + shadows (handoff ladder; namespaced to avoid clashing
+     with the existing --r-* / --shadow-* sets). */
+  --wf-r-card: 22px;
+  --wf-r-inner: 16px;
+  --wf-r-button: 14px;
+  --wf-r-chip: 11px;
+  --wf-shadow-card:
+    0 1px 2px rgba(16, 23, 41, 0.04), 0 6px 20px rgba(16, 23, 41, 0.05);
+  --wf-shadow-inner:
+    0 1px 2px rgba(16, 23, 41, 0.05), 0 2px 8px rgba(16, 23, 41, 0.04);
+  --wf-shadow-pop: 0 18px 60px rgba(16, 23, 41, 0.22);
+
+  /* ── Spacing / radii ──────────────────────────────────────────────────
+     The numeric --r-2…12 stay for dense internal corners. The v1.3 named
+     radii (added) carry the soft, rounded feel: chips 10–14, cards 18,
+     panels 24, hero/cover 32, and pill (999) for buttons/badges/search. */
+  --r-2: 2px;
+  --r-4: 4px;
+  --r-6: 6px;
+  --r-8: 8px;
+  --r-12: 12px;
+  --r-xs: 6px;
+  --r-sm: 10px; /* small + week chips */
+  --r-md: 14px; /* inputs, unit chips, lesson cards */
+  --r-lg: 18px; /* cards, panels */
+  --r-xl: 24px; /* panels, previews */
+  --r-2xl: 32px; /* cover, hero */
+  --r-pill: 999px;
+
+  /* ── Gradients (v1.3) — atmosphere only, never on ordinary cards ──────── */
+  --grad-hero: linear-gradient(
+    118deg,
+    #ffe7c2 0%,
+    #fdead9 26%,
+    #f4e7ff 62%,
+    #dcf5ec 100%
+  );
+  --grad-brand: linear-gradient(135deg, #eef3ff 0%, #f4e7ff 100%);
+  --grad-honey: linear-gradient(135deg, #f8cc5c 0%, #f4b740 100%);
+  --grad-dawn: linear-gradient(135deg, #ffd8a8 0%, #ffb3c7 50%, #c9b6ff 100%);
+  --grad-mint: linear-gradient(135deg, #bff0dc 0%, #a8e3ff 100%);
+
+  /* ── Chrome geometry + stacking ───────────────────────────────────────
+     Shared layout constants for the app chrome. `--topbar-h` is the sticky
+     planner top bar's height (keep in sync with top-bar.module.css `.bar`).
+     The docked side rails/panels use it as their sticky `top:` offset and
+     as the subtrahend for their self-contained viewport-tall height, so the
+     center scrolls while the bars stay put. The z-scale keeps the sticky
+     rails above page content but below the top bar + master banner. */
+  --topbar-h: 52px;
+  --z-rail: 20;
+  --z-topbar: 30;
+  --z-banner: 40;
+
+  --line: 1px solid var(--ink-150);
+  --line-strong: 1px solid var(--ink-200);
+
+  --shadow-card:
+    0 1px 2px rgba(20, 22, 32, 0.04), 0 1px 3px rgba(20, 22, 32, 0.06);
+  --shadow-card-hover:
+    0 2px 6px rgba(20, 22, 32, 0.07), 0 4px 12px rgba(20, 22, 32, 0.08);
+  --shadow-popover:
+    0 2px 4px rgba(20, 22, 32, 0.06), 0 10px 28px rgba(20, 22, 32, 0.12);
+
+  /* ── Elevation (v1.3) — soft, low-contrast, cast cool over the warm canvas.
+     Color glows (--sh-brand / --sh-honey) are RATIONED to primary buttons. */
+  --sh-xs: 0 1px 2px rgba(28, 27, 46, 0.05);
+  --sh-sm: 0 2px 6px rgba(28, 27, 46, 0.06);
+  --sh-md: 0 10px 24px -10px rgba(28, 27, 46, 0.14);
+  --sh-lg: 0 22px 48px -16px rgba(28, 27, 46, 0.2);
+  --sh-brand: 0 12px 26px -10px rgba(59, 108, 246, 0.45);
+  --sh-honey: 0 12px 26px -10px rgba(233, 165, 38, 0.55);
+}
+
+/* ── Base resets scoped to components ─────────────────────────────────── */
+.cp-root,
+.cp-root * {
+  box-sizing: border-box;
+}
+.cp-root {
+  font-family: var(--font-sans);
+  font-size: var(--t-13);
+  line-height: 1.4;
+  color: var(--ink-900);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+.cp-root button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.cp-root input,
+.cp-root textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+.cp-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "ss01";
+}
+
+/* Subject color mapping helper — used by .cp-subj.math, etc., so a single
+   class drives stripe + bg + text color. The PaletteProvider CSS bridge
+   (lib/palette.tsx) overrides --c / --cl / --cd per the active palette
+   type; these are the static fallbacks if no provider is mounted. */
+.cp-subj {
+  --c: var(--ink-500);
+  --cl: var(--ink-100);
+  --cd: var(--ink-700);
+}
+.cp-subj.math {
+  --c: var(--math);
+  --cl: var(--math-light);
+  --cd: var(--math-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--math-light);
+  --c-surface-strong: color-mix(in srgb, var(--math) 22%, white);
+  --c-border: color-mix(in srgb, var(--math) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--math-light) 60%, white);
+  --c-progress-fill: var(--math);
+  --c-deep: var(--math-deep);
+}
+.cp-subj.reading {
+  --c: var(--reading);
+  --cl: var(--reading-light);
+  --cd: var(--reading-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--reading-light);
+  --c-surface-strong: color-mix(in srgb, var(--reading) 22%, white);
+  --c-border: color-mix(in srgb, var(--reading) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--reading-light) 60%, white);
+  --c-progress-fill: var(--reading);
+  --c-deep: var(--reading-deep);
+}
+.cp-subj.writing {
+  --c: var(--writing);
+  --cl: var(--writing-light);
+  --cd: var(--writing-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--writing-light);
+  --c-surface-strong: color-mix(in srgb, var(--writing) 22%, white);
+  --c-border: color-mix(in srgb, var(--writing) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--writing-light) 60%, white);
+  --c-progress-fill: var(--writing);
+  --c-deep: var(--writing-deep);
+}
+.cp-subj.grammar {
+  --c: var(--grammar);
+  --cl: var(--grammar-light);
+  --cd: var(--grammar-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--grammar-light);
+  --c-surface-strong: color-mix(in srgb, var(--grammar) 22%, white);
+  --c-border: color-mix(in srgb, var(--grammar) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--grammar-light) 60%, white);
+  --c-progress-fill: var(--grammar);
+  --c-deep: var(--grammar-deep);
+}
+.cp-subj.spelling {
+  --c: var(--spelling);
+  --cl: var(--spelling-light);
+  --cd: var(--spelling-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--spelling-light);
+  --c-surface-strong: color-mix(in srgb, var(--spelling) 22%, white);
+  --c-border: color-mix(in srgb, var(--spelling) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--spelling-light) 60%, white);
+  --c-progress-fill: var(--spelling);
+  --c-deep: var(--spelling-deep);
+}
+.cp-subj.ufli {
+  --c: var(--ufli);
+  --cl: var(--ufli-light);
+  --cd: var(--ufli-deep);
+  /* Lane-card layered-system role tokens.
+     ufli-deep (#93401e) on ufli surface-strong: color-mix(ufli 22%, white)
+     is approximately #f8d6c8 — WCAG ratio ~5.2:1 (AA passes). */
+  --c-surface: var(--ufli-light);
+  --c-surface-strong: color-mix(in srgb, var(--ufli) 22%, white);
+  --c-border: color-mix(in srgb, var(--ufli) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--ufli-light) 60%, white);
+  --c-progress-fill: var(--ufli);
+  --c-deep: var(--ufli-deep);
+}
+.cp-subj.explorers {
+  --c: var(--explorers);
+  --cl: var(--explorers-light);
+  --cd: var(--explorers-deep);
+  /* Lane-card layered-system role tokens.
+     explorers-deep (#7a5810) on explorers surface-strong: color-mix(explorers 22%, white)
+     is approximately #f5e8c4 — WCAG ratio ~5.0:1 (AA passes). */
+  --c-surface: var(--explorers-light);
+  --c-surface-strong: color-mix(in srgb, var(--explorers) 22%, white);
+  --c-border: color-mix(in srgb, var(--explorers) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--explorers-light) 60%, white);
+  --c-progress-fill: var(--explorers);
+  --c-deep: var(--explorers-deep);
+}
+.cp-subj.sel {
+  --c: var(--sel);
+  --cl: var(--sel-light);
+  --cd: var(--sel-deep);
+  /* Lane-card layered-system role tokens */
+  --c-surface: var(--sel-light);
+  --c-surface-strong: color-mix(in srgb, var(--sel) 22%, white);
+  --c-border: color-mix(in srgb, var(--sel) 30%, transparent);
+  --c-progress-track: color-mix(in srgb, var(--sel-light) 60%, white);
+  --c-progress-fill: var(--sel);
+  --c-deep: var(--sel-deep);
+}
+
+/* Visible focus ring — used on interactive controls (settings pickers,
+   swatch buttons) for keyboard accessibility. :focus-visible keeps the
+   ring off mouse clicks while guaranteeing it for keyboard users. */
+.cp-focusable:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Urgent pulse — used on the most severe daily-note priority. */
+@keyframes cp-urgent-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(217, 43, 60, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(217, 43, 60, 0);
+  }
+}
+.cp-pulse {
+  animation: cp-urgent-pulse 2s ease-in-out infinite;
+}
+
+/* Reduced-motion (§6.6): drop the urgent pulse and collapse all transitions
+   to near-instant when the OS setting is on. Focus indicators stay instant
+   either way, so this only strips decorative motion. */
+@media (prefers-reduced-motion: reduce) {
+  .cp-root *,
+  .cp-root *::before,
+  .cp-root *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Scrollbar — thin, neutral. Power users see a lot of scroll. */
+.cp-root ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.cp-root ::-webkit-scrollbar-thumb {
+  background: var(--ink-200);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.cp-root ::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-300);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+.cp-root ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── Card-style axis ──────────────────────────────────────────────────
+   The weekly grid renders one of three card styles, selected by
+   data-style on <html>. Components read these flags; the values below
+   are shared knobs the Lesson Card (Task #3) consumes.
+     quiet → white card, thin 4px subject stripe (Phase-1 original)
+     calm  → white card + rounded subject monogram tile in the header
+     vivid → subject tint fills the card + matching stripe
+*/
+:root[data-style="quiet"] {
+  --card-fill: var(--paper);
+  --card-stripe-w: 4px;
+}
+:root[data-style="calm"] {
+  --card-fill: var(--paper);
+  --card-stripe-w: 4px;
+}
+:root[data-style="vivid"] {
+  --card-fill: var(--cl, var(--ink-100));
+  --card-stripe-w: 4px;
+}

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en" data-style="vivid" data-palette="highlight">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Resource &amp; Notecard Redesign — mycurricula.app</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=DM+Sans:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="app/tokens.css" />
+<link rel="stylesheet" href="resource_redesign/rn.css" />
+<link rel="stylesheet" href="resource_redesign/card-faces.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html,body{height:100%;margin:0;}
+  .rn-brief{font-family:var(--font-sans);font-size:12px;line-height:1.5;color:var(--body);padding:16px;}
+  .rn-brief h2{font-family:var(--font-display-sm);font-size:15px;font-weight:800;color:var(--ink);margin:0 0 8px;}
+  .rn-brief table{width:100%;border-collapse:collapse;font-size:11px;}
+  .rn-brief td{padding:4px 6px;border-top:1px solid var(--hairline);vertical-align:top;}
+  .rn-brief td:first-child{font-weight:800;color:var(--ink-soft);white-space:nowrap;}
+  .rn-brief .ok{color:var(--done);font-weight:800;}
+  /* Annotation callouts are hidden by default so the design reads cleanly. */
+  body.hide-callouts .rn-callout{display:none !important;}
+  .rn-coToggle{position:fixed;top:14px;right:14px;z-index:9999;display:inline-flex;align-items:center;gap:8px;
+    font-family:var(--font-sans);font-size:12px;font-weight:700;color:var(--ink);cursor:pointer;
+    background:var(--paper);border:1px solid var(--border);border-radius:999px;padding:8px 14px;box-shadow:var(--sh-md);}
+  .rn-coToggle:hover{border-color:var(--brand-300);}
+  .rn-coToggle .dot{width:9px;height:9px;border-radius:50%;background:var(--faint);}
+  .rn-coToggle.on .dot{background:var(--brand-500);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="resource_redesign/design-canvas.jsx"></script>
+<script type="text/babel" src="resource_redesign/rn-shared.jsx"></script>
+<script type="text/babel" src="resource_redesign/card-faces.jsx"></script>
+<script type="text/babel" src="resource_redesign/surface-panel.jsx"></script>
+<script type="text/babel" src="resource_redesign/surface-section.jsx"></script>
+<script type="text/babel" src="resource_redesign/surface-composer.jsx"></script>
+<script type="text/babel" src="resource_redesign/surface-notecard.jsx"></script>
+<script type="text/babel">
+const { DesignCanvas, DCSection, DCArtboard,
+        RNSectionCards,
+        RNSectionPanel, RNSectionSection, RNSectionComposer,
+        RNSectionNotecard, RNSectionPreview } = window;
+
+function BriefCard() {
+  return (
+    <div className="rn-brief">
+      <h2>Resource &amp; Notecard system — redesign</h2>
+      <p style={{margin:"0 0 10px"}}>
+        Per <code>BRIEF.md</code> (6.11.26). Tokens from <code>app/tokens.css</code>; visual family = <code>/weekly</code>.
+        Frozen constraints respected: notecard IS a LessonResource (body + flat gallery), JSONB seam,
+        live-only ink, sanitizer boundary, locked subject palette, no new deps.
+      </p>
+      <table>
+        <tbody>
+          <tr><td>P1 dupes</td><td>Sections canonical; lesson-array merged by content identity → <span className="ok">§1 board 1</span></td></tr>
+          <tr><td>P2 composer</td><td>Two entries, visible mode badge, staged capture → review → <span className="ok">§3</span></td></tr>
+          <tr><td>P3 rhythm</td><td>Notecard tile face in grids; compact row in sections → <span className="ok">§1 + §2</span></td></tr>
+          <tr><td>P4 targets</td><td>All notecard affordances ≥44px (inflated hits) → <span className="ok">§2</span></td></tr>
+          <tr><td>P5 blank frames</td><td>canEmbed ∧ CSP = one predicate; designed link card → <span className="ok">§5</span></td></tr>
+          <tr><td>P6 create</td><td>"New notecard" first-class in panel → <span className="ok">§1</span></td></tr>
+          <tr><td>P7 mistrust</td><td>Quiet "Session only" footer badge + tile dot → <span className="ok">§3</span></td></tr>
+          <tr><td>AC-7 gallery</td><td>Remove + drag-reorder; gallery[0]=poster, made visible → <span className="ok">§3 board 3</span></td></tr>
+          <tr><td>Decisions</td><td>Notes tab added (notecards in All + Notes); poster override = reorder (no separate control)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function App() {
+  const [showCo, setShowCo] = React.useState(false);
+  React.useEffect(() => {
+    document.body.classList.toggle("hide-callouts", !showCo);
+  }, [showCo]);
+  return (
+    <React.Fragment>
+      <button
+        className={"rn-coToggle" + (showCo ? " on" : "")}
+        onClick={() => setShowCo(v => !v)}
+        title="Toggle the numbered annotation notes that explain each fix"
+      >
+        <span className="dot" />
+        {showCo ? "Hide annotations" : "Show annotations"}
+      </button>
+      <DesignCanvas>
+      <RNSectionCards />
+      <DCSection id="overview" title="Overview" subtitle="What this set fixes, and the design decisions the brief delegated">
+        <DCArtboard id="brief" label="Coverage map" width={480}><BriefCard /></DCArtboard>
+      </DCSection>
+      <RNSectionPanel />
+      <RNSectionSection />
+      <RNSectionComposer />
+      <RNSectionNotecard />
+      <RNSectionPreview />
+    </DesignCanvas>
+    </React.Fragment>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

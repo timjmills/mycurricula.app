@@ -124,7 +124,7 @@
 
 .plus {
   background: var(--w-accent);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .plus:hover {

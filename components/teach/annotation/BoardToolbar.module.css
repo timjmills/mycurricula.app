@@ -48,7 +48,8 @@
   border-color: var(--brand-300);
 }
 .swatchActive {
-  border-color: var(--paper);
+  /* White halo ring against the saturated swatch fill, in every theme. */
+  border-color: var(--on-solid);
   outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }

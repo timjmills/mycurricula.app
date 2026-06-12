@@ -104,7 +104,7 @@
   padding: 10px 18px;
   min-height: 44px; /* ≥44px touch target */
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
   font-size: var(--t-13);
   font-weight: 700;
   border-radius: var(--r-pill);

@@ -301,7 +301,7 @@
 .saveBtn {
   background: var(--cd);
   border-color: var(--cd);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .saveBtn:hover:not(:disabled) {

@@ -204,7 +204,7 @@
 
 .btnSave {
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
   box-shadow: var(--sh-brand);
 }
 

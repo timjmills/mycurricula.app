@@ -203,7 +203,7 @@
 
 .weekStripDateWrapActive {
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .weekStripDate {
@@ -638,7 +638,7 @@
   border: none;
   border-radius: var(--r-sm);
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
   box-shadow: var(--sh-brand);
   cursor: pointer;
   transition:

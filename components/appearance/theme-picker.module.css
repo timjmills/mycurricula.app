@@ -1,0 +1,90 @@
+/* theme-picker.module.css — option chrome for the app-theme chooser.
+ *
+ * Hover/press affordances need real pseudo-classes, so the static option
+ * styles live here; the per-theme swatch colors stay inline in the TSX as
+ * --swatch-* token references. Selected state keys off aria-checked so the
+ * accessibility attribute IS the styling hook.
+ */
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  min-height: 44px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    box-shadow 140ms ease,
+    transform 140ms ease,
+    border-color 140ms ease;
+}
+
+.option:hover {
+  border-color: var(--ink-200);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.option:active {
+  transform: translateY(0);
+}
+
+.option[aria-checked="true"] {
+  border: 1.5px solid var(--theme-accent);
+  background: var(--theme-accent-soft);
+}
+
+/* ── Miniature planner preview ─────────────────────────────────────────────
+   A tiny "window" of the theme: its canvas, an accent bar where the top bar
+   sits, and a surface card carrying an ink text line — so every option shows
+   what the planner actually becomes, not an abstract color dot. The Follow
+   system option splits the window into a Paper half and a Night half. */
+
+.chip {
+  flex: 0 0 auto;
+  position: relative;
+  width: 30px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: flex;
+}
+
+.chipHalf {
+  flex: 1;
+  position: relative;
+}
+
+.chipAccent {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.chipCard {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  height: 11px;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(16, 18, 28, 0.18);
+}
+
+.chipInk {
+  position: absolute;
+  top: 3px;
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  border-radius: 1px;
+  opacity: 0.8;
+}

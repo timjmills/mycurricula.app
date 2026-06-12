@@ -26,6 +26,7 @@ import { usePathname } from "next/navigation";
 import { AppStateProvider } from "@/lib/app-state";
 import { ConsequenceToastProvider } from "@/lib/consequence-toast";
 import { Clock } from "@/components/shell/Clock";
+import { ThemeQuickSwitch } from "@/components/appearance/theme-quick-switch";
 import styles from "./layout.module.css";
 
 // ── Sub-page registry ──────────────────────────────────────────────────────
@@ -130,6 +131,10 @@ export default function SettingsLayout({
         <div className={styles.shell}>
           {/* ── Sidebar / nav strip ───────────────────────────────── */}
           <nav className={styles.sidebar} aria-label="Settings sections">
+            {/* Sticky wrapper holds BOTH the tab list and the theme strip —
+                sticky on the ul alone would slide over the strip below it
+                as the page scrolls. */}
+            <div className={styles.sidebarSticky}>
             <ul className={styles.tabList}>
               {TABS.map((tab) => {
                 const isActive = activeTab?.slug === tab.slug;
@@ -171,6 +176,17 @@ export default function SettingsLayout({
                 );
               })}
             </ul>
+
+            {/* Theme quick-switch — the same chips as Settings → Appearance,
+                surfaced in the sidebar so the most-wanted personal setting
+                is one click from anywhere in Settings. Hidden on phone
+                (≤600px) where the sidebar collapses to the pill strip —
+                there the Appearance tab is the affordance. */}
+            <div className={styles.sidebarTheme}>
+              <span className={styles.sidebarThemeLabel}>Theme</span>
+              <ThemeQuickSwitch />
+            </div>
+            </div>
           </nav>
 
           {/* ── Active sub-page ────────────────────────────────────── */}

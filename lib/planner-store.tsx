@@ -60,6 +60,7 @@ import {
 } from "@/lib/lesson-flow";
 import type { CellLayout } from "@/lib/cell-layout";
 import { cellKey, isTrivialLayout } from "@/lib/cell-layout";
+import { uid } from "@/lib/uid";
 import {
   LESSONS,
   ALL_UNITS,
@@ -579,13 +580,6 @@ function fillSyntheticSections(
     }
   }
   return result;
-}
-
-/** Duplicate uid helper (mirrors lesson-flow.ts, avoids importing its counter). */
-let _seq = 0;
-function uid(prefix: string): string {
-  _seq += 1;
-  return `${prefix}-${Date.now().toString(36)}-${_seq}`;
 }
 
 /** Remove a lesson id from every slot in a CellLayout; prunes empty rows/slots. */

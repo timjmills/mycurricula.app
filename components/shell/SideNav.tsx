@@ -46,6 +46,7 @@ const SECTIONS: NavSection[] = [
     items: [
       { label: "Catch-up", href: "/catch-up", icon: <FlagIcon /> },
       { label: "Schedule", href: "/schedule", icon: <ClockIcon /> },
+      { label: "Archive", href: "/archive", icon: <ArchiveIcon /> },
       { label: "Teach", href: "/teach", icon: <PresentIcon /> },
     ],
   },
@@ -226,6 +227,16 @@ function PresentIcon(): ReactNode {
     </svg>
   );
 }
+// Archive box — a lidded crate, for the Curriculum Archive (sealed years).
+function ArchiveIcon(): ReactNode {
+  return (
+    <svg {...svgProps()}>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+      <path d="M10 12h4" />
+    </svg>
+  );
+}
 function GearIcon(): ReactNode {
   return (
     <svg {...svgProps()}>
@@ -234,7 +245,10 @@ function GearIcon(): ReactNode {
     </svg>
   );
 }
-// Open-book brand glyph, white on the honey tile.
+// Open-book brand glyph. Page fills follow the active theme via the --logo-book-*
+// tokens (paper renders the original white-on-honey-tile lockup). SVG `fill`
+// presentation attributes do NOT resolve var() — the fills go through inline
+// style, which does.
 function BookGlyph(): ReactNode {
   return (
     <svg
@@ -246,11 +260,11 @@ function BookGlyph(): ReactNode {
     >
       <path
         d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5V5.5Z"
-        fill="#fff"
+        style={{ fill: "var(--logo-book-a)" }}
       />
       <path
         d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13V4Z"
-        fill="#3A2A05"
+        style={{ fill: "var(--logo-book-b)" }}
         opacity=".5"
       />
     </svg>

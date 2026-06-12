@@ -47,7 +47,11 @@
   min-width: 0;
 }
 
-/* ── Wordmark ───────────────────────────────────────────────────────── */
+/* ── Wordmark ───────────────────────────────────────────────────────────
+   NOTE: this block is currently unreferenced by top-bar.tsx (the brand
+   lockup now lives in SideNav). It is kept — and kept tokenized — for reuse:
+   the tile + wordmark follow the active theme's --logo-* tokens, so a future
+   top-bar logo re-colors per theme with no further edits. */
 .wordmark {
   display: flex;
   align-items: center;
@@ -58,18 +62,18 @@
   margin-right: 4px;
 }
 
-/* Brand glyph — open-book mark in a honey-gradient rounded tile with a soft
-   honey glow (v1.3 logo lockup). */
+/* Brand glyph — open-book mark in a rounded tile with a soft glow; the tile
+   gradient + glow follow the active theme's logo tokens (paper = v1.3 honey). */
 .wordmarkGlyph {
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: var(--grad-honey);
-  box-shadow: var(--sh-honey);
+  background: var(--logo-tile-grad);
+  box-shadow: var(--logo-tile-shadow);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  color: #fff;
+  color: var(--logo-book-a);
 }
 
 .wordmarkLabel {
@@ -78,18 +82,19 @@
   line-height: 1;
 }
 
-/* "mycurricula" in DM Sans 800 ink + ".app" in honey (v1.3 wordmark). */
+/* "mycurricula" in DM Sans 800 + ".app" accent — both follow the theme's
+   logo tokens (paper = ink wordmark + honey ".app", per v1.3). */
 .wordmarkApp {
   font-family: var(--font-logo);
   font-size: var(--t-16);
   font-weight: 800;
-  color: var(--ink);
+  color: var(--logo-text);
   letter-spacing: -0.4px;
   white-space: nowrap;
 }
 
 .wordmarkTld {
-  color: var(--honey-600);
+  color: var(--logo-tld);
 }
 
 .wordmarkGrade {
@@ -343,7 +348,7 @@
 .editToggleWrap
   :global([role="radio"][aria-label*="Team Curriculum"][aria-checked="true"]) {
   background: var(--core-mode);
-  color: var(--paper);
+  color: var(--on-solid);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--core-mode) 40%, transparent);
 }
 
@@ -433,7 +438,7 @@
   padding: 0 4px;
   border-radius: 999px;
   background: var(--urgent);
-  color: var(--paper);
+  color: var(--on-solid);
   font-size: var(--t-10);
   font-weight: 700;
   line-height: 16px;

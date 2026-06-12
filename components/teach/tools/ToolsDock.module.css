@@ -70,7 +70,7 @@
   appearance: none;
   border: 1px solid transparent;
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
   font: inherit;
   font-size: var(--t-13);
   font-weight: 700;
@@ -273,7 +273,7 @@
   appearance: none;
   border: 1px solid transparent;
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
   font: inherit;
   font-size: var(--t-13);
   font-weight: 700;

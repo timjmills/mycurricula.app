@@ -212,10 +212,10 @@
   background: var(--ink-150);
 }
 
-/* destructive — catchup-tinted fill, paper text. Archive/Delete. */
+/* destructive — catchup-tinted fill, on-solid ink. Archive/Delete. */
 .destructive {
   background: color-mix(in srgb, var(--catchup) 85%, white);
-  color: var(--paper);
+  color: var(--on-solid);
   border: 1px solid transparent;
   box-shadow: var(--shadow-card);
 }

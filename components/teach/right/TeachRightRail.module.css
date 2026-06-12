@@ -62,7 +62,7 @@
   font-size: 10px;
   font-weight: 800;
   line-height: 1;
-  color: var(--paper);
+  color: var(--on-solid);
   background: var(--danger);
   border-radius: var(--r-pill);
   pointer-events: none;
@@ -75,13 +75,13 @@
 
 .iconBtnActive {
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
   box-shadow: var(--sh-brand);
 }
 
 .iconBtnActive:hover {
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 /* Drag grip — surfaces on hover/focus over the icon. It is the sole drag

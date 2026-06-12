@@ -49,7 +49,7 @@ export function ImageLightbox({
         zIndex: 9999,
         display: "grid",
         placeItems: "center",
-        background: "rgba(0,0,0,0.85)",
+        background: "var(--scrim-lightbox)",
         cursor: "zoom-out",
       }}
     >

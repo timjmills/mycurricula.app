@@ -83,7 +83,7 @@
   border: none;
   border-radius: var(--r-pill);
   background: var(--w-accent);
-  color: var(--paper);
+  color: var(--on-solid);
   font-size: 0.929em;
   font-weight: 800;
   cursor: pointer;
