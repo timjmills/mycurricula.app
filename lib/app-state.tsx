@@ -25,6 +25,12 @@ import type { User } from "@supabase/supabase-js";
 import type { LessonStatus, SubjectId } from "@/lib/types";
 import { CURRENT_WEEK, ME } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/client";
+import {
+  PROFILE_EVENT,
+  PROFILE_STORAGE_KEY,
+  deriveInitials,
+  readStoredDisplayName,
+} from "@/lib/use-account-settings";
 
 /**
  * Grid (matrix/canvas view of lessons in a subject × day grid) vs
@@ -315,6 +321,21 @@ export function AppStateProvider({
     setCurrentUser((prev) => ({ ...prev, curriculumLabel: stored }));
   }, []);
 
+  // Post-mount: overlay the teacher-chosen display name (Settings →
+  // Account, persisted under `mycurricula:user:profile`) over the mock
+  // fallback so the top-bar / SideNav avatar reflects the chosen name.
+  // Same SSR-safety rationale as the curriculum-label overlay above —
+  // the initial render must use ME so server HTML matches first paint.
+  useEffect(() => {
+    const stored = readStoredDisplayName();
+    if (stored == null) return;
+    setCurrentUser((prev) => ({
+      ...prev,
+      name: stored,
+      initials: deriveInitials(stored),
+    }));
+  }, []);
+
   useEffect(() => {
     const supabase = createClient();
     let active = true;
@@ -329,6 +350,16 @@ export function AppStateProvider({
         // auth event (initial read, refresh, sign-in).
         const stored = readCurriculumLabel();
         if (stored != null) next.curriculumLabel = stored;
+        // Same overlay for the Settings → Account display name: the
+        // locally-chosen name (and its derived initials) wins over the
+        // auth-profile name until Supabase profile rows land (Phase 1B).
+        // Without this, any auth event (initial read, token refresh,
+        // sign-in) would clobber the teacher's rename.
+        const storedName = readStoredDisplayName();
+        if (storedName != null) {
+          next.name = storedName;
+          next.initials = deriveInitials(storedName);
+        }
         setCurrentUser(next);
       }
     };
@@ -356,6 +387,37 @@ export function AppStateProvider({
     };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  // Display-name sync — two channels for the same key:
+  //   • `storage` event  — a rename in ANOTHER tab (Settings → Account
+  //     open in tab B while /weekly sits in tab A).
+  //   • PROFILE_EVENT    — a rename in THIS tab (the `storage` event never
+  //     fires on the writing tab; lib/use-account-settings dispatches the
+  //     custom event after each write so the avatar updates live).
+  // Both re-read storage so there is a single source of truth. Clearing
+  // falls back to the mock ME name — when real Supabase profiles land
+  // (Phase 1B) the fallback becomes the auth-profile name instead.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const applyStoredName = (): void => {
+      const stored = readStoredDisplayName();
+      setCurrentUser((prev) => ({
+        ...prev,
+        name: stored ?? ME.name,
+        initials: stored != null ? deriveInitials(stored) : ME.initials,
+      }));
+    };
+    const onStorage = (e: StorageEvent): void => {
+      if (e.key !== PROFILE_STORAGE_KEY) return;
+      applyStoredName();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(PROFILE_EVENT, applyStoredName);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(PROFILE_EVENT, applyStoredName);
+    };
   }, []);
 
   // Setter exposed via the context. Writes through to localStorage and

@@ -86,6 +86,70 @@
 
 .action {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── "Saved" pulse chip ──────────────────────────────────────────────── */
+/* Instant-apply feedback: fades in next to the action slot when the
+   page bumps `savedTick`, fades back out ~1.4s later. Reduced motion
+   gets the same chip with no fade. */
+
+.saved {
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--done);
+  background: var(--done-tint);
+  border: 1px solid color-mix(in srgb, var(--done) 24%, transparent);
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+
+.savedVisible {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saved {
+    transition: none;
+  }
+}
+
+/* ── Search anchor wrapper ───────────────────────────────────────────── */
+/* The settings search scrolls to this section and briefly paints the
+   highlight ring via the data attribute set in lib (see settings search). */
+
+.anchor {
+  scroll-margin-top: 96px; /* clear the sticky settings header */
+  border-radius: var(--r-lg);
+}
+
+.anchor:global(.searchHighlight) {
+  animation: anchorPulse 1.6s ease;
+}
+
+@keyframes anchorPulse {
+  0%,
+  60% {
+    box-shadow: 0 0 0 2px var(--brand-500);
+  }
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anchor:global(.searchHighlight) {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--brand-500);
+  }
 }
 
 /* ── RadioDot ─────────────────────────────────────────────────────────── */
@@ -111,5 +175,40 @@
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--on-solid);
+}
+
+/* ── Picker option chrome ────────────────────────────────────────────────
+   Shared by the theme / card-style / palette pickers: hover lift + a
+   selected state keyed off aria-checked, echoing the ACTIVE theme's accent
+   so the whole Appearance panel speaks one selection language. Layout
+   (flex direction, padding, gaps) stays at each callsite; this class owns
+   surface, border, and motion. Reduced motion: the global `.cp-root *`
+   rule in tokens.css zeroes the transition. */
+
+.pickOption {
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    box-shadow 140ms ease,
+    transform 140ms ease,
+    border-color 140ms ease;
+}
+
+.pickOption:hover {
+  border-color: color-mix(in srgb, var(--theme-accent) 45%, var(--border));
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.pickOption:active {
+  transform: translateY(0);
+}
+
+.pickOption[aria-checked="true"] {
+  border: 1.5px solid var(--theme-accent);
+  background: var(--theme-accent-soft);
 }
