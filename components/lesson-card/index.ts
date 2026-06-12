@@ -14,5 +14,8 @@ export type { RelocatePickerProps, RelocateTarget } from "./relocate-picker";
 export { CompareToMaster } from "./compare-to-master";
 export type { CompareToMasterProps } from "./compare-to-master";
 
+export { ForkDiffPanel } from "./fork-diff";
+export type { ForkDiffPanelProps } from "./fork-diff";
+
 export { ArchiveToast } from "./archive-toast";
 export type { ArchiveToastProps } from "./archive-toast";

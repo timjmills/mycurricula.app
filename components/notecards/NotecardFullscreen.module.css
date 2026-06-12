@@ -1,8 +1,11 @@
 /* NotecardFullscreen.module.css — split-screen notecard modal.
  *
- * All color/radii/type come from app/tokens.css via var(). Desktop/tablet:
- * two columns (media | notes). Phone (≤640px): the columns stack (media on
- * top, notes below). */
+ * Restyled to the 6.12.26 resource-redesign §4 artboard (rn.css `.rn-fs*` +
+ * `.rn-notesBody` — the type authority). All color/radii/type come from
+ * app/tokens.css via var(); the only literal is the translucent backdrop
+ * scrim (mirrors ResourcePreview / ImageLightbox — there is no token for a
+ * dim overlay). Desktop/tablet: two columns (media 1.4fr | notes 1fr).
+ * Phone (≤640px): the columns stack (media on top, notes below). */
 
 .backdrop {
   position: fixed;
@@ -11,34 +14,36 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: var(--scrim-strong);
+  background: rgba(0, 0, 0, 0.78);
   overflow: auto;
   animation: fade 140ms ease-out;
 }
 
+/* Shell per `.rn-fs`: surface fill, --r-xl radius, hairline border, --sh-lg. */
 .dialog {
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: min(1120px, 95vw);
   max-height: 92vh;
-  background: var(--paper);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-lg);
   overflow: hidden;
   outline: none;
 }
 
-/* ── Header ───────────────────────────────────────────────────────────────── */
+/* ── Header — per `.rn-fsHead`: 12px/14px padding, bottom hairline ────────── */
 
 .header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 0 0 auto;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--paper);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface);
 }
 
 .title {
@@ -53,27 +58,42 @@
   white-space: nowrap;
 }
 
-.closeBtn {
+.headerActions {
   flex: 0 0 auto;
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--paper);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Honey Edit affordance (artboard: honey-600 glyph on honey-50). The
+   `.header .editBtn` compound out-specifies the Button primitive's
+   single-class variant styles. The Button primitive inflates the hit area
+   ≤900px; the ::after below extends the inflation to desktop too, so both
+   header buttons are ≥44px effective at every tier (artboard `.rn-44`). */
+.header .editBtn,
+.header .closeBtn {
+  position: relative;
+}
+
+.header .editBtn::after,
+.header .closeBtn::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.header .editBtn {
+  color: var(--honey-600);
+  background: var(--honey-50);
+}
+
+.header .editBtn:hover:not(:disabled) {
+  background: var(--honey-100);
+  color: var(--honey-600);
+}
+
+.header .closeBtn {
   color: var(--ink-700);
-  cursor: pointer;
-  transition: background 120ms ease;
-}
-
-.closeBtn:hover {
-  background: var(--surface-warm);
-}
-
-.closeBtn:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
 }
 
 /* ── Split body ───────────────────────────────────────────────────────────── */
@@ -82,10 +102,11 @@
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  /* Media gets the larger share; notes a readable column. */
+  /* Media gets the larger share (artboard flex 1.4 : 1). */
   grid-template-columns: 1.4fr 1fr;
 }
 
+/* Media pane per `.rn-fsMedia`: --ink-50 fill, right hairline. */
 .mediaPane {
   min-width: 0;
   min-height: 0;
@@ -93,7 +114,8 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: var(--surface-warm);
+  background: var(--ink-50);
+  border-right: 1px solid var(--hairline);
   overflow: auto;
 }
 
@@ -103,89 +125,112 @@
   max-width: 720px;
 }
 
+/* Notes pane per `.rn-fsNotes`: 18–20px padding. */
 .notesPane {
   min-width: 0;
   min-height: 0;
-  padding: 20px 22px;
-  border-left: 1px solid var(--border);
-  background: var(--paper);
+  padding: 18px 20px;
+  background: var(--surface);
   overflow: auto;
 }
 
-/* ── Notes prose ──────────────────────────────────────────────────────────── */
+/* ── Notes prose — `.rn-notesBody` implemented exactly ────────────────────── */
 /* Re-enable formatting for sanitized teacher HTML (Tailwind preflight zeroes
    lists/headings globally). Scoped to .notes so it never leaks elsewhere. */
 
 .notes {
   font-family: var(--font-sans);
-  font-size: var(--t-14);
-  line-height: 1.6;
+  font-size: var(--t-13);
+  line-height: 1.5;
   color: var(--body);
   word-break: break-word;
   overflow-wrap: break-word;
 }
 
+.notes h3 {
+  margin: 14px 0 6px;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-15);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.notes h3:first-child {
+  margin-top: 0;
+}
+
 .notes p {
-  margin: 0 0 0.6em;
+  margin: 0 0 8px;
+  font-size: var(--t-13);
+  color: var(--body);
 }
 
 .notes p:last-child {
   margin-bottom: 0;
 }
 
-.notes ul,
-.notes ol {
-  margin: 0.5em 0;
-  padding-left: var(--t-24);
-}
-
 .notes ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
   list-style: disc;
+  font-size: var(--t-13);
+  color: var(--body);
 }
 
 .notes ol {
+  margin: 0 0 8px;
+  padding-left: 18px;
   list-style: decimal;
+  font-size: var(--t-13);
+  color: var(--body);
 }
 
 .notes li {
-  margin: 3px 0;
-}
-
-.notes h1,
-.notes h2,
-.notes h3,
-.notes h4,
-.notes h5,
-.notes h6 {
-  margin: 0.7em 0 0.35em;
-  font-weight: 700;
-  line-height: 1.25;
-  color: var(--ink-900);
-}
-
-.notes h1 {
-  font-size: var(--t-20);
-}
-
-.notes h2 {
-  font-size: var(--t-18);
-}
-
-.notes h3 {
-  font-size: var(--t-16);
+  margin-bottom: 3px;
 }
 
 .notes a {
-  color: var(--brand-500);
+  color: var(--brand-600);
+  font-weight: 600;
   text-decoration: underline;
+  text-decoration-color: var(--brand-200);
 }
 
 .notes a:hover {
-  color: var(--brand-600);
+  color: var(--brand-700);
+}
+
+.notes mark {
+  background: var(--hlp-lemon);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Legacy vocabulary the sanitizer still admits (h1/h2, blockquote, code) —
+   kept readable in the same family; the spec only binds h3/p/ul/a/mark. */
+.notes h1,
+.notes h2,
+.notes h4,
+.notes h5,
+.notes h6 {
+  margin: 14px 0 6px;
+  font-family: var(--font-display-sm);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.notes h1 {
+  font-size: var(--t-18);
+}
+
+.notes h2 {
+  font-size: var(--t-16);
 }
 
 .notes blockquote {
-  margin: 0.6em 0;
+  margin: 0 0 8px;
   padding-left: 14px;
   border-left: 3px solid var(--border);
   color: var(--ink-700);
@@ -210,7 +255,7 @@
   text-align: center;
 }
 
-/* ── Phone: stack the split (media on top, notes below) + bigger close ─────── */
+/* ── Phone: stack the split (media on top, notes below) ───────────────────── */
 
 @media (max-width: 640px) {
   .backdrop {
@@ -222,6 +267,7 @@
     max-width: 100vw;
     max-height: 100vh;
     border-radius: 0;
+    border: 0;
   }
 
   .split {
@@ -230,14 +276,12 @@
     grid-template-rows: auto 1fr;
   }
 
-  .notesPane {
-    border-left: 0;
-    border-top: 1px solid var(--border);
+  .mediaPane {
+    border-right: 0;
   }
 
-  .closeBtn {
-    width: 44px;
-    height: 44px;
+  .notesPane {
+    border-top: 1px solid var(--hairline);
   }
 }
 

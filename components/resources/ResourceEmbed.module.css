@@ -52,72 +52,158 @@
   object-fit: cover;
 }
 
-/* ── OG link card ──────────────────────────────────────────────────────── */
+/* ── Designed link-card fallback (P5 — the §5 .rn-linkCard recipe) ──────── */
 
-.ogCard {
-  display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: 12px;
+.linkCard {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   text-decoration: none;
   color: inherit;
   border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-lg);
   overflow: hidden;
   background: var(--surface);
-  transition: border-color 120ms ease;
+  box-shadow: var(--shadow-card);
 }
 
-.ogCard:hover {
-  border-color: var(--brand-300);
+a.linkCard {
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
-.ogCard:focus-visible {
+a.linkCard:hover {
+  border-color: var(--ink-200);
+  box-shadow: var(--shadow-card-hover);
+}
+
+a.linkCard:focus-visible {
   outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
 
-.ogThumb {
-  width: 120px;
+.linkThumb {
+  position: relative;
+  height: 120px;
+  background: var(--ink-100);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  overflow: hidden;
+}
+
+.linkThumb svg {
+  width: 26px;
+  height: 26px;
+}
+
+.linkThumbImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.ogThumbFallback {
-  background: var(--surface-warm);
-}
-
-.ogBody {
+.linkBody {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 12px 14px 12px 0;
+  padding: 12px 14px;
   min-width: 0;
 }
 
-.ogTitle {
-  font-weight: 600;
-  font-size: 14px;
-  line-height: 1.3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ogDesc {
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--body);
-  margin-top: 4px;
+.linkTitle {
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.ogDomain {
-  font-size: 12px;
+.linkDesc {
+  font-size: var(--t-12);
+  color: var(--body);
+  margin-top: 3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.linkDomain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-11);
+  font-weight: 600;
   color: var(--muted);
-  margin-top: 6px;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+/* Favicon-initial — a tiny lettered disc standing in for the site favicon
+   (no network fetch; the domain's first letter). */
+.linkFavicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ink-100);
+  color: var(--ink-soft);
+  font-size: var(--t-10);
+  font-weight: 800;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.linkDomainText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Explicit Open action — preview variant only (rn-btn primary recipe). */
+.linkOpen {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  background: var(--brand-500);
+  color: var(--paper);
+  font-size: var(--t-12);
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--sh-brand);
+  flex: 0 0 auto;
+  transition: background 120ms ease;
+}
+
+.linkOpen:hover {
+  background: var(--brand-600);
+}
+
+.linkOpen:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.linkOpen svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Quiet denial caption — rendered only for the "not-embeddable" reason. */
+.linkCaption {
+  margin-top: 8px;
+  font-size: var(--t-11);
+  color: var(--muted);
 }
 
 /* ── Literal / hyperlink link modes ────────────────────────────────────── */
@@ -141,20 +227,41 @@
   height: 44px;
 }
 
-.v_row.ogCard {
-  grid-template-columns: 44px 1fr;
-  gap: 8px;
-  height: 44px;
+.v_row.linkCard {
+  flex-direction: row;
+  align-items: center;
+  border-radius: var(--r-sm);
+  box-shadow: none;
 }
 
-.v_row .ogThumb,
-.v_row .ogThumbFallback {
+.v_row .linkThumb {
   width: 44px;
   height: 44px;
+  flex: 0 0 auto;
 }
 
-.v_row .ogBody {
-  padding: 4px 10px 4px 0;
+.v_row .linkThumb svg {
+  width: 16px;
+  height: 16px;
+}
+
+.v_row .linkBody {
+  flex: 1;
+  padding: 4px 10px;
+}
+
+.v_row .linkTitle {
+  font-size: var(--t-12);
+  -webkit-line-clamp: 1;
+}
+
+.v_row .linkDesc,
+.v_row .linkCaption {
+  display: none;
+}
+
+.v_row .linkDomain {
+  margin-top: 1px;
 }
 
 .v_card,
@@ -162,10 +269,17 @@
   /* No overrides — default tile geometry. */
 }
 
+/* Preview-modal variant — the centered designed card (S5 artboard width). */
+.v_preview {
+  width: min(420px, 100%);
+  text-align: left;
+}
+
 /* ── Reduced motion ────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
-  .ogCard {
+  a.linkCard,
+  .linkOpen {
     transition: none;
   }
 }

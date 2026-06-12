@@ -21,7 +21,7 @@
 // served via `/api/resources/{id}` (which re-signs an inline R2 URL on each
 // load), never a raw presigned URL that would leak / expire.
 
-import type { ParsedResource } from "./resource-embed";
+import { canEmbedResource, type ParsedResource } from "./resource-embed";
 import type { ResourceProvider, TeachResource } from "./types";
 
 // ── Sandbox tiers ───────────────────────────────────────────────────────────
@@ -91,6 +91,15 @@ export function resolveBoardSrc(resource: TeachResource): string | null {
   if (resource.resourceId) return `/api/resources/${resource.resourceId}`;
   return null;
 }
+
+// The board's scheme gate for every <iframe>/<img>/<video>/<audio> `src` and
+// <a href> IS the planner's: ONE implementation in lib/resource-embed
+// (`isSafeUrl` — allows http(s) / blob: / same-origin root-relative; rejects
+// protocol-relative "//host", backslash tricks "/\host", raw tab/newline/CR
+// smuggling, javascript:, data:, file:, …), re-exported under the board name
+// so the two surfaces can never drift. `resolveBoardSrc` itself stays
+// unchanged; gating happens at the sinks.
+export { isSafeUrl as isSafeBoardUrl } from "./resource-embed";
 
 /** The render branches BoardCanvasResource switches on. Distinct from the
  *  coarse `TeachResource["kind"]` because the canvas needs `embed` vs `pdf` vs
@@ -182,19 +191,41 @@ export function boardEffectiveKind(
 }
 
 /**
- * Whether this resource can be shown in-canvas at all. False for bare links
- * that frame-block (the og-preview `canEmbed:false` signal) — the renderer
- * shows the "can't display" card with an Open-in-new-tab affordance instead of
- * a blank iframe.
+ * Whether this resource can be shown in-canvas at all. Defers to
+ * `canEmbedResource()` (lib/resource-embed) — the SINGLE embed authority the
+ * P5 contract requires every surface to consult, so the board can never frame
+ * something the planner tiles/preview wouldn't. That predicate is fail-closed
+ * and already rejects the cases the board's old `parsed?.canEmbed` check let
+ * through:
+ *   • notecards (`type:"notecard"`) — a gallery container, not itself a frame;
+ *   • unsafe-scheme rows (javascript:/data:/protocol-relative) — never framed;
+ *   • bare website links (the og-preview `canEmbed:false` signal).
+ * When it says no, the renderer shows the "can't display" / link card with an
+ * Open-in-new-tab affordance instead of a blank iframe.
+ *
+ * Hosted-file indirection: a hosted resource may carry only a `resourceId`
+ * (no public `url`) and stream from `/api/resources/{id}`. `canEmbedResource`
+ * keys off `resource.url`, so we evaluate it against the RESOLVED board src —
+ * the same `/api/resources/{id}` root-relative path the renderer points its
+ * <img>/<iframe> at — which the authority approves via its ROOT_RELATIVE +
+ * media-kind path. That keeps hosted media embeddable without re-deriving the
+ * verdict here. `parsed`/`kind` stay in the signature for the caller's
+ * sandbox/branch resolution and forward-compat.
  */
 export function boardCanEmbed(
   resource: TeachResource,
-  parsed: ParsedResource | null,
-  kind: BoardRenderKind,
+  _parsed: ParsedResource | null,
+  _kind: BoardRenderKind,
 ): boolean {
-  // A known provider / hosted media / pdf always embeds.
-  if (kind !== "link") return true;
-  // Generic link: respect the og-preview embeddability signal when present.
-  // `parsed.canEmbed` is false for plain website links.
-  return parsed?.canEmbed ?? false;
+  // Kept-but-unconsulted params (see the doc block) — same idiom as the
+  // planner mock source's contract-preserving signatures.
+  void _parsed;
+  void _kind;
+  const src = resolveBoardSrc(resource);
+  // Re-key the authority onto the resolved src so a hosted (resourceId-only)
+  // file is judged on its "/api/resources/{id}" stream, not its absent url.
+  // Spread preserves type/mimeType/provider so isMediaKind still classifies it.
+  const subject =
+    src === resource.url ? resource : { ...resource, url: src ?? undefined };
+  return canEmbedResource(subject);
 }

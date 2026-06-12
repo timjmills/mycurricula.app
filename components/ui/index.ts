@@ -31,6 +31,9 @@ export type { ChipProps } from "./Chip";
 export { Tooltip } from "./Tooltip";
 export type { TooltipProps } from "./Tooltip";
 
+export { UndoToast } from "./UndoToast";
+export type { UndoToastProps } from "./UndoToast";
+
 export { FutureControl } from "./FutureControl";
 export type { FutureControlProps } from "./FutureControl";
 

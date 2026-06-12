@@ -113,6 +113,7 @@ import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import {
   TODOS,
+  dateForWeekDay,
   dateNumberForWeekDay,
   notesForDay,
   shoutboxForDay,
@@ -827,9 +828,17 @@ export interface DailyViewProps {
    *  navigation thereafter is normal. (W1-V5 — closes Subject→Daily
    *  cross-route trust gap.) */
   initialLessonId?: string;
+  /** Seed the initial day/week from a `/daily?date=<YYYY-MM-DD>` deep-link
+   *  (UX roadmap item 07). Skipped when `initialLessonId` resolves (the lesson
+   *  pins its own week + day). Out-of-range / pre-anchor dates degrade to the
+   *  default view; the consumed query string is cleared on mount. */
+  initialDate?: string;
 }
 
-export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
+export function DailyView({
+  initialLessonId,
+  initialDate,
+}: DailyViewProps = {}): ReactNode {
   const router = useRouter();
   // selectedDay is shared planner state — the top bar may also change it.
   // viewMode drives the list vs. grid rendering choice.
@@ -902,6 +911,46 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
     router.replace("/daily", { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialLessonId]);
+
+  // `/daily?date=<YYYY-MM-DD>` deep link (UX roadmap item 07) — the sibling of
+  // the lesson seed above, skipped whenever that seed resolves (a lesson pins
+  // its own week + day). The date→(week, day) math inverts
+  // lib/mock/calendar.ts dateForWeekDay: anchor = Week 1 day 0, calendar weeks
+  // advance by 7 days regardless of the configured school week. Out-of-range /
+  // pre-anchor dates degrade to the default view.
+  useEffect(() => {
+    if (!initialDate) return;
+    if (initialLessonId && lessons.some((l) => l.id === initialLessonId)) {
+      // The lesson seed above owns the navigation AND the URL cleanup.
+      return;
+    }
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(initialDate);
+    if (m) {
+      // Local-midnight Date — the codebase deliberately avoids UTC date math
+      // (see lib/use-academic-year.ts) so the calendar day stays stable.
+      const target = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      const anchor = dateForWeekDay(1, 0);
+      // Math.round absorbs DST hour drift between two local midnights.
+      const diffDays = Math.round(
+        (target.getTime() - anchor.getTime()) / 86_400_000,
+      );
+      const targetWeek = Math.floor(diffDays / 7) + 1;
+      // Same 1–99 bound the weekly link parser enforces; out-of-range or
+      // pre-anchor dates degrade to the default view.
+      if (diffDays >= 0 && targetWeek <= 99) {
+        const dayIndex = Math.min(
+          diffDays % 7,
+          Math.max(weekdays.length - 1, 0),
+        );
+        if (targetWeek !== week) setWeek(targetWeek);
+        if (dayIndex !== selectedDay) setSelectedDay(dayIndex);
+      }
+    }
+    // Strip the consumed params on every path — valid, malformed, and
+    // out-of-range alike — so a bad date never leaves a dead query string.
+    router.replace("/daily", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDate]);
 
   // Collapse-all toggle — default expanded. UI-only, never persisted.
   const [collapsedAll, setCollapsedAll] = useState(false);

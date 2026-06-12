@@ -33,7 +33,10 @@ import { boardMatchesContext, type BoardContext } from "./board-tags";
 import { ensureCanvas } from "./board-migrate";
 import { BoardCapError, MAX_BOARDS_PER_TEACHER } from "./limits";
 import type { TeachDataSource } from "./queries";
-import { SANDBOX_LESSON_ID } from "./queries";
+// From the leaf module (NOT ./queries) so this import doesn't recreate the
+// queries → mock-source → queries runtime cycle. `import type` above is
+// erased, so it adds no runtime edge.
+import { SANDBOX_LESSON_ID } from "./constants";
 
 // ── Mutable in-memory store ─────────────────────────────────────────────────
 // Cloned from the fixtures so editing the live store never mutates the exported

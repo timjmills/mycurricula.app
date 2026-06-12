@@ -79,6 +79,8 @@ import { useSubjectColor } from "@/lib/palette";
 import { CURRENT_WEEK } from "@/lib/mock";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useHolidaysByDay } from "@/lib/use-day-holiday";
+import { todayColumnIndex } from "@/lib/now-anchor";
+import type { Weekday } from "@/lib/use-school-week";
 import type {
   ContextAction,
   ContextActionPayload,
@@ -100,6 +102,32 @@ import type { CellShade } from "./unitShading";
 import { useGridNavigation } from "./useGridNavigation";
 import type { CellNavProps, CellPos } from "./useGridNavigation";
 import styles from "./WeeklyGrid.module.css";
+
+// ── Today resolution (UX roadmap item 03 — orientation) ────────────────────
+// Which column (0-based index into the CONFIGURED school week) is today?
+// Derived from the live clock + the configured week via lib/now-anchor —
+// correct on Sun–Thu, Mon–Fri, and custom weeks (CLAUDE.md §1), null when
+// today isn't a school day (e.g. Saturday on a Sun–Thu week).
+//
+// SSR-safety: initial state is null (no emphasis in the server HTML) and
+// the real value lands in a post-mount effect — same hydration discipline
+// as useSchoolWeek. A 60s interval re-checks so the emphasis migrates at
+// midnight; setState with the SAME index bails out of re-rendering, so the
+// grid does NOT re-render every minute — only when the answer changes.
+function useTodayColumnIndex(
+  schoolWeekDays: readonly Weekday[],
+): number | null {
+  const [idx, setIdx] = useState<number | null>(null);
+  useEffect(() => {
+    const sync = (): void => {
+      setIdx(todayColumnIndex(new Date(), schoolWeekDays));
+    };
+    sync();
+    const id = window.setInterval(sync, 60_000);
+    return () => window.clearInterval(id);
+  }, [schoolWeekDays]);
+  return idx;
+}
 
 export function WeeklyGrid(): ReactNode {
   const { style } = useTheme();
@@ -235,6 +263,29 @@ export function WeeklyGrid(): ReactNode {
   // subject row of that day. Visual recipe matches UnitBar's `.holiday`
   // overlay (year-roadmap source of truth) — see WeeklyGrid.module.css.
   const holidaysByDay = useHolidaysByDay(week, DAY_COUNT);
+
+  // ── Today emphasis (UX roadmap item 03) ────────────────────────────────────
+  // Quiet emphasis on today's column: a "Today" chip in the column header +
+  // a faint --surface-warm wash down the column. Applies ONLY when the
+  // visible week IS the current week AND today is a configured school day;
+  // a holiday on today suppresses the emphasis entirely (the holiday
+  // treatment carries the orientation instead — per the item-03 spec).
+  //
+  // PHASE-1B: `CURRENT_WEEK` is the mock fixture's frozen current week
+  // (lib/mock) — the right source while mock data drives the planner, wrong
+  // once the Supabase flag is ON (the current week must resolve from the
+  // configured academic year's calendar, not a fixture constant). The 1B
+  // wave must swap this comparison to the store's current-week resolution —
+  // the same hydration-aware seam WeeklyShell's initial-link apply documents.
+  const schoolWeekTokens = useMemo(
+    () => weekdays.map((d) => d.token),
+    [weekdays],
+  );
+  const todayIdx = useTodayColumnIndex(schoolWeekTokens);
+  const emphasizedTodayIdx =
+    week === CURRENT_WEEK && todayIdx !== null && !holidaysByDay.has(todayIdx)
+      ? todayIdx
+      : null;
 
   // ── Scroll preservation after any store mutation ───────────────────────────
   // When a lesson is moved (drag, context-menu, undo/redo) we scroll the
@@ -739,6 +790,10 @@ export function WeeklyGrid(): ReactNode {
                 longLabel: dayName,
               }) => {
                 const holiday = holidaysByDay.get(dayIdx) ?? null;
+                // Item 03 — today's column header gets the quiet emphasis
+                // (chip + tinted day name). Derived from the configured
+                // school week + live date, never `dayIdx === 0`.
+                const isToday = dayIdx === emphasizedTodayIdx;
                 return (
                   <div
                     key={token}
@@ -751,18 +806,30 @@ export function WeeklyGrid(): ReactNode {
                     aria-label={
                       holiday
                         ? `${dayName} (${shortName}) — holiday: ${holiday.name}`
-                        : `${dayName} (${shortName})`
+                        : isToday
+                          ? `${dayName} (${shortName}) — today`
+                          : `${dayName} (${shortName})`
                     }
                     className={`${styles.dayHead} ${
-                      week === CURRENT_WEEK && dayIdx === 0
-                        ? styles.dayHeadToday
-                        : ""
+                      isToday ? styles.dayHeadToday : ""
                     } ${holiday ? styles.dayHeadHoliday : ""}`}
                   >
                     <span aria-hidden="true">{dayName}</span>
                     <span aria-hidden="true" className={styles.dayHeadDate}>
                       {shortName}
                     </span>
+                    {/* "Today" chip — quiet label, no saturated color;
+                        subject color stays the loudest voice (item-03
+                        spec). aria-hidden because the columnheader's
+                        aria-label already says "— today". */}
+                    {isToday && (
+                      <span
+                        className={styles.dayHeadTodayChip}
+                        aria-hidden="true"
+                      >
+                        Today
+                      </span>
+                    )}
                     {/* Holiday pill — surfaces the holiday name at the very
                         top of the affected column. CLAUDE.md §4 tooltip on
                         the marker carries the explanatory copy that the
@@ -805,12 +872,38 @@ export function WeeklyGrid(): ReactNode {
                   // dayIdx 0 → column 2 (subject col is 1, then day 1..5).
                   gridColumn: dayIdx + 2,
                   // Skip the day-header row (row 1); span all subject rows.
-                  gridRow: "2 / -1",
+                  // The end line must be a POSITIVE index: the grid declares
+                  // no explicit rows, so "-1" resolves to explicit line 1,
+                  // the range inverts to row 1, and the overlay then OCCUPIES
+                  // a header-row cell — bumping the last day header into the
+                  // next implicit row (Gate-R finding; todayColumn hit it).
+                  gridRow: `2 / ${subjects.length + 2}`,
                 }}
                 aria-hidden="true"
                 title={`Holiday — no instruction on this day (${holiday.name})`}
               />
             ))}
+
+            {/* ── Today column wash (item 03) ─────────────────────────────
+                A faint --surface-warm wash down today's column — same
+                grid-placement trick as .holidayColumn (skip the header
+                row, span every subject row, pointer-events:none so drags
+                and clicks fall through). Renders only on the current week
+                when today is a configured, non-holiday school day; hidden
+                in print (WeeklyGrid.module.css). */}
+            {emphasizedTodayIdx !== null && (
+              <div
+                className={styles.todayColumn}
+                style={{
+                  gridColumn: emphasizedTodayIdx + 2,
+                  // Positive end line — see the .holidayColumn comment above
+                  // (negative indices resolve against the EXPLICIT grid,
+                  // which has no explicit rows).
+                  gridRow: `2 / ${subjects.length + 2}`,
+                }}
+                aria-hidden="true"
+              />
+            )}
 
             {/* ── Subject rows ── */}
             {!weekHasLessons && (

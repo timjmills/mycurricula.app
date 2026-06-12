@@ -31,6 +31,7 @@ import { useEffect, useId, useState } from "react";
 import type { SectionResource } from "@/lib/lesson-flow";
 import { Button } from "@/components/ui";
 import { ResourceEmbed } from "@/components/resources";
+import { isSafeImgSrc } from "@/lib/resource-embed";
 import {
   isNotecard,
   isStack,
@@ -242,7 +243,10 @@ function PosterFace({
   const posterSrc =
     resource.thumbnailUrl ??
     (resource.provider === "image" ? resource.url : undefined);
-  if (posterSrc) {
+  // Gate the <img> src through the shared sink gate (the one authority every
+  // surface vets through) — an unsafe scheme falls through to the synthetic
+  // glyph poster instead of reaching an <img>.
+  if (posterSrc && isSafeImgSrc(posterSrc)) {
     return <PosterImage src={posterSrc} kind={kind} />;
   }
 
@@ -365,7 +369,9 @@ function NotecardPoster({
   const posterSrc = poster?.thumbnailUrl ?? poster?.url;
   const count = galleryCount(resource);
 
-  if (posterSrc) {
+  // Gate the poster <img> src through the shared sink gate — an unsafe scheme
+  // falls through to the note-styled glyph fallback below.
+  if (posterSrc && isSafeImgSrc(posterSrc)) {
     return (
       <>
         {/* eslint-disable-next-line @next/next/no-img-element */}

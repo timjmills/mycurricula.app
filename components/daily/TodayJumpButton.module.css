@@ -1,0 +1,17 @@
+/* TodayJumpButton.module.css — touch-target floor for the Daily "Today" jump.
+
+   The button is a Button primitive at size="sm" (32px visual). The primitive
+   inflates its TAP area to 44px via a ::before overlay on phone/tablet, but a
+   getBoundingClientRect() audit only sees the 32px box (measured ~39×32),
+   below the 44px touch floor (CLAUDE.md §4 / BUILD_STANDARD §8). Grow the
+   real border-box to ≥44×44 on phone/tablet so the target is honest; desktop
+   keeps the compact 32px sm visual. Label "Today" stays centred via the
+   primitive's flex. Tokens-only file (mechanical 44px hit math is permitted
+   by BUILD_STANDARD §3). */
+
+@media (max-width: 900px) {
+  .todayJump {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

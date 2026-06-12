@@ -3,10 +3,10 @@
 // components/resources/ResourceEmbed.tsx
 //
 // The single kind-switched renderer for every resource. Used by:
-//   • components/lesson-flow/resource-tile.tsx       (section thumbnails)
-//   • components/lesson-flow/section-resources.tsx   (primary 2x2 + lists)
 //   • components/subject/ResourcesSort.tsx           (all-resources table)
-//   • components/daily/ResourceComposer.tsx          (capture-strip preview)
+//   • components/notecards/Gallery.tsx               (gallery flip-through item)
+// Its `ResourceLinkCard` + `effectiveProvider` exports are also reused by the
+// sibling ResourcePreview enlarge modal so the fallback looks identical there.
 //
 // The component does NOT call /api/og-preview itself — OG enrichment
 // happens once at link-creation time on the server (the POST /api/resources
@@ -14,13 +14,27 @@
 // preview_title/_description/_thumbnail_url already set.
 //
 // Caller contract: pass `resource.url`. When the URL is absent, this
-// component renders a hidden marker — that's how the section-resources /
-// resource-tile callers keep their legacy synthetic-glyph branches working.
+// component renders a hidden marker so a mis-call is visible in dev.
+//
+// EMBED AUTHORITY (6.12.26 redesign P5): this component is the SINGLE
+// authority for what every resource renders as. The iframe-vs-fallback
+// decision is routed through `canEmbedResource()` in lib/resource-embed —
+// the SAME predicate ResourcePreview consults — and every media src
+// (iframe / img / video / audio) is re-vetted through `isSafeUrl` at the
+// sink. When the predicate says no, or a URL is unsafe, the designed link
+// card (`ResourceLinkCard`, the §5 `.rn-linkCard` recipe) renders instead —
+// never a blank refused-to-connect iframe, never a raw URL dump, never an
+// ungated media element.
 
 import type { ReactNode, MouseEvent } from "react";
 import { useState } from "react";
-import type { LessonResource } from "@/lib/types";
-import { parseResourceUrl } from "@/lib/resource-embed";
+import type { LessonResource, ResourceProvider } from "@/lib/types";
+import {
+  canEmbedResource,
+  embedDenialReason,
+  isSafeUrl,
+  parseResourceUrl,
+} from "@/lib/resource-embed";
 import { ImageLightbox } from "./ImageLightbox";
 import styles from "./ResourceEmbed.module.css";
 
@@ -41,7 +55,7 @@ export function ResourceEmbed({
   variant = "tile",
   onClick,
 }: ResourceEmbedProps): ReactNode {
-  const { url, provider, displayMode = "thumbnail" } = resource;
+  const { url, displayMode = "thumbnail" } = resource;
 
   // Legacy fixture row — no URL. Caller decides what to render in this
   // case; we surface a tiny invisible marker so a wrong call here is
@@ -50,7 +64,7 @@ export function ResourceEmbed({
     return <span className={styles.legacyMarker} aria-hidden="true" />;
   }
 
-  switch (provider) {
+  switch (effectiveProvider(resource)) {
     case "youtube":
     case "vimeo":
     case "gslides":
@@ -58,25 +72,51 @@ export function ResourceEmbed({
     case "gsheets":
     case "gdrive":
     case "pdf":
+      // P5 — the single embed authority. A row whose provider claims an
+      // embeddable host but whose URL does not actually yield a trusted
+      // embed target (crafted/imported rows, session blob: files) gets the
+      // designed link card, NEVER a blank iframe. ResourcePreview consults
+      // the same predicate, so both surfaces always agree.
+      if (!canEmbedResource(resource)) {
+        return <ResourceLinkCard resource={resource} variant={variant} />;
+      }
       return <IframeEmbed resource={resource} variant={variant} />;
     case "image":
       return (
         <ImageEmbed resource={resource} variant={variant} onClick={onClick} />
       );
     case "video":
-      return <VideoEmbed resource={resource} />;
+      return <VideoEmbed resource={resource} variant={variant} />;
     case "audio":
-      return <AudioEmbed resource={resource} />;
+      return <AudioEmbed resource={resource} variant={variant} />;
     case "website":
     default:
-      return (
-        <LinkEmbed
-          resource={resource}
-          displayMode={displayMode}
-          variant={variant}
-        />
-      );
+      // Teacher-chosen inline text renderings of a plain link keep working —
+      // literal/hyperlink are deliberate display modes, not embed fallbacks.
+      if (displayMode === "literal" || displayMode === "hyperlink") {
+        return <LinkEmbed resource={resource} displayMode={displayMode} />;
+      }
+      // The "website" taxonomy can never embed (canEmbedResource() is false
+      // for it by construction) → the designed link card.
+      return <ResourceLinkCard resource={resource} variant={variant} />;
   }
+}
+
+/** Resolve the render branch for a row. The stored provider wins unless it
+ *  is missing or the generic "website" (legacy rows; hosted uploads), in
+ *  which case the mime type, then the URL, decide — the same taxonomy
+ *  `canEmbedResource()` uses internally, so the chosen branch and the embed
+ *  predicate can never disagree. Shared with ResourcePreview (the other P5
+ *  surface) via a folder-internal import. */
+export function effectiveProvider(resource: LessonResource): ResourceProvider {
+  const stored = resource.provider;
+  if (stored && stored !== "website") return stored;
+  const mime = resource.mimeType?.toLowerCase() ?? "";
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
+  if (mime === "application/pdf") return "pdf";
+  return resource.url ? parseResourceUrl(resource.url).provider : "website";
 }
 
 // ── Iframe variants (YouTube / Vimeo / Google / hosted PDF) ───────────────
@@ -134,6 +174,12 @@ function ImageEmbed({
   onClick?: () => void;
 }): ReactNode {
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  // §4a review L7 — gate the chosen <img> src through the same isSafeUrl the
+  // iframe/link branches use. A crafted/imported row can carry a javascript:/
+  // data:text/protocol-relative value in thumbnailUrl or url; an unsafe pick
+  // never reaches an <img> — the row falls through to the designed link card
+  // (whose own thumb/href gates re-vet everything they render).
+  const src = resource.thumbnailUrl ?? resource.url;
   const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
     if (onClick) {
       onClick();
@@ -142,6 +188,9 @@ function ImageEmbed({
     e.preventDefault();
     setLightboxOpen(true);
   };
+  if (!isSafeUrl(src)) {
+    return <ResourceLinkCard resource={resource} variant={variant} />;
+  }
   return (
     <>
       <button
@@ -152,13 +201,13 @@ function ImageEmbed({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={resource.thumbnailUrl ?? resource.url}
+          src={src}
           alt={resource.label}
           loading="lazy"
           className={styles.image}
         />
       </button>
-      {lightboxOpen && resource.url && (
+      {lightboxOpen && isSafeUrl(resource.url) && (
         <ImageLightbox
           src={resource.url}
           alt={resource.label}
@@ -171,7 +220,21 @@ function ImageEmbed({
 
 // ── Native video / audio ──────────────────────────────────────────────────
 
-function VideoEmbed({ resource }: { resource: LessonResource }): ReactNode {
+function VideoEmbed({
+  resource,
+  variant,
+}: {
+  resource: LessonResource;
+  variant: "tile" | "row" | "card";
+}): ReactNode {
+  // §4a review — gate the <video> src through the same isSafeUrl the
+  // iframe/image/link branches use. A provider-spoofed or imported row can
+  // carry a protocol-relative ("//host/x.mp4"), data:, or javascript: URL;
+  // an unsafe src never mounts a media element — the row falls through to
+  // the designed link card (whose own href/thumb gates re-vet what it draws).
+  if (!isSafeUrl(resource.url)) {
+    return <ResourceLinkCard resource={resource} variant={variant} />;
+  }
   return (
     <div className={styles.aspect}>
       <video
@@ -185,7 +248,18 @@ function VideoEmbed({ resource }: { resource: LessonResource }): ReactNode {
   );
 }
 
-function AudioEmbed({ resource }: { resource: LessonResource }): ReactNode {
+function AudioEmbed({
+  resource,
+  variant,
+}: {
+  resource: LessonResource;
+  variant: "tile" | "row" | "card";
+}): ReactNode {
+  // §4a review — same isSafeUrl gate as VideoEmbed: an unsafe scheme never
+  // reaches an <audio src>; the row demotes to the designed link card.
+  if (!isSafeUrl(resource.url)) {
+    return <ResourceLinkCard resource={resource} variant={variant} />;
+  }
   return (
     <audio
       src={resource.url}
@@ -197,16 +271,14 @@ function AudioEmbed({ resource }: { resource: LessonResource }): ReactNode {
   );
 }
 
-// ── Link (three display modes + OG card) ──────────────────────────────────
+// ── Link (inline text display modes) ──────────────────────────────────────
 
 function LinkEmbed({
   resource,
   displayMode,
-  variant,
 }: {
   resource: LessonResource;
-  displayMode: "literal" | "hyperlink" | "thumbnail";
-  variant: "tile" | "row" | "card";
+  displayMode: "literal" | "hyperlink";
 }): ReactNode {
   // Only expose an anchor target for safe schemes; a dangerous scheme
   // (javascript:, data:, …) yields an inert anchor (no href / no navigation).
@@ -223,63 +295,125 @@ function LinkEmbed({
       </a>
     );
   }
-  if (displayMode === "hyperlink") {
-    return (
-      <a
-        href={safeHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={styles.hyperlink}
-      >
-        {resource.linkText || resource.label}
-      </a>
-    );
-  }
-  // thumbnail (OG card)
   return (
     <a
       href={safeHref}
       target="_blank"
       rel="noopener noreferrer"
-      className={[styles.ogCard, styles[`v_${variant}`]].join(" ")}
+      className={styles.hyperlink}
     >
-      {resource.thumbnailUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={resource.thumbnailUrl}
-          alt=""
-          loading="lazy"
-          className={styles.ogThumb}
-        />
-      ) : (
-        <span className={styles.ogThumbFallback} aria-hidden="true" />
-      )}
-      <span className={styles.ogBody}>
-        <span className={styles.ogTitle}>
-          {resource.previewTitle || resource.label}
-        </span>
-        {resource.previewDescription ? (
-          <span className={styles.ogDesc}>{resource.previewDescription}</span>
-        ) : null}
-        <span className={styles.ogDomain}>{safeHost(resource.url)}</span>
-      </span>
+      {resource.linkText || resource.label}
     </a>
   );
 }
 
-/** True for http(s), blob:, and same-origin root-relative ("/…") URLs — the
- *  schemes safe to feed into an <iframe> src or an <a href>. Root-relative is
- *  allowed for hosted files served via /api/resources/{id}; protocol-relative
- *  "//host" is rejected (it resolves to a foreign origin). Blocks javascript:,
- *  data:, and other dangerous schemes regardless of upstream validation. */
-function isSafeUrl(url: string | undefined): url is string {
-  if (!url) return false;
-  if (/^(https?|blob):/i.test(url)) return true;
-  // Same-origin root-relative path (e.g. /api/resources/{id}). Reject
-  // protocol-relative ("//host") and backslash tricks ("/\host") that
-  // browsers normalize to a foreign origin.
-  return /^\/(?![/\\])/.test(url);
+// ── Designed link-card fallback (P5 — the §5 `.rn-linkCard` recipe) ───────
+
+export interface ResourceLinkCardProps {
+  resource: LessonResource;
+  /** tile / card — the vertical designed card; row — compact 44px row;
+   *  preview — the ResourcePreview pane variant (static card with an
+   *  explicit Open button instead of a whole-card anchor). */
+  variant?: "tile" | "row" | "card" | "preview";
 }
+
+/**
+ * The ONE designed render for a resource that cannot embed: 120px
+ * `--ink-100` thumb area (OG thumbnail when present + safe, globe glyph
+ * otherwise), bold title, optional OG description, and a domain row with a
+ * favicon-initial. Folder-internal — ResourcePreview reuses it so the
+ * fallback looks identical on every surface.
+ */
+export function ResourceLinkCard({
+  resource,
+  variant = "tile",
+}: ResourceLinkCardProps): ReactNode {
+  const url = resource.url;
+  // Mirror the Resources panel's openResource guard — only a real http(s)
+  // target ever opens in a new tab; blob:/hosted/unsafe rows render inert.
+  const href = url && /^https?:\/\//i.test(url) ? url : undefined;
+  const domain = safeHost(url);
+  const thumb = isSafeUrl(resource.thumbnailUrl)
+    ? resource.thumbnailUrl
+    : undefined;
+  // Quiet caption only for the "this site just won't frame" case — unsafe
+  // schemes and missing URLs stay captionless (nothing actionable to say).
+  const showCaption = embedDenialReason(resource) === "not-embeddable";
+
+  const body = (
+    <>
+      <span className={styles.linkThumb} aria-hidden="true">
+        {thumb ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumb}
+            alt=""
+            loading="lazy"
+            className={styles.linkThumbImg}
+          />
+        ) : (
+          <GlobeIcon />
+        )}
+      </span>
+      <span className={styles.linkBody}>
+        <span className={styles.linkTitle}>
+          {resource.previewTitle || resource.label}
+        </span>
+        {resource.previewDescription ? (
+          <span className={styles.linkDesc}>{resource.previewDescription}</span>
+        ) : null}
+        {domain ? (
+          <span className={styles.linkDomain}>
+            <span className={styles.linkFavicon} aria-hidden="true">
+              {domain.charAt(0).toUpperCase()}
+            </span>
+            <span className={styles.linkDomainText}>{domain}</span>
+            {variant === "preview" && href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.linkOpen}
+              >
+                Open <OpenIcon />
+              </a>
+            ) : null}
+          </span>
+        ) : null}
+        {showCaption ? (
+          <span className={styles.linkCaption}>
+            This site can&apos;t be embedded — open it directly
+          </span>
+        ) : null}
+      </span>
+    </>
+  );
+
+  const className = [styles.linkCard, styles[`v_${variant}`]]
+    .filter(Boolean)
+    .join(" ");
+
+  // tile / row / card: the whole card is the open-in-new-tab anchor.
+  // preview: a static card — the explicit Open button above carries the
+  // action (nested anchors are invalid HTML).
+  if (variant !== "preview" && href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+      >
+        {body}
+      </a>
+    );
+  }
+  return <span className={className}>{body}</span>;
+}
+
+// `isSafeUrl` lives in lib/resource-embed (the authority module) so every
+// sink — this renderer and the Teach board alike — vets through the ONE
+// implementation, including its raw tab/newline/CR smuggling rejection.
 
 function safeHost(url: string | undefined): string {
   if (!url) return "";
@@ -288,4 +422,40 @@ function safeHost(url: string | undefined): string {
   } catch {
     return "";
   }
+}
+
+// ── Icons (Lucide-family line icons, per the §5 artboards) ─────────────────
+
+function GlobeIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+    </svg>
+  );
+}
+
+function OpenIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <path d="M15 3h6v6M10 14L21 3" />
+    </svg>
+  );
 }

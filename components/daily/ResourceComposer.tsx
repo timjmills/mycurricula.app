@@ -1,72 +1,77 @@
 "use client";
 
-// ResourceComposer.tsx — the card-wall "Add resource" dialog that the
-// Daily view's Resources panel opens when the teacher hits the "+" in the
-// panel header (or, in "add more photos" mode, taps a photo-stack tile).
+// ResourceComposer.tsx — the add-resource / notecard composer dialog.
+//
+// Rebuilt to the 6.12.26 Resource & Notecard Redesign §3 ("Composer — one
+// dialog, two modes"). The AUTHORITATIVE visual spec is
+// `Documents/Claude Design/6.12.26 design_handoff_ux_roadmap_and_resources/
+// resource_redesign/rn.css` (.rn-dialog block family) + the
+// `surface-composer.jsx` artboards. The commit / persistence machinery from
+// the previous composer survives unchanged — only the UI shell is new.
 //
 // ── Anatomy (top to bottom) ─────────────────────────────────────────────
-//   • Scrim (full-viewport dim overlay; click-to-dismiss).
-//   • Centered card (~480px wide, white, hairline border, soft shadow):
-//       Top bar:    [×]  spacer  [Add]
-//       Title input  (single line, large quiet typography)
-//       Tool grid    (FOUR tiles: Upload · Photo · Link · Search)
-//                    — Link expands an inline URL row when clicked.
-//                    — Search is a Phase-1A stub.
-//       Caption      "Add an image, video, link, or file."
-//       Body         (rich-text-free <textarea>; "Write something to…")
-//       Captured     (a chip strip — one chip per file / link / pasted item,
-//                     each with an [×] remove button)
-//       Routing row  (FOUR cascading PICKER PILLS:
-//                     Subject → Unit → Lesson → Section)
-//                    — labels come from useLabels() (cross-agent contract);
-//                       defaults fall back to "Subject"/"Unit"/"Lesson"/"Section"
-//                       so the composer still renders if the labels module
-//                       hasn't landed yet.
+//   • Scrim (frosted full-viewport overlay; click-to-dismiss). On phone
+//     (≤480px) the dialog becomes a full-height bottom sheet.
+//   • Dialog (520px, --r-xl, --sh-lg):
+//       Head    — mode badge (blue "Add resources" / honey "New notecard"),
+//                 2-dot stepper (resource mode only), close (≥44px hit area).
+//       Body    — per mode/step (below).
+//       Foot    — quiet "Session only" badge (grey pill + amber dot) while
+//                 captures are unsaved in mock mode, then Cancel/Back +
+//                 the primary commit button.
 //
-// ── Routing semantics ───────────────────────────────────────────────────
-// Changing an UPSTREAM picker resets every downstream picker to its first
-// valid match. Lesson list = all lessons in the selected unit, scoped to
-// the launching lesson's `week` when present (so the teacher gets THIS
-// week's lessons). Section is "Whole lesson" by default; if the composer
-// was launched from a section "+", that section is preselected.
+// ── Resource mode: staged capture → review (P2) ─────────────────────────
+//   Step 1 · Capture:
+//     4-up capture grid — Upload · Link · Google Drive · Camera. Drive +
+//     Camera are visibly disabled ("Soon" sub-label, 55% opacity) with
+//     why-tooltips; the working Camera path stays reachable via All tools.
+//     Below: the "All tools" wall trigger (AllToolsMenu sub-view), the
+//     drop hint (files can be dropped anywhere on the dialog), and the
+//     captured-items strip (86px tiles, removable ×, drag-reorder).
+//   Step 2 · Review & route:
+//     Upload error strip (danger tint + inline Retry — succeeded uploads
+//     stay cached and never re-upload), the same captured strip, the Title
+//     field (single item only — steers its label), a collapsed "+ Add a
+//     note to an item" reveal (per-resource rich-text body notes), and the
+//     Destination routing selects (Subject · Unit · Lesson · Section).
 //
-// ── Capture sources ──────────────────────────────────────────────────────
-// The captured-items strip is the single source of truth for "what will
-// be added on Add". Items flow in from:
-//   • File pickers — Upload (any) + Photo (image/*). Multiple selection.
-//   • Inline URL field — the Link tile reveals a small URL input row;
-//     pressing Enter appends a link item.
-//   • Clipboard paste — handled by the dialog-level onPaste:
-//       - Clipboard image (ClipboardItem with image/*) → image item.
-//       - Plain text matching ^https?://\S+$ → link item.
-//       - Other plain text → filled into the body textarea.
-//     A small "Pasted <kind>" status line surfaces what was captured so
-//     the teacher knows the paste actually landed.
-//   • initialItems prop — drag-drop on the panel hands the composer a
-//     pre-populated strip; the teacher confirms + routes + titles before
-//     anything is committed.
+// ── Notecard mode: single screen ─────────────────────────────────────────
+//   Card title · editable media gallery (drag-reorder + per-item remove;
+//   poster = gallery[0], shown with a honey outline + "POSTER" tag —
+//   reorder IS the poster control, per the handoff's delegated decision) ·
+//   rich-text notes (the existing components/rich-text editor, unchanged) ·
+//   Destination. "Edit note" on an existing resource opens this same
+//   screen prefilled with the resource's body + gallery, routing locked.
 //
-// ── Storage on Add ──────────────────────────────────────────────────────
-// Each captured item dispatches into the planner store:
-//   • If a Section is chosen → addSectionResource(lessonId, sectionId, type, label).
-//   • If "Whole lesson"     → editLesson(lessonId, { resources: [...prev, new] }).
+// ── Capture sources (the one capture engine both modes share) ────────────
+//   • Upload file picker (multi-select), the inline URL row (Link),
+//     the AllToolsMenu wall (Camera / Photo album / YouTube / Card wall…).
+//   • Clipboard paste on the dialog (image → image item, URL → link item).
+//   • Drag-drop onto the dialog (the drop hint is honest).
+//   • initialItems prop — drag-drop on the Resources panel pre-populates
+//     the strip; the teacher confirms + routes before anything commits.
 //
-// Photo-stack handling: the store does not currently support a native
-// "stack" shape, so the composer falls back to N separate image resources
-// at the resolved destination. The DROP path (in ResourcesPanel) is the
-// only place a synthetic stack shape lives in panel state.
-//
-// SYNTHETIC ONLY: no real uploads happen — file objects are translated
-// into LessonResource shapes whose `label` is the filename. This is in
-// line with the Phase-1A frontend-only prototype rule.
+// ── Storage on Add (the three commit paths — UNCHANGED machinery) ────────
+//   • resource mode — every captured item becomes a separate
+//     LessonResource (each may carry its own rich `body` note) at the
+//     routed destination: section → addSectionResource, whole lesson →
+//     editLesson({resources}).
+//   • notecard CREATE — exactly ONE makeNotecard({label, gallery, body}).
+//   • notecard EDIT (editResource) — patches the existing resource's
+//     body + gallery in place via editSectionResource / editLesson. The
+//     gallery strip seeds from the existing gallery so reorder/remove
+//     persist (AC-7); untouched galleries round-trip identically to the
+//     old append-only merge.
+//   Backend mode: file items presign → PUT to R2 → finalize via
+//   uploadHostedFile BEFORE the store write; mock mode keeps session-only
+//   blob:/data: URLs and never touches the network.
 //
 // ── Accessibility ───────────────────────────────────────────────────────
-//   • role="dialog" + aria-modal="true" + aria-labelledby on the title.
-//   • Focus moves to the title input on open.
-//   • Focus trap: Tab / Shift-Tab cycle inside the panel.
-//   • Escape closes.
-//   • All touch targets ≥44px (chip removes are hit-padded).
-//   • prefers-reduced-motion drops the enter scale/fade.
+//   • role="dialog" + aria-modal + aria-labelledby; focus trap; Escape
+//     closes (pickers / All-tools back out first); focus restore on close.
+//   • All touch targets ≥44px (small visuals get hit-area inflation).
+//   • Captured tiles are keyboard-reorderable (arrow keys) in addition to
+//     pointer drag. prefers-reduced-motion drops the enter motion.
 
 import {
   useCallback,
@@ -77,25 +82,16 @@ import {
   useState,
   type ChangeEvent,
   type ClipboardEvent,
+  type DragEvent,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import type { Lesson, LessonResource, SubjectId } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
 import { useLabels } from "@/lib/labels";
 import { Button, Tooltip } from "@/components/ui";
-import {
-  CapturedTypeIcon,
-  ChevronDownIcon,
-  CloseIcon,
-  LinkIcon,
-  MoreDotsIcon,
-  PhotoIcon,
-  SearchIcon,
-  SmallXIcon,
-  UploadIcon,
-} from "@/components/icons";
-import { parseResourceUrl } from "@/lib/resource-embed";
+import { parseResourceUrl, isSafeImgSrc } from "@/lib/resource-embed";
 import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
 import {
   resourceOwnerEvent,
@@ -105,8 +101,21 @@ import {
 } from "@/lib/resource-upload";
 import { renderPdfThumbnail } from "@/lib/pdf-thumbnail";
 import { makeNotecard } from "@/lib/notecards";
-import { ResourceEmbed } from "@/components/resources";
 import { RichTextEditor } from "@/components/rich-text";
+// Shared icon vocabulary (extracted by PR #12). These six are imported from
+// the shared folder rather than re-inlined so components/icons stays the
+// single source — the composer keeps only the glyphs unique to it (Drive,
+// Camera, NoteCard, Check, Warn, Plus, Grip, ChevronLeft/Right) local below.
+// The shared icons carry intrinsic width/height; every consuming CSS slot
+// sets an explicit svg width/height, so the swap preserves visual size.
+import {
+  CloseIcon,
+  UploadIcon,
+  LinkIcon,
+  SmallXIcon,
+  MoreDotsIcon,
+  ChevronDownIcon,
+} from "@/components/icons";
 import { AllToolsMenu } from "./AllToolsMenu";
 import styles from "./ResourceComposer.module.css";
 
@@ -116,14 +125,14 @@ import styles from "./ResourceComposer.module.css";
 export interface CapturedItem {
   /** Stable id for the React key + remove handling. */
   id: string;
-  /** Mapped from mime / source — drives the chip icon and the eventual LessonResource type. */
+  /** Mapped from mime / source — drives the tile icon and the eventual LessonResource type. */
   type: LessonResource["type"];
   /** Human label — filename, URL, or "Pasted image" fallback. */
   label: string;
-  /** Optional per-resource rich-text note. Each captured chip can reveal a
-   *  RichTextEditor where the teacher writes formatted notes (links, lists,
+  /** Optional per-resource rich-text note. In resource mode the step-2
+   *  "+ Add a note to an item" reveal writes formatted notes (links, lists,
    *  inline images) for THIS resource. Persisted to the resource's `body`
-   *  field on Add (NOT folded onto the label — the model now carries `body`
+   *  field on Add (NOT folded onto the label — the model carries `body`
    *  on every resource). Default empty. Stored as sanitized HTML. */
   body?: string;
   /** Real URL (embed source for links; `blob:` for in-session files). */
@@ -137,16 +146,21 @@ export interface CapturedItem {
   mimeType?: string;
   sizeBytes?: number;
   thumbnailUrl?: string;
-  /** Set true for file items so the limits banner can bucket them. */
+  /** Set true for file items so the capture caps can bucket them. */
   isFile?: boolean;
   /** The underlying File, kept so a backend-mode Add can upload the bytes to
    *  R2. Absent for links / title-only stubs. Not persisted anywhere. */
   file?: File;
+  /** Notecard EDIT only — the original gallery LessonResource this strip
+   *  tile represents. Committed verbatim (so reorder/remove of existing
+   *  gallery media never rewrites the resource payload). Absent for fresh
+   *  captures. */
+  existing?: LessonResource;
 }
 
-/** Summary of what landed in the planner doc on Add — handed back to
- *  the caller so it can track "stacks" (e.g. a photo-stack tile in the
- *  Resources panel) that the store itself does not model. */
+/** Summary of what landed in the planner doc on Add — handed back through
+ *  the optional `onCommitted` seam for any caller that wants to react to a
+ *  commit (historically the panel's photo-stack tracking, since dropped). */
 export interface ResourceComposerCommit {
   /** Resolved destination lesson id. */
   lessonId: string;
@@ -163,13 +177,14 @@ export interface ResourceComposerCommit {
  * What the composer is BEING USED FOR — the caller's intent. This drives both
  * the body the dialog renders AND how `handleAdd` commits.
  *
- *   • "resource" (default) — the historical flow: capture one-or-more media /
- *     links and attach them as N separate LessonResources at the routed
- *     destination. Each captured chip can carry its own rich-text `body` note.
+ *   • "resource" (default) — capture one-or-more media / links (staged
+ *     capture → review) and attach them as N separate LessonResources at
+ *     the routed destination. Each capture can carry its own rich-text
+ *     `body` note.
  *
  *   • "notecard" — capture media that become ONE notecard's flip-through
- *     `gallery`, plus a single top-level RichTextEditor for the notecard's
- *     `body`. On Add this commits exactly ONE resource via
+ *     `gallery`, plus a single RichTextEditor for the notecard's `body`.
+ *     On commit this writes exactly ONE resource via
  *     `makeNotecard({ label, gallery, body })` — never N separate resources.
  */
 export type ResourceComposerMode = "resource" | "notecard";
@@ -177,11 +192,11 @@ export type ResourceComposerMode = "resource" | "notecard";
 /**
  * Locator for "add / edit notes on an EXISTING resource" mode. When supplied
  * (alongside `mode="notecard"`), the composer does NOT create a new resource:
- * it opens pre-filled with the resource's current `body` (and label), locks
- * routing to the resource's existing home, and on Add PATCHES that resource —
- * setting its `body` (and merging any newly-captured media into its `gallery`)
- * via `editSectionResource` (section route) or `editLesson` (whole-lesson
- * route). This is the "add a notecard/note to any existing resource" path.
+ * it opens pre-filled with the resource's current `body` (and label + gallery),
+ * locks routing to the resource's existing home, and on commit PATCHES that
+ * resource — setting its `body` and writing the edited `gallery` — via
+ * `editSectionResource` (section route) or `editLesson` (whole-lesson route).
+ * This is the "add a notecard/note to any existing resource" path.
  */
 export interface ResourceComposerEditTarget {
   /** The lesson the resource lives on. */
@@ -195,12 +210,12 @@ export interface ResourceComposerEditTarget {
    *  `lesson.resources` so the patch can target the right array slot. The
    *  synthesized id alone isn't enough to locate the row in `editLesson`. */
   lessonResourceIndex?: number;
-  /** The resource being edited — seeds the title + body editor. */
+  /** The resource being edited — seeds the title + body editor + gallery. */
   resource: LessonResource;
 }
 
-/** Public API for ResourceComposer. Stable — the section-wiring agent
- *  imports this and the component will not change shape after first pass. */
+/** Public API for ResourceComposer. Stable — the panel/section agents
+ *  import this and the component will not change shape after first pass. */
 export interface ResourceComposerProps {
   /** Render the composer only when true. */
   open: boolean;
@@ -227,18 +242,19 @@ export interface ResourceComposerProps {
    *  this section is preselected (instead of "Whole lesson"). */
   initialSectionId?: string;
   /** Items already captured before the composer opened (e.g. by a drag-drop
-   *  onto the Resources panel). Pre-populates the chip strip; the teacher
-   *  still has to confirm + route + Add. */
+   *  onto the Resources panel). Pre-populates the strip; the teacher
+   *  still has to confirm + route + commit. */
   initialItems?: CapturedItem[];
-  /** When true the routing pills are read-only — used for "add more
-   *  photos" mode where a stack tile is being appended to in place. */
+  /** When true the routing selects are read-only (60% opacity, .locked) —
+   *  used when the opening context fixes the destination (e.g. "add more
+   *  photos" on a stack tile, or a section-scoped open). */
   lockRouting?: boolean;
   /** Fired when the dialog is dismissed (Escape, scrim click, × button). */
   onClose: () => void;
-  /** Optional — called immediately AFTER a successful Add, before close.
-   *  The ResourcesPanel uses this to register a "photo-stack" entry so it
-   *  can render a stack visual without the planner store needing a native
-   *  stack shape. */
+  /** Optional — called immediately AFTER a successful commit, before close,
+   *  with a summary of what landed. Kept as a public seam for callers that
+   *  want to react to a commit (no current caller passes it — the old
+   *  ResourcesPanel "photo-stack" flow that consumed it was dropped). */
   onCommitted?: (summary: ResourceComposerCommit) => void;
 }
 
@@ -249,6 +265,23 @@ const FOCUSABLE =
 // A URL is "a string starting with http:// or https:// with no whitespace".
 // Stricter than the spec but good enough to recognise a pasted link.
 const URL_REGEX = /^https?:\/\/\S+$/;
+
+/** True only for a well-formed absolute http(s) URL. The paste path already
+ *  gates on URL_REGEX, but typed/manual entry (the inline Link row, the
+ *  All-tools URL row) is NOT enforced by `input type="url"` in JS — so a
+ *  `javascript:` / `data:` / `blob:` / protocol-relative / garbage string
+ *  could otherwise be captured and later rendered. We gate twice: the regex
+ *  blocks non-http(s) schemes + whitespace cheaply, then `new URL()` confirms
+ *  the value actually parses and re-checks the protocol (defence in depth). */
+function isCapturableWebUrl(value: string): boolean {
+  if (!URL_REGEX.test(value)) return false;
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 // ── Resource caps ────────────────────────────────────────────────────────
 // Mirror the API allowlist in app/api/resources/upload/route.ts so the
@@ -280,7 +313,7 @@ function formatBytes(n: number): string {
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-/** Tiny unique id (chip keys + nothing else). */
+/** Tiny unique id (strip keys + nothing else). */
 let _seq = 0;
 function uid(prefix: string): string {
   _seq += 1;
@@ -314,9 +347,9 @@ export function mimeToResourceType(file: File): LessonResource["type"] {
 
 /** Map a File's mime to the fine-grained `ResourceProvider` tag used by
  *  the embed primitives. Mirrors `mimeToResourceType` but returns the
- *  newer provider taxonomy (image / pdf / video / audio) so the
- *  ResourceEmbed renderer can pick the right branch from a session-only
- *  blob URL. Returns undefined for things we don't yet recognise. */
+ *  newer provider taxonomy (image / pdf / video / audio) so renderers can
+ *  pick the right branch from a session-only blob URL. Returns undefined
+ *  for things we don't yet recognise. */
 function mimeToProvider(
   file: File,
 ): import("@/lib/types").ResourceProvider | undefined {
@@ -328,8 +361,8 @@ function mimeToProvider(
 }
 
 /** Convert a File into a CapturedItem. Mints a session-only `blob:` URL
- *  so the captured strip + ResourceEmbed can preview the file in-place
- *  before Add (real R2 upload lands in a later slice). */
+ *  so the captured strip can preview the file in-place before commit
+ *  (the real R2 upload runs at commit time in backend mode). */
 export function fileToCapturedItem(file: File): CapturedItem {
   return {
     id: uid("cap"),
@@ -342,6 +375,42 @@ export function fileToCapturedItem(file: File): CapturedItem {
     isFile: true,
     file,
   };
+}
+
+/** Build a link CapturedItem from a raw URL via parseResourceUrl, so the
+ *  tile carries a real provider + thumbnail + display name. Shared by the
+ *  inline URL row and the paste handler. */
+function linkToCapturedItem(raw: string): Omit<CapturedItem, "id"> {
+  const parsed = parseResourceUrl(raw);
+  return {
+    type:
+      parsed.provider === "youtube" ||
+      parsed.provider === "vimeo" ||
+      parsed.provider === "video"
+        ? "youtube"
+        : parsed.provider === "gslides"
+          ? "slides"
+          : parsed.provider === "gdocs" || parsed.provider === "gsheets"
+            ? "doc"
+            : parsed.provider === "gdrive" || parsed.provider === "pdf"
+              ? "pdf"
+              : parsed.provider === "image"
+                ? "image"
+                : "link",
+    label: parsed.displayName,
+    url: raw,
+    provider: parsed.provider,
+    thumbnailUrl: parsed.thumbnailUrl ?? undefined,
+    // Default to "thumbnail" for every link — the previous per-chip
+    // display-mode toggle was dropped by the redesign; the default flows
+    // through to LessonResource.displayMode unchanged.
+    displayMode: "thumbnail",
+  };
+}
+
+/** Strip HTML so "has this rich note any text" checks ignore empty <p>s. */
+function plainText(html: string): string {
+  return html.replace(/<[^>]*>/g, "").trim();
 }
 
 // ── Component ────────────────────────────────────────────────────────────
@@ -365,19 +434,23 @@ export function ResourceComposer({
   const isEditMode = editResource != null;
   const routingLocked = lockRouting || isEditMode;
   // ── Cross-agent label contract ───────────────────────────────────────
-  // useLabels() ships from lib/labels.tsx (another agent). If the module
-  // resolves it returns the configured captions; the default it returns
-  // matches the four words we'd hard-code anyway, so this stays safe even
-  // before the other agent's PR lands.
+  // useLabels() ships from lib/labels.tsx. The defaults match the four
+  // words we'd hard-code anyway, so this stays safe regardless.
   const labels = useLabels();
 
   // ── ID + refs ────────────────────────────────────────────────────────
   const headingId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  /** Focuses the first capture-grid button ([data-autofocus]) — queried
+   *  through the panel because the Tooltip wrapper owns the trigger ref. */
+  const focusFirstCapture = useCallback(() => {
+    panelRef.current
+      ?.querySelector<HTMLButtonElement>("[data-autofocus]")
+      ?.focus();
+  }, []);
   const linkInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   // Track the element that held focus before we opened so we can restore.
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -395,53 +468,64 @@ export function ResourceComposer({
     subjects,
   } = usePlanner();
 
-  // ── Local UI state ───────────────────────────────────────────────────
+  // ── Local UI state — the §3 composer state machine ───────────────────
+  //   mode    — from props (isNotecardMode above).
+  //   step    — 1 (capture) | 2 (review & route). Resource mode only;
+  //             notecard mode is a single screen.
+  //   items   — ordered captures[]; index 0 = poster (notecard mode).
+  //   routing — subject/unit/lesson/section target.
+  //   error   — uploadError + cached-retry state.
+  //   dirty   — derived (uncommitted captures) → "Session only" badge.
+  const [step, setStep] = useState<1 | 2>(1);
   const [title, setTitle] = useState<string>("");
   const [body, setBody] = useState<string>("");
   const [linkOpen, setLinkOpen] = useState<boolean>(false);
   const [linkValue, setLinkValue] = useState<string>("");
-  const [searchOpen, setSearchOpen] = useState<boolean>(false);
-  /** Switches the composer body to the "All tools" expanded grid (the
-   *  card-wall tool menu). Returning sets this back to false. */
+  /** Switches the body to the "All tools" expanded grid (the card-wall
+   *  tool menu). Returning sets this back to false. */
   const [allToolsOpen, setAllToolsOpen] = useState<boolean>(false);
+  /** Notecard mode — whether the "+" gallery tile has revealed the
+   *  capture methods block. */
+  const [captureOpen, setCaptureOpen] = useState<boolean>(false);
   const [items, setItems] = useState<CapturedItem[]>([]);
-  /** Which captured-chip is currently showing its note textarea. Null =
-   *  none open. Only one note editor is open at a time so the strip
-   *  doesn't grow taller than the composer can contain. */
-  const [noteOpenId, setNoteOpenId] = useState<string | null>(null);
+  /** Step 2 — whether the collapsed "+ Add a note to an item" reveal is
+   *  open, and which captured item the note editor is bound to. */
+  const [notesOpen, setNotesOpen] = useState<boolean>(false);
+  const [noteItemId, setNoteItemId] = useState<string | null>(null);
   /** Inline status copy — "Pasted image" / "Pasted link" — appears under
-   *  the captured-items strip so a teacher knows their paste registered. */
+   *  the captured strip so a teacher knows their paste registered. */
   const [pastedStatus, setPastedStatus] = useState<string | null>(null);
   /** Inline rejection copy — "Skipped photo.png — image must be ≤ 5 MB"
-   *  — appears in red under the captured-items strip when an upload is
-   *  refused at capture time (size cap, mime allowlist, or the per-
-   *  lesson count cap). Auto-clears after 6 s. */
+   *  — appears under the captured strip when a capture is refused (size
+   *  cap, mime allowlist, or the per-lesson count cap). Auto-clears. */
   const [rejectionStatus, setRejectionStatus] = useState<string | null>(null);
   /** True while hosted-file uploads to R2 are in flight (backend mode). */
   const [uploading, setUploading] = useState<boolean>(false);
-  /** Inline error when a hosted-file upload fails — keeps the dialog open so
-   *  the teacher can retry or remove the offending file. */
+  /** Inline error when a hosted-file upload fails — feeds the step-2 error
+   *  strip (danger tint + Retry); the dialog never closes on failure. */
   const [uploadError, setUploadError] = useState<string | null>(null);
+  /** Index currently being pointer-dragged in the strip (reorder). */
+  const dragIndexRef = useRef<number | null>(null);
   // Whether the planner Supabase seam is on. When true, file uploads persist
   // to R2 + the resources table; when false the composer keeps its
-  // session-only blob behavior (mock / local).
+  // session-only blob behavior (mock / local — nothing touches network).
   const backendOn = isPlannerSupabaseConfigured();
 
-  // Routing pills — initialize from the launching lesson + (optional) section.
-  // The Section pill carries the special value "" to mean "Whole lesson".
+  // Routing — initialize from the launching lesson + (optional) section.
+  // The Section select carries the special value "" to mean "Whole lesson".
   const [subjectId, setSubjectId] = useState<SubjectId>(lesson.subject);
   const [unitId, setUnitId] = useState<string>(lesson.unit);
   const [lessonId, setLessonId] = useState<string>(lesson.id);
   const [sectionId, setSectionId] = useState<string>(initialSectionId ?? "");
 
-  // Which picker is currently open (null = none).
+  // Which routing select's popover is currently open (null = none).
   const [openPicker, setOpenPicker] = useState<
     "subject" | "unit" | "lesson" | "section" | null
   >(null);
 
-  // ── On open: reset state + focus the title input ─────────────────────
+  // ── On open: reset state + land focus ────────────────────────────────
   // The `open` prop drives mount/unmount; this effect re-initialises every
-  // time the dialog re-opens so a previous session's chips don't leak.
+  // time the dialog re-opens so a previous session's captures don't leak.
   useEffect(() => {
     if (!open) return;
 
@@ -453,18 +537,32 @@ export function ResourceComposer({
     uploadedRef.current = new Map();
     pdfRenderedRef.current = new Set();
 
-    // In edit mode, seed the title + rich body from the resource being edited
-    // and route to its existing home; otherwise start blank at the launching
-    // lesson. The notecard body is the shared `body` state (a RichTextEditor in
-    // notecard mode); in resource mode `body` stays the plain description field.
+    // In edit mode, seed the title + rich body + GALLERY from the resource
+    // being edited and route to its existing home; otherwise start blank at
+    // the launching lesson. Existing gallery media become strip tiles that
+    // carry the original LessonResource verbatim (committed as-is), so
+    // reorder + remove are real edits (AC-7) without rewriting payloads.
+    setStep(1);
     setTitle(editResource ? (editResource.resource.label ?? "") : "");
     setBody(editResource ? (editResource.resource.body ?? "") : "");
     setLinkOpen(false);
     setLinkValue("");
-    setSearchOpen(false);
     setAllToolsOpen(false);
-    setNoteOpenId(null);
-    setItems(initialItems ?? []);
+    setCaptureOpen(false);
+    setNotesOpen(false);
+    setNoteItemId(null);
+    const seeded: CapturedItem[] = editResource
+      ? (editResource.resource.gallery ?? []).map((g) => ({
+          id: uid("cap"),
+          type: g.type,
+          label: g.label,
+          url: g.url,
+          provider: g.provider,
+          thumbnailUrl: g.thumbnailUrl,
+          existing: g,
+        }))
+      : [];
+    setItems([...seeded, ...(initialItems ?? [])]);
     setPastedStatus(null);
     setRejectionStatus(null);
     setUploading(false);
@@ -478,8 +576,10 @@ export function ResourceComposer({
     setOpenPicker(null);
 
     // Move focus into the dialog on the next frame so the panel is mounted.
+    // Notecard mode focuses the title; resource mode the first capture tool.
     const frame = requestAnimationFrame(() => {
-      titleInputRef.current?.focus();
+      if (isNotecardMode) titleInputRef.current?.focus();
+      else focusFirstCapture();
     });
     return () => cancelAnimationFrame(frame);
     // We intentionally do NOT re-run when initialItems/initialSectionId
@@ -488,18 +588,14 @@ export function ResourceComposer({
   }, [open]);
 
   // ── Blob-URL leak guard ──────────────────────────────────────────────
-  // File picks mint `blob:` URLs via URL.createObjectURL so the embed
-  // preview can render the file in-session. Those handles need an
-  // explicit URL.revokeObjectURL when the composer closes (or the items
-  // are dropped) or the browser leaks them for the page's lifetime.
-  // We keep a ref to the latest items array so the cleanup effect can
-  // revoke without listing `items` in its deps (which would re-fire on
-  // every keystroke).
-  // URLs we've already handed to the planner store on Add. The leak guard
-  // below must NOT revoke these — the committed resource still points at the
-  // blob for the rest of the session, so revoking it would leave the
-  // just-added image/PDF tile rendering a dead `blob:` (the "thumbnail
-  // doesn't show after adding" bug). Reset on every re-open.
+  // File picks mint `blob:` URLs via URL.createObjectURL so the strip can
+  // preview the file in-session. Those handles need an explicit
+  // URL.revokeObjectURL when the composer closes (or the items are
+  // dropped) or the browser leaks them for the page's lifetime.
+  // URLs already handed to the planner store on commit must NOT be revoked
+  // — the committed resource still points at the blob for the rest of the
+  // session, so revoking it would leave the just-added tile rendering a
+  // dead `blob:`. Reset on every re-open.
   const committedUrlsRef = useRef<Set<string>>(new Set<string>());
 
   // Cache of completed hosted-file uploads, keyed by CapturedItem id, so a
@@ -517,9 +613,13 @@ export function ResourceComposer({
   useEffect(() => {
     if (open) return;
     // The dialog just closed — revoke every blob URL we created during this
-    // session EXCEPT the ones already committed to the store on Add (those
-    // must stay alive so the resource's tile/preview keeps rendering).
+    // session EXCEPT the ones already committed to the store (those must
+    // stay alive so the resource's tile/preview keeps rendering). Tiles
+    // seeded from an EXISTING gallery (notecard edit) are skipped outright:
+    // we never minted those URLs, and revoking them would blank the
+    // already-committed resource elsewhere.
     for (const item of itemsRef.current) {
+      if (item.existing) continue;
       if (
         item.url?.startsWith("blob:") &&
         !committedUrlsRef.current.has(item.url)
@@ -528,6 +628,26 @@ export function ResourceComposer({
       }
     }
   }, [open]);
+  // Unmount leak guard — the effect above only fires on an open→false
+  // transition, so a composer unmounted WHILE open (e.g. the hosting drawer
+  // closes and tears the subtree down mid-capture) would leak its minted
+  // blob: URLs. Same rules as the close-time pass: skip `existing`-seeded
+  // tiles (we never minted those URLs) and committed URLs (the store still
+  // points at them). Revoking an already-revoked URL is a harmless no-op,
+  // so running after a normal close is fine.
+  useEffect(() => {
+    return () => {
+      for (const item of itemsRef.current) {
+        if (item.existing) continue;
+        if (
+          item.url?.startsWith("blob:") &&
+          !committedUrlsRef.current.has(item.url)
+        ) {
+          URL.revokeObjectURL(item.url);
+        }
+      }
+    };
+  }, []);
 
   // ── On close: restore focus ──────────────────────────────────────────
   useEffect(() => {
@@ -540,7 +660,6 @@ export function ResourceComposer({
   }, [open]);
 
   // ── Pasted status auto-clear (~2s) ───────────────────────────────────
-  // Keeps the strip from accumulating a stale status line.
   useEffect(() => {
     if (!pastedStatus) return;
     const t = setTimeout(() => setPastedStatus(null), 2000);
@@ -560,9 +679,9 @@ export function ResourceComposer({
   // ── PDF first-page posters ───────────────────────────────────────────
   // Render a real first-page thumbnail for every captured PDF (client-side,
   // from the file's bytes — no server job, no CORS). Patches the item's
-  // thumbnailUrl when it resolves so the captured strip + the eventual tile
-  // show the page; on failure the PDF keeps its icon poster. Guarded per item
-  // so it runs once, and it covers BOTH the picker and the drag-drop
+  // thumbnailUrl when it resolves so the strip + the eventual tile show the
+  // page; on failure the PDF keeps its icon poster. Guarded per item so it
+  // runs once, and it covers BOTH the picker and the drag-drop
   // (initialItems) capture paths since both land in `items`.
   useEffect(() => {
     for (const it of items) {
@@ -592,12 +711,11 @@ export function ResourceComposer({
     }
   }, [items]);
 
-  // ── Derived: available units / lessons for the pickers ───────────────
-  // Units come from the SUBJECT_BY_ID → UNITS map; we walk the planner
-  // store's lessons to derive the unit set for the chosen subject so the
-  // picker never offers a unit with zero lessons in the doc. Lessons are
-  // scoped to the chosen unit AND the launching lesson's `week` when
-  // present — that "show me THIS week" filter matches the routing spec.
+  // ── Derived: available units / lessons for the routing selects ───────
+  // Units come from walking the planner store's lessons so the select never
+  // offers a unit with zero lessons in the doc. Lessons are scoped to the
+  // chosen unit AND the launching lesson's `week` when present — that
+  // "show me THIS week" filter matches the routing spec.
 
   /** Subjects: just the canonical eight — fixed order, locked team-wide. */
   const subjectOptions = useMemo(() => subjects, [subjects]);
@@ -608,9 +726,6 @@ export function ResourceComposer({
     for (const l of lessons) {
       if (l.subject !== subjectId) continue;
       if (seen.has(l.unit)) continue;
-      // The lesson carries its unit id, but we want a label — pull a
-      // representative title from the first matching lesson and use the
-      // unit id as the fallback display.
       seen.set(l.unit, { id: l.unit, name: l.unit });
     }
     return [...seen.values()];
@@ -626,7 +741,7 @@ export function ResourceComposer({
       .filter((l) => (week ? l.week === week : true));
   }, [lessons, unitId, lesson.week]);
 
-  /** Sections of the chosen lesson — the Section picker shows these plus
+  /** Sections of the chosen lesson — the Section select shows these plus
    *  the special "Whole lesson" option at the top. */
   const sectionOptions = useMemo(
     () => (lessonId ? getSections(lessonId) : []),
@@ -634,13 +749,10 @@ export function ResourceComposer({
   );
 
   // ── Cascading reset effects ──────────────────────────────────────────
-  // Changing an upstream picker collapses every downstream pick to the
+  // Changing an upstream select collapses every downstream pick to the
   // first valid option. We do this in effects (not inside the setter) so
   // the cascade still fires for any future programmatic change.
 
-  // When subject changes, snap unit + lesson + section to the first
-  // valid match in the new subject. Skipped if the current selection is
-  // still valid (so picking the same subject is a no-op).
   useEffect(() => {
     if (routingLocked) return;
     const validUnit = unitOptions.find((u) => u.id === unitId);
@@ -652,7 +764,6 @@ export function ResourceComposer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectId, unitOptions.length]);
 
-  // When unit changes, snap lesson + section.
   useEffect(() => {
     if (routingLocked) return;
     const validLesson = lessonOptions.find((l) => l.id === lessonId);
@@ -670,18 +781,15 @@ export function ResourceComposer({
     setItems((prev) => [...prev, { ...partial, id: uid("cap") }]);
   }, []);
 
-  /** Add many at once — used by the file pickers' onChange. Validates
-   *  every incoming item against the spec caps (mime allowlist, size cap,
-   *  per-lesson count cap) and collects each rejection's reason. Accepted
-   *  items merge into the strip; rejection reasons become an inline
-   *  message the teacher sees ("Skipped photo.png — image must be
-   *  ≤ 5 MB (yours: 6.2 MB).").
+  /** Add many at once — used by the file picker / drop / paste paths.
+   *  Validates every incoming item against the spec caps (mime allowlist,
+   *  size cap, per-lesson count cap) and collects each rejection's reason.
+   *  Accepted items merge into the strip; rejection reasons become an
+   *  inline message ("Skipped photo.png — image must be ≤ 5 MB…").
    *
    *  Counts are local to the current strip — a Phase 1B+ improvement is
-   *  to include the section's already-attached items in the count so the
-   *  composer can refuse the 11th item across BOTH the strip and the
-   *  lesson's prior resources. Today the DB trigger backstops that case
-   *  on the API side. */
+   *  to include the section's already-attached items in the count. Today
+   *  the DB trigger backstops that case on the API side. */
   const addItems = useCallback((next: CapturedItem[]) => {
     if (next.length === 0) return;
     const reasons: string[] = [];
@@ -747,25 +855,33 @@ export function ResourceComposer({
 
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((c) => c.id !== id));
-    setNoteOpenId((cur) => (cur === id ? null : cur));
+    setNoteItemId((cur) => (cur === id ? null : cur));
   }, []);
 
-  /** Update one captured item's rich-text note (→ resource.body). Driven by
-   *  the per-chip RichTextEditor's onChange, which already emits sanitized
-   *  HTML; we store it verbatim and re-sanitize again on render. */
+  /** Reorder a captured item — pointer drag + keyboard arrows both land
+   *  here. In notecard mode index 0 IS the poster, so reorder = the
+   *  poster control (no separate "set poster" affordance, per the
+   *  handoff's delegated decision). */
+  const moveItem = useCallback((from: number, to: number) => {
+    setItems((prev) => {
+      if (from === to || from < 0 || to < 0 || to >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }, []);
+
+  /** Update one captured item's rich-text note (→ resource.body). Driven
+   *  by the step-2 note editor's onChange, which already emits sanitized
+   *  HTML; we store it verbatim (the editor owns the sanitizer boundary). */
   const setItemBody = useCallback((id: string, html: string) => {
     setItems((prev) =>
       prev.map((c) => (c.id === id ? { ...c, body: html } : c)),
     );
   }, []);
 
-  /** Toggle the per-chip note editor. Clicking the chip itself opens or
-   *  closes the note for that chip; clicking another chip swaps focus. */
-  const toggleNote = useCallback((id: string) => {
-    setNoteOpenId((cur) => (cur === id ? null : id));
-  }, []);
-
-  // ── File picker change handlers ──────────────────────────────────────
+  // ── File picker change handler ───────────────────────────────────────
 
   const onUploadChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -782,54 +898,21 @@ export function ResourceComposer({
     [addItems],
   );
 
-  const onPhotoChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files || files.length === 0) return;
-      const captured: CapturedItem[] = [];
-      for (let i = 0; i < files.length; i += 1) {
-        // Photo picker uses accept="image/*", but be defensive: only
-        // accept images here so the caller's intent is preserved.
-        if (!files[i].type.startsWith("image/")) continue;
-        // Photo picks get the same rich shape as the generic upload
-        // path — blob URL + provider + size + mime — so the embed
-        // preview and limits banner can read them.
-        const f = files[i];
-        captured.push({
-          id: uid("cap"),
-          type: "image",
-          label: f.name || "Photo",
-          url: URL.createObjectURL(f),
-          provider: "image",
-          mimeType: f.type,
-          sizeBytes: f.size,
-          isFile: true,
-          file: f,
-        });
-      }
-      addItems(captured);
-      e.target.value = "";
-    },
-    [addItems],
-  );
-
-  // ── Tile click handlers ──────────────────────────────────────────────
+  // ── Capture tool click handlers ──────────────────────────────────────
 
   const onUploadClick = useCallback(() => uploadInputRef.current?.click(), []);
-  const onPhotoClick = useCallback(() => photoInputRef.current?.click(), []);
   const onLinkClick = useCallback(() => {
     setLinkOpen((v) => !v);
     // Focus the URL input on next frame so the inline row reveals + lands focus.
     requestAnimationFrame(() => linkInputRef.current?.focus());
   }, []);
-  const onSearchClick = useCallback(() => setSearchOpen((v) => !v), []);
 
   /** Best-effort OG enrichment for a plain website link. The browser can't
    *  read another origin's OG tags directly (CORS), so we ask our own
    *  SSRF-guarded `/api/og-preview` route. On success we patch the matching
-   *  captured chip with a real thumbnail so the tile/preview shows a card
-   *  instead of a bare domain. Every failure is swallowed — the link still
-   *  works without a thumbnail, in line with the session-only model. */
+   *  captured tile with a real thumbnail so it shows a card instead of a
+   *  bare domain. Every failure is swallowed — the link still works
+   *  without a thumbnail, in line with the session-only model. */
   const enrichWebsiteLink = useCallback((url: string): void => {
     void (async () => {
       try {
@@ -856,35 +939,24 @@ export function ResourceComposer({
   }, []);
 
   /** Confirm the inline URL: parse it through `parseResourceUrl` so the
-   *  captured chip carries a real `provider`, `thumbnailUrl`, and
+   *  captured tile carries a real `provider`, `thumbnailUrl`, and
    *  `displayName`, then append a link item and clear the field. */
   const onLinkConfirm = useCallback(() => {
     const raw = linkValue.trim();
     if (!raw) return;
-    const parsed = parseResourceUrl(raw);
-    addItem({
-      type:
-        parsed.provider === "youtube" ||
-        parsed.provider === "vimeo" ||
-        parsed.provider === "video"
-          ? "youtube"
-          : parsed.provider === "gslides"
-            ? "slides"
-            : parsed.provider === "gdocs" || parsed.provider === "gsheets"
-              ? "doc"
-              : parsed.provider === "gdrive" || parsed.provider === "pdf"
-                ? "pdf"
-                : parsed.provider === "image"
-                  ? "image"
-                  : "link",
-      label: parsed.displayName,
-      url: raw,
-      provider: parsed.provider,
-      thumbnailUrl: parsed.thumbnailUrl ?? undefined,
-      // Default to "thumbnail" for every link; the segmented control on
-      // the chip lets the teacher flip to literal/hyperlink.
-      displayMode: "thumbnail",
-    });
+    // `input type="url"` does NOT enforce validity in JS, so a typed
+    // `javascript:` / `data:` / protocol-relative / garbage value would
+    // otherwise be stored and later rendered. Reject anything that isn't a
+    // well-formed http(s) URL; keep the field populated so the teacher can
+    // fix it, and surface the inline rejection message.
+    if (!isCapturableWebUrl(raw)) {
+      setRejectionStatus(
+        "That doesn't look like a web link — use an http(s) address.",
+      );
+      return;
+    }
+    const parsed = linkToCapturedItem(raw);
+    addItem(parsed);
     // Generic websites have no cheaply-derivable thumbnail — fetch one.
     if (parsed.provider === "website") enrichWebsiteLink(raw);
     setLinkValue("");
@@ -921,8 +993,7 @@ export function ResourceComposer({
       if (imgFiles.length > 0) {
         e.preventDefault();
         // Enrich pasted images with the same blob-URL + provider + size
-        // shape that the file picker uses, so the embed preview and the
-        // limits banner can read them.
+        // shape that the file picker uses.
         const captured: CapturedItem[] = imgFiles.map((f) => ({
           id: uid("cap"),
           type: "image",
@@ -944,53 +1015,51 @@ export function ResourceComposer({
       }
 
       // 2) Otherwise read plain text. URL → link item (parsed through
-      // parseResourceUrl so we capture provider + thumbnail), anything
-      // else → body.
+      // parseResourceUrl so we capture provider + thumbnail); anything
+      // else falls through to the default paste in the focused field.
       const text = cd.getData("text");
       if (!text) return;
 
       if (URL_REGEX.test(text.trim())) {
         e.preventDefault();
         const raw = text.trim();
-        const parsed = parseResourceUrl(raw);
-        addItem({
-          type:
-            parsed.provider === "youtube" ||
-            parsed.provider === "vimeo" ||
-            parsed.provider === "video"
-              ? "youtube"
-              : parsed.provider === "gslides"
-                ? "slides"
-                : parsed.provider === "gdocs" || parsed.provider === "gsheets"
-                  ? "doc"
-                  : parsed.provider === "gdrive" || parsed.provider === "pdf"
-                    ? "pdf"
-                    : parsed.provider === "image"
-                      ? "image"
-                      : "link",
-          label: parsed.displayName,
-          url: raw,
-          provider: parsed.provider,
-          thumbnailUrl: parsed.thumbnailUrl ?? undefined,
-          displayMode: "thumbnail",
-        });
+        const parsed = linkToCapturedItem(raw);
+        addItem(parsed);
         if (parsed.provider === "website") enrichWebsiteLink(raw);
         setPastedStatus("Pasted link");
-        return;
-      }
-
-      // Plain text — let the default paste land in whatever input is
-      // focused. Set a small status nudge if focus is in the body
-      // textarea so the teacher sees confirmation; for inputs the default
-      // browser behaviour already speaks for itself.
-      if (document.activeElement?.tagName === "TEXTAREA") {
-        setPastedStatus("Pasted text");
       }
     },
     [addItem, addItems, enrichWebsiteLink],
   );
 
-  // ── Inline-image resolver for the rich-text body editor ──────────────
+  // ── Drag-drop onto the dialog ────────────────────────────────────────
+  // The drop hint is honest: files dropped anywhere on the dialog land in
+  // the captured strip through the same validated addItems path. Internal
+  // strip-reorder drags are ignored here (they don't carry Files).
+
+  const onDialogDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    if (e.dataTransfer.types.includes("Files")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  }, []);
+
+  const onDialogDrop = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      if (!e.dataTransfer.types.includes("Files")) return;
+      e.preventDefault();
+      const files = e.dataTransfer.files;
+      if (!files || files.length === 0) return;
+      const captured: CapturedItem[] = [];
+      for (let i = 0; i < files.length; i += 1) {
+        captured.push(fileToCapturedItem(files[i]));
+      }
+      addItems(captured);
+    },
+    [addItems],
+  );
+
+  // ── Inline-image resolver for the rich-text editors ──────────────────
   // The RichTextEditor calls this when the teacher inserts an inline image.
   // Backend mode → upload the picked file to R2 and return its served URL
   // (/api/resources/{id}) so it persists + reaches the team. Mock/session
@@ -998,6 +1067,11 @@ export function ResourceComposer({
   // this session (the body string carries the data URL through the JSONB
   // seam unchanged). Returns null (cancels insertion) on cancel/failure.
   // sanitizeHtml() drops an unsafe src at emit regardless.
+  //
+  // Caps mirror the captured-file image path (the same ALLOWED_MIMES image
+  // subset + MAX_IMAGE_BYTES): without them, mock mode would inline the full
+  // file as a `data:` URL — bloating the body + localStorage — and backend
+  // mode would upload past the 5 MB image cap the capture path enforces.
   const requestBodyImageUrl = useCallback((): Promise<string | null> => {
     return new Promise<string | null>((resolve) => {
       if (typeof document === "undefined") {
@@ -1010,6 +1084,25 @@ export function ResourceComposer({
       input.onchange = () => {
         const file = input.files?.[0];
         if (!file) {
+          resolve(null);
+          return;
+        }
+        // Enforce the image MIME allowlist + size cap BEFORE reading or
+        // uploading. On violation cancel the insertion (resolve null) and
+        // surface the same inline rejection mechanism the capture path uses
+        // — never fail silently.
+        if (!file.type.startsWith("image/") || !ALLOWED_MIMES.has(file.type)) {
+          setRejectionStatus(
+            `Skipped "${file.name || "image"}" — ${file.type || "this file type"} isn't a supported image. ` +
+              `Use PNG, JPG, WebP, or GIF.`,
+          );
+          resolve(null);
+          return;
+        }
+        if (file.size > MAX_IMAGE_BYTES) {
+          setRejectionStatus(
+            `Skipped "${file.name || "image"}" — images must be ≤ 5 MB (yours: ${formatBytes(file.size)}).`,
+          );
           resolve(null);
           return;
         }
@@ -1032,7 +1125,7 @@ export function ResourceComposer({
     });
   }, [backendOn, getLesson, lessonId, lesson]);
 
-  // ── Add (commit) ─────────────────────────────────────────────────────
+  // ── Commit ───────────────────────────────────────────────────────────
   // Three commit shapes, by mode:
   //   • resource mode — translate every captured item into a separate
   //     LessonResource at the routed destination (each carrying its own rich
@@ -1043,24 +1136,29 @@ export function ResourceComposer({
   //     body/gallery in place via editSectionResource / editLesson.
 
   const canAdd = useMemo(() => {
+    // EDIT mode: always committable. Emptying the title, gallery, AND notes
+    // is a legitimate edit — a teacher may intentionally clear a card
+    // without deleting it — so Save stays enabled even when everything is
+    // empty. CREATE keeps the guards below.
+    if (isEditMode) return true;
     // Resource mode: at least one captured item OR a title (a title alone
-    // creates a labelled "link" stub). Notecard/edit mode: a title, captured
+    // creates a labelled "link" stub). Notecard mode: a title, captured
     // media, OR non-empty rich body is enough — a notes-only card is valid.
     if (isNotecardMode) {
       return (
         items.length > 0 ||
         title.trim().length > 0 ||
-        body.replace(/<[^>]*>/g, "").trim().length > 0
+        plainText(body).length > 0
       );
     }
     return items.length > 0 || title.trim().length > 0;
-  }, [isNotecardMode, items, title, body]);
+  }, [isEditMode, isNotecardMode, items, title, body]);
 
   const handleAdd = useCallback(async () => {
     if (!canAdd || uploading) return;
 
     // Resolve the destination lesson; fall back to the launching lesson
-    // if the picker somehow ended up with a stale id.
+    // if the select somehow ended up with a stale id.
     const destLesson = getLesson(lessonId) ?? lesson;
     const destLessonId = destLesson.id;
     const destSectionId = sectionId || null;
@@ -1082,11 +1180,14 @@ export function ResourceComposer({
       resourceId?: string;
       /** Per-resource rich-text note → LessonResource.body (sanitized HTML). */
       body?: string;
-      /** Transient: the File to upload, its blob URL, and the source
-       *  CapturedItem id (upload-cache key). Never dispatched. */
+      /** Transient: the File to upload, its blob URL, the source
+       *  CapturedItem id (upload-cache key), and — notecard EDIT only —
+       *  the original gallery LessonResource to commit verbatim. Never
+       *  dispatched. */
       __file?: File;
       __blobUrl?: string;
       __id?: string;
+      __existing?: LessonResource;
     };
     // In notecard mode the captured items become the card's GALLERY, so the
     // "title-only" stub is never minted (a notes-only / title-only notecard is
@@ -1111,6 +1212,7 @@ export function ResourceComposer({
             __file: it.file,
             __blobUrl: it.url?.startsWith("blob:") ? it.url : undefined,
             __id: it.id,
+            __existing: it.existing,
           }))
         : isNotecardMode
           ? []
@@ -1132,87 +1234,136 @@ export function ResourceComposer({
     if (backendOn && toCommit.some((r) => r.__file)) {
       setUploadError(null);
       setUploading(true);
-      const owner = resourceOwnerEvent(destLesson);
-      // Upload every file item, reusing any result already cached from a prior
-      // attempt so a RETRY never re-uploads a file that already succeeded
-      // (which would duplicate the R2 object + resources row and eat the
-      // per-event count quota). allSettled — not all — so one failure doesn't
-      // abandon the in-flight successes: they finish, cache, and commit on the
-      // next click.
-      const fileEntries = toCommit.filter((r) => r.__file);
-      const settled = await Promise.allSettled(
-        fileEntries.map(async (r) => {
-          const cached = r.__id ? uploadedRef.current.get(r.__id) : undefined;
-          const result =
-            cached ??
-            (await uploadHostedFile({
-              owner,
-              file: r.__file as File,
-              displayLabel: r.label,
-            }));
-          if (r.__id && !cached) uploadedRef.current.set(r.__id, result);
-          r.url = result.url;
-          r.resourceId = result.resourceId;
-          r.provider = result.provider;
-          r.mimeType = result.mimeType;
-          r.sizeBytes = result.sizeBytes;
-          // Image tiles read thumbnailUrl ?? url; the served url IS the image.
-          // For non-images keep any client-rendered poster we already have
-          // (e.g. the PDF first-page data URL) instead of clobbering it.
-          r.thumbnailUrl =
-            result.provider === "image" ? result.url : r.thumbnailUrl;
-          // The blob is no longer the resource's url — let it be revoked.
-          r.__blobUrl = undefined;
-        }),
-      );
-      setUploading(false);
-      const failure = settled.find((s) => s.status === "rejected");
-      if (failure) {
-        const reason = (failure as PromiseRejectedResult).reason;
-        setUploadError(
-          reason instanceof ResourceUploadError
-            ? reason.message
-            : "Couldn't upload your file. Please try again.",
+      // try/catch/finally so `uploading` is ALWAYS cleared: a synchronous
+      // throw (e.g. resourceOwnerEvent) or any unexpected rejection would
+      // otherwise strand the dialog with every control disabled. allSettled
+      // already keeps per-file failures from rejecting the batch; the catch
+      // is the backstop for anything outside that — it keeps the dialog open
+      // with a generic error instead of a frozen "Adding…" state.
+      try {
+        const owner = resourceOwnerEvent(destLesson);
+        // Upload every file item, reusing any result already cached from a
+        // prior attempt so a RETRY never re-uploads a file that already
+        // succeeded (which would duplicate the R2 object + resources row and
+        // eat the per-event count quota). allSettled — not all — so one
+        // failure doesn't abandon the in-flight successes: they finish,
+        // cache, and commit on the next click.
+        const fileEntries = toCommit.filter((r) => r.__file);
+        const settled = await Promise.allSettled(
+          fileEntries.map(async (r) => {
+            const cached = r.__id ? uploadedRef.current.get(r.__id) : undefined;
+            const result =
+              cached ??
+              (await uploadHostedFile({
+                owner,
+                file: r.__file as File,
+                displayLabel: r.label,
+              }));
+            if (r.__id && !cached) uploadedRef.current.set(r.__id, result);
+            r.url = result.url;
+            r.resourceId = result.resourceId;
+            r.provider = result.provider;
+            r.mimeType = result.mimeType;
+            r.sizeBytes = result.sizeBytes;
+            // Image tiles read thumbnailUrl ?? url; the served url IS the
+            // image. For non-images keep any client-rendered poster we
+            // already have (e.g. the PDF first-page data URL) rather than
+            // clobbering it.
+            r.thumbnailUrl =
+              result.provider === "image" ? result.url : r.thumbnailUrl;
+            // The blob is no longer the resource's url — let it be revoked.
+            r.__blobUrl = undefined;
+          }),
         );
-        return; // dialog stays open; succeeded uploads are cached for retry
+        const failure = settled.find((s) => s.status === "rejected");
+        if (failure) {
+          const reason = (failure as PromiseRejectedResult).reason;
+          setUploadError(
+            reason instanceof ResourceUploadError
+              ? reason.message
+              : "Couldn't upload your file. Please try again.",
+          );
+          return; // dialog stays open; succeeded uploads are cached for retry
+        }
+      } catch {
+        // Unexpected throw outside the per-file allSettled (e.g. building the
+        // owner event). Keep the dialog open with a generic error; any
+        // already-cached uploads survive for the retry.
+        setUploadError("Couldn't upload your file. Please try again.");
+        return;
+      } finally {
+        setUploading(false);
       }
     }
 
     // Map an uploaded CommitShape to a clean LessonResource (drops the
-    // transient __* fields). Shared by every commit path below.
-    const toResource = (r: CommitShape): LessonResource => ({
-      type: r.type,
-      label: r.label,
-      url: r.url,
-      provider: r.provider,
-      displayMode: r.displayMode,
-      linkText: r.linkText,
-      mimeType: r.mimeType,
-      sizeBytes: r.sizeBytes,
-      thumbnailUrl: r.thumbnailUrl,
-      resourceId: r.resourceId,
-      ...(r.body && r.body.trim() ? { body: r.body } : {}),
-    });
+    // transient __* fields). Shared by every commit path below. A notecard-
+    // EDIT tile that represents an EXISTING gallery resource passes the
+    // original through verbatim so its payload never gets rewritten.
+    const toResource = (r: CommitShape): LessonResource =>
+      r.__existing ?? {
+        type: r.type,
+        label: r.label,
+        url: r.url,
+        provider: r.provider,
+        displayMode: r.displayMode,
+        linkText: r.linkText,
+        mimeType: r.mimeType,
+        sizeBytes: r.sizeBytes,
+        thumbnailUrl: r.thumbnailUrl,
+        resourceId: r.resourceId,
+        ...(r.body && r.body.trim() ? { body: r.body } : {}),
+      };
 
     if (isNotecardMode) {
       // ── Notecard commit — ONE resource (create or edit), never N ──────────
-      // Captured media become the gallery; the single top-level rich body is
-      // the notes. A title falls back to a generic notecard name in makeNotecard.
-      const newGallery: LessonResource[] = toCommit.map(toResource);
+      // The strip IS the gallery (ordered; index 0 = poster); the single
+      // top-level rich body is the notes. A title falls back to a generic
+      // notecard name in makeNotecard.
       const labelInput = title.trim();
 
       if (isEditMode && editResource) {
-        // EDIT — patch the existing resource's body (+ append any newly-captured
-        // media to its gallery). We DON'T overwrite the existing gallery; new
-        // media is added after what's already there. Editing notes on a plain
-        // resource promotes it to carry `body` without changing its type.
+        // EDIT — patch the existing resource's body + gallery in place. The
+        // strip seeded from the existing gallery, so its current order /
+        // membership (plus any newly-captured media) IS the next gallery
+        // (AC-7: reorder + remove are real edits; an untouched strip
+        // round-trips identically to the old append-only merge). Editing
+        // notes on a plain resource promotes it to carry `body` without
+        // changing its type.
         const existing = editResource.resource;
-        const mergedGallery = [...(existing.gallery ?? []), ...newGallery];
+        const seededExisting = (existing.gallery?.length ?? 0) > 0;
+        const mergedGallery = toCommit.map(toResource);
+        // The title field edits the card's label too: include it in the
+        // patch when it changed and is non-empty (an emptied title keeps
+        // the old label rather than blanking the card's name). One patch
+        // object feeds BOTH seams below — section and whole-lesson.
         const patch: Partial<LessonResource> = {
+          ...(labelInput && labelInput !== existing.label
+            ? { label: labelInput }
+            : {}),
           ...(body.trim() ? { body } : { body: "" }),
-          ...(mergedGallery.length > 0 ? { gallery: mergedGallery } : {}),
+          ...(seededExisting || mergedGallery.length > 0
+            ? { gallery: mergedGallery }
+            : {}),
         };
         if (editResource.sectionId) {
+          // Validate the target still exists before committing — a stale
+          // section/resource id makes editSectionResource a silent no-op
+          // (the reducer keys on the id), which would close the dialog and
+          // drop the teacher's edit. If it's gone, keep the dialog open and
+          // surface the inline message instead of losing the work.
+          const section = getSections(destLessonId).find(
+            (s) => s.id === editResource.sectionId,
+          );
+          const targetExists = section?.resources.some(
+            (r) => r.id === editResource.resourceId,
+          );
+          if (!targetExists) {
+            setRejectionStatus(
+              "Couldn't save — this resource has moved or been removed. Close and reopen it from the lesson.",
+            );
+            return; // dialog stays open; nothing committed
+          }
           editSectionResource(
             destLessonId,
             editResource.sectionId,
@@ -1220,10 +1371,37 @@ export function ResourceComposer({
             patch,
           );
         } else {
-          // Whole-lesson resource — patch the array slot by index (the
-          // synthesized id can't locate the row inside editLesson).
-          const idx = editResource.lessonResourceIndex ?? -1;
-          const nextResources = destLesson.resources.map((res, i) =>
+          // Whole-lesson resource — patch the array slot. The synthesized id
+          // can't locate the row inside editLesson, so resolve the index
+          // defensively: prefer the persisted resourceId, then object
+          // reference, and only then the (possibly stale) captured index.
+          // A blind `lessonResourceIndex ?? -1` would silently patch the
+          // WRONG row — or, at -1, patch nothing while still closing the
+          // dialog — losing the edit. If we can't locate it, keep the dialog
+          // open and tell the teacher.
+          const resources = destLesson.resources;
+          const byResourceId = editResource.resource.resourceId
+            ? resources.findIndex(
+                (r) => r.resourceId === editResource.resource.resourceId,
+              )
+            : -1;
+          const byReference = resources.indexOf(editResource.resource);
+          const byIndex = editResource.lessonResourceIndex ?? -1;
+          const idx =
+            byResourceId >= 0
+              ? byResourceId
+              : byReference >= 0
+                ? byReference
+                : byIndex >= 0 && byIndex < resources.length
+                  ? byIndex
+                  : -1;
+          if (idx < 0) {
+            setRejectionStatus(
+              "Couldn't save — this resource has moved or been removed. Close and reopen it from the lesson.",
+            );
+            return; // dialog stays open; nothing committed
+          }
+          const nextResources = resources.map((res, i) =>
             i === idx ? { ...res, ...patch } : res,
           );
           editLesson(destLessonId, { resources: nextResources });
@@ -1232,7 +1410,7 @@ export function ResourceComposer({
         // CREATE — one new notecard at the routed destination.
         const notecard = makeNotecard({
           label: labelInput,
-          gallery: newGallery,
+          gallery: toCommit.map(toResource),
           body,
         });
         if (destSectionId) {
@@ -1267,8 +1445,9 @@ export function ResourceComposer({
       if (r.__blobUrl) committedUrlsRef.current.add(r.__blobUrl);
     }
 
-    // Report back to the caller (the Resources panel uses this to register
-    // photo-stacks). Notecard mode commits exactly one resource.
+    // Report the commit summary through the optional onCommitted seam (no
+    // current caller passes it — the panel's photo-stack flow that did was
+    // dropped). Notecard mode commits exactly one resource.
     if (onCommitted) {
       const headType = isNotecardMode
         ? "notecard"
@@ -1295,6 +1474,7 @@ export function ResourceComposer({
     lessonId,
     sectionId,
     getLesson,
+    getSections,
     lesson,
     addSectionResource,
     editSectionResource,
@@ -1303,14 +1483,36 @@ export function ResourceComposer({
     onCommitted,
   ]);
 
+  // ── Step navigation ──────────────────────────────────────────────────
+
+  const goToReview = useCallback(() => {
+    setStep(2);
+    setLinkOpen(false);
+    setAllToolsOpen(false);
+    // Land focus on the title field so the review step is ready to type.
+    requestAnimationFrame(() => titleInputRef.current?.focus());
+  }, []);
+
+  const goToCapture = useCallback(() => {
+    setStep(1);
+    setNotesOpen(false);
+    requestAnimationFrame(() => focusFirstCapture());
+  }, [focusFirstCapture]);
+
   // ── Keyboard handler (Escape + focus trap) ───────────────────────────
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
       if (e.key === "Escape") {
-        // If a picker is open, close THAT first; only then close the dialog.
+        // Every Escape branch is consumed HERE — stopPropagation as well as
+        // preventDefault, or the keydown bubbles (through the React tree,
+        // portal included) to the ResourcesDrawer's panel handler on ≤960px
+        // Daily, which would close the drawer and unmount the composer
+        // mid-capture, discarding everything the teacher staged.
+        // If a routing popover is open, close THAT first; only then the dialog.
         if (openPicker) {
           e.preventDefault();
+          e.stopPropagation();
           setOpenPicker(null);
           return;
         }
@@ -1318,10 +1520,12 @@ export function ResourceComposer({
         // (one Escape returns to the standard composer, a second closes).
         if (allToolsOpen) {
           e.preventDefault();
+          e.stopPropagation();
           setAllToolsOpen(false);
           return;
         }
         e.preventDefault();
+        e.stopPropagation();
         onClose();
         return;
       }
@@ -1363,24 +1567,123 @@ export function ResourceComposer({
   );
 
   // ── Render ───────────────────────────────────────────────────────────
-  if (!open) return null;
+  // The scrim + dialog PORTAL to document.body (same idiom as the panel's
+  // TileMenu): inside the drawer the panel's enter animation makes it a
+  // transformed ancestor, which turns position:fixed into "fixed to the
+  // panel" and mispositions the scrim. The portal keeps the overlay
+  // viewport-true. React events (the Escape/Tab handler, paste, drop) still
+  // propagate through the REACT tree, so the focus trap works unchanged —
+  // and the Escape branches stopPropagation explicitly for the same reason.
+  if (!open || typeof document === "undefined") return null;
 
-  // Pretty labels for the routing pills. Subject + Lesson titles come
-  // from mock data; Unit label borrows the unit id (the canonical
-  // UNIT_BY_ID lookup is in mock — using it here keeps the pill readable).
   const selectedSubject = subjectOptions.find((s) => s.id === subjectId);
   const selectedLesson = lessons.find((l) => l.id === lessonId);
 
-  return (
+  /** Uncommitted NEW captures (existing gallery seeds don't count) — the
+   *  quiet "Session only" badge shows while these exist in mock mode.
+   *  Calm copy per P7: never alarming, one explanation on demand. */
+  const newCaptureCount = items.filter((it) => !it.existing).length;
+  const showSessionBadge = !backendOn && newCaptureCount > 0;
+
+  const noteItem =
+    items.find((c) => c.id === noteItemId) ??
+    items.find((c) => !c.existing) ??
+    items[0];
+
+  // The capture-methods block (grid + All-tools + URL row + drop hint) is
+  // shared between resource step 1 and the notecard "+" reveal — two
+  // entries, one capture engine (P2).
+  const captureEngine = (
+    <>
+      <div className={styles.capRow} role="group" aria-label="Capture methods">
+        <CaptureButton
+          autoFocusTarget
+          label="Upload"
+          sub="Any file"
+          tone={styles.icUpload}
+          icon={<UploadIcon />}
+          onClick={onUploadClick}
+          tooltip="Pick files from this device — PDFs, docs, and images land in the captured strip below"
+        />
+        <CaptureButton
+          label="Link"
+          sub="Paste a URL"
+          tone={styles.icLink}
+          icon={<LinkIcon />}
+          onClick={onLinkClick}
+          active={linkOpen}
+          tooltip="Capture a web link — paste any URL and it joins the captured strip"
+        />
+        <CaptureButton
+          label="Google Drive"
+          sub="Soon"
+          tone={styles.icDrive}
+          icon={<DriveIcon />}
+          soon
+          tooltip="Google Drive import is coming after beta — it needs Google sign-in. For now, download the file and use Upload."
+        />
+        <CaptureButton
+          label="Camera"
+          sub="Soon"
+          tone={styles.icCamera}
+          icon={<CameraIcon />}
+          soon
+          tooltip="A built-in camera capture is coming soon — today, open All tools below and use its Camera tile."
+        />
+      </div>
+
+      {/* The long-tail tool wall (Card wall, YouTube, Camera, Photo album…). */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className={styles.allTools}
+        onClick={() => setAllToolsOpen(true)}
+        tooltip="Browse every capture tool the composer supports — photo album, camera, YouTube, card wall, and more"
+        leadingIcon={<MoreDotsIcon />}
+      >
+        All tools
+      </Button>
+
+      {/* Inline URL row (revealed by the Link button). */}
+      {linkOpen && (
+        <div className={styles.linkRow} role="group" aria-label="Add link">
+          <input
+            ref={linkInputRef}
+            type="url"
+            className={styles.input}
+            placeholder="https://…"
+            value={linkValue}
+            onChange={(e) => setLinkValue(e.target.value)}
+            onKeyDown={onLinkKeyDown}
+            aria-label="Resource URL"
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onLinkConfirm}
+            disabled={!linkValue.trim()}
+            tooltip="Capture this URL into the strip — you'll still review and route everything before it's added"
+          >
+            Add link
+          </Button>
+        </div>
+      )}
+
+      <div className={styles.dropHint}>
+        …or drop files anywhere in this dialog
+      </div>
+    </>
+  );
+
+  return createPortal(
     <div
       className={styles.scrim}
       onClick={handleScrimClick}
       aria-hidden={false}
     >
-      {/* The dialog panel carries the subject's color via the .cp-subj
-          class so the primary "Add" button can lift a single saturated
-          subject-color hit (the only saturated color in the whole composer).
-          Every other element stays neutral. */}
+      {/* cp-subj feeds the subject swatch in the routing selects; the
+          dialog chrome itself is mode-colored (brand / honey), never
+          subject-colored, per the §3 spec. */}
       <div
         ref={panelRef}
         role="dialog"
@@ -1388,780 +1691,1036 @@ export function ResourceComposer({
         aria-labelledby={headingId}
         title={
           isEditMode
-            ? "Add notes dialog — write formatted notes (and add media) to this resource"
+            ? "Edit note dialog — write formatted notes and curate this card's media gallery"
             : isNotecardMode
-              ? "New notecard dialog — gather photos and files into a card, then write its notes"
-              : "Add a resource dialog — capture links, files, videos, and docs, then pick which lesson and section to attach them to"
+              ? "New notecard dialog — gather media into a card's gallery, then write its notes"
+              : "Add resources dialog — capture links and files, then review and pick where they land"
         }
-        className={`${styles.panel} cp-subj ${subjectId}`}
+        className={`${styles.dialog} cp-subj ${subjectId}`}
         onKeyDown={handleKeyDown}
         onPaste={onDialogPaste}
+        onDragOver={onDialogDragOver}
+        onDrop={onDialogDrop}
       >
-        {/* ── Top bar: × close · spacer · Add ─────────────────────────── */}
-        <header className={styles.topBar}>
+        {/* Phone bottom-sheet grab handle (decorative; hidden ≥480px). */}
+        <div className={styles.sheetHandle} aria-hidden="true" />
+
+        {/* ── Head: mode badge · stepper · close ─────────────────────── */}
+        <header className={styles.dlgHead}>
+          <span
+            id={headingId}
+            className={`${styles.modeBadge} ${
+              isNotecardMode ? styles.modeBadgeNote : styles.modeBadgeRes
+            }`}
+          >
+            {isNotecardMode ? <NoteCardIcon /> : <UploadIcon />}
+            {isEditMode
+              ? "Edit note"
+              : isNotecardMode
+                ? "New notecard"
+                : "Add resources"}
+          </span>
+
+          {!isNotecardMode && (
+            <span className={styles.stepper} aria-label={`Step ${step} of 2`}>
+              <span
+                className={`${styles.stepDot} ${
+                  step === 1 ? styles.stepDotOn : styles.stepDotDone
+                }`}
+                aria-hidden="true"
+              >
+                {step === 1 ? "1" : <CheckIcon />}
+              </span>
+              <span className={styles.stepLabel}>Capture</span>
+              <span className={styles.stepArrow} aria-hidden="true">
+                →
+              </span>
+              <span
+                className={`${styles.stepDot} ${
+                  step === 2 ? styles.stepDotOn : ""
+                }`}
+                aria-hidden="true"
+              >
+                2
+              </span>
+              <span className={styles.stepLabel}>Review &amp; route</span>
+              <span className={styles.stepFraction} aria-hidden="true">
+                /2
+              </span>
+            </span>
+          )}
+
           <Button
             variant="icon"
-            iconAriaLabel="Close add-resource dialog"
+            size="sm"
+            iconAriaLabel="Close composer"
             className={styles.closeBtn}
             onClick={onClose}
-            tooltip="Close the resource composer without attaching anything"
+            tooltip="Close — uncommitted captures are discarded"
           >
             <CloseIcon />
           </Button>
-          <span id={headingId} className={styles.srOnly}>
-            {isEditMode
-              ? "Add notes to this resource"
-              : isNotecardMode
-                ? "Create a notecard"
-                : "Add a resource"}
-          </span>
-          <Button
-            variant="primary"
-            size="sm"
-            className={styles.addBtn}
-            tooltip={
-              backendOn
-                ? "Attach every captured resource to this lesson — files upload to your team's storage; links and notes save to the plan"
-                : "Attach every captured resource to the chosen lesson for this session — files aren't uploaded to the server yet, so they won't survive a reload or reach your team until backend sync is on"
-            }
-            onClick={handleAdd}
-            disabled={!canAdd || uploading}
-          >
-            {uploading ? "Adding…" : "Add"}
-          </Button>
         </header>
 
-        {/* ── Main composer body OR the "All tools" expanded grid ───── */}
-        {/* The dialog has two states: the standard composer (title +
-            4-tile grid + body + chips + routing) and the AllToolsMenu
-            sub-view (card-wall 3-column tool grid). The top bar
-            (× / Add) stays visible in both so the teacher can commit
-            captured items even while the All-Tools view is open. */}
-        {allToolsOpen ? (
-          <AllToolsMenu
-            onBack={() => setAllToolsOpen(false)}
-            onAddItem={(it) => addItem(it)}
-            onAddItems={(arr) => addItems(arr)}
-            onRequestLinkRow={() => {
-              // Close All-Tools, open the inline URL row in the standard
-              // composer view, and focus the URL field on the next frame.
-              setAllToolsOpen(false);
-              setLinkOpen(true);
-              requestAnimationFrame(() => linkInputRef.current?.focus());
-            }}
-          />
-        ) : (
-          <>
-            {/* ── Title input ─────────────────────────────────────────────── */}
-            <input
-              ref={titleInputRef}
-              type="text"
-              className={styles.titleInput}
-              placeholder={isNotecardMode ? "Notecard title" : "Title"}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              aria-label={isNotecardMode ? "Notecard title" : "Resource title"}
+        {/* ── Body ───────────────────────────────────────────────────── */}
+        <div className={styles.dlgBody}>
+          {allToolsOpen ? (
+            <AllToolsMenu
+              onBack={() => setAllToolsOpen(false)}
+              onAddItem={(it) => addItem(it)}
+              onAddItems={(arr) => addItems(arr)}
+              onRequestLinkRow={() => {
+                // Close All-Tools, open the inline URL row in the capture
+                // block, and focus the URL field on the next frame.
+                setAllToolsOpen(false);
+                setLinkOpen(true);
+                if (isNotecardMode) setCaptureOpen(true);
+                requestAnimationFrame(() => linkInputRef.current?.focus());
+              }}
             />
-
-            {/* Notecard-mode intro — names what the captured media + notes
-                become so the single-resource commit is unsurprising. In edit
-                mode it explains the patch-in-place behavior instead. */}
-            {isNotecardMode && (
-              <p className={styles.caption} role="note">
-                {isEditMode
-                  ? "Add formatted notes (and extra media) to this resource. Your changes save to the card."
-                  : "Photos and files you add become this card’s flip-through gallery; write the notes below."}
-              </p>
-            )}
-
-            {/* ── Tool grid: Upload · Photo · Link · Search ─────────────────
-                Each tile carries a pastel hue from the highlighter pen
-                family (--hlp-* body / --hl-* icon pill) so the four tiles
-                read as a quiet row of four colors — not stark grey rectangles.
-                These four hues are intentionally distinct so the teacher's
-                glance can find a tile by color memory, but ALL of them are
-                low-saturation pastels: the only saturated color in the
-                composer is the Add button (subject color). */}
-            <div
-              className={styles.toolGrid}
-              role="group"
-              aria-label="Resource source"
-            >
-              <ToolTile
-                label="Upload"
-                description="Any file"
-                onClick={onUploadClick}
-                icon={<UploadIcon />}
-                bgVar="--hlp-maya"
-                iconVar="--hl-maya"
-                staggerIndex={0}
-              />
-              <ToolTile
-                label="Photo"
-                description="Image files"
-                onClick={onPhotoClick}
-                icon={<PhotoIcon />}
-                bgVar="--hlp-violet"
-                iconVar="--hl-violet"
-                staggerIndex={1}
-              />
-              <ToolTile
-                label="Link"
-                description="Paste a URL"
-                onClick={onLinkClick}
-                active={linkOpen}
-                icon={<LinkIcon />}
-                bgVar="--hlp-slate"
-                iconVar="--hl-slate"
-                staggerIndex={2}
-              />
-              <ToolTile
-                label="Search"
-                description="Resource board"
-                onClick={onSearchClick}
-                active={searchOpen}
-                icon={<SearchIcon />}
-                bgVar="--hlp-lemon"
-                iconVar="--hl-lemon"
-                staggerIndex={3}
-              />
-            </div>
-
-            {/* ── All tools button ───────────────────────────────────────── */}
-            {/* Opens the AllToolsMenu sub-view. The four primary tiles above
-            cover the 80% case; this button exposes the long-tail tool
-            palette (Card wall, YouTube, Camera, etc.) without
-            cluttering the standard composer. */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className={styles.allToolsBtn}
-              onClick={() => setAllToolsOpen(true)}
-              aria-label="Show all tools"
-              tooltip="Browse every resource type the composer supports — files, links, video, slides, photos, and more"
-              leadingIcon={<MoreDotsIcon />}
-            >
-              All tools
-            </Button>
-
-            {/* Hidden file inputs — driven by the tool tiles' clicks. */}
-            <input
-              ref={uploadInputRef}
-              type="file"
-              multiple
-              className={styles.hiddenInput}
-              aria-hidden="true"
-              tabIndex={-1}
-              onChange={onUploadChange}
-            />
-            <input
-              ref={photoInputRef}
-              type="file"
-              multiple
-              accept="image/*"
-              className={styles.hiddenInput}
-              aria-hidden="true"
-              tabIndex={-1}
-              onChange={onPhotoChange}
-            />
-
-            {/* ── Inline URL row (revealed by the Link tile) ─────────────── */}
-            {linkOpen && (
-              <div
-                className={styles.inlineRow}
-                role="group"
-                aria-label="Add link"
-              >
+          ) : isNotecardMode ? (
+            /* ── Notecard mode — single screen ─────────────────────────── */
+            <>
+              <div className={styles.field}>
+                <label htmlFor={`${headingId}-title`}>Card title</label>
                 <input
-                  ref={linkInputRef}
-                  type="url"
-                  className={styles.urlInput}
-                  placeholder="https://…"
-                  value={linkValue}
-                  onChange={(e) => setLinkValue(e.target.value)}
-                  onKeyDown={onLinkKeyDown}
-                  aria-label="Resource URL"
+                  ref={titleInputRef}
+                  id={`${headingId}-title`}
+                  type="text"
+                  className={styles.input}
+                  placeholder="Name this card"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                 />
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className={styles.inlineAddBtn}
-                  onClick={onLinkConfirm}
-                  disabled={!linkValue.trim()}
-                  tooltip="Capture this URL into the resource list — you'll still need to click Add to attach everything to the lesson"
+              </div>
+
+              <div className={styles.field}>
+                <label id={`${headingId}-media`}>
+                  Media · drag to reorder — first item is the poster
+                </label>
+                <div
+                  className={styles.galEdit}
+                  role="list"
+                  aria-labelledby={`${headingId}-media`}
                 >
-                  Add link
-                </Button>
+                  {items.map((item, i) => (
+                    <GalleryTile
+                      key={item.id}
+                      item={item}
+                      index={i}
+                      count={items.length}
+                      poster={i === 0}
+                      onRemove={removeItem}
+                      onMove={moveItem}
+                      dragIndexRef={dragIndexRef}
+                    />
+                  ))}
+                  <Tooltip
+                    content="Add media to this card — opens the capture methods"
+                    side="top"
+                  >
+                    <button
+                      type="button"
+                      className={styles.galAdd}
+                      onClick={() => setCaptureOpen((v) => !v)}
+                      aria-expanded={captureOpen}
+                      aria-label="Add media — opens the capture methods"
+                      title="Add media — opens the capture methods"
+                    >
+                      <PlusIcon />
+                    </button>
+                  </Tooltip>
+                </div>
               </div>
-            )}
 
-            {/* ── Search stub (Phase 1A coming-soon line) ─────────────────── */}
-            {searchOpen && (
-              <p className={styles.searchStub} role="status">
-                Search the resource board — coming soon.
-              </p>
-            )}
+              {/* The "+" tile reveals the shared capture engine in place. */}
+              {captureOpen && (
+                <div className={styles.captureReveal}>{captureEngine}</div>
+              )}
 
-            {/* ── Caption ────────────────────────────────────────────────── */}
-            <p className={styles.caption}>
-              Add an image, video, link, or file.
-            </p>
+              {(pastedStatus || rejectionStatus) && (
+                <CaptureStatus
+                  pasted={pastedStatus}
+                  rejection={rejectionStatus}
+                />
+              )}
 
-            {/* Honest-persistence note (audit finding #22). The composer
-                writes captured resources into the planner store, but uploads
-                are SYNTHETIC (blob URLs — see the header) and, until the
-                Supabase seam is on, the store is in-memory only: an Add does
-                NOT durably save to the server or reach the team. Surface that
-                inline so the Add button never implies a durable, team-visible
-                save. Mirrors the InstanceRename "saved on this device for now"
-                precedent. */}
-            {backendOn ? (
-              <p className={styles.caption} role="note">
-                Files upload to your team&rsquo;s storage; links and notes save
-                to the lesson.
-              </p>
-            ) : (
-              <p
-                className={styles.caption}
-                style={{ color: "var(--catchup)" }}
-                role="note"
-              >
-                Attached for this session only — files aren&rsquo;t uploaded to
-                the server yet, so they won&rsquo;t survive a reload or reach
-                your team until backend sync is on.
-              </p>
-            )}
+              <div className={styles.field}>
+                <label id={`${headingId}-notes`}>Notes</label>
+                {/* The EXISTING rich-text editor, consumed unchanged — it
+                    owns the sanitizer boundary (emits sanitized HTML; we
+                    never double-sanitize). */}
+                <div className={styles.rteShell}>
+                  <RichTextEditor
+                    value={body}
+                    onChange={setBody}
+                    placeholder="Write the notes for this card — formatting, links, and images all work."
+                    ariaLabel="Notecard notes"
+                    onRequestImageUrl={requestBodyImageUrl}
+                  />
+                </div>
+              </div>
 
-            {/* Inline upload failure — keeps the dialog open so the teacher
-                can retry or remove the offending file. */}
-            {uploadError && (
-              <p
-                className={styles.caption}
-                style={{ color: "var(--catchup)" }}
-                role="alert"
-              >
-                {uploadError}
-              </p>
-            )}
+              <RoutingField
+                labels={labels}
+                locked={routingLocked}
+                openPicker={openPicker}
+                setOpenPicker={setOpenPicker}
+                subjectOptions={subjectOptions.map((s) => ({
+                  id: s.id,
+                  label: s.name,
+                }))}
+                unitOptions={unitOptions.map((u) => ({
+                  id: u.id,
+                  label: u.name,
+                }))}
+                lessonOptions={lessonOptions.map((l) => ({
+                  id: l.id,
+                  label: l.title,
+                }))}
+                sectionOptions={[
+                  { id: "", label: "Whole lesson" },
+                  ...sectionOptions.map((s) => ({
+                    id: s.id,
+                    label: plainText(s.heading) || "Section",
+                  })),
+                ]}
+                subjectId={subjectId}
+                unitId={unitId}
+                lessonId={lessonId}
+                sectionId={sectionId}
+                subjectValue={selectedSubject?.name ?? ""}
+                lessonValue={selectedLesson?.title ?? ""}
+                onPickSubject={(id) => setSubjectId(id as SubjectId)}
+                onPickUnit={setUnitId}
+                onPickLesson={(id) => {
+                  setLessonId(id);
+                  setSectionId("");
+                }}
+                onPickSection={setSectionId}
+              />
+            </>
+          ) : step === 1 ? (
+            /* ── Resource mode · Step 1 — capture ──────────────────────── */
+            <>
+              {captureEngine}
 
-            {/* ── Body ───────────────────────────────────────────────────────
-                Notecard mode: a full RichTextEditor whose HTML becomes the
-                notecard's `body` (formatted notes + links + inline images).
-                Resource mode: the original plain description textarea (its
-                per-resource notes are written through each chip's editor). */}
-            {isNotecardMode ? (
-              <div className={styles.notecardBody}>
-                <RichTextEditor
-                  value={body}
-                  onChange={setBody}
-                  placeholder="Write the notes for this card — formatting, links, and images all work…"
-                  ariaLabel="Notecard notes"
-                  onRequestImageUrl={requestBodyImageUrl}
+              {items.length > 0 && (
+                <div
+                  className={styles.capturedStrip}
+                  role="list"
+                  aria-label="Captured items"
+                >
+                  {items.map((item, i) => (
+                    <CapturedTile
+                      key={item.id}
+                      item={item}
+                      index={i}
+                      count={items.length}
+                      onRemove={removeItem}
+                      onMove={moveItem}
+                      dragIndexRef={dragIndexRef}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {(pastedStatus || rejectionStatus) && (
+                <CaptureStatus
+                  pasted={pastedStatus}
+                  rejection={rejectionStatus}
+                />
+              )}
+            </>
+          ) : (
+            /* ── Resource mode · Step 2 — review & route ───────────────── */
+            <>
+              {uploadError && (
+                <div className={styles.errStrip} role="alert">
+                  <WarnIcon />
+                  <span>{uploadError}</span>
+                  <Tooltip
+                    content="Try the failed uploads again — files that already uploaded are cached and never re-upload"
+                    side="top"
+                  >
+                    <button
+                      type="button"
+                      className={styles.retry}
+                      onClick={() => void handleAdd()}
+                      disabled={uploading}
+                      title="Try the failed uploads again — files that already uploaded never re-upload"
+                    >
+                      Retry
+                    </button>
+                  </Tooltip>
+                </div>
+              )}
+
+              {items.length > 0 && (
+                <div
+                  className={styles.capturedStrip}
+                  role="list"
+                  aria-label="Captured items"
+                >
+                  {items.map((item, i) => (
+                    <CapturedTile
+                      key={item.id}
+                      item={item}
+                      index={i}
+                      count={items.length}
+                      onRemove={removeItem}
+                      onMove={moveItem}
+                      dragIndexRef={dragIndexRef}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <div className={styles.field}>
+                <label htmlFor={`${headingId}-title`}>
+                  Title{" "}
+                  <span className={styles.labelAside}>
+                    (single item only — steers its label)
+                  </span>
+                </label>
+                <input
+                  ref={titleInputRef}
+                  id={`${headingId}-title`}
+                  type="text"
+                  className={styles.input}
+                  placeholder={
+                    items.length > 1
+                      ? "Keep each item's own name"
+                      : "Name this resource"
+                  }
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                 />
               </div>
-            ) : (
-              <textarea
-                className={styles.bodyArea}
-                placeholder="Write something to describe the resource…"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                aria-label="Resource description"
-                rows={3}
-              />
-            )}
 
-            {/* ── Limits banner ──────────────────────────────────────────── */}
-            {/* Per Tim's brief: ≤10 files (PDF/DOCX/RTF) + ≤10 images per
-            lesson; links unlimited. The banner counts ONLY the items in
-            the current capture strip — a Phase 1B+ improvement is to
-            include the section's already-attached items. The cap is
-            enforced in `addItems`, so this line is informational. */}
-            {items.length > 0 &&
-              (() => {
-                const fileCount = items.filter(
-                  (c) => c.isFile && c.provider !== "image",
-                ).length;
-                const imageCount = items.filter(
-                  (c) => c.isFile && c.provider === "image",
-                ).length;
-                const linkCount = items.filter((c) => !c.isFile).length;
-                return (
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "var(--ink-500)",
-                      margin: "4px 0",
-                    }}
-                    role="status"
-                    aria-live="polite"
+              {/* Per-item rich notes — collapsed by default. Each captured
+                  item can carry its own formatted note (→ resource.body). */}
+              {items.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className={styles.noteToggle}
+                    onClick={() => setNotesOpen((v) => !v)}
+                    aria-expanded={notesOpen}
                   >
-                    {fileCount} / 10 files · {imageCount} / 10 images ·{" "}
-                    {linkCount} link{linkCount === 1 ? "" : "s"}
-                  </div>
-                );
-              })()}
-
-            {/* ── Captured items strip + paste status ────────────────────── */}
-            {/* In resource mode each chip is a button — tapping it opens a
-            rich-text note editor below the strip where the teacher writes
-            formatted notes (→ resource.body) for THAT resource. Clicking the
-            same chip again closes the editor. In notecard mode the chips are
-            static labels (the captured media are the card's gallery; notes
-            live in the single top-level editor). */}
-            {(items.length > 0 || pastedStatus || rejectionStatus) && (
-              <div className={styles.capturedWrap}>
-                {items.length > 0 && (
-                  <ul
-                    className={styles.capturedStrip}
-                    aria-label="Captured items"
-                  >
-                    {items.map((item) => {
-                      const noteOpen = noteOpenId === item.id;
-                      // Strip tags to decide "has a note" so an empty <p></p>
-                      // from the rich editor doesn't light the dot.
-                      const hasNote =
-                        (item.body ?? "").replace(/<[^>]*>/g, "").trim()
-                          .length > 0;
-                      return (
-                        <li
-                          key={item.id}
-                          className={`${styles.capturedChip} ${
-                            noteOpen ? styles.capturedChipActive : ""
-                          }`}
+                    + Add a note to an item (optional)
+                  </button>
+                  {notesOpen && noteItem && (
+                    <div
+                      className={styles.noteEditor}
+                      role="group"
+                      aria-label="Per-item notes"
+                    >
+                      {items.length > 1 && (
+                        <div
+                          className={styles.notePickRow}
+                          role="radiogroup"
+                          aria-label="Which item the note is for"
                         >
-                          {isNotecardMode ? (
-                            // Notecard mode — the chip is a static label (its
-                            // notes live in the single top-level body editor,
-                            // not per-item). Still shows the type glyph + name.
-                            <span
-                              className={styles.capturedChipBody}
-                              title={`${item.label} — part of this notecard's gallery`}
-                            >
-                              <span
-                                className={styles.capturedChipIcon}
-                                aria-hidden="true"
-                              >
-                                <CapturedTypeIcon type={item.type} />
-                              </span>
-                              <span
-                                className={styles.capturedChipLabel}
-                                title={item.label}
-                              >
-                                {item.label}
-                              </span>
-                            </span>
-                          ) : (
-                            <Tooltip
-                              content={
-                                hasNote
-                                  ? `Edit the note attached to ${item.label} — the note shows up on the lesson card alongside the resource.`
-                                  : `Add a short note to ${item.label} so the team knows how to use it.`
-                              }
-                              side="top"
-                            >
+                          {items.map((it) => {
+                            const hasNote = plainText(it.body ?? "").length > 0;
+                            const on = it.id === noteItem.id;
+                            return (
                               <button
+                                key={it.id}
                                 type="button"
-                                className={styles.capturedChipBody}
-                                onClick={() => toggleNote(item.id)}
-                                aria-expanded={noteOpen}
-                                title={
-                                  hasNote
-                                    ? `Edit the note attached to ${item.label}`
-                                    : `Add a short note to ${item.label} so the team knows how to use it`
-                                }
-                                aria-label={
-                                  hasNote
-                                    ? `Edit note for ${item.label}`
-                                    : `Add note for ${item.label}`
-                                }
+                                role="radio"
+                                aria-checked={on}
+                                className={`${styles.notePick} ${
+                                  on ? styles.notePickOn : ""
+                                }`}
+                                onClick={() => setNoteItemId(it.id)}
+                                title={`Write a note for ${it.label}`}
                               >
-                                <span
-                                  className={styles.capturedChipIcon}
-                                  aria-hidden="true"
-                                >
-                                  <CapturedTypeIcon type={item.type} />
-                                </span>
-                                <span
-                                  className={styles.capturedChipLabel}
-                                  title={item.label}
-                                >
-                                  {item.label}
-                                </span>
+                                {it.label}
                                 {hasNote && (
                                   <span
-                                    className={styles.capturedChipNoteDot}
+                                    className={styles.noteDot}
                                     aria-label="Has note"
-                                    title="Has note"
                                   />
                                 )}
                               </button>
-                            </Tooltip>
-                          )}
-                          <Tooltip
-                            content={`Remove ${item.label} from the captured list — it won't be attached to the lesson.`}
-                            side="top"
-                          >
-                            <button
-                              type="button"
-                              className={styles.capturedChipRemove}
-                              onClick={() => removeItem(item.id)}
-                              aria-label={`Remove ${item.label}`}
-                              title={`Remove ${item.label} from the captured list — it won't be attached to the lesson`}
-                            >
-                              <SmallXIcon />
-                            </button>
-                          </Tooltip>
-                          {/* Inline embed preview — shows the teacher the
-                          actual thing before they Add. We pass the
-                          captured item as a LessonResource (the shape is
-                          compatible: type/label/url/provider/etc.); the
-                          renderer falls back to a legacy marker if no
-                          url is present, so legacy fixtures stay safe. */}
-                          {item.url && (
-                            <div
-                              style={{
-                                flexBasis: "100%",
-                                marginTop: 4,
-                              }}
-                            >
-                              <ResourceEmbed
-                                resource={item as LessonResource}
-                                variant="row"
-                              />
-                            </div>
-                          )}
-                          {/* 3-way display-mode toggle — only for true
-                          link/website rows. The teacher's choice flows
-                          through to LessonResource.displayMode on Add. */}
-                          {item.provider === "website" && (
-                            <div
-                              role="radiogroup"
-                              aria-label="Link display mode"
-                              style={{
-                                display: "flex",
-                                gap: 4,
-                                marginTop: 4,
-                                flexBasis: "100%",
-                              }}
-                            >
-                              {(
-                                ["literal", "hyperlink", "thumbnail"] as const
-                              ).map((mode) => (
-                                <button
-                                  key={mode}
-                                  type="button"
-                                  role="radio"
-                                  aria-checked={item.displayMode === mode}
-                                  onClick={() =>
-                                    setItems((prev) =>
-                                      prev.map((c) =>
-                                        c.id === item.id
-                                          ? { ...c, displayMode: mode }
-                                          : c,
-                                      ),
-                                    )
-                                  }
-                                  style={{
-                                    padding: "2px 8px",
-                                    fontSize: 11,
-                                    border: "1px solid var(--ink-100)",
-                                    borderRadius: 4,
-                                    background:
-                                      item.displayMode === mode
-                                        ? "var(--brand-500)"
-                                        : "transparent",
-                                    color:
-                                      item.displayMode === mode
-                                        ? "white"
-                                        : "inherit",
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  {mode}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-
-                {/* The note editor for the currently-open chip. Sits BELOW
-                the strip so a single editor handles all chips (saves
-                vertical space and keeps the chip row scannable). A full
-                RichTextEditor writes to the resource's `body` (formatted
-                notes + links + inline images). Only in resource mode —
-                notecard mode uses the single top-level body editor instead. */}
-                {!isNotecardMode &&
-                  noteOpenId &&
-                  items.find((c) => c.id === noteOpenId) &&
-                  (() => {
-                    const item = items.find((c) => c.id === noteOpenId)!;
-                    return (
-                      <div
-                        className={styles.noteEditor}
-                        role="group"
-                        aria-label={`Note for ${item.label}`}
-                      >
-                        <span className={styles.noteEditorLabel}>
-                          Note for <strong>{item.label}</strong>
-                        </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <span className={styles.noteFor}>
+                        Note for <strong>{noteItem.label}</strong>
+                      </span>
+                      <div className={styles.rteShell}>
                         <RichTextEditor
-                          value={item.body ?? ""}
-                          onChange={(html) => setItemBody(item.id, html)}
+                          key={noteItem.id}
+                          value={noteItem.body ?? ""}
+                          onChange={(html) => setItemBody(noteItem.id, html)}
                           placeholder="Write a note for this resource…"
-                          ariaLabel={`Note text for ${item.label}`}
+                          ariaLabel={`Note text for ${noteItem.label}`}
                           onRequestImageUrl={requestBodyImageUrl}
                         />
-                        <p className={styles.noteHint}>
-                          Formatted notes, links, and images save with this
-                          resource and show on its card.
-                        </p>
                       </div>
-                    );
-                  })()}
+                    </div>
+                  )}
+                </>
+              )}
 
-                {pastedStatus && (
-                  <p
-                    className={styles.pastedStatus}
-                    role="status"
-                    aria-live="polite"
-                  >
-                    {pastedStatus}
-                  </p>
-                )}
-                {rejectionStatus && (
-                  <p
-                    className={styles.rejectionStatus}
-                    role="alert"
-                    aria-live="assertive"
-                  >
-                    {rejectionStatus}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* ── Routing row ────────────────────────────────────────────── */}
-            {/* "{Subject} → {Unit} → {Lesson} → {Section}" — labels come
-            from useLabels(); the caption is composed so the four user-
-            facing words match whatever the labels module emits. */}
-            <div
-              className={styles.routingRow}
-              role="group"
-              aria-label={`Where to save · ${labels.subject} · ${labels.unit} · ${labels.lesson} · ${labels.section}`}
-            >
-              <span className={styles.routingCaption}>
-                {labels.subject} · {labels.unit} · {labels.lesson} ·{" "}
-                {labels.section}
-              </span>
-              <div className={styles.routingPills}>
-                {/* Subject pill */}
-                <PickerPill
-                  label={labels.subject}
-                  value={selectedSubject?.name ?? ""}
-                  open={openPicker === "subject"}
-                  disabled={routingLocked}
-                  onToggle={() =>
-                    setOpenPicker(openPicker === "subject" ? null : "subject")
-                  }
-                  onClose={() => setOpenPicker(null)}
-                  options={subjectOptions.map((s) => ({
+              <RoutingField
+                labels={labels}
+                locked={routingLocked}
+                openPicker={openPicker}
+                setOpenPicker={setOpenPicker}
+                subjectOptions={subjectOptions.map((s) => ({
+                  id: s.id,
+                  label: s.name,
+                }))}
+                unitOptions={unitOptions.map((u) => ({
+                  id: u.id,
+                  label: u.name,
+                }))}
+                lessonOptions={lessonOptions.map((l) => ({
+                  id: l.id,
+                  label: l.title,
+                }))}
+                sectionOptions={[
+                  { id: "", label: "Whole lesson" },
+                  ...sectionOptions.map((s) => ({
                     id: s.id,
-                    label: s.name,
-                  }))}
-                  selectedId={subjectId}
-                  onPick={(id) => {
-                    setSubjectId(id as SubjectId);
-                    setOpenPicker(null);
-                  }}
-                  swatchClass={subjectId}
-                />
-                {/* Unit pill */}
-                <PickerPill
-                  label={labels.unit}
-                  value={unitOptions.find((u) => u.id === unitId)?.name ?? ""}
-                  open={openPicker === "unit"}
-                  disabled={routingLocked || unitOptions.length === 0}
-                  onToggle={() =>
-                    setOpenPicker(openPicker === "unit" ? null : "unit")
-                  }
-                  onClose={() => setOpenPicker(null)}
-                  options={unitOptions.map((u) => ({
-                    id: u.id,
-                    label: u.name,
-                  }))}
-                  selectedId={unitId}
-                  onPick={(id) => {
-                    setUnitId(id);
-                    setOpenPicker(null);
-                  }}
-                />
-                {/* Lesson pill */}
-                <PickerPill
-                  label={labels.lesson}
-                  value={selectedLesson?.title ?? ""}
-                  open={openPicker === "lesson"}
-                  disabled={routingLocked || lessonOptions.length === 0}
-                  onToggle={() =>
-                    setOpenPicker(openPicker === "lesson" ? null : "lesson")
-                  }
-                  onClose={() => setOpenPicker(null)}
-                  options={lessonOptions.map((l) => ({
-                    id: l.id,
-                    label: l.title,
-                  }))}
-                  selectedId={lessonId}
-                  onPick={(id) => {
-                    setLessonId(id);
-                    setSectionId("");
-                    setOpenPicker(null);
-                  }}
-                />
-                {/* Section pill — special "Whole lesson" option at the top. */}
-                <PickerPill
-                  label={labels.section}
-                  value={
-                    sectionId
-                      ? (sectionOptions.find((s) => s.id === sectionId)
-                          ?.heading ?? "Section")
-                      : "Whole lesson"
-                  }
-                  open={openPicker === "section"}
-                  disabled={routingLocked}
-                  onToggle={() =>
-                    setOpenPicker(openPicker === "section" ? null : "section")
-                  }
-                  onClose={() => setOpenPicker(null)}
-                  options={[
-                    { id: "", label: "Whole lesson" },
-                    ...sectionOptions.map((s) => ({
-                      id: s.id,
-                      label: stripHtml(s.heading) || "Section",
-                    })),
-                  ]}
-                  selectedId={sectionId}
-                  onPick={(id) => {
-                    setSectionId(id);
-                    setOpenPicker(null);
-                  }}
-                />
-              </div>
-            </div>
-          </>
-        )}
+                    label: plainText(s.heading) || "Section",
+                  })),
+                ]}
+                subjectId={subjectId}
+                unitId={unitId}
+                lessonId={lessonId}
+                sectionId={sectionId}
+                subjectValue={selectedSubject?.name ?? ""}
+                lessonValue={selectedLesson?.title ?? ""}
+                onPickSubject={(id) => setSubjectId(id as SubjectId)}
+                onPickUnit={setUnitId}
+                onPickLesson={(id) => {
+                  setLessonId(id);
+                  setSectionId("");
+                }}
+                onPickSection={setSectionId}
+              />
+            </>
+          )}
+        </div>
+
+        {/* ── Foot: session badge · cancel/back · primary ─────────────── */}
+        <footer className={styles.dlgFoot}>
+          {showSessionBadge && (
+            <Tooltip
+              content="These captures live in this tab for now — once you add them they stay on this device for the session, and they'll sync to your team when the backend arrives."
+              side="top"
+            >
+              <button
+                type="button"
+                className={styles.sessionBadge}
+                aria-label="Session only — tap for what that means"
+                title="These captures live in this tab for now — they'll sync to your team when the backend arrives"
+              >
+                <span className={styles.sessionDot} aria-hidden="true" />
+                Session only
+              </button>
+            </Tooltip>
+          )}
+          <span className={styles.footSpacer} />
+          {isNotecardMode ? (
+            <>
+              <Button
+                variant="ghost"
+                size="md"
+                className={styles.footBtn}
+                onClick={onClose}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="honey"
+                size="md"
+                className={styles.footBtn}
+                onClick={() => void handleAdd()}
+                disabled={!canAdd || uploading}
+                loading={uploading}
+                tooltip={
+                  isEditMode
+                    ? "Save this card's notes and media back to the resource"
+                    : "Create the notecard at the chosen destination — its media flip through as a gallery"
+                }
+              >
+                {isEditMode ? "Save note" : "Create notecard"}
+              </Button>
+            </>
+          ) : step === 1 ? (
+            <>
+              <Button
+                variant="ghost"
+                size="md"
+                className={styles.footBtn}
+                onClick={onClose}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                className={styles.footBtn}
+                onClick={goToReview}
+                trailingIcon={<ChevronRightIcon />}
+                tooltip="Review what you've captured and pick which lesson and section it lands in"
+              >
+                {items.length > 0
+                  ? `Next · ${items.length} item${items.length === 1 ? "" : "s"}`
+                  : "Next"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="md"
+                className={styles.footBtn}
+                onClick={goToCapture}
+                leadingIcon={<ChevronLeftIcon />}
+                tooltip="Back to the capture step — everything you've captured stays put"
+              >
+                Back
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                className={styles.footBtn}
+                onClick={() => void handleAdd()}
+                disabled={!canAdd || uploading}
+                loading={uploading}
+                tooltip={
+                  backendOn
+                    ? "Attach every captured resource to the chosen destination — files upload to your team's storage"
+                    : "Attach every captured resource to the chosen destination for this session"
+                }
+              >
+                {uploading
+                  ? "Adding…"
+                  : items.length > 1
+                    ? `Add ${items.length} resources`
+                    : "Add resource"}
+              </Button>
+            </>
+          )}
+        </footer>
+
+        {/* Hidden file input — driven by the Upload capture button. */}
+        <input
+          ref={uploadInputRef}
+          type="file"
+          multiple
+          className={styles.hiddenInput}
+          aria-hidden="true"
+          tabIndex={-1}
+          data-trap-exclude
+          onChange={onUploadChange}
+        />
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
-// ── ToolTile ─────────────────────────────────────────────────────────────
-// One of the four square tiles in the tool grid. Reads as a gentle
-// rounded square with a centered icon over a small label + description.
+// ── CaptureButton ─────────────────────────────────────────────────────────
+// One of the 4-up capture-grid buttons (.rn-capBtn): icon tile + label +
+// sub-label. `soon` renders the visibly-disabled 55%-opacity state with a
+// why-tooltip (CLAUDE.md §4 — disabled controls explain why). The bespoke
+// anatomy (icon tile + dual label) is why this doesn't reuse FutureControl.
 
-interface ToolTileProps {
+interface CaptureButtonProps {
   label: string;
-  description: string;
+  sub: string;
   icon: ReactNode;
-  onClick: () => void;
-  /** Reflect a "this tile owns the open sub-row" state visually. */
+  /** Tone class for the icon tile background (token-backed). */
+  tone: string;
+  tooltip: string;
+  onClick?: () => void;
   active?: boolean;
-  /** Pastel hue token for the tile body — references --hlp-* in tokens.css.
-   *  Wired via an inline custom property so the .toolTile class can pull
-   *  it without generating a per-tile class. */
-  bgVar?: string;
-  /** Stronger hue token for the icon-pill background. References --hl-*. */
-  iconVar?: string;
-  /** 0-based position in the row — drives the staggered entrance animation
-   *  delay so the four tiles cascade in rather than landing as a block. */
-  staggerIndex?: number;
+  soon?: boolean;
+  /** Marks the button the open-effect lands focus on (queried via
+   *  [data-autofocus] — the Tooltip wrapper owns the trigger ref, so a
+   *  forwarded ref would be clobbered by its cloneElement). */
+  autoFocusTarget?: boolean;
 }
 
-function ToolTile({
+function CaptureButton({
   label,
-  description,
+  sub,
   icon,
+  tone,
+  tooltip,
   onClick,
   active = false,
-  bgVar,
-  iconVar,
-  staggerIndex = 0,
-}: ToolTileProps): ReactNode {
-  // The three inline custom properties feed --tileBg / --tileIconBg /
-  // --stagger inside ResourceComposer.module.css. Both color tokens
-  // reference --hlp-* / --hl-* from tokens.css so no hex sneaks in.
-  const tileStyle = {
-    "--tileBg": bgVar ? `var(${bgVar})` : "var(--ink-50)",
-    "--tileIconBg": iconVar ? `var(${iconVar})` : "var(--ink-100)",
-    "--stagger": `${staggerIndex * 40}ms`,
-  } as React.CSSProperties;
-
+  soon = false,
+  autoFocusTarget = false,
+}: CaptureButtonProps): ReactNode {
   return (
-    <Tooltip content={`${label} — ${description}`} side="top">
+    <Tooltip content={tooltip} side="top">
       <button
         type="button"
-        className={`${styles.toolTile} ${active ? styles.toolTileActive : ""}`}
-        onClick={onClick}
-        aria-pressed={active}
-        title={`${label} — ${description}`}
-        style={tileStyle}
+        className={`${styles.capBtn} ${soon ? styles.capBtnSoon : ""} ${
+          active ? styles.capBtnActive : ""
+        }`}
+        onClick={soon ? undefined : onClick}
+        disabled={soon}
+        aria-disabled={soon || undefined}
+        aria-pressed={onClick && !soon ? active : undefined}
+        title={tooltip}
+        data-autofocus={autoFocusTarget || undefined}
       >
-        <span className={styles.toolTileIcon} aria-hidden="true">
+        <span className={`${styles.capIc} ${tone}`} aria-hidden="true">
           {icon}
         </span>
-        <span className={styles.toolTileLabel}>{label}</span>
-        <span className={styles.toolTileDesc}>{description}</span>
+        <span className={styles.capT}>{label}</span>
+        <span className={styles.capS}>{sub}</span>
       </button>
     </Tooltip>
   );
 }
 
-// ── PickerPill ───────────────────────────────────────────────────────────
-// A compact rounded pill-button that opens a list popover. Used four times
-// in the routing row (Subject → Unit → Lesson → Section).
+// ── Captured strip tile (.rn-capItem — 86px) ─────────────────────────────
+// Thumb area (real thumbnail when we have one, type-tinted icon otherwise),
+// truncated label, removable × (hit-inflated to ≥44), pointer drag-reorder
+// + keyboard arrow reorder.
 
-interface PickerOption {
+interface TileProps {
+  item: CapturedItem;
+  index: number;
+  count: number;
+  onRemove: (id: string) => void;
+  onMove: (from: number, to: number) => void;
+  dragIndexRef: React.MutableRefObject<number | null>;
+}
+
+/** Shared drag/keyboard reorder handlers for strip + gallery tiles. */
+function useReorderHandlers(
+  index: number,
+  count: number,
+  onMove: (from: number, to: number) => void,
+  dragIndexRef: React.MutableRefObject<number | null>,
+) {
+  const onDragStart = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      dragIndexRef.current = index;
+      e.dataTransfer.effectAllowed = "move";
+      // Some engines need data set for a drag to start.
+      e.dataTransfer.setData("text/plain", String(index));
+    },
+    [index, dragIndexRef],
+  );
+  const onDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    // Only accept internal reorder drags — file drops bubble to the dialog.
+    if (e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }, []);
+  const onDrop = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      if (e.dataTransfer.types.includes("Files")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const from = dragIndexRef.current;
+      dragIndexRef.current = null;
+      if (from != null) onMove(from, index);
+    },
+    [index, onMove, dragIndexRef],
+  );
+  const onDragEnd = useCallback(() => {
+    // A cancelled drag (Escape, drop outside the strip) never reaches
+    // onDrop, which would leave the stashed index live — and a later,
+    // unrelated drop could replay it as a spurious move. dragend always
+    // fires on the SOURCE element, completed or cancelled, so clear here.
+    dragIndexRef.current = null;
+  }, [dragIndexRef]);
+  const onKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === "ArrowLeft" && index > 0) {
+        e.preventDefault();
+        onMove(index, index - 1);
+      } else if (e.key === "ArrowRight" && index < count - 1) {
+        e.preventDefault();
+        onMove(index, index + 1);
+      }
+    },
+    [index, count, onMove],
+  );
+  return { onDragStart, onDragOver, onDrop, onDragEnd, onKeyDown };
+}
+
+/** Type-tinted thumb class for a captured item (th-* recipe). */
+function thumbClass(item: CapturedItem): string {
+  switch (item.type) {
+    case "image":
+      return styles.thImage;
+    case "pdf":
+    case "doc":
+      return styles.thPdf;
+    case "slides":
+      return styles.thSlides;
+    case "youtube":
+      return styles.thYoutube;
+    case "notecard":
+      return styles.thNote;
+    default:
+      return styles.thLink;
+  }
+}
+
+/** Safe-gated thumb src for a strip / gallery tile, plus an onError that
+ *  demotes a broken src to the next candidate (and finally to the type
+ *  glyph). Failures are tracked per-src so a thumbnail that lands later
+ *  (e.g. the async PDF first-page poster) gets its own try instead of the
+ *  tile staying demoted for the session. */
+function useTileImg(item: CapturedItem): {
+  src: string | undefined;
+  onError: () => void;
+} {
+  const [failed, setFailed] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    setFailed(new Set());
+  }, [item.thumbnailUrl, item.url]);
+  const candidates: string[] = [];
+  if (isSafeImgSrc(item.thumbnailUrl)) candidates.push(item.thumbnailUrl);
+  if (item.provider === "image" && isSafeImgSrc(item.url)) {
+    candidates.push(item.url);
+  }
+  const src = candidates.find((c) => !failed.has(c));
+  const onError = useCallback(() => {
+    if (src) setFailed((prev) => new Set(prev).add(src));
+  }, [src]);
+  return { src, onError };
+}
+
+function CapturedTile({
+  item,
+  index,
+  count,
+  onRemove,
+  onMove,
+  dragIndexRef,
+}: TileProps): ReactNode {
+  const handlers = useReorderHandlers(index, count, onMove, dragIndexRef);
+  const hasNote = plainText(item.body ?? "").length > 0;
+  const img = useTileImg(item);
+  return (
+    <div
+      role="listitem"
+      tabIndex={0}
+      draggable
+      className={styles.capItem}
+      aria-label={`${item.label} — captured item ${index + 1} of ${count}. Drag or use arrow keys to reorder.`}
+      title={`${item.label} — drag (or use arrow keys) to reorder`}
+      {...handlers}
+    >
+      <div className={`${styles.ciTh} ${thumbClass(item)}`} aria-hidden="true">
+        {img.src ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={img.src}
+            alt=""
+            className={styles.ciImg}
+            onError={img.onError}
+          />
+        ) : (
+          <TypeIcon type={item.type} />
+        )}
+      </div>
+      <Tooltip
+        content={`Remove ${item.label} from this add — it won't be attached`}
+        side="top"
+        required
+      >
+        <button
+          type="button"
+          className={styles.capX}
+          onClick={() => onRemove(item.id)}
+          aria-label={`Remove ${item.label}`}
+          title={`Remove ${item.label} from this add`}
+        >
+          <SmallXIcon />
+        </button>
+      </Tooltip>
+      <div className={styles.ciL}>
+        {item.label}
+        {hasNote && <span className={styles.noteDot} aria-label="Has note" />}
+      </div>
+    </div>
+  );
+}
+
+// ── Gallery tile (.rn-galItem — 72×56, notecard mode) ────────────────────
+// Same recipe family as CapturedTile plus the grip glyph and the poster
+// treatment on index 0 (honey outline + "POSTER" tag — reorder to change).
+
+function GalleryTile({
+  item,
+  index,
+  count,
+  poster,
+  onRemove,
+  onMove,
+  dragIndexRef,
+}: TileProps & { poster: boolean }): ReactNode {
+  const handlers = useReorderHandlers(index, count, onMove, dragIndexRef);
+  const img = useTileImg(item);
+  return (
+    <div
+      role="listitem"
+      tabIndex={0}
+      draggable
+      className={`${styles.galItem} ${poster ? styles.galItemPoster : ""} ${thumbClass(item)}`}
+      aria-label={`${item.label} — gallery item ${index + 1} of ${count}${
+        poster ? " (poster)" : ""
+      }. Drag or use arrow keys to reorder; the first item is the poster.`}
+      title={`${item.label} — drag to reorder; the first item is the card's poster`}
+      {...handlers}
+    >
+      <span className={styles.giGrip} aria-hidden="true">
+        <GripIcon />
+      </span>
+      {img.src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={img.src}
+          alt=""
+          className={styles.ciImg}
+          onError={img.onError}
+        />
+      ) : (
+        <TypeIcon type={item.type} />
+      )}
+      {poster && (
+        <span className={styles.posterStar} aria-hidden="true">
+          POSTER
+        </span>
+      )}
+      {/* required: in notecard EDIT this × deletes stored media from the
+          card — destructive per CLAUDE.md §4, so the tooltip is always on. */}
+      <Tooltip
+        content={`Remove ${item.label} from this card`}
+        side="top"
+        required
+      >
+        <button
+          type="button"
+          className={styles.capX}
+          onClick={() => onRemove(item.id)}
+          aria-label={`Remove ${item.label} from this card`}
+          title={`Remove ${item.label} from this card`}
+        >
+          <SmallXIcon />
+        </button>
+      </Tooltip>
+    </div>
+  );
+}
+
+// ── Capture status lines (paste confirmation + rejections) ───────────────
+
+function CaptureStatus({
+  pasted,
+  rejection,
+}: {
+  pasted: string | null;
+  rejection: string | null;
+}): ReactNode {
+  return (
+    <div className={styles.statusWrap}>
+      {pasted && (
+        <p className={styles.pastedStatus} role="status" aria-live="polite">
+          {pasted}
+        </p>
+      )}
+      {rejection && (
+        <p
+          className={styles.rejectionStatus}
+          role="alert"
+          aria-live="assertive"
+        >
+          {rejection}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── RoutingField ──────────────────────────────────────────────────────────
+// The "Destination" field — four .rn-select pickers (Subject · Unit ·
+// Lesson · Section). Locked selects render at 60% opacity with a
+// why-tooltip when the opening context fixes the destination.
+
+interface RouteOption {
   id: string;
   label: string;
 }
 
-interface PickerPillProps {
-  /** Pill caption (e.g. "Subject"). */
-  label: string;
+interface RoutingFieldProps {
+  labels: { subject: string; unit: string; lesson: string; section: string };
+  locked: boolean;
+  openPicker: "subject" | "unit" | "lesson" | "section" | null;
+  setOpenPicker: (p: "subject" | "unit" | "lesson" | "section" | null) => void;
+  subjectOptions: RouteOption[];
+  unitOptions: RouteOption[];
+  lessonOptions: RouteOption[];
+  sectionOptions: RouteOption[];
+  subjectId: string;
+  unitId: string;
+  lessonId: string;
+  sectionId: string;
+  subjectValue: string;
+  lessonValue: string;
+  onPickSubject: (id: string) => void;
+  onPickUnit: (id: string) => void;
+  onPickLesson: (id: string) => void;
+  onPickSection: (id: string) => void;
+}
+
+function RoutingField(props: RoutingFieldProps): ReactNode {
+  const {
+    labels,
+    locked,
+    openPicker,
+    setOpenPicker,
+    subjectOptions,
+    unitOptions,
+    lessonOptions,
+    sectionOptions,
+    subjectId,
+    unitId,
+    lessonId,
+    sectionId,
+    subjectValue,
+    lessonValue,
+    onPickSubject,
+    onPickUnit,
+    onPickLesson,
+    onPickSection,
+  } = props;
+  return (
+    <div className={styles.field}>
+      <label>Destination</label>
+      <div
+        className={styles.routeRow}
+        role="group"
+        aria-label={`Where to save · ${labels.subject} · ${labels.unit} · ${labels.lesson} · ${labels.section}`}
+      >
+        <RouteSelect
+          k={labels.subject}
+          value={subjectValue}
+          locked={locked}
+          open={openPicker === "subject"}
+          onToggle={() =>
+            setOpenPicker(openPicker === "subject" ? null : "subject")
+          }
+          onClose={() => setOpenPicker(null)}
+          options={subjectOptions}
+          selectedId={subjectId}
+          onPick={(id) => {
+            onPickSubject(id);
+            setOpenPicker(null);
+          }}
+          swatchClass={subjectId}
+        />
+        <RouteSelect
+          k={labels.unit}
+          value={unitOptions.find((u) => u.id === unitId)?.label ?? ""}
+          locked={locked || unitOptions.length === 0}
+          open={openPicker === "unit"}
+          onToggle={() => setOpenPicker(openPicker === "unit" ? null : "unit")}
+          onClose={() => setOpenPicker(null)}
+          options={unitOptions}
+          selectedId={unitId}
+          onPick={(id) => {
+            onPickUnit(id);
+            setOpenPicker(null);
+          }}
+        />
+        <RouteSelect
+          k={labels.lesson}
+          value={lessonValue}
+          locked={locked || lessonOptions.length === 0}
+          open={openPicker === "lesson"}
+          onToggle={() =>
+            setOpenPicker(openPicker === "lesson" ? null : "lesson")
+          }
+          onClose={() => setOpenPicker(null)}
+          options={lessonOptions}
+          selectedId={lessonId}
+          onPick={(id) => {
+            onPickLesson(id);
+            setOpenPicker(null);
+          }}
+        />
+        <RouteSelect
+          k={labels.section}
+          value={
+            sectionId
+              ? (sectionOptions.find((s) => s.id === sectionId)?.label ??
+                "Section")
+              : "Whole lesson"
+          }
+          locked={locked}
+          open={openPicker === "section"}
+          onToggle={() =>
+            setOpenPicker(openPicker === "section" ? null : "section")
+          }
+          onClose={() => setOpenPicker(null)}
+          options={sectionOptions}
+          selectedId={sectionId}
+          onPick={(id) => {
+            onPickSection(id);
+            setOpenPicker(null);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── RouteSelect ───────────────────────────────────────────────────────────
+// One .rn-select pill: uppercase key + value + chevron, opening a listbox
+// popover. `.locked` = 60% opacity + disabled (routing fixed by context).
+
+interface RouteSelectProps {
+  /** Uppercase key caption (e.g. "Subject"). */
+  k: string;
   /** Currently-selected option's display text. */
   value: string;
-  /** Is the popover open? */
+  locked: boolean;
   open: boolean;
-  /** Disabled when there are no options or routing is locked. */
-  disabled?: boolean;
   onToggle: () => void;
   onClose: () => void;
-  options: PickerOption[];
+  options: RouteOption[];
   selectedId: string;
   onPick: (id: string) => void;
-  /** Optional class added to the pill swatch (e.g. subject id) so the
-   *  Subject pill can carry a tiny .cp-subj color dot. */
+  /** Optional class for a subject color dot (cp-subj id). */
   swatchClass?: string;
 }
 
-function PickerPill({
-  label,
+function RouteSelect({
+  k,
   value,
+  locked,
   open,
-  disabled = false,
   onToggle,
   onClose,
   options,
   selectedId,
   onPick,
   swatchClass,
-}: PickerPillProps): ReactNode {
+}: RouteSelectProps): ReactNode {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Close the popover when a click lands outside it. Useful when the
-  // teacher clicks another pill — the focus trap still cycles correctly.
+  // teacher clicks another select — the focus trap still cycles correctly.
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent): void => {
@@ -2179,59 +2738,60 @@ function PickerPill({
   }, [open, onClose]);
 
   return (
-    <div className={styles.pickerWrap}>
+    <div className={styles.selectWrap}>
       <Tooltip
-        content="Pick where to attach this resource — choose the subject, unit, lesson, and section in this order."
+        content={
+          locked
+            ? "Routing is locked — this opened from a fixed destination, so where it lands can't change here"
+            : `Choose the ${k.toLowerCase()} this lands in`
+        }
         side="top"
       >
         <button
           type="button"
-          className={`${styles.pickerPill} ${
-            disabled ? styles.pickerPillDisabled : ""
-          }`}
+          className={`${styles.select} ${locked ? styles.selectLocked : ""}`}
           onClick={onToggle}
           aria-haspopup="listbox"
           aria-expanded={open}
-          disabled={disabled}
-          title="Pick where to attach this resource — choose the subject, unit, lesson, and section in this order"
+          disabled={locked}
+          title={
+            locked
+              ? "Routing is locked while this destination is fixed"
+              : `Choose the ${k.toLowerCase()} this lands in`
+          }
         >
           {swatchClass && (
             <span
-              className={`${styles.pickerSwatch} cp-subj ${swatchClass}`}
+              className={`${styles.selectSwatch} cp-subj ${swatchClass}`}
               aria-hidden="true"
             />
           )}
-          <span className={styles.pickerPillLabel}>{label}</span>
-          <span className={styles.pickerPillValue} title={value}>
+          <span className={styles.selK}>{k}</span>
+          <span className={styles.selV} title={value}>
             {value || "—"}
           </span>
           <ChevronDownIcon />
         </button>
       </Tooltip>
       {open && (
-        <div ref={popoverRef} className={styles.pickerPopover} role="listbox">
+        <div ref={popoverRef} className={styles.selectPopover} role="listbox">
           {options.length === 0 ? (
-            <p className={styles.pickerEmpty}>No options.</p>
+            <p className={styles.selectEmpty}>No options.</p>
           ) : (
             options.map((opt) => (
-              <Tooltip
+              <button
                 key={opt.id || "__whole__"}
-                content={`Pick ${opt.label}`}
-                side="right"
+                type="button"
+                role="option"
+                aria-selected={opt.id === selectedId}
+                className={`${styles.selectOption} ${
+                  opt.id === selectedId ? styles.selectOptionOn : ""
+                }`}
+                onClick={() => onPick(opt.id)}
+                title={`Pick ${opt.label}`}
               >
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={opt.id === selectedId}
-                  className={`${styles.pickerOption} ${
-                    opt.id === selectedId ? styles.pickerOptionActive : ""
-                  }`}
-                  onClick={() => onPick(opt.id)}
-                  title={`Pick ${opt.label}`}
-                >
-                  {opt.label}
-                </button>
-              </Tooltip>
+                {opt.label}
+              </button>
             ))
           )}
         </div>
@@ -2240,12 +2800,223 @@ function PickerPill({
   );
 }
 
-// ── Misc helpers ─────────────────────────────────────────────────────────
+// ── Icons ────────────────────────────────────────────────────────────────
+// Stroked, Lucide-family (~2px stroke, round caps, 24×24 viewbox) — same
+// vocabulary as the rest of the repo. Sized by the CSS module.
+//
+// CloseIcon, UploadIcon, LinkIcon, SmallXIcon, MoreDotsIcon, and
+// ChevronDownIcon now come from `@/components/icons` (imported above) — only
+// the composer-unique glyphs below stay local.
 
-/** Strip HTML from a rich-text heading so the pill shows plain text. */
-function stripHtml(html: string): string {
-  if (!html) return "";
-  // Defensive — the rich-text editor may emit HTML; this dialog only
-  // needs the human readable string for the picker label.
-  return html.replace(/<[^>]*>/g, "").trim();
+function DriveIcon(): ReactNode {
+  // A simple triangle-fold "drive" glyph in the Lucide vocabulary.
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 3h6l6 10-3 6H6l-3-6z" />
+      <path d="M9 3 6 13h12" />
+    </svg>
+  );
+}
+
+function CameraIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  );
+}
+
+function NoteCardIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <line x1="7" y1="9" x2="17" y2="9" />
+      <line x1="7" y1="13" x2="13" y2="13" />
+    </svg>
+  );
+}
+
+function CheckIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function WarnIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={styles.warnIcon}
+    >
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+function PlusIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function GripIcon(): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="9" cy="6" r="1.6" />
+      <circle cx="15" cy="6" r="1.6" />
+      <circle cx="9" cy="12" r="1.6" />
+      <circle cx="15" cy="12" r="1.6" />
+      <circle cx="9" cy="18" r="1.6" />
+      <circle cx="15" cy="18" r="1.6" />
+    </svg>
+  );
+}
+
+function ChevronLeftIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={styles.footChevron}
+    >
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={styles.footChevron}
+    >
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
+// Type glyph used inside a strip / gallery thumb. Falls through to a
+// generic "link" glyph when the type isn't one we model specially.
+function TypeIcon({ type }: { type: LessonResource["type"] }): ReactNode {
+  const common = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+  switch (type) {
+    case "image":
+      return (
+        <svg {...common}>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <polyline points="21 15 16 10 5 21" />
+        </svg>
+      );
+    case "pdf":
+    case "doc":
+      return (
+        <svg {...common}>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="9" y1="14" x2="15" y2="14" />
+        </svg>
+      );
+    case "slides":
+      return (
+        <svg {...common}>
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      );
+    case "youtube":
+      return (
+        <svg {...common}>
+          <polygon points="23 7 16 12 23 17 23 7" />
+          <rect x="1" y="5" width="15" height="14" rx="2" />
+        </svg>
+      );
+    case "notecard":
+      return <NoteCardIcon />;
+    case "website":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="2" y1="12" x2="22" y2="12" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      );
+    case "link":
+    default:
+      return <LinkIcon />;
+  }
 }

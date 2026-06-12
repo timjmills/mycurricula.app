@@ -288,6 +288,38 @@
   font-size: 15px;
   font-weight: 800;
 }
+/* "Copy link" header affordance (UX roadmap item 07) — a quiet icon button
+   pushed to the section header's right edge; picks up the active subject's
+   accent on hover/focus. Sized to match the .pclose icon-button idiom.
+
+   The element is the ui <Button variant="icon" size="sm"> primitive (§4a
+   review M5): the primitive owns the Tooltip wiring and the ≥44px ::before
+   hit-area inflation at ≤900px viewports; these rules only re-skin it to
+   the bordered 34px chip this header already used. Selectors are stacked
+   on purpose — they must out-rank Button.module.css's `.icon.sm` (0,2,0)
+   and `.icon:hover:not(:disabled)` (0,3,0) deterministically, regardless
+   of which CSS-module chunk the bundler emits first. */
+.ech .copylink.copylink {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+.ech .copylink.copylink:hover,
+.ech .copylink.copylink:focus-visible {
+  color: var(--ac-d);
+  border-color: var(--ac);
+  background: var(--surface);
+}
+.copylink svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
 .vsel {
   margin-left: auto;
   display: flex;

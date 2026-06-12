@@ -20,9 +20,12 @@
 //     / gdocs / gsheets / gdrive
 //     / pdf                         → large sandboxed <iframe> (via parseResourceUrl)
 //   • video / audio                 → native player
-//   • website / link                → OG-style card + "Open in new tab"
-//                                     (arbitrary sites refuse to frame, so we
-//                                      never trap the teacher in a blank iframe)
+//   • website / link / anything
+//     canEmbedResource() rejects   → the designed link card (P5 — the SAME
+//                                     single predicate the tiles consult, so
+//                                     this pane never frames anything the
+//                                     tiles wouldn't and never traps the
+//                                     teacher in a blank iframe)
 //   • no url / unknown              → honest "no preview" fallback
 //
 // LIVE ANNOTATION (Ultraplan §3): the visual media kinds (image, iframe/PDF,
@@ -48,11 +51,16 @@ import {
   type ReactNode,
 } from "react";
 import type { LessonResource } from "@/lib/types";
-import { parseResourceUrl } from "@/lib/resource-embed";
+import {
+  canEmbedResource,
+  parseResourceUrl,
+  isSafeUrl,
+} from "@/lib/resource-embed";
 import { galleryItems, hasNotes, isNotecard } from "@/lib/notecards";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { Gallery } from "@/components/notecards";
 import { PreviewAnnotation } from "./PreviewAnnotation";
+import { ResourceLinkCard, effectiveProvider } from "./ResourceEmbed";
 import styles from "./ResourcePreview.module.css";
 
 export interface ResourcePreviewProps {
@@ -67,10 +75,10 @@ type PreviewKind = "image" | "iframe" | "video" | "audio" | "link" | "none";
 
 function previewKindFor(resource: LessonResource): PreviewKind {
   if (!resource.url) return "none";
-  // Prefer the stored provider; fall back to deriving it from the URL so a
-  // legacy row with a url but no provider still previews correctly.
-  const provider = resource.provider ?? parseResourceUrl(resource.url).provider;
-  switch (provider) {
+  // Shared provider derivation (ResourceEmbed.effectiveProvider — stored
+  // provider, then mime type, then the URL) so the modal always picks the
+  // same branch as the tile renderer.
+  switch (effectiveProvider(resource)) {
     case "image":
       return "image";
     case "video":
@@ -352,73 +360,51 @@ function PreviewBody({
   }
 
   if (kind === "iframe" && url) {
-    // Only ever frame a resource we can vouch for: either a recognized provider
-    // produced a real embeddable URL (trusted host — YouTube/Vimeo/Google), OR
-    // it is our OWN same-origin hosted file (root-relative /api/resources/{id},
-    // e.g. a PDF). An attacker-authored row (forking model) can claim
-    // provider:"youtube" while pointing url at an arbitrary cross-origin site;
-    // parseResourceUrl yields no embedUrl for it, so we must NOT fall back to
-    // framing the raw url with allow-scripts allow-same-origin (M2). Untrusted
-    // rows fall through to the safe link card below instead of being framed.
-    const embedUrl = parseResourceUrl(url).embedUrl;
-    const rootRelative = /^\/(?![/\\])/.test(url);
-    const frameSrc = embedUrl ?? (rootRelative ? url : null);
-    if (frameSrc) {
-      return (
-        <PreviewAnnotation className={styles.frameAnnotate}>
-          <div className={styles.frame}>
-            <iframe
-              src={frameSrc}
-              title={resource.label}
-              className={styles.iframe}
-              loading="lazy"
-              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation"
-            />
-          </div>
-        </PreviewAnnotation>
-      );
+    // P5 — the SINGLE embed authority. canEmbedResource() (lib/resource-embed)
+    // is the same predicate the tiles consult, so this pane frames EXACTLY
+    // what they would: a recognized provider's real embed URL (trusted host —
+    // YouTube/Vimeo/Google) or our OWN same-origin hosted file (root-relative
+    // /api/resources/{id}, e.g. a PDF). An attacker-authored row (forking
+    // model) can claim provider:"youtube" while pointing url at an arbitrary
+    // cross-origin site; the predicate is false for it, so it is never framed
+    // with allow-scripts allow-same-origin (M2) — it falls through to the
+    // designed link card below instead.
+    if (canEmbedResource(resource)) {
+      const embedUrl = parseResourceUrl(url).embedUrl;
+      const rootRelative = /^\/(?![/\\])/.test(url);
+      // Session blob: media (a teacher's own just-uploaded PDF) is embeddable
+      // per the predicate but has no parseResourceUrl embedUrl — frame the
+      // blob URL directly, same trust level as the pre-predicate behavior.
+      const isBlob = /^blob:/i.test(url);
+      const frameSrc = embedUrl ?? (rootRelative || isBlob ? url : null);
+      if (frameSrc) {
+        return (
+          <PreviewAnnotation className={styles.frameAnnotate}>
+            <div className={styles.frame}>
+              <iframe
+                src={frameSrc}
+                title={resource.label}
+                className={styles.iframe}
+                loading="lazy"
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation"
+              />
+            </div>
+          </PreviewAnnotation>
+        );
+      }
     }
-    // No trusted embed + not same-origin → don't frame it; fall through to the
-    // link card (a deliberate "Open in new tab" beats auto-loading an untrusted
-    // origin in a script-enabled frame).
+    // Not embeddable → never a blank frame; fall through to the link card
+    // (a deliberate "Open" beats auto-loading an untrusted origin in a
+    // script-enabled frame).
   }
 
   if ((kind === "link" || kind === "iframe") && url) {
     // Arbitrary sites set X-Frame-Options / frame-ancestors and refuse to
     // load in an iframe, so we never trap the teacher in a blank frame —
-    // we show an OG-style card and a clear "Open in new tab" action.
-    return (
-      <div className={styles.linkCard}>
-        {resource.thumbnailUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={resource.thumbnailUrl}
-            alt=""
-            className={styles.linkThumb}
-          />
-        ) : (
-          <span className={styles.linkThumbFallback} aria-hidden="true">
-            <GlobeIcon />
-          </span>
-        )}
-        <span className={styles.linkTitle}>
-          {resource.previewTitle || resource.label}
-        </span>
-        {resource.previewDescription ? (
-          <span className={styles.linkDesc}>{resource.previewDescription}</span>
-        ) : null}
-        <span className={styles.linkDomain}>{safeHost(url)}</span>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.openBtn}
-        >
-          Open in new tab
-        </a>
-      </div>
-    );
+    // the designed link card (shared with the tile renderer) shows the OG
+    // thumb/title/description, the domain, and an explicit Open action.
+    return <ResourceLinkCard resource={resource} variant="preview" />;
   }
 
   // No url / unknown — honest fallback rather than a blank panel.
@@ -432,27 +418,6 @@ function PreviewBody({
   );
 }
 
-/** True for http(s), blob:, and same-origin root-relative ("/…") URLs — the
- *  schemes safe to place in an <iframe>/<img>/<video> src or an <a href>.
- *  Root-relative is allowed for hosted files served via /api/resources/{id};
- *  protocol-relative "//host" is rejected. Blocks javascript:, data:, etc. */
-function isSafeUrl(url: string | undefined): url is string {
-  if (!url) return false;
-  if (/^(https?|blob):/i.test(url)) return true;
-  // Same-origin root-relative path (e.g. /api/resources/{id}). Reject
-  // protocol-relative ("//host") and backslash tricks ("/\host") that
-  // browsers normalize to a foreign origin.
-  return /^\/(?![/\\])/.test(url);
-}
-
-function safeHost(url: string | undefined): string {
-  if (!url) return "";
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return "";
-  }
-}
 
 // ── Icons ───────────────────────────────────────────────────────────────────
 

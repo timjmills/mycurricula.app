@@ -1,0 +1,63 @@
+/* UndoToast.module.css — the roadmap-02 undo toast surface.
+   All color / type / spacing from var(--…) only. Zero hex.
+
+   Visual contract (6.12.26 UX roadmap item 02): bottom-center, white
+   surface (--paper) with hairline border + --sh-md, one text line and an
+   "Undo" text button. Quiet — this is a safety affordance, not an alert.
+   The dark team-scoped ConsequenceToast is a different primitive on
+   purpose: that one announces blast radius; this one offers a way back. */
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  max-width: calc(100vw - 32px);
+  padding: 0 8px 0 16px;
+  background: var(--paper);
+  color: var(--ink-900);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-md);
+  font-size: var(--t-13);
+}
+
+.message {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "Undo" text button — ≥44px hit area at every tier (the visible button
+   is 36px tall; the ::after inset inflates the target per BUILD_STANDARD
+   §8 without growing the toast). */
+.undoBtn {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: none;
+  background: none;
+  border-radius: var(--r-sm);
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--brand-600);
+  cursor: pointer;
+}
+
+.undoBtn::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+
+.undoBtn:hover,
+.undoBtn:focus-visible {
+  background: var(--brand-50);
+}

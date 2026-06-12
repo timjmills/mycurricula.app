@@ -234,7 +234,7 @@ export function Gallery({
 }
 
 // ── Icons ───────────────────────────────────────────────────────────────────
-// Stroked chevrons matching the resource-tile / ResourcePreview icon family.
+// Stroked chevrons matching the ResourcePreview icon family.
 
 function ChevronLeftIcon(): ReactNode {
   return (

@@ -13,11 +13,12 @@
 // restored to the trigger on close, and the fade respects
 // prefers-reduced-motion (CSS module).
 //
-// Chrome (CLAUDE.md §4): all color/radii/type via tokens (the dark backdrop
-// scrim is the one literal, matching ResourcePreview); the notes body is
-// sanitized with sanitizeHtml() before dangerouslySetInnerHTML (audit #9 —
-// stored XSS under the forking model); the close button carries a ≥44px touch
-// target on phone + an aria-label.
+// Chrome (CLAUDE.md §4 + the 6.12.26 resource-redesign §4 artboard): all
+// color/radii/type via tokens (the dark backdrop scrim is the one literal,
+// matching ResourcePreview); the notes body is sanitized with sanitizeHtml()
+// before dangerouslySetInnerHTML (audit #9 — stored XSS under the forking
+// model); the header's Edit (honey) + close buttons are Button primitives with
+// ≥44px effective targets and onboarding tooltips.
 
 import {
   useEffect,
@@ -29,6 +30,7 @@ import {
 import type { LessonResource } from "@/lib/types";
 import { galleryItems, hasNotes } from "@/lib/notecards";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import { Button } from "@/components/ui";
 import { Gallery } from "./Gallery";
 import styles from "./NotecardFullscreen.module.css";
 
@@ -41,6 +43,11 @@ export interface NotecardFullscreenProps {
    *  called with the carousel's current index. Optional — when omitted the
    *  carousel items are not separately click-to-enlarge. */
   onEnlargeItem?: (index: number) => void;
+  /** Open the composer's edit seam for THIS card (gallery + notes) without
+   *  closing the fullscreen view first — the redesign's explicit Edit
+   *  affordance (§4 callout 1). Additive: when omitted, no Edit button
+   *  renders and the header is unchanged. */
+  onEdit?: () => void;
 }
 
 /** Full-screen split view: media carousel left, written notes right. */
@@ -48,6 +55,7 @@ export function NotecardFullscreen({
   resource,
   onClose,
   onEnlargeItem,
+  onEdit,
 }: NotecardFullscreenProps): ReactNode {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -99,20 +107,35 @@ export function NotecardFullscreen({
         aria-label={`Notecard: ${title}`}
         className={styles.dialog}
       >
-        {/* ── Header: title + close ────────────────────────────────────────── */}
+        {/* ── Header: title + edit (honey) + close ─────────────────────────── */}
         <header className={styles.header}>
           <span className={styles.title} title={title}>
             {title}
           </span>
-          <button
-            type="button"
-            className={styles.closeBtn}
-            onClick={onClose}
-            aria-label="Close notecard"
-            title="Close notecard"
-          >
-            <CloseIcon />
-          </button>
+          <span className={styles.headerActions}>
+            {onEdit && (
+              <Button
+                variant="icon"
+                size="sm"
+                className={styles.editBtn}
+                onClick={onEdit}
+                iconAriaLabel={`Edit "${title}"`}
+                tooltip="Edit this card — change its gallery and notes without closing"
+              >
+                <PencilIcon />
+              </Button>
+            )}
+            <Button
+              variant="icon"
+              size="sm"
+              className={styles.closeBtn}
+              onClick={onClose}
+              iconAriaLabel="Close notecard"
+              tooltip="Close (Esc)"
+            >
+              <CloseIcon />
+            </Button>
+          </span>
         </header>
 
         {/* ── Split body: media carousel left, notes right (stacked on phone) ── */}
@@ -147,6 +170,25 @@ export function NotecardFullscreen({
 }
 
 // ── Icons ───────────────────────────────────────────────────────────────────
+
+function PencilIcon(): ReactNode {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  );
+}
 
 function CloseIcon(): ReactNode {
   return (

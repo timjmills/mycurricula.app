@@ -1,69 +1,35 @@
-/* resource-type-pill.module.css — small uppercase pill tag for resource types.
+/* resource-type-pill.module.css — small uppercase type tag for resources.
  *
- * Spec §4.4 lists HEX pairs for each resource type — the published
- * resource-type colorway, distinct from the subject-color cascade. The
- * actual values now live in `app/tokens.css` as `--tag-<hue>-bg` /
- * `--tag-<hue>-fg` pairs (Tailwind-100/800-style soft pastel + deep
- * contrast text) so the spec mapping is `data-kind="video"` → pink,
- * etc., but the values stay in the token system per CLAUDE.md §4.
+ * Restyled for the 6.12.26 Resource & Notecard Redesign §2: the section
+ * card's rows wear the handoff's `.rn-typeTag` treatment — a QUIET muted
+ * uppercase word (no pill background), per resource_redesign/rn.css:
  *
- * Layout: 2px 8px padding, 999px radius (true pill), 10px text, weight 600,
- * uppercase, letter-spacing 0.4.
+ *   .rn-typeTag{font-size:var(--t-10);font-weight:800;letter-spacing:.06em;
+ *               color:var(--muted);flex:0 0 auto;}
+ *
+ * The pre-redesign colored pill pairs (spec §4.4 tag-pill chrome) are gone
+ * from this surface — the compact rows already carry a type-tinted 30px
+ * icon tile, so a second colored chip per row was noise. The component name
+ * (`ResourceTypePill`) stays for API stability; only the dressing changed.
  */
 
 .pill {
-  /* Inline so the pill flows next to the resource title without breaking the
+  /* Inline so the tag flows next to the resource title without breaking the
      row's vertical rhythm. */
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
 
-  /* Geometry per spec §4.4. */
-  padding: 2px 8px;
-  border-radius: var(--r-pill);
-
-  /* Type per spec §4.4 — small uppercase tag. */
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
-
-  /* `line-height: 1` keeps the pill snug around its glyph height. */
+  /* AA: the handoff's .rn-typeTag says color:var(--muted) (#908fa3), but
+     that is only ~3.2:1 on white — 10px text needs ≥4.5:1, so it was
+     overridden for contrast. --ink-500 (#57566b) is the lightest ink-ramp
+     step that clears it (~7.1:1 on white; next-lighter --ink-400 = --muted
+     fails at ~3.2:1). Flag for design review. */
+  color: var(--ink-500);
   line-height: 1;
-}
-
-/* ── Per-kind colorway, spec §4.4 ───────────────────────────────────────
-   Each data-kind picks one of the `--tag-<hue>-bg/-fg` pairs from
-   `app/tokens.css`. The spec hex values live there; this file just maps
-   resource kinds to the appropriate hue. */
-
-.pill[data-kind="video"] {
-  background: var(--tag-pink-bg);
-  color: var(--tag-pink-fg);
-}
-
-.pill[data-kind="docx"] {
-  background: var(--tag-blue-bg);
-  color: var(--tag-blue-fg);
-}
-
-.pill[data-kind="pdf"] {
-  background: var(--tag-red-bg);
-  color: var(--tag-red-fg);
-}
-
-.pill[data-kind="link"] {
-  background: var(--tag-gray-bg);
-  color: var(--tag-gray-fg);
-}
-
-.pill[data-kind="slides"] {
-  background: var(--tag-amber-bg);
-  color: var(--tag-amber-fg);
-}
-
-.pill[data-kind="image"] {
-  background: var(--tag-green-bg);
-  color: var(--tag-green-fg);
 }

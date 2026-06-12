@@ -23,13 +23,17 @@
 // `tool` / `color` / `width` React state plus a local `useBoardAnnotations()`
 // instance, exactly as the integration brief requires.
 //
-// Chrome (CLAUDE.md §4): every colour/radius/type via tokens; the swatches are
-// `--hl-*` / ink / urgent / done token references (no hex). ≥44px touch targets
-// on phone. Tooltips on every non-obvious control; the destructive **Clear**
-// carries a `required` tooltip (never dismissible). The toolbar fade + the
-// layer respect prefers-reduced-motion (handled in the CSS module / the
-// AnnotationLayer). Drawing is keyboard-independent but every control is a real
-// focusable button so the toolbar is fully keyboard reachable.
+// Chrome (6.12.26 §5 redesign): the toolbar is the floating `.rn-annoBar`
+// pill — `--surface` pill, `--shadow-popover`, 5px padding — holding
+// pen/highlighter/eraser, four 22px colour swatches, the stroke widths, and
+// undo/redo/clear as 36px circular buttons (active = `--ink-900` bg /
+// `--paper` glyph), every hit area inflated to ≥44px via ::after pads. While
+// ink is on, the dark `.rn-ephemeral` pill ("Ink is temporary — it clears
+// when you close") makes the wipe-on-close rule legible. All colour/radius/
+// type via tokens (no hex); the destructive **Clear** carries a `required`
+// tooltip (never dismissible, never a dialog — CLAUDE.md no-confirm rule).
+// Drawing is keyboard-independent but every control is a real focusable
+// button so the toolbar is fully keyboard reachable.
 
 import {
   useCallback,
@@ -42,8 +46,7 @@ import {
 import type { BoardTool } from "@/lib/teach/types";
 import { useBoardAnnotations } from "@/lib/use-board-annotations";
 import { AnnotationLayer } from "@/components/teach/annotation";
-import { Button, Tooltip, ToggleGroup } from "@/components/ui";
-import type { ToggleOption } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import styles from "./PreviewAnnotation.module.css";
 
 // ── Tool / swatch / width tables ─────────────────────────────────────────────
@@ -52,33 +55,40 @@ import styles from "./PreviewAnnotation.module.css";
 // are board-canvas features and are intentionally left out of the scratch
 // surface to keep it light.
 
-const TOOL_OPTIONS: Array<ToggleOption<BoardTool>> = [
+interface ToolOption {
+  value: BoardTool;
+  label: string;
+  icon: ReactNode;
+  tip: string;
+  tooltipId: string;
+}
+
+const TOOL_OPTIONS: readonly ToolOption[] = [
   {
     value: "pen",
     label: "Pen",
-    icon: <span aria-hidden="true">✎</span>,
-    title: "Draw freehand on top of this resource",
+    icon: <PenIcon />,
+    tip: "Draw freehand on top of this resource",
     tooltipId: "preview-annot-pen",
   },
   {
     value: "highlighter",
     label: "Highlighter",
-    ariaLabel: "Highlighter",
-    icon: <span aria-hidden="true">▰</span>,
-    title: "Highlight part of this resource with a wide, see-through marker",
+    icon: <HighlighterIcon />,
+    tip: "Highlight part of this resource with a wide, see-through marker",
     tooltipId: "preview-annot-highlighter",
   },
   {
     value: "eraser",
     label: "Eraser",
-    icon: <span aria-hidden="true">⌫</span>,
-    title: "Tap or drag over a mark to remove the whole stroke",
+    icon: <EraserIcon />,
+    tip: "Tap or drag over a mark to remove the whole stroke",
     tooltipId: "preview-annot-eraser",
   },
-];
+] as const;
 
-/** Swatch palette — ink / urgent / done + the four highlighter pens. Every
- *  entry is a token name from app/tokens.css; never a literal hex. */
+/** Swatch palette — the §5 four: ink / urgent / done / lemon highlighter.
+ *  Every entry is a token name from app/tokens.css; never a literal hex. */
 interface Swatch {
   id: string;
   token: string;
@@ -90,9 +100,6 @@ const SWATCHES: readonly Swatch[] = [
   { id: "urgent", token: "--urgent", label: "Red" },
   { id: "done", token: "--done", label: "Green" },
   { id: "hl-lemon", token: "--hl-lemon", label: "Yellow highlighter" },
-  { id: "hl-mint", token: "--hl-mint", label: "Green highlighter" },
-  { id: "hl-maya", token: "--hl-maya", label: "Blue highlighter" },
-  { id: "hl-violet", token: "--hl-violet", label: "Pink highlighter" },
 ] as const;
 
 const WIDTHS: ReadonlyArray<{ value: number; label: string }> = [
@@ -199,8 +206,17 @@ export function PreviewAnnotation({
         />
       )}
 
-      {/* ── Floating toolbar ───────────────────────────────────────────────
-          Sits over the top of the media box. The "Annotate" toggle is always
+      {/* Ephemeral-ink pill (§5) — makes the wipe-on-close rule legible the
+          whole time ink is on. Decorative for pointers (pointer-events:none)
+          so it never blocks a stroke beneath it. */}
+      {active && (
+        <span className={styles.ephemeral}>
+          <PenIcon /> Ink is temporary — it clears when you close
+        </span>
+      )}
+
+      {/* ── Floating pill toolbar (§5 .rn-annoBar) ─────────────────────────
+          Bottom-centered over the media box. The "Annotate" toggle is always
           present; the tool/colour/width/clear controls appear only while
           annotation is active. */}
       <div
@@ -217,7 +233,7 @@ export function PreviewAnnotation({
               ? "Stop drawing and clear your marks — this scratch ink is never saved"
               : "Draw, highlight, and erase on top of this resource — your marks are temporary and clear when you close"
           }
-          side="bottom"
+          side="top"
           tooltipId="preview-annot-toggle"
         >
           <Button
@@ -234,22 +250,60 @@ export function PreviewAnnotation({
           <>
             <span className={styles.divider} aria-hidden="true" />
 
-            <ToggleGroup<BoardTool>
-              options={TOOL_OPTIONS}
-              value={tool}
-              onChange={setTool}
-              size="sm"
-              variant="prominent"
-              ariaLabel="Drawing tool"
+            {/* Tools — pen / highlighter / eraser as 36px circular buttons.
+
+                A11y semantics (§4a review L5): these were role="radio" inside
+                a role="radiogroup", but WITHOUT the roving tabindex + ←/→
+                arrow-key contract that role demands — a screen-reader user was
+                promised radio behavior that didn't exist. Of the two
+                conforming options (implement full radiogroup keyboard
+                semantics, or drop the radio roles), we take the SIMPLER one:
+                plain toggle buttons with aria-pressed in a labelled group.
+                Every button stays individually Tab-reachable (matching how the
+                rest of this toolbar already navigates) and the pressed state
+                is announced honestly. The colour-swatch and stroke-width
+                groups below get the identical treatment for the same reason. */}
+            <div
               className={styles.tools}
-            />
+              role="group"
+              aria-label="Drawing tool"
+            >
+              {TOOL_OPTIONS.map((t) => {
+                const isActive = t.value === tool;
+                return (
+                  <Tooltip
+                    key={t.value}
+                    content={t.tip}
+                    side="top"
+                    tooltipId={t.tooltipId}
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={isActive}
+                      aria-label={t.label}
+                      className={[
+                        styles.annoBtn,
+                        isActive ? styles.annoBtnOn : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={() => setTool(t.value)}
+                    >
+                      {t.icon}
+                    </button>
+                  </Tooltip>
+                );
+              })}
+            </div>
 
             <span className={styles.divider} aria-hidden="true" />
 
-            {/* Colour swatches — disabled for the eraser (which has no colour). */}
+            {/* Colour swatches — disabled for the eraser (which has no colour).
+                aria-pressed toggle buttons, not radios — see the L5 note on the
+                tools group above. */}
             <div
               className={styles.swatches}
-              role="radiogroup"
+              role="group"
               aria-label="Annotation colour"
             >
               {SWATCHES.map((sw) => {
@@ -258,13 +312,12 @@ export function PreviewAnnotation({
                   <Tooltip
                     key={sw.id}
                     content={`Use ${sw.label.toLowerCase()} for new marks`}
-                    side="bottom"
+                    side="top"
                     tooltipId={`preview-annot-swatch-${sw.id}`}
                   >
                     <button
                       type="button"
-                      role="radio"
-                      aria-checked={isActive}
+                      aria-pressed={isActive}
                       aria-label={sw.label}
                       disabled={tool === "eraser"}
                       className={[
@@ -283,10 +336,11 @@ export function PreviewAnnotation({
 
             <span className={styles.divider} aria-hidden="true" />
 
-            {/* Stroke width. */}
+            {/* Stroke width — aria-pressed toggle buttons, not radios (L5,
+                same rationale as the tools group). */}
             <div
               className={styles.widths}
-              role="radiogroup"
+              role="group"
               aria-label="Stroke width"
             >
               {WIDTHS.map((w) => {
@@ -295,13 +349,12 @@ export function PreviewAnnotation({
                   <Tooltip
                     key={w.value}
                     content={`${w.label} stroke`}
-                    side="bottom"
+                    side="top"
                     tooltipId={`preview-annot-width-${w.value}`}
                   >
                     <button
                       type="button"
-                      role="radio"
-                      aria-checked={isActive}
+                      aria-pressed={isActive}
                       aria-label={`${w.label} stroke`}
                       className={[
                         styles.width,
@@ -325,47 +378,157 @@ export function PreviewAnnotation({
             <span className={styles.divider} aria-hidden="true" />
 
             {/* Undo / redo. */}
-            <Button
-              variant="icon"
-              size="sm"
-              iconAriaLabel="Undo"
-              disabled={!annotations.canUndo}
-              tooltip="Undo your last mark"
-              onClick={annotations.undo}
-            >
-              <span aria-hidden="true">↶</span>
-            </Button>
-            <Button
-              variant="icon"
-              size="sm"
-              iconAriaLabel="Redo"
-              disabled={!annotations.canRedo}
-              tooltip="Redo the mark you just undid"
-              onClick={annotations.redo}
-            >
-              <span aria-hidden="true">↷</span>
-            </Button>
+            <Tooltip content="Undo your last mark" side="top">
+              <button
+                type="button"
+                aria-label="Undo"
+                disabled={!annotations.canUndo}
+                className={styles.annoBtn}
+                onClick={annotations.undo}
+              >
+                <UndoIcon />
+              </button>
+            </Tooltip>
+            <Tooltip content="Redo the mark you just undid" side="top">
+              <button
+                type="button"
+                aria-label="Redo"
+                disabled={!annotations.canRedo}
+                className={styles.annoBtn}
+                onClick={annotations.redo}
+              >
+                <RedoIcon />
+              </button>
+            </Tooltip>
 
             <span className={styles.divider} aria-hidden="true" />
 
-            {/* Clear — destructive, always-on tooltip (CLAUDE.md §4). */}
+            {/* Clear all ink — bulk-destructive, so the tooltip stays ALWAYS-ON
+                (CLAUDE.md §4 `required`; a warning, never a confirm dialog).
+                Copy is truthful (§4a review L4): CLEAR pushes the annotation
+                history, so the adjacent Undo CAN restore the wiped strokes —
+                the old "can't be undone" claim was false and would scare
+                teachers off a recoverable action. `required` is kept because
+                one tap still wipes every stroke at once. */}
             <Tooltip
-              content="Erase every mark on this resource. Your scratch ink is never saved anyway."
-              side="bottom"
+              content="Clear all ink from this preview — the Undo button can bring it back; everything clears anyway when you close"
+              side="top"
               required
             >
-              <Button
-                variant="destructive"
-                size="sm"
+              <button
+                type="button"
+                aria-label="Clear all ink"
                 disabled={annotations.strokes.length === 0}
+                className={`${styles.annoBtn} ${styles.annoBtnDanger}`}
                 onClick={annotations.clear}
               >
-                Clear
-              </Button>
+                <TrashIcon />
+              </button>
             </Tooltip>
           </>
         )}
       </div>
     </div>
+  );
+}
+
+// ── Icons (Lucide-family line icons, per the §5 artboards) ──────────────────
+
+function PenIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+
+function HighlighterIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 11l4 4L21 7l-4-4z" />
+      <path d="M9 11l-4 4 2 2-3 3h6l1-1 2 2" />
+    </svg>
+  );
+}
+
+function EraserIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 20H8L3 15a2 2 0 0 1 0-2.8l8.2-8.2a2 2 0 0 1 2.8 0l6 6a2 2 0 0 1 0 2.8L14 19" />
+    </svg>
+  );
+}
+
+function UndoIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 14L4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+    </svg>
+  );
+}
+
+function RedoIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15 14l5-5-5-5" />
+      <path d="M20 9H10a6 6 0 0 0 0 12h3" />
+    </svg>
+  );
+}
+
+function TrashIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
+    </svg>
   );
 }

@@ -17,16 +17,37 @@
 //     "lessons only" so a teacher sees just the curriculum at first glance.
 //
 // Persistence: both pills persist to localStorage. Same SSR-safe + post-
-// mount hydration + write-gated pattern used in lib/year-state.tsx — the
-// only structural difference here is no Provider/Context, because both pills
-// have a single consumer (the Weekly shell). The hook can be called directly
-// from the shell and the pill component.
+// mount hydration + write-gated pattern used in lib/year-state.tsx.
+//
+// ── Why a Provider/Context (was: provider-less useState) ──────────────────
+// The Weekly chrome has TWO consumers of this state that must agree in real
+// time: <WeeklyViewControls> (the WRITER — the Grid/List/Schedule toggle in
+// the page-header actions slot) and <WeeklyShell> (the READER — picks
+// WeeklyGrid vs. ScheduleTimeline for the canvas). A provider-less hook gave
+// each its OWN useState copy, so clicking the toggle updated the controls'
+// copy + localStorage but left the shell's copy stale: the canvas only
+// switched Grid→Schedule after a full reload. Lifting the state into a
+// shared context — one instance mounted above both consumers
+// (<WeeklyScheduleProvider> at the top of WeeklyShell) — makes the toggle
+// flip the canvas immediately, in-session. The localStorage round-trip and
+// SSR-safety are unchanged; only the state's HOME moved from per-hook to the
+// shared provider.
 //
 // Storage keys:
 //   • mycurricula:weekly-schedule-mode      → "subject" | "schedule"
 //   • mycurricula:weekly-schedule-include-events → "lessons" | "all"
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { ReactNode } from "react";
 
 // ── Storage keys + value types ───────────────────────────────────────────
 
@@ -82,7 +103,7 @@ function writeEvents(value: WeeklyScheduleEvents): void {
   }
 }
 
-// ── Public hook ──────────────────────────────────────────────────────────
+// ── Public shape ──────────────────────────────────────────────────────────
 
 export interface UseWeeklyScheduleModeReturn {
   /** Current Subject ↔ Schedule mode. */
@@ -97,16 +118,31 @@ export interface UseWeeklyScheduleModeReturn {
   includeAllEvents: boolean;
 }
 
+// ── Context ────────────────────────────────────────────────────────────────
+
+const WeeklyScheduleContext = createContext<UseWeeklyScheduleModeReturn | null>(
+  null,
+);
+
+// ── Provider ────────────────────────────────────────────────────────────────
+
 /**
- * Weekly view's inline-pill state.
+ * Owns the Subject↔Schedule + Lessons↔All state for the Weekly view and
+ * shares ONE instance with every consumer beneath it. Mount it once, above
+ * both <WeeklyViewControls> (writer) and the canvas reader — i.e. at the top
+ * of <WeeklyShell>.
  *
- * Provider-less: the hook owns its own state and the localStorage round-trip.
- * The first render returns DEFAULT_* so the SSR HTML and first client render
- * match; a post-mount effect hydrates the saved values. Writes are gated on
+ * Hydration discipline (unchanged from the old hook): the first render
+ * returns DEFAULT_* so the SSR HTML and the first client render match; a
+ * post-mount effect hydrates the saved values. Writes are gated on
  * `hydratedRef` so the hydration effect doesn't immediately overwrite storage
  * with the defaults.
  */
-export function useWeeklyScheduleMode(): UseWeeklyScheduleModeReturn {
+export function WeeklyScheduleProvider({
+  children,
+}: {
+  children: ReactNode;
+}): ReactNode {
   const [mode, setModeState] = useState<WeeklyScheduleMode>(DEFAULT_MODE);
   const [events, setEventsState] =
     useState<WeeklyScheduleEvents>(DEFAULT_EVENTS);
@@ -132,12 +168,41 @@ export function useWeeklyScheduleMode(): UseWeeklyScheduleModeReturn {
     if (hydratedRef.current) writeEvents(value);
   }, []);
 
-  return {
-    mode,
-    setMode,
-    scheduleMode: mode === "schedule",
-    events,
-    setEvents,
-    includeAllEvents: events === "all",
-  };
+  const value = useMemo<UseWeeklyScheduleModeReturn>(
+    () => ({
+      mode,
+      setMode,
+      scheduleMode: mode === "schedule",
+      events,
+      setEvents,
+      includeAllEvents: events === "all",
+    }),
+    [mode, setMode, events, setEvents],
+  );
+
+  // No JSX here so this module can stay a `.ts` file (the importers reference
+  // it extensionless); createElement is the plain-TS equivalent of
+  // <WeeklyScheduleContext.Provider value={value}>{children}</…>.
+  return createElement(WeeklyScheduleContext.Provider, { value }, children);
+}
+
+// ── Public hook ──────────────────────────────────────────────────────────
+
+/**
+ * Weekly view's inline-pill state. Reads the shared instance from
+ * <WeeklyScheduleProvider>; both the writer (WeeklyViewControls) and the
+ * reader (WeeklyShell canvas) get the SAME state object, so a toggle is
+ * reflected across the view immediately with no reload.
+ *
+ * Throws if used outside the provider — a loud failure beats two silently
+ * desynced copies (the bug this replaced).
+ */
+export function useWeeklyScheduleMode(): UseWeeklyScheduleModeReturn {
+  const ctx = useContext(WeeklyScheduleContext);
+  if (!ctx) {
+    throw new Error(
+      "useWeeklyScheduleMode must be used within a <WeeklyScheduleProvider>",
+    );
+  }
+  return ctx;
 }

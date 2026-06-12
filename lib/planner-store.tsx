@@ -71,6 +71,7 @@ import {
   describeStandard as mockDescribeStandard,
 } from "@/lib/mock";
 import { useAppState } from "@/lib/app-state";
+import { snapshotRestorePatch } from "@/lib/fork-diff";
 import { plannerClient } from "@/lib/planner/client";
 import { resolveGrade } from "@/lib/planner/grade";
 import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
@@ -78,6 +79,7 @@ import {
   LESSON_TEMPLATE_BY_ID,
   DEFAULT_LESSON_TEMPLATE_ID,
 } from "@/lib/lesson-templates";
+import { detectFirstFork } from "@/lib/undo-toast-messages";
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -171,6 +173,18 @@ export interface LastChange {
   lessonIds: string[];
   /** Section id, if a section mutation was the cause. */
   sectionId?: string;
+  /**
+   * True when THIS action lazily forked an affected lesson for the first
+   * time — it transitioned from unforked (`modified !== true` and not
+   * previously `isPersonal`) to personally forked (`modified === true` AND
+   * `isPersonal === true`). Computed in the history reducer by diffing the
+   * previous and next documents (see detectFirstFork in
+   * lib/undo-toast-messages.ts). Consumed by the UndoToastBridge to fire the
+   * forking-model education toast (UX roadmap item 02). Never set on
+   * undo/redo/hydrate, and structurally impossible for setLessonStatus —
+   * completion never forks (CLAUDE.md §2).
+   */
+  firstFork?: boolean;
 }
 
 // ── Actions ────────────────────────────────────────────────────────────────
@@ -246,6 +260,18 @@ type RelocateLessonAction = {
   id: string;
   target: { day?: number; subject?: SubjectId; week?: number };
   keepOriginal: boolean;
+};
+
+/** Revert ONLY a lesson's placement to a captured day/week in ONE history
+ *  step (fork-diff scheduling revert — FIX 4). Applies the move (reusing the
+ *  moveLesson reducer for CellLayout pruning) AND forces `moved: null`, so the
+ *  per-field revert tooltip's "Undo with ⌘Z" (singular) is honest. Content
+ *  fields are untouched — a scheduling-only revert must keep the teacher's
+ *  text edits (`modified` stays as-is). */
+type RevertPlacementAction = {
+  type: "revertPlacement";
+  id: string;
+  to: { day: number; week: number };
 };
 
 type SetSaveTargetAction = {
@@ -419,6 +445,7 @@ type PlannerAction =
   | UnarchiveLessonAction
   | RestoreLessonAction
   | RelocateLessonAction
+  | RevertPlacementAction
   | SetSectionsAction
   | ReorderSectionsAction
   | EditSectionAction
@@ -464,6 +491,8 @@ function labelFor(action: PlannerAction): string {
       return "Restore lesson";
     case "relocateLesson":
       return "Relocate lesson";
+    case "revertPlacement":
+      return "Revert placement";
     case "setSections":
       return "Edit sections";
     case "reorderSections":
@@ -909,21 +938,59 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
     }
 
     case "restoreLesson": {
-      // Revert a personally-modified lesson back to its master/core appearance.
-      // Sets the forking flags to their "unforked" state: modified=false,
-      // moved=null, isPersonal=false.
+      // Revert a personally-forked lesson back to the team's version.
       //
-      // NOTE: This does NOT revert content fields (title, objective, preview,
-      // directions, etc.) because the master snapshot is not yet stored in the
-      // data model. When master snapshots land (planned alongside the Supabase
-      // backend), this case must also restore the content fields from the
-      // snapshot. Until then only the forking metadata is cleared.
+      // PROTOTYPE — reads the `Lesson.masterSnapshot` seam (the mock-fixture
+      // capture of the team's values); Phase 1B replaces that source with
+      // persisted fork lineage, same shape. When the lesson carries a
+      // snapshot, "restore" must MEAN restore (roadmap-01 finding H1): the
+      // captured content fields (title / objective / preview / standards —
+      // via the pure, unit-tested snapshotRestorePatch) are written back AND
+      // the captured placement (day / week) is re-applied through the
+      // moveLesson delegation below. All of it happens inside this ONE
+      // action, so the gesture stays one history step — one ⌘Z brings the
+      // whole fork back — and the existing "Restored the team's version"
+      // toast stays honest.
+      //
+      // Lessons WITHOUT a snapshot keep the previous flags-only behavior
+      // (clear modified / moved / isPersonal, content untouched): there is
+      // nothing captured to restore FROM, and refusing the action would
+      // strand a teacher unable to clear stale fork flags on snapshot-less
+      // lessons. Phase 1B's persisted lineage closes that gap for every
+      // fork; until then the three-tier card signal is only fully truthful
+      // where a snapshot exists.
+      const lesson = doc.lessons.find((l) => l.id === action.id);
+      if (!lesson) return doc;
+      const snapshot = lesson.masterSnapshot;
+
+      // Placement first, THROUGH the moveLesson reducer — the same
+      // delegation bumpLesson / relocateLesson use — so the source cell's
+      // CellLayout is pruned and slot handling stays consistent. moveLesson
+      // sets `moved` ("same-week"/"across-weeks"); the flag reset below
+      // overrides it to null, which is correct: after a restore the lesson
+      // sits exactly where the team put it.
+      const placed =
+        snapshot &&
+        (lesson.day !== snapshot.day || lesson.week !== snapshot.week)
+          ? applyDocAction(doc, {
+              type: "moveLesson",
+              id: action.id,
+              patch: { day: snapshot.day, week: snapshot.week },
+            })
+          : doc;
+
       return {
-        ...doc,
-        lessons: doc.lessons.map((l) =>
+        ...placed,
+        lessons: placed.lessons.map((l) =>
           l.id !== action.id
             ? l
-            : { ...l, modified: false, moved: null, isPersonal: false },
+            : {
+                ...l,
+                ...(snapshot ? snapshotRestorePatch(snapshot) : {}),
+                modified: false,
+                moved: null,
+                isPersonal: false,
+              },
         ),
       };
     }
@@ -966,6 +1033,33 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
         id: copy.id,
         patch: action.target,
       });
+    }
+
+    case "revertPlacement": {
+      // Scheduling-only fork revert in ONE step (FIX 4). Run the placement
+      // through the moveLesson reducer — same delegation restore/bump/relocate
+      // use — so the source cell's CellLayout is pruned and slot handling
+      // stays consistent. moveLesson sets `moved` ("same-week"/"across-weeks");
+      // we then force it back to null in the SAME pass, because reverting to
+      // the captured placement means the lesson sits exactly where the team put
+      // it (the move-arrow / stripe must reset immediately). CONTENT is left
+      // untouched — `modified` and every text field stay as-is, so the
+      // teacher's edits survive a scheduling-only revert.
+      const lesson = doc.lessons.find((l) => l.id === action.id);
+      if (!lesson) return doc;
+
+      const placed = applyDocAction(doc, {
+        type: "moveLesson",
+        id: action.id,
+        patch: { day: action.to.day, week: action.to.week },
+      });
+
+      return {
+        ...placed,
+        lessons: placed.lessons.map((l) =>
+          l.id !== action.id ? l : { ...l, moved: null },
+        ),
+      };
     }
 
     // ── Section actions ────────────────────────────────────────────────
@@ -1296,6 +1390,24 @@ function historyReducer(
   // Derive lastChange before touching history.
   const lastChange = buildLastChange(action);
 
+  // First-fork detection (roadmap 02): both the previous doc (present) and
+  // the next doc are in scope here, so this is the one place that can see an
+  // affected lesson transition from unforked to personally forked by THIS
+  // action. Only Personal-mode flows ever set the modified+isPersonal pair on
+  // an existing lesson (the lazy fork — e.g. setSaveTarget "personal");
+  // Master/Team-mode writes never touch the forking metadata, so a detected
+  // transition implies Personal mode. setLessonStatus rewrites only `status`,
+  // so completion can never trip this (CLAUDE.md: completion never forks).
+  if (
+    detectFirstFork(
+      state.history.present.lessons,
+      nextDoc.lessons,
+      lastChange.lessonIds,
+    )
+  ) {
+    lastChange.firstFork = true;
+  }
+
   // ── Coalescing check ─────────────────────────────────────────────────
   // If the incoming action has a coalesceKey AND it matches the previous
   // key AND it fired within COALESCE_WINDOW_MS, update present in place
@@ -1390,6 +1502,7 @@ function buildLastChange(action: PlannerAction): LastChange {
     case "unarchiveLesson":
     case "restoreLesson":
     case "relocateLesson":
+    case "revertPlacement":
       return { kind: action.type, lessonIds: [action.id] };
 
     case "duplicateWeek":
@@ -1543,6 +1656,18 @@ export interface PlannerValue {
     target: { day?: number; subject?: SubjectId; week?: number },
     keepOriginal: boolean,
   ) => void;
+  /**
+   * Revert ONLY a lesson's placement to a captured day/week in ONE undoable
+   * step (fork-diff scheduling revert — FIX 4). Applies the move AND clears
+   * `moved` in a single reducer pass, so one ⌘Z brings the placement back —
+   * matching the per-field revert tooltip's singular "Undo with ⌘Z". Content
+   * fields stay untouched (a scheduling-only revert keeps the teacher's text).
+   * Tees persistence the SAME way moveLesson does (resolved {week,day} via the
+   * Personal | Team-Curriculum save target), so the reverted placement
+   * survives reload in backend mode. The reducer-local `moved` flag is NOT
+   * persisted (it is not a LessonMoveTarget field).
+   */
+  revertPlacement: (id: string, to: { day: number; week: number }) => void;
 
   // ── Section mutation actions ───────────────────────────────────────────
   /**
@@ -1617,6 +1742,17 @@ export interface PlannerValue {
   canUndo: boolean;
   /** True when there is at least one step available to redo. */
   canRedo: boolean;
+  /**
+   * The number of undoable steps currently on the past stack (= past.length).
+   * ADDITIVE — the UndoToastBridge's batch-detection seam (§4a review M2):
+   * a single dispatch advances this by exactly 1, while a bulk gesture that
+   * dispatches N actions in one batch (e.g. WeeklyGrid.handleBulkMove)
+   * advances it by N. The bridge compares successive values to detect a
+   * multi-entry advance and suppress a misleading single-step undo toast.
+   * Note: at HISTORY_LIMIT the past stack is truncated, so an observed jump
+   * can undercount — acceptable until item 06's real batch undo lands.
+   */
+  historyDepth: number;
   /**
    * The human label of the action that WILL be undone next, or null.
    * Use this to render tooltip text like "Undo Move lesson".
@@ -2211,6 +2347,34 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [],
   );
 
+  const revertPlacement = useCallback(
+    (id: string, to: { day: number; week: number }) => {
+      // One dispatch → one history step (FIX 4): the reducer applies the move
+      // AND clears `moved` in a single pass, so the fork-diff scheduling
+      // revert is a single ⌘Z (matching its singular tooltip).
+      dispatchRef.current({ type: "revertPlacement", id, to });
+      // Tee persistence the SAME way moveLesson does: send the RESOLVED final
+      // slot { week, day } (not a bare patch) under the live Personal |
+      // Team-Curriculum save target, so the reverted placement survives reload
+      // in backend mode. `to.day`/`to.week` are both required, so the resolved
+      // slot is exactly the target; we still merge over the current lesson to
+      // mirror moveLesson's defensive idiom 1:1. The reducer-local `moved`
+      // flag is intentionally NOT persisted (not a LessonMoveTarget field) —
+      // matching the two-dispatch behavior this replaces.
+      const current = present.lessons.find((l) => l.id === id);
+      const week = to.week ?? current?.week ?? 0;
+      const day = to.day ?? current?.day ?? 0;
+      persist(
+        "moveLesson",
+        id,
+        { week, day },
+        ownerIdRef.current ?? "",
+        saveTargetRef.current,
+      );
+    },
+    [persist, present.lessons],
+  );
+
   const setSections = useCallback(
     (lessonId: string, next: LessonSectionContent[]) => {
       dispatchRef.current({ type: "setSections", lessonId, next });
@@ -2410,6 +2574,9 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const canRedo = future.length > 0;
   const undoLabel = canUndo ? past[past.length - 1].label : null;
   const redoLabel = canRedo ? future[0].label : null;
+  // ADDITIVE — the UndoToastBridge's batch-detection seam (§4a review M2).
+  // See the PlannerValue doc comment for the contract.
+  const historyDepth = past.length;
 
   // ── Owner-keyed hydration readiness ────────────────────────────────────
   // The reducer's `hydration` is the raw lifecycle for whatever doc is on
@@ -2509,6 +2676,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       unarchiveLesson,
       restoreLesson,
       relocateLesson,
+      revertPlacement,
       setSections,
       reorderSections,
       editSection,
@@ -2524,6 +2692,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       redo,
       canUndo,
       canRedo,
+      historyDepth,
       undoLabel,
       redoLabel,
       lastChange,
@@ -2555,6 +2724,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       unarchiveLesson,
       restoreLesson,
       relocateLesson,
+      revertPlacement,
       setSections,
       reorderSections,
       editSection,
@@ -2570,6 +2740,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       redo,
       canUndo,
       canRedo,
+      historyDepth,
       undoLabel,
       redoLabel,
       lastChange,

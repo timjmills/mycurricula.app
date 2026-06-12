@@ -1,0 +1,564 @@
+/* ResourceCardFace.module.css — the §0 resource/notecard card face.
+ *
+ * Faithful transcription of the 6.12.26 design handoff
+ * (resource_redesign/card-faces.css) onto camelCase module classes:
+ * the canonical Weekly-card recipe (BUILD_STANDARD §2) in the app's
+ * default VIVID style —
+ *   · subject tint fills the body (--wash, default --c-surface via the
+ *     .cp-subj cascade)
+ *   · stronger --c-surface-strong header band holding icon tile + title
+ *   · 4px subject-deep left border, var(--r-12), subject hairline border
+ *   · var(--shadow-card), hover lift (dropped under reduced motion)
+ * --wash is the teacher's per-card override (any --subj-N-tint, or
+ * --paper for white). The header band + left stripe stay subject-locked.
+ * Spacing: strict 4·8·12·16·24 scale; raw px is layout math only. */
+
+.card {
+  --wash: var(--c-surface); /* vivid default: subject tint fills the body */
+  width: 248px;
+  background: var(--wash);
+  border: 1px solid var(--c-border);
+  border-left: 4px solid var(--cd);
+  border-radius: var(--r-12);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  text-align: left;
+  transition:
+    box-shadow 0.12s ease,
+    transform 0.12s ease;
+}
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .kebab {
+    transition: none;
+  }
+  .card:hover {
+    transform: none;
+  }
+}
+
+/* ── Header band — subject-locked, stronger tint over the body ─────────── */
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: var(--c-surface-strong);
+  border-bottom: 1px solid var(--c-border);
+  padding: 12px 36px 12px 12px;
+  position: relative;
+}
+.iconTile {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  flex: 0 0 auto;
+  background: var(--paper);
+  color: var(--cd);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--sh-xs);
+}
+.iconTile svg {
+  width: 14px;
+  height: 14px;
+}
+.hgroup {
+  min-width: 0;
+  flex: 1;
+}
+.meta {
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cd);
+  opacity: 0.72;
+  margin-bottom: 2px;
+}
+.title {
+  font-family: var(--font-display-sm);
+  font-size: var(--t-14);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--cd);
+}
+.subtitle {
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--cd);
+  opacity: 0.65;
+  margin-top: 2px;
+}
+
+/* kebab — hover-revealed (BUILD_STANDARD §9), ≥44 inflated hit */
+.kebab {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-xs);
+  color: var(--cd);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  cursor: pointer;
+}
+.card:hover .kebab,
+.card:focus-within .kebab {
+  opacity: 1;
+}
+@media (hover: none) {
+  .kebab {
+    opacity: 1;
+  }
+}
+.kebab:hover {
+  background: color-mix(in srgb, var(--cd) 12%, transparent);
+}
+.kebab svg {
+  width: 15px;
+  height: 15px;
+}
+.kebab::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+/* ── Preview — inset white frame on the tinted body, uniform height ────── */
+.preview {
+  margin: 12px 12px 0;
+  height: 120px;
+  flex: 0 0 auto;
+  background: var(--paper);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--sh-xs);
+  position: relative;
+  overflow: hidden;
+  cursor: zoom-in;
+  display: block;
+  padding: 0;
+}
+/* a non-interactive frame (no onEnlarge) drops the zoom affordance */
+div.preview {
+  cursor: default;
+}
+.preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* caption under preview */
+.caption {
+  padding: 8px 12px 0;
+  font-size: var(--t-11);
+  line-height: 1.45;
+  color: var(--ink-500);
+}
+
+/* ── Notes on a resource — 3-line clamp + …more ─────────────────────────── */
+.notes {
+  padding: 8px 12px 0;
+  font-size: var(--t-12);
+  line-height: 1.5;
+  color: var(--ink-700);
+}
+.notesText {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.notesText p {
+  margin: 0;
+}
+.more {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--cd);
+  margin-top: 4px;
+  display: inline-block;
+  min-height: 24px;
+  cursor: pointer;
+}
+.more:hover {
+  text-decoration: underline;
+}
+
+/* ── Footer — source identity left, chips right ─────────────────────────── */
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 12px;
+  margin-top: auto;
+}
+.src {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  background: var(--paper);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  padding: 3px 10px 3px 4px;
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-700);
+}
+/* 16px colored initial circle; the artboard's 8px glyph is the micro token
+   minus mechanical 2px — no raw font-size px (token rules, §3). */
+.srcInitial {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--t-10) - 2px);
+  font-weight: 800;
+  color: var(--paper);
+  flex: 0 0 auto;
+}
+.srcDomain {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.typeTag {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--cd);
+  background: color-mix(in srgb, var(--cd) 10%, transparent);
+  border-radius: var(--r-pill);
+  padding: 3px 8px;
+}
+.noteFlag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  font-size: var(--t-10);
+  font-weight: 800;
+  color: var(--honey-600);
+  background: var(--honey-100);
+  border-radius: var(--r-pill);
+  padding: 3px 8px;
+}
+.noteFlag svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* ── Notecard body — rich text, clamped with fade + Read more ───────────── */
+.body {
+  position: relative;
+  padding: 12px 12px 0;
+  font-size: var(--t-12);
+  line-height: 1.55;
+  color: var(--ink-700);
+  max-height: 232px;
+  overflow: hidden;
+}
+.bodyClamped::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, var(--wash));
+}
+.body h4 {
+  font-family: var(--font-display-sm);
+  font-size: var(--t-12);
+  font-weight: 800;
+  color: var(--ink-900);
+  margin: 12px 0 4px;
+}
+.body h4:first-child {
+  margin-top: 0;
+}
+.body p {
+  margin: 0 0 8px;
+}
+.body ul {
+  margin: 4px 0 8px;
+  padding-left: 16px;
+  list-style: disc;
+}
+.body li {
+  margin: 0 0 4px;
+}
+.body a {
+  color: var(--brand-600);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--brand-200);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.body mark {
+  background: var(--hlp-lemon);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+/* inline image in the text flow — same inset-frame language as previews */
+.body img {
+  display: block;
+  width: 100%;
+  margin: 4px 0 8px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--c-border);
+  background: var(--paper);
+  box-shadow: var(--sh-xs);
+}
+.readMore {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 12px 0;
+  min-height: 28px;
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--cd);
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  cursor: pointer;
+}
+.readMore svg {
+  width: 12px;
+  height: 12px;
+}
+.readMore:hover {
+  text-decoration: underline;
+}
+.readMore::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+/* ── Preview fallbacks — never a broken frame (redesign P5) ─────────────── */
+
+/* youtube/video → dark stage + white play circle (thumb behind if present) */
+.videoStage {
+  position: absolute;
+  inset: 0;
+  background: var(--ink-900);
+  display: grid;
+  place-items: center;
+}
+.videoThumb {
+  position: absolute;
+  inset: 0;
+}
+.playButton {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  display: grid;
+  place-items: center;
+  color: var(--ink-900);
+}
+.playButton svg {
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+}
+
+/* pdf/doc/slides without thumbnail → type-tinted fill + big glyph */
+.typeFill {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.typeFill svg {
+  width: 36px;
+  height: 36px;
+}
+.fillPink {
+  background: var(--tag-pink-bg);
+  color: var(--tag-pink-fg);
+}
+.fillBlue {
+  background: var(--tag-blue-bg);
+  color: var(--tag-blue-fg);
+}
+
+/* designed link-card fallback — centered initial tile + domain + path */
+.linkCard {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-warm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+  text-align: center;
+}
+.linkInitial {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: var(--t-18);
+  font-weight: 800;
+  color: var(--paper);
+  box-shadow: var(--sh-xs);
+  margin-bottom: 4px;
+}
+.linkDomain {
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink-900);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.linkPath {
+  font-size: var(--t-10);
+  color: var(--ink-400);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Card ⋯ menu (portaled, position:fixed at the kebab) ────────────────── */
+.menu {
+  width: 216px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-popover);
+  padding: 4px;
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--r-xs);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-700);
+  min-height: 36px;
+  text-align: left;
+  cursor: pointer;
+  position: relative; /* anchors the ::after hit inflation */
+}
+/* desktop keeps the artboard's 36px visual row; ±4px inflation gives a
+   44px effective hit (36 + 2·4) for the precise mouse pointer */
+.menuItem::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+/* touch devices get a real ≥44px row (CLAUDE.md §4) — and the inflation is
+   dropped there, because stacked rows with overlapping ::after halos would
+   make taps near a boundary ambiguous */
+@media (hover: none) {
+  .menuItem {
+    min-height: 44px;
+  }
+  .menuItem::after {
+    inset: 0;
+  }
+}
+.menuItem:hover {
+  background: var(--hairline);
+  color: var(--ink-900);
+}
+.menuItem svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ink-400);
+  flex: 0 0 auto;
+}
+.menuItemDanger {
+  color: var(--danger);
+}
+.menuItemDanger:hover {
+  color: var(--danger);
+}
+.menuItemDanger svg {
+  color: currentColor;
+}
+.menuSep {
+  height: 1px;
+  background: var(--hairline);
+  margin: 4px 8px;
+}
+.menuLabel {
+  padding: 8px 12px 4px;
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 24px);
+  gap: 8px;
+  padding: 4px 12px 8px;
+}
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-200);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+}
+/* Hit inflation to exactly the 32px grid pitch (24px swatch + 8px gap).
+   DELIBERATE deviation from the ≥44 rule (CLAUDE.md §4 / BUILD_STANDARD §8):
+   on a 32px pitch you cannot have both ≥44px hits and non-overlapping
+   neighbors — the prior −10px (44px hit) overlapped each neighbor by 12px,
+   making every tap between swatches ambiguous, and the artboard's own −8px
+   overlapped too. A zero-ambiguity 32px target beats an overlapping 44px
+   one in a dense color grid. */
+.swatch::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+.swatchOn {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+.swatchSubject {
+  background: var(--c-surface);
+  border-color: var(--c);
+}
+.swatchPaper {
+  background: var(--paper);
+}

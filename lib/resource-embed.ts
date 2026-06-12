@@ -10,7 +10,9 @@
 //
 // Security: only http(s) URLs are accepted; everything else degrades to
 // the link fallback. The renderer never injects HTML — every URL flows
-// through React `src`/`href` props.
+// through React `src`/`href` props, and every rendered `src`/`href` is
+// vetted by `isSafeUrl` (exported below) — the one sink gate shared by
+// the planner surfaces and the Teach board.
 
 import type { LessonResource, ResourceProvider } from "./types";
 
@@ -273,5 +275,164 @@ export function parsedToLegacyType(
     case "website":
     default:
       return "website";
+  }
+}
+
+// ── canEmbedResource — the single embed authority (6.12.26 redesign P5) ───
+//
+// ONE predicate decides iframe/native-embed vs. the designed link-card
+// fallback. Tiles, the Resources panel, and the preview pane all consult
+// this function, so a blank/broken iframe can never render: when this
+// returns false the caller draws the link card — always a safe render.
+//
+// Fail-closed by construction: any uncertainty (missing url, unknown
+// scheme, a throw anywhere inside) yields false.
+
+/** Why a resource cannot embed. `null` means it CAN embed.
+ *  "unsafe-scheme" = javascript:/data:/file:/protocol-relative — never
+ *  framed; "not-embeddable" = a safe URL that only merits a link card. */
+export type EmbedDenialReason = "no-url" | "unsafe-scheme" | "not-embeddable";
+
+/** Same-origin root-relative path (hosted "/api/resources/{id}" streams).
+ *  Rejects protocol-relative ("//host") and backslash tricks ("/\host")
+ *  that browsers normalize to a foreign origin — the same arm `isSafeUrl`
+ *  below applies at the render sinks. */
+const ROOT_RELATIVE = /^\/(?![/\\])/;
+
+/** Raw ASCII tab / newline / CR anywhere in a URL. The WHATWG URL parser
+ *  strips these BEFORE parsing, so a legitimate value never carries them
+ *  (they would arrive %09/%0A/%0D-encoded) — they only aid smuggling:
+ *  "/\t/evil" passes a root-relative test, then normalizes to "//evil"
+ *  (a foreign origin) once the browser strips the tab. */
+const SMUGGLE_CHARS = /[\t\n\r]/;
+
+/**
+ * True for http(s), blob:, and same-origin root-relative ("/…") URLs — the
+ * schemes safe to feed into an <iframe>/<img>/<video>/<audio> `src` or an
+ * <a href>. Root-relative is allowed for hosted files served via
+ * /api/resources/{id}; protocol-relative "//host" is rejected (it resolves
+ * to a foreign origin). Blocks javascript:, data:, and other dangerous
+ * schemes regardless of upstream validation.
+ *
+ * This is THE shared sink gate. Every render surface vets its src/href
+ * through this one function so the rule can't drift per surface: ResourceEmbed,
+ * ResourcePreview, the Resources panel, notecard card-faces, section-resource
+ * posters, the composer, and the Teach board (via lib/board-embed's
+ * `isSafeBoardUrl` re-export). Image sinks call {@link isSafeImgSrc}, which is
+ * this gate plus ONLY the base64 `data:image` schemes an `<img>` may carry.
+ */
+export function isSafeUrl(url: string | null | undefined): url is string {
+  if (!url) return false;
+  if (SMUGGLE_CHARS.test(url)) return false;
+  if (/^(https?|blob):/i.test(url)) return true;
+  return ROOT_RELATIVE.test(url);
+}
+
+/** Base64 `data:image` sources an `<img>`/poster may carry beyond
+ *  {@link isSafeUrl} — raster formats, plus SVG ONLY when base64 (a non-base64
+ *  `data:image/svg+xml,<svg onload=…>` stays rejected). Mirrors
+ *  lib/sanitize-html's SAFE_IMG_SRC data: slice. */
+const DATA_IMAGE_RE =
+  /^data:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml);base64,/i;
+
+/**
+ * The image-sink gate: {@link isSafeUrl} (http(s)/blob/same-origin
+ * root-relative, smuggle-char-rejecting) OR a base64 `data:image`. This is the
+ * single source for every `<img>`/poster `src` check — the Resources panel,
+ * notecard card-faces, section-resource posters, the composer, and the
+ * preview. The smuggle/foreign-origin guard rides in via `isSafeUrl`; the
+ * data: arm is exempt (a `data:` URL never matches the root-relative arm, and
+ * legitimate wrapped base64 may contain newlines).
+ */
+export function isSafeImgSrc(url: string | null | undefined): url is string {
+  if (!url) return false;
+  return isSafeUrl(url) || DATA_IMAGE_RE.test(url);
+}
+
+/** True when the mime type / provider says the row is directly renderable
+ *  media (img / video / audio / pdf viewer) rather than an arbitrary page. */
+function isMediaKind(resource: LessonResource): boolean {
+  const mime = resource.mimeType?.toLowerCase() ?? "";
+  if (
+    mime.startsWith("image/") ||
+    mime.startsWith("video/") ||
+    mime.startsWith("audio/") ||
+    mime === "application/pdf"
+  ) {
+    return true;
+  }
+  const p = resource.provider;
+  return p === "image" || p === "video" || p === "audio" || p === "pdf";
+}
+
+/** Shared classifier behind `canEmbedResource` / `embedDenialReason`. */
+function classifyEmbed(resource: LessonResource): EmbedDenialReason | null {
+  // A notecard / gallery container is not itself embeddable — its gallery
+  // items are evaluated per-item by the gallery renderer.
+  if (resource.type === "notecard") return "not-embeddable";
+
+  // Legacy fixture rows carry no URL — synthetic glyph only, never a frame.
+  if (!resource.url) return "no-url";
+  const url = resource.url.trim();
+  if (!url) return "no-url";
+
+  // Interior tab/newline/CR survives trim() yet is stripped by the browser
+  // pre-parse (see SMUGGLE_CHARS) — never frame it.
+  if (SMUGGLE_CHARS.test(url)) return "unsafe-scheme";
+
+  // Hosted rows stream from our own origin ("/api/resources/{id}", with
+  // `resourceId` set). parseResourceUrl rejects non-http(s) input, so
+  // root-relative URLs are handled HERE, before delegating: the same-origin
+  // stream always embeds when it is real media.
+  if (ROOT_RELATIVE.test(url)) {
+    return isMediaKind(resource) ? null : "not-embeddable";
+  }
+
+  // Session-minted blob: URLs — the teacher's OWN freshly-uploaded file (the
+  // composer mints them via URL.createObjectURL, same-session, same-origin by
+  // construction; a blob: URL cannot point at a foreign document). These
+  // carried full embed trust before the predicate existed — a just-uploaded
+  // PDF rendered in the preview iframe — so they embed when the row is real
+  // media (pdf / image / video / audio), exactly like the hosted root-relative
+  // path above. A blob: row that is NOT media still gets the link card.
+  // javascript:, data:text/html, file:, etc. stay fail-closed below.
+  if (/^blob:/i.test(url)) {
+    return isMediaKind(resource) ? null : "not-embeddable";
+  }
+
+  // Everything else must be http(s) — javascript:, data:, file:, and
+  // protocol-relative URLs never get a frame (§4a review L8: labeled as
+  // a scheme failure, not a host failure, so fallback copy/telemetry
+  // built on this taxonomy stays truthful).
+  if (!SAFE_SCHEME.test(url)) return "unsafe-scheme";
+
+  // Trusted-provider / direct-media taxonomy (youtube, vimeo, the Google
+  // docs family, direct media extensions ⇒ true; generic website ⇒ false).
+  return parseResourceUrl(url).canEmbed ? null : "not-embeddable";
+}
+
+/**
+ * True only when the renderer can draw REAL embedded content for this
+ * resource — an iframe player/preview or a native img/video/audio/pdf —
+ * never a bare link. False ⇒ render the designed link-card fallback.
+ */
+export function canEmbedResource(resource: LessonResource): boolean {
+  try {
+    return classifyEmbed(resource) === null;
+  } catch {
+    // Fail closed — the link card is always a safe render.
+    return false;
+  }
+}
+
+/** The reason `canEmbedResource` said no, for fallback-card copy/telemetry.
+ *  `null` when the resource can embed. */
+export function embedDenialReason(
+  resource: LessonResource,
+): EmbedDenialReason | null {
+  try {
+    return classifyEmbed(resource);
+  } catch {
+    return "not-embeddable";
   }
 }

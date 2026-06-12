@@ -102,8 +102,7 @@
 }
 
 .actionBtn:focus-visible,
-.closeBtn:focus-visible,
-.openBtn:focus-visible {
+.closeBtn:focus-visible {
   outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
@@ -183,75 +182,10 @@
   width: 100%;
 }
 
-/* ── Link / website fallback card ───────────────────────────────────────── */
-
-.linkCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 10px;
-  max-width: 520px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--paper);
-}
-
-.linkThumb {
-  display: block;
-  max-width: 100%;
-  max-height: 240px;
-  object-fit: cover;
-  border-radius: var(--r-sm);
-}
-
-.linkThumbFallback {
-  display: grid;
-  place-items: center;
-  width: 72px;
-  height: 72px;
-  border-radius: var(--r-sm);
-  background: var(--surface-warm);
-  color: var(--muted);
-}
-
-.linkTitle {
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--ink-900);
-}
-
-.linkDesc {
-  font-size: 14px;
-  line-height: 1.45;
-  color: var(--body);
-}
-
-.linkDomain {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.openBtn {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  margin-top: 4px;
-  padding: 10px 18px;
-  border-radius: var(--r-sm);
-  background: var(--brand-500);
-  color: #fff;
-  font-weight: 600;
-  font-size: 14px;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 120ms ease;
-}
-
-.openBtn:hover {
-  background: var(--brand-600);
-}
+/* ── Link / website fallback ────────────────────────────────────────────────
+   The designed link card itself lives in ResourceEmbed.module.css
+   (ResourceLinkCard, variant="preview") — the P5 fallback is one shared
+   render across the tiles and this modal. */
 
 /* ── No-preview fallback ─────────────────────────────────────────────────── */
 

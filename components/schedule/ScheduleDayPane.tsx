@@ -22,26 +22,32 @@
 //     linked lesson).
 //   • Events — placeholder empty state until a DayEvent fixture lands.
 //
-// Now resolution:
-//   The pane calls useNowTick() and computes `nowMin` once per render. Each
-//   ScheduleRow receives `isNow = (day === todayDayIndex()) && minute is in
-//   [block.startMin, block.endMin]`. The hook itself is enabled only for the
-//   today-day; off-today panes don't burn an interval.
+// Now resolution (review finding M3 — real clock, no mocks):
+//   "Is this pane's day today?" derives from the REAL clock + the
+//   CONFIGURED school week (lib/now-anchor's todayColumnIndex), SSR-safe
+//   per the WeeklyGrid useTodayColumnIndex house pattern: null initial
+//   state (no active-now tint in the server HTML), real value in a
+//   post-mount effect, 60s re-check for midnight. The live minute comes
+//   from useNowTick (30s) + minuteOfDay — enabled ONLY for today's pane,
+//   so off-today panes don't burn an interval. Each ScheduleRow receives
+//   `isNow = today && minute in [block.startMin, block.endMin)`.
+//   Off-school-day → todayIdx null → no row tint anywhere.
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Lesson } from "@/lib/types";
 import {
   type TimelineBlock,
   getDayBlocks,
   isMinuteWithinDay,
-  nowMinuteMock,
-  todayDayIndex,
+  minuteOfDay,
 } from "@/lib/schedule-data";
 import { WEEK_DAYS } from "@/lib/mock";
 import { dateForWeekDay } from "@/lib/mock/calendar";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { useNowTick } from "@/lib/use-now-tick";
+import { useSchoolWeek } from "@/lib/use-school-week";
+import { todayColumnIndex } from "@/lib/now-anchor";
 import { EmptyState, Tooltip } from "@/components/ui";
 import { ScheduleRow } from "./ScheduleRow";
 import { ScheduleTabs, type ScheduleTab } from "./ScheduleTabs";
@@ -82,15 +88,30 @@ export function ScheduleDayPane({
 }: ScheduleDayPaneProps): ReactNode {
   const { week } = useAppState();
   const { getLesson } = usePlanner();
+  const { days: schoolWeekDays } = useSchoolWeek();
 
   const [tab, setTab] = useState<ScheduleTab>("bell");
 
-  const isToday = day === todayDayIndex();
+  // ── Today resolution — SSR-safe house pattern (findings M3/M4) ──────────
+  // Initial null → the server HTML carries no active-now tint; the real
+  // clock answer lands post-mount. 60s re-check migrates at midnight.
+  const [todayIdx, setTodayIdx] = useState<number | null>(null);
+  useEffect(() => {
+    const sync = (): void => {
+      setTodayIdx(todayColumnIndex(new Date(), schoolWeekDays));
+    };
+    sync();
+    const id = window.setInterval(sync, 60_000);
+    return () => window.clearInterval(id);
+  }, [schoolWeekDays]);
+  const isToday = todayIdx !== null && todayIdx === day;
+
   // Now-tick is only enabled for today's pane — every other day's pane has
-  // no live state and shouldn't run an interval.
-  // TODO: production swaps `nowMinuteMock()` for `minuteOfDay(now)`.
-  useNowTick({ enabled: isToday });
-  const nowMin = nowMinuteMock();
+  // no live state and shouldn't run an interval. `isToday` is false until
+  // the post-mount effect above runs, so `nowMin` never influences the
+  // server HTML or the hydration paint.
+  const now = useNowTick({ enabled: isToday });
+  const nowMin = minuteOfDay(now);
   const nowVisible = isToday && isMinuteWithinDay(nowMin);
 
   const blocks = getDayBlocks(day);

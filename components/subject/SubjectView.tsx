@@ -38,6 +38,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui";
 import type { Lesson, LessonStatus, SubjectId } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
 import { useLabels, pluralize } from "@/lib/labels";
@@ -46,6 +47,8 @@ import { InstanceRenameLabel } from "@/components/rename";
 import { useSubjectColor } from "@/lib/palette";
 import { CURRENT_WEEK, SUBJECT_BY_ID, WEEK_DAYS } from "@/lib/mock";
 import { usePlanner } from "@/lib/planner-store";
+import { buildSubjectLink, parseUnitHash } from "@/lib/deep-links";
+import { useCopyLink } from "@/lib/use-copy-link";
 import { StatStrip } from "./StatStrip";
 import styles from "./SubjectWorkspace.module.css";
 
@@ -57,7 +60,7 @@ type IconName =
   | "book" | "grid" | "pencil" | "list" | "sparkle" | "flask" | "globe"
   | "heart" | "calendar" | "roadmap" | "chD" | "chL" | "chR" | "x" | "plus"
   | "check" | "clock" | "more" | "chart" | "target" | "clipboard" | "edit"
-  | "standards" | "folder" | "assess" | "curriculum"; // prettier-ignore
+  | "standards" | "folder" | "assess" | "curriculum" | "link"; // prettier-ignore
 
 const ICON_PATHS: Record<IconName, ReactNode> = {
   book: <><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z" /><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z" /></>, // prettier-ignore
@@ -86,6 +89,7 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
   folder: <path d="M4 6a2 2 0 0 1 2-2h5l2 2h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />, // prettier-ignore
   assess: <><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></>, // prettier-ignore
   curriculum: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>, // prettier-ignore
+  link: <><path d="M10.2 13.8 13.8 10.2" /><path d="m11 6.5 1.8-1.8a3.2 3.2 0 0 1 4.5 4.5L15.5 11" /><path d="m13 17.5-1.8 1.8a3.2 3.2 0 0 1-4.5-4.5L8.5 13" /></>, // prettier-ignore
 };
 
 function Icon({ name, sw = 2 }: { name: IconName; sw?: number }): ReactNode {
@@ -152,6 +156,19 @@ function unitTopic(name: string): string {
 /** Approximate month index (0 = Aug) for a week number — 4 weeks ≈ 1 month. */
 function weekToMonthIndex(week: number): number {
   return Math.min(MONTHS.length - 1, Math.floor((week - 1) / 4));
+}
+
+/** scrollIntoView behavior for the unit-pick scrolls. Programmatic smooth
+ *  scrolling is NOT tamed by `prefers-reduced-motion` on its own — the
+ *  media query governs CSS animation, while `scrollIntoView({ behavior:
+ *  "smooth" })` animates regardless — so honoring CLAUDE.md §4's
+ *  reduced-motion rule means asking matchMedia ourselves and downgrading
+ *  to an instant jump (§4a review L5). Client-only callers (effects /
+ *  click handlers); never invoked during SSR. */
+function unitScrollBehavior(): ScrollBehavior {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? "auto"
+    : "smooth";
 }
 
 /** Map a lesson status onto the prototype's three-state vocabulary. */
@@ -264,11 +281,16 @@ function SubjectRow({
 interface SubjectPaneProps {
   subjectId: SubjectId;
   onPickSubject: (id: SubjectId) => void;
+  /** 1-based unit index from a `#unit-N` deep-link fragment (UX roadmap
+   *  item 07), or null when the URL carries no hash. Out-of-range values
+   *  are ignored — right view, default focus. */
+  initialUnitIndex?: number | null;
 }
 
 function SubjectPane({
   subjectId,
   onPickSubject,
+  initialUnitIndex = null,
 }: SubjectPaneProps): ReactNode {
   const color = useSubjectColor(subjectId);
   const {
@@ -401,6 +423,40 @@ function SubjectPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeUnitId, activeWeek]);
 
+  // ── `#unit-N` deep link — activate + container-scroll the unit ────────
+  // Runs on mount (the pane re-mounts keyed by subject) and again if the
+  // root consumes the hash after this pane mounted. Activating the unit
+  // opens its weeks; the rAF-deferred scroll brings the Week-breakdown
+  // card — the unit's section — into view once layout settles, using the
+  // same scrollIntoView({ block: "nearest" }) idiom pickUnit uses.
+  useEffect(() => {
+    if (initialUnitIndex == null) return;
+    const target = units[initialUnitIndex - 1];
+    if (!target) return;
+    setActiveUnitId(target.id);
+    const raf = requestAnimationFrame(() => {
+      weekCardRef.current?.scrollIntoView({
+        behavior: unitScrollBehavior(),
+        block: "nearest",
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialUnitIndex]);
+
+  // ── Unit copy-link (UX roadmap item 07) ───────────────────────────────
+  // Copies `/subject/<id>#unit-N` (absolute) for the ACTIVE unit — the
+  // affordance lives in the Week-breakdown header, so any unit's link is
+  // ≤2 clicks away: pick the unit, then copy. Confirmation via the shared
+  // "Link copied" toast.
+  const copyLink = useCopyLink();
+  function handleCopyUnitLink(): void {
+    if (!activeUnit) return;
+    void copyLink(
+      buildSubjectLink({ subject: subjectId, unit: activeUnit.index + 1 }),
+    );
+  }
+
   const selectedLesson =
     days.find((l) => l.id === selectedId) ?? days[0] ?? null;
   const selectedIndex = selectedLesson
@@ -412,7 +468,10 @@ function SubjectPane({
     setActiveUnitId(unitId);
     // week/day reset via the validity effects above. Bring the Week-breakdown
     // card into view so the unit's weeks are visibly "opened".
-    weekCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); // prettier-ignore
+    weekCardRef.current?.scrollIntoView({
+      behavior: unitScrollBehavior(),
+      block: "nearest",
+    });
     // On narrow viewports the Subjects panel is a slide-over — close it after a
     // unit pick so the freshly-opened weeks aren't hidden behind it.
     if (typeof window !== "undefined" && window.innerWidth <= 1000) {
@@ -585,6 +644,10 @@ function SubjectPane({
               {units.map((u) => (
                 <button
                   type="button"
+                  // Stable `#unit-N` anchor (UX roadmap item 07) — the
+                  // 1-based id the buildSubjectLink fragment targets. Only
+                  // one SubjectPane mounts at a time, so ids stay unique.
+                  id={`unit-${u.index + 1}`}
                   className={`${styles.uleg} ${u.id === activeUnitId ? styles.ulegOn : ""}`}
                   key={u.id}
                   onClick={() => pickUnit(u.id)}
@@ -626,6 +689,24 @@ function SubjectPane({
                   labels.unit
                 )}
               </h3>
+              {/* Copy-link — every unit's shareable URL in ≤2 clicks (pick
+                  the unit, then copy). The ui <Button> primitive supplies
+                  the Tooltip wiring (styled bubble + aria-describedby +
+                  native-title mirror for touch long-press) and the ≥44px
+                  hit-area inflation on phone/tablet (CLAUDE.md §4 — §4a
+                  review M5); .copylink keeps the view-local 34px visual. */}
+              {activeUnit && (
+                <Button
+                  variant="icon"
+                  size="sm"
+                  className={styles.copylink}
+                  onClick={handleCopyUnitLink}
+                  iconAriaLabel={`Copy link to ${unitTag(activeUnit.index, labels.unit)}`}
+                  tooltip={`Copy a shareable link to ${unitTag(activeUnit.index, labels.unit)} — teammates who open it land on this ${labels.unit.toLowerCase()}`}
+                >
+                  <Icon name="link" />
+                </Button>
+              )}
             </div>
             {weeks.length === 0 ? (
               <div className={styles.empty}>
@@ -1042,6 +1123,21 @@ export function SubjectView({ initialSubject }: SubjectViewProps): ReactNode {
   const { subjectView, setSubjectView } = useAppState();
   const router = useRouter();
 
+  // ── Deep link — `/subject/<id>#unit-N` (UX roadmap item 07) ────────────
+  // The fragment never reaches the server, so it is read here once on
+  // mount via lib/deep-links' parseUnitHash and handed to the pane as a
+  // 1-based unit index. State (not a ref) because the pane may already be
+  // mounted when the hash resolves AND the pane re-mounts (keyed) when the
+  // slug-sync effect lands on the linked subject — both paths must see the
+  // value. Cleared on a manual subject pick so switching subjects later
+  // never re-applies a stale hash.
+  const [hashUnit, setHashUnit] = useState<number | null>(null);
+
+  useEffect(() => {
+    const unit = parseUnitHash(window.location.hash);
+    if (unit !== null) setHashUnit(unit);
+  }, []);
+
   // Sync app-state when a slug param is passed in (from the dynamic route).
   useEffect(() => {
     if (initialSubject && initialSubject !== subjectView) {
@@ -1053,6 +1149,7 @@ export function SubjectView({ initialSubject }: SubjectViewProps): ReactNode {
   function handleSubjectSelect(id: SubjectId): void {
     router.push(`/subject/${id}`);
     setSubjectView(id);
+    setHashUnit(null);
   }
 
   // Re-mount the pane on subject change so the unit/week/day selection state
@@ -1062,6 +1159,7 @@ export function SubjectView({ initialSubject }: SubjectViewProps): ReactNode {
       key={subjectView}
       subjectId={subjectView}
       onPickSubject={handleSubjectSelect}
+      initialUnitIndex={hashUnit}
     />
   );
 }

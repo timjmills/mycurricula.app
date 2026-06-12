@@ -24,8 +24,11 @@ import {
   boardCanEmbed,
   boardEffectiveKind,
   boardSandboxFor,
+  isSafeBoardUrl,
   resolveBoardSrc,
 } from "@/lib/board-embed";
+import { isNotecard, notecardPoster } from "@/lib/notecards";
+import { toTeachResource } from "@/lib/teach/toTeachResource";
 import type { TeachResource } from "@/lib/types";
 import styles from "./BoardCanvasResource.module.css";
 
@@ -49,32 +52,58 @@ export function BoardCanvasResource({
   resource,
   className,
 }: BoardCanvasResourceProps): ReactNode {
+  // Notecard on the board (board-inspector fix): a `type:"notecard"` row has
+  // no top-level url — only a `gallery` (poster + flip-through media) and/or a
+  // rich-text `body`. Without this branch it falls straight to LinkFallback and
+  // loses everything. SMALLEST fix: render the notecard's POSTER (gallery[0])
+  // as the board tile face by routing the pipeline below through the poster as
+  // a TeachResource. The card stays "openable large" because this IS the large
+  // canvas; the deferred deeper work is the inline gallery flip-through + the
+  // split media|notes layout (the NotecardFullscreen / ResourcePreview view),
+  // which needs a trigger wired from TeachWorkspace and lives outside this file.
+  // A notes-only notecard (no poster) keeps the LinkFallback "can't display"
+  // card. We never recurse: a poster is flat media by the gallery contract, but
+  // we still guard against a poster that is itself a notecard.
+  const poster = isNotecard(resource) ? notecardPoster(resource) : undefined;
+  const renderResource: TeachResource = useMemo(
+    () => (poster && !isNotecard(poster) ? toTeachResource(poster) : resource),
+    [poster, resource],
+  );
+
   const parsed: ParsedResource | null = useMemo(
-    () => (resource.url ? parseResourceUrl(resource.url) : null),
-    [resource.url],
+    () => (renderResource.url ? parseResourceUrl(renderResource.url) : null),
+    [renderResource.url],
   );
   const kind = useMemo(
-    () => boardEffectiveKind(resource, parsed),
-    [resource, parsed],
+    () => boardEffectiveKind(renderResource, parsed),
+    [renderResource, parsed],
   );
-  const src = useMemo(() => resolveBoardSrc(resource), [resource]);
-  const canEmbed = boardCanEmbed(resource, parsed, kind);
+  const src = useMemo(() => resolveBoardSrc(renderResource), [renderResource]);
+  const canEmbed = boardCanEmbed(renderResource, parsed, kind);
+  // P5 sink gate (board-inspector fix): every media element on the board must
+  // re-vet its src through the same scheme rule the planner surfaces use
+  // (isSafeBoardUrl IS lib/resource-embed's isSafeUrl, re-exported — one
+  // implementation, no drift). resolveBoardSrc is allowed to return any stored
+  // url; a protocol-relative / data: / javascript: value must never reach an
+  // <iframe>/<img>/<video>/<audio> src — it demotes to the LinkFallback
+  // (whose own href is gated below) instead.
+  const safeSrc = isSafeBoardUrl(src) ? src : null;
 
   return (
     <div
       className={[styles.frame, className].filter(Boolean).join(" ")}
       title={`Resource: ${resource.label}`}
     >
-      {!src || !canEmbed ? (
+      {!safeSrc || !canEmbed ? (
         <LinkFallback resource={resource} />
       ) : kind === "embed" || kind === "pdf" ? (
-        <IframeView resource={resource} src={src} />
+        <IframeView resource={renderResource} src={safeSrc} />
       ) : kind === "image" ? (
-        <ImageView resource={resource} src={src} />
+        <ImageView resource={renderResource} src={safeSrc} />
       ) : kind === "video" ? (
-        <VideoView resource={resource} src={src} />
+        <VideoView resource={renderResource} src={safeSrc} />
       ) : kind === "audio" ? (
-        <AudioView resource={resource} src={src} />
+        <AudioView resource={renderResource} src={safeSrc} />
       ) : (
         <LinkFallback resource={resource} />
       )}
@@ -129,6 +158,11 @@ function IframeView({
 }): ReactNode {
   const { loaded, timedOut, markLoaded } = useLoadState(src);
   const sandbox = boardSandboxFor(resource.provider);
+  // Defense-in-depth (mirrors ResourceEmbed's IframeEmbed): the parent's
+  // safeSrc gate means an unsafe scheme can't normally reach here, but a
+  // crafted/imported row must never get a script-capable frame even if a
+  // future caller wires this view directly. about:blank renders inert.
+  const safeSrc = isSafeBoardUrl(src) ? src : "about:blank";
 
   return (
     <div className={styles.fill}>
@@ -141,7 +175,7 @@ function IframeView({
         />
       ) : null}
       <iframe
-        src={src}
+        src={safeSrc}
         title={resource.label}
         className={styles.iframe}
         data-loaded={loaded ? "true" : undefined}
@@ -235,7 +269,10 @@ function LinkFallback({
   heading?: string;
   body?: string;
 }): ReactNode {
-  const href = resource.url ?? undefined;
+  // Gate the Open-in-new-tab href through the same scheme rule as every other
+  // sink (matches ResourceLinkCard's href gate): an unsafe scheme yields no
+  // button rather than a navigable javascript:/data: link.
+  const href = isSafeBoardUrl(resource.url) ? resource.url : undefined;
   return (
     <div className={styles.fallback}>
       <EmptyState

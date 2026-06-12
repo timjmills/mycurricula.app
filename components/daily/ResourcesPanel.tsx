@@ -1,69 +1,80 @@
 "use client";
 
-// ResourcesPanel.tsx — the Daily view right-rail "Resources" panel.
+// ResourcesPanel.tsx — the redesigned Resources panel (Daily/Weekly right rail).
 //
-// A WHITE card at the top of the right rail that gives a teacher a quick,
-// card-wall glance at the resources tied to the lesson they have open.
-// Two presentation modes share a single filtered set:
+// 6.12.26 Resource & Notecard Redesign §1
+// (Documents/Claude Design/6.12.26 …/resource_redesign/surface-panel.jsx, with
+// rn.css as the authoritative measurements). The panel is a white card:
 //
-//   • grid (default) — a 2-column responsive grid of subject-tinted tiles.
-//     Each tile reuses <ResourceTile> from "@/components/lesson-flow" — the
-//     same component the LessonFlow editor renders — so the visual
-//     vocabulary stays one shared family across surfaces. We layer a small
-//     "···" overflow menu button on top of each tile via a thin wrapper;
-//     ResourceTile itself is NOT modified.
+//   • Header — "Resources" + count chip (the FULL deduped count, stable
+//     across tabs) + add button (opens the composer) + a list/grid segmented
+//     control + collapse chevron (or an × in drawer presentation). All icon
+//     buttons are 32px with always-on ≥44px hit inflation (rn-44).
+//   • Pill tabs — All · Files · Links · Media · Notes, each with a per-tab
+//     count. Notecards roll up in All AND Notes; every other tab excludes
+//     them. Files = pdf/doc/slides/uploads · Links = website/link ·
+//     Media = image/youtube/video/audio.
+//   • "New notecard" — a first-class dashed entry row (P6) directly under
+//     the tabs; opens the composer in notecard mode routed to this lesson.
+//   • Grid mode — a 2-column tile grid (74px thumb + footer). A notecard
+//     renders as a TILE FACE with the same footprint as a plain tile (P3):
+//     honey-50 thumb (poster when one exists), white NOTE glyph pill
+//     bottom-left, dark gallery-count pill bottom-right.
+//   • List mode — 44px rows: 30px type-tinted icon tile, label, type tag,
+//     hover-revealed ⋯. The notecard row carries the honey wash + count.
+//   • Overflow menu — Open · Enlarge · Add/edit note · ─ · Remove from
+//     lesson (danger, `required` tooltip). 188px, --shadow-popover,
+//     keyboard-operable (mirrors ResourceCardFace's CardMenu pattern).
 //
-//   • list — a compact stack of inline rows: type icon + label + small
-//     type tag, useful when the rail is narrow or the resource set is long.
+// ── Dedup (P1 — sections are canonical) ──────────────────────────────────
+// The rendered list is `dedupeLessonResources({ sectionResources,
+// lessonResources })` from lib/resources-dedup: section resources first, in
+// section order, then lesson-level rows minus any whose CONTENT IDENTITY a
+// section already owns. Each rendered entry keeps its PROVENANCE (lesson +
+// section, or whole-lesson index) so edit-note / remove route back to the
+// exact store row. Week mode applies the same merge across every lesson in
+// the week with one shared identity set.
 //
-// ── Resource aggregation (the load-bearing bit) ─────────────────────────
-// The panel shows the lesson's COMBINED resources: the lesson-level array
-// (`lesson.resources`) PLUS every section's per-section resources, sourced
-// from the planner store via `usePlanner().getSections(lessonId)`. The
-// union deduplicates on resource id so the same item authored once in a
-// section's "+" popup appears here exactly once. This means adding a
-// resource inside a SECTION of the lesson flow immediately surfaces here
-// too — there is no duplicate state, only a derived view.
+// ── Thumbnails (P5 — never a broken frame) ───────────────────────────────
+// Every thumb renders through a fallback chain: a safe poster/thumbnail
+// <img> (onError → demote) → the type-tinted glyph fill (rn.css th-*) → the
+// designed link-card mini-face built from the URL/label. NEVER an iframe
+// inside a tile. Legacy fixture rows with no url render the glyph or the
+// label-derived link face — the old synthetic-URL fabrication is gone.
 //
-// The lesson-level resources don't carry a stable id (the type is just
-// `{ type, label }`), so we synthesize one — `lesson:<lessonId>:res:<i>`
-// — purely for React keys and the ResourceTile contract (which expects a
-// SectionResource shape with `id`). The resources sourced from sections
-// keep their real `id` so a section-edit elsewhere preserves React
-// identity here.
-//
-// ── Category tabs ───────────────────────────────────────────────────────
-// "All" + three roll-up categories: Slides, Handouts (pdf / doc / image),
-// Tools (website / link / youtube). The filter applies to the combined
-// list; the head count chip reports the visible total relative to the
-// full combined total so the teacher never sees a count that disagrees
-// with the tab they picked.
-//
-// ── Read-only for now ────────────────────────────────────────────────────
-// Editing resources lives inside the LessonFlow section editor on the
-// detail pane. This rail panel is glance-and-open; the "···" overflow
-// button is a stub for Phase 1A — a click-target visible in the design
-// without a backing menu yet.
-//
-// ── Chrome rules (CLAUDE.md §4) ──────────────────────────────────────────
-//   • Tailwind = layout only. All color / radii / type sizes via tokens.
-//   • Subject color is carried only through the tile artwork (.cp-subj
-//     cascade, supplied by the parent rail wrapper). The panel chrome
-//     itself stays neutral.
-//   • The panel container is a white CARD: var(--paper) fill, 1px
-//     var(--ink-150) hairline border, var(--shadow-card) lift.
+// ── Chrome rules (CLAUDE.md §4 / BUILD_STANDARD §3) ─────────────────────
+// Tailwind = layout only; all color / radii / type via tokens (zero hex —
+// the youtube tint uses color-mix over var(--youtube) per rn.css). The panel
+// chrome stays neutral; subject color arrives only via the parent rail's
+// cp-subj cascade where tiles want it.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DragEvent as ReactDragEvent, ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type {
+  DragEvent as ReactDragEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  ReactNode,
+  RefObject,
+} from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Lesson, LessonResource } from "@/lib/types";
 import type { SectionResource } from "@/lib/lesson-flow";
-import { ResourceTile } from "@/components/lesson-flow";
 import { ResourcePreview } from "@/components/resources";
-import { NotecardCard } from "@/components/notecards";
-import { hasNotes, isNotecard } from "@/lib/notecards";
+import { galleryCount, isNotecard, notecardPoster } from "@/lib/notecards";
+import { isSafeImgSrc } from "@/lib/resource-embed";
+import { dedupeLessonResources, resourceIdentity } from "@/lib/resources-dedup";
 import { usePlanner } from "@/lib/planner-store";
+import { useAppState } from "@/lib/app-state";
 import { lessonResourceRefs } from "@/lib/lesson-resources";
+import { useUndoToastOptional } from "@/lib/undo-toast";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
 import { Button, Tooltip } from "@/components/ui";
 import type { PanelDragHandleProps } from "./RightRail";
@@ -75,755 +86,1005 @@ import {
 } from "./ResourceComposer";
 import styles from "./ResourcesPanel.module.css";
 
-/** True when a resource should render as a notecard (a flip gallery +
- *  expandable notes) rather than a plain tile: a dedicated notecard, anything
- *  carrying a gallery, or anything carrying rich notes. Single-media resources
- *  with no gallery and no notes stay plain tiles (unchanged). */
-function isNotecardish(resource: LessonResource): boolean {
-  return (
-    isNotecard(resource) ||
-    (resource.gallery?.length ?? 0) > 0 ||
-    hasNotes(resource)
-  );
-}
+// ── Icons — Lucide-family 24×24, ~2px stroke (rn-shared.jsx vocabulary) ────
 
-/** A resource paired with the PROVENANCE needed to route an "add/edit note"
- *  patch back to its row: the lesson + section it lives on, or a whole-lesson
- *  array index when it has no section. */
-interface AggregatedResource {
-  resource: SectionResource;
-  lessonId: string;
-  /** Owning section id, or null for a whole-lesson (Lesson.resources) entry. */
-  sectionId: string | null;
-  /** Index into Lesson.resources for a whole-lesson entry (sectionId === null). */
-  lessonResourceIndex?: number;
-}
+const STROKE = {
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
 
-// ── Grip + chevron + back icons (rail-driven controls) ──────────────────
-// Rendered only when ResourcesPanel is mounted inside <RightRail>, which
-// supplies the dragHandleProps + onToggleCollapsed bundle. The grip is the
-// SOLE drag activator for the panel — clicking anywhere else on the
-// header (or the body) never starts a reorder.
-
-// Back-chevron for the "Back to week" affordance — left-pointing ‹ arrow.
-function BackIcon(): ReactNode {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
-  );
-}
-
-function GripVerticalIcon(): ReactNode {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <circle cx="9" cy="5" r="1.5" />
-      <circle cx="15" cy="5" r="1.5" />
-      <circle cx="9" cy="12" r="1.5" />
-      <circle cx="15" cy="12" r="1.5" />
-      <circle cx="9" cy="19" r="1.5" />
-      <circle cx="15" cy="19" r="1.5" />
-    </svg>
-  );
-}
-
-// Small plus icon used in the panel header's "Add resource" button.
-// Mirrors the stroked Lucide-style vocabulary of the other inline icons —
-// kept tight at 14px so it reads alongside the grip + count chip.
 function PlusIcon(): ReactNode {
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
+    <svg {...STROKE} strokeWidth={2.4}>
+      <path d="M12 5v14M5 12h14" />
     </svg>
   );
 }
 
-function ChevronToggleIcon({ collapsed }: { collapsed: boolean }): ReactNode {
-  // A single chevron that flips direction by CSS rotation — collapsed
-  // points right (▶), expanded points down (▼). aria-hidden so the
-  // surrounding button label carries semantics.
+function DotsIcon(): ReactNode {
   return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{
-        transition: "transform 0.15s ease-out",
-        transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
-      }}
-    >
-      <polyline points="6 9 12 15 18 9" />
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
     </svg>
   );
 }
-
-// ── Category tabs ────────────────────────────────────────────────────────
-
-type ResourceCategory = "all" | "slides" | "handouts" | "tools";
-
-interface CategoryTab {
-  /** Stable id used as the active key + React key. */
-  key: ResourceCategory;
-  /** Visible tab label. */
-  label: string;
-  /**
-   * Resource types this tab includes. "all" passes every type — its
-   * `types` is empty to mean "no filter applied". A small accept fn keeps
-   * the predicate one place.
-   */
-  types: readonly LessonResource["type"][];
-}
-
-const TABS: readonly CategoryTab[] = [
-  { key: "all", label: "All", types: [] },
-  { key: "slides", label: "Slides", types: ["slides"] },
-  // "Handouts" rolls up the printable / saved artifacts — what a teacher
-  // physically hands out or pulls onto the projector.
-  { key: "handouts", label: "Handouts", types: ["pdf", "doc", "image"] },
-  // "Tools" rolls up the external interactive surfaces — websites, deep
-  // links, and embedded video.
-  { key: "tools", label: "Tools", types: ["website", "link", "youtube"] },
-] as const;
-
-/** Does this resource pass the active category's filter? */
-function acceptByCategory(
-  resource: LessonResource,
-  category: ResourceCategory,
-): boolean {
-  if (category === "all") return true;
-  const tab = TABS.find((t) => t.key === category);
-  if (!tab) return true;
-  return tab.types.includes(resource.type);
-}
-
-// ── Grid/list view toggle ────────────────────────────────────────────────
-
-type ViewMode = "grid" | "list";
-
-// Small inline icons for the toggle. Same Lucide-style outline idiom as
-// the rest of the repo so the visual vocabulary stays consistent.
 
 function GridIcon(): ReactNode {
   return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
+    <svg {...STROKE}>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
     </svg>
   );
 }
 
 function ListIcon(): ReactNode {
   return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="8" y1="6" x2="20" y2="6" />
-      <line x1="8" y1="12" x2="20" y2="12" />
-      <line x1="8" y1="18" x2="20" y2="18" />
-      <line x1="4" y1="6" x2="4.01" y2="6" />
-      <line x1="4" y1="12" x2="4.01" y2="12" />
-      <line x1="4" y1="18" x2="4.01" y2="18" />
+    <svg {...STROKE}>
+      <path d="M8 6h13M8 12h13M8 18h13" />
+      <circle cx="4" cy="6" r="1" fill="currentColor" />
+      <circle cx="4" cy="12" r="1" fill="currentColor" />
+      <circle cx="4" cy="18" r="1" fill="currentColor" />
     </svg>
   );
 }
 
-// ── Resource list row (two-line, "quick access" style) ──────────────────
-// In list mode each resource renders as a wide button row that mirrors
-// Image 17 ("Resource quick access"):
-//   • a 32×32 pastel SQUARE chip on the left, carrying the same per-type
-//     pastel as the grid tiles (so the two modes feel paired);
-//   • a two-line text block — bold label on line 1, small ink-500 URL
-//     preview on line 2;
-//   • a small COLORED TYPE TAG pill on the right (uppercase short label,
-//     stronger pastel fill, deeper text).
-//
-// The row is a button so keyboard navigation reaches every resource. Click
-// opens the resource link in a new tab. Since these are synthetic Phase-1A
-// fixtures, the URLs are derived plausibly from the type via `synthUrl()`
-// (see below) — `window.open` is still called so the affordance is real
-// and the design reads as complete; a real backend will swap the derived
-// URL for the resource's stored href without changing this row.
-
-// ── Per-type tag mapping ────────────────────────────────────────────────
-// Single source of truth for the list view's left chip + right pill:
-//   • `label` — uppercase short tag rendered in the right-side pill.
-//   • `tagClass` — CSS-module class on .resourceRow that drives the
-//     pastel pair for the LEFT chip AND the RIGHT pill (defined in
-//     ResourcesPanel.module.css; mirrors the resource-tile per-type tints
-//     so the two surfaces share a visual vocabulary).
-//
-// "Video"/youtube is mapped to heliotrope rather than --hl-violet because
-// the heliotrope token is actually purple (#c977ff) and reads as "video"
-// the way YouTube's brand red already lives on the grid frame; --hl-violet
-// is a hot-pink and would clash with the document tag.
-
-interface TypeTag {
-  /** Uppercase short label rendered in the right-side pill. */
-  label: string;
-  /** CSS-module modifier class added to the .resourceRow root. */
-  tagClass: string;
-}
-
-const TYPE_TAGS: Record<LessonResource["type"], TypeTag> = {
-  slides: { label: "PPT", tagClass: "rowSlides" },
-  pdf: { label: "PDF", tagClass: "rowPdf" },
-  doc: { label: "DOCX", tagClass: "rowDoc" },
-  image: { label: "IMG", tagClass: "rowImage" },
-  youtube: { label: "VIDEO", tagClass: "rowVideo" },
-  website: { label: "WEB", tagClass: "rowWeb" },
-  link: { label: "LINK", tagClass: "rowLink" },
-  notecard: { label: "NOTE", tagClass: "rowLink" },
-};
-
-// ── Synthetic URL preview ────────────────────────────────────────────────
-// Resources don't carry a stored URL yet (Phase 1A is frontend-only), so
-// the list view fabricates a plausible-looking URL string per type — the
-// same domain pattern a teacher would see if the data were real. Helps the
-// row read like Image 17's "Resource quick access" without lying about
-// data shape: the second line is clearly a preview, not a live link.
-function synthUrl(type: LessonResource["type"], label: string): string {
-  // Best-effort slug from the resource label — lowercase, hyphenated,
-  // truncated. Falls back to a generic stem so an empty label still
-  // produces a believable URL fragment.
-  const slug =
-    label
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 28) || "resource";
-  switch (type) {
-    case "slides":
-      return `docs.google.com/presentation/d/${slug}`;
-    case "pdf":
-    case "doc":
-    case "image":
-      return `drive.google.com/file/d/${slug}`;
-    case "youtube":
-      return `youtube.com/watch?v=${slug}`;
-    case "website":
-    case "link":
-    default:
-      // If the label itself already looks like a URL, surface it; else
-      // emit a neutral em-dash so the line still reads as "no URL yet"
-      // rather than fabricating a domain we can't justify.
-      if (/^https?:\/\//i.test(label) || /^[\w.-]+\.[a-z]{2,}/i.test(label)) {
-        return label
-          .replace(/^https?:\/\//i, "")
-          .replace(/^www\./i, "")
-          .slice(0, 48);
-      }
-      return "—";
-  }
-}
-
-/** Pretty, human-readable form of a REAL resource url for the list row's
- *  second line. Blob URLs (session-only uploads) read as "Uploaded file"
- *  rather than an opaque `blob:` string. */
-function prettyUrl(raw: string): string {
-  if (raw.startsWith("blob:")) return "Uploaded file";
-  try {
-    const u = new URL(raw);
-    const host = u.hostname.replace(/^www\./, "");
-    return (host + u.pathname).replace(/\/$/, "").slice(0, 48) || host;
-  } catch {
-    return raw
-      .replace(/^https?:\/\//i, "")
-      .replace(/^www\./i, "")
-      .slice(0, 48);
-  }
-}
-
-// ── Paperclip glyph for the "Resource quick access" list header ─────────
-function PaperclipIcon(): ReactNode {
+function ChevronToggleIcon({ collapsed }: { collapsed: boolean }): ReactNode {
   return (
     <svg
-      width="11"
-      height="11"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
+      {...STROKE}
+      strokeWidth={2.2}
+      style={{ transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)" }}
     >
-      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.48-8.48l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+      <path d="M6 9l6 6 6-6" />
     </svg>
   );
 }
 
-function ResourceTypeIcon({
+function CloseIcon(): ReactNode {
+  return (
+    <svg {...STROKE} strokeWidth={2.4}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+function BackIcon(): ReactNode {
+  return (
+    <svg {...STROKE} strokeWidth={2.4}>
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
+function GripVerticalIcon(): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="9" cy="6" r="1.5" />
+      <circle cx="15" cy="6" r="1.5" />
+      <circle cx="9" cy="12" r="1.5" />
+      <circle cx="15" cy="12" r="1.5" />
+      <circle cx="9" cy="18" r="1.5" />
+      <circle cx="15" cy="18" r="1.5" />
+    </svg>
+  );
+}
+
+function PlayIcon(): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M8 5.5v13l11-6.5z" />
+    </svg>
+  );
+}
+
+function NoteCardIcon(): ReactNode {
+  return (
+    <svg {...STROKE}>
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d="M7 9h10M7 13h7" />
+    </svg>
+  );
+}
+
+function NotePenIcon(): ReactNode {
+  return (
+    <svg {...STROKE}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+
+function OpenIcon(): ReactNode {
+  return (
+    <svg {...STROKE}>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <path d="M15 3h6v6M10 14L21 3" />
+    </svg>
+  );
+}
+
+function EnlargeIcon(): ReactNode {
+  return (
+    <svg {...STROKE} strokeWidth={2.2}>
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+    </svg>
+  );
+}
+
+function TrashIcon(): ReactNode {
+  return (
+    <svg {...STROKE}>
+      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
+    </svg>
+  );
+}
+
+/** Per-type glyph used by the thumb fill, the list-row icon tile, and the
+ *  tile-footer icon. `play` swaps the youtube logo for the play triangle —
+ *  the artboards use the triangle on stage fills and the logo in footers. */
+function TypeGlyph({
   type,
+  play = false,
 }: {
   type: LessonResource["type"];
+  play?: boolean;
 }): ReactNode {
-  // Pared-back outline icons sized for inline rows. Matches the
-  // ResourceTile small-icon vocabulary so the two modes feel paired.
-  const common = {
-    width: 14,
-    height: 14,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.8,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    "aria-hidden": true,
-  };
   switch (type) {
     case "slides":
       return (
-        <svg {...common}>
-          <rect x="2" y="3" width="20" height="14" rx="2" />
-          <line x1="8" y1="21" x2="16" y2="21" />
-          <line x1="12" y1="17" x2="12" y2="21" />
+        <svg {...STROKE}>
+          <rect x="3" y="4" width="18" height="13" rx="2" />
+          <path d="M12 17v4M8 21h8" />
         </svg>
       );
     case "pdf":
       return (
-        <svg {...common}>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="9" y1="15" x2="15" y2="15" />
+        <svg {...STROKE}>
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+          <path d="M14 3v5h5" />
         </svg>
       );
     case "doc":
       return (
-        <svg {...common}>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="9" y1="13" x2="15" y2="13" />
-          <line x1="9" y1="17" x2="15" y2="17" />
+        <svg {...STROKE}>
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+          <path d="M14 3v5h5M9 13h6M9 17h6" />
         </svg>
       );
     case "image":
       return (
-        <svg {...common}>
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <polyline points="21 15 16 10 5 21" />
+        <svg {...STROKE}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <circle cx="9" cy="10" r="1.6" />
+          <path d="M21 16l-5-5-8 8" />
         </svg>
       );
     case "youtube":
-      return (
-        <svg {...common}>
-          <polygon points="23 7 16 12 23 17 23 7" />
-          <rect x="1" y="5" width="15" height="14" rx="2" />
+      return play ? (
+        <PlayIcon />
+      ) : (
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C18 4.8 12 4.8 12 4.8s-6 0-7.7.5a2.7 2.7 0 0 0-1.9 1.9A28 28 0 0 0 2 12a28 28 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.7.5 7.7.5 7.7.5s6 0 7.7-.5a2.7 2.7 0 0 0 1.9-1.9A28 28 0 0 0 22 12a28 28 0 0 0-.4-4.8zM10 15.2V8.8L15.2 12z" />
         </svg>
       );
+    case "notecard":
+      return <NoteCardIcon />;
     case "website":
       return (
-        <svg {...common}>
-          <circle cx="12" cy="12" r="10" />
-          <line x1="2" y1="12" x2="22" y2="12" />
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        <svg {...STROKE}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
         </svg>
       );
     case "link":
     default:
       return (
-        <svg {...common}>
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        <svg {...STROKE}>
+          <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+          <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
         </svg>
       );
   }
 }
 
-function ResourceListRow({
-  resource,
-  onActivate,
-}: {
-  resource: SectionResource;
-  /** Open the resource in the shared preview modal. */
-  onActivate: () => void;
-}): ReactNode {
-  // Pull the type-tag descriptor; every kind in LessonResource["type"] is
-  // covered in TYPE_TAGS, so the fallback is just defensive.
-  const tag: TypeTag = TYPE_TAGS[resource.type] ?? {
-    label: resource.type.toUpperCase(),
-    tagClass: "rowLink",
-  };
-  const label = resource.label || resource.type;
-  // Show the resource's REAL url when it has one; only fall back to the
-  // synthetic preview string for legacy fixtures with no url. (Previously
-  // this ALWAYS synthesized a url and opened that fabricated link — so a
-  // real resource opened a bogus address. Now clicking opens the preview.)
-  const url = resource.url
-    ? prettyUrl(resource.url)
-    : synthUrl(resource.type, label);
+// ── Tabs — All · Files · Links · Media · Notes ─────────────────────────────
 
+type PanelTab = "all" | "files" | "links" | "media" | "notes";
+type PanelCategory = Exclude<PanelTab, "all">;
+
+const TABS: ReadonlyArray<{ key: PanelTab; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "files", label: "Files" },
+  { key: "links", label: "Links" },
+  { key: "media", label: "Media" },
+  { key: "notes", label: "Notes" },
+];
+
+/**
+ * Which tab a resource rolls up under (besides All).
+ *   Notes — notecards (they ALSO appear in All; never in Files/Links/Media).
+ *   Media — images, youtube/vimeo, raw video/audio.
+ *   Files — pdf / doc / slides, plus uploads (rows carrying a mime type or a
+ *           blob:/hosted same-origin url) that aren't media.
+ *   Links — websites + generic links (everything else).
+ */
+function categoryOf(r: LessonResource): PanelCategory {
+  if (isNotecard(r)) return "notes";
+  if (r.type === "image" || r.type === "youtube") return "media";
+  const p = r.provider;
+  if (
+    p === "image" ||
+    p === "video" ||
+    p === "audio" ||
+    p === "youtube" ||
+    p === "vimeo"
+  ) {
+    return "media";
+  }
+  if (r.type === "pdf" || r.type === "doc" || r.type === "slides") {
+    return "files";
+  }
+  if (p === "pdf" || p === "gdocs" || p === "gsheets" || p === "gslides") {
+    return "files";
+  }
+  // Uploads — a mime type or a session-blob / same-origin hosted url marks a
+  // file row even when its legacy `type` is the generic "link".
+  if (r.mimeType) return "files";
+  if (r.url && (r.url.startsWith("blob:") || /^\/(?![/\\])/.test(r.url))) {
+    return "files";
+  }
+  return "links";
+}
+
+/** Uppercase footer/row tag (artboard vocabulary). */
+function typeTagFor(type: LessonResource["type"]): string {
+  switch (type) {
+    case "notecard":
+      return "NOTE";
+    case "website":
+    case "link":
+      return "LINK";
+    default:
+      // slides → SLIDES, pdf → PDF, doc → DOC, image → IMAGE, youtube → YOUTUBE
+      return type.toUpperCase();
+  }
+}
+
+/** True for rows that should read as video (play glyph on the stage). */
+function isVideoLike(r: LessonResource): boolean {
   return (
-    <Tooltip content={`${tag.label} — ${label}`} side="left">
-      <button
-        type="button"
-        className={`${styles.resourceRow} ${styles[tag.tagClass] ?? ""}`}
-        aria-label={`Open ${tag.label}: ${label}`}
-        title={`${tag.label} — ${label}`}
-        onClick={onActivate}
+    r.type === "youtube" ||
+    r.provider === "youtube" ||
+    r.provider === "vimeo" ||
+    r.provider === "video"
+  );
+}
+
+/** rn.css `th-*` type-tinted fill for a resource's stage / row icon. */
+function thClassFor(r: LessonResource): string {
+  if (r.provider === "video" || r.provider === "audio") return styles.thVideo!;
+  switch (r.type) {
+    case "slides":
+      return styles.thSlides!;
+    case "pdf":
+      return styles.thPdf!;
+    case "doc":
+      return styles.thDoc!;
+    case "image":
+      return styles.thImage!;
+    case "youtube":
+      return styles.thYoutube!;
+    case "notecard":
+      return styles.thNote!;
+    case "website":
+    case "link":
+    default:
+      return styles.thLink!;
+  }
+}
+
+// ── Link-face helpers (local mirrors of the §0 card's, which are not exported
+// from ResourceCardFace) ─────────────────────────────────────────────────────
+// <img src> safety uses the shared isSafeImgSrc (lib/resource-embed) — the one
+// sink gate every surface vets through.
+
+const TAG_TOKENS = [
+  "red",
+  "orange",
+  "amber",
+  "green",
+  "teal",
+  "blue",
+  "indigo",
+  "purple",
+  "pink",
+  "gray",
+] as const;
+
+/** Deterministic pick from the 10 `--tag-*` tokens — always a token, never
+ *  a raw hex (mirrors ResourceCardFace's tagColorFor). */
+function tagColorFor(seed: string): string {
+  let sum = 0;
+  for (let i = 0; i < seed.length; i++) sum += seed.charCodeAt(i);
+  return `var(--tag-${TAG_TOKENS[sum % TAG_TOKENS.length]})`;
+}
+
+/** Hostname minus "www.", or null when the URL doesn't parse. */
+function domainOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "") || null;
+  } catch {
+    return null;
+  }
+}
+
+/** First alphanumeric character, uppercased — the initial-tile glyph. */
+function initialOf(text: string): string {
+  const ch = text.replace(/[^a-z0-9]/gi, "")[0] ?? text[0] ?? "?";
+  return ch.toUpperCase();
+}
+
+/** The designed link-card mini-face — the chain's terminal stage. Renders
+ *  from the domain when the URL parses, from the label otherwise, so
+ *  SOMETHING designed always paints (P5). */
+function LinkMiniFace({ resource }: { resource: LessonResource }): ReactNode {
+  const domain = resource.url ? domainOf(resource.url) : null;
+  const display = domain ?? resource.label ?? "resource";
+  return (
+    <span className={styles.linkFace}>
+      <span
+        className={styles.linkInitial}
+        style={{ background: tagColorFor(display) }}
+        aria-hidden="true"
       >
-        {/* Left chip — 32×32 pastel SQUARE with the type glyph centered.
-          The pastel pair comes from the .row<Type> class on this button. */}
-        <span className={styles.resourceRowChip} aria-hidden="true">
-          <ResourceTypeIcon type={resource.type} />
-        </span>
-        {/* Two-line text block: bold label on top, small URL preview below. */}
-        <span className={styles.resourceRowText}>
-          <span className={styles.resourceRowLabel}>{label}</span>
-          <span className={styles.resourceRowUrl}>{url}</span>
-        </span>
-        {/* Right pill — uppercase TYPE TAG (PPT / PDF / DOCX / IMG / VIDEO /
-          WEB / LINK). Same per-type pastel as the chip, slightly stronger. */}
-        <span className={styles.resourceRowTag}>{tag.label}</span>
-      </button>
-    </Tooltip>
+        {initialOf(display)}
+      </span>
+      <span className={styles.linkDomain}>{display}</span>
+    </span>
   );
 }
 
-// ── Tile overflow ("···") wrapper ────────────────────────────────────────
-// The "···" overflow button sits at the top-left corner of every tile.
-// ResourceTile already lays its own collapse/remove controls at top: 6px /
-// right: 6px; we DON'T edit ResourceTile, so this wrapper overlays a separate
-// "···" chip clear of those — same chip vocabulary, distinct affordance. Its
-// menu's one action opens the composer to add / edit notes on the resource.
+// ── Tile thumb — the P5 fallback chain ──────────────────────────────────────
 
-function OverflowIcon(): ReactNode {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      {/* Three filled dots — the universal "more actions" affordance. */}
-      <circle cx="5" cy="12" r="1.6" />
-      <circle cx="12" cy="12" r="1.6" />
-      <circle cx="19" cy="12" r="1.6" />
-    </svg>
-  );
-}
+/** 74px stage: safe <img> (onError → demote) → type-tinted glyph fill →
+ *  designed link mini-face. Never an iframe. */
+function TileThumb({ resource }: { resource: LessonResource }): ReactNode {
+  const [failed, setFailed] = useState<ReadonlySet<string>>(new Set());
 
-interface TileWithOverflowProps {
-  resource: SectionResource;
-  /**
-   * When >1 the tile renders a photo-stack visual: 2–3 small offset shadow
-   * cards behind the main tile plus a small count badge over the tile's
-   * top-left corner. The underlying resource is still a single LessonResource
-   * — the stack is panel-side metadata so the planner store doesn't need a
-   * native stack shape. (See onStackClick for the "add more photos" flow.)
-   */
-  stackCount?: number;
-  /** Fired when a stack tile is clicked — opens the composer in append mode. */
-  onStackClick?: () => void;
-  /** Open this resource in the shared preview modal (click-to-enlarge). */
-  onActivate?: () => void;
-  /** Open the composer to add / edit notes (a body + extra gallery) on this
-   *  resource. Drives the "···" overflow menu's single action. */
-  onEditNote?: () => void;
-}
-
-function TileWithOverflow({
-  resource,
-  stackCount,
-  onStackClick,
-  onActivate,
-  onEditNote,
-}: TileWithOverflowProps): ReactNode {
-  // ResourceTile requires onCollapse + onRemove; this panel is read-only,
-  // so both are no-ops — edits live in the LessonFlow section editor on
-  // the detail pane. Declared at module scope below so referential equality
-  // stays stable across tile renders.
-  const isStack = (stackCount ?? 1) > 1;
-  return (
-    <div
-      className={`${styles.tileWrap} ${isStack ? styles.tileWrapStack : ""}`}
-      // For a stack the wrapper is clickable so a teacher can hit anywhere
-      // on the tile to add more photos. For a regular tile the wrapper is
-      // presentational — ResourceTile + the "···" button handle their own
-      // interactions and we don't intercept clicks.
-      onClick={isStack && onStackClick ? onStackClick : undefined}
-      role={isStack ? "button" : undefined}
-      tabIndex={isStack ? 0 : undefined}
-      aria-label={
-        isStack ? `Photo stack — ${stackCount} photos. Add more.` : undefined
-      }
-      onKeyDown={(e) => {
-        if (!isStack || !onStackClick) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onStackClick();
-        }
-      }}
-    >
-      {/* Stack ghosts: 2 small offset shadow cards behind the main tile.
-          Pure CSS — they sit at negative z so ResourceTile renders above. */}
-      {isStack && (
-        <>
-          <span className={styles.stackGhost1} aria-hidden="true" />
-          <span className={styles.stackGhost2} aria-hidden="true" />
-        </>
-      )}
-      {/* Regular tiles become a click-to-enlarge poster (onActivate). Stack
-          tiles keep their "add more photos" wrapper click, so we don't also
-          wire the inner tile to the preview there. */}
-      <ResourceTile
-        resource={resource}
-        onCollapse={noop}
-        onRemove={noop}
-        onActivate={isStack ? undefined : onActivate}
-      />
-      {/* Photo-stack count badge — small chip in the top-left corner
-          indicating how many photos are bundled into the stack. */}
-      {isStack && (
-        <Tooltip
-          content={`${stackCount} photos bundled in this stack — click the tile to add more.`}
-          side="top"
-        >
-          <span
-            className={styles.stackBadge}
-            aria-hidden="true"
-            title={`${stackCount} photos in this stack`}
-            tabIndex={0}
-          >
-            {stackCount}
-          </span>
-        </Tooltip>
-      )}
-      {/* The "···" overflow menu. Sits over the tile's top-right corner;
-          positioning is tuned so it lands clear of ResourceTile's collapse +
-          remove chips (which sit at top: 6px right: 6px / 36px). Hidden on a
-          stack tile because the whole wrapper IS the click target there. Its
-          one action opens the composer to add / edit notes on this resource. */}
-      {!isStack && onEditNote && (
-        <OverflowMenu
-          resource={resource}
-          hasNote={hasNotes(resource)}
-          onEditNote={onEditNote}
-        />
-      )}
-    </div>
-  );
-}
-
-// ── OverflowMenu — the tile "···" menu (add / edit note) ─────────────────────
-// A small popover anchored to the tile's "···" chip. Phase 1A exposes a single
-// action — "Add note" / "Edit note" — which opens the composer in
-// add-notes-to-this-resource mode. Click-outside + Escape close it; the trigger
-// stops propagation so opening the menu never triggers the tile's enlarge.
-
-function OverflowMenu({
-  resource,
-  hasNote,
-  onEditNote,
-}: {
-  resource: SectionResource;
-  hasNote: boolean;
-  onEditNote: () => void;
-}): ReactNode {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const label = resource.label || resource.type;
-
+  // The failure set describes specific srcs — when the row's srcs change
+  // (teacher fixed a link, a thumbnail landed) retry instead of staying
+  // demoted until remount.
   useEffect(() => {
-    if (!open) return;
+    setFailed(new Set());
+  }, [resource.thumbnailUrl, resource.url]);
+
+  const markFailed = useCallback((src: string): void => {
+    setFailed((prev) => new Set(prev).add(src));
+  }, []);
+
+  // Stage-1 candidates, in order: explicit thumbnail, then (for image rows)
+  // the image itself.
+  const candidates: string[] = [];
+  if (isSafeImgSrc(resource.thumbnailUrl))
+    candidates.push(resource.thumbnailUrl);
+  if (
+    (resource.type === "image" || resource.provider === "image") &&
+    isSafeImgSrc(resource.url)
+  ) {
+    candidates.push(resource.url);
+  }
+  const src = candidates.find((c) => !failed.has(c));
+
+  const video = isVideoLike(resource);
+  const tint = thClassFor(resource);
+
+  if (video) {
+    // Video stage — tint + play glyph; the poster sits behind when it loads.
+    // A failed poster keeps the stage (it is already a designed face).
+    return (
+      <span className={`${styles.thumb} ${tint}`}>
+        {src && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            className={styles.thumbImg}
+            src={src}
+            alt=""
+            loading="lazy"
+            onError={() => markFailed(src)}
+          />
+        )}
+        <span className={styles.playBadge}>
+          <PlayIcon />
+        </span>
+      </span>
+    );
+  }
+
+  if (src) {
+    return (
+      <span className={`${styles.thumb} ${tint}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className={styles.thumbImg}
+          src={src}
+          alt=""
+          loading="lazy"
+          onError={() => markFailed(src)}
+        />
+      </span>
+    );
+  }
+
+  // Stage 2/3 — typed rows get the tinted glyph; link-ish rows get the
+  // designed mini link-card face on the amber pair.
+  if (resource.type === "website" || resource.type === "link") {
+    return (
+      <span className={`${styles.thumb} ${tint}`}>
+        <LinkMiniFace resource={resource} />
+      </span>
+    );
+  }
+  return (
+    <span className={`${styles.thumb} ${tint}`}>
+      <TypeGlyph type={resource.type} play />
+    </span>
+  );
+}
+
+// ── Aggregation — deduped list + provenance ────────────────────────────────
+
+/** A deduped resource paired with the PROVENANCE needed to route edit-note /
+ *  remove back to its store row. */
+interface AggregatedResource {
+  resource: LessonResource;
+  /** Stable React key — the section resource id, or a synthesized
+   *  `lesson:<id>:res:<i>` for a whole-lesson row. */
+  key: string;
+  lessonId: string;
+  /** Owning section id, or null for a whole-lesson (Lesson.resources) row. */
+  sectionId: string | null;
+  /** Index into Lesson.resources for a whole-lesson row. */
+  lessonResourceIndex?: number;
+}
+
+// ── Overflow menu (rn-menu) — portaled, keyboard-operable ───────────────────
+// Mirrors ResourceCardFace's CardMenu pattern (the §0 gate): focus moves to
+// the first item on open; ArrowUp/Down/Home/End rove; Tab closes and returns
+// focus; Esc closes with stopPropagation; outside-click / scroll / resize
+// dismiss; the trigger's mousedown is exempt so its own click can toggle.
+
+interface TileMenuProps {
+  /** Viewport anchor — x is the menu's right edge, y its top. */
+  anchor: { x: number; y: number };
+  /** The ⋯ trigger — exempt from outside-click close + focus return target. */
+  ignoreRef: RefObject<HTMLButtonElement | null>;
+  /** Notecard menus reword: Open card / Enlarge poster / Edit card. */
+  notecard: boolean;
+  /** Render "Open" only when there is a real target. */
+  canOpen: boolean;
+  onOpen: () => void;
+  onEnlarge: () => void;
+  onEditNote: () => void;
+  onRemove: () => void;
+  onClose: () => void;
+}
+
+function TileMenu({
+  anchor,
+  ignoreRef,
+  notecard,
+  canOpen,
+  onOpen,
+  onEnlarge,
+  onEditNote,
+  onRemove,
+  onClose,
+}: TileMenuProps): ReactNode {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x: anchor.x, y: anchor.y });
+
+  // Clamp inside the viewport once measured (context-menu idiom).
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    const nx = Math.min(anchor.x - width, window.innerWidth - width - 8);
+    const ny = Math.min(anchor.y, window.innerHeight - height - 8);
+    setPos({ x: Math.max(8, nx), y: Math.max(8, ny) });
+  }, [anchor]);
+
+  // Outside-click / Esc-fallback / scroll / resize dismissal.
+  useEffect(() => {
     const onDown = (e: MouseEvent): void => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
+      const t = e.target as Node;
+      if (
+        ref.current &&
+        !ref.current.contains(t) &&
+        !ignoreRef.current?.contains(t)
+      ) {
+        onClose();
       }
     };
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") onClose();
     };
-    document.addEventListener("mousedown", onDown);
+    const onDetach = (): void => onClose();
+    document.addEventListener("mousedown", onDown, true);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onDetach, true);
+    window.addEventListener("resize", onDetach);
     return () => {
-      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("mousedown", onDown, true);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onDetach, true);
+      window.removeEventListener("resize", onDetach);
     };
-  }, [open]);
+  }, [onClose, ignoreRef]);
+
+  // Focus the first item on open — the menu is portaled, so without this a
+  // keyboard user could never reach it. preventScroll: the scroll listener
+  // above closes the menu, so a focus-induced scroll would self-dismiss.
+  useEffect(() => {
+    ref.current
+      ?.querySelector<HTMLElement>('[role="menuitem"]')
+      ?.focus({ preventScroll: true });
+  }, []);
+
+  // WAI-ARIA menu keyboard pattern (mirrors CardMenu).
+  const onMenuKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (e.key === "Escape") {
+      // The same keypress must not also close a parent dialog/lightbox.
+      e.stopPropagation();
+      onClose();
+      return;
+    }
+    if (e.key === "Tab") {
+      // A menu is not a tab-stop sequence: Tab dismisses, focus returns to
+      // the trigger (onClose does the focusing).
+      e.preventDefault();
+      onClose();
+      return;
+    }
+    if (
+      e.key !== "ArrowDown" &&
+      e.key !== "ArrowUp" &&
+      e.key !== "Home" &&
+      e.key !== "End"
+    ) {
+      return;
+    }
+    e.preventDefault();
+    const items = Array.from(
+      ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    );
+    if (items.length === 0) return;
+    const idx = items.indexOf(document.activeElement as HTMLElement);
+    const next =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? items.length - 1
+          : e.key === "ArrowDown"
+            ? idx < 0
+              ? 0
+              : (idx + 1) % items.length
+            : idx <= 0
+              ? items.length - 1
+              : idx - 1;
+    items[next]?.focus();
+  };
+
+  const fire = (action: () => void): void => {
+    action();
+    onClose();
+  };
 
   return (
-    <div ref={wrapRef} className={styles.tileMenuWrap}>
-      <Button
-        variant="icon"
-        iconAriaLabel={`More actions for ${label}`}
-        className={styles.tileMenuBtn}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        tooltip={`Open the menu for "${label}" — add formatted notes or extra media to this resource`}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((o) => !o);
-        }}
-      >
-        <OverflowIcon />
-      </Button>
-      {open && (
-        <div
-          className={styles.tileMenu}
-          role="menu"
-          aria-label={`Actions for ${label}`}
+    <div
+      ref={ref}
+      role="menu"
+      aria-label="Resource actions"
+      className={styles.menu}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={onMenuKeyDown}
+      style={{
+        position: "fixed",
+        top: pos.y,
+        left: pos.x,
+        zIndex: "var(--z-menu)",
+      }}
+    >
+      {canOpen && (
+        <button
+          type="button"
+          role="menuitem"
+          className={styles.menuItem}
+          onClick={() => fire(onOpen)}
         >
-          <button
-            type="button"
-            role="menuitem"
-            className={styles.tileMenuItem}
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(false);
-              onEditNote();
-            }}
-          >
-            {hasNote ? "Edit note" : "Add note"}
-          </button>
-        </div>
+          <OpenIcon /> {notecard ? "Open card" : "Open"}
+        </button>
       )}
+      <button
+        type="button"
+        role="menuitem"
+        className={styles.menuItem}
+        onClick={() => fire(onEnlarge)}
+      >
+        <EnlargeIcon /> {notecard ? "Enlarge poster" : "Enlarge"}
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className={styles.menuItem}
+        onClick={() => fire(onEditNote)}
+      >
+        <NotePenIcon /> {notecard ? "Edit card" : "Add / edit note"}
+      </button>
+      <div role="separator" className={styles.menuSep} />
+      <Tooltip
+        content="Remove this resource from the lesson — the underlying file or link is not deleted, only unlinked here"
+        required
+      >
+        <button
+          type="button"
+          role="menuitem"
+          className={`${styles.menuItem} ${styles.menuItemDanger}`}
+          onClick={() => fire(onRemove)}
+        >
+          <TrashIcon /> Remove from lesson
+        </button>
+      </Tooltip>
     </div>
   );
 }
 
-// ── NotecardTile — a notecard rendered in the panel grid ─────────────────────
-// Wraps NotecardCard (flip gallery + expandable notes). Enlarge / fullscreen
-// both open the shared ResourcePreview (which routes notecards to the split
-// view). A "···" overflow menu adds the same add/edit-note action as a plain
-// tile so notes can be revised in place.
-
-function NotecardTile({
+/** The ⋯ trigger + its portaled menu. `buttonClassName` picks the tile
+ *  (.tileMore) or row (.rowMore) chrome — both hover-revealed with a −9px
+ *  hit inflation. */
+function MoreMenuButton({
   agg,
+  buttonClassName,
+  onOpen,
   onEnlarge,
   onEditNote,
+  onRemove,
 }: {
   agg: AggregatedResource;
+  buttonClassName: string;
+  onOpen: () => void;
   onEnlarge: () => void;
   onEditNote: () => void;
+  onRemove: () => void;
 }): ReactNode {
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
+  const label = agg.resource.label || agg.resource.type;
+  const notecard = isNotecard(agg.resource);
+  const canOpen = notecard || Boolean(agg.resource.url);
+
+  const toggle = (e: ReactMouseEvent<HTMLButtonElement>): void => {
+    e.stopPropagation();
+    if (anchor) {
+      setAnchor(null);
+      return;
+    }
+    triggerRef.current = e.currentTarget;
+    const rect = e.currentTarget.getBoundingClientRect();
+    setAnchor({ x: rect.right, y: rect.bottom + 4 });
+  };
+
+  const close = useCallback((): void => {
+    setAnchor(null);
+    // Focus returns to the ⋯ so keyboard users keep their place.
+    triggerRef.current?.focus();
+  }, []);
+
   return (
-    <div className={styles.notecardWrap}>
-      <NotecardCard
-        resource={agg.resource}
-        onEnlarge={onEnlarge}
-        onOpenFullscreen={onEnlarge}
-      />
-      <OverflowMenu
-        resource={agg.resource}
-        hasNote={hasNotes(agg.resource)}
-        onEditNote={onEditNote}
+    <>
+      <Tooltip
+        content={`Actions for "${label}" — open, enlarge, add a note, or remove it from this lesson`}
+        tooltipId="resources.panel.tile-more"
+      >
+        <button
+          type="button"
+          className={buttonClassName}
+          aria-label={`Actions for ${label}`}
+          aria-haspopup="menu"
+          aria-expanded={anchor !== null}
+          onClick={toggle}
+        >
+          <DotsIcon />
+        </button>
+      </Tooltip>
+      {anchor &&
+        createPortal(
+          <TileMenu
+            anchor={anchor}
+            ignoreRef={triggerRef}
+            notecard={notecard}
+            canOpen={canOpen}
+            onOpen={onOpen}
+            onEnlarge={onEnlarge}
+            onEditNote={onEditNote}
+            onRemove={onRemove}
+            onClose={close}
+          />,
+          document.body,
+        )}
+    </>
+  );
+}
+
+// ── Grid tiles ──────────────────────────────────────────────────────────────
+
+interface TileActions {
+  onActivate: (agg: AggregatedResource) => void;
+  onOpen: (agg: AggregatedResource) => void;
+  onEditNote: (agg: AggregatedResource) => void;
+  onRemove: (agg: AggregatedResource) => void;
+}
+
+/** Plain resource tile — 74px thumb stage + footer (13px icon · label · tag). */
+function ResourceTileFace({
+  agg,
+  actions,
+}: {
+  agg: AggregatedResource;
+  actions: TileActions;
+}): ReactNode {
+  const r = agg.resource;
+  const label = r.label || r.type;
+  return (
+    <div className={styles.tile}>
+      <button
+        type="button"
+        className={styles.tileBody}
+        onClick={() => actions.onActivate(agg)}
+        aria-label={`Enlarge ${label}`}
+        title={`${typeTagFor(r.type)} — ${label}`}
+      >
+        <TileThumb resource={r} />
+        <span className={styles.tileFoot}>
+          <span className={styles.tileFootIcon} aria-hidden="true">
+            <TypeGlyph type={r.type} />
+          </span>
+          <span className={styles.tileLabel}>{label}</span>
+          <span className={styles.typeTag}>{typeTagFor(r.type)}</span>
+        </span>
+      </button>
+      <MoreMenuButton
+        agg={agg}
+        buttonClassName={styles.tileMore!}
+        onOpen={() => actions.onOpen(agg)}
+        onEnlarge={() => actions.onActivate(agg)}
+        onEditNote={() => actions.onEditNote(agg)}
+        onRemove={() => actions.onRemove(agg)}
       />
     </div>
   );
 }
 
-// ── Props ────────────────────────────────────────────────────────────────
+/** Notecard tile face — identical footprint to a plain tile (P3): honey-50
+ *  thumb (poster when present), white NOTE glyph pill bottom-left, dark
+ *  gallery-count pill bottom-right. Click = fullscreen split view (via the
+ *  shared ResourcePreview, which routes notecards there). */
+function NotecardTileFace({
+  agg,
+  actions,
+}: {
+  agg: AggregatedResource;
+  actions: TileActions;
+}): ReactNode {
+  const r = agg.resource;
+  const label = r.label || "Notecard";
+  const poster = notecardPoster(r);
+  const count = galleryCount(r);
 
-interface ResourcesPanelProps {
-  /** The currently-selected lesson, or null if none is selected. Drives
-   *  aggregation in day mode; ignored in week mode (the panel aggregates
-   *  across `lessons` instead). */
-  lesson: Lesson | null;
-  /**
-   * Whether the panel BODY (tabs + grid/list) is collapsed to its header
-   * only. Optional — when omitted the panel renders fully expanded with
-   * no chevron and behaves identically to the standalone component.
-   */
-  collapsed?: boolean;
-  /** Flip the collapsed state. Rendered as a chevron button in the header. */
-  onToggleCollapsed?: () => void;
-  /**
-   * dnd-kit wiring supplied by <RightRail>. When provided the panel
-   * renders a grip button in its header that is the SOLE drag activator
-   * for reorder. When omitted there is no grip.
-   */
-  dragHandleProps?: PanelDragHandleProps;
-  /**
-   * Aggregation scope.
-   *   • "day"  (default) — existing behavior: combine `lesson.resources`
-   *                        with every section's resources for the selected
-   *                        lesson, deduplicated on id.
-   *   • "week"           — combine resources across EVERY lesson supplied
-   *                        in `lessons` (used by the Weekly view shell).
-   *
-   * Omitting the prop preserves the original day-mode contract.
-   */
-  mode?: "day" | "week";
-  /**
-   * Lessons to aggregate across in week mode. Required only when
-   * `mode === "week"`; ignored otherwise. Each lesson's resources are
-   * unioned (lesson-level + every section's resources) with the same
-   * dedup-on-id rule as day mode.
-   */
-  lessons?: Lesson[];
-  /**
-   * Active week number, used to title the panel in week mode (e.g.
-   * "Resources · Week 12"). Ignored in day mode. Optional — defaults to
-   * undefined so callers that don't know the week (e.g. standalone
-   * day-mode embeds) need not supply it.
-   */
-  week?: number;
-  /**
-   * Called when the teacher clicks "Back to week" in the panel header.
-   * Only rendered when this prop is supplied AND the panel is in
-   * lesson-scoped day mode (i.e. when `lesson` is non-null). Intended
-   * for the Weekly view where a lesson card can be deselected to revert
-   * the Resources panel to week-aggregate scope.
-   */
-  onClearLesson?: () => void;
+  // Poster face inside the honey stage: safe img → poster's type-tinted
+  // glyph → honey notecard glyph (notes-only card). Same P5 chain.
+  const posterSrc = poster
+    ? isSafeImgSrc(poster.thumbnailUrl)
+      ? poster.thumbnailUrl
+      : (poster.type === "image" || poster.provider === "image") &&
+          isSafeImgSrc(poster.url)
+        ? poster.url
+        : undefined
+    : undefined;
+  const [posterFailed, setPosterFailed] = useState(false);
+  useEffect(() => setPosterFailed(false), [posterSrc]);
+
+  return (
+    <div className={`${styles.tile} ${styles.noteFace}`}>
+      <button
+        type="button"
+        className={styles.tileBody}
+        onClick={() => actions.onActivate(agg)}
+        aria-label={`Open notecard ${label}`}
+        title={`NOTE — ${label}`}
+      >
+        <span className={styles.thumb}>
+          {posterSrc && !posterFailed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              className={styles.thumbImg}
+              src={posterSrc}
+              alt=""
+              loading="lazy"
+              onError={() => setPosterFailed(true)}
+            />
+          ) : poster ? (
+            <span
+              className={`${styles.notePoster} ${thClassFor(poster)}`}
+              aria-hidden="true"
+            >
+              <TypeGlyph type={poster.type} play />
+            </span>
+          ) : (
+            <span className={styles.noteFallbackGlyph} aria-hidden="true">
+              <NoteCardIcon />
+            </span>
+          )}
+          <span className={styles.noteGlyph} aria-hidden="true">
+            <NotePenIcon /> NOTES
+          </span>
+          {count > 0 && (
+            <span
+              className={styles.galleryCt}
+              aria-label={`${count} gallery item${count === 1 ? "" : "s"}`}
+            >
+              {count}
+            </span>
+          )}
+        </span>
+        <span className={styles.tileFoot}>
+          <span
+            className={`${styles.tileFootIcon} ${styles.tileFootIconNote}`}
+            aria-hidden="true"
+          >
+            <NoteCardIcon />
+          </span>
+          <span className={styles.tileLabel}>{label}</span>
+          <span className={styles.typeTag}>NOTE</span>
+        </span>
+      </button>
+      <MoreMenuButton
+        agg={agg}
+        buttonClassName={styles.tileMore!}
+        onOpen={() => actions.onActivate(agg)}
+        onEnlarge={() => actions.onActivate(agg)}
+        onEditNote={() => actions.onEditNote(agg)}
+        onRemove={() => actions.onRemove(agg)}
+      />
+    </div>
+  );
 }
 
-// ── ResourcesPanel ───────────────────────────────────────────────────────
+// ── List rows (rn-row) ─────────────────────────────────────────────────────
+
+function ResourceListRow({
+  agg,
+  actions,
+}: {
+  agg: AggregatedResource;
+  actions: TileActions;
+}): ReactNode {
+  const r = agg.resource;
+  const notecard = isNotecard(r);
+  const label = r.label || (notecard ? "Notecard" : r.type);
+  const count = notecard ? galleryCount(r) : 0;
+  return (
+    <li className={`${styles.row} ${notecard ? styles.rowNote : ""}`}>
+      <button
+        type="button"
+        className={styles.rowMain}
+        onClick={() => actions.onActivate(agg)}
+        aria-label={notecard ? `Open notecard ${label}` : `Enlarge ${label}`}
+        title={`${typeTagFor(r.type)} — ${label}`}
+      >
+        <span
+          className={`${styles.rowIc} ${
+            notecard ? styles.rowIcNote : thClassFor(r)
+          }`}
+          aria-hidden="true"
+        >
+          {notecard ? <NoteCardIcon /> : <TypeGlyph type={r.type} play />}
+        </span>
+        <span className={styles.rowLabel}>{label}</span>
+      </button>
+      {count > 0 && (
+        <span
+          className={`${styles.galleryCt} ${styles.galleryCtStatic}`}
+          aria-label={`${count} gallery item${count === 1 ? "" : "s"}`}
+        >
+          {count}
+        </span>
+      )}
+      <span className={styles.typeTag}>{typeTagFor(r.type)}</span>
+      <MoreMenuButton
+        agg={agg}
+        buttonClassName={styles.rowMore!}
+        onOpen={() => actions.onOpen(agg)}
+        onEnlarge={() => actions.onActivate(agg)}
+        onEditNote={() => actions.onEditNote(agg)}
+        onRemove={() => actions.onRemove(agg)}
+      />
+    </li>
+  );
+}
+
+// ── View-mode persistence (per teacher) ────────────────────────────────────
+
+type ViewMode = "grid" | "list";
+const VIEW_MODE_KEY = "mycurricula:resources-panel-view";
+
+function readViewMode(): ViewMode {
+  if (typeof window === "undefined") return "grid";
+  try {
+    const raw = window.localStorage.getItem(VIEW_MODE_KEY);
+    if (raw === "grid" || raw === "list") return raw;
+  } catch {
+    // localStorage unavailable — use default.
+  }
+  return "grid";
+}
+
+function writeViewMode(mode: ViewMode): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(VIEW_MODE_KEY, mode);
+  } catch {
+    // Storage full / unavailable — preference simply won't persist.
+  }
+}
+
+// ── Props ───────────────────────────────────────────────────────────────────
+
+interface ResourcesPanelProps {
+  /** The currently-selected lesson, or null. Drives aggregation in day
+   *  mode; ignored in week mode (the panel aggregates `lessons` instead). */
+  lesson: Lesson | null;
+  /** Whether the panel BODY (tabs + content) is collapsed to its header. */
+  collapsed?: boolean;
+  /** Flip the collapsed state — rendered as the header chevron. */
+  onToggleCollapsed?: () => void;
+  /** dnd-kit wiring supplied by <RightRail>. The grip is the SOLE drag
+   *  activator for panel reorder within the rail. */
+  dragHandleProps?: PanelDragHandleProps;
+  /** Aggregation scope — "day" (default) combines the selected lesson's
+   *  seams; "week" merges across every lesson in `lessons`. */
+  mode?: "day" | "week";
+  /** Lessons to aggregate across in week mode. */
+  lessons?: Lesson[];
+  /** Active week — labels the week-mode aria contexts. */
+  week?: number;
+  /** "Back to week" affordance — rendered only when supplied AND the panel
+   *  is lesson-scoped (Weekly view's selected-card scope). */
+  onClearLesson?: () => void;
+  /** Drawer presentation: renders an × close button in the header (in place
+   *  of the collapse chevron) and drops the standalone card chrome. Supplied
+   *  by <ResourcesDrawer> below. */
+  onCloseDrawer?: () => void;
+  /** Drawer presentation only: notified whenever the panel's composer opens
+   *  or closes. <ResourcesDrawer> uses this to hide its own slide-in panel
+   *  while the composer sheet is up, so the composer (portaled to <body> at
+   *  the same z-band as the drawer) isn't occluded by the right-docked drawer
+   *  (§UXR FIX 3). The panel stays MOUNTED — we only hide the drawer chrome —
+   *  so the composer it renders is never torn down. */
+  onComposerOpenChange?: (open: boolean) => void;
+}
+
+// ── ResourcesPanel ──────────────────────────────────────────────────────────
 
 export function ResourcesPanel({
   lesson,
@@ -834,81 +1095,104 @@ export function ResourcesPanel({
   lessons,
   week,
   onClearLesson,
+  onCloseDrawer,
+  onComposerOpenChange,
 }: ResourcesPanelProps): ReactNode {
-  // Panel-local UI state. Default tab "all"; default view "grid" (matches
-  // the design and the LessonFlow editor's default for the same data).
-  // Renamed from `mode` to `viewMode` so it doesn't collide with the
-  // public `mode: "day" | "week"` prop above — the local presentation
-  // toggle and the aggregation scope are independent concerns.
-  const [category, setCategory] = useState<ResourceCategory>("all");
+  const [activeTab, setActiveTab] = useState<PanelTab>("all");
+  // SSR-safe persisted view mode: default for the server render, the saved
+  // choice loaded post-mount (same hydration idiom as RightRail).
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  // The resource currently open in the shared click-to-enlarge modal, or
-  // null when the modal is closed. Set from a grid tile or a list row.
-  const [previewResource, setPreviewResource] =
-    useState<SectionResource | null>(null);
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    setViewMode(readViewMode());
+    hydratedRef.current = true;
+  }, []);
+  const selectViewMode = useCallback((m: ViewMode): void => {
+    setViewMode(m);
+    if (hydratedRef.current) writeViewMode(m);
+  }, []);
 
-  // ── Composer + drag-drop state ───────────────────────────────────────
-  // The "+" trigger in the panel header and a drop of one-or-more files
-  // onto the panel both open the shared ResourceComposer. `pendingItems`
-  // carries the dropped files into the composer as pre-captured chips so
-  // the teacher just confirms routing + Adds. `isDragOver` drives a soft
-  // drop-target outline on the panel while files are being dragged over it.
-  const [composerOpen, setComposerOpen] = useState<boolean>(false);
+  // The resource open in the shared click-to-enlarge modal (notecards route
+  // to the fullscreen split view inside ResourcePreview).
+  const [previewResource, setPreviewResource] = useState<LessonResource | null>(
+    null,
+  );
+
+  // ── Composer + drag-drop state ─────────────────────────────────────────
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerMode, setComposerMode] = useState<"resource" | "notecard">(
+    "resource",
+  );
   const [pendingItems, setPendingItems] = useState<CapturedItem[]>([]);
-  const [isDragOver, setIsDragOver] = useState<boolean>(false);
-  // When set, the composer opens in "add/edit notes on THIS resource" mode
-  // (notecard mode + a locked edit target) so any existing resource can gain
-  // a rich `body` / extra `gallery` media. Null = the normal "add" composer.
+  const [isDragOver, setIsDragOver] = useState(false);
+  // When set, the composer opens in "add/edit notes on THIS resource" mode.
   const [editTarget, setEditTarget] =
     useState<ResourceComposerEditTarget | null>(null);
 
-  // Routing destination for the composer. In day mode it's the selected
-  // lesson; in week mode we fall back to the first lesson in the week (the
-  // teacher can re-route via the composer's pickers). When neither yields a
-  // lesson, the composer stays disabled.
+  // Routing default: the selected lesson, else the week's first lesson.
   const composerLesson: Lesson | null = lesson ?? lessons?.[0] ?? null;
+
+  // §UXR FIX 3 — tell the drawer host whenever the composer opens/closes so it
+  // can hide its slide-in panel while the composer sheet is up (the composer
+  // portals to <body> at the same z-band as the drawer, so a visible drawer
+  // would occlude the sheet's right edge at ≤960px). Inline (desktop)
+  // mounts pass no handler, so this is a no-op there.
+  useEffect(() => {
+    onComposerOpenChange?.(composerOpen);
+  }, [composerOpen, onComposerOpenChange]);
 
   const openComposer = useCallback((): void => {
     setEditTarget(null);
+    setComposerMode("resource");
+    setComposerOpen(true);
+  }, []);
+
+  // The "New notecard" entry (P6) — same composer seam, notecard mode.
+  const openNotecardComposer = useCallback((): void => {
+    setEditTarget(null);
+    setComposerMode("notecard");
     setComposerOpen(true);
   }, []);
 
   const closeComposer = useCallback((): void => {
     setComposerOpen(false);
+    setComposerMode("resource");
     setPendingItems([]);
     setEditTarget(null);
   }, []);
 
-  // Open the composer to add / edit notes on an existing aggregated resource.
+  // KNOWN EDGE (§4a M1 mirror — documented, intentionally not changed):
+  // like removal, "Add / edit note" conceptually targets the CONTENT
+  // identity, but the edit routes to ONE store row (the rendered one). When
+  // the same resource exists in a section AND the lesson-level array, the
+  // shadowed duplicate's note is untouched — and for url-less rows a note
+  // edit can even SPLIT identity (tier-3 identity hashes the body), so the
+  // pair un-merges and both rows paint. Cascading edits across seams is a
+  // store-level concern, deferred with the split-identity follow-up; the
+  // removal cascade in removeResource is the model when it lands.
   const openNoteEditor = useCallback((agg: AggregatedResource): void => {
     setPendingItems([]);
+    setComposerMode("notecard");
     setEditTarget({
       lessonId: agg.lessonId,
       sectionId: agg.sectionId,
-      resourceId: agg.resource.id,
+      resourceId: agg.key,
       lessonResourceIndex: agg.lessonResourceIndex,
       resource: agg.resource,
     });
     setComposerOpen(true);
   }, []);
 
-  // ── Multi-file drag-drop on the panel ────────────────────────────────
-  // Accepts native HTML5 drags carrying File items (a folder-or-file drag
-  // from the OS). preventDefault on dragOver is required to enable a drop;
-  // dragLeave clears the visual hint only when the pointer truly exits the
-  // panel (not when it crosses an internal child).
-  const handleDragOver = useCallback(
-    (e: ReactDragEvent<HTMLDivElement>): void => {
-      if (!e.dataTransfer.types.includes("Files")) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "copy";
-      setIsDragOver(true);
-    },
-    [],
-  );
+  // ── Multi-file drag-drop onto the panel (drop-to-add) ─────────────────
+  const handleDragOver = useCallback((e: ReactDragEvent<HTMLElement>): void => {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setIsDragOver(true);
+  }, []);
 
   const handleDragLeave = useCallback(
-    (e: ReactDragEvent<HTMLDivElement>): void => {
+    (e: ReactDragEvent<HTMLElement>): void => {
       const next = e.relatedTarget as Node | null;
       if (next && e.currentTarget.contains(next)) return;
       setIsDragOver(false);
@@ -917,136 +1201,283 @@ export function ResourcesPanel({
   );
 
   const handleDrop = useCallback(
-    (e: ReactDragEvent<HTMLDivElement>): void => {
+    (e: ReactDragEvent<HTMLElement>): void => {
       if (!e.dataTransfer.types.includes("Files")) return;
       e.preventDefault();
       setIsDragOver(false);
       const files = Array.from(e.dataTransfer.files);
       if (files.length === 0 || composerLesson === null) return;
-      const items = files.map((f) => fileToCapturedItem(f));
-      setPendingItems(items);
+      setPendingItems(files.map((f) => fileToCapturedItem(f)));
+      setComposerMode("resource");
+      setEditTarget(null);
       setComposerOpen(true);
     },
     [composerLesson],
   );
 
-  // Pull the lesson's section content from the planner store so the
-  // aggregation reacts to section-resource edits in real time. We read
-  // getSections from the store as a STABLE callback (planner-store
-  // memoizes it on the sections record), and call it inside the
-  // aggregation useMemo so the only dependencies are `lesson` and
-  // `getSections` — avoiding the "conditional value changes every
-  // render" lint warning that derived `sections` outside the memo would
-  // produce.
-  const { getSections, getLesson } = usePlanner();
+  // ── Store wiring ───────────────────────────────────────────────────────
+  const {
+    getSections,
+    getLesson,
+    removeSectionResource,
+    setSections,
+    editLesson,
+  } = usePlanner();
+  const toast = useUndoToastOptional();
 
-  // ── Aggregation ──────────────────────────────────────────────────────
-  // DAY mode:
-  //   Derive the lesson's resources from the CANONICAL helper
-  //   `lessonResources(sections)` (lib/lesson-resources.ts). This is the
-  //   single source of truth shared with the weekly card and the daily
-  //   lesson detail, so all three surfaces always agree on the same list
-  //   (audit finding BUG-006). The sections are read from the planner
-  //   store via `getSections(lesson.id)` so section-resource edits
-  //   anywhere in the UI are reflected here immediately.
-  //
-  // WEEK mode:
-  //   Same canonical helper applied across EVERY lesson in `lessons`.
-  //   Lessons keep their original order (the consumer is responsible for
-  //   ordering by day / subject); within each lesson resources appear in
-  //   section order. Deduplication on resource id is still applied — the
-  //   same resource authored in two lessons surfaces once per lesson
-  //   (the synthesized `lesson:<id>:res:<i>` key is already lesson-scoped)
-  //   so a week-aggregate glance is accurate.
+  // ── Aggregation — dedupeLessonResources (P1) + provenance ──────────────
+  // Day mode: one lesson's two seams merged by content identity, sections
+  // canonical. Week mode: the same merge per lesson, with one shared
+  // identity set across the week so a resource reused in two lessons still
+  // paints once.
   const combined = useMemo<AggregatedResource[]>(() => {
-    /**
-     * Push one lesson's resources into `out` via the canonical helper,
-     * deduplicating on id. Each entry carries its PROVENANCE (lessonId +
-     * sectionId, or a whole-lesson index) so the "add/edit note" action can
-     * route a patch back to the exact row. Lesson-level resources (no native
-     * id on the type) receive a synthesized id so React keys + dedup work.
-     */
     function appendLesson(
       l: Lesson,
       seen: Set<string>,
       out: AggregatedResource[],
     ): void {
-      // Section-level resources — the canonical source per BUG-006. Using
-      // lessonResourceRefs (not the id-less lessonResources) keeps the owning
-      // sectionId paired with each resource for the edit-note route.
-      const sectionRefs = lessonResourceRefs(getSections(l.id));
-      for (const ref of sectionRefs) {
-        if (seen.has(ref.resource.id)) continue;
-        seen.add(ref.resource.id);
-        out.push({
-          resource: ref.resource,
-          lessonId: l.id,
-          sectionId: ref.sectionId,
-        });
+      const refs = lessonResourceRefs(getSections(l.id));
+      // Provenance by object reference — dedupeLessonResources returns the
+      // SAME row objects it was handed, so a reference map recovers each
+      // surviving row's home without re-deriving identity.
+      const provenance = new Map<LessonResource, AggregatedResource>();
+      for (const ref of refs) {
+        if (!provenance.has(ref.resource)) {
+          provenance.set(ref.resource, {
+            resource: ref.resource,
+            key: ref.resource.id,
+            lessonId: l.id,
+            sectionId: ref.sectionId,
+          });
+        }
       }
-      // Lesson-level resources (Lesson.resources) — synthesize an id so
-      // they participate in the same dedup contract as section resources.
-      // These come AFTER section resources so section edits are the
-      // primary edit surface; lesson-level entries are a legacy fallback
-      // that will migrate to sections as the data model matures.
       l.resources.forEach((r, i) => {
-        const id = `lesson:${l.id}:res:${i}`;
-        if (seen.has(id)) return;
-        seen.add(id);
-        out.push({
-          resource: { ...r, id },
-          lessonId: l.id,
-          sectionId: null,
-          lessonResourceIndex: i,
-        });
+        if (!provenance.has(r)) {
+          provenance.set(r, {
+            resource: r,
+            key: `lesson:${l.id}:res:${i}`,
+            lessonId: l.id,
+            sectionId: null,
+            lessonResourceIndex: i,
+          });
+        }
       });
+      const deduped = dedupeLessonResources({
+        sectionResources: refs.map((ref) => ref.resource),
+        lessonResources: l.resources,
+      });
+      for (const r of deduped) {
+        const identity = resourceIdentity(r);
+        if (seen.has(identity)) continue; // cross-lesson guard (week mode)
+        seen.add(identity);
+        const agg = provenance.get(r);
+        if (agg) out.push(agg);
+      }
     }
 
     const seen = new Set<string>();
     const out: AggregatedResource[] = [];
-
     if (mode === "week") {
-      // Week mode — aggregate across every supplied lesson. An empty
-      // `lessons` array (or undefined) renders the empty state.
-      for (const l of lessons ?? []) {
-        appendLesson(l, seen, out);
-      }
+      for (const l of lessons ?? []) appendLesson(l, seen, out);
       return out;
     }
-
-    // Day mode — bail when nothing is selected.
     if (!lesson) return [];
     appendLesson(lesson, seen, out);
     return out;
   }, [mode, lesson, lessons, getSections]);
 
-  // Filtered subset for the active tab.
+  // Per-tab counts over the DEDUPED list. The header chip is the stable
+  // "all" total; tab counts phrase the pills.
+  const tabCounts = useMemo<Record<PanelTab, number>>(() => {
+    const counts: Record<PanelTab, number> = {
+      all: combined.length,
+      files: 0,
+      links: 0,
+      media: 0,
+      notes: 0,
+    };
+    for (const agg of combined) counts[categoryOf(agg.resource)] += 1;
+    return counts;
+  }, [combined]);
+
   const visibleResources = useMemo<AggregatedResource[]>(
-    () => combined.filter((a) => acceptByCategory(a.resource, category)),
-    [combined, category],
+    () =>
+      activeTab === "all"
+        ? combined
+        : combined.filter((agg) => categoryOf(agg.resource) === activeTab),
+    [combined, activeTab],
   );
 
-  // Counts for the head + the "no <tab>" empty-state copy. The head's
-  // badge always shows the FULL combined count — it's the panel's
-  // "how much is in here?" answer and should stay stable as the teacher
-  // flips tabs. The empty-state copy uses the per-tab count to phrase
-  // its message.
   const totalCount = combined.length;
   const visibleCount = visibleResources.length;
 
-  // Reduced-motion-safe collapse: opacity-only fade under prefers-reduced-
-  // motion, height + opacity otherwise. Mirrors the same idiom lesson-flow
-  // uses for its section-body collapse.
+  // ── Tile / row actions ─────────────────────────────────────────────────
+
+  const activateResource = useCallback((agg: AggregatedResource): void => {
+    setPreviewResource(agg.resource);
+  }, []);
+
+  // "Open" — the resource's real target in a new tab; notecards (and rows
+  // with no url) open the preview instead. Never a fabricated URL (the old
+  // synthUrl() approach is deleted).
+  const openResource = useCallback((agg: AggregatedResource): void => {
+    const url = agg.resource.url;
+    if (!isNotecard(agg.resource) && url && /^https?:\/\//i.test(url)) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setPreviewResource(agg.resource);
+  }, []);
+
+  // "Remove from lesson" — no confirm dialog (CLAUDE.md §6); an undo toast
+  // restores the rows instead.
+  //
+  // ── Identity cascade (§4a M1) ───────────────────────────────────────────
+  // The panel renders the DEDUPED list, so one visible row can shadow
+  // duplicates in the other seam (a section row hides an identical
+  // lesson-level row, or vice versa). Removing only the rendered row would
+  // make the shadowed duplicate immediately resurface — "Remove" would look
+  // like a no-op to the teacher. So removal cascades: EVERY store row whose
+  // resourceIdentity() matches the aggregated row's is deleted, across BOTH
+  // seams — each matching section row via removeSectionResource, and all
+  // matching lesson-level rows via ONE editLesson splice.
+  //
+  // The captured `agg.lessonResourceIndex` is deliberately NOT trusted here
+  // (§4a Low 2): the store may have shifted under the memoized aggregation
+  // (another panel removed a row, an undo replayed). Instead, BOTH seams are
+  // re-scanned by identity against the CURRENT store at click time; if
+  // nothing matches anymore the click is a silent no-op and no toast fires —
+  // there is nothing to undo.
+  //
+  // Undo restores ALL removed rows at their ORIGINAL positions from a
+  // snapshot captured before removal ({sectionId, index, resource} per
+  // section row; {index, resource} per lesson row). Section rows restore
+  // positionally via setSections (the only positional section verb — and the
+  // persist-robust one, see planner-store's setSections rationale); lesson
+  // rows via one editLesson with ascending-index splices.
+  const removeResource = useCallback(
+    (agg: AggregatedResource): void => {
+      const label = agg.resource.label || agg.resource.type;
+      const identity = resourceIdentity(agg.resource);
+      const { lessonId } = agg;
+
+      // ── Snapshot every matching row, both seams, before removing ──────
+      const sectionRows: {
+        sectionId: string;
+        index: number;
+        resource: SectionResource;
+      }[] = [];
+      for (const section of getSections(lessonId)) {
+        section.resources.forEach((resource, index) => {
+          if (resourceIdentity(resource) === identity) {
+            sectionRows.push({ sectionId: section.id, index, resource });
+          }
+        });
+      }
+      const current = getLesson(lessonId);
+      const lessonRows: { index: number; resource: LessonResource }[] = [];
+      current?.resources.forEach((resource, index) => {
+        if (resourceIdentity(resource) === identity) {
+          lessonRows.push({ index, resource });
+        }
+      });
+
+      // Stale aggregation — the row is already gone from both seams.
+      // No-op, and no toast: there is nothing to undo (Low 2).
+      if (sectionRows.length === 0 && lessonRows.length === 0) return;
+
+      // ── Remove — per-row through the section seam, one splice for the
+      // lesson-level array ───────────────────────────────────────────────
+      for (const row of sectionRows) {
+        removeSectionResource(lessonId, row.sectionId, row.resource.id);
+      }
+      if (lessonRows.length > 0 && current) {
+        const drop = new Set(lessonRows.map((row) => row.index));
+        editLesson(lessonId, {
+          resources: current.resources.filter((_, i) => !drop.has(i)),
+        });
+      }
+
+      toast?.showUndoToast({
+        message: `Removed "${label}" from the lesson`,
+        onUndo: () => {
+          // Section rows — re-insert each at its captured index (§4a Low 3:
+          // the old undo appended at the end, losing the teacher's order).
+          // A section deleted since removal is SILENTLY skipped — restoring
+          // a row into a section that no longer exists has no sensible home,
+          // and resurrecting the section itself would undo more than the
+          // teacher asked. (Kept from the previous behavior, now explicit.)
+          if (sectionRows.length > 0) {
+            const bySection = new Map<string, typeof sectionRows>();
+            for (const row of sectionRows) {
+              const list = bySection.get(row.sectionId) ?? [];
+              list.push(row);
+              bySection.set(row.sectionId, list);
+            }
+            let touched = false;
+            const next = getSections(lessonId).map((section) => {
+              const rows = bySection.get(section.id);
+              if (!rows) return section;
+              touched = true;
+              const resources = [...section.resources];
+              // Ascending-index splices reconstruct the original order even
+              // when several rows left the same section.
+              for (const row of [...rows].sort((a, b) => a.index - b.index)) {
+                resources.splice(Math.min(row.index, resources.length), 0, {
+                  ...row.resource,
+                });
+              }
+              return { ...section, resources };
+            });
+            if (touched) setSections(lessonId, next);
+          }
+          // Lesson-level rows — one editLesson, positional splices.
+          if (lessonRows.length > 0) {
+            const latest = getLesson(lessonId);
+            if (latest) {
+              const restored = [...latest.resources];
+              for (const row of [...lessonRows].sort(
+                (a, b) => a.index - b.index,
+              )) {
+                restored.splice(
+                  Math.min(row.index, restored.length),
+                  0,
+                  row.resource,
+                );
+              }
+              editLesson(lessonId, { resources: restored });
+            }
+          }
+        },
+      });
+    },
+    [
+      getSections,
+      getLesson,
+      removeSectionResource,
+      setSections,
+      editLesson,
+      toast,
+    ],
+  );
+
+  const tileActions: TileActions = useMemo(
+    () => ({
+      onActivate: activateResource,
+      onOpen: openResource,
+      onEditNote: openNoteEditor,
+      onRemove: removeResource,
+    }),
+    [activateResource, openResource, openNoteEditor, removeResource],
+  );
+
+  // ── Collapse animation (reduced-motion safe) ───────────────────────────
   const reducedMotion = useReducedMotion() ?? false;
   const collapseTransition = reducedMotion
     ? DRAG_MOTION.reduced
     : DRAG_MOTION.collapse;
 
-  // ── Empty-state + tab-visibility helpers ─────────────────────────────
-  // Day mode keys off `lesson` to decide "nothing selected" vs. "selected
-  // but empty"; week mode keys off the supplied `lessons` array length.
-  // Centralizing these once keeps the JSX below readable and the day-mode
-  // contract identical to the original.
+  // ── Empty-state helpers ────────────────────────────────────────────────
   const isWeek = mode === "week";
   const hasContext = isWeek ? (lessons?.length ?? 0) > 0 : lesson !== null;
   const emptyContextCopy = isWeek
@@ -1055,17 +1486,15 @@ export function ResourcesPanel({
   const emptyAllCopy = isWeek
     ? "No resources in this week."
     : "No resources on this lesson.";
-  const emptyCategoryScope = isWeek ? "in this week" : "on this lesson";
+  const emptyScope = isWeek ? "in this week" : "on this lesson";
+  const activeTabLabel =
+    TABS.find((t) => t.key === activeTab)?.label.toLowerCase() ?? "resources";
 
-  // The body block — tabs + content — is what collapses; the header (and
-  // its grip + chevron) stays put. Computed once so AnimatePresence keeps
-  // one stable child to fade between mount + unmount.
+  // ── Collapsible body content ───────────────────────────────────────────
   const bodyContent = (
     <>
-      {/* ── Category tabs ──────────────────────────────────────────── */}
-      {/* Hidden when there is no context (no selected lesson in day mode,
-          no lessons in week mode) — the empty-state line below carries
-          the panel's whole message in that case. */}
+      {/* Pill tabs — hidden with no context; the empty line below carries
+          the whole message in that case. */}
       {hasContext && (
         <div
           className={styles.tabs}
@@ -1077,101 +1506,107 @@ export function ResourcesPanel({
               key={tab.key}
               type="button"
               role="tab"
-              aria-selected={category === tab.key}
+              aria-selected={activeTab === tab.key}
               className={`${styles.tab} ${
-                category === tab.key ? styles.tabActive : ""
+                activeTab === tab.key ? styles.tabOn : ""
               }`}
-              onClick={() => setCategory(tab.key)}
+              onClick={() => setActiveTab(tab.key)}
             >
               {tab.label}
+              <span className={styles.tabCount}>{tabCounts[tab.key]}</span>
             </button>
           ))}
         </div>
       )}
 
-      {/* ── Body: grid, list, or empty state ───────────────────────── */}
-      {!hasContext ? (
-        <p className={styles.empty}>{emptyContextCopy}</p>
-      ) : totalCount === 0 ? (
-        <p className={styles.empty}>{emptyAllCopy}</p>
-      ) : visibleCount === 0 ? (
-        // The tab filtered everything out — surface that clearly so the
-        // teacher doesn't read "no resources" and mistrust the count chip.
-        <p className={styles.empty}>
-          No {TABS.find((t) => t.key === category)?.label.toLowerCase()}{" "}
-          {emptyCategoryScope}.
-        </p>
-      ) : viewMode === "grid" ? (
-        // Grid mode — notecard resources (gallery + notes) render as a
-        // NotecardCard (flip gallery + expandable notes); everything else
-        // keeps the ResourceTile thumbnail wrapped with the "···" menu. Both
-        // open the shared preview on enlarge and expose an "add/edit note"
-        // action so any resource can gain a body/gallery.
-        <div className={styles.grid}>
-          {visibleResources.map((agg) =>
-            isNotecardish(agg.resource) ? (
-              <NotecardTile
-                key={agg.resource.id}
-                agg={agg}
-                onEnlarge={() => setPreviewResource(agg.resource)}
-                onEditNote={() => openNoteEditor(agg)}
-              />
-            ) : (
-              <TileWithOverflow
-                key={agg.resource.id}
-                resource={agg.resource}
-                onActivate={() => setPreviewResource(agg.resource)}
-                onEditNote={() => openNoteEditor(agg)}
-              />
-            ),
-          )}
-        </div>
-      ) : (
-        // List mode — "Resource quick access" stack: a small chrome label
-        // above two-line rows (label + synthetic URL preview + type tag).
-        <div className={styles.listWrap}>
-          <div className={styles.listHeader} aria-hidden="true">
-            <PaperclipIcon />
-            <span>Resource quick access</span>
+      {/* "New notecard" — first-class entry (P6), composer in notecard mode. */}
+      {hasContext && composerLesson && (
+        <Tooltip
+          content="Create a notecard — formatted notes plus a flip-through media gallery — attached to this lesson"
+          tooltipId="resources.panel.new-notecard"
+          side="bottom"
+        >
+          <button
+            type="button"
+            className={styles.newNote}
+            onClick={openNotecardComposer}
+            aria-haspopup="dialog"
+          >
+            <span className={styles.newNoteIc} aria-hidden="true">
+              <NoteCardIcon />
+            </span>
+            New notecard
+            <span className={styles.newNotePlus} aria-hidden="true">
+              <PlusIcon />
+            </span>
+          </button>
+        </Tooltip>
+      )}
+
+      {/* Body — grid, list, or an empty-state line. */}
+      <div className={styles.scroll}>
+        {!hasContext ? (
+          <p className={styles.empty}>{emptyContextCopy}</p>
+        ) : totalCount === 0 ? (
+          <p className={styles.empty}>{emptyAllCopy}</p>
+        ) : visibleCount === 0 ? (
+          <p className={styles.empty}>
+            No {activeTabLabel} {emptyScope}.
+          </p>
+        ) : viewMode === "grid" ? (
+          <div className={styles.grid}>
+            {visibleResources.map((agg) =>
+              isNotecard(agg.resource) ? (
+                <NotecardTileFace
+                  key={agg.key}
+                  agg={agg}
+                  actions={tileActions}
+                />
+              ) : (
+                <ResourceTileFace
+                  key={agg.key}
+                  agg={agg}
+                  actions={tileActions}
+                />
+              ),
+            )}
           </div>
+        ) : (
           <ul className={styles.list}>
             {visibleResources.map((agg) => (
-              <li key={agg.resource.id} className={styles.listItem}>
-                <ResourceListRow
-                  resource={agg.resource}
-                  onActivate={() => setPreviewResource(agg.resource)}
-                />
-              </li>
+              <ResourceListRow key={agg.key} agg={agg} actions={tileActions} />
             ))}
           </ul>
-        </div>
-      )}
+        )}
+      </div>
     </>
   );
 
   return (
     <section
-      className={[styles.panel, isDragOver ? styles.panelDragOver : ""]
+      className={[
+        styles.panel,
+        isDragOver ? styles.panelDragOver : "",
+        onCloseDrawer ? styles.panelInDrawer : "",
+      ]
         .filter(Boolean)
         .join(" ")}
       aria-label={
         isWeek
-          ? "Week resources"
+          ? typeof week === "number"
+            ? `Resources for week ${week}`
+            : "Week resources"
           : lesson !== null
             ? `Resources for ${lesson.title}`
             : "Lesson resources"
       }
-      title="Resources panel — every link, file, video, and doc attached to the current lesson (or the whole week when no lesson is selected); drag files in to attach"
+      title="Resources panel — every link, file, video, doc, and notecard attached to the current lesson (or the whole week when no lesson is selected); drag files in to attach"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* ── Card head: optional grip + title + count + add + grid/list + chevron ── */}
+      {/* ── Header: grip? · back? · title · count · + · seg · chevron/× ── */}
       <header className={styles.head}>
-        {/* Drag grip — rendered only when RightRail supplies the bundle.
-            Its activator ref + listeners scope drag activation to this
-            button alone, so the rest of the header (mode toggle, count
-            chip) stays click-through. ≥44px touch target via padding. */}
         {dragHandleProps && (
           <Tooltip
             content="Drag to reorder the Resources panel within the right rail."
@@ -1190,168 +1625,167 @@ export function ResourcesPanel({
             </button>
           </Tooltip>
         )}
-        {/* "Back to week" affordance — shown only when the panel is
-            lesson-scoped on the Weekly view (i.e. `onClearLesson` is
-            supplied AND a lesson is selected). Clicking it clears the
-            weekly card selection so the panel reverts to the week
-            aggregate. Uses a chevron-left + label combination so it
-            reads as a navigation back-action, not a destructive button. */}
+        {/* "Back to week" — only when the Weekly view pinned a lesson scope. */}
         {!isWeek && lesson !== null && onClearLesson && (
           <Button
-            variant="ghost"
+            variant="icon"
             size="sm"
-            className={styles.backBtn}
+            iconAriaLabel="Back to week resources"
+            className={styles.iconBtn}
             onClick={onClearLesson}
-            aria-label="Back to week resources"
             tooltip="Return to the week-wide resources view (un-pins the current lesson scope)"
-            leadingIcon={<BackIcon />}
-          />
+          >
+            <BackIcon />
+          </Button>
         )}
-        {/* Headline:
-            • Week mode: "Resources · Week 12" (or just "Resources").
-            • Day mode with a selected lesson: "Resources · <lesson title>"
-              (truncated via CSS ellipsis so the head doesn't overflow).
-            • Day mode with no selection: "Resources". */}
         <Tooltip
-          content="Open the lesson's attached resources — slides, handouts, videos, and links the team has attached to this lesson. Drag files in to attach."
+          content="Everything attached to this lesson — slides, handouts, videos, links, and notecards. Drag files in to attach more."
           side="bottom"
+          tooltipId="resources.panel.title"
         >
           <h3
             className={styles.title}
             title={
               !isWeek && lesson !== null
                 ? `Resources for ${lesson.title}`
-                : "Resources panel — attached links, files, videos, and docs"
+                : "Resources panel — attached links, files, videos, docs, and notecards"
             }
             tabIndex={0}
           >
-            {isWeek && typeof week === "number"
-              ? `Resources · Week ${week}`
-              : !isWeek && lesson !== null
-                ? `Resources · ${lesson.title}`
-                : "Resources"}
+            Resources
           </h3>
         </Tooltip>
-        {/* Small neutral count chip on the right of the title — only
-            shown once there's context (a selected lesson in day mode, or
-            at least one lesson in the week in week mode), so an empty
-            rail head reads as "no context yet" rather than "0 resources".
-            Stays visible in the collapsed state so the teacher still
-            sees "how much is in here" at a glance. */}
         {hasContext && (
-          <span className={styles.count} aria-label={`${totalCount} resources`}>
+          <span
+            className={styles.countChip}
+            aria-label={`${totalCount} resources`}
+          >
             {totalCount}
           </span>
         )}
-        {/* "+" Add-resource button — opens the shared ResourceComposer
-            for `composerLesson` (the selected lesson in day mode, or the
-            first lesson of the week in week mode). Hidden when there is
-            no lesson to route to, so the rail head reads as "no context
-            yet" rather than offering a control that can't act. */}
-        {composerLesson && (
-          <Button
-            variant="icon"
-            iconAriaLabel="Add a resource to this lesson"
-            className={styles.addBtn}
-            onClick={openComposer}
-            aria-haspopup="dialog"
-            aria-expanded={composerOpen}
-            tooltip="Attach a new link, file, video, or doc to this lesson — opens the resource composer"
-          >
-            <PlusIcon />
-          </Button>
-        )}
-        {/* The list/grid toggle is anchored to the right of the head
-            row. Hidden when there are zero combined resources — the body
-            below shows a single empty-state line in that case and a view
-            toggle would be meaningless. Kept visible even when collapsed
-            so the teacher's chosen view is still legible at a glance. */}
-        {hasContext && totalCount > 0 && (
-          <div
-            className={styles.modeToggle}
-            role="group"
-            aria-label="Resource view mode"
-          >
+        <div className={styles.headActions}>
+          {composerLesson && (
             <Button
               variant="icon"
-              iconAriaLabel="List view"
-              aria-pressed={viewMode === "list"}
-              className={`${styles.modeBtn} ${
-                viewMode === "list" ? styles.modeBtnActive : ""
-              }`}
-              onClick={() => setViewMode("list")}
-              tooltip="Show resources as a compact list — best for scanning many items quickly"
+              size="sm"
+              iconAriaLabel="Add resources to this lesson"
+              className={styles.iconBtn}
+              onClick={openComposer}
+              aria-haspopup="dialog"
+              aria-expanded={composerOpen}
+              tooltip="Attach a new link, file, video, or doc to this lesson — opens the resource composer"
             >
-              <ListIcon />
+              <PlusIcon />
             </Button>
+          )}
+          {hasContext && (
+            <span
+              className={styles.segmented}
+              role="group"
+              aria-label="Resource view mode"
+            >
+              <Tooltip content="List view — compact rows, best for scanning many items">
+                <button
+                  type="button"
+                  className={`${styles.segBtn} ${
+                    viewMode === "list" ? styles.segBtnOn : ""
+                  }`}
+                  aria-pressed={viewMode === "list"}
+                  aria-label="List view"
+                  onClick={() => selectViewMode("list")}
+                >
+                  <ListIcon />
+                </button>
+              </Tooltip>
+              <Tooltip content="Grid view — visual tiles with thumbnails">
+                <button
+                  type="button"
+                  className={`${styles.segBtn} ${
+                    viewMode === "grid" ? styles.segBtnOn : ""
+                  }`}
+                  aria-pressed={viewMode === "grid"}
+                  aria-label="Grid view"
+                  onClick={() => selectViewMode("grid")}
+                >
+                  <GridIcon />
+                </button>
+              </Tooltip>
+            </span>
+          )}
+          {onCloseDrawer ? (
             <Button
               variant="icon"
-              iconAriaLabel="Grid view"
-              aria-pressed={viewMode === "grid"}
-              className={`${styles.modeBtn} ${
-                viewMode === "grid" ? styles.modeBtnActive : ""
-              }`}
-              onClick={() => setViewMode("grid")}
-              tooltip="Show resources as visual tiles — best when you want previews of videos and documents"
+              size="sm"
+              iconAriaLabel="Close resources drawer"
+              className={styles.iconBtn}
+              onClick={onCloseDrawer}
+              tooltip="Close the resources drawer"
             >
-              <GridIcon />
+              <CloseIcon />
             </Button>
-          </div>
-        )}
-        {/* Chevron collapse toggle — flush right, after every other
-            header control. Rendered only when RightRail wires the
-            onToggleCollapsed callback. */}
-        {onToggleCollapsed && (
-          <Button
-            variant="icon"
-            iconAriaLabel={
-              collapsed ? "Expand Resources panel" : "Collapse Resources panel"
-            }
-            className={styles.collapseBtn}
-            onClick={onToggleCollapsed}
-            aria-expanded={!collapsed}
-            tooltip={
-              collapsed
-                ? "Expand the Resources panel to see this lesson's materials"
-                : "Collapse the Resources panel — frees up vertical space in the rail"
-            }
-          >
-            <ChevronToggleIcon collapsed={collapsed} />
-          </Button>
-        )}
+          ) : (
+            onToggleCollapsed && (
+              <Button
+                variant="icon"
+                size="sm"
+                iconAriaLabel={
+                  collapsed
+                    ? "Expand Resources panel"
+                    : "Collapse Resources panel"
+                }
+                className={styles.iconBtn}
+                onClick={onToggleCollapsed}
+                aria-expanded={!collapsed}
+                tooltip={
+                  collapsed
+                    ? "Expand the Resources panel to see this lesson's materials"
+                    : "Collapse the Resources panel — frees up vertical space in the rail"
+                }
+              >
+                <ChevronToggleIcon collapsed={collapsed} />
+              </Button>
+            )
+          )}
+        </div>
       </header>
 
-      {/* ── Collapsible body ───────────────────────────────────────── */}
-      {/* AnimatePresence is mounted unconditionally so the height 0→auto
-          (or opacity-only under reduced motion) enter + exit animations
-          actually play around the collapsed → expanded transition. */}
+      {/* ── Collapsible body ─────────────────────────────────────────── */}
       <AnimatePresence initial={false}>
         {!collapsed && (
           <motion.div
             key="resources-body"
-            className={styles.body}
+            style={
+              reducedMotion
+                ? {
+                    display: "flex",
+                    flexDirection: "column",
+                    minHeight: 0,
+                    flex: 1,
+                  }
+                : {
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    minHeight: 0,
+                    flex: 1,
+                  }
+            }
             initial={reducedMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
             animate={
               reducedMotion ? { opacity: 1 } : { height: "auto", opacity: 1 }
             }
             exit={reducedMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
             transition={collapseTransition}
-            style={reducedMotion ? undefined : { overflow: "hidden" }}
           >
             {bodyContent}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Shared add-resource composer — opens from the "+" button in the
-          header, a multi-file drop onto the panel, OR a tile's "Add/Edit
-          note" action (editTarget set → notecard edit mode). `composerLesson`
-          is the routing default for the ADD path; in EDIT mode we resolve the
-          resource's own lesson so the patch + any upload land on the right
-          event. `initialItems` pre-populates the strip on a panel drop. */}
+      {/* Shared composer — "+" (resource mode), "New notecard" (notecard
+          mode), a multi-file drop (pre-captured items), or a tile's
+          Add/Edit note (notecard mode + locked edit target). */}
       {(() => {
-        // In edit mode route to the resource's own lesson; else the add-path
-        // default. Fall back to composerLesson if the id can't be resolved.
         const launchLesson = editTarget
           ? (getLesson(editTarget.lessonId) ?? composerLesson)
           : composerLesson;
@@ -1360,7 +1794,7 @@ export function ResourcesPanel({
           <ResourceComposer
             open={composerOpen}
             lesson={launchLesson}
-            mode={editTarget ? "notecard" : "resource"}
+            mode={composerMode}
             editResource={editTarget ?? undefined}
             initialItems={pendingItems.length > 0 ? pendingItems : undefined}
             onClose={closeComposer}
@@ -1368,10 +1802,8 @@ export function ResourcesPanel({
         );
       })()}
 
-      {/* Shared click-to-enlarge modal — opened from a grid tile or a list
-          row. Renders the right large preview for every resource kind
-          (image / iframe-embeddable / video / link) with open + download
-          actions, and a graceful fallback when nothing can be previewed. */}
+      {/* Shared click-to-enlarge modal (notecards route to the fullscreen
+          split view inside ResourcePreview). */}
       {previewResource && (
         <ResourcePreview
           resource={previewResource}
@@ -1382,7 +1814,179 @@ export function ResourcesPanel({
   );
 }
 
-// A shared no-op used for the read-only ResourceTile callbacks. Declared
-// once so the React tree doesn't see a fresh function identity per render
-// and trigger unnecessary tile re-renders.
-function noop(): void {}
+// ════════════════════════════════════════════════════════════════════════════
+// ResourcesDrawer — narrow-viewport drawer presentation (Daily view)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// The Daily right rail folds away at ≤960px (DailyView.module.css), which
+// previously left the Resources panel unreachable on tablet/phone. Per the
+// §1 drawer artboard, the panel re-surfaces as a right drawer over the view,
+// opened from a floating grid-icon trigger in the top-bar area. (The Weekly
+// view already has its own host — <WeeklyRailDrawer> wraps the whole rail at
+// ≤1280px — so this component is mounted only for the Daily, day-mode rail.)
+//
+// Chrome mirrors WeeklyRailDrawer/SchedulePanel: portal to <body>, scrim
+// click + Esc close, focus trapped inside, focus restored to the trigger on
+// close, 250ms slide-in (fade under reduced motion — see the CSS module).
+
+/** Matches the Daily view's rail-fold breakpoint (DailyView.module.css). */
+const DAILY_RAIL_FOLD_MQ = "(max-width: 960px)";
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+export interface ResourcesDrawerProps {
+  /** The selected lesson — same prop the inline panel receives. */
+  lesson: Lesson | null;
+  /** Active week — forwarded to the panel. */
+  week?: number;
+}
+
+export function ResourcesDrawer({
+  lesson,
+  week,
+}: ResourcesDrawerProps): ReactNode {
+  // SSR-safe narrow flag — false on the server; synced post-mount.
+  const [narrow, setNarrow] = useState(false);
+  const [open, setOpen] = useState(false);
+  // §UXR FIX 3 — true while the inner panel's composer sheet is open. We HIDE
+  // the slide-in drawer (not unmount it) so the composer, which portals to
+  // <body> at the same z-band, is unobstructed. Hiding (vs. closing) keeps
+  // the ResourcesPanel — and therefore the composer it renders — mounted.
+  const [composerOpen, setComposerOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // §4a Low 6 — in Team-Curriculum ("master") mode the sticky MasterBanner
+  // sits ABOVE the top bar in flow and pushes it down, so the fixed trigger
+  // at its usual top would overlap the bar. The banner exposes no height
+  // variable (it is sticky/in-flow chrome; the rails ride below it
+  // naturally), so the cleanest hook is the same state the banner itself
+  // renders from: editMode. While it's "master" the trigger drops below the
+  // tallest banner phase (see .drawerTriggerBelowBanner).
+  const { editMode } = useAppState();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia(DAILY_RAIL_FOLD_MQ);
+    setNarrow(mq.matches);
+    const handler = (e: MediaQueryListEvent): void => {
+      setNarrow(e.matches);
+      if (!e.matches) setOpen(false); // widened past the fold — inline rail is back
+    };
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  const close = useCallback((): void => {
+    setOpen(false);
+    // Drop the composer-hidden flag so a fresh open starts with the drawer
+    // chrome visible (the inner panel re-reports its composer state on mount).
+    setComposerOpen(false);
+    triggerRef.current?.focus();
+  }, []);
+
+  // Focus moves into the drawer on open (its first focusable — the panel
+  // header's first control).
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current
+      ?.querySelector<HTMLElement>(FOCUSABLE)
+      ?.focus({ preventScroll: true });
+  }, [open]);
+
+  // Esc closes + Tab/Shift-Tab cycle inside the drawer (focus trap).
+  //
+  // KNOWN GAP (§4a Low 15): the undo toast is portaled to <body> at z 1200
+  // (UndoToast.module.css), OUTSIDE this trap — after "Remove from lesson"
+  // a keyboard user inside the open drawer cannot Tab to the toast's Undo
+  // button (Ctrl+Z via the planner's global undo still works). Deferred to
+  // the app-wide focus-management pass rather than special-casing one trap.
+  const onPanelKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLDivElement>): void => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        close();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const nodes = panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (!nodes || nodes.length === 0) return;
+      const first = nodes[0]!;
+      const last = nodes[nodes.length - 1]!;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    },
+    [close],
+  );
+
+  if (!narrow) return null;
+
+  return createPortal(
+    <>
+      {/* The trigger stays mounted while the drawer is open (behind the
+          scrim) so the focus-restore target is never a detached node. The
+          element is captured from the click event rather than a ref prop —
+          the Tooltip primitive clones its child and owns the ref slot. */}
+      <Tooltip
+        content="Open this lesson's resources — links, files, videos, and notecards"
+        side="left"
+        tooltipId="resources.panel.drawer-trigger"
+      >
+        <button
+          type="button"
+          className={`${styles.drawerTrigger} ${
+            editMode === "master" ? styles.drawerTriggerBelowBanner : ""
+          }`}
+          aria-label="Open resources drawer"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={(e) => {
+            triggerRef.current = e.currentTarget;
+            setOpen(true);
+          }}
+        >
+          <GridIcon />
+        </button>
+      </Tooltip>
+      {open && (
+        <>
+          {/* Scrim — click closes. aria-hidden: the dialog beside it carries
+              the semantics; Esc is the keyboard path. Hidden while the
+              composer is up so the composer sheet owns the viewport (§UXR
+              FIX 3). */}
+          <div
+            className={`${styles.drawerScrim} ${
+              composerOpen ? styles.drawerHidden : ""
+            }`}
+            aria-hidden="true"
+            onClick={close}
+          />
+          <div
+            ref={panelRef}
+            className={`${styles.drawerPanel} ${
+              composerOpen ? styles.drawerHidden : ""
+            }`}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Resources drawer"
+            onKeyDown={onPanelKeyDown}
+          >
+            <ResourcesPanel
+              lesson={lesson}
+              week={week}
+              onCloseDrawer={close}
+              onComposerOpenChange={setComposerOpen}
+            />
+          </div>
+        </>
+      )}
+    </>,
+    document.body,
+  );
+}

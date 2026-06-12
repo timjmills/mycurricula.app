@@ -12,8 +12,29 @@
 //
 // The WeeklyBoard day-column variant remains in components/weekly but is
 // not active; WeeklyGrid is the canonical view.
+//
+// Deep links (UX roadmap item 07): `/weekly?week=14&subject=math&lesson=…
+// &grade=…` is parsed HERE on the server via lib/deep-links and handed to
+// WeeklyShell as `initialLink`, so a shared URL restores week + subject
+// filter + open lesson detail on first paint. A missing/invalid `week`
+// nulls the whole link (parseWeeklyParams) and the shell opens normally.
 import { WeeklyShell } from "@/components/weekly";
+import { parseWeeklyParams } from "@/lib/deep-links";
 
-export default function WeeklyPage() {
-  return <WeeklyShell />;
+export default async function WeeklyPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  // Next hands repeated params as string[]; the deep-link scheme is
+  // single-valued, so take the FIRST occurrence of each key (same
+  // convention as /daily's lesson param).
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    const first = Array.isArray(value) ? value[0] : value;
+    if (typeof first === "string") sp.set(key, first);
+  }
+  const initialLink = parseWeeklyParams(sp);
+  return <WeeklyShell initialLink={initialLink ?? undefined} />;
 }

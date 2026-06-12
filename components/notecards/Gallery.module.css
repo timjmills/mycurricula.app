@@ -1,8 +1,11 @@
 /* Gallery.module.css — flip-through media strip for a notecard's gallery.
  *
- * All color/radii/type come from app/tokens.css via var(). The stage holds one
- * ResourceEmbed at a time; the chevrons + index indicator overlay it. Motion
- * (the slide fade) is removed under prefers-reduced-motion. */
+ * Restyled to the 6.12.26 resource-redesign §4 artboard (rn.css `.rn-chev` +
+ * `.rn-dots`): 44px circular paper chevrons with --sh-sm, 7px dots in
+ * --ink-200 with the active dot in --brand-500. All color/radii/type come
+ * from app/tokens.css via var(). The stage holds one ResourceEmbed at a time;
+ * the chevrons + index indicator overlay it. Motion (the slide fade) is
+ * removed under prefers-reduced-motion. */
 
 .gallery {
   position: relative;
@@ -23,7 +26,8 @@
   width: 100%;
   border-radius: var(--r-md);
   overflow: hidden;
-  background: var(--surface-warm);
+  /* Letterbox fill matching the fullscreen media pane (`.rn-fsMedia`). */
+  background: var(--ink-50);
 }
 
 /* When clickable, the whole stage is a single full-bleed button. Reset the
@@ -51,56 +55,53 @@
   border-radius: var(--r-md);
 }
 
-/* ── Nav chevrons ─────────────────────────────────────────────────────────── */
-/* Circular translucent buttons floating over the stage's left/right edges.
-   The Button primitive supplies the ≥44px hit area; these rules set the
-   floating circular look + the paper scrim so the glyph reads over any media. */
+/* ── Nav chevrons — per `.rn-chev` ────────────────────────────────────────── */
+/* 44px circular paper buttons floating over the stage's left/right edges,
+   hairline border + --sh-sm so the glyph reads over any media. ≥44px touch
+   target at every tier by construction. */
 
-.navBtn {
+/* `button.navBtn` inside `.gallery` out-specifies the Button primitive's
+   `.icon.sm` compound (which would otherwise pin the visual to 32px). */
+.gallery button.navBtn {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
   z-index: 2;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border-radius: var(--r-pill);
-  /* Paper scrim with a hairline so the chevron reads over a dark video plate
-     or a busy photo alike. */
-  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  background: var(--paper);
   border: 1px solid var(--border);
-  color: var(--ink-900);
+  color: var(--ink-soft);
   box-shadow: var(--sh-sm);
-  transition:
-    background 120ms ease,
-    transform 120ms ease;
+  transition: background 120ms ease;
 }
 
-.navBtn:hover {
-  background: var(--paper);
+.gallery button.navBtn:hover {
+  background: var(--surface-warm);
+  color: var(--ink-soft);
 }
 
 .navPrev {
-  left: 8px;
+  left: 10px;
 }
 
 .navNext {
-  right: 8px;
+  right: 10px;
 }
 
-/* ── Index indicators ─────────────────────────────────────────────────────── */
+/* ── Index indicators — dots per `.rn-dots` ───────────────────────────────── */
 
 .dots {
   position: absolute;
   left: 50%;
-  bottom: 8px;
+  bottom: 12px;
   transform: translateX(-50%);
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
-  border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--ink-900) 42%, transparent);
+  gap: 5px;
 }
 
 .dot {
@@ -109,7 +110,7 @@
   padding: 0;
   border: 0;
   border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  background: var(--ink-200);
   cursor: pointer;
   transition:
     transform 120ms ease,
@@ -121,8 +122,7 @@
 }
 
 .dotActive {
-  background: var(--paper);
-  transform: scale(1.15);
+  background: var(--brand-500);
 }
 
 .counter {
@@ -138,15 +138,6 @@
   font-size: var(--t-11);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-}
-
-/* ── Phone: larger touch targets on the chevrons ──────────────────────────── */
-
-@media (max-width: 640px) {
-  .navBtn {
-    width: 44px;
-    height: 44px;
-  }
 }
 
 /* ── Motion ───────────────────────────────────────────────────────────────── */
@@ -166,9 +157,13 @@
     animation: none;
   }
 
-  .navBtn,
+  .gallery button.navBtn,
   .dot,
   .dotActive {
     transition: none;
+  }
+
+  .dot:hover {
+    transform: none;
   }
 }
