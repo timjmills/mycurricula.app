@@ -196,16 +196,17 @@ primitive instead of inventing one locally.
 
 ### To build (next wave) — `components/ui/`
 
-| Primitive     | Variants                                              | Purpose                                                                                                                              |
-| ------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `Button`      | primary / secondary / ghost / icon-only / destructive | Single source for every button. Tokens, ≥44px on phone/tablet.                                                                       |
-| `Card`        | subject-tinted / neutral                              | The layered Weekly recipe, generic. Wraps any content with the same border / shadow / header treatment.                              |
-| `PageHeader`  | with-actions / plain                                  | Page title + subtitle + right-aligned action buttons. Used on every route page.                                                      |
-| `EmptyState`  | centered illustration + heading + CTA                 | Standard empty pattern for empty days, empty subject filters, empty search.                                                          |
-| `Chip`        | static / removable / filterable                       | Inline tag chip (used by ListRow, ResourcesSort, StatusFilterBar).                                                                   |
-| `Badge`       | success / info / warn / danger / neutral              | Status badge primitive (StatusBadge becomes a subject-aware specialization).                                                         |
-| `ToggleGroup` | 2-button / 3-button segmented                         | The Personal/Master, By-Unit/By-Week, Grid/List, Roadmap/Progression pattern. **Toggle redesign is in flight — see §12 open items.** |
-| `Tooltip`     | hover / focus                                         | Replaces ad-hoc `title=""` everywhere. Keyboard-reachable.                                                                           |
+| Primitive     | Variants                                              | Purpose                                                                                                                                                                                                                                                   |
+| ------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`      | primary / secondary / ghost / icon-only / destructive | Single source for every button. Tokens, ≥44px on phone/tablet.                                                                                                                                                                                            |
+| `Card`        | subject-tinted / neutral                              | The layered Weekly recipe, generic. Wraps any content with the same border / shadow / header treatment.                                                                                                                                                   |
+| `PageHeader`  | with-actions / plain                                  | Page title + subtitle + right-aligned action buttons. Used on every route page.                                                                                                                                                                           |
+| `EmptyState`  | centered illustration + heading + CTA                 | Standard empty pattern for empty days, empty subject filters, empty search.                                                                                                                                                                               |
+| `Chip`        | static / removable / filterable                       | Inline tag chip (used by ListRow, ResourcesSort, StatusFilterBar).                                                                                                                                                                                        |
+| `Badge`       | success / info / warn / danger / neutral              | Status badge primitive (StatusBadge becomes a subject-aware specialization).                                                                                                                                                                              |
+| `ToggleGroup` | 2-button / 3-button segmented                         | The Personal/Master, By-Unit/By-Week, Grid/List, Roadmap/Progression pattern. **Toggle redesign is in flight — see §12 open items.**                                                                                                                      |
+| `Tooltip`     | hover / focus                                         | Replaces ad-hoc `title=""` everywhere. Keyboard-reachable.                                                                                                                                                                                                |
+| `UndoToast`   | undoable / confirmation-only                          | The roadmap-02 undo toast (white, bottom-center, 6s pausable, ⌘Z). Fire via `useUndoToast()` (`lib/undo-toast.tsx`); planner gestures toast automatically through the shell bridge. Sibling of `ConsequenceToast` (dark, team-scope) — do not merge them. |
 
 When you need a new primitive variant: add to the existing component
 with a new prop. Do not duplicate.
@@ -252,13 +253,13 @@ Three viewport tiers. Every page works at every tier.
 
 ### Top-bar collapse cascade (do not regress)
 
-| Breakpoint | Behavior                                                       |
-| ---------- | -------------------------------------------------------------- |
-| ≤ 1280px   | "Soon" view tabs hidden                                        |
-| ≤ 1024px   | Save indicator + view-mode pill hidden                         |
-| ≤ 768px    | Week label + undo/redo hidden                                  |
-| ≤ 540px    | View-tab + edit-toggle padding compressed                      |
-| ≤ 480px    | Master/Personal labels become `P \| M`; bar padding tightens   |
+| Breakpoint | Behavior                                                     |
+| ---------- | ------------------------------------------------------------ |
+| ≤ 1280px   | "Soon" view tabs hidden                                      |
+| ≤ 1024px   | Save indicator + view-mode pill hidden                       |
+| ≤ 768px    | Week label + undo/redo hidden                                |
+| ≤ 540px    | View-tab + edit-toggle padding compressed                    |
+| ≤ 480px    | Master/Personal labels become `P \| M`; bar padding tightens |
 
 ### Verification
 
@@ -289,6 +290,17 @@ the riskiest tier — do not skip it.
 - **Reduced motion:** every transition has a `@media
 (prefers-reduced-motion: reduce)` block that drops it. No bounce,
   parallax, confetti, or surprise motion.
+- **Resource previews are never broken (6.12.26 P5):** one authority —
+  `canEmbedResource()` in `lib/resource-embed.ts` — decides iframe vs.
+  fallback on EVERY surface (tiles, panel, preview pane). When it says no,
+  render the designed link card, never a blank frame or raw URL. Every
+  resource `<img>` is allowlist-gated (`isSafeImgSrc` idiom) and demotes
+  on error through: thumbnail → image url → type-tinted glyph → link card.
+  New surfaces must consult the same predicate, not re-derive it.
+- **Undo over confirmation (roadmap 02):** state-changing planner gestures
+  fire the `UndoToast` (via the shell bridge watching `lastChange`); a
+  toast never outlives the history step it describes. Confirmation-only
+  moments ("Link copied") use the same surface without an undo.
 
 ---
 
@@ -367,13 +379,17 @@ with the redesigned visual, then every existing toggle migrates to it.
 Until that wave lands: do not invent new toggle styles. Use the existing
 inline pattern in `top-bar.tsx` so the redesign migration is mechanical.
 
-### Master-snapshot diff data
+### Master-snapshot diff data (prototype shipped 6.12.26; lineage is 1B)
 
-`Restore from Master` and `Compare to Master` actions in the lesson
-context menu currently render a "Master snapshot not available yet"
-stub. Real diffs land once the backend supplies a master snapshot per
-lesson. Don't build the snapshot UI ahead of the data — the stub is
-documented in `components/lesson-card/compare-to-master.tsx`.
+The fork-diff UI is REAL now (UX roadmap item 01): "Compare with Team
+Curriculum" opens `components/lesson-card/fork-diff/` — inline old→new
+rows in semantic tints, per-field revert, whole-lesson restore, Propose
+to Team via the banner-gated Master mode. The DATA side is still the
+prototype seam: `Lesson.masterSnapshot?` (`lib/types.ts`) carried by a
+handful of mock fixtures. Phase 1B replaces the seam with persisted fork
+lineage from Supabase and should also export a store test harness (the
+restoreLesson reducer's move-delegation half is currently untested —
+noted in `tests/fork-diff.test.ts`).
 
 ### Add-lesson / add-event persistence
 

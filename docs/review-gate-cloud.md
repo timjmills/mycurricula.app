@@ -34,7 +34,7 @@ the gate is satisfied in the cloud by:
    message).
 
 When a change later flows through a **local** session or a PR where Codex
-*is* available, run the real gate there — this fallback does not exempt the
+_is_ available, run the real gate there — this fallback does not exempt the
 work from adversarial review, it records that the cloud run was blocked and
 what substituted for it.
 
@@ -51,7 +51,7 @@ what substituted for it.
 **Checklist findings:**
 
 - **React hook ordering (correctness).** `InstanceRenameLabel` calls all
-  hooks (`useInstanceLabels`, `useState`, `useRef`) *before* the
+  hooks (`useInstanceLabels`, `useState`, `useRef`) _before_ the
   `if (readOnly) return` early exit; `RenamePopover` calls all hooks before
   the `typeof document === "undefined"` portal guard. No conditional-hook
   violation. ESLint `react-hooks/rules-of-hooks` passes. ✓
@@ -66,7 +66,7 @@ what substituted for it.
   button-in-button nestings. The pencil `stopPropagation`/`preventDefault`
   is defensive belt-and-braces. ✓
 - **Save-button edge cases.** `disabled={!isChanged && currentName ===
-  defaultName}` keeps Save inert when nothing changed and no override
+defaultName}` keeps Save inert when nothing changed and no override
   exists; clearing the input on an existing override is treated as a valid
   change and routes through `rename(..., "")`, which the store maps to
   "clear this scope's override" → falls back to the other scope or default.
@@ -109,3 +109,25 @@ repositions within the viewport at all tiers.
 **Result:** No Critical/High issues found in self-review. Codex gate
 blocked (binary absent in cloud container) — recorded here per §4a
 fallback.
+
+### 2026-06-12 — 6.12.26 UX Roadmap + Resources build (waves 1–3)
+
+**Scope:** the full 6.12.26 handoff build — six commits across
+`claude/ux-roadmap-resources-wave-{1,2,3}`.
+
+**Reviewers on record:** one freshly-spawned independent review agent per
+wave (did not author the diffs) + lead disposition of every finding;
+implementation agents additionally ran self-administered passes. Codex
+unavailable in this container per the §4a cloud protocol.
+
+**Findings/fixes:** 0 Critical · 3 High · 20 Medium across the three
+waves — all fixed before their commits (full disposition in each commit
+message); ~30 Lows fixed or deferred with in-code notes. Highlights: a
+stale-toast wrong-undo path, an Esc-in-drawer capture loss, a
+remove-after-dedup targeting bug, a `javascript:` link-popover gap, and a
+restoreLesson that didn't restore.
+
+**Local verification stack:** tsc 0 · 282 vitest passed · lint ·
+prettier · `next build` · responsive probes (360/768/1280) · Playwright
+behavioral probes + artboard screenshot comparison in mock mode.
+See `docs/6.12.26 UX Roadmap + Resources Build Record.md`.
