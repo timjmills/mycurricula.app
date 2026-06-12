@@ -1,9 +1,9 @@
 /* lesson-detail.module.css
    Scoped styles for the LessonDetail panel.
 
-   TARGET (revised 2026-05-20) — "the same visual style used by lesson
+   TARGET (revised 2026-05-20) â€” "the same visual style used by lesson
    cards in the weekly view." The pane is a single rounded-corner WHITE
-   card. Across the top sits a FLAT, light subject-tinted HEADER BAND —
+   card. Across the top sits a FLAT, light subject-tinted HEADER BAND â€”
    the exact treatment the weekly-grid lesson cards already use. The
    header is no longer a dark slab; it is `var(--cl)` (subject light) fill
    with `var(--cd)` (subject deep) text, a 4px `var(--c)` left accent
@@ -11,13 +11,13 @@
    `var(--c)` bottom border to seat the band against the white body.
 
    Inside the band, three flex regions sit on one row:
-     LEFT   → a tiny 2-letter subject MONOGRAM chip, a 16×16 mark-done
+     LEFT   â†’ a tiny 2-letter subject MONOGRAM chip, a 16Ã—16 mark-done
               checkbox glyph, and the SUBJECT NAME big + uppercase.
-     MIDDLE → the lesson TITLE, centered in the remaining width, single-
+     MIDDLE â†’ the lesson TITLE, centered in the remaining width, single-
               line truncating with ellipsis on overflow.
-     RIGHT  → the lesson TIME range right-justified in big tabular
+     RIGHT  â†’ the lesson TIME range right-justified in big tabular
               numerals, followed by a tight pair of header icon buttons
-              (kebab ⋮ + expand ⤢).
+              (kebab â‹® + expand â¤¢).
 
    Everything below the band sits in the lesson BODY, which is now
    LEFT-ALIGNED (was centered): a flush-left readable column capped at
@@ -27,25 +27,25 @@
    bottom-of-pane controls owned by <LessonFlow> ("+ Add section",
    "Edit lesson flow / template") remain centered.
 
-   Color rules — ALL color, type, spacing tokens come from `tokens.css`
+   Color rules â€” ALL color, type, spacing tokens come from `tokens.css`
    via `var()`. The subject cascade `--c / --cl / --cd` (from the
    `.cp-subj.<subject>` wrapper) drives the header palette. NO hex, NO px
    font sizes in this file. (The sister agent owning per-section badges
-   uses explicit hex per spec §3.1 — that exception does not apply here.)
+   uses explicit hex per spec Â§3.1 â€” that exception does not apply here.)
 
    Layout overview:
-     .root          → the white card surface (rounded; clips the band).
-     .band          → flat subject-LIGHT header row with three regions.
-     .bandLeft      → monogram + checkbox + subject-name cluster.
-     .bandTitle     → centered, truncating lesson title region.
-     .bandRight     → right-justified time + header icon buttons.
-     .body          → scrollable body / the "cell" region (cellRef target).
-     .column        → 760px max, flush-left (NOT centered) readable column.
-     .actionRow     → compact icon+label action buttons under the I-CAN
+     .root          â†’ the white card surface (rounded; clips the band).
+     .band          â†’ flat subject-LIGHT header row with three regions.
+     .bandLeft      â†’ monogram + checkbox + subject-name cluster.
+     .bandTitle     â†’ centered, truncating lesson title region.
+     .bandRight     â†’ right-justified time + header icon buttons.
+     .body          â†’ scrollable body / the "cell" region (cellRef target).
+     .column        â†’ 760px max, flush-left (NOT centered) readable column.
+     .actionRow     â†’ compact icon+label action buttons under the I-CAN
                       line; left = completion, right = lesson-notes jump.
-     .section       → each lower block (standards / notes). */
+     .section       â†’ each lower block (standards / notes). */
 
-/* ── Root — the single white card ───────────────────────────────────────
+/* â”€â”€ Root â€” the single white card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    One rounded card with the only border + shadow in the whole pane.
    `overflow: hidden` clips the colored header band to the card's
    rounded top corners. */
@@ -63,10 +63,10 @@
   box-shadow: var(--sh-sm);
   overflow: hidden;
   /* The lesson-detail panel renders at 80% scale so a whole lesson fits on
-     screen at 100% browser zoom — the left sidebar and the day-header strip
+     screen at 100% browser zoom â€” the left sidebar and the day-header strip
      stay at full size. `zoom` re-flows content at scale (unlike
      transform: scale, which would leave an empty gap). width/height are
-     pre-multiplied by 1.25 so 0.8 × 1.25 = 1 and the panel still exactly
+     pre-multiplied by 1.25 so 0.8 Ã— 1.25 = 1 and the panel still exactly
      fills its pane; `flex: none` stops the flex parent from shrinking that
      compensated height. The docked rich-text toolbar is portaled to <body>
      (see rich-text-editor.tsx) so this `zoom` never offsets its
@@ -77,7 +77,20 @@
   height: 125%;
 }
 
-/* ── Header band — FLAT subject-LIGHT weekly-card treatment ──────────────
+/* The 80% scale is a DESKTOP fit-the-lesson ergonomic. At the phone/tablet
+   tier it would shrink type below the app-wide scale AND quietly deflate
+   every â‰¥44px touch compensation in the pane to ~35px effective (44 Ã— 0.8)
+   â€” the CLAUDE.md Â§4 floor. Render 1:1 there instead: text matches the
+   rest of the app and the pane's hit-area rules mean what they say. */
+@media (max-width: 900px) {
+  .root {
+    zoom: 1;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+/* â”€â”€ Header band â€” FLAT subject-LIGHT weekly-card treatment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    The header now matches the weekly-grid lesson card: a flat
    `var(--cl)` (subject light) fill with `var(--cd)` (subject deep) text
    and icons, a 4px `var(--c)` left accent stripe, and a hair-thin 25%
@@ -86,21 +99,21 @@
    of the band, flush to the card's rounded corner (the .root's
    `overflow:hidden` clips it).
 
-   Vertical padding 14px / horizontal padding 20px — the spec's
+   Vertical padding 14px / horizontal padding 20px â€” the spec's
    measurements (the 4px stripe lives on top of the left padding so the
    left cluster begins 20px in from the visible accent edge). A
-   `min-height` keeps the band ≥72px even when content is short. The
+   `min-height` keeps the band â‰¥72px even when content is short. The
    spec's three-region flex row lives directly inside this container.
 
    CLIPPING FIX: `overflow: hidden` on `.root` combined with the
    `zoom: 0.8; width: 125%` scaling trick means the band's content must
    truly fit within the band's box. `.band` must NOT have `flex-shrink:0`
-   fighting overflow — instead we let `.band` fill 100% of `.root`'s
+   fighting overflow â€” instead we let `.band` fill 100% of `.root`'s
    width and ensure the inner flex layout resolves without overflowing.
    The time region stays `flex: 0 0 auto` (never shrinks), while the
    title region yields space first. See `.bandTitle` and `.bandRight`. */
 .band {
-  /* Do NOT use flex-shrink:0 — it prevents the band from fitting inside
+  /* Do NOT use flex-shrink:0 â€” it prevents the band from fitting inside
      .root when the pane is narrow. The band is in a column flex, so
      flex-shrink applies to the cross axis; the real guard is `width:100%`
      ensuring the band's flex row is constrained to its container width. */
@@ -116,28 +129,28 @@
   gap: 16px;
   min-height: 72px;
   padding: 14px 20px;
-  /* Flat subject-light fill — falls back to a neutral wash when no
+  /* Flat subject-light fill â€” falls back to a neutral wash when no
      cp-subj wrapper is mounted. */
   background: var(--cl, var(--hairline));
   /* All text + icons inside the band read in the subject-deep ink,
      which clears AA against the light tint in every subject palette. */
   color: var(--cd, var(--ink-soft));
-  /* 4px solid accent stripe on the left edge — the weekly-card stripe.
+  /* 4px solid accent stripe on the left edge â€” the weekly-card stripe.
      `border-left` (rather than a ::before) keeps the stripe a real box-
      model edge so the inner padding measures from its inside face. */
   border-left: 4px solid var(--c, var(--muted));
-  /* Hair-thin tinted seam at the bottom of the band — a 25%
+  /* Hair-thin tinted seam at the bottom of the band â€” a 25%
      `var(--c)`-toward-transparent rule that seats the band against the
      white body without introducing a hard rule line. */
   border-bottom: 1px solid
     color-mix(in oklch, var(--c, var(--muted)) 25%, transparent);
   /* Prevent box-sizing from causing the border-left to push total width
-     past the parent — border-box is already the global default but stated
+     past the parent â€” border-box is already the global default but stated
      explicitly here for clarity given the clipping sensitivity. */
   box-sizing: border-box;
 }
 
-/* ── Header region A — LEFT (monogram + check + subject name) ────────────
+/* â”€â”€ Header region A â€” LEFT (monogram + check + subject name) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Hugs the left edge of the band. `flex: 0 0 auto` so the cluster sizes
    to its content; the title region in the middle takes the remaining
    space. `min-width: 0` allows the subject text to ellipsis-collapse if
@@ -150,10 +163,10 @@
   flex: 0 0 auto;
 }
 
-/* Two-letter subject monogram chip — e.g. "MA" for Math. The chip uses
+/* Two-letter subject monogram chip â€” e.g. "MA" for Math. The chip uses
    the subject BASE color (`var(--c)`) for its text so it stands out as
    the most-saturated mark in the band; weight 700 keeps the two letters
-   legible at micro-size. No background fill — the chip is letterforms
+   legible at micro-size. No background fill â€” the chip is letterforms
    only, matching the weekly card's tone-on-tone monogram. */
 .bandMonogram {
   flex-shrink: 0;
@@ -166,7 +179,7 @@
   line-height: 1;
 }
 
-/* Mark-done checkbox glyph — a 16×16 empty rounded-square hint. Just an
+/* Mark-done checkbox glyph â€” a 16Ã—16 empty rounded-square hint. Just an
    indicator (the real "Mark done" action button lives in the body's
    action row below). Sits in the band as a subtle weekly-card affordance
    so the header reads like a card header at a glance. */
@@ -181,9 +194,9 @@
   background: transparent;
 }
 
-/* Subject name — the BIG uppercase weekly-card hero on the left of the
+/* Subject name â€” the BIG uppercase weekly-card hero on the left of the
    band. Token mapping: spec asks for "~22px / weight 800 / spacing 0.6"
-   → `--t-22` (22px) is the exact token. The deep-subject ink keeps the
+   â†’ `--t-22` (22px) is the exact token. The deep-subject ink keeps the
    contrast on the light tint. `min-width: 0` + `text-overflow: ellipsis`
    guard against absurd subject names blowing out the cluster. */
 .bandSubject {
@@ -201,7 +214,7 @@
   text-overflow: ellipsis;
 }
 
-/* "Personal" pill — a small accent inline with the subject name. On the
+/* "Personal" pill â€” a small accent inline with the subject name. On the
    light tint we flip it to a `var(--cd)` chip with paper text so it
    still reads as a marked tag, not a button. */
 .bandPersonal {
@@ -217,15 +230,15 @@
   color: var(--on-solid);
 }
 
-/* ── Header region B — MIDDLE (centered, truncating title) ───────────────
+/* â”€â”€ Header region B â€” MIDDLE (centered, truncating title) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    `flex: 1 1 auto` so the title region absorbs the remaining width
    between the left cluster and the right cluster, then `text-align:
    center` true-centers the title in that remaining space. Token
-   mapping: spec asks for "~19px / weight 700" → `--t-18` (18px) is the
+   mapping: spec asks for "~19px / weight 700" â†’ `--t-18` (18px) is the
    nearest token and visually reads as the spec's lesson-title tier.
    Single-line truncate with ellipsis on overflow.
 
-   CLIPPING FIX: This region is the designated "yield" element — it must
+   CLIPPING FIX: This region is the designated "yield" element â€” it must
    shrink before the left or right clusters do. `flex: 1 1 auto` + `min-
    width: 0` together allow the browser's flex algorithm to shrink this
    region all the way to zero before touching the `flex: 0 0 auto` left
@@ -240,7 +253,7 @@
   font-weight: 700;
   line-height: 1.2;
   color: var(--cd, var(--ink));
-  /* Title is the FIRST to truncate when the band is squeezed — the left
+  /* Title is the FIRST to truncate when the band is squeezed â€” the left
      subject cluster and the right time+icons never yield. */
   white-space: nowrap;
   overflow: hidden;
@@ -248,14 +261,14 @@
   margin: 0;
 }
 
-/* ── Header region C — RIGHT (time + icons) ──────────────────────────────
+/* â”€â”€ Header region C â€” RIGHT (time + icons) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    `flex: 0 0 auto; margin-left: auto` keeps the right cluster hard-
    pinned to the right edge of the band; `text-align: right` reads-right
    for any wrapping of the inner stack. The time + icon row sit on one
    line; gap reserved for visual separation.
 
    CLIPPING FIX: `flex-shrink: 0` (implied by `flex: 0 0 auto`) ensures
-   the right cluster — including the full time string — is NEVER squeezed
+   the right cluster â€” including the full time string â€” is NEVER squeezed
    or clipped by the flex algorithm. The title region in the middle
    absorbs all available squeeze instead. `white-space: nowrap` on
    `.bandTime` ensures the time string itself never wraps. */
@@ -274,10 +287,10 @@
   padding-right: 4px;
 }
 
-/* The time range itself — big right-justified tabular-numerals digits.
-   Token mapping: spec asks for "~26px / weight 700" → `--t-26` (26px) is
+/* The time range itself â€” big right-justified tabular-numerals digits.
+   Token mapping: spec asks for "~26px / weight 700" â†’ `--t-26` (26px) is
    the exact token. `tabular-nums` keeps the digit widths even, so
-   ranges like "8:10–9:10" line up visually. The negative letter-spacing
+   ranges like "8:10â€“9:10" line up visually. The negative letter-spacing
    matches the spec's tight tracking on the time digits.
 
    `font-feature-settings: "tnum"` is added defensively for browsers
@@ -294,18 +307,18 @@
   white-space: nowrap;
 }
 
-/* The icon button cluster on the far right of the band — kebab ⋮ and
-   expand ⤢. `gap: 4px` per spec. The header is a tertiary control
+/* The icon button cluster on the far right of the band â€” kebab â‹® and
+   expand â¤¢. `gap: 4px` per spec. The header is a tertiary control
    surface (the primary action is the body's "Mark done"), so the spec
-   gives these a 28×28 hit target with a 16px glyph rather than the
-   ≥44px we use for primary tap targets. */
+   gives these a 28Ã—28 hit target with a 16px glyph rather than the
+   â‰¥44px we use for primary tap targets. */
 .bandIcons {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-/* Band icon button — kebab / expand. 28×28 hit target with a 16px
+/* Band icon button â€” kebab / expand. 28Ã—28 hit target with a 16px
    glyph. `color: inherit` picks up the band's `var(--cd)` so the
    glyphs read tone-on-tone with the rest of the band. A 60% opacity
    resting state keeps them quiet next to the time hero; hover/focus
@@ -340,8 +353,8 @@
   outline-offset: -2px;
 }
 
-/* ── Header responsive behavior ─────────────────────────────────────────
-   Spec §1.3: below 720px panel width the subject + time retain their
+/* â”€â”€ Header responsive behavior â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   Spec Â§1.3: below 720px panel width the subject + time retain their
    sizes while the TITLE truncates first; only below 540px should the
    title wrap or the time step down to ~20px.
 
@@ -365,8 +378,8 @@
   }
 }
 
-/* ── Scrollable body / the "cell" region (cellRef target) ────────────────
-   cellRef is attached to this element — the docked rich-text toolbar
+/* â”€â”€ Scrollable body / the "cell" region (cellRef target) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   cellRef is attached to this element â€” the docked rich-text toolbar
    centers itself on it. Plain white surface; it just scrolls. The
    readable measure + LEFT-ALIGNED gutter live on the inner `.column`. */
 .body {
@@ -375,16 +388,21 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
+  /* NO container-type here â€” inline-size containment would make this
+     element the containing block for position:fixed descendants, which
+     breaks the (non-portaled) ResourceComposer dialog rendered inside
+     <LessonFlow>. The agenda-navigator stacking is JS-measured instead
+     (a ResizeObserver in LessonDetail toggles .workspaceNarrow). */
 }
 
-/* ── Readable content column — LEFT-aligned (spec §2) ────────────────────
+/* â”€â”€ Readable content column â€” LEFT-aligned (spec Â§2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Previous build centered the body content with `margin: 0 auto`,
    leaving empty margins on both sides of a roomy pane. The spec calls
    for the body to be FLUSH-LEFT against a 32px gutter from the pane
    edge, with at least 24px on the right before the right rail.
 
-   Implementation: `margin: 0` (NOT `0 auto`) — equivalently
-   `margin-inline-start: 0; margin-inline-end: auto` — so the column
+   Implementation: `margin: 0` (NOT `0 auto`) â€” equivalently
+   `margin-inline-start: 0; margin-inline-end: auto` â€” so the column
    anchors to the left of the body. `max-width: 760px` caps the
    reading measure. Side padding pins the 32px left gutter; the right
    padding is the minimum 24px the spec requires.
@@ -403,18 +421,19 @@
   flex-direction: column;
 }
 
-/* ── Title row + Objective row — edit-affordance flex containers ────────
-   W3-C5: each editable text (title + I-can objective) sits inside a
-   flex row that also carries a visible PENCIL button. The pencil is
-   OUTSIDE the editable element itself so its hover/focus reveal scopes
-   to the whole row, and so it never falls inside any W2-B1 team-mode
-   edit-cue ring drawn on the text element.
+/* â”€â”€ Title row â€” edit-affordance flex container â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   W3-C5: the editable title sits inside a flex row that also carries a
+   visible PENCIL button. The pencil is OUTSIDE the editable element
+   itself so its hover/focus reveal scopes to the whole row, and so it
+   never falls inside any W2-B1 team-mode edit-cue ring drawn on the
+   text element. (The "I can" objective row that used to share this
+   pattern moved into the planning panel's Objective pane.)
 
    Reveal behavior (see `.editPencil` below):
-     • Desktop (>480px): pencil opacity 0 by default; opacity 1 when the
+     â€¢ Desktop (>480px): pencil opacity 0 by default; opacity 1 when the
        row receives `:hover` OR contains `:focus-within` (keyboard focus
        into the editable text reveals the pencil too).
-     • Phone (≤480px): pencil is always opacity 1 — touch surfaces have
+     â€¢ Phone (â‰¤480px): pencil is always opacity 1 â€” touch surfaces have
        no hover, so the affordance must be permanent.
 
    The row aligns the pencil to the editable text's baseline-ish center
@@ -437,42 +456,20 @@
   min-width: 0;
 }
 
-.objectiveRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  margin-top: 10px;
-}
-
-/* Same flex behavior for the objective paragraph — it expands to fill
-   the row, leaving the pencil pinned to the trailing edge. */
-.objectiveRow > .objective {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-/* The objective `<p>` carried its own `margin-top: 10px`; now that the
-   row supplies that spacing, neutralize the paragraph's top margin so
-   the row gap is the only vertical lift. */
-.objectiveRow .objective {
-  margin-top: 0;
-}
-
-/* ── Visible pencil edit affordance (W3-C5) ─────────────────────────────
+/* â”€â”€ Visible pencil edit affordance (W3-C5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    A real `<button>` (not a div) so it gets keyboard focus + Enter/Space
    activation for free. The button hosts a single-stroke PencilIcon SVG
    that inherits currentColor; the color is the muted ink so it reads as
    a quiet affordance, brightening on hover/focus.
 
-   Reveal — desktop default is opacity 0 with the pencil still in the
+   Reveal â€” desktop default is opacity 0 with the pencil still in the
    DOM (no width collapse, no layout shift on hover). The row reveals it
    on `:hover` OR `:focus-within`. Below 480px the pencil is always
-   visible (opacity 1) — touch devices have no hover state.
+   visible (opacity 1) â€” touch devices have no hover state.
 
    The button itself remains keyboard-reachable even when opacity is 0
    (the row's `:focus-within` rule lifts it to opacity 1 the instant the
-   button receives focus). A 28×28 hit target keeps it tappable on
+   button receives focus). A 28Ã—28 hit target keeps it tappable on
    touch; the visible glyph is 14px. */
 .editPencil {
   display: inline-flex;
@@ -495,9 +492,7 @@
 }
 
 .titleRow:hover .editPencil,
-.titleRow:focus-within .editPencil,
-.objectiveRow:hover .editPencil,
-.objectiveRow:focus-within .editPencil {
+.titleRow:focus-within .editPencil {
   opacity: 1;
 }
 
@@ -512,7 +507,7 @@
   outline-offset: 1px;
 }
 
-/* Phone — always visible. Touch surfaces have no hover; the pencil
+/* Phone â€” always visible. Touch surfaces have no hover; the pencil
    must be permanent so the affordance is discoverable. */
 @media (max-width: 480px) {
   .editPencil {
@@ -520,8 +515,8 @@
   }
 }
 
-/* ── Title — hero ────────────────────────────────────────────────────────
-   The lesson title is the largest text in the body — confident, dark on
+/* â”€â”€ Title â€” hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   The lesson title is the largest text in the body â€” confident, dark on
    white. The header band has its own subject hero above; the body title
    is the lesson NAME (e.g. "Adding Fractions with Unlike Denominators").
    `overflow-wrap: anywhere` keeps very long single-word titles from
@@ -538,10 +533,10 @@
   overflow-wrap: anywhere;
 }
 
-/* ── Double-click-to-edit static text ───────────────────────────────────
+/* â”€â”€ Double-click-to-edit static text â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    The lesson title and "I can" objective render as static text by
    default and swap to a RichTextEditor only on double-click (or Enter /
-   F2). This `.editableText` class is the static element — it inherits
+   F2). This `.editableText` class is the static element â€” it inherits
    all type/color from its container, shows a quiet hover and
    keyboard-focus affordance so teachers can discover the edit gesture,
    and keeps a comfortable hit area via the container's metrics. Mirrors
@@ -555,12 +550,12 @@
   transition: background 0.1s;
 }
 
-/* Quiet hover tint — a faint wash of the current text color. */
+/* Quiet hover tint â€” a faint wash of the current text color. */
 .editableText:hover {
   background: color-mix(in srgb, currentColor 7%, transparent);
 }
 
-/* Keyboard-focus affordance — the hover tint plus a focus ring so the
+/* Keyboard-focus affordance â€” the hover tint plus a focus ring so the
    edit affordance is discoverable without a mouse. */
 .editableText:focus-visible {
   outline: 2px solid var(--brand-500);
@@ -568,20 +563,12 @@
   background: color-mix(in srgb, currentColor 7%, transparent);
 }
 
-/* An empty objective shows a quiet, muted placeholder prompt — still a
-   double-click target so a teacher can add an objective to a lesson
-   that lacks one. */
-.objectiveEmpty {
-  color: var(--muted);
-  font-style: italic;
-}
-
-/* ── Rich-text editor hosting ────────────────────────────────────────────
-   RichEditorWrapper — the shell hosting a RichTextEditor while the title
-   or objective is being edited. The editor's toolbar is docked
-   (position:fixed, portaled) and escapes this subtree; the wrapper just
-   occupies the field's normal flow box so the editor sits exactly where
-   the static text was. */
+/* â”€â”€ Rich-text editor hosting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   RichEditorWrapper â€” the shell hosting a RichTextEditor while the title
+   is being edited. The wrapper just occupies the field's normal flow box
+   so the editor sits exactly where the static text was; the sticky
+   RtToolbar at the top of the scroll body supplies the formatting
+   chrome (the editor renders chromeless). */
 .richEditorWrap {
   position: relative;
   display: inline-block;
@@ -590,48 +577,15 @@
   vertical-align: top;
 }
 
-/* ── "I Can" objective — a quiet single line, no box ─────────────────────
-   `overflow-wrap: anywhere` keeps long objective text from blowing out
-   the readable column when the pane is narrow. A small lift below the
-   larger title hero keeps the objective on the same paragraph rhythm. */
-.objective {
-  margin: 10px 0 0;
-  font-size: var(--t-13);
-  line-height: 1.55;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-/* Small uppercase "I CAN" label in the subject color, inline with the
-   objective text. The label takes a faint subject-light pill wash so it
-   reads as a quiet highlighter pen mark on the page — the spec calls
-   for "the highlighter pill on I CAN" (kept from the previous build per
-   spec §5). */
-.objectiveLabel {
-  font-size: var(--t-11);
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: var(--cd, var(--ink-soft));
-  background: var(--cl, var(--hairline));
-  padding: 1px 6px;
-  border-radius: var(--r-4);
-  margin-right: 7px;
-}
-
-.objectiveText {
-  color: var(--ink-soft);
-}
-
-/* ── Action row ──────────────────────────────────────────────────────────
+/* â”€â”€ Action row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Compact icon+label buttons. Left cluster groups completion affordances
    (Mark done + Add status). Right cluster (pushed via margin-left:auto)
-   holds the Lesson notes jump button. Per spec §5 the print + overflow
-   icons NO LONGER appear here — they have moved into the header band's
+   holds the Lesson notes jump button. Per spec Â§5 the print + overflow
+   icons NO LONGER appear here â€” they have moved into the header band's
    right region. The row contains only the three controls the spec
    preserves: Mark done, Add status, Lesson notes.
 
-   `flex-wrap: wrap` keeps the row tidy on narrow widths — the right
+   `flex-wrap: wrap` keeps the row tidy on narrow widths â€” the right
    cluster wraps to a second line instead of pushing the row past the
    column edge. */
 .actionRow {
@@ -658,7 +612,7 @@
   flex-shrink: 0;
 }
 
-/* "Mark done" — outlined ~12px/6px-radius pill per spec §5. Inline 44px
+/* "Mark done" â€” outlined ~12px/6px-radius pill per spec Â§5. Inline 44px
    min-height keeps it a primary tap target. */
 .markDone {
   display: inline-flex;
@@ -690,14 +644,14 @@
   outline-offset: 1px;
 }
 
-/* Done state — the label picks up the completion green. */
+/* Done state â€” the label picks up the completion green. */
 .markDoneDone {
   color: var(--done);
 }
 
-/* Generic action button — quiet icon+label pair used by [Add status] and
+/* Generic action button â€” quiet icon+label pair used by [Add status] and
    [Lesson notes]. Same outlined affordance language as .markDone per
-   spec §5 (outlined, 12px, 6px radius, ink-200 border) so the row reads
+   spec Â§5 (outlined, 12px, 6px radius, ink-200 border) so the row reads
    as a coherent tier of compact actions. The [Lesson notes] variant
    strips the border to read as a quieter trailing link. */
 .actionBtn {
@@ -730,7 +684,7 @@
   outline-offset: 1px;
 }
 
-/* "Lesson notes" — the trailing jump-to-notes link on the right of the
+/* "Lesson notes" â€” the trailing jump-to-notes link on the right of the
    action row. Lighter visual weight than the outlined buttons on the
    left; reads as a navigational link with an inline icon, not a CTA. */
 .notesLink {
@@ -761,124 +715,495 @@
   outline-offset: 1px;
 }
 
-/* ── Lesson Flow container ──────────────────────────────────────────────
-   <LessonFlow> sits directly on the white body — no bordered or shaded
+/* â”€â”€ Lesson workspace â€” agenda navigator + lesson flow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   (6.11.26 redesign Â§6.) Two-column grid: the sticky numbered section
+   navigator on the left, the lesson flow filling the rest. Hiding the
+   navigator (the .agendaBar toggle) collapses to one column. When the
+   center column is narrow (the dock columns are teacher-resizable), the
+   navigator stacks ABOVE the flow as a horizontally scrolling strip â€”
+   a container query, since the column width is independent of the
+   viewport. */
+.workspace {
+  display: grid;
+  grid-template-columns: 184px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.workspaceNavOff {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* â”€â”€ Agenda section head (prototype .agendaSectionHead) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   Drag grip (decorative) Â· "Lesson agenda" display title Â· right-aligned
+   actions cluster (Templates menu + Hide-navigation toggle). */
+.agendaSectionHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 26px 0 14px;
+}
+
+.sectionGrip {
+  display: inline-flex;
+  color: var(--faint);
+  opacity: 0.6;
+}
+
+.sectionGrip svg {
+  width: 14px;
+  height: 14px;
+}
+
+.agendaSectionTitle {
+  font-family: var(--font-display-sm);
+  font-size: var(--t-18);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.agendaActions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* â”€â”€ Templates menu (prototype .tmplWrap/.tmplBtn/.tmplMenu) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   The button shares the agendaToggle's quiet-chrome recipe; the menu is
+   an absolutely-positioned popover listing the built-in lesson-flow
+   templates. Production addition: the menu scrolls past ~7 items (the
+   built-in library is larger than the prototype's sample list). */
+.tmplWrap {
+  position: relative;
+}
+
+/* Doubled classes on the four buttons below: the tokens.css
+   `.cp-root button` reset (0,1,1) otherwise strips their borders and
+   padding (the .rtBtn.rtBtn pattern). */
+.tmplBtn.tmplBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+@media (max-width: 900px), (hover: none) {
+  .tmplBtn.tmplBtn {
+    min-height: 56px;
+    padding: 10px 14px;
+  }
+}
+
+.tmplBtn:hover {
+  color: var(--brand-600);
+  border-color: var(--brand-300);
+}
+
+.tmplBtn:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.tmplBtn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tmplMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 236px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
+  padding: 6px;
+}
+
+.tmplMenuLabel {
+  font-size: var(--t-10);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 8px 10px 4px;
+}
+
+.tmplMenuItem.tmplMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  min-height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-sm);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+@media (max-width: 900px), (hover: none) {
+  .tmplMenuItem {
+    min-height: 48px;
+  }
+}
+
+.tmplMenuItem:hover {
+  background: var(--hairline);
+}
+
+.tmplMenuItem:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+}
+
+.tmplMenuItem svg {
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+/* Phase-count suffix on a template row, pushed to the trailing edge. */
+.tmShort {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: var(--t-11);
+  font-weight: 500;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.agendaToggle.agendaToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+/* Touch devices: pad up to the â‰¥44px target rule (the detail card's
+   zoom: 0.8 shrinks rendered sizes, so the layout box compensates). */
+@media (max-width: 900px), (hover: none) {
+  .agendaToggle.agendaToggle {
+    min-height: 56px;
+    padding: 10px 14px;
+  }
+}
+
+.agendaToggle:hover {
+  color: var(--brand-600);
+  border-color: var(--brand-300);
+}
+
+.agendaToggle:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+/* Sticky inside the scrollable detail body (.body is the scroll
+   ancestor), so the navigator rides along while the flow scrolls.
+   top: 52px clears the sticky RtToolbar pinned at the top of the same
+   scroll context (prototype value). That assumes a ONE-ROW toolbar:
+   below 720px the toolbar's hint is hidden and its ~14 buttons need
+   â‰ˆ500px, while this sticky nav only exists while the JS-measured
+   content width is â‰¥560px (narrower flips .workspaceNarrow, which makes
+   the nav static) â€” so the toolbar cannot wrap while this offset is in
+   effect. Revisit if buttons are added to the toolbar. */
+.agendaNav {
+  position: sticky;
+  top: 52px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding-top: 2px;
+  min-width: 0;
+}
+
+.agendaItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    border-color 0.14s ease,
+    background 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+/* Items are drag-reorderable â€” the grab cursor advertises it
+   (prototype `[draggable="true"]` rules). Renaming flips draggable off,
+   so the text cursor wins inside the input. */
+.agendaItem[draggable="true"] {
+  cursor: grab;
+}
+
+.agendaItem[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.agendaItem:hover {
+  border-color: var(--brand-300);
+  background: var(--brand-50);
+}
+
+.agendaItem:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+/* Touch devices: pad up to the â‰¥44px target rule (the detail card's
+   zoom: 0.8 shrinks rendered sizes, so the layout box compensates). */
+@media (max-width: 900px), (hover: none) {
+  .agendaItem {
+    min-height: 60px;
+  }
+}
+
+/* The item mid-drag (prototype .agDragging). */
+.agendaItemDragging {
+  opacity: 0.45;
+  box-shadow: var(--sh-md);
+}
+
+.agendaNum {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: var(--t-13);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--ink-100);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Two-line text block: phase name above, minutes below (the time line
+   is simply not rendered when a phase has no minutes â€” the handoff's
+   optional-minutes rule, no dangling separator). */
+.agendaText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.agendaName {
+  display: block;
+  min-width: 0;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agendaTime {
+  display: block;
+  font-size: var(--t-11);
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Inline rename input â€” swapped in for the name on double-click / F2.
+   Same metrics as the static name; brand focus ring per the prototype's
+   contenteditable focus rules. */
+.agendaNameInput {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+  border-radius: var(--r-4);
+  outline: 2px solid var(--brand-200);
+  outline-offset: 1px;
+  cursor: text;
+}
+
+.agendaChev {
+  color: var(--faint);
+  flex-shrink: 0;
+  display: inline-flex;
+  transition: transform 0.14s ease;
+}
+
+.agendaItemActive {
+  border-color: var(--brand-500);
+  background: var(--brand-50);
+  box-shadow: var(--sh-sm);
+}
+
+.agendaItemActive .agendaNum {
+  background: var(--brand-100);
+  color: var(--brand-700);
+  border-color: var(--brand-300);
+}
+
+.agendaItemActive .agendaName {
+  color: var(--brand-700);
+}
+
+.agendaItemActive .agendaChev {
+  transform: rotate(90deg);
+  color: var(--brand-500);
+}
+
+/* A completed phase tints its number circle with the done tokens. */
+.agendaItemDone .agendaNum {
+  background: var(--done-tint);
+  color: var(--done);
+  border-color: color-mix(in oklch, var(--done) 30%, transparent);
+}
+
+/* â”€â”€ "Add phase" nav item (prototype .agendaAdd) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   Dashed quiet row closing the navigator; appends a phase through the
+   same store action as the flow's footer button. */
+.agendaAdd.agendaAdd {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--t-12);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.14s ease,
+    color 0.14s ease,
+    background 0.14s ease;
+}
+
+@media (max-width: 900px), (hover: none) {
+  .agendaAdd {
+    min-height: 60px;
+  }
+}
+
+.agendaAdd:hover {
+  border-color: var(--brand-300);
+  color: var(--brand-600);
+  background: var(--brand-50);
+}
+
+.agendaAdd:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.agendaAddIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border);
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.agendaAdd:hover .agendaAddIcon {
+  border-color: var(--brand-300);
+  color: var(--brand-600);
+}
+
+.agendaAddIcon svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Narrow center column â†’ the navigator stacks above the flow as a
+   horizontal strip. The dock columns resize independently of the
+   viewport, so this is keyed on a JS-measured class (a ResizeObserver
+   in LessonDetail watches the body cell's width) rather than a media
+   query â€” and rather than a container query, which would impose
+   containment on the scroll container and break the fixed-position
+   ResourceComposer rendered inside the flow. */
+.workspaceNarrow {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 13px;
+}
+
+.workspaceNarrow .agendaNav {
+  position: static;
+  flex-direction: row;
+  overflow-x: auto;
+  gap: 8px;
+  padding: 2px 1px 8px;
+  scrollbar-width: thin;
+}
+
+.workspaceNarrow .agendaItem,
+.workspaceNarrow .agendaAdd {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 148px;
+}
+
+.workspaceNarrow .agendaItem .agendaChev {
+  display: none;
+}
+
+/* â”€â”€ Lesson Flow container â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   <LessonFlow> sits directly on the white body â€” no bordered or shaded
    box. Just normal vertical breathing room above it. The other agent
    owns the lesson flow internals (sections / per-section resources);
    this wrapper just gives the flow its place in the column. */
 .flowWrap {
-  margin-top: 22px;
-}
-
-/* ── Section blocks (standards / notes) ─────────────────────────────────
-   Clean content on white. Generous, even space between each block so
-   the panel reads with a calm vertical rhythm. */
-.section {
-  margin-top: 28px;
-}
-
-/* Section heading — bold subject-color text seated in a little BANNER,
-   the same highlighter treatment as <LessonFlow>'s section headings so
-   the whole detail panel reads consistently. Echoes the Weekly card's
-   `.band`:
-     • the band is a subject-light highlighter wash (var(--cl)) with the
-       same long horizontal fade tail as the lesson-flow headings — it
-       shrink-wraps to the heading text (`inline-flex` + `width:
-       fit-content`) rather than stretching the full row, so it stays a
-       banner, not a full-width bar;
-     • a faint vertical subject wash gives it gentle banner weight;
-     • a single multi-layer box-shadow carries a 2px inset colored SEAM
-       at the bottom edge plus a soft subject-tinted DROP SHADOW falling
-       DOWNWARD into the white body.
-   All color via the --c / --cd / --cl cascade; no hard-coded values. */
-.sectionHead {
-  display: inline-flex;
-  max-width: 100%;
-  min-width: 0;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin: 0 0 13px;
-  padding: 3px min(9em, 28%) 4px 9px;
-  font-family: var(--font-display-sm);
-  font-size: var(--t-14);
-  font-weight: 800;
-  letter-spacing: -0.1px;
-  color: var(--cd, var(--ink));
-  border-radius: var(--r-xs);
-  background:
-    linear-gradient(
-      to right,
-      var(--cl, var(--hairline)) 0,
-      var(--cl, var(--hairline)) calc(100% - min(8.4em, 26%)),
-      transparent 100%
-    ),
-    linear-gradient(
-      to bottom,
-      transparent 0,
-      color-mix(in oklch, var(--cd, var(--faint)) 7%, transparent) 100%
-    );
-  box-shadow:
-    inset 0 -2px 0 0
-      color-mix(in oklch, var(--cd, var(--faint)) 32%, transparent),
-    0 1px 4px color-mix(in oklch, var(--cd, var(--faint)) 12%, transparent);
-}
-
-/* Small count suffix beside a heading — quieter than the heading itself. */
-.sectionCount {
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: color-mix(in oklch, var(--cd, var(--muted)) 60%, transparent);
-}
-
-/* ── Teacher notes editor wrapper ───────────────────────────────────────
-   The notes are ALWAYS visible — there is no hover-to-reveal blur. The
-   editor sits directly on the white body, no border, no fill. */
-.notesWrap {
-  /* Plain flow box; nothing to style beyond its place in the column. */
-}
-
-/* ── Standards — inline rows on white, no filled box ────────────────────
-   A code chip (the only small fill — it reads as a label, matching the
-   subject-tint chip language used elsewhere) followed by the
-   description directly on the white surface. */
-.standardsList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.standardItem {
-  display: flex;
-  gap: 9px;
-  /* Keep the row flex-shrinkable so very long standards descriptions
-     wrap instead of pushing the column wider. */
+  margin-top: 0;
   min-width: 0;
 }
 
-/* Subject-tinted standard code chip — a small content accent. */
-.standardCode {
-  font-size: var(--t-11);
-  font-weight: 600;
-  color: var(--cd, var(--ink-soft));
-  background: var(--cl, var(--hairline));
-  padding: 2px 6px;
-  border-radius: var(--r-4);
-  flex-shrink: 0;
-  height: fit-content;
-  margin-top: 1px;
-}
-
-.standardDesc {
-  flex: 1 1 0;
-  min-width: 0;
-  font-size: var(--t-12);
-  color: var(--ink-soft);
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
-
-/* ── Reduced motion ──────────────────────────────────────────────────────
+/* â”€â”€ Reduced motion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Transitions stripped to near-instant under prefers-reduced-motion. */
 @media (prefers-reduced-motion: reduce) {
   .editableText,
@@ -886,7 +1211,16 @@
   .markDone,
   .actionBtn,
   .notesLink,
-  .editPencil {
+  .editPencil,
+  .agendaItem,
+  .agendaAdd,
+  .agendaChev,
+  .agendaToggle,
+  .tmplBtn {
     transition: none;
+  }
+
+  .agendaItemActive .agendaChev {
+    transform: none;
   }
 }

@@ -22,51 +22,69 @@
   background: var(--canvas);
 }
 
-/* ── Page header (title + subtitle) ──────────────────────────────────────
-   Wrapper class for the canonical <PageHeader> primitive — paints the
-   paper background and bottom hairline so the header reads as a top
-   chrome band like Year's. Padding/typography are owned by PageHeader. */
+/* ── Page header — single tightened bar (6.11.26 redesign) ───────────────
+   One header band: the page title with the breadcrumb DIRECTLY underneath
+   (the previous separate breadcrumb strip and the generic subtitle were
+   removed to calm the top of the page), and the actions cluster (view
+   pill + Present) pushed to the right. */
 .dailyPageHeader {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 22px;
 }
 
-/* Actions cluster in the page-header actions slot — the Subject/Schedule
-   toggle and the Present button sit on one row, wrapping to a second row
-   on narrow viewports so neither control overflows the header. */
+.pageHeadText {
+  min-width: 0;
+}
+
+.pageTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--t-22);
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+/* Breadcrumb row under the title — Week N › Day › Subject. Each segment
+   is a clickable link; the › separators are presentational. Neutral ink:
+   navigation chrome, never subject-colored. */
+.headerCrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: var(--t-12);
+}
+
+/* Actions cluster — the Subject/Schedule toggle and the Present button
+   sit on one row, wrapping on narrow viewports so neither control
+   overflows the header. */
 .headerActions {
+  margin-left: auto;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-/* ── Breadcrumb: Week N / Day / Subject (BIG-7) ─────────────────────────
-   A slim single-line strip across the top of the Daily view.  Each segment
-   is a clickable link; chevron separators are presentational (aria-hidden).
-   Sits above the body row (icon rail + columns) so it spans the full width.
-   Color is neutral ink — it is navigation chrome, not subject-colored. */
+/* Phone: the header stacks — title + crumb on top, actions on their own
+   row beneath — so the Present button never collides with the crumb. */
+@media (max-width: 640px) {
+  .dailyPageHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 14px;
+  }
 
-.breadcrumb {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
-  height: 30px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-}
-
-.breadcrumbList {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: var(--t-12);
-  color: var(--muted);
+  .headerActions {
+    margin-left: 0;
+  }
 }
 
 .breadcrumbLink {
@@ -80,6 +98,8 @@
 
 .breadcrumbLink:hover {
   color: var(--ink);
+  /* Prototype crumb hover paints a hairline wash, not color alone. */
+  background: var(--hairline);
 }
 
 .breadcrumbLink:focus-visible {
@@ -434,21 +454,9 @@
   align-items: stretch;
 }
 
-/* The grid columns are set inline by DailyView from the resizable width:
-   [lesson list (px)] [splitter (auto)] [center detail (1fr)] [right rail
-   (auto)]. The fallback here keeps a sane layout if the inline style is
-   ever absent. The narrow media query at the foot of this file overrides
-   this back to a single column.  */
-.body {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  /* Five tracks, left → right: lesson list | left splitter | center detail |
-     right splitter | right rail. The list and the rail are both resizable
-     (DailyView writes their px widths into an inline gridTemplateColumns at
-     runtime); the center detail takes the remaining 1fr. */
-  grid-template-columns: 300px auto 1fr auto 320px;
-}
+/* The grid-mode body is the dock panel system — its layout lives in
+   components/daily/dock/Dock.module.css (three flex columns whose widths
+   are --w flex-grow ratios, slot tab strips, icon rails, splitters). */
 
 /* ── List-mode body ─────────────────────────────────────────────────────── */
 /* When viewMode==="list", DailyList replaces the lesson-list + detail
@@ -1011,17 +1019,9 @@
     flex-direction: column;
   }
 
-  /* The body switches to a vertical flex column in narrow mode — the
-     wide-viewport grid tracks are meaningless when everything stacks. The
-     !important overrides the inline grid-template-columns DailyView sets
-     from the resizable list width. */
-  .body {
-    display: flex !important;
-    flex-direction: column;
-    grid-template-columns: 1fr !important;
-  }
-
-  /* The splitter is meaningless when the panes stack — remove it. */
+  /* The splitter is meaningless when the panes stack — remove it. (The
+     dock system's own splitters hide via Dock.module.css; this rule
+     covers PaneSplitter instances that share this class.) */
   .splitter {
     display: none;
   }
@@ -1031,19 +1031,8 @@
     border-bottom: 1px solid var(--border);
   }
 
-  /* data-narrow-pane="list" → show the list, hide the center detail.
-     Hides both the inner column wrapper AND the outer .columnSlot via
-     :has() so the slot doesn't reserve space in the narrow stack. */
-  .body[data-narrow-pane="list"] [data-column="detail"],
-  .body[data-narrow-pane="list"] .columnSlot:has([data-column="detail"]) {
-    display: none;
-  }
-
-  /* data-narrow-pane="detail" → show the detail, hide the list. */
-  .body[data-narrow-pane="detail"] [data-column="list"],
-  .body[data-narrow-pane="detail"] .columnSlot:has([data-column="list"]) {
-    display: none;
-  }
+  /* Single-pane switching (data-narrow-pane on the dock body) lives in
+     components/daily/dock/Dock.module.css. */
 
   /* The "← Back to list" button is visible only in the narrow layout.
      W3-C9: pin it to the top of the scroll container so a teacher who
@@ -1671,194 +1660,6 @@
   color: var(--muted);
 }
 
-/* ── Column reorder: per-column wrapper + grip + drag ghost ──────────── */
-/* The three big content columns — lesson list, center detail, right rail —
-   are reorderable as a horizontal sortable group. Each column is wrapped
-   in a SortableColumn whose DOM looks like:
-     <div .columnSlot>                  ← sortable item; transform host
-       <div .columnWithGrip data-column>← positioning host for the grip
-         <button .columnDragGrip />     ← dnd-kit activator (≥44px)
-         <…column content…>             ← unchanged inner subtree
-       </div>
-     </div>
-   The grip sits ABSOLUTELY in the column's top-left, above the column's
-   own content. The visible icon chip is 24×24; the wrapping button pads
-   out to a ≥44px tap target while keeping the rendered chip small.
-   Subject color does not enter the grip — it is intentionally neutral
-   (CLAUDE.md §4: color is information, never decoration). */
-
-/* The sortable item that wraps each column. min-width: 0 lets the column
-   collapse cleanly inside its grid track — the lesson list and detail
-   both manage their own internal overflow strategy already. */
-.columnSlot {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
-
-/* The positioning host inside each column. Stretches to fill the slot so
-   inner content (white card, detail pane, rail) keeps its full track. */
-.columnWithGrip {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-}
-
-/* Direct child of columnWithGrip fills the available height. Before the
-   reorder wrapper landed, leftPane / rightPane / RightRail were direct
-   grid items that auto-stretched to their row; now they sit one level
-   deeper inside a flex column, so they need `flex: 1` to recover the
-   same full-height behaviour. */
-.columnWithGrip > :not(.columnDragGrip) {
-  flex: 1 1 auto;
-  min-height: 0;
-  min-width: 0;
-}
-
-/* The grip BUTTON — pads out to a ≥44px touch target while painting the
-   small 24px chip in the top-left corner. `touch-action: none` keeps
-   mobile from interpreting the press as a scroll gesture; the dnd-kit
-   activator owns the press from pointerdown.
-
-   Discoverability: the grip is ALWAYS visible at a low (25%) opacity so
-   teachers know the panels are movable without needing to hover first —
-   the spec says "subtle but present grip affordance". On hover of the
-   column or keyboard focus it lifts to 65% and scales up so the grab
-   affordance reads unambiguously. Direct hover/focus on the grip itself
-   lifts to full color so it clearly reads as "grab here". */
-.columnDragGrip {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: inline-flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  /* ≥44px tap target via padding — the visible chip is the inner span. */
-  width: 44px;
-  height: 44px;
-  padding: 4px;
-  border: none;
-  background: transparent;
-  color: var(--faint);
-  cursor: grab;
-  z-index: 2;
-  border-radius: var(--r-4);
-  /* Resting state: subtly visible so the affordance is present even before
-     the user hovers. 0.25 is dim enough not to compete with column content
-     but bright enough to telegraph "this column can be reordered". */
-  opacity: 0.25;
-  transform: scale(1);
-  transform-origin: top left;
-  transition:
-    opacity 0.18s ease-out,
-    transform 0.18s ease-out,
-    color 0.12s ease,
-    background 0.12s ease;
-  /* Block touch-action so mobile dnd-kit can own the gesture. */
-  touch-action: none;
-}
-
-/* Column hover / keyboard focus reveal — the grip brightens and the
-   drag affordance becomes unmistakable. The scale nudge makes the chip
-   feel interactive ("it's alive") without distracting column content. */
-.columnWithGrip:hover .columnDragGrip,
-.columnWithGrip:focus-within .columnDragGrip {
-  opacity: 0.65;
-  transform: scale(1.05);
-}
-
-/* Direct hover/focus on the grip itself lifts it to full color so it
-   reads as the active drag affordance. */
-.columnDragGrip:hover,
-.columnDragGrip:focus-visible {
-  opacity: 1;
-  transform: scale(1);
-  color: var(--muted);
-  background: color-mix(in oklch, var(--surface) 70%, var(--hairline));
-}
-
-.columnDragGrip:active {
-  cursor: grabbing;
-}
-
-.columnDragGrip:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
-}
-
-/* The visible 24×24 chip — neutral ink dots, inherits the button color. */
-.columnDragGripIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--r-4);
-  color: inherit;
-  pointer-events: none;
-}
-
-/* ── Column DragOverlay ghost ─────────────────────────────────────────── */
-/* While a column rides the DragOverlay we float a small header-style chip
-   showing the column's name + the grip glyph. Reuses the right-rail
-   panel-ghost visual vocabulary (paper card + hairline + soft lift) so
-   the chip reads as "the same thing, picked up". Width auto + a generous
-   max-width keeps it from overflowing the viewport on narrow layouts. */
-.columnDragGhost {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: auto;
-  max-width: min(280px, calc(100vw - 28px));
-  padding: 10px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  box-shadow: var(--sh-md);
-  /* A faint tilt sells the lift without animation cost — matches the
-     right-rail dragGhost idiom in RightRail.module.css. */
-  transform: rotate(-0.5deg);
-  cursor: grabbing;
-}
-
-.columnDragGhostGrip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  color: var(--muted);
-  flex-shrink: 0;
-}
-
-.columnDragGhostTitle {
-  font-size: var(--t-13);
-  font-weight: 700;
-  letter-spacing: -0.1px;
-  color: var(--ink);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-/* ── Screen-reader-only live region ──────────────────────────────────── */
-/* Used for the aria-live announcement when the column order changes via
-   the keyboard. Same visually-hidden recipe as lesson-flow's .srOnly. */
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 /* ── Responsive: intermediate breakpoints (960px, 540px, 480px) ──────────
    The primary narrow-viewport rule lives above at max-width: 720px.
    These additive blocks handle the mid-range and very-narrow cases.
@@ -1948,19 +1749,8 @@
   .shoutInput,
   .resourceTab,
   .modeToggleBtn,
-  .resourceRow,
-  .columnDragGrip,
-  .columnDragGripIcon {
+  .resourceRow {
     transition: none;
-  }
-  .columnDragGrip {
-    /* Keep the reveal pattern but skip the scale/transform. The
-       :hover/:focus-within reveal still shows the grip, just without
-       the spring-style scale-in. */
-    transform: none;
-  }
-  .columnDragGhost {
-    transform: none;
   }
   /* Drop the lesson-row entrance choreography — the cascade is decorative
      and only welcome when motion is enabled. tokens.css already collapses

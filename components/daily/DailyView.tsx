@@ -1,28 +1,34 @@
 "use client";
 
-// DailyView.tsx — the Daily view: a FOUR-track body row with a slim icon
-// nav rail, a calendar-style lesson list column, the center lesson detail,
-// and an auxiliary right rail.
+// DailyView.tsx — the Daily view: a slim icon nav rail beside a DOCKABLE
+// three-column panel system (6.11.26 design_handoff_daily_view).
 //
-// Layout (Image 13 redesign):
-//   body row → [icon rail] [lesson list] [splitter] [lesson detail] [right rail]
+// Layout:
+//   body row → [icon rail] [dock: left slot | center slot | right slot]
 //
-// The Daily view no longer has a separate top day-selector strip or a
-// pinned day-header strip. Both fold INTO the lesson list column itself:
-// the column now reads as a calendar-style panel with a "WEEK 12"
-// eyebrow, a clickable week strip of weekday pills (one per configured
-// school-week day), a Sunday-style day-header block (full day name +
-// "X of Y lessons" + per-subject progress bar), the daily notes (when
-// the day has any personal notes), and the lesson list itself. The
-// week strip replaces the old <DayBar>; the day-header block reuses the
-// <TodayDashboard> component, now repurposed for in-column rendering.
+// The three content panels — Day (the calendar-style lesson list),
+// Lesson (the center detail), and Side panel (Resources / To-do / Chat)
+// — live in dockable slots (components/daily/dock). Teachers drag slot
+// tabs to move panels between columns, collapse the side columns to 50px
+// icon rails, unpin them into hover-peek overlays, and resize with the
+// splitters. The whole arrangement persists under ONE localStorage key
+// (`mycurricula:daily-dock-layout-v1`); `[` / `]` toggle the side
+// columns from the keyboard.
 //
-// The four-track layout reflects the 3-column restructure (Image 12 in
-// the design handoff). LOGICALLY there are three content panels — lesson
-// list, center detail, right rail — preceded by a thin app-level nav
-// rail. The global filter pane is suppressed for the Daily view (the
-// shell agent owns that), so the icon rail replaces what would otherwise
-// sit there.
+// The page header is a single tightened bar: the title with the
+// breadcrumb (Week › Day › Subject) directly underneath, and the view
+// pill + Present button pushed right. The previous separate breadcrumb
+// band and the generic subtitle were removed to calm the top of the page.
+//
+// The Day panel has no separate top day-selector strip or pinned
+// day-header strip — both fold INTO the lesson list column itself: a
+// "WEEK 12" eyebrow, a clickable week strip of weekday pills (one per
+// configured school-week day), a day-header block (full day name +
+// "X of Y lessons" + per-subject progress bar via <TodayDashboard>),
+// the daily notes banner, and the lesson list.
+//
+// The global filter pane is suppressed for the Daily view (the shell
+// owns that), so the icon rail replaces what would otherwise sit there.
 //
 // Icon rail (<IconRail>): a 56px-wide vertical strip of nav-icon buttons
 //   — calendar / today (active), schedule, to-dos, year/month, voice, plus
@@ -61,21 +67,17 @@
 // Lessons not yet in the saved order append at the end; dayLessons are
 // sorted by the saved order before rendering.
 //
-// ── Resizable list↔detail boundary ────────────────────────────────────────
-// The boundary between the left lesson list and the center detail is a
-// draggable splitter. The chosen list-pane width is clamped to a sensible
-// min/max and persisted to localStorage (SSR-guarded, loaded post-mount —
-// same pattern as the per-teacher row order below). The splitter is also
-// keyboard-operable (arrow keys nudge the width) and exposes a proper
-// separator role + aria-value* attributes. The right rail width is fixed
-// for this pass; only the list↔detail balance is teacher-tunable.
+// ── Resizing & docking ────────────────────────────────────────────────────
+// Column widths are flex-grow ratios driven by a --w custom property the
+// dock splitters rewrite (drag, or arrow keys on the focused splitter;
+// double-click resets). Panel placement, active tabs, collapse/pin state,
+// and widths all persist together — see components/daily/dock.
 //
 // ── Responsive ───────────────────────────────────────────────────────────
-// Wide viewports keep the four-track layout. Narrow viewports collapse to
-// a single column: the icon rail hides, the lesson list shows by default,
-// selecting a lesson swaps to the full-width detail with a "← Back to
-// list" affordance, and the right rail stacks beneath. The persisted
-// list-pane width is ignored in the narrow layout.
+// Wide viewports keep the three-column dock. Narrow viewports (≤720px)
+// collapse to a single pane: the icon rail and dock chrome hide, the
+// lesson list shows by default, selecting a lesson swaps to the
+// full-width detail with a "← Back to list" affordance.
 //
 // selectedDay is shared planner state (useAppState). Internal selected-
 // lesson state is local — never written to global selectedLessonId.
@@ -91,15 +93,7 @@
 //                   and narrow-mode pane choice remain local; the row
 //                   order alone is mirrored to localStorage.
 
-import {
-  Fragment,
-  useMemo,
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  useId,
-} from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import {
   DndContext,
@@ -112,13 +106,17 @@ import {
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
-  horizontalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { useAppState } from "@/lib/app-state";
-import { dateNumberForWeekDay, notesForDay } from "@/lib/mock";
+import {
+  TODOS,
+  dateNumberForWeekDay,
+  notesForDay,
+  shoutboxForDay,
+} from "@/lib/mock";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useDayHoliday, useHolidaysByDay } from "@/lib/use-day-holiday";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
@@ -128,179 +126,22 @@ import { useRouter } from "next/navigation";
 import { LessonDetail } from "./LessonDetail";
 import { TodayDashboard } from "./TodayDashboard";
 import { IconRail } from "./IconRail";
-import { RightRail } from "./RightRail";
-import { PaneSplitter } from "./PaneSplitter";
+import {
+  RightRail,
+  readRailTab,
+  writeRailTab,
+  type RailTabId,
+} from "./RightRail";
 import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
-import { Button, EmptyState, PageHeader, Tooltip } from "@/components/ui";
+import { DockLayout, useDockLayout, type DockPanelDef } from "./dock";
+import { Button, EmptyState, Tooltip } from "@/components/ui";
 import { DailyList } from "@/components/list/DailyList";
 import { ScheduleDayPane } from "@/components/schedule";
 import { DailySchedulePill } from "./daily-schedule-pill";
 import { useDailyScheduleMode } from "@/lib/daily-schedule-state";
 import { useLabels, pluralize } from "@/lib/labels";
 import styles from "./DailyView.module.css";
-
-// ── Pane width persistence — NO fixed clamps; sanity-bounded by container ─
-// The splitter writes each pane's px width to localStorage so the teacher's
-// chosen list / center / right balance survives a reload. All access is
-// `typeof window`-guarded and loaded post-mount, never in a useState
-// initializer — the server has no localStorage, so seeding from it in the
-// initializer would diverge from the server HTML and trip a hydration
-// mismatch (identical reasoning to the row-order persistence below).
-//
-// ── Why no fixed clamps ─────────────────────────────────────────────────
-// The owner explicitly wants each pane "as big or small as someone wants",
-// so this view does NOT hard-code an upper bound like the old 560 / 520 px
-// caps. Instead the bounds are computed LIVE from the container at the
-// moment of every commit (drag move, keyboard step, window resize):
-//
-//   left  min  = PANE_FLOOR                                  // never zero
-//   left  max  = bodyWidth − PANE_FLOOR − otherPaneWidth     // see below
-//   right min  = PANE_FLOOR
-//   right max  = bodyWidth − PANE_FLOOR − leftPaneWidth
-//
-// PANE_FLOOR (40 px) is small enough that a pane can shrink to a thin strip
-// but never collapse to zero, and it doubles as the reservation for EACH
-// other neighbour — by subtracting `PANE_FLOOR + otherPaneWidth` from
-// bodyWidth we guarantee the OTHER side pane keeps at least PANE_FLOOR and
-// the center detail keeps at least PANE_FLOOR too. (Two neighbours × 40 px =
-// 80 px is always preserved beyond the pane being resized.) The clamp helpers
-// read bodyRef.current.getBoundingClientRect() so the bound follows window
-// resizes naturally — see the resize-observer effect further down which
-// re-clamps both stored widths whenever the container shrinks.
-
-const PANE_WIDTH_KEY = "mycurricula:daily-left-width";
-
-/** Absolute floor for the side-pane width reservation math, in px. The
- *  splitter never lets a content pane settle at this width — that's what
- *  PANE_VISIBLE_MIN is for. This is the smallest amount of space the layout
- *  guarantees for the OTHER side and the center detail when computing the
- *  upper bound for THIS pane. */
-const PANE_FLOOR = 40;
-
-/** Visible minimum for a content pane, in px. Below this the lesson list /
- *  resources / shoutbox surfaces are unreadable and overlap their own
- *  padding. The splitter clamps to this lower bound so a teacher cannot
- *  create a broken layout by dragging the divider in. (W1-A3 — audit
- *  blocker; teachers reported creating 40px slivers.) */
-const PANE_VISIBLE_MIN = 280;
-
-/** Default left-pane width — only used on first paint before localStorage
- *  is read and before bodyRef has resolved a live container width. */
-const PANE_DEFAULT = 300;
-
-/** Keyboard nudge step (px) for the splitter's arrow-key resize. */
-const PANE_STEP = 16;
-
-/** Clamp a candidate pane width to dynamic, sanity-only bounds.
- *
- *  - `bodyWidth` is the live container width (from getBoundingClientRect).
- *  - `otherWidth` is the OTHER side pane's current width — we reserve at
- *    least PANE_FLOOR for it and another PANE_FLOOR for the center detail.
- *
- *  If `bodyWidth` is not available (initial paint, ref not yet attached) we
- *  fall back to a permissive lower-bound clamp so persisted values are
- *  honoured. */
-function clampPaneWidth(
-  px: number,
-  bodyWidth: number,
-  otherWidth: number,
-): number {
-  const rounded = Math.round(px);
-  if (!Number.isFinite(bodyWidth) || bodyWidth <= 0) {
-    return Math.max(PANE_VISIBLE_MIN, rounded);
-  }
-  // Reserve PANE_FLOOR for the center detail's minimum breathing room.
-  // The OTHER side pane's own min is already enforced when it was set,
-  // so we only need to leave PANE_FLOOR for the center column here.
-  const max = Math.max(PANE_VISIBLE_MIN, bodyWidth - otherWidth - PANE_FLOOR);
-  return Math.min(max, Math.max(PANE_VISIBLE_MIN, rounded));
-}
-
-/** Compute the live (min, max) bounds for a pane given the container width
- *  and the OTHER side pane's current width. Used for aria-valuemin /
- *  aria-valuemax on the splitter and for the resize-observer re-clamp.
- *  `bodyWidth` may be 0 before the container has measured — in that case
- *  we return permissive bounds anchored to PANE_FLOOR. */
-function paneBounds(
-  bodyWidth: number,
-  otherWidth: number,
-): { min: number; max: number } {
-  if (!Number.isFinite(bodyWidth) || bodyWidth <= 0) {
-    return { min: PANE_VISIBLE_MIN, max: Number.MAX_SAFE_INTEGER };
-  }
-  const max = Math.max(PANE_VISIBLE_MIN, bodyWidth - otherWidth - PANE_FLOOR);
-  return { min: PANE_VISIBLE_MIN, max };
-}
-
-/** Read the saved left-pane width, or the default if none / unavailable.
- *  Only the absolute floor is enforced here — the live upper bound depends
- *  on container width, which isn't available at read time. The commit path
- *  re-clamps against the live container before each write. */
-function readPaneWidth(): number {
-  if (typeof window === "undefined") return PANE_DEFAULT;
-  try {
-    const raw = window.localStorage.getItem(PANE_WIDTH_KEY);
-    if (!raw) return PANE_DEFAULT;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed)
-      ? Math.max(PANE_FLOOR, Math.round(parsed))
-      : PANE_DEFAULT;
-  } catch {
-    // Corrupt or unavailable storage — fall back to the default width.
-    return PANE_DEFAULT;
-  }
-}
-
-/** Persist the chosen left-pane width. */
-function writePaneWidth(px: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(PANE_WIDTH_KEY, String(px));
-  } catch {
-    // Storage full / unavailable — width simply won't persist; non-fatal.
-  }
-}
-
-// ── Resizable RIGHT-rail width (mirror of the left-pane persistence) ────
-// Same "no fixed clamps; sanity-bounded by the live container" model as the
-// left pane: default state → post-mount load from localStorage → drag /
-// keyboard commit + persist. A separate key keeps the two widths
-// independent so a teacher can size them however they like. The same
-// clampPaneWidth / paneBounds helpers above govern this pane too — only
-// the localStorage key + default differ.
-
-const RIGHT_PANE_WIDTH_KEY = "mycurricula:daily-right-width";
-
-/** Default right-rail width — only used on first paint. The live upper
- *  bound is computed from the body width minus the left pane (and minus
- *  PANE_FLOOR for the center) at commit time. */
-const RIGHT_PANE_DEFAULT = 320;
-
-/** Read the saved right-rail width, or the default. SSR-guarded. */
-function readRightPaneWidth(): number {
-  if (typeof window === "undefined") return RIGHT_PANE_DEFAULT;
-  try {
-    const raw = window.localStorage.getItem(RIGHT_PANE_WIDTH_KEY);
-    if (!raw) return RIGHT_PANE_DEFAULT;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed)
-      ? Math.max(PANE_FLOOR, Math.round(parsed))
-      : RIGHT_PANE_DEFAULT;
-  } catch {
-    return RIGHT_PANE_DEFAULT;
-  }
-}
-
-/** Persist the chosen right-rail width. */
-function writeRightPaneWidth(px: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(RIGHT_PANE_WIDTH_KEY, String(px));
-  } catch {
-    // Storage full / unavailable — width simply won't persist; non-fatal.
-  }
-}
 
 // ── Reorder-teaching toast persistence (W3-C13) ──────────────────────────
 // One-time teaching that the daily reorder is local-only. The key flips
@@ -504,109 +345,6 @@ function ChevronDownIcon(): ReactNode {
       <polyline points="6 9 12 15 18 9" />
     </svg>
   );
-}
-
-// Lucide-style GripHorizontal — two rows of three dots, oriented for the
-// column-reorder grip (a HORIZONTAL grip on each column's top edge reads as
-// "drag me sideways"). Distinct from the row-reorder GripVertical above
-// (two columns of three dots) so the two activator shapes are visually
-// unambiguous in the same view.
-function GripHorizontalIcon(): ReactNode {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <circle cx="5" cy="9" r="1.5" />
-      <circle cx="12" cy="9" r="1.5" />
-      <circle cx="19" cy="9" r="1.5" />
-      <circle cx="5" cy="15" r="1.5" />
-      <circle cx="12" cy="15" r="1.5" />
-      <circle cx="19" cy="15" r="1.5" />
-    </svg>
-  );
-}
-
-// ── Column reorder: stable ids + persistence ────────────────────────────
-// The Daily body has THREE big content columns — the lesson list, the
-// center detail, and the right rail — that the teacher can reorder by
-// dragging a small grip on each column's top edge. The icon rail is NOT
-// part of this group: it stays pinned to the far left as a sibling of
-// the reorderable body.
-//
-// Order is a per-teacher viewing preference: it persists to localStorage
-// (post-mount load, NEVER inside the useState initializer — the server
-// has no localStorage, so seeding from it would diverge from server HTML
-// and trip a React hydration mismatch). Same pattern as the pane-width
-// + row-order persistence further up.
-
-const COLUMN_IDS = ["list", "detail", "rail"] as const;
-type ColumnId = (typeof COLUMN_IDS)[number];
-
-const DEFAULT_COLUMN_ORDER: ColumnId[] = [...COLUMN_IDS];
-const COLUMN_ORDER_KEY = "mycurricula:daily-column-order";
-
-/** Human-readable column labels — used in the drag-grip aria-labels, the
- *  DragOverlay ghost chip, and the aria-live announcement string. */
-const COLUMN_LABEL: Record<ColumnId, string> = {
-  list: "Lesson list",
-  detail: "Lesson detail",
-  rail: "Resources rail",
-};
-
-/** Type-guard a parsed string against the closed ColumnId set. */
-function isColumnId(value: unknown): value is ColumnId {
-  return (
-    typeof value === "string" &&
-    (COLUMN_IDS as readonly string[]).includes(value)
-  );
-}
-
-/** Normalize a parsed order: drop unknown ids, de-duplicate, then append
- *  any missing default ids so a future column addition never disappears. */
-function normalizeColumnOrder(raw: unknown): ColumnId[] {
-  const candidate = Array.isArray(raw) ? raw.filter(isColumnId) : [];
-  const seen = new Set<ColumnId>();
-  const out: ColumnId[] = [];
-  for (const id of candidate) {
-    if (!seen.has(id)) {
-      seen.add(id);
-      out.push(id);
-    }
-  }
-  for (const id of DEFAULT_COLUMN_ORDER) {
-    if (!seen.has(id)) {
-      seen.add(id);
-      out.push(id);
-    }
-  }
-  return out;
-}
-
-/** Read the saved column order from localStorage, or the default. */
-function readColumnOrder(): ColumnId[] {
-  if (typeof window === "undefined") return DEFAULT_COLUMN_ORDER;
-  try {
-    const raw = window.localStorage.getItem(COLUMN_ORDER_KEY);
-    if (!raw) return DEFAULT_COLUMN_ORDER;
-    return normalizeColumnOrder(JSON.parse(raw) as unknown);
-  } catch {
-    // Corrupt or unavailable storage — fall back to the default.
-    return DEFAULT_COLUMN_ORDER;
-  }
-}
-
-/** Persist the chosen column order. Non-fatal on failure. */
-function writeColumnOrder(order: ColumnId[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(order));
-  } catch {
-    // Storage full / unavailable — order simply won't persist; non-fatal.
-  }
 }
 
 // ── Lesson row in the left pane ──────────────────────────────────────────
@@ -983,142 +721,6 @@ function WeekStrip({ week, selectedDay, onSelect }: WeekStripProps): ReactNode {
   );
 }
 
-// ── Column-reorder grip ──────────────────────────────────────────────────
-// A small GripHorizontal chip that lives in the top-left of each big
-// content column and acts as the dnd-kit activator for column reordering.
-// Visually it's subject-neutral: an ink-300 dot pattern that lifts to
-// ink-500 on hover / focus. The visible chip is 24×24, but the wrapping
-// button enlarges the tap target to ≥44px via padding — the same idiom
-// the lesson-row grip uses (DRAG_CHIP.handleTouchTarget). The grip never
-// competes with column content because it sits absolutely in the corner
-// over neutral chrome (the white card top + the rail track top).
-//
-// `aria-label` carries the human-readable column name so a screen-reader
-// hears "Drag to reorder lesson list column" — keyboard users hit Space
-// to lift, arrows to move, Space to drop, Esc to cancel (dnd-kit's
-// KeyboardSensor, shared via useDndSensors).
-
-interface ColumnDragGripProps {
-  /** Stable column id — must match SortableContext items. */
-  id: ColumnId;
-  /** setActivatorNodeRef from useSortable — the grip is the SOLE activator. */
-  activatorRef: (el: HTMLElement | null) => void;
-  /** dnd-kit pointer + keyboard activation listeners. */
-  listeners: Record<string, unknown> | undefined;
-  /** dnd-kit a11y attributes (role, aria-roledescription, etc.). */
-  attributes: Record<string, unknown>;
-}
-
-function ColumnDragGrip({
-  id,
-  activatorRef,
-  listeners,
-  attributes,
-}: ColumnDragGripProps): ReactNode {
-  return (
-    <Tooltip
-      content={`Drag this ${COLUMN_LABEL[id].toLowerCase()} column to rearrange the daily layout — your layout choice is remembered between sessions.`}
-      side="bottom"
-    >
-      <button
-        type="button"
-        ref={activatorRef}
-        // Spread dnd-kit's pointer + keyboard listeners + a11y attributes.
-        // The listeners object is typed loosely here because dnd-kit's
-        // SyntheticListenerMap is a record of arbitrary event-handler keys.
-        {...(listeners ?? {})}
-        {...attributes}
-        className={styles.columnDragGrip}
-        aria-label={`Drag to reorder ${COLUMN_LABEL[id].toLowerCase()} column`}
-        title={`Drag to reorder the ${COLUMN_LABEL[id].toLowerCase()} column`}
-      >
-        <span className={styles.columnDragGripIcon} aria-hidden="true">
-          <GripHorizontalIcon />
-        </span>
-      </button>
-    </Tooltip>
-  );
-}
-
-// ── Sortable column wrapper ─────────────────────────────────────────────
-// Each big content column (lesson list, center detail, right rail) wraps
-// its content in this component. The wrapper:
-//   • holds the useSortable transform (so the column slides into its new
-//     slot when the order changes);
-//   • exposes the grip activator props so the column's content can render
-//     a ColumnDragGrip in its own top-left corner;
-//   • carries the per-column className from the caller so the wrapper
-//     itself remains stylistically transparent.
-//
-// IMPORTANT: the wrapper is also the SortableContext item. It must occupy
-// the same grid track its column would occupy in the static layout — its
-// inline style adds `gridColumn: span 1` (the default) and nothing else
-// so the parent grid keeps its track math.
-
-interface SortableColumnProps {
-  id: ColumnId;
-  className: string;
-  children: (grip: ReactNode) => ReactNode;
-}
-
-function SortableColumn({
-  id,
-  className,
-  children,
-}: SortableColumnProps): ReactNode {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  // Apply the sortable transform to the OUTER wrapper so the whole column
-  // slides into its new position. While dragging, dim the in-place
-  // placeholder — the floating overlay carries the visible chip.
-  const wrapperStyle: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : undefined,
-  };
-
-  const grip = (
-    <ColumnDragGrip
-      id={id}
-      activatorRef={setActivatorNodeRef}
-      listeners={listeners as unknown as Record<string, unknown>}
-      attributes={attributes as unknown as Record<string, unknown>}
-    />
-  );
-
-  return (
-    <div ref={setNodeRef} style={wrapperStyle} className={className}>
-      {children(grip)}
-    </div>
-  );
-}
-
-// ── Column drag ghost ───────────────────────────────────────────────────
-// While a column rides the DragOverlay we show a small header-style chip
-// with the column's label. Reuses the visual vocabulary of the right-
-// rail panel ghost (paper card + hairline + lift) without importing its
-// CSS — the matching styles live in DailyView.module.css alongside the
-// grip.
-
-function ColumnDragGhost({ id }: { id: ColumnId }): ReactNode {
-  return (
-    <div className={styles.columnDragGhost} aria-hidden="true">
-      <span className={styles.columnDragGhostGrip}>
-        <GripHorizontalIcon />
-      </span>
-      <span className={styles.columnDragGhostTitle}>{COLUMN_LABEL[id]}</span>
-    </div>
-  );
-}
-
 // ── Reorder-teaching toast (W3-C13) ──────────────────────────────────────
 // A transient bottom-of-screen status surface that teaches the teacher,
 // the first time they drop a reordered row in a session, that the change
@@ -1317,14 +919,63 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
   const [narrowPane, setNarrowPane] = useState<"list" | "detail">("list");
 
   // dnd-kit sensors — pointer + touch + keyboard (keyboard makes the drag
-  // reorder operable without a mouse). The SAME sensors instance feeds two
-  // independent DndContexts: the row-reorder context inside the lesson list
-  // and the column-reorder context that wraps the three big columns. Each
-  // context's collision detection + items are scoped to its own surface, so
-  // pointer events on a row's grip never bubble up and trigger column drag,
-  // and pointer events on a column grip never reach inner rows.
+  // reorder operable without a mouse). These feed the row-reorder
+  // DndContext inside the lesson list. Panel docking (moving whole panels
+  // between columns) is owned by the dock system below, which uses native
+  // HTML5 drag on the slot tabs — the two drag surfaces never overlap.
   const sensors = useDndSensors();
   const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  // ── Dock panel layout (6.11.26 redesign) ──────────────────────────────
+  // The three content panels — Day (lesson list), Lesson (detail), Side
+  // panel (Resources / To-do / Chat) — live in dockable slots. Layout
+  // state (panel placement, active tabs, collapse/pin, column widths)
+  // persists under one localStorage key; `[` / `]` toggle the side
+  // columns. See components/daily/dock.
+  //
+  // The `[` / `]` shortcuts only arm while the dock columns are actually
+  // visible: grid mode AND a viewport above the 720px single-pane fold
+  // (Dock.module.css). Otherwise they'd silently toggle invisible dock
+  // state and starve the global week-navigation shortcuts that share the
+  // same keys. SSR-safe: assume wide until the post-mount measure.
+  const [narrowViewport, setNarrowViewport] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 720px)");
+    const update = (): void => setNarrowViewport(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const dock = useDockLayout({
+    keyboardEnabled: viewMode !== "list" && !narrowViewport,
+  });
+
+  // Controlled side-panel tab — the dock's collapsed icon rail deep-opens
+  // a specific inner tab (Resources / To-do / Chat). RightRail remains the
+  // storage-key owner; this state seeds from the persisted value post-
+  // mount (SSR-safe) and writes back when a rail icon changes it.
+  const [railTab, setRailTab] = useState<RailTabId>("resources");
+  useEffect(() => {
+    setRailTab(readRailTab());
+  }, []);
+  const selectRailTab = useCallback((tab: RailTabId): void => {
+    setRailTab(tab);
+    writeRailTab(tab);
+  }, []);
+
+  // Rail badges — mock-driven in Phase 1A. The to-do count seeds from the
+  // same "due today" scope TodayTodos renders, then live-updates through
+  // the panel's onOpenCountChange report so a check-off ticks the
+  // collapsed-rail badge down (handoff §2 — "To-do completion drives the
+  // rail badge count"). The chat dot shows whenever the day's shoutbox
+  // has any messages (real unread tracking is Phase 1B).
+  const [openTodoCount, setOpenTodoCount] = useState(
+    () => TODOS.filter((t) => t.due === "today" && !t.done).length,
+  );
+  const chatHasActivity = useMemo(
+    () => shoutboxForDay(week, selectedDay).length > 0,
+    [week, selectedDay],
+  );
 
   // ── Reorder-teaching toast (W3-C13) ───────────────────────────────────
   // One-time teaching toast that fires the first time the teacher drops a
@@ -1341,137 +992,6 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
   useEffect(() => {
     reorderTaughtRef.current = readReorderTaught();
   }, []);
-
-  // ── Resizable column widths (local + localStorage) ────────────────────
-  // The persisted widths track the LIST and RAIL columns regardless of where
-  // they sit in the order. The names follow the column they govern, not a
-  // position in the grid — when the teacher reorders the columns, `listWidth`
-  // still belongs to the lesson list and `railWidth` still belongs to the
-  // right rail.
-  //
-  // Initialised to the defaults so the server and the client's first render
-  // agree; the mount effect then swaps in any persisted width. `bodyRef`
-  // points at the body grid so drag math can resolve a pointer x into a
-  // width relative to the grid's left edge.
-  //
-  // `bodyWidth` mirrors the live container width — it is updated from a
-  // ResizeObserver below so the dynamic clamps + the splitter's
-  // aria-valuemin/max always reflect what the user can actually drag to.
-  //
-  // OLD storage keys (PANE_WIDTH_KEY, RIGHT_PANE_WIDTH_KEY) are reused so
-  // previously persisted widths still load for existing teachers.
-  const [listWidth, setListWidth] = useState<number>(PANE_DEFAULT);
-  const [railWidth, setRailWidth] = useState<number>(RIGHT_PANE_DEFAULT);
-  const [bodyWidth, setBodyWidth] = useState<number>(0);
-  const bodyRef = useRef<HTMLDivElement | null>(null);
-
-  // Load the persisted widths once, after hydration.
-  useEffect(() => {
-    setListWidth(readPaneWidth());
-    setRailWidth(readRightPaneWidth());
-  }, []);
-
-  // ── Live container measurement ────────────────────────────────────────
-  // Track the body grid's width via ResizeObserver (with a window-resize
-  // fallback for ancient browsers). Each tick re-clamps both stored widths
-  // against the new live bound and writes the clamped value back to
-  // localStorage so a previously persisted width that exceeds the new body
-  // can never strand a pane off-screen.
-  useEffect(() => {
-    const grid = bodyRef.current;
-    if (!grid) return;
-
-    // Re-clamp helper: read the latest stored widths, clamp each against
-    // the new container width + the OTHER pane's current width, and write
-    // back if anything changed. Uses the functional setState form so we
-    // never close over a stale value.
-    const reclamp = (nextBodyWidth: number): void => {
-      setBodyWidth(nextBodyWidth);
-      setListWidth((prevList) => {
-        // Rail width may also be reclamped below; use its current state
-        // value via the closure of setRailWidth in the next call.
-        setRailWidth((prevRail) => {
-          const clampedRail = clampPaneWidth(prevRail, nextBodyWidth, prevList);
-          if (clampedRail !== prevRail) writeRightPaneWidth(clampedRail);
-          return clampedRail;
-        });
-        // `prevRail` from the inner setRailWidth callback isn't in scope
-        // here; use the latest committed railWidth from outer state (one
-        // render behind, harmless — the observer will fire again next tick
-        // if it changed).
-        const clampedList = clampPaneWidth(prevList, nextBodyWidth, railWidth);
-        if (clampedList !== prevList) writePaneWidth(clampedList);
-        return clampedList;
-      });
-    };
-
-    // ResizeObserver is the preferred path — it fires on layout changes
-    // that a window-resize listener would miss (e.g. an ancestor's flex
-    // basis changing). We feature-detect and gracefully degrade.
-    if (typeof ResizeObserver !== "undefined") {
-      const ro = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          reclamp(entry.contentRect.width);
-        }
-      });
-      ro.observe(grid);
-      return () => ro.disconnect();
-    }
-
-    // Fallback: window resize listener. Less precise but functional.
-    const handle = (): void => {
-      const rect = grid.getBoundingClientRect();
-      reclamp(rect.width);
-    };
-    handle();
-    window.addEventListener("resize", handle);
-    return () => window.removeEventListener("resize", handle);
-    // We intentionally read railWidth from closure (not deps): re-creating
-    // the ResizeObserver on every width tick would tear it down mid-drag.
-    // The stale read is harmless — a follow-up observer tick will re-clamp
-    // if a stored width drifts out of bounds, per the comment above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── Generic column-width commit ───────────────────────────────────────
-  // After the column reorder lands, the lesson list and the rail can sit
-  // at ANY position in the grid — they're no longer hard-coded to the
-  // first / last track. The splitter drag math therefore can't anchor to
-  // `rect.left` or `rect.right` of the body anymore; it has to resolve
-  // the pointer x against the LIVE bounding rect of the column track
-  // being resized. Each splitter is rendered with a callback that knows
-  // which column it governs and which neighbor "absorbs" the slack.
-  //
-  // The helpers below replace the old `commitWidth` + `commitRightWidth`
-  // pair with a single `commitColumnWidth(column, px)` that clamps + sets
-  // + persists, parameterised by which column (`"list"` or `"rail"`) is
-  // being resized.
-
-  const commitColumnWidth = useCallback(
-    (column: "list" | "rail", px: number): void => {
-      const grid = bodyRef.current;
-      const liveBodyWidth = grid ? grid.getBoundingClientRect().width : 0;
-      if (column === "list") {
-        const next = clampPaneWidth(px, liveBodyWidth, railWidth);
-        setListWidth(next);
-        writePaneWidth(next);
-      } else {
-        const next = clampPaneWidth(px, liveBodyWidth, listWidth);
-        setRailWidth(next);
-        writeRightPaneWidth(next);
-      }
-    },
-    [listWidth, railWidth],
-  );
-
-  // ── Live aria bounds per splitter ─────────────────────────────────────
-  // Each splitter exposes its aria-valuemin / aria-valuemax via the props
-  // we pass to <PaneSplitter>. The bounds for a column being resized are
-  // anchored to the OTHER fixed column's current width — the detail
-  // (1fr) absorbs whatever's left. The min is PANE_FLOOR; the max is
-  // `bodyWidth − PANE_FLOOR − otherFixedColumnWidth`.
-  const listBounds = paneBounds(bodyWidth, railWidth);
-  const railBounds = paneBounds(bodyWidth, listWidth);
 
   // When the day changes, default-select the first not-done lesson (or null)
   // and return narrow mode to the list.
@@ -1542,204 +1062,6 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
     setDraggingId(null);
   }
 
-  // ── Column reorder state + drag handlers ─────────────────────────────
-  // The three big content columns — lesson list, center detail, right
-  // rail — can be reordered by dragging a small horizontal grip on each
-  // column's top-left corner. Order is a per-teacher viewing preference,
-  // never the shared doc; it persists to localStorage under
-  // `mycurricula:daily-column-order`.
-  //
-  // Hydration discipline: `columnOrder` starts at the default so the
-  // server-rendered HTML and the first client render match; the mount
-  // effect below loads any persisted order and `hydratedColumnRef` then
-  // gates persistence so the first load doesn't immediately overwrite
-  // storage with the default. Same pattern as the right-rail panel
-  // order, the per-day row order, and the pane widths above.
-
-  const [columnOrder, setColumnOrder] =
-    useState<ColumnId[]>(DEFAULT_COLUMN_ORDER);
-  const [draggingColumnId, setDraggingColumnId] = useState<ColumnId | null>(
-    null,
-  );
-  const hydratedColumnRef = useRef(false);
-
-  // Load the saved column order once, post-mount. Empty deps so it never
-  // re-fires — the order is then driven purely by user action.
-  useEffect(() => {
-    setColumnOrder(readColumnOrder());
-    hydratedColumnRef.current = true;
-  }, []);
-
-  // Persist whenever the order changes (after the initial load only).
-  useEffect(() => {
-    if (!hydratedColumnRef.current) return;
-    writeColumnOrder(columnOrder);
-  }, [columnOrder]);
-
-  // Screen-reader live announcement — committed when the order changes so
-  // a keyboard reorder is audible. The aria-live region below uses
-  // role="status" + aria-live="polite" so SR speaks the new order without
-  // interrupting the current speech, matching the lesson-flow idiom.
-  const [columnAnnouncement, setColumnAnnouncement] = useState<string>("");
-  const columnAnnounceRegionId = useId();
-
-  const handleColumnDragStart = useCallback((e: DragStartEvent): void => {
-    const id = String(e.active.id);
-    if (isColumnId(id)) setDraggingColumnId(id);
-  }, []);
-
-  const handleColumnDragEnd = useCallback((e: DragEndEvent): void => {
-    setDraggingColumnId(null);
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const from = String(active.id);
-    const to = String(over.id);
-    if (!isColumnId(from) || !isColumnId(to)) return;
-    setColumnOrder((prev) => {
-      const fromIdx = prev.indexOf(from);
-      const toIdx = prev.indexOf(to);
-      if (fromIdx === -1 || toIdx === -1) return prev;
-      const next = arrayMove(prev, fromIdx, toIdx);
-      // Build an aria-live announcement reading the column's new home as
-      // "first / middle / last" plus the full new order, so a keyboard
-      // user hears confirmation when they release Space to drop.
-      const positionWords = ["first", "middle", "last"] as const;
-      const newPos = next.indexOf(from);
-      const orderLabels = next.map((id) => COLUMN_LABEL[id]).join(", ");
-      setColumnAnnouncement(
-        `${COLUMN_LABEL[from]} column moved to ${positionWords[newPos]}. New order: ${orderLabels}.`,
-      );
-      return next;
-    });
-  }, []);
-
-  const handleColumnDragCancel = useCallback((): void => {
-    setDraggingColumnId(null);
-  }, []);
-
-  // ── Dynamic grid template ─────────────────────────────────────────────
-  // Walk the column order, emitting a track size per column AND an `auto`
-  // track between each pair of adjacent columns for the splitter that
-  // sits there. Tracks: list → `${listWidth}px`, detail → `1fr`,
-  // rail → `${railWidth}px`. The template is recomputed each render off
-  // the current state — cheap, three columns + at most two splitters.
-  const gridTemplate = useMemo(() => {
-    const trackFor = (id: ColumnId): string => {
-      if (id === "list") return `${listWidth}px`;
-      if (id === "rail") return `${railWidth}px`;
-      // detail → flex track; minmax(0, 1fr) keeps the column from refusing
-      // to shrink if its inner content (the LessonDetail) has any
-      // intrinsic min-width contribution.
-      return "minmax(0, 1fr)";
-    };
-    const parts: string[] = [];
-    columnOrder.forEach((id, i) => {
-      parts.push(trackFor(id));
-      if (i < columnOrder.length - 1) parts.push("auto"); // splitter track
-    });
-    return parts.join(" ");
-  }, [columnOrder, listWidth, railWidth]);
-
-  // ── Per-splitter drag wiring ──────────────────────────────────────────
-  // The two splitters sit between adjacent columns in the new order. Each
-  // splitter resizes the FIXED column nearer to it:
-  //   • LEFT fixed + RIGHT detail   → resize LEFT column. Drag math:
-  //       LEFT.width = clientX − LEFT.left  (LEFT.left from live rect).
-  //   • LEFT detail + RIGHT fixed   → resize RIGHT column. Drag math:
-  //       RIGHT.width = RIGHT.right − clientX.
-  //   • BOTH fixed (detail is at an edge)   → resize LEFT column. Drag
-  //       math: LEFT.width = clientX − LEFT.left. Detail (at the opposite
-  //       edge as a 1fr track) absorbs the slack.
-  //
-  // Keyboard step: PaneSplitter reports +1 for ArrowRight / ArrowDown.
-  // We translate that to "grow the column the splitter governs" so the
-  // separator feels conventional: dragging or arrowing rightward grows
-  // whichever column the splitter is anchored to.
-  //
-  // Per-splitter min/max bounds derive from the OTHER fixed column's
-  // current width, with PANE_FLOOR reserved for the detail too.
-  //
-  // resolveColumnTrackLeft / Right walk the rendered grid: each column
-  // wrapper carries a data-column attribute so we can find it from the
-  // body element without holding extra refs.
-  const resolveColumnRect = useCallback(
-    (column: "list" | "rail"): DOMRect | null => {
-      const grid = bodyRef.current;
-      if (!grid) return null;
-      const el = grid.querySelector<HTMLElement>(`[data-column="${column}"]`);
-      return el ? el.getBoundingClientRect() : null;
-    },
-    [],
-  );
-
-  /** Build the prop bundle a single splitter passes to <PaneSplitter>. */
-  function splitterPropsFor(
-    leftCol: ColumnId,
-    rightCol: ColumnId,
-  ): {
-    width: number;
-    min: number;
-    max: number;
-    onDrag: (clientX: number) => void;
-    onStep: (direction: -1 | 1) => void;
-    label: string;
-  } {
-    // Determine which fixed column this splitter resizes. The detail
-    // column is 1fr, so the splitter never resizes it directly — it
-    // resizes whichever fixed neighbor it sits beside.
-    const leftIsDetail = leftCol === "detail";
-    // If left is detail, the splitter resizes the RIGHT (fixed) neighbor;
-    // otherwise it resizes the LEFT (fixed) neighbor — that covers all
-    // three patterns (fixed-detail, detail-fixed, fixed-fixed).
-    const target: "list" | "rail" = leftIsDetail
-      ? (rightCol as "list" | "rail")
-      : (leftCol as "list" | "rail");
-
-    const currentWidth = target === "list" ? listWidth : railWidth;
-    const bounds = target === "list" ? listBounds : railBounds;
-    const targetLabel = COLUMN_LABEL[target];
-
-    return {
-      width: currentWidth,
-      min: bounds.min,
-      max: bounds.max,
-      label: `Resize ${targetLabel.toLowerCase()} column`,
-      onDrag: (clientX: number) => {
-        // -Infinity / +Infinity (keyboard Home/End) flow through to the
-        // clamp in commitColumnWidth, which lands on the bound exactly.
-        if (!Number.isFinite(clientX)) {
-          commitColumnWidth(target, clientX);
-          return;
-        }
-        const rect = resolveColumnRect(target);
-        if (!rect) return;
-        // The splitter resolves clientX into a width for the target
-        // column. If the splitter is on the LEFT of the target (i.e. the
-        // splitter's left neighbor is detail and the target is on the
-        // right), the column's RIGHT edge is fixed and we compute width
-        // as `rect.right - clientX`. Otherwise the column's LEFT edge is
-        // fixed and width is `clientX - rect.left`.
-        const splitterOnLeftOfTarget = leftIsDetail;
-        const nextWidth = splitterOnLeftOfTarget
-          ? rect.right - clientX
-          : clientX - rect.left;
-        commitColumnWidth(target, nextWidth);
-      },
-      onStep: (direction: -1 | 1) => {
-        // ArrowRight / ArrowDown → direction = +1, which conventionally
-        // moves the divider to the right. If the splitter sits on the
-        // LEFT of the target column, moving right SHRINKS the target;
-        // otherwise moving right GROWS the target. Mirror that here so
-        // the keyboard feel matches the drag feel.
-        const splitterOnLeftOfTarget = leftIsDetail;
-        const delta = splitterOnLeftOfTarget
-          ? -direction * PANE_STEP
-          : direction * PANE_STEP;
-        commitColumnWidth(target, currentWidth + delta);
-      },
-    };
-  }
-
   // ── Scroll preservation ──────────────────────────────────────────────
   // After any store mutation (edit, completion, undo, redo) scroll the
   // affected lesson card into view. `lastChange` identity changes on every
@@ -1763,23 +1085,17 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
     : null;
   const lessonIds = dayLessons.map((l) => l.id);
 
-  // ── Column renderers ──────────────────────────────────────────────────
-  // Each column's content is captured in a small render fn that takes the
-  // ColumnDragGrip element + an absolute-positioned wrapper className.
-  // The wrapper supplies the `position: relative` host the grip needs;
-  // the inner subtree of each column is unchanged from the static layout.
-  //
-  // LessonDetail (center) and RightRail are owned by other agents and not
-  // modified here. Both get a transparent wrapper <div> inside the
-  // SortableColumn so the grip can sit absolutely on a corner the wrapper
-  // owns without touching the inner component's root.
+  // ── Dock panel content ────────────────────────────────────────────────
+  // Each dock panel's BODY is captured in a small render fn. The dock
+  // system (components/daily/dock) owns all the column chrome — slot tab
+  // strips, drag-to-dock, collapse/pin icon rails, splitters — so these
+  // functions return only the panel content. LessonDetail and RightRail
+  // are reused as-is.
 
-  function renderListColumn(grip: ReactNode): ReactNode {
+  function renderDayPanel(): ReactNode {
     return (
-      <div className={styles.columnWithGrip} data-column="list">
-        {grip}
-        <div className={styles.leftPane}>
-          {/* ── Daily Schedule pill ──────────────────────────────
+      <div className={styles.leftPane} data-column="list">
+        {/* ── Daily Schedule pill ──────────────────────────────
               Placed at the top of the lesson-list column header area
               (above the WEEK eyebrow) so it reads as primary chrome for
               this column. Toggling the pill mounts <ScheduleDayPane
@@ -1789,265 +1105,286 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
               modes; placing it here inside the lesson-list column would
               hide it in list mode. */}
 
-          {/* ── WEEK eyebrow ───────────────────────────────────── */}
-          <div className={styles.leftPaneEyebrow}>
-            {labels.week} {week}
-          </div>
+        {/* ── WEEK eyebrow ───────────────────────────────────── */}
+        <div className={styles.leftPaneEyebrow}>
+          {labels.week} {week}
+        </div>
 
-          {/* ── Week strip: one pill per configured school-week day ─ */}
-          <WeekStrip
-            week={week}
-            selectedDay={selectedDay}
-            onSelect={handleDayChange}
-          />
+        {/* ── Week strip: one pill per configured school-week day ─ */}
+        <WeekStrip
+          week={week}
+          selectedDay={selectedDay}
+          onSelect={handleDayChange}
+        />
 
-          {/* ── Holiday banner ──────────────────────────────────────────
+        {/* ── Holiday banner ──────────────────────────────────────────
               Self-hides on non-holiday days. F#20 (Wave 1B extension to
               /daily) — the visual idiom matches the UnitBar.module.css
               `.holiday` recipe so /year, /weekly, /daily all read as the
               same concept. Sits above the day header so a teacher sees
               the no-school context before reading the daily lineup. */}
-          <HolidayBanner week={week} day={selectedDay} />
+        <HolidayBanner week={week} day={selectedDay} />
 
-          {/* ── In-column day header (full day name + progress) ── */}
-          <TodayDashboard
-            dayLessons={dayLessons}
-            dayLabel={weekdays[selectedDay]?.longLabel ?? "Day"}
-          />
+        {/* ── In-column day header (full day name + progress) ── */}
+        <TodayDashboard
+          dayLessons={dayLessons}
+          dayLabel={weekdays[selectedDay]?.longLabel ?? "Day"}
+        />
 
-          {/* ── Daily notes banner (when this day has personal notes) ─ */}
-          <NotesBanner day={selectedDay} />
+        {/* ── Daily notes banner (when this day has personal notes) ─ */}
+        <NotesBanner day={selectedDay} />
 
-          {/* ── "Lessons" label row + collapse-all + add-lesson stub ─ */}
-          <div className={styles.lessonsLabelRow}>
-            <span className={styles.lessonsLabel}>
-              {pluralize(labels.lesson)}
-            </span>
-            <div className={styles.lessonsLabelActions}>
-              {/* Collapse all / Expand all — keyboard-accessible button. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className={styles.collapseAllBtn}
-                onClick={() => setCollapsedAll((c) => !c)}
-                aria-pressed={collapsedAll}
-                aria-label={
-                  collapsedAll
-                    ? "Expand all lesson rows"
-                    : "Collapse all lesson rows"
-                }
-                leadingIcon={
-                  <span
-                    className={`${styles.collapseAllIcon} ${
-                      collapsedAll ? styles.collapseAllIconCollapsed : ""
-                    }`}
-                    aria-hidden="true"
-                  >
-                    <ChevronDownIcon />
-                  </span>
-                }
-              >
-                {collapsedAll ? "Expand all" : "Collapse all"}
-              </Button>
-              {/* Filled blue "+" add-lesson button (DAILY-ADD-LESSON-001). */}
-              <Button
-                variant="icon"
-                iconAriaLabel="Add a lesson"
-                className={styles.addLessonBtn}
-                aria-pressed={addLessonOpen}
-                onClick={() => {
-                  setAddEventOpen(false);
-                  setAddLessonOpen((v) => !v);
-                }}
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
+        {/* ── "Lessons" label row + collapse-all + add-lesson stub ─ */}
+        <div className={styles.lessonsLabelRow}>
+          <span className={styles.lessonsLabel}>
+            {pluralize(labels.lesson)}
+          </span>
+          <div className={styles.lessonsLabelActions}>
+            {/* Collapse all / Expand all — keyboard-accessible button. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={styles.collapseAllBtn}
+              onClick={() => setCollapsedAll((c) => !c)}
+              aria-pressed={collapsedAll}
+              aria-label={
+                collapsedAll
+                  ? "Expand all lesson rows"
+                  : "Collapse all lesson rows"
+              }
+              leadingIcon={
+                <span
+                  className={`${styles.collapseAllIcon} ${
+                    collapsedAll ? styles.collapseAllIconCollapsed : ""
+                  }`}
                   aria-hidden="true"
-                  focusable="false"
                 >
-                  <path
-                    d="M6 1.5v9M1.5 6h9"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </Button>
-            </div>
-          </div>
-
-          {/* Scrollable lesson list — drag-reorderable via dnd-kit. */}
-          <div
-            className={styles.leftScroll}
-            role="list"
-            aria-label="Today's lessons"
-          >
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleRowDragStart}
-              onDragEnd={handleRowDragEnd}
-              onDragCancel={handleRowDragCancel}
-            >
-              <SortableContext
-                items={lessonIds}
-                strategy={verticalListSortingStrategy}
-              >
-                {dayLessons.map((lesson) => (
-                  <LessonRow
-                    key={lesson.id}
-                    lesson={lesson}
-                    selected={selectedId === lesson.id}
-                    collapsed={collapsedAll}
-                    onSelect={handleSelectLesson}
-                    onToggleComplete={handleToggleComplete}
-                  />
-                ))}
-              </SortableContext>
-
-              {/* Floating ghost of the dragged row. */}
-              <DragOverlay>
-                {draggingLesson && (
-                  <div
-                    className={`${styles.lessonRow} ${styles.lessonRowOverlay} cp-subj ${draggingLesson.subject}`}
-                    aria-hidden="true"
-                  >
-                    <span className={styles.lessonDragHandle}>
-                      <GripVerticalIcon />
-                    </span>
-                    <span className={styles.lessonStripe} />
-                    <span className={styles.lessonCheckBtn}>
-                      <LessonCheckbox status={draggingLesson.status} />
-                    </span>
-                    <span className={styles.lessonRowSelectBtn}>
-                      <span className={styles.lessonSubjectLabel}>
-                        {subjectById[draggingLesson.subject].name}
-                      </span>
-                      <span className={styles.lessonTitle}>
-                        {draggingLesson.title}
-                      </span>
-                    </span>
-                  </div>
-                )}
-              </DragOverlay>
-            </DndContext>
-
-            {dayLessons.length === 0 && (
-              <div className={styles.emptyList}>
-                {/* W3-C11 — canonical EmptyState replaces the prior flat
-                    "No lessons planned for X." copy. Size=sm because this
-                    region sits inside an already-narrow scroll column. */}
-                <EmptyState
-                  size="sm"
-                  heading="No lessons for this day yet"
-                  body="Add a lesson with the + button above, or check a different day on the week strip."
-                />
-              </div>
-            )}
-
-            {/* Today's Events section — stub add affordance (Phase 1A). */}
-            <div className={styles.eventsSection}>
-              <div className={styles.eventsSectionHead}>
-                <span className={styles.eventsSectionLabel}>
-                  Today&apos;s Events
+                  <ChevronDownIcon />
                 </span>
-              </div>
-              {/* Add-event button (DAILY-ADD-EVENT-001). */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className={styles.addEventBtn}
-                aria-label="Add an event"
-                aria-pressed={addEventOpen}
-                onClick={() => {
-                  setAddLessonOpen(false);
-                  setAddEventOpen((v) => !v);
-                }}
-                leadingIcon={
-                  <svg
-                    width="11"
-                    height="11"
-                    viewBox="0 0 11 11"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M5.5 1v9M1 5.5h9"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                }
+              }
+            >
+              {collapsedAll ? "Expand all" : "Collapse all"}
+            </Button>
+            {/* Filled blue "+" add-lesson button (DAILY-ADD-LESSON-001). */}
+            <Button
+              variant="icon"
+              iconAriaLabel="Add a lesson"
+              className={styles.addLessonBtn}
+              aria-pressed={addLessonOpen}
+              onClick={() => {
+                setAddEventOpen(false);
+                setAddLessonOpen((v) => !v);
+              }}
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                aria-hidden="true"
+                focusable="false"
               >
-                Add an event
-              </Button>
-            </div>
+                <path
+                  d="M6 1.5v9M1.5 6h9"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </Button>
           </div>
         </div>
-      </div>
-    );
-  }
 
-  function renderDetailColumn(grip: ReactNode): ReactNode {
-    // The center detail's inner root (LessonDetail) is owned by another
-    // agent and never modified here; a thin wrapper carries the grip in
-    // its top-left corner.
-    return (
-      <div className={styles.columnWithGrip} data-column="detail">
-        {grip}
-        <div className={styles.rightPane}>
-          {/* Narrow-mode "← Back to list" affordance. */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className={styles.backToList}
-            onClick={() => setNarrowPane("list")}
+        {/* Scrollable lesson list — drag-reorderable via dnd-kit. */}
+        <div
+          className={styles.leftScroll}
+          role="list"
+          aria-label="Today's lessons"
+        >
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleRowDragStart}
+            onDragEnd={handleRowDragEnd}
+            onDragCancel={handleRowDragCancel}
           >
-            <span aria-hidden="true">←</span> Back to list
-          </Button>
+            <SortableContext
+              items={lessonIds}
+              strategy={verticalListSortingStrategy}
+            >
+              {dayLessons.map((lesson) => (
+                <LessonRow
+                  key={lesson.id}
+                  lesson={lesson}
+                  selected={selectedId === lesson.id}
+                  collapsed={collapsedAll}
+                  onSelect={handleSelectLesson}
+                  onToggleComplete={handleToggleComplete}
+                />
+              ))}
+            </SortableContext>
 
-          {selectedLesson ? (
-            <LessonDetail
-              lesson={selectedLesson}
-              onToggleComplete={handleToggleComplete}
-            />
-          ) : (
-            <div className={styles.emptyDetail}>
-              {/* W3-C11 — canonical EmptyState (md) replaces the bare
-                  "Select a lesson to view its plan." copy. The wrapper
-                  div keeps the existing flex-1 sizing rule from the
-                  module CSS so this column always fills its track. */}
+            {/* Floating ghost of the dragged row. */}
+            <DragOverlay>
+              {draggingLesson && (
+                <div
+                  className={`${styles.lessonRow} ${styles.lessonRowOverlay} cp-subj ${draggingLesson.subject}`}
+                  aria-hidden="true"
+                >
+                  <span className={styles.lessonDragHandle}>
+                    <GripVerticalIcon />
+                  </span>
+                  <span className={styles.lessonStripe} />
+                  <span className={styles.lessonCheckBtn}>
+                    <LessonCheckbox status={draggingLesson.status} />
+                  </span>
+                  <span className={styles.lessonRowSelectBtn}>
+                    <span className={styles.lessonSubjectLabel}>
+                      {subjectById[draggingLesson.subject].name}
+                    </span>
+                    <span className={styles.lessonTitle}>
+                      {draggingLesson.title}
+                    </span>
+                  </span>
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+
+          {dayLessons.length === 0 && (
+            <div className={styles.emptyList}>
+              {/* W3-C11 — canonical EmptyState replaces the prior flat
+                    "No lessons planned for X." copy. Size=sm because this
+                    region sits inside an already-narrow scroll column. */}
               <EmptyState
-                heading="Pick a lesson on the left"
-                body="Select any lesson row to see its sections, resources, and per-section notes."
+                size="sm"
+                heading="No lessons for this day yet"
+                body="Add a lesson with the + button above, or check a different day on the week strip."
               />
             </div>
           )}
+
+          {/* Today's Events section — stub add affordance (Phase 1A). */}
+          <div className={styles.eventsSection}>
+            <div className={styles.eventsSectionHead}>
+              <span className={styles.eventsSectionLabel}>
+                Today&apos;s Events
+              </span>
+            </div>
+            {/* Add-event button (DAILY-ADD-EVENT-001). */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={styles.addEventBtn}
+              aria-label="Add an event"
+              aria-pressed={addEventOpen}
+              onClick={() => {
+                setAddLessonOpen(false);
+                setAddEventOpen((v) => !v);
+              }}
+              leadingIcon={
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 11 11"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M5.5 1v9M1 5.5h9"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              }
+            >
+              Add an event
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
-  function renderRailColumn(grip: ReactNode): ReactNode {
-    // RightRail's inner root is owned by another agent and never modified
-    // here; a thin wrapper carries the grip in its top-left corner.
+  function renderLessonPanel(): ReactNode {
     return (
-      <div className={styles.columnWithGrip} data-column="rail">
-        {grip}
-        <RightRail lesson={selectedLesson} week={week} day={selectedDay} />
+      <div className={styles.rightPane} data-column="detail">
+        {/* Narrow-mode "← Back to list" affordance. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={styles.backToList}
+          onClick={() => setNarrowPane("list")}
+        >
+          <span aria-hidden="true">←</span> Back to list
+        </Button>
+
+        {selectedLesson ? (
+          <LessonDetail
+            lesson={selectedLesson}
+            onToggleComplete={handleToggleComplete}
+          />
+        ) : (
+          <div className={styles.emptyDetail}>
+            {/* W3-C11 — canonical EmptyState (md) replaces the bare
+                  "Select a lesson to view its plan." copy. The wrapper
+                  div keeps the existing flex-1 sizing rule from the
+                  module CSS so this column always fills its track. */}
+            <EmptyState
+              heading="Pick a lesson on the left"
+              body="Select any lesson row to see its sections, resources, and per-section notes."
+            />
+          </div>
+        )}
       </div>
     );
   }
 
-  const COLUMN_RENDERERS: Record<ColumnId, (grip: ReactNode) => ReactNode> = {
-    list: renderListColumn,
-    detail: renderDetailColumn,
-    rail: renderRailColumn,
-  };
+  // ── Dock panel definitions ────────────────────────────────────────────
+  // The side panel exposes its inner tabs (Resources / To-do / Chat) as
+  // railItems so the dock's collapsed icon rail renders one icon per tab
+  // with badges: open-to-do count + chat activity dot (design handoff §2).
+  const dockPanels: DockPanelDef[] = [
+    { id: "day", title: "Day", content: renderDayPanel() },
+    { id: "lesson", title: "Lesson", content: renderLessonPanel() },
+    {
+      id: "side",
+      title: "Side panel",
+      content: (
+        <RightRail
+          lesson={selectedLesson}
+          week={week}
+          day={selectedDay}
+          activeTab={railTab}
+          onActiveTabChange={setRailTab}
+          onOpenTodoCountChange={setOpenTodoCount}
+        />
+      ),
+      railItems: [
+        {
+          key: "resources",
+          title: "Resources",
+          active: railTab === "resources",
+          onActivate: () => selectRailTab("resources"),
+        },
+        {
+          key: "todos",
+          title: "To-do",
+          badgeCount: openTodoCount,
+          active: railTab === "todos",
+          onActivate: () => selectRailTab("todos"),
+        },
+        {
+          key: "chat",
+          title: "Chat",
+          badgeDot: chatHasActivity,
+          active: railTab === "chat",
+          onActivate: () => selectRailTab("chat"),
+        },
+      ],
+    },
+  ];
 
   // ── Breadcrumb (BIG-7) ─────────────────────────────────────────────────
   // Week N / <Day> / <Subject> — each segment is a clickable link.
@@ -2073,15 +1410,15 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
 
   return (
     <div className={styles.page}>
-      {/* ── Page header (title + onboarding subtitle) ─────────────────────
-          Visible page-level h1 + subtitle, matching the YearView recipe
-          via the canonical <PageHeader> primitive. Replaces the prior
-          sr-only h1 with a visible heading that doubles as onboarding
-          (CLAUDE.md §4 — tell a first-time teacher what this page is
-          FOR). Renders on BOTH grid and list modes so the page has
-          exactly one h1 in the a11y tree at all times. DailyList's
-          inner day title is demoted to an h2 (see DailyList.tsx) to
-          keep the single-h1-per-page invariant. */}
+      {/* ── Page header (6.11.26 redesign — single tightened bar) ─────────
+          Visible page-level h1 with the breadcrumb DIRECTLY beneath it,
+          plus the view pills + Present in headerActions. The previous
+          separate breadcrumb band, generic subtitle, and <PageHeader>
+          primitive were removed to calm the top of the page (handoff
+          "Page header" §). Renders on BOTH grid and list modes so the
+          page has exactly one h1 in the a11y tree at all times.
+          DailyList's inner day title is demoted to an h2 (see
+          DailyList.tsx) to keep the single-h1-per-page invariant. */}
       {/* The Subject ↔ Schedule toggle now lives in the page-header actions
           slot (W5) instead of a standalone in-page "VIEW" bar, mirroring the
           Weekly view's title-row toggle. The onboarding tip banner was
@@ -2097,82 +1434,54 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
           a matching native title= for the touch long-press fallback, and the
           wrapping <Tooltip> mirrors the search-trigger idiom in the top bar
           (the Button primitive's own `tooltip` prop has no tooltipId yet). */}
-      <PageHeader
-        title="Daily View"
-        subtitle="Today's lessons in detail, side-by-side with the day's schedule and notes."
-        className={styles.dailyPageHeader}
-        actions={
-          <div className={styles.headerActions}>
-            <DailySchedulePill />
-            <Tooltip
-              content="Open this day in the full-screen Teaching View for live class delivery"
-              side="bottom"
-              tooltipId="daily-present"
-            >
-              <Button
-                variant="primary"
-                onClick={() => router.push("/teach?present=1")}
-                title="Open this day in the full-screen Teaching View for live class delivery"
-              >
-                Present
-              </Button>
-            </Tooltip>
-          </div>
-        }
-      />
-
-      {/* ── Breadcrumb: Week N / Day / Subject (BIG-7) ───────────────────
-          Renders above the body row so it sits flush with the page top,
-          spanning the full width including the icon rail. Each segment is
-          an anchor; the separator chevrons are presentational. */}
-      <nav className={styles.breadcrumb} aria-label="Breadcrumb">
-        <ol className={styles.breadcrumbList}>
-          <li>
+      <div className={styles.dailyPageHeader}>
+        <div className={styles.pageHeadText}>
+          <h1 className={styles.pageTitle}>Daily View</h1>
+          {/* Breadcrumb directly under the title — Week N › Day › Subject.
+              Each segment is a real link; the subject segment is omitted
+              (not stale) when no lesson is selected. Day labels derive
+              from the configured school week (useOrderedWeekdays). */}
+          <nav className={styles.headerCrumb} aria-label="Breadcrumb">
             <Link href="/weekly" className={styles.breadcrumbLink}>
-              Week {week}
+              {labels.week} {week}
             </Link>
-          </li>
-          <li className={styles.breadcrumbSep} aria-hidden="true">
-            ›
-          </li>
-          <li>
-            {/* Day segment — links to the same daily view; clicking re-confirms
-                the active day, which is a no-op when already on it. */}
+            <span className={styles.breadcrumbSep} aria-hidden="true">
+              ›
+            </span>
             <Link href="/daily" className={styles.breadcrumbLink}>
               {weekdays[selectedDay]?.longLabel ?? "Day"}
             </Link>
-          </li>
-          {breadcrumbSubject && (
-            <>
-              <li className={styles.breadcrumbSep} aria-hidden="true">
-                ›
-              </li>
-              <li>
+            {breadcrumbSubject && (
+              <>
+                <span className={styles.breadcrumbSep} aria-hidden="true">
+                  ›
+                </span>
                 <Link
                   href={`/subject/${breadcrumbSubject.id}`}
                   className={styles.breadcrumbLink}
                 >
                   {breadcrumbSubject.name}
                 </Link>
-              </li>
-            </>
-          )}
-        </ol>
-      </nav>
-
-      {/* ── aria-live region: column reorder announcements ───────────────
-          A visually hidden polite live region — when a column moves
-          (mouse, touch, or keyboard) we write the new order into it so
-          screen-readers hear the change. Always in DOM so the live
-          attribute is observed from the start. */}
-      <div
-        id={columnAnnounceRegionId}
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className={styles.srOnly}
-      >
-        {columnAnnouncement}
+              </>
+            )}
+          </nav>
+        </div>
+        <div className={styles.headerActions}>
+          <DailySchedulePill />
+          <Tooltip
+            content="Open this day in the full-screen Teaching View for live class delivery"
+            side="bottom"
+            tooltipId="daily-present"
+          >
+            <Button
+              variant="primary"
+              onClick={() => router.push("/teach?present=1")}
+              title="Open this day in the full-screen Teaching View for live class delivery"
+            >
+              Present
+            </Button>
+          </Tooltip>
+        </div>
       </div>
 
       {/* ── Body row: icon rail + content body + optional schedule rail ────
@@ -2209,63 +1518,20 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
             <RightRail lesson={selectedLesson} week={week} day={selectedDay} />
           </div>
         ) : (
-          /* ── Grid mode body (three-track reorderable) ────────────────────
-              data-narrow-pane drives the narrow (single-column) layout: CSS
-              shows exactly one pane on narrow viewports and ignores it on
-              wide. The grid template is computed from columnOrder above;
-              each column wrapper carries a data-column attribute so the
-              splitter drag math can find its column track via querySelector
-              on bodyRef. */
-          <div
-            id="daily-pane-body"
-            ref={bodyRef}
-            className={styles.body}
-            role="tabpanel"
-            aria-labelledby={`daily-tab-${selectedDay}`}
-            data-narrow-pane={narrowPane}
-            style={{ gridTemplateColumns: gridTemplate }}
-          >
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleColumnDragStart}
-              onDragEnd={handleColumnDragEnd}
-              onDragCancel={handleColumnDragCancel}
-            >
-              <SortableContext
-                items={columnOrder}
-                strategy={horizontalListSortingStrategy}
-              >
-                {columnOrder.map((id, i) => {
-                  const render = COLUMN_RENDERERS[id];
-                  // Build a unique CSS class per column id so its inner
-                  // chrome (lesson-list card vs. right-rail track) keeps
-                  // its existing look regardless of position.
-                  return (
-                    <Fragment key={id}>
-                      <SortableColumn id={id} className={styles.columnSlot}>
-                        {(grip) => render(grip)}
-                      </SortableColumn>
-                      {/* Splitter sits between this column and the next; the
-                          last column has no trailing splitter. */}
-                      {i < columnOrder.length - 1 && (
-                        <PaneSplitter
-                          {...splitterPropsFor(id, columnOrder[i + 1]!)}
-                        />
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </SortableContext>
-
-              {/* Floating ghost of the dragged column — a small chip with
-                  the column's label, reusing the right-rail panel-ghost
-                  visual vocabulary (paper card + hairline + soft lift). */}
-              <DragOverlay>
-                {draggingColumnId && <ColumnDragGhost id={draggingColumnId} />}
-              </DragOverlay>
-            </DndContext>
-          </div>
+          /* ── Grid mode body: the dockable panel system ──────────────────
+              Three slots (left / center / right) host the Day, Lesson, and
+              Side panels. Teachers drag slot tabs to move panels between
+              columns, collapse side columns to 50px icon rails, unpin them
+              into hover-peek overlays, and resize with the splitters —
+              all persisted. `data-narrow-pane` drives the ≤720px single-
+              pane layout (CSS in Dock.module.css). */
+          <DockLayout
+            panels={dockPanels}
+            api={dock}
+            bodyId="daily-pane-body"
+            ariaLabelledBy={`daily-tab-${selectedDay}`}
+            narrowPane={narrowPane}
+          />
         )}
         {/* ── Schedule rail (Schedule pill ON) ─────────────────────────────
             Mounted as an additional track on the right end of the bodyRow.

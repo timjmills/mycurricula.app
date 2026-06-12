@@ -20,6 +20,13 @@ export interface SectionResource extends LessonResource {
   id: string;
 }
 
+/** Per-phase delivery status (6.11.26 daily handoff §7). Independent of
+ *  the lesson-level LessonStatus — setting a phase's status never
+ *  completes (or forks) the lesson. Display vocabulary is the design
+ *  system's fixed set: done → "Completed", progress → "In progress",
+ *  idle → "Not started". */
+export type SectionStatus = "idle" | "progress" | "done";
+
 /** One section of a lesson, instantiated from a template section. */
 export interface LessonSectionContent {
   id: string;
@@ -35,6 +42,13 @@ export interface LessonSectionContent {
   body: string;
   /** Resources attached to this section, in display order. */
   resources: SectionResource[];
+  /** Planned phase length, rendered as "· N min" after the heading.
+   *  Null/absent → no time shown (the handoff's optional-minutes rule —
+   *  never a dangling separator). */
+  minutes?: number | null;
+  /** Phase delivery status — drives the phaseHead status chip and the
+   *  agenda navigator's done tint. Defaults to "idle". */
+  status?: SectionStatus;
 }
 
 /** A fresh resource for a section. */
@@ -56,6 +70,8 @@ export function newLessonSection(
     prompt: "",
     body: "",
     resources: [],
+    minutes: 10, // prototype default for a fresh phase ("New Phase · 10 min")
+    status: "idle",
   };
 }
 
@@ -110,6 +126,8 @@ export function instantiateSections(
     prompt: s.prompt,
     body: "",
     resources: [] as SectionResource[],
+    minutes: s.minutes ?? null,
+    status: "idle" as SectionStatus,
   }));
   return distributeResources(sections, resources);
 }

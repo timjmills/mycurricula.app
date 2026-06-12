@@ -1,0 +1,116 @@
+/* rt-toolbar.module.css — the /daily sticky rich-text toolbar.
+   Exact recipe from the 6.11.26 design handoff (`.rtToolbar`, ~line 270):
+
+     position:sticky; top:0; z-index:30; display:flex; flex-wrap:wrap;
+     gap:2px; padding:7px 12px;
+     background:color-mix(in srgb, var(--surface) 94%, transparent);
+     backdrop-filter:blur(8px); border-bottom:1px solid var(--border);
+
+   Buttons are the canonical <Button variant="icon" size="sm"> primitive,
+   re-skinned here to the prototype's 30px `.rtBtn` density. The doubled
+   class selectors (.rtBtn.rtBtn) are deliberate: they out-specify
+   Button.module.css's `.icon.sm` / `.icon:hover:not(:disabled)` rules
+   (0,3-4,0 vs 0,2-3,0) so the override wins regardless of CSS injection
+   order. Button's base keeps supplying focus-visible ring, disabled fade,
+   reduced-motion transition removal, and the ≤900px ::before hit-area
+   inflation to ≥44px — so phone/tablet touch targets stay compliant while
+   the visual stays 30px dense.
+
+   All color via var(--…) tokens; structural px dimensions follow the
+   prototype. No animation is introduced (sticky + blur are static), so
+   there is nothing additional to gate behind prefers-reduced-motion —
+   Button's own reduced-motion rule already drops its hover transitions. */
+
+/* ── Bar ─────────────────────────────────────────────────────────────── */
+
+.rtToolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 12px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Buttons (prototype .rtBtn) ──────────────────────────────────────── */
+
+.rtToolbar .rtBtn.rtBtn {
+  min-width: 30px;
+  width: auto; /* glyph buttons may be wider than square */
+  height: 30px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-xs);
+  color: var(--ink-soft);
+  font-size: var(--t-14);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rtToolbar .rtBtn.rtBtn:hover {
+  background: var(--hairline);
+  color: var(--ink);
+}
+
+/* Press feedback (prototype :active) and the lit state of a toggle whose
+   format is active at the caret share the same brand tint. Declared after
+   :hover so a lit toggle stays lit while hovered. */
+.rtToolbar .rtBtn.rtBtn:active,
+.rtToolbar .rtBtn.rtBtn.rtBtnActive {
+  background: var(--brand-50);
+  color: var(--brand-600);
+}
+
+/* 16px icon glyphs (prototype `.rtBtn svg`). */
+.rtToolbar .rtBtn.rtBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Letter-glyph semantics — match the prototype's <b>/<i>/<u>/<s> children. */
+.rtBtn i {
+  font-style: italic;
+}
+.rtBtn u {
+  text-decoration: underline;
+}
+.rtBtn s {
+  text-decoration: line-through;
+}
+
+/* ── Separators (prototype .rtSep) ───────────────────────────────────── */
+
+.rtSep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 5px;
+}
+
+/* ── Hint (prototype .rtHint) ────────────────────────────────────────── */
+
+.rtHint {
+  margin-left: auto;
+  font-size: var(--t-11);
+  color: var(--faint);
+  font-weight: 500;
+  align-self: center;
+}
+
+/* The hint is decorative guidance — drop it on narrow widths (~720px per
+   the handoff) so the buttons keep a single comfortable row on tablets
+   and never crowd the phone tier. */
+@media (max-width: 719px) {
+  .rtHint {
+    display: none;
+  }
+}

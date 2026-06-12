@@ -27,7 +27,7 @@ export function DailySchedulePill(): ReactNode {
       options={[
         {
           value: "subject",
-          label: "Subject",
+          label: "Subjects",
           ariaLabel: "Subject lesson list",
         },
         {

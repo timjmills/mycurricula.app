@@ -19,6 +19,10 @@ export interface LessonTemplateSection {
   label: string;
   /** Guiding text shown as placeholder in an empty section. */
   prompt: string;
+  /** Suggested phase length in minutes — instantiated lessons render it
+   *  as "· N min" after the phase heading (6.11.26 daily handoff §7).
+   *  Null/absent → the phase shows no time. */
+  minutes?: number | null;
 }
 
 /** An ordered, named lesson structure a teacher can adopt as their default. */
@@ -34,6 +38,22 @@ export interface LessonTemplate {
   sections: LessonTemplateSection[];
 }
 
+/** Suggested per-section minutes for the built-ins that have a natural
+ *  pacing (index-aligned with the template's section order). Templates
+ *  without an entry instantiate with no phase times — minutes are
+ *  optional everywhere. */
+const TEMPLATE_MINUTES: Record<string, readonly number[]> = {
+  minimal: [5, 35, 10],
+  "direct-instruction": [5, 15, 15, 15, 10],
+  "gradual-release": [10, 15, 15, 15, 5],
+  "madeline-hunter": [5, 5, 15, 10, 15, 5, 5],
+  "5e": [10, 15, 15, 10, 10],
+  // Connection · Mini-Lesson · Active Engagement · Work Time · Share
+  "workshop-ela": [5, 10, 5, 30, 10],
+  // Warm-Up · Launch · Explore · Discuss · Consolidate
+  "math-workshop": [10, 5, 20, 15, 10],
+};
+
 /** Helper — builds a section with a generated id. */
 function s(
   templateId: string,
@@ -41,7 +61,12 @@ function s(
   label: string,
   prompt: string,
 ): LessonTemplateSection {
-  return { id: `${templateId}-s${index + 1}`, label, prompt };
+  return {
+    id: `${templateId}-s${index + 1}`,
+    label,
+    prompt,
+    minutes: TEMPLATE_MINUTES[templateId]?.[index] ?? null,
+  };
 }
 
 /** The 15 built-in lesson-flow templates. */

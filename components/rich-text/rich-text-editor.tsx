@@ -35,6 +35,14 @@
 // universally supported in all current browsers and is the pragmatic choice
 // for a contentEditable prototype. All document/window access is guarded so
 // it never runs during SSR render.
+//
+// chromeless mode (6.11.26 daily redesign): when the `chromeless` prop is
+// set the editor renders NO toolbar of its own (neither floating nor docked)
+// and instead registers with the shared RichTextCommandBus while focused, so
+// ONE external sticky toolbar (components/daily/rt-toolbar) can drive
+// whichever editor the teacher is working in. All bus commands route through
+// the SAME pipeline the built-in toolbar uses. Omitting the prop preserves
+// today's behavior exactly.
 
 import {
   useCallback,
@@ -46,6 +54,11 @@ import {
 import { createPortal } from "react-dom";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { parseResourceUrl } from "@/lib/resource-embed";
+import {
+  notifyRichTextStateChanged,
+  useRichTextCommandTarget,
+  type RichTextCommandImpl,
+} from "./command-bus";
 import styles from "./rich-text-editor.module.css";
 
 // ── Public contract ─────────────────────────────────────────────────────────
@@ -96,6 +109,23 @@ export interface RichTextEditorProps {
    * unchanged. (The Weekly view relies on that floating behavior.)
    */
   dockTarget?: React.RefObject<HTMLElement | null>;
+  /**
+   * Chromeless mode — the editor renders NO toolbar of its own (neither the
+   * floating selection toolbar nor the docked variant) but is otherwise
+   * identical: same commands, same sanitizing emit, same caret safety.
+   *
+   * Instead, the editor registers itself with the shared RichTextCommandBus
+   * (./command-bus.ts) while it has focus, so a single EXTERNAL toolbar —
+   * e.g. the /daily sticky `RtToolbar` (components/daily/rt-toolbar) — can
+   * drive whichever chromeless editor the teacher is working in. The editor
+   * also snapshots its last selection Range on every selection change so a
+   * bus command can restore the selection if it was lost in transit (e.g.
+   * keyboard focus sitting on the external toolbar).
+   *
+   * Default false — omitting the prop preserves today's behavior exactly.
+   * When set, `dockTarget` is ignored (chromeless replaces docking).
+   */
+  chromeless?: boolean;
   /**
    * Resolve the source for an inline image, DECOUPLED from storage. When the
    * teacher presses the "Insert image" toolbar button, the editor calls this
@@ -611,11 +641,13 @@ export function RichTextEditor({
   ariaLabel,
   autoFocus = false,
   dockTarget,
+  chromeless = false,
   onRequestImageUrl,
 }: RichTextEditorProps): ReactNode {
   // Docked mode is active whenever a dockTarget ref is supplied. When false,
   // every code path below behaves exactly as it did before this prop existed.
-  const docked = dockTarget != null;
+  // Chromeless mode supersedes docking — the external toolbar IS the chrome.
+  const docked = !chromeless && dockTarget != null;
   const editorRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
@@ -632,6 +664,14 @@ export function RichTextEditor({
   // wrapper on the very next render. Compared against lastWrittenRef (raw DOM)
   // this tracks the clean string instead.
   const lastEmittedRef = useRef<string>("");
+
+  // Chromeless mode: the last selection Range observed INSIDE this editor
+  // (cloned, so later DOM selection moves don't mutate it). Bus-driven
+  // commands restore it when the live selection is no longer in the editor —
+  // e.g. after keyboard focus moved onto the external toolbar, or after a
+  // prompt stole focus. Never populated outside chromeless mode, so the
+  // floating/docked paths are byte-for-byte unaffected.
+  const savedRangeRef = useRef<Range | null>(null);
 
   // Toolbar visibility & position (viewport-relative, for position:fixed).
   const [toolbarVisible, setToolbarVisible] = useState(false);
@@ -694,6 +734,13 @@ export function RichTextEditor({
       // is acceptable because the content itself changed underneath the teacher.
       el.innerHTML = sanitizeHtml(value);
       lastWrittenRef.current = value;
+      // An external rewrite invalidates the last-emit baseline. Without
+      // this, undo (external rewrite to the older value) followed by redo
+      // (back to a value that EQUALS the stale last emit) would skip the
+      // rewrite above and leave a mounted editor showing the undone
+      // content — the next keystroke would then emit the stale DOM and
+      // silently destroy the redone value.
+      lastEmittedRef.current = value;
     }
     setEmpty(isEditorEmpty(el));
   }, [value]);
@@ -752,6 +799,20 @@ export function RichTextEditor({
 
   // ── Toolbar positioning & format-state polling ──────────────────────────
   const updateToolbar = useCallback(() => {
+    // Chromeless mode renders no toolbar at all — selectionchange instead
+    // (a) snapshots the selection Range for later restore and (b) pings the
+    // command bus so the EXTERNAL toolbar re-reads its toggle states (bold
+    // lit while the caret sits in bold text, etc.).
+    if (chromeless) {
+      const el = editorRef.current;
+      const sel = window.getSelection();
+      if (el && sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
+        savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+        notifyRichTextStateChanged();
+      }
+      return;
+    }
+
     // Docked mode does not respond to selectionchange for visibility — the
     // focus-driven effect owns show/hide there. We still refresh the toggle
     // states (the caret may have moved within the editor) and the docked
@@ -823,7 +884,7 @@ export function RichTextEditor({
 
     setToolbarPos({ top, left });
     setToolbarVisible(true);
-  }, [docked, syncFormatState, positionDocked]);
+  }, [chromeless, docked, syncFormatState, positionDocked]);
 
   // ── Auto-focus on mount ─────────────────────────────────────────────
   // Inline editors open in response to a teacher action (double-click a
@@ -989,11 +1050,36 @@ export function RichTextEditor({
 
   // ── Format command helpers ──────────────────────────────────────────
 
-  /** Apply a format command while keeping focus in the editor. */
-  const applyCommand = useCallback(
-    (e: React.MouseEvent, command: string, value = "") => {
-      e.preventDefault(); // prevent blur before execCommand
-      editorRef.current?.focus();
+  /**
+   * Focus the editable region and, if the live selection is no longer inside
+   * it, restore the last Range observed there (chromeless mode tracks it on
+   * selectionchange). Outside chromeless mode savedRangeRef is always null,
+   * so this is exactly the bare `.focus()` call the pre-chromeless code made.
+   */
+  const restoreFocusAndSelection = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    const inside = sel && sel.rangeCount > 0 && el.contains(sel.anchorNode);
+    if (!inside) {
+      const saved = savedRangeRef.current;
+      if (saved && el.contains(saved.startContainer) && sel) {
+        sel.removeAllRanges();
+        sel.addRange(saved);
+      }
+    }
+  }, []);
+
+  /**
+   * Execute a format command while keeping focus + selection in the editor.
+   * The SINGLE command pipeline — the built-in toolbar's mouse handlers and
+   * the external command bus both land here, so behavior (selection
+   * preservation, sanitized emit, undo history) is identical either way.
+   */
+  const runCommand = useCallback(
+    (command: string, value = "") => {
+      restoreFocusAndSelection();
       exec(command, value);
       // Re-read all toggle-command states after the command.
       syncFormatState();
@@ -1001,8 +1087,21 @@ export function RichTextEditor({
       const html = editorRef.current?.innerHTML ?? "";
       lastWrittenRef.current = html;
       emitChange(html);
+      // Let any external toolbar refresh its toggle highlights immediately
+      // (the follow-up selectionchange also pings, but is not guaranteed for
+      // every command). No-op when this editor isn't bus-registered.
+      if (chromeless) notifyRichTextStateChanged();
     },
-    [emitChange, syncFormatState],
+    [restoreFocusAndSelection, emitChange, syncFormatState, chromeless],
+  );
+
+  /** Apply a format command from the built-in toolbar's mouse handlers. */
+  const applyCommand = useCallback(
+    (e: React.MouseEvent, command: string, value = "") => {
+      e.preventDefault(); // prevent blur before execCommand
+      runCommand(command, value);
+    },
+    [runCommand],
   );
 
   const applyTextColor = useCallback(
@@ -1054,29 +1153,55 @@ export function RichTextEditor({
   // These use window.prompt for the URL — acceptable for a teacher-only
   // prototype tool. Replace with an inline popover when a richer UI is needed.
 
+  /**
+   * Best available selection Range for a command about to surrender focus:
+   * the live selection when it sits inside this editor, else the last Range
+   * tracked here (chromeless mode — covers commands arriving while keyboard
+   * focus is on the external toolbar), else the live selection unchanged
+   * (pre-chromeless behavior: savedRangeRef is null outside chromeless mode).
+   */
+  const captureSelectionRange = useCallback((): Range | null => {
+    const el = editorRef.current;
+    const sel = window.getSelection();
+    const live = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    if (live && el && el.contains(live.startContainer)) return live;
+    const saved = savedRangeRef.current;
+    if (saved && el && el.contains(saved.startContainer)) return saved;
+    return live;
+  }, []);
+
+  /**
+   * Link flow core — shared by the built-in toolbar button and the command
+   * bus (`requestLink`). Prompts for a URL, restores the pre-prompt
+   * selection, and runs createLink through the sanitizing emit.
+   */
+  const runLink = useCallback(() => {
+    // Preserve the selection range before the prompt steals focus.
+    const sel = window.getSelection();
+    const savedRange = captureSelectionRange();
+
+    const url = window.prompt("Enter link URL:", "https://");
+    if (!url || !url.trim()) return; // cancelled or empty
+
+    // Restore the selection that may have been lost while the prompt was open.
+    if (savedRange && sel) {
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+    }
+
+    editorRef.current?.focus();
+    exec("createLink", url.trim());
+    const html = editorRef.current?.innerHTML ?? "";
+    lastWrittenRef.current = html;
+    emitChange(html);
+  }, [captureSelectionRange, emitChange]);
+
   const applyLink = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      // Preserve the selection range before the prompt steals focus.
-      const sel = window.getSelection();
-      const savedRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-
-      const url = window.prompt("Enter link URL:", "https://");
-      if (!url || !url.trim()) return; // cancelled or empty
-
-      // Restore the selection that may have been lost while the prompt was open.
-      if (savedRange && sel) {
-        sel.removeAllRanges();
-        sel.addRange(savedRange);
-      }
-
-      editorRef.current?.focus();
-      exec("createLink", url.trim());
-      const html = editorRef.current?.innerHTML ?? "";
-      lastWrittenRef.current = html;
-      emitChange(html);
+      runLink();
     },
-    [emitChange],
+    [runLink],
   );
 
   // ── Insert raw HTML at a (possibly stale) caret position ────────────────
@@ -1121,34 +1246,59 @@ export function RichTextEditor({
   // <img> at the caret. Without the prop we fall back to prompting for a URL —
   // the original behavior. The src is sanitized on emit, so an unsafe value is
   // dropped regardless of which path produced it.
+  /**
+   * Image flow core — shared by the built-in toolbar button and the command
+   * bus (`requestImage`). Parent-driven via onRequestImageUrl when supplied
+   * (the notecards-wave upload path), URL prompt otherwise.
+   */
+  const runImage = useCallback(() => {
+    // Snapshot the caret BEFORE any focus loss (prompt or async resolver).
+    const savedRange = captureSelectionRange();
+
+    if (onRequestImageUrl) {
+      // Parent-driven path. Await the resolver, then insert. Errors and a
+      // null result both cancel silently — the parent owns user feedback.
+      void onRequestImageUrl()
+        .then((url) => {
+          if (!url || !url.trim()) return;
+          insertHtmlAtSavedRange(buildImageHtml(url.trim()), savedRange);
+        })
+        .catch(() => {
+          /* parent surfaces upload failures; nothing to insert */
+        });
+      return;
+    }
+
+    // Fallback: prompt for a URL (original behavior).
+    const url = window.prompt("Enter image URL:", "https://");
+    if (!url || !url.trim()) return;
+    insertHtmlAtSavedRange(buildImageHtml(url.trim()), savedRange);
+  }, [captureSelectionRange, onRequestImageUrl, insertHtmlAtSavedRange]);
+
   const applyImage = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      // Snapshot the caret BEFORE any focus loss (prompt or async resolver).
-      const sel = window.getSelection();
-      const savedRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-
-      if (onRequestImageUrl) {
-        // Parent-driven path. Await the resolver, then insert. Errors and a
-        // null result both cancel silently — the parent owns user feedback.
-        void onRequestImageUrl()
-          .then((url) => {
-            if (!url || !url.trim()) return;
-            insertHtmlAtSavedRange(buildImageHtml(url.trim()), savedRange);
-          })
-          .catch(() => {
-            /* parent surfaces upload failures; nothing to insert */
-          });
-        return;
-      }
-
-      // Fallback: prompt for a URL (original behavior).
-      const url = window.prompt("Enter image URL:", "https://");
-      if (!url || !url.trim()) return;
-      insertHtmlAtSavedRange(buildImageHtml(url.trim()), savedRange);
+      runImage();
     },
-    [onRequestImageUrl, insertHtmlAtSavedRange],
+    [runImage],
   );
+
+  // ── Command-bus registration (chromeless mode only) ─────────────────────
+  // The registered target object delegates through this ref, so it stays
+  // reference-stable for the editor's lifetime while always invoking the
+  // freshest closures (runCommand re-closes over onChange etc. every render).
+  const commandImplRef = useRef<RichTextCommandImpl>({
+    runCommand,
+    runLink,
+    runImage,
+  });
+  useEffect(() => {
+    commandImplRef.current = { runCommand, runLink, runImage };
+  });
+  // Registers on focus / unregisters on blur. No-op unless chromeless.
+  // singleLine editors advertise no block-command support so the external
+  // toolbar disables formatBlock/list/indent/image against them.
+  useRichTextCommandTarget(editorRef, commandImplRef, chromeless, !singleLine);
 
   // ── Insert embed (YouTube / Vimeo / Google) ─────────────────────────────
   // Prompt for a URL, run it through parseResourceUrl, and insert a sanitized
@@ -1271,8 +1421,12 @@ export function RichTextEditor({
           still escapes the zoomed panel while keeping its styling. A portal
           does not change fixed-positioning behaviour. The `typeof document`
           guard keeps it inert during SSR (toolbarVisible is also client-only,
-          so this never runs on the server). */}
-      {toolbarVisible &&
+          so this never runs on the server). Chromeless mode renders no
+          toolbar at all — the external RtToolbar drives this editor through
+          the command bus instead (toolbarVisible also never becomes true in
+          chromeless mode; the guard is belt-and-braces). */}
+      {!chromeless &&
+        toolbarVisible &&
         typeof document !== "undefined" &&
         createPortal(
           <div

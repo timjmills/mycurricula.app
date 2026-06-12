@@ -28,7 +28,7 @@
 // of which day tab is active. Tags render as small color dots (tag color is
 // the only color in the panel besides the green done state).
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { ReactNode, FormEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { TODOS, TAG_BY_ID } from "@/lib/mock";
@@ -232,12 +232,16 @@ interface TodayTodosProps {
    * interactive.
    */
   dragHandleProps?: PanelDragHandleProps;
+  /** Reports the live OPEN count (the badge number) upward — the Daily
+   *  dock's collapsed-rail badge subscribes so check-offs tick it down. */
+  onOpenCountChange?: (count: number) => void;
 }
 
 export function TodayTodos({
   collapsed = false,
   onToggleCollapsed,
   dragHandleProps,
+  onOpenCountChange,
 }: TodayTodosProps = {}): ReactNode {
   // Local working copy seeded from the "today" bucket. Toggling and adding
   // mutate this copy only — there is no to-do store in the prototype yet.
@@ -255,6 +259,10 @@ export function TodayTodos({
   // teacher's remaining work for the day. (Switched from done/total to
   // remaining-only on the redesign — matches Image 13.)
   const openCount = todos.filter((t) => !t.done).length;
+
+  useEffect(() => {
+    onOpenCountChange?.(openCount);
+  }, [openCount, onOpenCountChange]);
 
   // Toggle one item's done state.
   const handleToggle = useCallback((id: string): void => {

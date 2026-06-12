@@ -388,12 +388,30 @@ export function Tooltip({
   // For the enabled path the ref lives on the trigger itself; for the
   // disabled path the ref lives on the wrapper span so getBoundingClientRect()
   // measures the right element.
+  //
+  // COMPOSE with any ref the child already carries — cloneElement's
+  // injected ref otherwise REPLACES it, silently emptying callers' own
+  // ref books (agenda drag midpoints, planning-tab focus rosters, menu
+  // outside-click anchors).
+  const childOwnRef =
+    ((childProps as { ref?: React.Ref<HTMLElement> } | null)?.ref ??
+      (children as unknown as { ref?: React.Ref<HTMLElement> }).ref) ||
+    null;
+  const composedTriggerRef = (node: HTMLElement | null): void => {
+    (triggerRef as React.MutableRefObject<HTMLElement | null>).current = node;
+    if (typeof childOwnRef === "function") {
+      childOwnRef(node);
+    } else if (childOwnRef && typeof childOwnRef === "object") {
+      (childOwnRef as React.MutableRefObject<HTMLElement | null>).current =
+        node;
+    }
+  };
   const trigger = cloneElement(
     children as ReactElement<JSX.IntrinsicElements["button"]>,
     {
       ...(childDisabled
         ? {}
-        : { ref: triggerRef as React.Ref<HTMLButtonElement> }),
+        : { ref: composedTriggerRef as React.Ref<HTMLButtonElement> }),
       "aria-describedby": open ? tooltipId : undefined,
       // Native `title=` mirror. CLAUDE.md §4 requires touch users to reach the
       // explanation via long-press of the native OS tooltip, and the

@@ -134,6 +134,26 @@ function writeTab(tab: TabId): void {
   }
 }
 
+// Public aliases — the Daily dock's collapsed icon rail renders one icon
+// per inner tab and needs the id set + the persisted value to seed its
+// controlled-tab state. RightRail remains the single owner of the
+// storage key.
+export type RailTabId = TabId;
+export const RAIL_TAB_IDS = TAB_IDS;
+export const RAIL_TAB_LABEL = TAB_LABEL;
+
+/** Read the persisted rail tab (SSR-safe; default "resources"). */
+export function readRailTab(): RailTabId {
+  return readTab();
+}
+
+/** Persist the rail tab — for consumers that change the controlled tab
+ *  from OUTSIDE the rail's own tab strip (the dock's collapsed icon
+ *  rail). Same key, same owner file. */
+export function writeRailTab(tab: RailTabId): void {
+  writeTab(tab);
+}
+
 // ── Panel definitions (stacked mode) ─────────────────────────────────────
 
 // The three stacked panels share a stable id set. The panel order and heights
@@ -389,6 +409,22 @@ interface RightRailProps {
    * week" affordance. Omit in pure day mode.
    */
   onClearLesson?: () => void;
+  /**
+   * Live count of OPEN to-dos, reported up from <TodayTodos> so the
+   * dock's collapsed-rail badge ticks down as the teacher checks items
+   * off (handoff §2 — "To-do completion drives the rail badge count").
+   */
+  onOpenTodoCountChange?: (count: number) => void;
+  /**
+   * Optional CONTROLLED active tab (tabbed mode). When set, the rail
+   * renders this tab instead of its internal state — the Daily dock's
+   * collapsed icon rail uses it so clicking a Resources / To-do / Chat
+   * rail icon deep-opens the matching tab. Persistence still happens
+   * here (one owner for the storage key) via `selectTab`.
+   */
+  activeTab?: RailTabId;
+  /** Change notifications for the controlled `activeTab`. */
+  onActiveTabChange?: (tab: RailTabId) => void;
 }
 
 // ── RightRail ────────────────────────────────────────────────────────────
@@ -400,6 +436,9 @@ export function RightRail({
   mode = "day",
   lessons,
   onClearLesson,
+  onOpenTodoCountChange,
+  activeTab: controlledTab,
+  onActiveTabChange,
 }: RightRailProps): ReactNode {
   // The `cp-subj` wrapper on the rail forwards the selected lesson's subject
   // color into ResourcesPanel via the cascading --c / --cl / --cd properties.
@@ -419,7 +458,10 @@ export function RightRail({
   const hydratedRef = useRef(false);
 
   // ── Active tab — SSR-safe hydration ────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<TabId>(DEFAULT_TAB);
+  // Controlled when the consumer passes `activeTab` (the Daily dock does);
+  // otherwise the internal state below drives the tab strip.
+  const [internalTab, setInternalTab] = useState<TabId>(DEFAULT_TAB);
+  const activeTab = controlledTab ?? internalTab;
 
   // ── Stacked-mode state — SSR-safe hydration ────────────────────────────
   const [panelOrder, setPanelOrder] = useState<PanelId[]>(DEFAULT_PANEL_ORDER);
@@ -430,7 +472,7 @@ export function RightRail({
   // Single post-mount effect loads all persisted values. Runs once.
   useEffect(() => {
     setRailMode(readRailMode());
-    setActiveTab(readTab());
+    setInternalTab(readTab());
     setPanelOrder(readPanelOrder());
     setPanelHeights(readPanelHeights());
     hydratedRef.current = true;
@@ -443,10 +485,14 @@ export function RightRail({
   }, []);
 
   // ── Tab selection (tabbed mode) ────────────────────────────────────────
-  const selectTab = useCallback((tab: TabId) => {
-    setActiveTab(tab);
-    if (hydratedRef.current) writeTab(tab);
-  }, []);
+  const selectTab = useCallback(
+    (tab: TabId) => {
+      setInternalTab(tab);
+      onActiveTabChange?.(tab);
+      if (hydratedRef.current) writeTab(tab);
+    },
+    [onActiveTabChange],
+  );
 
   // ── Panel reorder (stacked mode) ──────────────────────────────────────
   const sensors = useDndSensors();
@@ -560,6 +606,7 @@ export function RightRail({
               /* no-op */
             }}
             dragHandleProps={dragHandleProps}
+            onOpenCountChange={onOpenTodoCountChange}
           />
         );
       case "chat":

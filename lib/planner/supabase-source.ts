@@ -60,6 +60,7 @@
 
 import type {
   Lesson,
+  LessonDifferentiation,
   LessonMoved,
   LessonResource,
   LessonStatus,
@@ -372,6 +373,7 @@ interface MasterEventRow {
   resources: unknown; // jsonb: LessonResource[]
   standards: string[]; // uuid[]
   display_order_within_day: number;
+  differentiation: unknown; // jsonb: LessonDifferentiation | null
   deleted_at: string | null;
 }
 
@@ -394,6 +396,7 @@ interface PersonalCopyRow {
   standards: string[];
   display_order_within_day: number;
   is_diverged_from_master: boolean;
+  differentiation: unknown; // jsonb: LessonDifferentiation | null
   archived_at: string | null;
 }
 
@@ -415,6 +418,7 @@ interface AuthoredLessonRow {
   display_order_within_day: number;
   status: string | null;
   reason_not_done: string | null;
+  differentiation: unknown; // jsonb: LessonDifferentiation | null
   deleted_at: string | null;
 }
 
@@ -462,15 +466,17 @@ interface SectionRow {
   body: string;
   resources: unknown; // jsonb: SectionResource[]
   display_order: number;
+  minutes: number | null;
+  status: string | null;
 }
 
 // Column lists kept in one place so reads stay consistent.
 const MASTER_COLS =
-  "id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, deleted_at";
+  "id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, differentiation, deleted_at";
 const COPY_COLS =
-  "id, teacher_id, master_core_lesson_event_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, is_diverged_from_master, archived_at";
+  "id, teacher_id, master_core_lesson_event_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, is_diverged_from_master, differentiation, archived_at";
 const AUTHORED_COLS =
-  "id, owner_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, status, reason_not_done, deleted_at";
+  "id, owner_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, status, reason_not_done, differentiation, deleted_at";
 const COMPLETION_COLS = "core_lesson_event_id, status, reason_not_done";
 const UNIT_COLS =
   "id, grade_level_id, subject_id, name, start_week, end_week, school_year_id";
@@ -478,7 +484,7 @@ const SUBJECT_COLS =
   "id, grade_level_id, name, color, parent_id, display_order";
 const STANDARD_COLS = "id, code, description";
 const SECTION_COLS =
-  "id, owner_kind, owner_lesson_id, owner_id, grade_level_id, template_section_id, heading, prompt, body, resources, display_order";
+  "id, owner_kind, owner_lesson_id, owner_id, grade_level_id, template_section_id, heading, prompt, body, resources, display_order, minutes, status";
 
 // ── jsonb helpers ─────────────────────────────────────────────────────────────
 
@@ -510,6 +516,30 @@ function jsonToResources(raw: unknown): LessonResource[] {
       typeof (r as { type?: unknown }).type === "string" &&
       typeof (r as { label?: unknown }).label === "string",
   );
+}
+
+/** Coerce a jsonb `differentiation` value to a typed `LessonDifferentiation`,
+ *  or undefined when null/absent/malformed. Defensive: each tier must be a
+ *  string; missing tiers default to "" so the pane editors stay controlled. */
+function jsonToDifferentiation(
+  raw: unknown,
+): LessonDifferentiation | undefined {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return undefined;
+  }
+  const o = raw as Record<string, unknown>;
+  const tier = (v: unknown): string => (typeof v === "string" ? v : "");
+  return {
+    support: tier(o.support),
+    onLevel: tier(o.onLevel),
+    extension: tier(o.extension),
+  };
+}
+
+/** Coerce a persisted section `status` text to the SectionStatus union the
+ *  flow renders; anything unknown falls back to "idle". */
+function sectionStatusFromDb(raw: string | null): "idle" | "progress" | "done" {
+  return raw === "progress" || raw === "done" ? raw : "idle";
 }
 
 /** Coerce a jsonb section `resources` value to typed `SectionResource[]`,
@@ -581,6 +611,7 @@ function buildLesson(args: {
   isPersonal: boolean;
   modified: boolean;
   moved: LessonMoved;
+  differentiation?: LessonDifferentiation;
 }): Lesson {
   // `preview` is a short summary; the fixtures fall it back to directions. With
   // no dedicated preview column we mirror that: first line of directions.
@@ -608,6 +639,7 @@ function buildLesson(args: {
     commentCount: 0,
     unreadComments: 0,
     tasks,
+    differentiation: args.differentiation,
   };
 }
 
@@ -784,8 +816,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
     const weekEnd = opts?.weekEnd;
     const explicitYearId = opts?.schoolYearId;
     const schoolYearId =
-      explicitYearId ??
-      (await resolveActiveSchoolYearId(client, gradeLevelId));
+      explicitYearId ?? (await resolveActiveSchoolYearId(client, gradeLevelId));
 
     // School-year scoping is carried on `units`, NOT on the lesson tables:
     // neither `master_core_lesson_events` nor `personal_authored_lessons` has a
@@ -959,6 +990,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
           isPersonal: copy != null,
           modified: copy?.is_diverged_from_master ?? false,
           moved: copy ? deriveMoved(master, copy) : null,
+          differentiation: jsonToDifferentiation(src.differentiation),
         }),
       );
     }
@@ -987,6 +1019,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
         isPersonal: true,
         modified: false,
         moved: null,
+        differentiation: jsonToDifferentiation(a.differentiation),
       });
     });
 
@@ -1142,6 +1175,8 @@ export const plannerSupabaseSource: PlannerDataSource = {
           patch.resources as unknown as AuthoredLessonRow["resources"];
       if (patch.standards !== undefined)
         next.standards = standardCodesToUuids(patch.standards);
+      if (patch.differentiation !== undefined)
+        next.differentiation = patch.differentiation;
       // Authored completion lives on its OWN `status`/`reason_not_done` columns
       // (NOT `completion_status`, which FKs to master events).
       if (patch.status !== undefined) next.status = statusToDb(patch.status);
@@ -1175,6 +1210,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
       "standards",
       "time",
       "tasks",
+      "differentiation",
     ];
     const hasContent = contentKeys.some((k) => patch[k] !== undefined);
 
@@ -1204,6 +1240,8 @@ export const plannerSupabaseSource: PlannerDataSource = {
           patch.resources as unknown as MasterEventRow["resources"];
       if (patch.standards !== undefined)
         next.standards = standardCodesToUuids(patch.standards);
+      if (patch.differentiation !== undefined)
+        next.differentiation = patch.differentiation;
       // `preview`/`time`/`tasks` have no master column (derived/unmodelled) —
       // skipped, exactly as in the personal-copy patch below.
       if (Object.keys(next).length > 0) {
@@ -1235,6 +1273,8 @@ export const plannerSupabaseSource: PlannerDataSource = {
       if (patch.resources !== undefined) next.resources = patch.resources;
       if (patch.standards !== undefined)
         next.standards = standardCodesToUuids(patch.standards);
+      if (patch.differentiation !== undefined)
+        next.differentiation = patch.differentiation;
       // `preview`/`time`/`tasks` have no column in the copies table — they are
       // derived (preview) or unmodelled (time/tasks). Skipped intentionally.
       void copy;
@@ -1425,6 +1465,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
       isPersonal: true,
       modified: false,
       moved: null,
+      differentiation: jsonToDifferentiation(inserted.differentiation),
     });
   },
 
@@ -1522,6 +1563,10 @@ export const plannerSupabaseSource: PlannerDataSource = {
       resources: s.resources, // preserve the section's resources jsonb array.
       display_order: i,
       template_section_id: s.templateSectionId ?? null,
+      // 6.11.26 daily redesign: planned length + teach-time chip persist with
+      // the section (null minutes = no time line; status defaults idle).
+      minutes: s.minutes ?? null,
+      status: s.status ?? "idle",
     }));
 
     const rpc = await client.rpc("replace_lesson_sections", {
@@ -1626,7 +1671,8 @@ async function forkAndPatch(
   // idempotent (ignoreDuplicates on the conflict key), so a simultaneous first
   // fork by two writers still yields a single copy row.
   const existing = await loadCopy(client, lessonId, ownerId);
-  const copy = existing ?? (await ensurePersonalCopy(client, lessonId, ownerId));
+  const copy =
+    existing ?? (await ensurePersonalCopy(client, lessonId, ownerId));
 
   const applied = patch(existing);
   const row = { ...applied, is_diverged_from_master: true };
@@ -1690,6 +1736,8 @@ async function ensurePersonalCopy(
     standards: master.standards,
     display_order_within_day: master.display_order_within_day,
     is_diverged_from_master: false,
+    // First fork clones the master's content — differentiation included.
+    differentiation: master.differentiation ?? null,
     archived_at: null,
   };
   const inserted = await client
@@ -1871,6 +1919,7 @@ async function reloadLesson(
     isPersonal: copy != null,
     modified: copy?.is_diverged_from_master ?? false,
     moved: copy ? deriveMoved(master, copy) : null,
+    differentiation: jsonToDifferentiation(src.differentiation),
   });
 }
 
@@ -1935,6 +1984,7 @@ async function reloadAuthoredLesson(
     isPersonal: true,
     modified: false,
     moved: null,
+    differentiation: jsonToDifferentiation(authored.differentiation),
   });
 }
 
@@ -1985,6 +2035,8 @@ function mapSectionRows(rows: SectionRow[]): LessonSectionContent[] {
     prompt: row.prompt,
     body: row.body,
     resources: jsonToSectionResources(row.resources, row.id),
+    minutes: row.minutes ?? null,
+    status: sectionStatusFromDb(row.status),
   }));
 }
 
