@@ -193,6 +193,7 @@ primitive instead of inventing one locally.
 | `StatusBadge`                                       | `components/year/StatusBadge.tsx`   | Status pill: completed / in_progress / modified / skipped / not_started / behind.                                      |
 | `PaneSplitter`                                      | `components/daily/PaneSplitter.tsx` | Resizable separator. Vertical or horizontal.                                                                           |
 | `ResourceComposer`, `AddLessonForm`, `AddEventForm` | `components/daily/`                 | Modal patterns. Focus-trap, Esc-close, ≥44px controls.                                                                 |
+| `StandardsPicker`                                   | `components/standards/`             | The standards menu modal: searchable worldwide framework catalog, subject/grade filters, pin-to-top, licence badges, code tagging.      |
 
 ### To build (next wave) — `components/ui/`
 

@@ -35,6 +35,7 @@ Supabase backend is the Phase 1B wave. The honest map:
 | `/subject` (Curriculum view, per-subject unit pages) | Shipped Phase 1A |
 | `/schedule` (timetable) | Shipped as deep-link + side-panel via GlobalRail (Phase 1A complete; rotation cycles deferred to Phase 1B) |
 | `/catch-up` (lessons-not-covered triage) | Shipped Phase 1A |
+| Standards menu + lesson tagging (`components/standards` picker; worldwide framework catalog in `lib/standards/`; Supabase migration + seed in `supabase/`) | Shipped 2026-06-12 — see `docs/research-k12-standards-frameworks-2026-06-12.md`; apply order in `docs/SUPABASE_SETUP.md` |
 | `/settings/*` (unified hub: curriculum, school week, school months, academic year, holidays, appearance, lesson templates, catch-up rules) | Shipped Phase 1A |
 | Master/Personal forking model | Visual + state shipped; persistence to Supabase is Phase 1B |
 | Onboarding wizard | Shipped Phase 1A (`Documents/Claude Design/.../onboarding_wizard` is the spec) |
