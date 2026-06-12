@@ -159,7 +159,7 @@ export function RelocatePicker({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(20, 22, 32, 0.24)",
+        background: "var(--scrim-soft)",
       }}
     >
       <div

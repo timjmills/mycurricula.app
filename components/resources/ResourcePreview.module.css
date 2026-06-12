@@ -1,8 +1,6 @@
 /* ResourcePreview.module.css — the universal click-to-enlarge modal.
  *
- * All color/radii/type come from app/tokens.css via var(); the only literal
- * is the translucent backdrop scrim (mirrors ImageLightbox's inline style —
- * there is no token for a dim overlay). */
+ * All color/radii/type come from app/tokens.css via var(). */
 
 .backdrop {
   position: fixed;
@@ -11,7 +9,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.78);
+  background: var(--scrim-strong);
   overflow: auto;
   animation: fade 140ms ease-out;
 }

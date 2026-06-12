@@ -61,7 +61,7 @@
 .boxDone {
   background: var(--w-accent);
   border-color: var(--w-accent);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .label {

@@ -80,7 +80,7 @@
 }
 .chromeBtnActive {
   background: var(--wf-purple-accent);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .topLeft {
@@ -162,7 +162,7 @@
 }
 .toolActive {
   background: var(--wf-purple-accent);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 .toolActive:hover {
   background: var(--wf-purple-accent);
@@ -295,7 +295,7 @@
   padding: 12px 16px;
   border-radius: var(--r-12);
   background: var(--wf-purple-accent);
-  color: var(--paper);
+  color: var(--on-solid);
   font-size: var(--t-14);
   font-weight: 700;
   cursor: pointer;

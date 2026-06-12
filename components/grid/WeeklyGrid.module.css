@@ -585,7 +585,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: var(--paper);
+  color: var(--on-solid);
   background: var(--cell-accent, var(--ink-500));
   padding: 2px 7px;
   border-radius: 999px;
@@ -690,7 +690,7 @@
 .cellAdd:hover {
   background: var(--cell-accent, var(--brand-50));
   border-color: var(--cell-accent, var(--brand-300));
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 /* "Add another lesson" affordance — a compact "+" button pinned to the
@@ -734,7 +734,7 @@
 .cellAddInline:hover {
   background: var(--cell-accent, var(--brand-50));
   border-color: var(--cell-accent, var(--brand-300));
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .cellAddInline:focus-visible {

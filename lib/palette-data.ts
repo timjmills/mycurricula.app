@@ -148,10 +148,21 @@ export const DEFAULT_SUBJECT_MAPPING: SubjectMapping = {
   sel: "subj-9",
 };
 
+/** v1.3 brand-scale slot ids look like `subj-7`; legacy 20-pool ids are
+ *  named hues (`ocean`, `coral`, …). Slots carry a matching `--subj-N-*`
+ *  token family in app/tokens.css, which the dark (night) theme overrides. */
+const SLOT_ID = /^subj-\d+$/;
+
 /**
  * Resolve a subject's color tokens for a given palette type and mapping.
  * Pure — usable on the server or outside React. The `useSubjectColor`
  * hook in `palette.tsx` wraps this with the active PaletteContext.
+ *
+ * The returned values are CSS color EXPRESSIONS — `var(--token)` references
+ * (for v1.3 slot swatches, so the night theme's token overrides flow through)
+ * or `color-mix(...)` / hex literals (for legacy swatches). They are valid in
+ * inline `style` and CSS custom properties but NOT raw hex; consumers must
+ * assign them as CSS values and must never parse them as colors.
  */
 export function resolveSubjectColor(
   subjectId: SubjectId,
@@ -167,14 +178,40 @@ export function resolveSubjectColor(
   // into the words. The Highlight palette uses the brighter accent; Normal
   // uses the muted solid.
   //
-  // `tint` is explicit on the v1.3 15-slot scale; legacy 20-pool swatches
-  // omit it, so we mix a soft fill from `normal` to keep them usable.
-  const tint = swatch.tint ?? `color-mix(in oklch, ${swatch.normal} 18%, #fff)`;
+  // For v1.3 slots we emit token REFERENCES (`var(--subj-N-*)`) rather than the
+  // literal hexes, so the night theme's per-slot overrides in tokens.css cascade
+  // through. Legacy 20-pool swatches have no token family, so they keep their
+  // hexes — but any mix toward white targets `var(--tint-base)` (white on light
+  // themes, a dark surface on night) instead of a hard-coded `#fff`.
+  if (SLOT_ID.test(swatch.id)) {
+    const tint = `var(--${swatch.id}-tint)`;
+    const accent =
+      type === "highlight"
+        ? `var(--${swatch.id}-bright)`
+        : `var(--${swatch.id})`;
+    const ink = `var(--${swatch.id}-ink)`;
+    const gradient = `linear-gradient(180deg, ${tint} 0%, color-mix(in oklch, ${tint} 55%, var(--tint-base)) 100%)`;
+    return {
+      c: accent,
+      cl: tint,
+      cd: ink,
+      tile: tint,
+      deep: ink,
+      bg: gradient,
+      bgSolid: tint,
+      stripe: accent,
+      gradient,
+    };
+  }
+
+  // Legacy 20-pool swatch: `tint` is absent, so mix a soft fill from `normal`.
+  const tint =
+    swatch.tint ?? `color-mix(in oklch, ${swatch.normal} 18%, var(--tint-base))`;
   const accent =
     type === "highlight" ? (swatch.bright ?? swatch.highlight) : swatch.normal;
 
   // Card background — a soft vertical wash of the tint so fills never read flat.
-  const gradient = `linear-gradient(180deg, ${tint} 0%, color-mix(in oklch, ${tint} 55%, #fff) 100%)`;
+  const gradient = `linear-gradient(180deg, ${tint} 0%, color-mix(in oklch, ${tint} 55%, var(--tint-base)) 100%)`;
 
   return {
     c: accent,

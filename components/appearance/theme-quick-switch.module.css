@@ -1,0 +1,50 @@
+/* theme-quick-switch.module.css — chip-button chrome for the compact
+ * theme switcher (top-bar More menu + Settings sidebar).
+ *
+ * Each button wraps the shared miniature-planner ThemeChip; selection keys
+ * off aria-checked, mirroring theme-picker.module.css. Buttons are 40×36
+ * with wrap — a secondary quick-access control; the fully-spec'd ≥44px
+ * primary picker lives on Settings → Appearance.
+ */
+
+.group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chipBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.chipBtn:hover {
+  background: var(--hairline);
+}
+
+.chipBtn[aria-checked="true"] {
+  border-color: var(--theme-accent);
+  background: var(--theme-accent-soft);
+}
+
+.chipBtn:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chipBtn {
+    transition: none;
+  }
+}

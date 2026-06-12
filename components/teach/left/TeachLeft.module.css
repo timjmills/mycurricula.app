@@ -58,13 +58,13 @@
 
 .railBtnActive {
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
   box-shadow: var(--sh-brand);
 }
 
 .railBtnActive:hover {
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 /* Inner accent bar on the active icon (left edge). */
@@ -464,7 +464,7 @@
 
 .boardNumActive {
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .boardLabel {

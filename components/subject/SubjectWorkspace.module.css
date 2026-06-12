@@ -914,7 +914,7 @@
 .mscrim {
   position: fixed;
   inset: 0;
-  background: rgba(28, 27, 46, 0.32);
+  background: var(--scrim-soft);
   z-index: 55;
 }
 

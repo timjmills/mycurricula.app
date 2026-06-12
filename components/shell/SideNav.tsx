@@ -245,7 +245,10 @@ function GearIcon(): ReactNode {
     </svg>
   );
 }
-// Open-book brand glyph, white on the honey tile.
+// Open-book brand glyph. Page fills follow the active theme via the --logo-book-*
+// tokens (paper renders the original white-on-honey-tile lockup). SVG `fill`
+// presentation attributes do NOT resolve var() — the fills go through inline
+// style, which does.
 function BookGlyph(): ReactNode {
   return (
     <svg
@@ -257,11 +260,11 @@ function BookGlyph(): ReactNode {
     >
       <path
         d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5V5.5Z"
-        fill="#fff"
+        style={{ fill: "var(--logo-book-a)" }}
       />
       <path
         d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13V4Z"
-        fill="#3A2A05"
+        style={{ fill: "var(--logo-book-b)" }}
         opacity=".5"
       />
     </svg>

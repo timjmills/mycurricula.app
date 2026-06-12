@@ -23,7 +23,7 @@
   font-size: 0.7em;
   font-weight: 800;
   letter-spacing: 0.06em;
-  color: var(--paper);
+  color: var(--on-solid);
   background: var(--w-accent);
   padding: 0.25em 0.7em;
   border-radius: var(--r-pill);

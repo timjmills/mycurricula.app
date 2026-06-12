@@ -126,7 +126,7 @@
   place-items: center;
   flex: none;
   border-radius: 50%;
-  color: var(--paper);
+  color: var(--on-solid);
   font-weight: 800;
 }
 

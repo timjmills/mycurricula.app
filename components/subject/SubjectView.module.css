@@ -336,13 +336,13 @@
 .chipActive {
   background: var(--c);
   border-color: var(--c);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .chipActive:hover {
   background: var(--c);
   border-color: var(--c);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .filterSep {
@@ -434,7 +434,7 @@
   font-size: var(--t-10);
   padding: 1px 7px;
   background: var(--c);
-  color: var(--paper);
+  color: var(--on-solid);
   border-radius: 999px;
   font-weight: 600;
   text-transform: uppercase;
@@ -611,7 +611,7 @@
   padding: 1px 6px;
   border-radius: 999px;
   background: var(--c);
-  color: var(--paper);
+  color: var(--on-solid);
   flex: 0 0 auto;
 }
 

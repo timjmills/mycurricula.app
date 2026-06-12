@@ -85,12 +85,13 @@
   font-size: var(--t-26);
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: var(--ink);
+  color: var(--logo-text);
 }
 
-/* ".app" rendered in honey to echo the brand wordmark. */
+/* ".app" accent — follows the theme's logo token (paper = honey) to echo the
+   brand wordmark. */
 .wordmarkTld {
-  color: var(--honey-600);
+  color: var(--logo-tld);
 }
 
 .motto {

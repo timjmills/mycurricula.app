@@ -216,7 +216,7 @@
   padding: 0 6px;
   border-radius: 999px;
   background: var(--urgent);
-  color: var(--paper);
+  color: var(--on-solid);
   font-size: var(--t-11);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -408,7 +408,7 @@
 
 .sendBtn:hover:not(:disabled) {
   background: var(--fyi);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .sendBtn:disabled {

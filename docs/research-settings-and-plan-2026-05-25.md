@@ -73,8 +73,9 @@ the codebase on this rule.
 
 | Setting | What it controls | Lives in | Default | Status | Persist |
 |---|---|---|---|---|---|
-| **Card style** (Quiet / Calm / Vivid) | `data-style` attribute → CSS recipe | `lib/theme.tsx`; UI in `components/appearance/style-picker.tsx` | "vivid" | shipped (UI in Appearance) | **NOT** persisted to localStorage — resets on reload (audit gap) |
-| **Palette** (Normal / Highlight) | `data-palette` attribute → saturation | `lib/theme.tsx`; UI in `components/appearance/palette-toggle.tsx` | "highlight" | shipped (UI) | same gap — not persisted |
+| **Card style** (Quiet / Calm / Vivid) | `data-style` attribute → CSS recipe | `lib/theme.tsx`; UI in `components/appearance/style-picker.tsx` | "vivid" | shipped (UI in Appearance) | ~~audit gap~~ **closed 2026-06-12** — localStorage `mycurricula:user:theme-style` (theme wave) |
+| **Palette** (Normal / Highlight) | `data-palette` attribute → saturation | `lib/theme.tsx`; UI in `components/appearance/palette-toggle.tsx` | "highlight" | shipped (UI) | ~~audit gap~~ **closed 2026-06-12** — localStorage `mycurricula:user:theme-palette` |
+| **App theme** (Paper / Cloud / Night / Mint / Sky / Blossom / Follow system) | `data-theme` attribute → foundation token overrides incl. dark mode + themed logo | `lib/theme.tsx` + `lib/theme-init.tsx` (no-FOUC boot); UI in `components/appearance/theme-picker.tsx` | "paper" | shipped 2026-06-12 (theme wave) | localStorage `mycurricula:user:theme` |
 | **Subject → swatch mapping** | Which palette swatch a subject uses | `components/appearance/subject-colors.tsx`; `lib/palette.tsx` | `DEFAULT_SUBJECT_MAPPING` | shipped (UI) | local React state — **not persisted at all** (audit-cross-cutting calls this out) |
 | **Hierarchy labels** | Renaming Subject / Unit / Lesson / Section | `lib/labels.tsx`; UI in `app/settings/appearance/page.tsx:96-224` | factory defaults | shipped | localStorage `mycurricula:hierarchy-labels` |
 | **Dense / compact spacing** | Power-user reduced padding | not present | n/a | **missing** | listed as cross-cutting improvement |

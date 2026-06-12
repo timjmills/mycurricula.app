@@ -29,28 +29,30 @@
   text-decoration: none;
   color: inherit;
 }
+/* Logo tile + wordmark follow the active theme's --logo-* tokens
+   (paper renders the original honey tile / ink wordmark / honey ".app"). */
 .glyph {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: var(--grad-honey);
-  box-shadow: var(--sh-honey);
+  background: var(--logo-tile-grad);
+  box-shadow: var(--logo-tile-shadow);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  color: #fff;
+  color: var(--logo-book-a);
 }
 .brandText {
   font-family: var(--font-logo);
   font-weight: 800;
   font-size: var(--t-16);
-  color: var(--ink);
+  color: var(--logo-text);
   letter-spacing: -0.02em;
   line-height: 1.05;
   white-space: nowrap;
 }
 .tld {
-  color: var(--honey-600);
+  color: var(--logo-tld);
 }
 .brandSub {
   display: block;

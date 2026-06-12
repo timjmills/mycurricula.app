@@ -190,7 +190,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  color: var(--paper);
+  color: var(--on-solid);
   font-size: var(--t-11);
   font-weight: 700;
   letter-spacing: 0.2px;

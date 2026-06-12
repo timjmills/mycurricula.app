@@ -214,7 +214,7 @@
   padding: 1px 6px;
   border-radius: var(--r-4);
   background: var(--cd, var(--ink-soft));
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 /* ── Header region B — MIDDLE (centered, truncating title) ───────────────

@@ -120,9 +120,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  box-shadow:
-    0 4px 16px rgba(28, 27, 46, 0.1),
-    0 1px 3px rgba(28, 27, 46, 0.06);
+  box-shadow: var(--shadow-popover);
   padding: 4px 0;
   min-width: 180px;
   /* Animate in with a gentle fade+slide. Respects prefers-reduced-motion

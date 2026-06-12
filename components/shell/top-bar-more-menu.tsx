@@ -45,6 +45,7 @@ import {
 import Link from "next/link";
 import { Tooltip } from "@/components/ui";
 import { CatchupFlameButton } from "./catchup-flame-button";
+import { ThemeQuickSwitch } from "@/components/appearance/theme-quick-switch";
 import styles from "./top-bar-more-menu.module.css";
 
 // ── Tab definition (mirrors top-bar.tsx's ViewDef) ──────────────────────────
@@ -379,6 +380,33 @@ export function TopBarMoreMenu({
               )}
             </button>
           </Tooltip>
+
+          <div className={styles.divider} role="separator" aria-hidden="true" />
+
+          {/* ── Theme quick-switch ───────────────────────────────────────
+              The same miniature theme chips as Settings → Appearance, here
+              for one-click access from anywhere. Picking a chip applies +
+              persists immediately and the menu STAYS OPEN — flipping
+              through themes while watching the app change is the point.
+              Full descriptions + the style/palette axes live on the
+              Appearance page; the Tooltip on the label teaches that. */}
+          <div className={styles.themeRow}>
+            <Tooltip
+              content="Switch the app's color theme — applies instantly, saved on this device. The full picker (with card style and color intensity) is in Settings → Appearance."
+              side="left"
+            >
+              <Link
+                href="/settings/appearance"
+                role="menuitem"
+                className={styles.themeLabel}
+                onClick={close}
+                title="Theme — open all appearance settings"
+              >
+                Theme
+              </Link>
+            </Tooltip>
+            <ThemeQuickSwitch menuSemantics />
+          </div>
 
           <div className={styles.divider} role="separator" aria-hidden="true" />
 

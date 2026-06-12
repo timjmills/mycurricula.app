@@ -19,7 +19,7 @@
   justify-content: center;
   gap: 8px;
   background: var(--core-mode);
-  color: var(--paper);
+  color: var(--on-solid);
   font-weight: 600;
   text-align: center;
   /* Pin at viewport top, above the top-bar (z-index 30). */
