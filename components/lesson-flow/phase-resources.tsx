@@ -49,27 +49,30 @@ import { ResourcePreview } from "@/components/resources";
 import styles from "./phase-resources.module.css";
 
 // ── Type → --rc color mapping (ONE exported helper) ─────────────────────
-// Maps every resource type to an existing bright token. Used for the chip
-// thumb tint (12% bg / 22% border / full-strength icon via color-mix).
+// Maps every resource type to a TAG token. Used for the chip thumb tint
+// (12% bg / 22% border / full-strength icon via color-mix). Tag tokens —
+// never subject or status tokens: a chip's hue says "what kind of file",
+// and a subject color here would read as subject meaning the chip doesn't
+// carry (BUILD_STANDARD §4 — color carries meaning).
 
 export function resourceChipColor(type: SectionResource["type"]): string {
   switch (type) {
     case "slides":
       return "var(--brand-500)";
     case "youtube":
-      return "var(--urgent)";
+      return "var(--tag-red-fg)";
     case "doc":
+      return "var(--tag-gray-fg)";
     case "notecard":
-      return "var(--done)";
+      return "var(--tag-green-fg)";
     case "pdf":
-      return "var(--writing-bright)";
+      return "var(--tag-amber-fg)";
     case "image":
-      return "var(--grammar-bright)";
+      return "var(--tag-pink-fg)";
     case "website":
-      return "var(--explorers-bright)";
     case "link":
     default:
-      return "var(--reading-bright)";
+      return "var(--tag-blue-fg)";
   }
 }
 

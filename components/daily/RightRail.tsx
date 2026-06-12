@@ -410,6 +410,12 @@ interface RightRailProps {
    */
   onClearLesson?: () => void;
   /**
+   * Live count of OPEN to-dos, reported up from <TodayTodos> so the
+   * dock's collapsed-rail badge ticks down as the teacher checks items
+   * off (handoff §2 — "To-do completion drives the rail badge count").
+   */
+  onOpenTodoCountChange?: (count: number) => void;
+  /**
    * Optional CONTROLLED active tab (tabbed mode). When set, the rail
    * renders this tab instead of its internal state — the Daily dock's
    * collapsed icon rail uses it so clicking a Resources / To-do / Chat
@@ -430,6 +436,7 @@ export function RightRail({
   mode = "day",
   lessons,
   onClearLesson,
+  onOpenTodoCountChange,
   activeTab: controlledTab,
   onActiveTabChange,
 }: RightRailProps): ReactNode {
@@ -599,6 +606,7 @@ export function RightRail({
               /* no-op */
             }}
             dragHandleProps={dragHandleProps}
+            onOpenCountChange={onOpenTodoCountChange}
           />
         );
       case "chat":

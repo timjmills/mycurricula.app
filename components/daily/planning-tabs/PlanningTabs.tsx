@@ -339,7 +339,11 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
         setMenuOpen(false);
       }
       function onKeyDown(e: globalThis.KeyboardEvent): void {
-        if (e.key === "Escape") setMenuOpen(false);
+        if (e.key === "Escape") {
+          setMenuOpen(false);
+          // Hand focus back to the trigger (APG menu-button pattern).
+          addBtnRef.current?.focus();
+        }
       }
       document.addEventListener("pointerdown", onPointerDown);
       document.addEventListener("keydown", onKeyDown);
@@ -348,6 +352,34 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
         document.removeEventListener("keydown", onKeyDown);
       };
     }, [menuOpen]);
+
+    // APG menu keyboard pattern: focus moves into the menu on open and
+    // roves with the arrow keys; items sit outside the tab order.
+    useEffect(() => {
+      if (!menuOpen) return;
+      menuRef.current
+        ?.querySelector<HTMLButtonElement>('[role="menuitem"]')
+        ?.focus();
+    }, [menuOpen]);
+
+    function handleMenuKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
+      const items = Array.from(
+        menuRef.current?.querySelectorAll<HTMLButtonElement>(
+          '[role="menuitem"]',
+        ) ?? [],
+      );
+      if (items.length === 0) return;
+      const idx = items.indexOf(document.activeElement as HTMLButtonElement);
+      let next: number | null = null;
+      if (e.key === "ArrowDown") next = (idx + 1) % items.length;
+      else if (e.key === "ArrowUp")
+        next = (idx - 1 + items.length) % items.length;
+      else if (e.key === "Home") next = 0;
+      else if (e.key === "End") next = items.length - 1;
+      if (next === null) return;
+      e.preventDefault();
+      items[next]?.focus();
+    }
 
     // ── Drag-to-reorder (HTML5 drag, midpoint insertion) ─────────────
     const [dragKey, setDragKey] = useState<PlanningToolKey | null>(null);
@@ -401,6 +433,29 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
       tool: PlanningToolKey,
     ): void {
       const idx = visibleTools.indexOf(tool);
+      // Shift+Arrow MOVES the tab (keyboard counterpart of the pointer
+      // drag-reorder); plain arrows rove per the APG tabs pattern.
+      if (e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+        const target = visibleTools[idx + (e.key === "ArrowRight" ? 1 : -1)];
+        if (!target) return;
+        e.preventDefault();
+        setTabsState((s) => {
+          // Same move-before-target rule as the pointer drag; hidden
+          // tools keep their order slots.
+          const order = [...s.order];
+          const from = order.indexOf(tool);
+          const to = order.indexOf(target);
+          if (from < 0 || to < 0) return s;
+          order.splice(from, 1);
+          order.splice(to, 0, tool);
+          return { ...s, order };
+        });
+        // Keep focus with the moved tab after the re-render.
+        window.requestAnimationFrame(() => {
+          tabBtnRefs.current.get(tool)?.focus();
+        });
+        return;
+      }
       let next: PlanningToolKey | undefined;
       if (e.key === "ArrowRight") {
         next = visibleTools[(idx + 1) % visibleTools.length];
@@ -426,7 +481,13 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
         if (!opts?.focus) return;
         const root = rootRef.current;
         if (!root) return;
-        root.scrollIntoView({ behavior: "smooth", block: "start" });
+        const reduce =
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        root.scrollIntoView({
+          behavior: reduce ? "auto" : "smooth",
+          block: "start",
+        });
         // Defer focus a tick so the smooth scroll can begin first and the
         // newly-activated pane is display:flex before we query it.
         window.setTimeout(() => {
@@ -661,6 +722,7 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
         className={styles.menu}
         role="menu"
         aria-label="Add a tool"
+        onKeyDown={handleMenuKeyDown}
       >
         <div className={styles.menuLabel}>Add a tool</div>
         {hiddenTools.length > 0 ? (
@@ -669,6 +731,7 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
               key={k}
               type="button"
               role="menuitem"
+              tabIndex={-1}
               className={styles.menuItem}
               style={{ "--pc": TOOL_META[k].color } as CSSProperties}
               onClick={() => {
@@ -732,31 +795,36 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
                       }
                     }}
                     onDragEnd={() => setDragKey(null)}
-                    title={`${TOOL_META[k].label} — click to open; drag to reorder the tools`}
                   >
-                    <button
-                      type="button"
-                      role="tab"
-                      id={`${uid}-tab-${k}`}
-                      aria-selected={on}
-                      aria-controls={`${uid}-pane-${k}`}
-                      tabIndex={on ? 0 : -1}
-                      className={styles.tabBtn}
-                      ref={(el) => {
-                        if (el) tabBtnRefs.current.set(k, el);
-                        else tabBtnRefs.current.delete(k);
-                      }}
-                      onClick={() => activateTool(k)}
-                      onKeyDown={(e) => handleTabKeyDown(e, k)}
+                    <Tooltip
+                      content={`Open the ${TOOL_META[k].label} pane — drag the tab to reorder your tools (or hold Shift and press ←/→)`}
+                      side="bottom"
+                      tooltipId="planning-tabs-tab"
                     >
-                      <span className={styles.grip} aria-hidden="true">
-                        <GripIcon />
-                      </span>
-                      <span className={styles.tabIcon} aria-hidden="true">
-                        <ToolIcon tool={k} />
-                      </span>
-                      {TOOL_META[k].label}
-                    </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        id={`${uid}-tab-${k}`}
+                        aria-selected={on}
+                        aria-controls={`${uid}-pane-${k}`}
+                        tabIndex={on ? 0 : -1}
+                        className={styles.tabBtn}
+                        ref={(el) => {
+                          if (el) tabBtnRefs.current.set(k, el);
+                          else tabBtnRefs.current.delete(k);
+                        }}
+                        onClick={() => activateTool(k)}
+                        onKeyDown={(e) => handleTabKeyDown(e, k)}
+                      >
+                        <span className={styles.grip} aria-hidden="true">
+                          <GripIcon />
+                        </span>
+                        <span className={styles.tabIcon} aria-hidden="true">
+                          <ToolIcon tool={k} />
+                        </span>
+                        {TOOL_META[k].label}
+                      </button>
+                    </Tooltip>
                     <Tooltip
                       content={`Hide the ${TOOL_META[k].label} tool from this panel — bring it back any time with the + button`}
                       side="bottom"
@@ -809,6 +877,11 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
                 data-plan-pane={k}
                 role="tabpanel"
                 aria-labelledby={`${uid}-tab-${k}`}
+                // Read-only panes hold no focusable content, so the panel
+                // itself joins the tab order (APG tabs pattern).
+                tabIndex={
+                  k === "standards" || k === "resources" ? 0 : undefined
+                }
                 className={`${styles.pane} ${k === active ? styles.paneOn : ""}`}
                 style={{ "--pc": TOOL_META[k].color } as CSSProperties}
               >

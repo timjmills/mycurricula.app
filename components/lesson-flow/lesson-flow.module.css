@@ -125,7 +125,10 @@
   border-radius: var(--r-md);
   background: var(--surface);
   padding: 18px 22px 22px;
-  /* Agenda-nav jumps land the head below sticky chrome. */
+  /* For scrollIntoView callers (footer add-phase). The agenda navigator's
+     click-jump uses manual scrollTo() and clears the sticky toolbar in JS
+     (LessonAgendaNav stickyChromeHeight) — scroll-margin doesn't apply
+     there. */
   scroll-margin-top: 60px;
   transition:
     border-color 0.14s ease,
@@ -136,6 +139,18 @@
 .phase:focus-within {
   border-color: var(--brand-300);
   box-shadow: var(--sh-sm);
+}
+
+/* The phase the agenda navigator marks as being read (prototype
+   .phase.current, ~641): brand border, 3px brand-500 left bar, lifted
+   shadow, brand-50 showing through the border zone. */
+.phaseCurrent {
+  border-color: var(--brand-300);
+  border-left: 3px solid var(--brand-500);
+  box-shadow: var(--sh-md);
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--brand-50);
 }
 
 /* Tighter padding at phone widths so the card never crowds 360px. */
@@ -251,6 +266,49 @@
   inset: -12px -6px;
 }
 
+/* "+ min" ghost — the way back to a planned length once minutes is
+   cleared. Hidden until the card is hovered or keyboard-focused (the
+   .phaseDel reveal pattern); same type + hit area as .min. */
+.minAdd {
+  position: relative;
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--t-15);
+  font-weight: 600;
+  color: var(--faint);
+  cursor: pointer;
+  border-radius: var(--r-4);
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    opacity 0.14s ease,
+    color 0.1s ease;
+}
+
+.phase:hover .minAdd,
+.phase:focus-within .minAdd {
+  opacity: 1;
+}
+
+.minAdd:hover {
+  color: var(--muted);
+}
+
+.minAdd:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--brand-200);
+  outline-offset: 2px;
+}
+
+.minAdd::after {
+  content: "";
+  position: absolute;
+  inset: -12px -6px;
+}
+
 /* Inline minutes input — same type as the .min text, narrow. */
 .minInput {
   flex: 0 0 auto;
@@ -271,7 +329,10 @@
 }
 
 /* ── Status chip (prototype ~654-658) — a cycling BUTTON ─────────────── */
-.statusChip {
+/* Doubled class: out-specifies the tokens.css `.cp-root button` reset
+   (0,1,1), which otherwise zeroes the pill padding (the .rtBtn.rtBtn
+   pattern from rt-toolbar.module.css). */
+.statusChip.statusChip {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -297,11 +358,11 @@
   background: currentColor;
 }
 
-/* ≥44px effective touch target around the small pill. */
+/* ≥44px effective touch target around the small pill (21px tall + 2×12). */
 .statusChip::after {
   content: "";
   position: absolute;
-  inset: -11px -4px;
+  inset: -12px -4px;
   border-radius: var(--r-pill);
 }
 
@@ -331,8 +392,10 @@
 
 /* ── Phase delete (prototype .phaseDel, ~289-292) ────────────────────── */
 /* Hover-revealed on the card; ALSO visible on keyboard focus. The 28px
-   visual box gets a ≥44px effective hit area via padding + negative margin. */
-.phaseDel {
+   visual box gets a ≥44px effective hit area via padding + negative margin.
+   Doubled class: the `.cp-root button` reset (0,1,1) otherwise zeroes the
+   hit-area padding. */
+.phaseDel.phaseDel {
   width: 28px;
   height: 28px;
   display: grid;
@@ -470,7 +533,8 @@
   line-height: 1.55;
   color: var(--ink-soft);
   margin: 0;
-  min-height: 36px;
+  /* 44px floor — this block is a role="button" edit target (CLAUDE.md §4). */
+  min-height: 44px;
   cursor: text;
   border-radius: var(--r-4);
   transition: background 0.1s ease;
@@ -567,8 +631,10 @@
   margin-top: 2px;
 }
 
-/* Dashed full-width "Add phase" (prototype .addPhaseBtn, ~295-297). */
-.addPhaseBtn {
+/* Dashed full-width "Add phase" (prototype .addPhaseBtn, ~295-297).
+   Doubled class: the `.cp-root button` reset (0,1,1) otherwise strips the
+   dashed border + padding. */
+.addPhaseBtn.addPhaseBtn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -606,8 +672,10 @@
 /* ── Reduced motion ──────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .phase,
+  .phaseCurrent,
   .phaseTitleText,
   .min,
+  .minAdd,
   .statusChip,
   .phaseDel,
   .collapseChevron,

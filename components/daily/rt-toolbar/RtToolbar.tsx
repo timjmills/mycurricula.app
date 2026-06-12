@@ -300,11 +300,13 @@ export function RtToolbar({ className }: RtToolbarProps): ReactNode {
     let next: HTMLButtonElement | undefined;
     if (e.key === "Home") next = buttons[0];
     else if (e.key === "End") next = buttons[buttons.length - 1];
+    else if (current === -1)
+      // Focus isn't on a toolbar button yet — either arrow lands on the
+      // first one (not the second; current=-1 must not pre-advance).
+      next = buttons[0];
     else if (e.key === "ArrowRight")
-      next = buttons[(Math.max(current, 0) + 1) % buttons.length];
-    else
-      next =
-        buttons[(Math.max(current, 0) - 1 + buttons.length) % buttons.length];
+      next = buttons[(current + 1) % buttons.length];
+    else next = buttons[(current - 1 + buttons.length) % buttons.length];
     if (!next) return;
     e.preventDefault();
     next.focus();

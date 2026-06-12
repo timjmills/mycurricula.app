@@ -53,7 +53,15 @@
 // local; never persisted or undone.
 
 import type { ReactNode, RefObject } from "react";
-import { memo, useCallback, useId, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   DndContext,
   DragOverlay,
@@ -139,6 +147,10 @@ export interface LessonFlowProps {
    *  /daily sticky RtToolbar drives it. Chromeless supersedes dockTarget
    *  inside the editor. Default false. */
   chromeless?: boolean;
+  /** The section the agenda navigator's scrollspy marks as being read —
+   *  that phase card carries the handoff's `.phase.current` treatment.
+   *  Null/omitted paints no card as current. */
+  currentSectionId?: string | null;
 }
 
 // ── SortablePhase ────────────────────────────────────────────────────────
@@ -172,6 +184,10 @@ interface SortablePhaseProps {
   onToggleCollapsed: (id: string) => void;
   dockTarget?: RefObject<HTMLElement | null>;
   chromeless?: boolean;
+  /** Scrollspy current — paints the `.phase.current` treatment. */
+  isCurrent: boolean;
+  /** A just-added phase opens its rename input ready to type. */
+  autoRename: boolean;
   // Double-click-to-edit body (state owned by LessonFlow)
   editingBody: boolean;
   draftValue: string;
@@ -200,6 +216,8 @@ const SortablePhase = memo(function SortablePhase({
   onToggleCollapsed,
   dockTarget,
   chromeless,
+  isCurrent,
+  autoRename,
   editingBody,
   draftValue,
   onOpenBodyEditor,
@@ -250,6 +268,12 @@ const SortablePhase = memo(function SortablePhase({
     e?.stopPropagation();
     setRenaming(true);
   }, []);
+  // A phase added from the flow footer arrives rename-ready (prototype
+  // addPhase parity). Transition-gated: fires once when autoRename turns
+  // on, never re-opens after the teacher commits or cancels.
+  useEffect(() => {
+    if (autoRename) setRenaming(true);
+  }, [autoRename]);
   const commitRename = useCallback(
     (value: string): void => {
       setRenaming(false);
@@ -289,6 +313,7 @@ const SortablePhase = memo(function SortablePhase({
         styles.row,
         isDragging ? styles.rowDragging : "",
         isCompact ? "" : styles.phase,
+        !isCompact && isCurrent ? styles.phaseCurrent : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -345,6 +370,7 @@ const SortablePhase = memo(function SortablePhase({
                   defaultValue={titleText}
                   autoFocus
                   aria-label={`Rename phase: ${titleText}`}
+                  onFocus={(e) => e.currentTarget.select()}
                   onBlur={(e) => commitRename(e.currentTarget.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -415,7 +441,26 @@ const SortablePhase = memo(function SortablePhase({
                     · {minutes} min
                   </button>
                 </Tooltip>
-              ) : null}
+              ) : (
+                // No planned length — a hover/focus-revealed "+ min" ghost
+                // is the way BACK once minutes is cleared (a structured
+                // field can't be re-typed into the title the way the
+                // prototype's parsed "· 15 min" could).
+                <Tooltip
+                  content="Give this phase a planned length in minutes"
+                  side="top"
+                  tooltipId="lesson-flow-phase-minutes"
+                >
+                  <button
+                    type="button"
+                    className={styles.minAdd}
+                    onClick={() => setEditingMinutes(true)}
+                    aria-label={`No planned length for ${titleText}. Activate to add minutes.`}
+                  >
+                    · + min
+                  </button>
+                </Tooltip>
+              )}
             </h3>
 
             {/* Right side — status chip, collapse chevron, hover trash. */}
@@ -527,35 +572,47 @@ const SortablePhase = memo(function SortablePhase({
                       />
                     </RichEditorWrapper>
                   ) : stripHtml(section.body) ? (
-                    <div
-                      className={styles.teachText}
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`Edit plan for phase: ${titleText}`}
-                      onDoubleClick={(e) => onOpenBodyEditor(section.id, e)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === "F2")
-                          onOpenBodyEditor(section.id, e);
-                      }}
-                      title={`Double-click or press Enter to edit ${titleText}`}
-                      // eslint-disable-next-line react/no-danger
-                      dangerouslySetInnerHTML={{ __html: safeBody }}
-                    />
-                  ) : (
-                    <div
-                      className={[styles.teachText, styles.bodyEmpty].join(" ")}
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`Add a plan for phase: ${titleText}`}
-                      onDoubleClick={(e) => onOpenBodyEditor(section.id, e)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === "F2")
-                          onOpenBodyEditor(section.id, e);
-                      }}
-                      title={`Double-click or press Enter to edit ${titleText}`}
+                    <Tooltip
+                      content="Double-click (or press Enter) to edit this phase's plan"
+                      side="top"
+                      tooltipId="lesson-flow-edit-plan"
                     >
-                      {BODY_PLACEHOLDER}
-                    </div>
+                      <div
+                        className={styles.teachText}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Edit plan for phase: ${titleText}`}
+                        onDoubleClick={(e) => onOpenBodyEditor(section.id, e)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "F2")
+                            onOpenBodyEditor(section.id, e);
+                        }}
+                        // eslint-disable-next-line react/no-danger
+                        dangerouslySetInnerHTML={{ __html: safeBody }}
+                      />
+                    </Tooltip>
+                  ) : (
+                    <Tooltip
+                      content="Double-click (or press Enter) to write this phase's plan"
+                      side="top"
+                      tooltipId="lesson-flow-edit-plan"
+                    >
+                      <div
+                        className={[styles.teachText, styles.bodyEmpty].join(
+                          " ",
+                        )}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Add a plan for phase: ${titleText}`}
+                        onDoubleClick={(e) => onOpenBodyEditor(section.id, e)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "F2")
+                            onOpenBodyEditor(section.id, e);
+                        }}
+                      >
+                        {BODY_PLACEHOLDER}
+                      </div>
+                    </Tooltip>
                   )}
                 </div>
 
@@ -594,6 +651,7 @@ export function LessonFlow({
   lessonId,
   dockTarget,
   chromeless = false,
+  currentSectionId = null,
 }: LessonFlowProps): ReactNode {
   const {
     lessons,
@@ -682,8 +740,33 @@ export function LessonFlow({
 
   // ── Phase management ────────────────────────────────────────────────
   // "New phase" is the 6.11.26 spec title (sentence case, not the store
-  // default "New section").
+  // default "New section"). A footer-added phase scrolls into view and
+  // opens its rename input ready to type (prototype addPhase parity) —
+  // pendingAdd-gated so phases added elsewhere (agenda navigator,
+  // templates) don't hijack the rename.
+  const [autoRenameId, setAutoRenameId] = useState<string | null>(null);
+  const pendingAddRef = useRef(false);
+  const prevCountRef = useRef(sections.length);
+  useEffect(() => {
+    const grew = sections.length > prevCountRef.current;
+    prevCountRef.current = sections.length;
+    if (!grew || !pendingAddRef.current) return;
+    pendingAddRef.current = false;
+    const last = sections[sections.length - 1];
+    if (!last) return;
+    setAutoRenameId(last.id);
+    // window.CSS, not the dnd-kit `CSS` util this file imports.
+    const el = document.querySelector<HTMLElement>(
+      `[data-flow-section="${window.CSS.escape(last.id)}"]`,
+    );
+    el?.scrollIntoView({
+      block: "center",
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  }, [sections, prefersReducedMotion]);
+
   function addPhase(): void {
+    pendingAddRef.current = true;
     storeAddSection(lessonId, "New phase");
   }
 
@@ -999,6 +1082,8 @@ export function LessonFlow({
                 onToggleCollapsed={toggleCollapsed}
                 dockTarget={dockTarget}
                 chromeless={chromeless}
+                isCurrent={section.id === currentSectionId}
+                autoRename={section.id === autoRenameId}
                 editingBody={editTarget !== null && editTarget === section.id}
                 draftValue={editTarget === section.id ? editDraft : ""}
                 onOpenBodyEditor={openBodyEditor}
@@ -1046,7 +1131,7 @@ export function LessonFlow({
           title="Append a new phase to this lesson plan"
         >
           <AddIcon />
-          Add phase
+          Add a lesson phase
         </button>
       </div>
 

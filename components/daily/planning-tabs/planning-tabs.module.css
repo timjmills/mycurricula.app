@@ -131,12 +131,17 @@
 }
 
 /* The real role="tab" button — unstyled shell; the wrapper carries the
-   visual tab treatment so the sibling close button sits inside it. */
-.tabBtn {
+   visual tab treatment so the sibling close button sits inside it. The
+   button mirrors the wrapper's seat padding with negative margins so the
+   CLICKABLE area covers the visual tab (otherwise only the 18px label row
+   activates; the wrapper's padding is dead space). Left + vertical only —
+   the right side stays clear of the sibling close button. */
+.tabBtn.tabBtn {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 0;
+  padding: 12px 0 11px 15px;
+  margin: -12px 0 -11px -15px;
   border: none;
   background: none;
   font: inherit;
@@ -221,8 +226,11 @@
 }
 
 /* ── "+" add-tool button ────────────────────────────────────────────── */
+/* Doubled classes here + on .menuItem/.emptyAdd: the tokens.css
+   `.cp-root button` reset (0,1,1) otherwise strips their borders and
+   padding (the .rtBtn.rtBtn pattern). */
 
-.add {
+.add.add {
   position: relative;
   width: 30px;
   height: 34px;
@@ -281,7 +289,7 @@
   padding: 5px 9px 3px;
 }
 
-.menuItem {
+.menuItem.menuItem {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -433,7 +441,10 @@
 .stdCode {
   font-size: var(--t-11);
   font-weight: 700;
-  color: var(--explorers-deep);
+  /* Tag token, not a subject color — a standards code carries no subject
+     meaning (BUILD_STANDARD §4). Green harmonizes with the pane's --done
+     accent. */
+  color: var(--tag-green-fg);
   background: color-mix(in oklch, var(--pc) 14%, var(--surface));
   padding: 2px 6px;
   border-radius: var(--r-4);
@@ -557,7 +568,7 @@
   font-weight: 600;
 }
 
-.emptyAdd {
+.emptyAdd.emptyAdd {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -588,20 +599,30 @@
 }
 
 /* ── Touch-tier hit areas (≥44px, CLAUDE.md §4) ─────────────────────── */
-/* Padding extends the hit area without changing the desktop visual. */
+/* Padding extends the hit area without changing the desktop visual.
+   Gated on the BUILD_STANDARD §8 width tier AND coarse pointers, so the
+   documented ~400px DevTools width check exercises these rules. */
 
-@media (pointer: coarse) {
+@media (max-width: 900px), (pointer: coarse) {
   .tab {
     padding-top: 14px;
     padding-bottom: 13px;
   }
 
+  /* Keep the button's hit box mirroring the deeper touch-tier seat. */
+  .tabBtn.tabBtn {
+    padding-top: 14px;
+    padding-bottom: 13px;
+    margin-top: -14px;
+    margin-bottom: -13px;
+  }
+
   /* The 17px close circle keeps its size; an invisible ::after pad
-     grows the touch target to ~44px. */
+     grows the touch target to 45px. */
   .tabClose::after {
     content: "";
     position: absolute;
-    inset: -13px;
+    inset: -14px;
   }
 
   .add {
@@ -610,6 +631,10 @@
   }
 
   .menuItem {
+    min-height: 44px;
+  }
+
+  .emptyAdd {
     min-height: 44px;
   }
 }

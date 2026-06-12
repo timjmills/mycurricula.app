@@ -56,12 +56,18 @@
 }
 
 /* "+ Add" — routes into the shared ResourceComposer. Small text affordance;
-   ≥44px effective target via padding + negative margin. */
-.phaseResAdd {
+   ≥44px effective target via padding + negative margin. content-box, like
+   its .resChipDel siblings — under border-box the 8px pads would absorb
+   into min-height and the real target would be ~29px. */
+/* Doubled classes throughout: the tokens.css `.cp-root button` reset
+   (0,1,1) otherwise zeroes button padding/borders/backgrounds declared at
+   single-class specificity (the .rtBtn.rtBtn pattern). */
+.phaseResAdd.phaseResAdd {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
+  box-sizing: content-box;
   min-height: 28px;
   padding: 8px 10px;
   margin: -8px -4px -8px 0;
@@ -157,7 +163,7 @@
 }
 
 /* ── Chip drag grip (prototype .resChip .dragGrip{opacity:.55}) ──────── */
-.chipGrip {
+.chipGrip.chipGrip {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -268,7 +274,7 @@
 }
 
 /* ── Open — 30px bordered square (prototype ~694-696) ────────────────── */
-.resChipOpen {
+.resChipOpen.resChipOpen {
   position: relative;
   flex-shrink: 0;
   width: 30px;
@@ -304,7 +310,7 @@
 }
 
 /* ── Delete — hover-revealed (prototype ~303-306) ────────────────────── */
-.resChipDel {
+.resChipDel.resChipDel {
   flex-shrink: 0;
   width: 28px;
   height: 28px;

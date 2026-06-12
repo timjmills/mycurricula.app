@@ -88,7 +88,11 @@
 // UI-only state (titleEditing, draftTitle) stays local — not persisted.
 
 import { useState, useEffect, useRef } from "react";
-import type { ReactNode, SyntheticEvent } from "react";
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  ReactNode,
+  SyntheticEvent,
+} from "react";
 import type { Lesson } from "@/lib/types";
 import { lessonTime } from "@/lib/mock";
 import { instantiateSections } from "@/lib/lesson-flow";
@@ -273,6 +277,10 @@ export function LessonDetail({
     return () => ro.disconnect();
   }, []);
 
+  // The navigator's scrollspy choice, mirrored onto the flow so the phase
+  // card being read carries the handoff's `.phase.current` treatment.
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+
   // ── Agenda navigator visibility (per-teacher, persisted) ─────────────
   const [agendaNavOn, setAgendaNavOn] = useState(true);
   useEffect(() => {
@@ -313,7 +321,11 @@ export function LessonDetail({
       setTmplOpen(false);
     }
     function onKeyDown(e: KeyboardEvent): void {
-      if (e.key === "Escape") setTmplOpen(false);
+      if (e.key === "Escape") {
+        setTmplOpen(false);
+        // Hand focus back to the trigger (APG menu-button pattern).
+        tmplBtnRef.current?.focus();
+      }
     }
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -322,6 +334,34 @@ export function LessonDetail({
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [tmplOpen]);
+
+  // APG menu keyboard pattern: focus moves into the menu on open and
+  // roves with the arrow keys; items sit outside the tab order.
+  useEffect(() => {
+    if (!tmplOpen) return;
+    tmplMenuRef.current
+      ?.querySelector<HTMLButtonElement>('[role="menuitem"]')
+      ?.focus();
+  }, [tmplOpen]);
+
+  function handleTmplMenuKeyDown(e: ReactKeyboardEvent<HTMLDivElement>): void {
+    const items = Array.from(
+      tmplMenuRef.current?.querySelectorAll<HTMLButtonElement>(
+        '[role="menuitem"]',
+      ) ?? [],
+    );
+    if (items.length === 0) return;
+    const idx = items.indexOf(document.activeElement as HTMLButtonElement);
+    let next: number | null = null;
+    if (e.key === "ArrowDown") next = (idx + 1) % items.length;
+    else if (e.key === "ArrowUp")
+      next = (idx - 1 + items.length) % items.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = items.length - 1;
+    if (next === null) return;
+    e.preventDefault();
+    items[next]?.focus();
+  }
 
   function applyTemplate(template: LessonTemplate): void {
     const previous = getSections(lesson.id);
@@ -475,8 +515,9 @@ export function LessonDetail({
               variant="icon"
               iconAriaLabel="More options"
               className={detailStyles.bandIconBtn}
-              aria-haspopup="menu"
-              tooltip="Open the lesson menu — mark status, relocate, save as template, print, archive, or fork to Team Curriculum"
+              // No aria-haspopup until the menu exists — advertising a
+              // popup that never opens misleads assistive tech.
+              tooltip="Lesson actions menu — coming soon (status, relocate, save as template, print, archive)"
             >
               {/* Vertical three-dots — kebab overflow per spec §1.2(C). */}
               <svg
@@ -495,7 +536,7 @@ export function LessonDetail({
               variant="icon"
               iconAriaLabel="Expand to full screen"
               className={detailStyles.bandIconBtn}
-              tooltip="Expand this lesson detail to full screen — fewer distractions while you read or edit"
+              tooltip="Full-screen lesson view — coming soon"
             >
               {/* Expand / full-screen — diagonal arrows pointing outward. */}
               <svg
@@ -559,6 +600,7 @@ export function LessonDetail({
                 <Tooltip
                   content="Double-click or press Enter to edit the lesson title — saved into your personal copy."
                   side="top"
+                  tooltipId="lesson-detail-title-text"
                 >
                   <span
                     className={detailStyles.editableText}
@@ -569,7 +611,6 @@ export function LessonDetail({
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === "F2") openEditor(e);
                     }}
-                    title="Double-click or press Enter to edit"
                   >
                     {lesson.title}
                   </span>
@@ -791,6 +832,8 @@ export function LessonDetail({
                     className={detailStyles.tmplMenu}
                     role="menu"
                     aria-label="Lesson flow templates"
+                    title="Lesson flow templates — applying one replaces this lesson's phases (undoable)"
+                    onKeyDown={handleTmplMenuKeyDown}
                   >
                     <div className={detailStyles.tmplMenuLabel}>
                       Lesson flow templates
@@ -800,6 +843,7 @@ export function LessonDetail({
                         key={template.id}
                         type="button"
                         role="menuitem"
+                        tabIndex={-1}
                         className={detailStyles.tmplMenuItem}
                         onClick={() => applyTemplate(template)}
                       >
@@ -861,7 +905,11 @@ export function LessonDetail({
             } ${workspaceNarrow ? detailStyles.workspaceNarrow : ""}`}
           >
             {agendaNavOn && (
-              <LessonAgendaNav scrollRef={cellRef} lessonId={lesson.id} />
+              <LessonAgendaNav
+                scrollRef={cellRef}
+                lessonId={lesson.id}
+                onActiveChange={setActiveSectionId}
+              />
             )}
             <div className={detailStyles.flowWrap}>
               <LessonFlow
@@ -869,6 +917,7 @@ export function LessonDetail({
                 lessonId={lesson.id}
                 modified={lesson.modified}
                 chromeless
+                currentSectionId={agendaNavOn ? activeSectionId : null}
               />
             </div>
           </div>

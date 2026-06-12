@@ -54,10 +54,26 @@ interface LessonAgendaNavProps {
   scrollRef: RefObject<HTMLDivElement | null>;
   /** The lesson whose phases this navigator lists. */
   lessonId: string;
+  /** Reports the scrollspy's active section so the flow can paint the
+   *  matching phase card as current. */
+  onActiveChange?: (id: string | null) => void;
 }
 
-/** Top offset (px) a clicked section settles at inside the container. */
-const SCROLL_OFFSET = 12;
+/** Gap (px) between the sticky toolbar's bottom edge and a clicked
+ *  section's top. The toolbar is sticky at top:0 INSIDE the same scroll
+ *  container, so jumps must clear its live height or the phase head
+ *  lands hidden underneath it. */
+const SCROLL_GAP = 12;
+
+/** The sticky chrome a jump has to clear — the RtToolbar at the top of
+ *  the detail scroll body. offsetHeight is in local (unzoomed) px, the
+ *  same space as scrollTop. */
+function stickyChromeHeight(root: HTMLElement): number {
+  const toolbar = root.querySelector<HTMLElement>(
+    '[role="toolbar"][aria-label="Text formatting"]',
+  );
+  return toolbar?.offsetHeight ?? 0;
+}
 
 /** The reading line sits this fraction down the container — the section
  *  whose top has crossed it is the one the teacher is reading. */
@@ -66,6 +82,7 @@ const READING_LINE = 0.25;
 export function LessonAgendaNav({
   scrollRef,
   lessonId,
+  onActiveChange,
 }: LessonAgendaNavProps): ReactNode {
   const { getSections, reorderSections, editSection, addSection } =
     usePlanner();
@@ -77,6 +94,10 @@ export function LessonAgendaNav({
   // immediately override it (short lessons can't bring their last
   // sections up to the line).
   const clickLockUntilRef = useRef(0);
+
+  useEffect(() => {
+    onActiveChange?.(activeId);
+  }, [activeId, onActiveChange]);
 
   /** Effective CSS zoom on the scroll container. The detail card renders
    *  at `zoom: 0.8` (see lesson-detail.module.css .root), and modern
@@ -177,7 +198,8 @@ export function LessonAgendaNav({
         (el.getBoundingClientRect().top - root.getBoundingClientRect().top) /
           z +
         root.scrollTop -
-        SCROLL_OFFSET;
+        stickyChromeHeight(root) -
+        SCROLL_GAP;
       const reduced =
         typeof window.matchMedia === "function" &&
         window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -269,7 +291,8 @@ export function LessonAgendaNav({
     );
   }
 
-  // ── Add phase — append, then scroll to the new row once it renders ──
+  // ── Add phase — append, scroll to the new row once it renders, and
+  // open its rename input ready to type (prototype addPhase parity).
   const pendingAddRef = useRef(false);
   const prevCountRef = useRef(sections.length);
   useEffect(() => {
@@ -278,7 +301,10 @@ export function LessonAgendaNav({
     if (!grew || !pendingAddRef.current) return;
     pendingAddRef.current = false;
     const last = sections[sections.length - 1];
-    if (last) scrollToSection(last.id);
+    if (last) {
+      scrollToSection(last.id);
+      setRenamingId(last.id);
+    }
   }, [sections, scrollToSection]);
 
   function handleAddPhase(): void {
@@ -294,6 +320,7 @@ export function LessonAgendaNav({
     <nav
       className={styles.agendaNav}
       aria-label="Lesson phases"
+      title="Lesson agenda — every phase of this lesson; click one to jump to it"
       onDragOver={handleNavDragOver}
     >
       {displayOrder.map((id, i) => {
@@ -305,103 +332,109 @@ export function LessonAgendaNav({
         const done = section.status === "done";
         const renaming = id === renamingId;
         return (
-          <div
+          <Tooltip
             key={id}
-            ref={(el) => {
-              if (el) itemRefs.current.set(id, el);
-              else itemRefs.current.delete(id);
-            }}
-            role="button"
-            tabIndex={0}
-            className={[
-              styles.agendaItem,
-              active ? styles.agendaItemActive : "",
-              done ? styles.agendaItemDone : "",
-              dragId === id ? styles.agendaItemDragging : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            aria-current={active ? "true" : undefined}
-            aria-label={`Phase ${i + 1}: ${title}${
-              minutes != null ? `, ${minutes} minutes` : ""
-            }${done ? ", completed" : ""}`}
-            draggable={!renaming}
-            onDragStart={(e) => {
-              setDragId(id);
-              try {
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", `agenda:${id}`);
-              } catch {
-                // Some engines throw on setData with custom types.
-              }
-            }}
-            onDragEnd={handleDragEnd}
-            onClick={() => {
-              if (!renaming) scrollToSection(id);
-            }}
-            onDoubleClick={(e) => {
-              e.preventDefault();
-              setRenamingId(id);
-            }}
-            onKeyDown={(e) => {
-              if (renaming) return;
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                scrollToSection(id);
-              } else if (e.key === "F2") {
+            content={`Jump to "${title}" — double-click renames it, drag reorders the lesson's phases`}
+            side="right"
+            tooltipId="lesson-detail-agenda-item"
+          >
+            <div
+              ref={(el) => {
+                if (el) itemRefs.current.set(id, el);
+                else itemRefs.current.delete(id);
+              }}
+              role="button"
+              tabIndex={0}
+              className={[
+                styles.agendaItem,
+                active ? styles.agendaItemActive : "",
+                done ? styles.agendaItemDone : "",
+                dragId === id ? styles.agendaItemDragging : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              aria-current={active ? "true" : undefined}
+              aria-label={`Phase ${i + 1}: ${title}${
+                minutes != null ? `, ${minutes} minutes` : ""
+              }${done ? ", completed" : ""}`}
+              draggable={!renaming}
+              onDragStart={(e) => {
+                setDragId(id);
+                try {
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", `agenda:${id}`);
+                } catch {
+                  // Some engines throw on setData with custom types.
+                }
+              }}
+              onDragEnd={handleDragEnd}
+              onClick={() => {
+                if (!renaming) scrollToSection(id);
+              }}
+              onDoubleClick={(e) => {
                 e.preventDefault();
                 setRenamingId(id);
-              }
-            }}
-            title={`Jump to ${title} — double-click to rename, drag to reorder`}
-          >
-            <span className={styles.agendaNum} aria-hidden="true">
-              {i + 1}
-            </span>
-            <span className={styles.agendaText}>
-              {renaming ? (
-                <input
-                  type="text"
-                  className={styles.agendaNameInput}
-                  defaultValue={title}
-                  autoFocus
-                  aria-label={`Rename phase: ${title}`}
-                  onClick={(e) => e.stopPropagation()}
-                  onDoubleClick={(e) => e.stopPropagation()}
-                  onBlur={(e) => commitRename(id, e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      commitRename(id, e.currentTarget.value);
-                    } else if (e.key === "Escape") {
-                      e.preventDefault();
-                      setRenamingId(null);
-                    }
-                  }}
-                />
-              ) : (
-                <span className={styles.agendaName}>{title}</span>
-              )}
-              {minutes != null && (
-                <span className={styles.agendaTime}>{minutes} min</span>
-              )}
-            </span>
-            <span className={styles.agendaChev} aria-hidden="true">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </span>
-          </div>
+              }}
+              onKeyDown={(e) => {
+                if (renaming) return;
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  scrollToSection(id);
+                } else if (e.key === "F2") {
+                  e.preventDefault();
+                  setRenamingId(id);
+                }
+              }}
+            >
+              <span className={styles.agendaNum} aria-hidden="true">
+                {i + 1}
+              </span>
+              <span className={styles.agendaText}>
+                {renaming ? (
+                  <input
+                    type="text"
+                    className={styles.agendaNameInput}
+                    defaultValue={title}
+                    autoFocus
+                    aria-label={`Rename phase: ${title}`}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                    onBlur={(e) => commitRename(id, e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitRename(id, e.currentTarget.value);
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        setRenamingId(null);
+                      }
+                    }}
+                  />
+                ) : (
+                  <span className={styles.agendaName}>{title}</span>
+                )}
+                {minutes != null && (
+                  <span className={styles.agendaTime}>{minutes} min</span>
+                )}
+              </span>
+              <span className={styles.agendaChev} aria-hidden="true">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </span>
+            </div>
+          </Tooltip>
         );
       })}
 

@@ -98,6 +98,8 @@
 
 .breadcrumbLink:hover {
   color: var(--ink);
+  /* Prototype crumb hover paints a hairline wash, not color alone. */
+  background: var(--hairline);
 }
 
 .breadcrumbLink:focus-visible {

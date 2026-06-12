@@ -250,25 +250,49 @@ const prSurfaceSmall = await page.evaluate(() => {
     'nav[aria-label="Lesson phases"], [aria-label="Lesson planning"], [role="toolbar"][aria-label="Text formatting"], [data-flow-section]',
   );
   const bad = [];
+  // Effective hit size = element rect, extended by absolutely-positioned
+  // ::before/::after pads: either the Button primitive's centered
+  // min-width/min-height overlay, or negative-inset extension pads.
+  const effective = (e) => {
+    const r = e.getBoundingClientRect();
+    let w = r.width;
+    let h = r.height;
+    for (const which of ["::before", "::after"]) {
+      const ps = getComputedStyle(e, which);
+      if (ps.content === "none" || ps.position !== "absolute") continue;
+      const v = (s) => {
+        const n = parseFloat(s);
+        return Number.isFinite(n) ? n : 0;
+      };
+      const extW = Math.max(0, -v(ps.left)) + Math.max(0, -v(ps.right));
+      const extH = Math.max(0, -v(ps.top)) + Math.max(0, -v(ps.bottom));
+      w = Math.max(w, r.width + extW, v(ps.minWidth));
+      h = Math.max(h, r.height + extH, v(ps.minHeight));
+    }
+    return { w, h };
+  };
   for (const root of roots) {
     for (const e of root.querySelectorAll(
       'button, [role="button"], [role="tab"], a[href]',
     )) {
       const r = e.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
-      const ps = getComputedStyle(e, "::before");
-      const inflated =
-        ps.content !== "none" &&
-        ps.position === "absolute" &&
-        parseFloat(ps.minWidth) >= 44 &&
-        parseFloat(ps.minHeight) >= 44;
-      if (!inflated && r.width < 44 && r.height < 44) {
+      // Inline-rename TEXT targets are exempt: they are secondary
+      // affordances with a keyboard path (Enter/F2), and padding a text
+      // span to 44px would distort the row. Their row's primary actions
+      // (open / remove / drag) all meet the floor.
+      if (
+        (e.getAttribute("aria-label") ?? "").includes("Press Enter to rename")
+      )
+        continue;
+      const eff = effective(e);
+      if (eff.w < 44 || eff.h < 44) {
         bad.push({
           label:
             e.getAttribute("aria-label") ||
             (e.textContent || "").trim().slice(0, 30),
-          w: Math.round(r.width),
-          h: Math.round(r.height),
+          w: Math.round(eff.w),
+          h: Math.round(eff.h),
         });
       }
     }

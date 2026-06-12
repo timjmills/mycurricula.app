@@ -963,14 +963,14 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
     writeRailTab(tab);
   }, []);
 
-  // Rail badges — mock-driven in Phase 1A. The to-do count uses the same
-  // "due today" scope TodayTodos renders (a check-off inside the panel
-  // won't tick this number down until the to-do store lands in Phase 1B);
-  // the chat dot shows whenever the day's shoutbox has any messages
-  // (real unread tracking is also Phase 1B).
-  const openTodoCount = useMemo(
+  // Rail badges — mock-driven in Phase 1A. The to-do count seeds from the
+  // same "due today" scope TodayTodos renders, then live-updates through
+  // the panel's onOpenCountChange report so a check-off ticks the
+  // collapsed-rail badge down (handoff §2 — "To-do completion drives the
+  // rail badge count"). The chat dot shows whenever the day's shoutbox
+  // has any messages (real unread tracking is Phase 1B).
+  const [openTodoCount, setOpenTodoCount] = useState(
     () => TODOS.filter((t) => t.due === "today" && !t.done).length,
-    [],
   );
   const chatHasActivity = useMemo(
     () => shoutboxForDay(week, selectedDay).length > 0,
@@ -1358,6 +1358,7 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
           day={selectedDay}
           activeTab={railTab}
           onActiveTabChange={setRailTab}
+          onOpenTodoCountChange={setOpenTodoCount}
         />
       ),
       railItems: [
@@ -1409,15 +1410,15 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
 
   return (
     <div className={styles.page}>
-      {/* ── Page header (title + onboarding subtitle) ─────────────────────
-          Visible page-level h1 + subtitle, matching the YearView recipe
-          via the canonical <PageHeader> primitive. Replaces the prior
-          sr-only h1 with a visible heading that doubles as onboarding
-          (CLAUDE.md §4 — tell a first-time teacher what this page is
-          FOR). Renders on BOTH grid and list modes so the page has
-          exactly one h1 in the a11y tree at all times. DailyList's
-          inner day title is demoted to an h2 (see DailyList.tsx) to
-          keep the single-h1-per-page invariant. */}
+      {/* ── Page header (6.11.26 redesign — single tightened bar) ─────────
+          Visible page-level h1 with the breadcrumb DIRECTLY beneath it,
+          plus the view pills + Present in headerActions. The previous
+          separate breadcrumb band, generic subtitle, and <PageHeader>
+          primitive were removed to calm the top of the page (handoff
+          "Page header" §). Renders on BOTH grid and list modes so the
+          page has exactly one h1 in the a11y tree at all times.
+          DailyList's inner day title is demoted to an h2 (see
+          DailyList.tsx) to keep the single-h1-per-page invariant. */}
       {/* The Subject ↔ Schedule toggle now lives in the page-header actions
           slot (W5) instead of a standalone in-page "VIEW" bar, mirroring the
           Weekly view's title-row toggle. The onboarding tip banner was
