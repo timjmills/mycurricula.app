@@ -63,18 +63,26 @@
   box-shadow: var(--sh-sm);
   overflow: hidden;
   /* The lesson-detail panel renders at 80% scale so a whole lesson fits on
-     screen at 100% browser zoom â€” the left sidebar and the day-header strip
+     screen at 100% browser zoom - the left sidebar and the day-header strip
      stay at full size. `zoom` re-flows content at scale (unlike
-     transform: scale, which would leave an empty gap). width/height are
-     pre-multiplied by 1.25 so 0.8 Ã— 1.25 = 1 and the panel still exactly
-     fills its pane; `flex: none` stops the flex parent from shrinking that
-     compensated height. The docked rich-text toolbar is portaled to <body>
+     transform: scale, which would leave an empty gap).
+
+     STANDARDIZED ZOOM - NO PRE-MULTIPLICATION (owner report 2026-06-12).
+     Under the standardized `zoom` (Chrome 128+ / Safari 17.4+ / Firefox
+     126+), percentage sizes on a zoomed element already resolve in the
+     element's zoomed coordinate space: the engine divides the containing
+     block by the zoom factor, so `width: 100%` renders exactly pane-wide.
+     The legacy WebKit recipe of pre-multiplying by 1.25 (0.8 x 1.25 = 1)
+     now DOUBLE-compensates - it rendered the card at 125% of the pane,
+     pushing the band, phase cards, and every text editor under the side
+     panel. `flex: none` keeps the flex parent from re-stretching the
+     zoomed box. The docked rich-text toolbar is portaled to <body>
      (see rich-text-editor.tsx) so this `zoom` never offsets its
      position: fixed coordinates. */
   zoom: 0.8;
   flex: none;
-  width: 125%;
-  height: 125%;
+  width: 100%;
+  height: 100%;
 }
 
 /* The 80% scale is a DESKTOP fit-the-lesson ergonomic. At the phone/tablet
@@ -85,8 +93,6 @@
 @media (max-width: 900px) {
   .root {
     zoom: 1;
-    width: 100%;
-    height: 100%;
   }
 }
 
