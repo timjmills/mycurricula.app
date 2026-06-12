@@ -21,10 +21,38 @@
     border-color 150ms ease;
 }
 
+/* Scope stripes — the lesson-card left-stripe language carried onto the
+   overview tiles: team red for sections that change the whole team,
+   quiet ink for personal ones. Blast radius readable before the click. */
+.cardTeam {
+  border-left: 4px solid var(--core-mode);
+}
+
+.cardPersonal {
+  border-left: 4px solid var(--ink-200);
+}
+
+/* Section glyph — sits before the label, tinted like the label. */
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+}
+
 .card:hover {
   border-color: var(--brand-300);
   box-shadow: var(--shadow-card-hover);
   transform: translateY(-1px);
+}
+
+/* Hover repaints all borders brand — keep the scope stripe's color. */
+.cardTeam:hover {
+  border-left-color: var(--core-mode);
+}
+
+.cardPersonal:hover {
+  border-left-color: var(--ink-200);
 }
 
 .card:focus-visible {

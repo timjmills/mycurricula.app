@@ -22,16 +22,13 @@
 // onboarding-voice tooltip. Inputs use `title=`; Buttons use the
 // `tooltip` prop on the canonical primitive.
 
-import {
-  useEffect,
-  useState,
-  type ChangeEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import { useAppState } from "@/lib/app-state";
 import { useConsequenceToast } from "@/lib/consequence-toast";
 import { PageHeader, Tooltip } from "@/components/ui";
 import { SettingsCard } from "@/components/appearance/settings-card";
+import { SECTION_ICONS } from "@/components/settings/section-icons";
+import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./page.module.css";
 
 // ── Page ────────────────────────────────────────────────────────────────────
@@ -39,7 +36,7 @@ import styles from "./page.module.css";
 export default function CurriculumSettingsPage(): ReactNode {
   return (
     <div className={styles.page}>
-      <div className={styles.inner}>
+      <div className={`${styles.inner} ${reveal.reveal}`}>
         <PageHeader
           eyebrow="Settings"
           title="Curriculum"
@@ -93,6 +90,7 @@ function CurriculumLabelSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.curriculum({ size: 14 })}
       anchorId="curriculum-label"
       eyebrow="Identity"
       scope="team"

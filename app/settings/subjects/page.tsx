@@ -58,6 +58,8 @@ import {
   useVisibleSubjects,
   type EffectiveSubject,
 } from "@/lib/use-visible-subjects";
+import { SECTION_ICONS } from "@/components/settings/section-icons";
+import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./page.module.css";
 
 // ── Page ────────────────────────────────────────────────────────────────────
@@ -65,7 +67,7 @@ import styles from "./page.module.css";
 export default function SubjectsSettingsPage(): ReactNode {
   return (
     <div className={styles.page}>
-      <div className={styles.inner}>
+      <div className={`${styles.inner} ${reveal.reveal}`}>
         <PageHeader
           eyebrow="Settings"
           title="Subjects"
@@ -284,6 +286,8 @@ function TeamSubjectsSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.subjects({ size: 14 })}
+      tone="brand"
       anchorId="team-subjects"
       scope="team"
       eyebrow="Roster"
@@ -358,10 +362,10 @@ function TeamSubjectsSection(): ReactNode {
         })}
       </ul>
       <p className={styles.fieldHint}>
-        Subject colors are locked team-wide — a renamed subject keeps its
-        color, so &ldquo;Maths&rdquo; still reads as Math on every
-        teacher&rsquo;s grid. Archiving hides a subject everywhere for
-        everyone; it never deletes the team&rsquo;s lessons.
+        Subject colors are locked team-wide — a renamed subject keeps its color,
+        so &ldquo;Maths&rdquo; still reads as Math on every teacher&rsquo;s
+        grid. Archiving hides a subject everywhere for everyone; it never
+        deletes the team&rsquo;s lessons.
       </p>
     </SettingsCard>
   );
@@ -386,6 +390,8 @@ function VisibilitySection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.subjects({ size: 14 })}
+      tone="brand"
       anchorId="subject-visibility"
       scope="personal"
       eyebrow="Visibility"
@@ -445,9 +451,9 @@ function VisibilitySection(): ReactNode {
         })}
       </ul>
       <p className={styles.fieldHint}>
-        Hiding is personal and reversible — flip the switch back any time.
-        Your planner views (Weekly, Daily, Year) adopt this list as the
-        rollout lands; Settings respects it today.
+        Hiding is personal and reversible — flip the switch back any time. Your
+        planner views (Weekly, Daily, Year) adopt this list as the rollout
+        lands; Settings respects it today.
       </p>
     </SettingsCard>
   );
@@ -498,6 +504,8 @@ function PersonalSubjectsSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.subjects({ size: 14 })}
+      tone="brand"
       anchorId="personal-subjects"
       scope="personal"
       eyebrow="My additions"
@@ -669,6 +677,8 @@ function ArchivedSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.subjects({ size: 14 })}
+      tone="brand"
       anchorId="archived-subjects"
       scope="team"
       eyebrow="Roster"

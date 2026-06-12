@@ -38,6 +38,8 @@ import { useDisplayName, useDefaultView } from "@/lib/use-account-settings";
 import { LESSON_TEMPLATES } from "@/lib/lesson-templates";
 import { SUBJECTS } from "@/lib/mock";
 import { OverviewCard } from "@/components/settings";
+import { SECTION_ICONS } from "@/components/settings/section-icons";
+import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./page.module.css";
 
 // ── Generic post-mount localStorage JSON reader ────────────────────────────
@@ -210,7 +212,7 @@ function OverviewBody(): ReactNode {
   // ── Grouped tiles (mirrors SETTINGS_GROUPS in layout.tsx) ─────────────
   return (
     <div className={styles.page}>
-      <div className={styles.inner}>
+      <div className={`${styles.inner} ${reveal.reveal}`}>
         <PageHeader
           eyebrow="Settings"
           title="Overview"
@@ -218,22 +220,31 @@ function OverviewBody(): ReactNode {
         />
 
         <section className={styles.group} aria-label="Planning settings">
-          <h2 className={styles.groupLabel}>Planning</h2>
+          <h2 className={styles.groupLabel}>
+            <span
+              className={`${styles.groupDot} ${styles.groupDotHoney}`}
+              aria-hidden
+            />
+            Planning
+          </h2>
           <div className={styles.grid}>
             <OverviewCard
               href="/settings/curriculum"
+              glyph={SECTION_ICONS.curriculum({ size: 20 })}
               label="Curriculum"
               scope="team"
               summary={summaries.curriculum}
             />
             <OverviewCard
               href="/settings/calendar"
+              glyph={SECTION_ICONS.calendar({ size: 20 })}
               label="Calendar"
               scope="team"
               summary={summaries.calendar}
             />
             <OverviewCard
               href="/settings/schedule"
+              glyph={SECTION_ICONS.schedule({ size: 20 })}
               label="Schedule"
               scope="personal"
               summary={summaries.schedule}
@@ -242,16 +253,24 @@ function OverviewBody(): ReactNode {
         </section>
 
         <section className={styles.group} aria-label="Content settings">
-          <h2 className={styles.groupLabel}>Content</h2>
+          <h2 className={styles.groupLabel}>
+            <span
+              className={`${styles.groupDot} ${styles.groupDotBrand}`}
+              aria-hidden
+            />
+            Content
+          </h2>
           <div className={styles.grid}>
             <OverviewCard
               href="/settings/subjects"
+              glyph={SECTION_ICONS.subjects({ size: 20 })}
               label="Subjects"
               scope="team"
               summary={summaries.subjects}
             />
             <OverviewCard
               href="/settings/lesson-templates"
+              glyph={SECTION_ICONS["lesson-templates"]({ size: 20 })}
               label="Lesson templates"
               scope="personal"
               summary={summaries.templates}
@@ -260,16 +279,24 @@ function OverviewBody(): ReactNode {
         </section>
 
         <section className={styles.group} aria-label="People settings">
-          <h2 className={styles.groupLabel}>People</h2>
+          <h2 className={styles.groupLabel}>
+            <span
+              className={`${styles.groupDot} ${styles.groupDotTeal}`}
+              aria-hidden
+            />
+            People
+          </h2>
           <div className={styles.grid}>
             <OverviewCard
               href="/settings/workspace"
+              glyph={SECTION_ICONS.workspace({ size: 20 })}
               label="Workspace & Team"
               scope="team"
               summary={summaries.workspace}
             />
             <OverviewCard
               href="/settings/account"
+              glyph={SECTION_ICONS.account({ size: 20 })}
               label="Account"
               scope="personal"
               summary={summaries.account}
@@ -278,16 +305,24 @@ function OverviewBody(): ReactNode {
         </section>
 
         <section className={styles.group} aria-label="Preference settings">
-          <h2 className={styles.groupLabel}>Preferences</h2>
+          <h2 className={styles.groupLabel}>
+            <span
+              className={`${styles.groupDot} ${styles.groupDotNeutral}`}
+              aria-hidden
+            />
+            Preferences
+          </h2>
           <div className={styles.grid}>
             <OverviewCard
               href="/settings/appearance"
+              glyph={SECTION_ICONS.appearance({ size: 20 })}
               label="Appearance"
               scope="personal"
               summary={summaries.appearance}
             />
             <OverviewCard
               href="/settings/catch-up"
+              glyph={SECTION_ICONS["catch-up"]({ size: 20 })}
               label="Catch-up"
               scope="personal"
               summary={summaries.catchup}

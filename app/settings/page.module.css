@@ -22,12 +22,40 @@
 }
 
 .groupLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
   font-size: var(--t-11);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+/* Group tone dots — mirror the sidebar's (layout.module.css) so the
+   overview teaches the same group → tone mapping. */
+.groupDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.groupDotHoney {
+  background: var(--honey-600);
+}
+
+.groupDotBrand {
+  background: var(--brand-500);
+}
+
+.groupDotTeal {
+  background: var(--tag-teal);
+}
+
+.groupDotNeutral {
+  background: var(--ink-200);
 }
 
 .grid {

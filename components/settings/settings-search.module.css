@@ -19,7 +19,8 @@
   pointer-events: none;
 }
 
-.input {
+/* Doubled: `.cp-root input` (0,1,1) resets font/color on raw inputs. */
+.input.input {
   width: 100%;
   min-height: 36px;
   padding: 0 12px 0 32px;

@@ -61,6 +61,8 @@ import { useConsequenceToast } from "@/lib/consequence-toast";
 import { Button, PageHeader, Tooltip } from "@/components/ui";
 import { SettingsCard, RadioDot } from "@/components/appearance/settings-card";
 import { useRovingRadio } from "@/components/appearance/use-roving-radio";
+import { SECTION_ICONS } from "@/components/settings/section-icons";
+import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./workspace-settings.module.css";
 
 // ── Top-level composition ──────────────────────────────────────────────────
@@ -73,7 +75,7 @@ export function WorkspaceSettings(): ReactNode {
     // notebook list, the resolved workspace name, and isWorkspaceAdmin.
     <NotebookProvider>
       <div className={styles.page}>
-        <div className={styles.inner}>
+        <div className={`${styles.inner} ${reveal.reveal}`}>
           <PageHeader
             eyebrow="Settings"
             title="Workspace & Team"
@@ -142,6 +144,8 @@ function WorkspaceNameCard(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.workspace({ size: 14 })}
+      tone="teal"
       anchorId="workspace-name"
       scope="team"
       eyebrow="Identity"
@@ -180,8 +184,8 @@ function WorkspaceNameCard(): ReactNode {
           />
         </Tooltip>
         <p className={styles.fieldHint}>
-          Saves when you press Enter or click out of the field. Every teacher
-          in the workspace sees the new name.
+          Saves when you press Enter or click out of the field. Every teacher in
+          the workspace sees the new name.
         </p>
       </div>
     </SettingsCard>
@@ -270,6 +274,8 @@ function NotebooksCard(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.workspace({ size: 14 })}
+      tone="teal"
       anchorId="notebooks"
       scope="team"
       eyebrow="Grade levels"
@@ -545,14 +551,19 @@ function NewNotebookForm({
           />
         </Tooltip>
         <Tooltip content={buttonTip} side="top" required>
-          <Button type="submit" variant="primary" size="md" disabled={!canSubmit}>
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            disabled={!canSubmit}
+          >
             + New notebook
           </Button>
         </Tooltip>
       </div>
       <p className={styles.fieldHint}>
-        New notebooks start active and appear in every teacher&rsquo;s
-        notebook switcher immediately.
+        New notebooks start active and appear in every teacher&rsquo;s notebook
+        switcher immediately.
       </p>
     </form>
   );
@@ -599,6 +610,8 @@ function DefaultNotebookCard(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.workspace({ size: 14 })}
+      tone="teal"
       anchorId="default-notebook"
       scope="personal"
       eyebrow="Preference"
@@ -683,8 +696,8 @@ function DefaultNotebookCard(): ReactNode {
           an active notebook (it was archived after being picked). */}
       {defaultNotebookId !== null && selectedId === null && (
         <p className={styles.fieldHint} role="status">
-          Your saved default notebook was archived — the app opens in the
-          first active notebook until you pick a new one.
+          Your saved default notebook was archived — the app opens in the first
+          active notebook until you pick a new one.
         </p>
       )}
     </SettingsCard>

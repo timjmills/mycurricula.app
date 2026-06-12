@@ -47,7 +47,9 @@
   max-width: 64ch;
 }
 
-.textInput {
+/* Doubled: `.cp-root input` (0,1,1) resets font/color on raw inputs —
+   a single class (0,1,0) silently loses those declarations. */
+.textInput.textInput {
   min-height: 44px;
   padding: 0 12px;
   font-family: inherit;
@@ -84,7 +86,7 @@
   margin-top: 4px;
 }
 
-.select {
+.select.select {
   min-height: 44px;
   padding: 0 12px;
   font-family: inherit;
@@ -163,14 +165,23 @@
   }
 }
 
-/* ── Individual month chip ─────────────────────────────────────────── */
+/* ── Individual month chip ─────────────────────────────────────────────
+   Selectors are DOUBLED (`.monthChip.monthChip`) on purpose: the app-wide
+   `.cp-root button` reset in tokens.css (specificity 0,1,1) strips
+   background/border/padding/color from any raw button styled by a single
+   module class (0,1,0). Doubling lifts these to 0,2,0 so the chip styling
+   actually lands — the un-doubled rules shipped as ghost-white pills.
+   Selected = solid brand fill with a crisp border (no glow); unselected =
+   quiet outline. The contrast IS the information. */
 
-.monthChip {
+.monthChip.monthChip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  padding: 0 10px;
+  /* 14px side padding — labels were crowding the chip edge at 10px,
+     most visibly on the solid brand-filled (selected) chips. */
+  padding: 0 14px;
   border-radius: var(--r-pill);
   font-family: inherit;
   font-size: var(--t-13);
@@ -194,7 +205,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .monthChip {
+  .monthChip.monthChip {
     transition: none;
   }
   .monthChip:active {
@@ -202,24 +213,28 @@
   }
 }
 
-.monthChipOn {
+.monthChip.monthChipOn {
   background: var(--brand-500);
-  color: #fff;
-  border: 1px solid var(--brand-500);
-  box-shadow: var(--sh-brand);
+  color: var(--on-solid);
+  border: 1px solid var(--brand-600);
 }
 
-.monthChipOn:hover {
+.monthChip.monthChipOn:hover {
   background: var(--brand-600);
 }
 
-.monthChipOff {
+.monthChip.monthChipOff {
   background: var(--surface);
-  color: var(--ink-soft);
+  /* --body (not --muted): the month abbreviations are information — which
+     months the school year spans — so the off-state label must clear WCAG
+     AA (4.5:1) on --surface. --muted (~3.16:1) failed; --body (~6.4:1)
+     stays quietly de-emphasised against the solid selected chips while
+     remaining legible (CLAUDE.md §4 AA contract). */
+  color: var(--body);
   border: 1px solid var(--border);
 }
 
-.monthChipOff:hover {
+.monthChip.monthChipOff:hover {
   border-color: var(--brand-300);
   color: var(--brand-600);
 }

@@ -1,0 +1,62 @@
+/* section-reveal.module.css — shared entrance choreography for settings
+ * section pages.
+ *
+ * The exact recipe the rebuilt Appearance page uses (app/settings/
+ * appearance/appearance.module.css): each direct child of the page's
+ * inner column rises 6px and fades in, staggered 45ms apart, so a
+ * section reads as one choreographed reveal instead of a pop-in wall.
+ * Apply the class to the page's `.inner` column alongside its own class:
+ *   <div className={`${styles.inner} ${reveal.reveal}`}>
+ *
+ * Reduced motion: the explicit block below removes the animation
+ * entirely (belt-and-suspenders on top of the global collapse in
+ * tokens.css). */
+
+.reveal > * {
+  animation: sectionRise 300ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.reveal > *:nth-child(2) {
+  animation-delay: 45ms;
+}
+.reveal > *:nth-child(3) {
+  animation-delay: 90ms;
+}
+.reveal > *:nth-child(4) {
+  animation-delay: 135ms;
+}
+.reveal > *:nth-child(5) {
+  animation-delay: 180ms;
+}
+.reveal > *:nth-child(6) {
+  animation-delay: 225ms;
+}
+.reveal > *:nth-child(7) {
+  animation-delay: 270ms;
+}
+.reveal > *:nth-child(8) {
+  animation-delay: 315ms;
+}
+.reveal > *:nth-child(9) {
+  animation-delay: 360ms;
+}
+.reveal > *:nth-child(10) {
+  animation-delay: 405ms;
+}
+
+@keyframes sectionRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal > * {
+    animation: none;
+  }
+}
