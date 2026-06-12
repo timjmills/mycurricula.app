@@ -921,10 +921,15 @@ function LessonDetailPanel({ lessonId }: { lessonId: string }): ReactNode {
           onClick={() => {
             // Hand off via the W1-V5 deep link — /daily resolves ?lesson=
             // server-side, seeds its selection to THIS lesson (not "first
-            // not-done of the day"), and syncs week + day itself. Clearing
-            // the global selection first unmounts this read-only panel so
-            // Daily doesn't render with a leftover second panel.
-            setSelectedLessonId(null);
+            // not-done of the day"), and syncs week + day itself.
+            //
+            // Do NOT clear the global selection here. Clearing it flips
+            // WeeklyShell's `selectedLesson`, whose URL-write effect then
+            // router.replace()s back to `/weekly?…` and clobbers this push —
+            // the lesson never opens (the reported bug). DailyView clears the
+            // global selection itself once it resolves this deep link (on
+            // /daily, where Weekly has unmounted so clearing is safe), so the
+            // shell LessonDetailPanel never double-renders beside Daily's rail.
             router.push(`/daily?lesson=${encodeURIComponent(lesson.id)}`);
           }}
         >

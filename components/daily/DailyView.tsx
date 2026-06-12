@@ -846,7 +846,15 @@ export function DailyView({
   // from Weekly/Year, so without a local setter a teacher who picked List
   // elsewhere landed here with no way back to the grid (owner report
   // 2026-06-12).
-  const { viewMode, setViewMode, week, selectedDay, setSelectedDay, setWeek } =
+  const {
+    viewMode,
+    setViewMode,
+    week,
+    selectedDay,
+    setSelectedDay,
+    setWeek,
+    setSelectedLessonId,
+  } =
     useAppState();
 
   // Renameable hierarchy captions — a school may rename "Week" → "Module",
@@ -861,7 +869,11 @@ export function DailyView({
 
   // Lessons come from the planner store so completions, edits, and undo/redo
   // are immediately reflected in the left pane list and right pane detail.
-  const { lessons, setLessonStatus, lastChange, subjectById } = usePlanner();
+  // `hydration` gates the deep-link resolver below: under the Supabase flag the
+  // doc arrives async, so the resolver must tell "still settling" from "loaded
+  // and the id genuinely isn't there".
+  const { lessons, setLessonStatus, lastChange, subjectById, hydration } =
+    usePlanner();
 
   // ── Per-teacher row order (local + localStorage, NOT the shared doc) ──
   // Keyed by week+day. Initialised EMPTY rather than from localStorage: the
@@ -903,18 +915,88 @@ export function DailyView({
     return first?.id ?? null;
   });
 
-  // Once-only sync of week + selectedDay to the deep-linked lesson's
-  // location, then drop the query string so subsequent day changes don't
-  // re-seed. Runs only when initialLessonId is set on first mount.
+  // Deep-link resolver for a `?lesson=<id>` hand-off (the Weekly / Subject
+  // "Go to lesson" buttons, the command palette, a resource row). It selects
+  // THAT lesson and syncs the view to its week + day, then drops the query so a
+  // later manual day change can't re-trigger it.
+  //
+  // Why an effect that watches `lessons`/`hydration` instead of running once on
+  // mount: under the Supabase flag the document hydrates AFTER mount, so at the
+  // first render `lessons` is empty and neither the initializer above nor a
+  // mount-only effect can resolve the id — they silently no-op and the view
+  // falls back to "first not-done of today". That is the reported bug, and it
+  // is worst on a COLD direct load / refresh of `/daily?lesson=…`: on a cold
+  // load the auth owner is null for the first frames, so the store settles to
+  // hydration "empty" (EMPTY_DOC) for the null owner BEFORE the real owner's
+  // lessons load — a transient empty-but-not-loading window. Re-running as the
+  // doc actually arrives lets the resolve land the moment the lesson exists.
+  // With the flag OFF the mock doc is present synchronously, so this resolves on
+  // the first run.
+  //
+  // `seededFor` is the deep-link id this resolver last settled (resolved OR gave
+  // up on). It is STATE (not a ref) so the URL-cleanup effect below re-runs once
+  // the seed has committed in its OWN render: the `?lesson=` query is stripped
+  // only AFTER the week/day/selection seed lands, never in the same tick (else
+  // App Router can re-render the page without the query before the seed commits,
+  // dropping it — a race on the cold hydration path). Keyed by id (not a bare
+  // boolean) so a NEW deep link arriving while DailyView stays mounted (command
+  // palette, another "Go to lesson", a resource row) is still honored; reset
+  // when the query is absent so even a repeat link to the SAME lesson re-seeds.
+  const [seededFor, setSeededFor] = useState<string | null>(null);
   useEffect(() => {
-    if (!initialLessonId) return;
+    if (!initialLessonId) {
+      // No (or stripped) ?lesson= — re-arm so a later deep link, even to the
+      // same lesson, resolves again.
+      if (seededFor !== null) setSeededFor(null);
+      return;
+    }
+    if (seededFor === initialLessonId) return; // already settled this id
     const target = lessons.find((l) => l.id === initialLessonId);
-    if (!target) return;
-    if (target.week !== week) setWeek(target.week);
-    if (target.day !== selectedDay) setSelectedDay(target.day);
+    if (target) {
+      // Set week/day unconditionally — React bails out of a same-value useState
+      // set, so no `!==` guard is needed and `week`/`selectedDay` stay out of
+      // the effect (keeping the deps below honest).
+      setWeek(target.week);
+      setSelectedDay(target.day);
+      setSelectedId(target.id);
+      // Clear the GLOBAL shell selection the Weekly "Go to lesson" hand-off
+      // leaves set (it can't clear it itself without tripping WeeklyShell's
+      // URL-write bounce — see the panel handler). We're on /daily now, so
+      // clearing here is safe and stops the shell LessonDetailPanel from
+      // double-rendering beside Daily's own rail. A cold/Schedule/List-mode
+      // load never set it, so this is a harmless no-op there.
+      setSelectedLessonId(null);
+      setSeededFor(initialLessonId);
+      return;
+    }
+    // Target not present yet. Give up ONLY once the loaded document definitively
+    // lacks it: a POPULATED lessons array that doesn't contain the id (a
+    // genuinely bad / foreign id), or a terminal "error". An EMPTY array is
+    // treated as "still settling" even when `hydration` momentarily reads a
+    // non-"loading" value — on a cold load the store passes through hydration
+    // "empty" with EMPTY_DOC for the null owner before the real owner's lessons
+    // arrive, and latching here would strand the deep link forever. Staying
+    // armed while empty costs nothing (there is no lesson to select yet) and the
+    // next lessons/hydration change retries.
+    if (
+      hydration === "error" ||
+      (lessons.length > 0 && hydration !== "loading")
+    ) {
+      setSeededFor(initialLessonId);
+    }
+    // setWeek / setSelectedDay / setSelectedId / setSelectedLessonId are stable
+    // setters and router is stable, so they are intentionally omitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLessonId, lessons, hydration, seededFor]);
+
+  // Strip the consumed `?lesson=` only AFTER the seed for this id has committed
+  // (a separate render from the seed above), so the week/day/selection lands
+  // before App Router re-renders the page without the query.
+  useEffect(() => {
+    if (!initialLessonId || seededFor !== initialLessonId) return;
     router.replace("/daily", { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialLessonId]);
+  }, [initialLessonId, seededFor]);
 
   // `/daily?date=<YYYY-MM-DD>` deep link (UX roadmap item 07) — the sibling of
   // the lesson seed above, skipped whenever that seed resolves (a lesson pins
