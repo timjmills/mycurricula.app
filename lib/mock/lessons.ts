@@ -218,10 +218,12 @@ export const LESSONS: Lesson[] = [
       {
         type: "image",
         label: "Fraction Wall Diagram",
-        url: "https://commons.wikimedia.org/wiki/Special:FilePath/Cake_fractions.svg?width=480",
+        // Inline base64 SVG: CSP-clean (img-src 'self' data:), passes the
+        // shared isSafeImgSrc gate (data:image/svg+xml;base64,…), and renders
+        // with no network/host dependency — the prior Wikimedia URLs were
+        // either 404 or CSP-blocked (commons.wikimedia.org isn't allowlisted).
+        url: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iOTAiPjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iOTAiIGZpbGw9IiNmZGU2OGEiLz48cmVjdCB4PSI2IiB5PSI2IiB3aWR0aD0iMjg4IiBoZWlnaHQ9IjE4IiBmaWxsPSIjZjU5ZTBiIi8+PHJlY3QgeD0iNiIgeT0iMjgiIHdpZHRoPSIxNDEiIGhlaWdodD0iMTgiIGZpbGw9IiMxMGI5ODEiLz48cmVjdCB4PSIxNTMiIHk9IjI4IiB3aWR0aD0iMTQxIiBoZWlnaHQ9IjE4IiBmaWxsPSIjMzRkMzk5Ii8+PHJlY3QgeD0iNiIgeT0iNTAiIHdpZHRoPSI5MyIgaGVpZ2h0PSIxOCIgZmlsbD0iIzNiODJmNiIvPjxyZWN0IHg9IjEwNSIgeT0iNTAiIHdpZHRoPSI5MyIgaGVpZ2h0PSIxOCIgZmlsbD0iIzYwYTVmYSIvPjxyZWN0IHg9IjIwNCIgeT0iNTAiIHdpZHRoPSI5MCIgaGVpZ2h0PSIxOCIgZmlsbD0iIzkzYzVmZCIvPjxyZWN0IHg9IjYiIHk9IjcyIiB3aWR0aD0iNjkiIGhlaWdodD0iMTIiIGZpbGw9IiM4YjVjZjYiLz48L3N2Zz4=",
         provider: "image",
-        thumbnailUrl:
-          "https://commons.wikimedia.org/wiki/Special:FilePath/Cake_fractions.svg?width=480",
       }, // Card 3 — image branch
       {
         type: "pdf",
