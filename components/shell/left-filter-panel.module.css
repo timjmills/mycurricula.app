@@ -12,7 +12,7 @@
   display: flex;
   flex-direction: column;
   width: 240px;
-  background: var(--paper);
+  background: var(--panel-bg); /* per-theme whisper wash */
   border-right: var(--line);
   flex: 0 0 auto;
   overflow: hidden;
@@ -233,17 +233,18 @@
   outline-offset: 2px;
 }
 
-/* Active state — chip is toggled on. v1.3: the functional indigo. */
+/* Active state — chip is toggled on. Chrome-accent tier: indigo on Paper,
+   the theme's own accent everywhere else. */
 .chipActive {
-  background: var(--brand-500);
-  border-color: var(--brand-500);
-  color: #fff;
+  background: var(--chrome-accent);
+  border-color: var(--chrome-accent);
+  color: var(--on-solid);
 }
 
 .chipActive:hover {
-  background: var(--brand-600);
-  border-color: var(--brand-600);
-  color: #fff;
+  background: var(--chrome-accent-strong);
+  border-color: var(--chrome-accent-strong);
+  color: var(--on-solid);
 }
 
 /* Color dot inside subject chips — driven by inline style. */

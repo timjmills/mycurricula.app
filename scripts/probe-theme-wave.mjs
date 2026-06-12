@@ -210,6 +210,10 @@ for (const t of THEMES) {
         ["--ink-900", "--brand-50", 4.5],
         ["--brand-700", "--surface", 3.0],
         ["--honey-600", "--honey-50", 4.5],
+        // Chrome-accent tier (per-theme chrome wave).
+        ["--on-solid", "--chrome-accent", 4.5],
+        ["--on-solid", "--chrome-accent-strong", 4.5],
+        ["--chrome-accent-deep", "--chrome-accent-soft", 4.5],
       ];
       for (let n = 1; n <= 15; n++) {
         pairs.push([`--subj-${n}-ink`, `--subj-${n}-tint`, 4.5]);
@@ -241,6 +245,81 @@ for (const t of THEMES) {
   await ctx.close();
 }
 
+// ── Chrome-accent audit across the light themes ────────────────────────────
+// Night's chrome pairs ride the main audit above; the light themes each
+// define their own --chrome-accent solids, so every one needs the AA check.
+const CHROME_PAIRS = [
+  ["--on-solid", "--chrome-accent", 4.5],
+  ["--on-solid", "--chrome-accent-strong", 4.5],
+  ["--chrome-accent-deep", "--chrome-accent-soft", 4.5],
+];
+const chromeAudit = [];
+for (const theme of ["paper", "cloud", "mint", "sky", "blossom"]) {
+  const ctx = await browser.newContext({
+    viewport: { width: 900, height: 700 },
+  });
+  await ctx.addCookies(cookies);
+  await ctx.addInitScript((t) => {
+    try {
+      localStorage.setItem("mycurricula:user:theme", t);
+    } catch {}
+  }, theme);
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/weekly`, {
+    waitUntil: "domcontentloaded",
+    timeout: 90000,
+  });
+  await page.waitForTimeout(1200);
+  const rows = await page.evaluate((pairs) => {
+    const probe = document.createElement("div");
+    document.body.appendChild(probe);
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const cctx = canvas.getContext("2d", { willReadFrequently: true });
+    const resolve = (expr) => {
+      probe.style.color = "";
+      probe.style.color = expr;
+      const computed = getComputedStyle(probe).color;
+      if (!computed) return null;
+      cctx.clearRect(0, 0, 1, 1);
+      cctx.fillStyle = "#000";
+      cctx.fillStyle = computed;
+      cctx.fillRect(0, 0, 1, 1);
+      const d = cctx.getImageData(0, 0, 1, 1).data;
+      return [d[0], d[1], d[2]];
+    };
+    const lum = ([r, g, b]) => {
+      const f = (c) => {
+        c /= 255;
+        return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    const out = [];
+    for (const [fgTok, bgTok, min] of pairs) {
+      const fg = resolve(`var(${fgTok})`);
+      const bg = resolve(`var(${bgTok})`);
+      if (!fg || !bg) {
+        out.push({ pair: `${fgTok} on ${bgTok}`, ratio: null, min, pass: false });
+        continue;
+      }
+      const a = lum(fg);
+      const b = lum(bg);
+      const rr = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      out.push({
+        pair: `${fgTok} on ${bgTok}`,
+        ratio: Math.round(rr * 100) / 100,
+        min,
+        pass: rr >= min,
+      });
+    }
+    probe.remove();
+    return out;
+  }, CHROME_PAIRS);
+  for (const r of rows) chromeAudit.push({ theme, ...r });
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log(`\nShots: ${OUT_DIR}`);
@@ -264,5 +343,13 @@ for (const c of contrastReport ?? []) {
     `${c.pass ? "  ok  " : "  FAIL"} ${String(c.ratio).padEnd(6)} >= ${c.min}  ${c.pair}`,
   );
 }
+console.log("\nChrome-accent audit, light themes (AA):");
+for (const c of chromeAudit) {
+  if (!c.pass) fails++;
+  console.log(
+    `${c.pass ? "  ok  " : "  FAIL"} ${c.theme.padEnd(8)} ${String(c.ratio).padEnd(6)} >= ${c.min}  ${c.pair}`,
+  );
+}
+
 console.log(`\ncontrast failures: ${fails}`);
 console.log(`route checks failed: ${results.filter((r) => !r.ok).length}`);

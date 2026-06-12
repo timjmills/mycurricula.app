@@ -36,6 +36,7 @@ import type { ReactNode } from "react";
 import { useMemo } from "react";
 import type { Lesson } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
+import { useTheme } from "@/lib/theme";
 import { Tooltip } from "@/components/ui";
 import styles from "./ListRow.module.css";
 
@@ -196,6 +197,18 @@ export function ListRow({
   onClick,
 }: ListRowProps): ReactNode {
   const { setLessonStatus } = usePlanner();
+  // Card-style axis (quiet | calm | vivid). The list row mirrors the canonical
+  // card's three-style language, scaled down for a dense table:
+  //   • quiet → thin subject stripe only (the monogram tile is suppressed).
+  //   • calm  → stripe + subject monogram tile (the warmer middle ground).
+  //   • vivid → stripe + monogram tile + a soft subject-tint row fill.
+  // The stripe + tile colors come from the .cp-subj cascade (--c / --cl / --cd)
+  // already on the row, so no color is invented here — the style only decides
+  // WHICH of those signals show. A full subject-tint fill (the canonical
+  // vivid card) would hurt scanability across a dense list, so vivid here is a
+  // gentle wash driven from --cl in the CSS module (see .rowVivid), not the
+  // opaque card fill.
+  const { style } = useTheme();
 
   // Resolved time/weekday display — weekday takes precedence when provided.
   const chipLabel = weekday ?? time ?? lesson.time ?? "";
@@ -204,12 +217,19 @@ export function ListRow({
 
   // Row CSS classes — subject class drives --c/--cl/--cd via the .cp-subj
   // cascade (palette bridge in lib/palette.tsx), modified adds dashed edge.
+  // The vivid wash is a dedicated class (rather than a data-style selector) so
+  // it composes cleanly with .done / .rowModified and stays a single source of
+  // truth for the tint recipe.
   const rowClasses = useMemo(() => {
     const base = [styles.row, `cp-subj ${lesson.subject}`];
     if (lesson.modified) base.push(styles.rowModified);
+    if (style === "vivid") base.push(styles.rowVivid);
     if (isDone) base.push(styles.done);
     return base.join(" ");
-  }, [lesson.subject, lesson.modified, isDone]);
+  }, [lesson.subject, lesson.modified, isDone, style]);
+
+  // Quiet is the stripe-only style; calm + vivid both carry the monogram tile.
+  const showTile = style !== "quiet";
 
   // Em-dash title split — body of the title is the dominant headline;
   // the qualifier (after " — ") becomes a muted subtitle line below.
@@ -254,10 +274,15 @@ export function ListRow({
         aria-label={`${subjectLabelFor(lesson.subject)} — ${lesson.title}${isDone ? " (done)" : ""}`}
         title={`Open "${lesson.title}" in the Daily view — see the full lesson plan, notes, and attached resources`}
       >
-        {/* Subject monogram tile — background color from .cp-subj cascade */}
-        <span className={styles.tile} aria-hidden="true">
-          {monogramFor(lesson.subject)}
-        </span>
+        {/* Subject monogram tile — background color from .cp-subj cascade.
+            Calm + vivid show it (the tile is calm's signature); quiet drops it
+            so quiet reads as the minimal stripe-only style. The subject still
+            reads from the always-present left stripe + the subject label. */}
+        {showTile && (
+          <span className={styles.tile} aria-hidden="true">
+            {monogramFor(lesson.subject)}
+          </span>
+        )}
 
         {/* Time / weekday chip */}
         <span className={styles.timeCol} aria-hidden="true">

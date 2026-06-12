@@ -798,6 +798,28 @@
   --theme-accent: var(--honey-500);
   --theme-accent-soft: var(--honey-50);
 
+  /* Chrome accent — what "active / selected" looks like in the app CHROME:
+     side-nav items, settings tabs, top-bar view tabs, rail icons, filter
+     chips. Paper (these defaults) keeps today's indigo; every other theme
+     re-hues the set to its own accent so the chrome carries the theme.
+     Components must use THESE — never raw --brand-* — for chrome states.
+     -accent/-strong are SOLID fills (must hold ≥4.5:1 with --on-solid);
+     -soft is the active pill bg; -soft-edge its border/hover; -deep its
+     text; -mid hover borders on white. */
+  --chrome-accent: var(--brand-500);
+  --chrome-accent-strong: var(--brand-600);
+  --chrome-accent-soft: var(--brand-50);
+  --chrome-accent-soft-edge: var(--brand-100);
+  --chrome-accent-deep: var(--brand-700);
+  --chrome-accent-mid: var(--brand-300);
+
+  /* Chrome surfaces — sidebars/rails and slide-out panels. Light themes wash
+     these with ~2.5% of their accent (whisper-strength, per design); Night
+     gives the rail its own step between canvas and surface. */
+  --rail-bg: var(--paper);
+  --panel-bg: var(--paper);
+  --panel-header-bg: var(--ink-50);
+
   /* Static picker swatches — NEVER themed. The theme picker previews every
      option at once, so each option's swatch must resolve to its OWN colors
      regardless of the active theme. These live outside every override block. */
@@ -1028,6 +1050,23 @@
   animation: cp-urgent-pulse 2s ease-in-out infinite;
 }
 
+/* Theme-switch cross-fade — lib/theme.tsx pulses [data-theme-transition]
+   on <html> for ~220ms around a theme change, then removes it. Scoped so the
+   transition cost exists ONLY during that pulse (a permanent `transition` on
+   every element would tax scroll, hover, and drag). We transition only the
+   color-bearing properties — never box-shadow/transform, which carry paint
+   cost and would smear drag-ghost / card-lift interactions. */
+:root[data-theme-transition],
+:root[data-theme-transition] *,
+:root[data-theme-transition] *::before,
+:root[data-theme-transition] *::after {
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease,
+    fill 180ms ease !important;
+}
+
 /* Reduced-motion (§6.6): drop the urgent pulse and collapse all transitions
    to near-instant when the OS setting is on. Focus indicators stay instant
    either way, so this only strips decorative motion. */
@@ -1037,6 +1076,19 @@
   .cp-root *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  /* The cross-fade rule above is keyed on :root[data-theme-transition], whose
+     specificity (0,2,0) out-ranks `.cp-root *` (0,1,0) and — both being
+     !important — would otherwise re-introduce the fade under reduced motion.
+     This explicit, equally-targeted override collapses it back to instant so
+     a theme switch repaints with no animation when the OS setting is on.
+     (It also covers the print-preview shell + any node outside .cp-root.) */
+  :root[data-theme-transition],
+  :root[data-theme-transition] *,
+  :root[data-theme-transition] *::before,
+  :root[data-theme-transition] *::after {
     transition-duration: 0.001ms !important;
   }
 }
@@ -1117,10 +1169,13 @@
        chrome geometry.
 
    The light themes (cloud / mint / sky / blossom) are gentle re-tints of the
-   Paper neutral ramp — surface stays #ffffff, shadows/scrims/status/tags/
-   subjects unchanged; only the canvas/hairline/border steps, selection, mesh,
-   logo, and picker accent move. Night is a full dark inversion and carries
-   the heavy lifting (its own ink ramp, shadows, scrims, and tint recipes).
+   Paper neutral ramp — surface stays #ffffff, scrims/status/tags/subjects
+   unchanged; the canvas/hairline/border steps, selection, mesh, logo, picker
+   accent, and the three ambient card shadows (re-hued to the theme; the
+   --sh-* elevation ladder and drag shadows deliberately keep Paper's neutral
+   cast — imperceptible at those alphas) move. Night is a full dark inversion
+   and carries the heavy lifting (its own ink ramp, shadows, scrims, and tint
+   recipes).
    ════════════════════════════════════════════════════════════════════════ */
 @media screen {
   /* ── Cloud — cool neutral paper (the "greyscale" light theme) ──────────── */
@@ -1136,6 +1191,14 @@
     --ink-300: #bcc0d0;
     --faint: #bcc0d0; /* alias of ink-300 — keep in sync */
     --border-cool: #e4e7f0;
+    /* Ambient shadows re-hued to the theme — same offsets/blur as Paper so
+       perceived depth is identical; only the cast picks up the wash. */
+    --shadow-card:
+      0 1px 2px rgba(36, 44, 66, 0.05), 0 1px 3px rgba(36, 44, 66, 0.07);
+    --shadow-card-hover:
+      0 2px 6px rgba(36, 44, 66, 0.08), 0 4px 12px rgba(36, 44, 66, 0.09);
+    --shadow-popover:
+      0 2px 4px rgba(36, 44, 66, 0.07), 0 10px 28px rgba(36, 44, 66, 0.13);
     --selection-bg: #dce6ff;
     --logo-tile-grad: linear-gradient(135deg, #5b6478 0%, #3b4456 100%);
     --logo-tile-shadow: 0 12px 26px -10px rgba(59, 68, 86, 0.45);
@@ -1143,6 +1206,16 @@
     --logo-tld: #3b4456;
     --theme-accent: #5b6478;
     --theme-accent-soft: #eef0f4;
+    /* Chrome — cool slate actives; rails stay pure white (Cloud's identity
+       is the absence of warmth, so no wash). */
+    --chrome-accent: #4a5468;
+    --chrome-accent-strong: #3b4456;
+    --chrome-accent-soft: #eef0f4;
+    --chrome-accent-soft-edge: #dde1e9;
+    --chrome-accent-deep: #3b4456;
+    --chrome-accent-mid: #9aa3b5;
+    --rail-bg: #ffffff;
+    --panel-bg: #ffffff;
     --mesh-a: rgba(59, 108, 246, 0.05);
     --mesh-b: rgba(139, 92, 246, 0.04);
     --mesh-c: rgba(71, 177, 209, 0.04);
@@ -1165,6 +1238,13 @@
     --ink-300: #a8c4b1;
     --faint: #a8c4b1; /* alias of ink-300 — keep in sync */
     --border-cool: #d5e7e0;
+    /* Theme-hued ambient shadows — Paper's offsets, mint's deep-green cast. */
+    --shadow-card:
+      0 1px 2px rgba(20, 70, 42, 0.05), 0 1px 3px rgba(20, 70, 42, 0.07);
+    --shadow-card-hover:
+      0 2px 6px rgba(20, 70, 42, 0.08), 0 4px 12px rgba(20, 70, 42, 0.09);
+    --shadow-popover:
+      0 2px 4px rgba(20, 70, 42, 0.07), 0 10px 28px rgba(20, 70, 42, 0.13);
     --selection-bg: #d9f0df;
     --logo-tile-grad: linear-gradient(135deg, #34b96a 0%, #1fa85a 100%);
     --logo-tile-shadow: 0 12px 26px -10px rgba(31, 168, 90, 0.45);
@@ -1172,6 +1252,16 @@
     --logo-tld: #166534;
     --theme-accent: #1fa85a;
     --theme-accent-soft: #eaf6ed;
+    /* Chrome — green actives (solid deepened past the accent for ≥4.5:1
+       with white chip text); rails take a whisper of mint. */
+    --chrome-accent: #147c42;
+    --chrome-accent-strong: #11703c;
+    --chrome-accent-soft: #eaf6ed;
+    --chrome-accent-soft-edge: #d3eedd;
+    --chrome-accent-deep: #166534;
+    --chrome-accent-mid: #7cc99c;
+    --rail-bg: color-mix(in srgb, #1fa85a 2.5%, var(--paper));
+    --panel-bg: color-mix(in srgb, #1fa85a 2%, var(--paper));
     --mesh-a: rgba(31, 168, 90, 0.14);
     --mesh-b: rgba(122, 199, 155, 0.1);
     --mesh-c: rgba(244, 183, 64, 0.06);
@@ -1190,6 +1280,13 @@
     --ink-300: #a3bedd;
     --faint: #a3bedd; /* alias of ink-300 — keep in sync */
     --border-cool: #d6e4f4;
+    /* Theme-hued ambient shadows — Paper's offsets, sky's deep-blue cast. */
+    --shadow-card:
+      0 1px 2px rgba(18, 52, 110, 0.05), 0 1px 3px rgba(18, 52, 110, 0.07);
+    --shadow-card-hover:
+      0 2px 6px rgba(18, 52, 110, 0.08), 0 4px 12px rgba(18, 52, 110, 0.09);
+    --shadow-popover:
+      0 2px 4px rgba(18, 52, 110, 0.07), 0 10px 28px rgba(18, 52, 110, 0.13);
     --selection-bg: #d8e7fd;
     --logo-tile-grad: linear-gradient(135deg, #4788d1 0%, #2e6be6 100%);
     --logo-tile-shadow: 0 12px 26px -10px rgba(46, 107, 230, 0.45);
@@ -1197,6 +1294,16 @@
     --logo-tld: #2543b0;
     --theme-accent: #2e6be6;
     --theme-accent-soft: #e9f1fe;
+    /* Chrome — Sky's blue is near the brand indigo; the values still route
+       through the chrome tier so the system stays uniform. */
+    --chrome-accent: #2e6be6;
+    --chrome-accent-strong: #2453c4;
+    --chrome-accent-soft: #e9f1fe;
+    --chrome-accent-soft-edge: #d4e4fb;
+    --chrome-accent-deep: #2543b0;
+    --chrome-accent-mid: #8fb0f0;
+    --rail-bg: color-mix(in srgb, #2e6be6 2.5%, var(--paper));
+    --panel-bg: color-mix(in srgb, #2e6be6 2%, var(--paper));
     --mesh-a: rgba(46, 107, 230, 0.12);
     --mesh-b: rgba(71, 182, 209, 0.1);
     --mesh-c: rgba(139, 92, 246, 0.05);
@@ -1215,6 +1322,13 @@
     --ink-300: #d0a9bd;
     --faint: #d0a9bd; /* alias of ink-300 — keep in sync */
     --border-cool: #ecdcea;
+    /* Theme-hued ambient shadows — Paper's offsets, blossom's plum cast. */
+    --shadow-card:
+      0 1px 2px rgba(108, 24, 60, 0.05), 0 1px 3px rgba(108, 24, 60, 0.07);
+    --shadow-card-hover:
+      0 2px 6px rgba(108, 24, 60, 0.08), 0 4px 12px rgba(108, 24, 60, 0.09);
+    --shadow-popover:
+      0 2px 4px rgba(108, 24, 60, 0.07), 0 10px 28px rgba(108, 24, 60, 0.13);
     --selection-bg: #fad3e3;
     --logo-tile-grad: linear-gradient(135deg, #e87aa9 0%, #e84e93 100%);
     --logo-tile-shadow: 0 12px 26px -10px rgba(232, 78, 147, 0.45);
@@ -1222,6 +1336,16 @@
     --logo-tld: #9d174d;
     --theme-accent: #e84e93;
     --theme-accent-soft: #fce5ee;
+    /* Chrome — rose actives (solid deepened past the accent for ≥4.5:1
+       with white chip text); rails take a whisper of blossom. */
+    --chrome-accent: #c52f74;
+    --chrome-accent-strong: #a82663;
+    --chrome-accent-soft: #fce5ee;
+    --chrome-accent-soft-edge: #f8d0e0;
+    --chrome-accent-deep: #9d174d;
+    --chrome-accent-mid: #eb8ab4;
+    --rail-bg: color-mix(in srgb, #e84e93 2.5%, var(--paper));
+    --panel-bg: color-mix(in srgb, #e84e93 2%, var(--paper));
     --mesh-a: rgba(232, 78, 147, 0.11);
     --mesh-b: rgba(199, 122, 199, 0.09);
     --mesh-c: rgba(244, 183, 64, 0.06);
@@ -1324,6 +1448,19 @@
     --logo-tld: var(--honey-400);
     --theme-accent: #8b7fc0;
     --theme-accent-soft: #2a2940;
+    /* Chrome — Night's chrome goes violet like its logo. The solid is
+       deepened so white chip text holds ≥4.5:1; -deep lightens for text on
+       the dark soft tint. The rail takes its own step between canvas and
+       surface so the nav reads as distinct furniture. */
+    --chrome-accent: #6f61a8;
+    --chrome-accent-strong: #5b4f91;
+    --chrome-accent-soft: #2a2940;
+    --chrome-accent-soft-edge: #3a3754;
+    --chrome-accent-deep: color-mix(in srgb, #8b7fc0 55%, white);
+    --chrome-accent-mid: #564d80;
+    --rail-bg: #191826;
+    --panel-bg: #1c1b2a;
+    --panel-header-bg: #242336;
 
     /* Subject tint/ink recipes — mix toward the dark surface so fills sit on
        night without glowing, and lift ink toward white for AA on the dark
@@ -1390,8 +1527,8 @@
     --tag-green-fg: color-mix(in srgb, var(--tag-green) 55%, white);
 
     /* Atmosphere gradients — hero + brand wash re-tuned for dark (these are
-       backdrops, not buttons). --grad-honey / --grad-dawn / --grad-mint are
-       button identity → left at :root. */
+       backdrops, not buttons). --grad-honey / --grad-mint are button identity
+       → left at :root. */
     --grad-hero: linear-gradient(
       118deg,
       #2a2440 0%,
@@ -1399,6 +1536,16 @@
       #1d2a38 100%
     );
     --grad-brand: linear-gradient(135deg, #232a44 0%, #2a2344 100%);
+
+    /* Avatar dawn gradient — the user-avatar circles paint white initials over
+       var(--grad-dawn). The Paper pastels (#ffd8a8 / #ffb3c7 / #c9b6ff) are
+       already borderline for white text on light themes (~1.3–1.8:1) and would
+       be worse here, so Night gets a deepened DUSK variant of the same
+       amber→rose→violet hues. Tuned so white (#fff) clears WCAG 3:1 against
+       EVERY stop (per-stop relative luminance / 1.05:(L+0.05)):
+         #b07c4a ≈ 3.6:1 · #c2607e ≈ 4.0:1 · #7e6bc9 ≈ 4.3:1.
+       Light themes keep the :root pastel gradient (pre-existing design). */
+    --grad-dawn: linear-gradient(135deg, #b07c4a 0%, #c2607e 50%, #7e6bc9 100%);
 
     /* Highlighter note wash — pens (--hl-*) stay; the pastel -hlp-* tints (used
        behind highlighted note text) remix toward the dark surface so a

@@ -177,6 +177,28 @@
   text-overflow: ellipsis;
 }
 
+/* ── Current-setting badge ────────────────────────────────────────────────── */
+/* Marks the appearance row whose theme / card style is live right now. Uses
+   the functional brand accent (not a subject color) so it reads as "current"
+   rather than decorative, and sits just before the neutral meta pill. */
+.resultCurrent {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--t-11);
+  font-weight: 600;
+  /* brand-700, not 600 — it's the ramp's TEXT member, which the Night theme
+     re-lightens to keep AA on the (also re-mixed, dark) brand-50 chip;
+     brand-600 stays a solid-background color and never adapts. */
+  color: var(--brand-700);
+  background: var(--brand-50);
+  padding: 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
 /* ── Result meta ──────────────────────────────────────────────────────────── */
 .resultMeta {
   flex-shrink: 0;

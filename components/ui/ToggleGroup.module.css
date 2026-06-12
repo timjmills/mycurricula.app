@@ -22,7 +22,7 @@
 .tray {
   display: inline-flex;
   align-items: center;
-  gap: 2px; /* 2px gap between chips inside the tray */
+  gap: 3px; /* air between chips inside the tray */
   padding: 4px; /* internal padding so chips don't touch the tray edge */
   border-radius: var(--r-pill); /* v1.3: pill segmented track */
   background: var(--hairline);
@@ -34,10 +34,11 @@
 /* ── Sizes ───────────────────────────────────────────────────────────── */
 
 /* md: default. Visual height ~34px inside a 40px tray.
-   lg equivalent — the tray grows to fit. */
+   lg equivalent — the tray grows to fit. 19px side padding so the label
+   never crowds the pill edge (user report: text ran to the edge). */
 .md .option {
   height: 34px;
-  padding: 0 16px;
+  padding: 0 19px;
   font-size: var(--t-13);
   font-weight: 700;
   border-radius: var(--r-pill);
@@ -47,10 +48,11 @@
   font-weight: 700;
 }
 
-/* sm: compact. Visual height ~26px inside a 32px tray. */
+/* sm: compact. Visual height ~26px inside a 32px tray. 15px side padding —
+   the compact pills are where edge-crowding showed first. */
 .sm .option {
   height: 26px;
-  padding: 0 12px;
+  padding: 0 15px;
   font-size: var(--t-12);
   font-weight: 700;
   border-radius: var(--r-pill);
@@ -133,12 +135,12 @@
   background: color-mix(in srgb, var(--surface) 60%, transparent);
 }
 
-/* v1.3 segmented: active chip = surface + deep-indigo text + soft lift.
-   brand-700 (not 600) — it's the ramp's TEXT member, so dark themes can
-   lighten it while brand-600 stays a solid-background color. */
+/* v1.3 segmented: active chip = surface + deep accent text + soft lift.
+   Routed through the chrome tier so each theme's toggles speak its accent
+   (Paper resolves to the original deep indigo). */
 .subtle .active {
   background: var(--surface);
-  color: var(--brand-700);
+  color: var(--chrome-accent-deep);
   box-shadow: var(--sh-xs);
 }
 
@@ -159,7 +161,7 @@
 
 .prominent .active {
   background: var(--surface);
-  color: var(--brand-700);
+  color: var(--chrome-accent-deep);
   box-shadow: var(--sh-sm);
 }
 

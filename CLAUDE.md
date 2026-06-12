@@ -166,8 +166,18 @@ The visual system has three independent axes, all set as `<html>` data attribute
   meaning); Night re-tints only the subject `-tint`/`-ink` companions. The logo
   re-colors per theme through the `--logo-*` tokens. All three axes persist to
   localStorage (`mycurricula:user:theme*`) and paint pre-hydration via the
-  no-FOUC boot script in `lib/theme-init.tsx` — its allowlists must stay in
-  lockstep with `lib/theme.tsx`.
+  no-FOUC boot script in `lib/theme-init.tsx`. Theme changes pulse a
+  `data-theme-transition` attribute on `<html>` for ~220ms so tokens.css can
+  cross-fade the swap (suppressed under reduced motion). Optional cross-device
+  sync (`lib/theme-sync.ts`, OFF unless `NEXT_PUBLIC_THEME_SYNC=1`) mirrors the
+  three axes to the `teacher_preferences` table. ALLOWLIST LOCKSTEP: the value
+  lists live canonically in `lib/theme.tsx` (exported guards); the boot
+  script's inline arrays and the migration's SQL CHECK constraints must mirror
+  them exactly. CHROME TIER: active/selected chrome (nav items, tabs, rail
+  icons, filter chips) and chrome surfaces consume the `--chrome-accent-*` /
+  `--rail-bg` / `--panel-bg` tokens — never raw `--brand-*` — so every theme
+  re-hues its own chrome; Paper's chrome tokens default to the original
+  brand/paper values (see BUILD_STANDARD.md §Themes).
 
 **Hard rules:**
 
@@ -180,8 +190,8 @@ The visual system has three independent axes, all set as `<html>` data attribute
   bridge in `lib/palette.tsx`) or the `useSubjectColor(subjectId)` hook. Never invent a
   subject color.
 - The 8 subjects (`math, reading, writing, grammar, spelling, ufli, explorers, sel`)
-  and their swatch mapping are **locked team-wide**. Style + palette are per-teacher
-  preference; the subject→color mapping is not.
+  and their swatch mapping are **locked team-wide**. Style, palette, and theme are
+  per-teacher preference; the subject→color mapping is not.
 - Respect `prefers-reduced-motion`: the master-mode banner appears solid (no flash) and
   urgent notes never pulse under reduced motion.
 - Accessibility: WCAG AA contrast minimum, full keyboard navigation, ≥44px touch

@@ -22,7 +22,7 @@
   flex-direction: column;
   align-items: center;
   padding: 8px 0;
-  background: var(--paper);
+  background: var(--rail-bg); /* per-theme whisper wash */
   border-right: 1px solid var(--ink-150);
   /* Quiet drop in case the rail sits over content with no shadow underlying
      it — keeps the boundary present without screaming. */
@@ -128,15 +128,17 @@
   outline-offset: 2px;
 }
 
+/* Chrome-accent tier (never raw --brand-*): the active icon pill carries
+   each theme's own accent. */
 .buttonActive {
-  background: var(--brand-50);
-  color: var(--brand-700);
-  border-color: var(--brand-100);
+  background: var(--chrome-accent-soft);
+  color: var(--chrome-accent-deep);
+  border-color: var(--chrome-accent-soft-edge);
 }
 
 .buttonActive:hover {
-  background: var(--brand-100);
-  color: var(--brand-700);
+  background: var(--chrome-accent-soft-edge);
+  color: var(--chrome-accent-deep);
 }
 
 /* The icon sits in a centered slot — the SVG inside picks up `color` via

@@ -44,6 +44,7 @@ import {
 import type { ReactNode } from "react";
 import { PaletteProvider } from "./palette";
 import type { PaletteType, SubjectMapping } from "./palette";
+import { loadRemotePrefs, saveRemotePrefs } from "./theme-sync";
 
 /** Card-style axis. */
 export type ThemeStyle = "quiet" | "calm" | "vivid";
@@ -108,16 +109,38 @@ const THEME_KEY = "mycurricula:user:theme";
 const STYLE_KEY = "mycurricula:user:theme-style";
 const PALETTE_KEY = "mycurricula:user:theme-palette";
 
-const STYLE_VALUES: readonly ThemeStyle[] = ["quiet", "calm", "vivid"];
-const PALETTE_VALUES: readonly ThemePalette[] = ["normal", "highlight"];
+/** The card-style values, exported so consumers validate against ONE list. */
+export const STYLE_VALUES: readonly ThemeStyle[] = ["quiet", "calm", "vivid"];
+/** The palette values, exported for the same single-source reason. */
+export const PALETTE_VALUES: readonly ThemePalette[] = [
+  "normal",
+  "highlight",
+];
 
-function isThemeSetting(v: unknown): v is ThemeSetting {
+// Cross-fade pulse window. When the RESOLVED app theme actually changes, the
+// mirror effect sets `data-theme-transition` on <html> for this long so the CSS
+// under :root[data-theme-transition] (shipped by the theme-polish work) can
+// cross-fade the color swap, then removes it. Kept just above the CSS transition
+// duration so the attribute outlives the fade.
+const THEME_TRANSITION_MS = 220;
+
+// Debounce window for the best-effort remote write. Rapid toggling (e.g. arrow-
+// keying through the theme picker) collapses into a single saveRemotePrefs call
+// this long after the last change. Local state + localStorage update instantly;
+// only the cross-device push is deferred.
+const REMOTE_SAVE_DEBOUNCE_MS = 800;
+
+/** Allowlist guards — exported so lib/theme-sync.ts (and any future consumer)
+ *  validates against THIS file's lists instead of keeping duplicates. The two
+ *  copies that must stay literal regardless are the inline boot script in
+ *  lib/theme-init.tsx and the SQL CHECK constraints (see COUPLING headers). */
+export function isThemeSetting(v: unknown): v is ThemeSetting {
   return v === "system" || APP_THEMES.includes(v as AppTheme);
 }
-function isThemeStyle(v: unknown): v is ThemeStyle {
+export function isThemeStyle(v: unknown): v is ThemeStyle {
   return STYLE_VALUES.includes(v as ThemeStyle);
 }
-function isThemePalette(v: unknown): v is ThemePalette {
+export function isThemePalette(v: unknown): v is ThemePalette {
   return PALETTE_VALUES.includes(v as ThemePalette);
 }
 
@@ -195,12 +218,97 @@ export function ThemeProvider({
   // cross-tab `storage` events so a change made in another tab (e.g. via the
   // Settings picker) reflects here. SSR never runs this path.
   useEffect(() => {
+    // Guards async state-sets (the remote load below) against a unmount that
+    // races the in-flight promise.
+    let active = true;
+
     const savedStyle = readValidated(STYLE_KEY, isThemeStyle);
     if (savedStyle !== null) setStyle(savedStyle);
     const savedPalette = readValidated(PALETTE_KEY, isThemePalette);
     if (savedPalette !== null) setPalette(savedPalette);
     const savedTheme = readValidated(THEME_KEY, isThemeSetting);
     if (savedTheme !== null) setTheme(savedTheme);
+
+    // Cross-device sync (best-effort, OFF unless NEXT_PUBLIC_THEME_SYNC=1). After
+    // the synchronous localStorage reconciliation above, pull the teacher's
+    // remote prefs. loadRemotePrefs() returns a discriminated result and no-ops
+    // (kind "unavailable") in the default prototype path, so this whole branch is
+    // inert until the flag flips.
+    void loadRemotePrefs().then((remote) => {
+      // Settle BEFORE applying/seeding: the mirror effect refuses to schedule
+      // remote saves until the initial remote read has resolved, so a device with
+      // stale localStorage can never upsert over newer remote prefs during the
+      // load race.
+      remoteSettledRef.current = true;
+      if (!active) return;
+
+      if (remote.kind === "loaded") {
+        // A row exists — adopt its values for axes the user hasn't touched since
+        // mount, so the look follows them across devices. The mirror effect
+        // persists every user change to localStorage synchronously, so a re-read
+        // that differs from the mount-time capture means the user changed that
+        // axis while this read was in flight — their fresh choice wins over the
+        // (older) remote value. Each applied setState re-runs the mirror effect,
+        // which (now that remoteSettledRef is true) pushes the reconciled triple
+        // back, keeping every device's row in agreement.
+        const untouched = (key: string, atMount: string | null): boolean => {
+          try {
+            return window.localStorage.getItem(key) === atMount;
+          } catch {
+            return true;
+          }
+        };
+        if (
+          remote.prefs.style !== undefined &&
+          remote.prefs.style !== savedStyle &&
+          untouched(STYLE_KEY, savedStyle)
+        ) {
+          setStyle(remote.prefs.style);
+        }
+        if (
+          remote.prefs.palette !== undefined &&
+          remote.prefs.palette !== savedPalette &&
+          untouched(PALETTE_KEY, savedPalette)
+        ) {
+          setPalette(remote.prefs.palette);
+        }
+        if (
+          remote.prefs.theme !== undefined &&
+          remote.prefs.theme !== savedTheme &&
+          untouched(THEME_KEY, savedTheme)
+        ) {
+          setTheme(remote.prefs.theme);
+        }
+        return;
+      }
+
+      if (remote.kind === "empty") {
+        // The query succeeded and the teacher has NO row yet. This is the common
+        // first-load state at rollout for an existing teacher whose look lives
+        // only in localStorage. Seed the row from the authoritative local values
+        // (re-read here so a change made during the in-flight read is captured)
+        // so their existing look reaches their other devices. The mirror effect
+        // alone would NOT do this: its setStates from localStorage land before
+        // remoteSettledRef flips, so its post-settle save never fires without a
+        // later change. Skip brand-new users with no stored prefs at all — there
+        // is nothing to preserve, and their first real change persists via the
+        // mirror effect (remoteSettledRef is true by now). Gated on `active`
+        // like the apply path above: under React StrictMode's dev mount/unmount/
+        // remount, the first (inactive) read is skipped and only the live mount
+        // seeds, so the row is never written twice.
+        const localStyle = readValidated(STYLE_KEY, isThemeStyle);
+        const localPalette = readValidated(PALETTE_KEY, isThemePalette);
+        const localTheme = readValidated(THEME_KEY, isThemeSetting);
+        if (localStyle !== null || localPalette !== null || localTheme !== null) {
+          void saveRemotePrefs({
+            theme: localTheme ?? DEFAULT_THEME,
+            style: localStyle ?? DEFAULT_STYLE,
+            palette: localPalette ?? DEFAULT_PALETTE,
+          });
+        }
+      }
+      // kind === "unavailable": sync off / no session / read error — do nothing.
+    });
 
     // OS dark-mode preference + live subscription (drives "system").
     // `unsubscribeScheme` is assigned ONLY after addEventListener succeeds, so
@@ -236,6 +344,7 @@ export function ThemeProvider({
     window.addEventListener("storage", onStorage);
 
     return () => {
+      active = false;
       if (unsubscribeScheme) unsubscribeScheme();
       window.removeEventListener("storage", onStorage);
     };
@@ -259,21 +368,84 @@ export function ThemeProvider({
   // re-runs, and that is correct: the server-rendered defaults are already on
   // <html> and there is nothing to persist yet.
   const mounted = useRef(false);
+  // The last RESOLVED theme actually painted to <html>. Seeded on the first run
+  // from the DOM (what the boot script painted), NOT from React's default state
+  // — otherwise the load effect's catch-up to the persisted value would look
+  // like a change and fire a spurious cross-fade on every page load.
+  const prevResolvedRef = useRef<AppTheme | null>(null);
+  // Timers for the cross-fade attribute removal and the debounced remote save;
+  // held in refs so successive runs can cancel a pending one (clearTimeout-safe
+  // across rapid switches).
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True once the initial loadRemotePrefs() has resolved (with OR without a
+  // row). Until then the mirror effect must NOT schedule remote saves — a
+  // device booting with stale localStorage would otherwise upsert those stale
+  // values over newer remote prefs while the read was still in flight.
+  const remoteSettledRef = useRef(false);
   useEffect(() => {
+    const root = document.documentElement;
+
     if (!mounted.current) {
       mounted.current = true;
+      // Baseline the cross-fade tracker from the live DOM (boot-script paint),
+      // so the first real change is measured against what is actually on screen.
+      const painted = root.dataset.theme;
+      prevResolvedRef.current = APP_THEMES.includes(painted as AppTheme)
+        ? (painted as AppTheme)
+        : resolvedTheme;
       return;
     }
-    const root = document.documentElement;
+
+    // Cross-fade trigger (CONTRACT with the theme cross-fade CSS): ONLY when the
+    // resolved app theme actually changes from the previously-painted value —
+    // not on style/palette-only changes, and not on this skipped first run. Set
+    // `data-theme-transition` BEFORE writing dataset.theme so the CSS under
+    // :root[data-theme-transition] cross-fades the swap, then remove it after the
+    // pulse window. clearTimeout makes rapid theme switches collapse to one
+    // attribute lifetime rather than a premature removal mid-fade.
+    if (resolvedTheme !== prevResolvedRef.current) {
+      root.setAttribute("data-theme-transition", "");
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = setTimeout(() => {
+        root.removeAttribute("data-theme-transition");
+        transitionTimerRef.current = null;
+      }, THEME_TRANSITION_MS);
+    }
+
     root.dataset.style = style;
     root.dataset.palette = palette;
     root.dataset.theme = resolvedTheme;
+    prevResolvedRef.current = resolvedTheme;
     // Persist the SETTING for theme (may be "system"); style/palette are
     // already concrete. Reads validate against the same allowlists.
     writeKey(STYLE_KEY, style);
     writeKey(PALETTE_KEY, palette);
     writeKey(THEME_KEY, theme);
+
+    // Best-effort cross-device push (no-op unless NEXT_PUBLIC_THEME_SYNC=1).
+    // Debounced so rapid toggling collapses to one write; localStorage above is
+    // the immediate source of truth, so a failed/slow remote save never delays
+    // or affects the local paint. saveRemotePrefs swallows its own errors.
+    // Gated on the initial remote read having settled (remoteSettledRef) so a
+    // boot race can never push stale local values over newer remote ones.
+    if (remoteSettledRef.current) {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        void saveRemotePrefs({ theme, style, palette });
+        saveTimerRef.current = null;
+      }, REMOTE_SAVE_DEBOUNCE_MS);
+    }
   }, [style, palette, resolvedTheme, theme]);
+
+  // Clear any pending pulse/save timers on unmount so they cannot fire against a
+  // torn-down tree.
+  useEffect(() => {
+    return () => {
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
 
   const value = useMemo<ThemeContextValue>(
     () => ({

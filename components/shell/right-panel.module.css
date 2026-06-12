@@ -11,7 +11,7 @@
   display: flex;
   flex-direction: column;
   width: 320px;
-  background: var(--paper);
+  background: var(--panel-bg); /* per-theme whisper wash */
   border-left: var(--line);
   flex: 0 0 auto;
   overflow: hidden;
@@ -163,7 +163,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--ink-500);
-  background: var(--paper);
+  background: var(--panel-bg); /* match the panel so the sticky header blends */
   position: sticky;
   top: 0;
   z-index: 1;

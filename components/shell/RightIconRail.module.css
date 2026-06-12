@@ -21,7 +21,7 @@
   flex-direction: column;
   align-items: center;
   padding: 8px 0;
-  background: var(--paper);
+  background: var(--rail-bg); /* per-theme whisper wash (mirrors GlobalRail) */
   border-left: 1px solid var(--ink-150);
   /* Sticky docked rail — mirrors GlobalRail: stays put under the top bar while
      the routed <main> scrolls at the document level. `align-self: flex-start`

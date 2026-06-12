@@ -204,16 +204,17 @@
   outline-offset: 2px;
 }
 
-/* Active/current route — soft brand pill */
+/* Active/current route — soft accent pill via the chrome tier (each theme
+   re-hues it; Paper resolves to today's brand indigo). */
 .viewTabActive {
-  background: var(--brand-50);
-  color: var(--brand-700);
+  background: var(--chrome-accent-soft);
+  color: var(--chrome-accent-deep);
   border-color: transparent;
 }
 
 .viewTabActive:hover {
-  background: var(--brand-100);
-  color: var(--brand-700);
+  background: var(--chrome-accent-soft-edge);
+  color: var(--chrome-accent-deep);
 }
 
 /* Disabled soon-tab — POLISH-003/TOPBAR-002/QW-4.

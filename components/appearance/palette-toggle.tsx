@@ -13,6 +13,8 @@ import type { ThemePalette } from "@/lib/theme";
 import { SUBJECT_SWATCHES } from "@/lib/palette";
 import { Tooltip } from "@/components/ui";
 import { SettingsCard, RadioDot } from "./settings-card";
+import { useRovingRadio } from "./use-roving-radio";
+import cardStyles from "./settings-card.module.css";
 
 interface PaletteOption {
   id: ThemePalette;
@@ -48,6 +50,11 @@ const PALETTE_OPTIONS: readonly PaletteOptionFull[] = [
 
 export function PaletteToggle(): ReactNode {
   const { palette, setPalette } = useTheme();
+  const roving = useRovingRadio({
+    values: PALETTE_OPTIONS.map((o) => o.id),
+    selected: palette,
+    onSelect: (v) => setPalette(v as ThemePalette),
+  });
 
   return (
     <SettingsCard
@@ -65,6 +72,7 @@ export function PaletteToggle(): ReactNode {
       <div
         role="radiogroup"
         aria-label="Color palette"
+        {...roving.getGroupProps()}
         style={{
           marginTop: 12,
           display: "grid",
@@ -75,14 +83,20 @@ export function PaletteToggle(): ReactNode {
         {PALETTE_OPTIONS.map((opt) => {
           const selected = palette === opt.id;
           return (
-            <Tooltip key={opt.id} content={opt.tooltip} side="top">
+            <Tooltip
+              key={opt.id}
+              content={opt.tooltip}
+              side="top"
+              tooltipId={`appearance-palette-${opt.id}`}
+            >
               <button
                 type="button"
                 role="radio"
                 aria-checked={selected}
+                {...roving.getOptionProps(opt.id)}
                 onClick={() => setPalette(opt.id)}
                 title={opt.tooltip}
-                className="cp-focusable"
+                className={`${cardStyles.pickOption} cp-focusable`}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -90,13 +104,6 @@ export function PaletteToggle(): ReactNode {
                   gap: 8,
                   padding: "12px 14px",
                   minHeight: 44,
-                  borderRadius: 10,
-                  background: selected ? "var(--brand-50)" : "var(--surface)",
-                  border: selected
-                    ? "1.5px solid var(--brand-500)"
-                    : "1px solid var(--border)",
-                  textAlign: "left",
-                  cursor: "pointer",
                 }}
               >
                 <span style={{ display: "flex", alignItems: "center", gap: 8 }}>

@@ -116,12 +116,42 @@ Non-subject status colors are NOT subject colors. Use:
 | `var(--important)`                     | Modified, attention     |
 | `var(--catchup)` / `var(--catchup-bg)` | Behind, needs catch-up  |
 | `var(--ink-50…900)`                    | Neutral ink ramp        |
-| `var(--paper)`                         | The card body white     |
+| `var(--paper)`                         | The card body surface   |
 | `var(--tag-*)`                         | 10 tag colors for chips |
 
 A blue ring on a Reading card means "this is math" — never use a
 subject color for a non-subject signal. Selection states, focus rings,
 and informational accents use `--fyi`, `--ink-900`, or a tag color.
+
+### Themes — neutrals are theme-RELATIVE, not colors
+
+The app ships six selectable themes (`data-theme` on `<html>`: `paper`
+default, `cloud`, `night` dark mode, `mint`, `sky`, `blossom` — see
+CLAUDE.md §4). Every neutral above is re-mapped per theme, which changes
+what some tokens MEAN on a dark surface:
+
+- **`--paper` and the `--ink-*` ramp are theme-relative.** On Night,
+  `--paper` is a DARK surface and `--ink-900` is near-white. Never use
+  `color: var(--paper)` to mean "white ink on a saturated solid" — that
+  flips dark-on-dark under Night. Use **`var(--on-solid)`** (always
+  white) for text/icons over `--brand-500/600`, status solids, subject
+  solids, and other saturated theme-stable fills.
+- **Tint/deep pairs adapt; mid-solids don't.** `--brand-50/100/700` and
+  `--honey-50/100/600` re-mix on Night (tint surfaces darken, their text
+  members lighten); `--brand-500/600` and `--honey-300..500` stay
+  saturated. Pair text-on-tint with the ramp's TEXT member (`--brand-700`,
+  `--honey-600`), never the solid members.
+- **Subject tints flow through `--tint-base`.** Recipes that mix toward
+  white must mix toward `var(--tint-base)` so dark themes re-tint them.
+- **Chrome states use the `--chrome-accent-*` tier, never raw `--brand-*`.**
+  Active/selected chrome (nav items, tabs, rail icons, filter chips) and
+  chrome surfaces (`--rail-bg`, `--panel-bg`, `--panel-header-bg`) re-hue
+  per theme; Paper's defaults resolve to the original indigo, so using the
+  tier costs nothing and keeps every theme's chrome in its own accent.
+- **Verify every new surface in Night** (and one wash, e.g. Mint) before
+  calling it done — the same way the responsive contract requires three
+  viewport tiers. Settings → Appearance switches instantly; persisted
+  per device.
 
 ---
 

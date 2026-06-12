@@ -41,6 +41,7 @@ import { SubjectColors } from "@/components/appearance/subject-colors";
 import { PaletteReference } from "@/components/appearance/palette-reference";
 import { SettingsCard } from "@/components/appearance/settings-card";
 import { Button, PageHeader, Tooltip } from "@/components/ui";
+import styles from "./appearance.module.css";
 
 export default function AppearancePage(): ReactNode {
   // Team Curriculum subject → swatch mapping. Local state for this build:
@@ -56,6 +57,7 @@ export default function AppearancePage(): ReactNode {
   return (
     <div style={{ padding: 24 }}>
       <div
+        className={styles.reveal}
         style={{
           maxWidth: 1100,
           margin: "0 auto",
