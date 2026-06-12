@@ -117,8 +117,12 @@ export function normalizeDockLayout(raw: unknown): DockLayoutState {
     out.slots[key].pinned = c.pinned !== false;
     out.slots[key].usermode =
       c.usermode === "tabs" || c.usermode === "stack" ? c.usermode : null;
+    // Clamp persisted widths to a sane flex-grow ratio band — a corrupted
+    // or hand-edited value (1e9, 0.0001) would otherwise wedge the layout
+    // on every load. Defaults run 312–620, so [80, 4000] is generous.
     const w = typeof c.width === "number" ? c.width : null;
-    out.slots[key].width = w !== null && Number.isFinite(w) && w > 0 ? w : null;
+    out.slots[key].width =
+      w !== null && Number.isFinite(w) && w >= 80 && w <= 4000 ? w : null;
     out.slots[key].active = isPanelId(c.active) ? c.active : null;
   }
 

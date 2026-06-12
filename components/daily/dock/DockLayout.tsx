@@ -320,14 +320,21 @@ export function DockLayout({
       api.setWidths(snapshot);
 
       const target = e.currentTarget;
+      let captured = true;
       try {
         target.setPointerCapture(e.pointerId);
       } catch {
-        // Pointer capture unavailable — drag still works via element events.
+        // Pointer capture unavailable — fall back to WINDOW listeners, or
+        // the drag dies (and body styles stick) the moment the pointer
+        // leaves the 10px splitter track.
+        captured = false;
       }
       document.body.style.userSelect = "none";
       document.body.style.cursor = "col-resize";
 
+      // With capture, element listeners receive every event; without it,
+      // only window listeners track a pointer that left the splitter.
+      const listenTarget: HTMLElement | Window = captured ? target : window;
       const onMove = (ev: PointerEvent): void => {
         const d = ev.clientX - startX;
         const np = Math.max(pMin, Math.min(sum - nMin, pw + d));
@@ -335,15 +342,15 @@ export function DockLayout({
       };
       const onUp = (): void => {
         clearDragBodyStyles();
-        target.removeEventListener("pointermove", onMove);
-        target.removeEventListener("pointerup", onUp);
-        target.removeEventListener("pointercancel", onUp);
-        target.removeEventListener("lostpointercapture", onUp);
+        listenTarget.removeEventListener("pointermove", onMove as EventListener);
+        listenTarget.removeEventListener("pointerup", onUp);
+        listenTarget.removeEventListener("pointercancel", onUp);
+        listenTarget.removeEventListener("lostpointercapture", onUp);
       };
-      target.addEventListener("pointermove", onMove);
-      target.addEventListener("pointerup", onUp);
-      target.addEventListener("pointercancel", onUp);
-      target.addEventListener("lostpointercapture", onUp);
+      listenTarget.addEventListener("pointermove", onMove as EventListener);
+      listenTarget.addEventListener("pointerup", onUp);
+      listenTarget.addEventListener("pointercancel", onUp);
+      listenTarget.addEventListener("lostpointercapture", onUp);
     },
     // splitterEnabled / splitterNeighbors are cheap derived values; the
     // handler reads them from the closure of the render that bound it.

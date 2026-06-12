@@ -373,6 +373,7 @@ type PersistableSectionAction =
   | AddSectionAction
   | RemoveSectionAction
   | DuplicateSectionAction
+  | EditSectionAction
   | MoveSectionResourceAction
   | AddSectionResourceAction
   | RemoveSectionResourceAction;
@@ -2247,16 +2248,22 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       patch: Partial<LessonSectionContent>,
       coalesce?: { key: string; ts: number },
     ) => {
-      dispatchRef.current({
+      const action: EditSectionAction = {
         type: "editSection",
         lessonId,
         sectionId,
         patch,
         coalesceKey: coalesce?.key ?? `section:${lessonId}:${sectionId}:patch`,
         coalesceTs: coalesce?.ts ?? Date.now(),
-      });
+      };
+      dispatchRef.current(action);
+      // Persist via the full current-section-list replace, like every other
+      // section mutation. Call sites commit ONE-SHOT (body on blur, rename /
+      // minutes on Enter, status per tap) — the coalesce key batches UNDO
+      // history, not writes, so this does not flood the RPC.
+      persistSectionAction(action);
     },
-    [],
+    [persistSectionAction],
   );
 
   const addSection = useCallback(

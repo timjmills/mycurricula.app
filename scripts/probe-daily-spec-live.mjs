@@ -103,23 +103,19 @@ await step("[ / ] shortcuts", async () => {
   await page.waitForTimeout(450);
   log((await collapsed("right")) === r0, `"]" toggles right column back`);
 
-  // Guard: focused inside an editable field, [ must NOT toggle.
-  const minInput = page
-    .locator('input[aria-label^="Phase length in minutes"]')
-    .first();
-  if ((await minInput.count()) > 0) {
-    await minInput.click();
-    const lBefore = await collapsed("left");
-    await page.keyboard.press("[");
-    await page.waitForTimeout(350);
-    log(
-      (await collapsed("left")) === lBefore,
-      `"[" ignored while typing in an input`,
-    );
-    await page.keyboard.press("Escape");
-  } else {
-    log(false, "minutes input found for the shortcut-guard check");
-  }
+  // Guard: focused inside an editable field, [ must NOT toggle. (A rich-text
+  // body is always present; the minutes INPUT only exists mid-edit.)
+  const editor = page.locator('[contenteditable="true"]').first();
+  await editor.click();
+  const lBefore = await collapsed("left");
+  await page.keyboard.press("[");
+  await page.waitForTimeout(350);
+  log(
+    (await collapsed("left")) === lBefore,
+    `"[" ignored while typing in an editor`,
+  );
+  await page.keyboard.press("Backspace");
+  await page.locator("body").click({ position: { x: 5, y: 400 } });
 });
 
 // ── 2. Splitters ────────────────────────────────────────────────────────────
@@ -198,11 +194,10 @@ await step("rail collapse/expand + badges", async () => {
     .catch(() => []);
   info(`rail badge contents: ${JSON.stringify(badgeText)}`);
 
-  const todoIcon = icons.filter({ hasText: /^$/ }).first(); // icons are svg-only
-  const todoByLabel = slot("right")
-    .locator('button[aria-label*="o-do"], button[aria-label*="To-do"]')
+  // ":visible" matters — hidden in-panel buttons share the "Open " prefix.
+  const target = slot("right")
+    .locator('button[aria-label^="Open To-do"]:visible')
     .first();
-  const target = (await todoByLabel.count()) ? todoByLabel : todoIcon;
   await target.click();
   await page.waitForTimeout(500);
   log(
@@ -246,12 +241,15 @@ await step("re-open lesson", async () => {
 });
 
 // ── 6. Phase rename + minutes edit reflected in navigator ──────────────────
+// (Hover-revealed controls; the corrected mechanics — double-click the title,
+// click the "Planned length" chip to open the input — live in
+// probe-daily-spec-live2.mjs steps B + C, which cover these behaviors.)
 await step("phase rename + minutes", async () => {
-  const rename = page
-    .locator('[data-flow-section] [aria-label^="Rename phase:"]')
-    .first();
-  log((await rename.count()) >= 1, "phase rename control exists");
-  await rename.click();
+  const phase = page.locator("[data-flow-section]").first();
+  await phase.hover();
+  const title = phase.locator("[data-flow-title], h3, h4").first();
+  await title.dblclick();
+  await page.waitForTimeout(300);
   await page.keyboard.press("Control+a");
   await page.keyboard.type("Probe Renamed Phase");
   await page.keyboard.press("Enter");
@@ -264,10 +262,12 @@ await step("phase rename + minutes", async () => {
     "rename reflects in the agenda navigator",
   );
 
-  const minInput = page
+  await phase.hover();
+  await phase.locator('[aria-label^="Planned length:"]').first().click();
+  const minInput = phase
     .locator('input[aria-label^="Phase length in minutes"]')
     .first();
-  await minInput.click();
+  await minInput.waitFor({ state: "visible", timeout: 5000 });
   await page.keyboard.press("Control+a");
   await page.keyboard.type("25");
   await page.keyboard.press("Enter");
@@ -305,10 +305,14 @@ await step("agenda text layout", async () => {
   );
 
   // Clear minutes → time line must disappear entirely (no dangling "·").
-  const minInput = page
+  // Open the input via the "Planned length" chip (hover-revealed flow).
+  const phase = page.locator("[data-flow-section]").first();
+  await phase.hover();
+  await phase.locator('[aria-label^="Planned length:"]').first().click();
+  const minInput = phase
     .locator('input[aria-label^="Phase length in minutes"]')
     .first();
-  await minInput.click();
+  await minInput.waitFor({ state: "visible", timeout: 5000 });
   await page.keyboard.press("Control+a");
   await page.keyboard.press("Delete");
   await page.keyboard.press("Enter");
@@ -321,9 +325,10 @@ await step("agenda text layout", async () => {
     !/min|·/.test(itemText.replace(/^[0-9]+/, "")),
     `empty minutes hides the time line (item text: "${itemText.trim().slice(0, 40)}")`,
   );
-  // restore
-  await minInput.click();
-  await page.keyboard.press("Control+a");
+  // restore — minutes is null now, so the way back is the "+ min" ghost.
+  await phase.hover();
+  await phase.locator('button[aria-label^="No planned length"]').click();
+  await minInput.waitFor({ state: "visible", timeout: 5000 });
   await page.keyboard.type("10");
   await page.keyboard.press("Enter");
   await page.waitForTimeout(400);
@@ -415,12 +420,14 @@ await step("templates + undo", async () => {
   const label = (await item.textContent())?.trim();
   await item.click();
   await page.waitForTimeout(700);
-  const toast = page.locator('[role="status"], [class*="toast"]').first();
-  const toastText = (await toast.textContent().catch(() => "")) ?? "";
-  log(
-    /undo/i.test(toastText),
-    `applying template "${label}" shows an Undo toast ("${toastText.trim().slice(0, 60)}")`,
-  );
+  // The Undo BUTTON is the toast's load-bearing affordance (a live clock
+  // also carries role="status", so text-matching the first status node lies).
+  const undoVisible = await page
+    .getByRole("button", { name: /undo/i })
+    .first()
+    .isVisible()
+    .catch(() => false);
+  log(undoVisible, `applying template "${label}" surfaces an Undo affordance`);
   await page.screenshot({ path: path.join(OUT, "template-toast.png") });
   const undo = page.getByRole("button", { name: /undo/i }).first();
   if ((await undo.count()) > 0) {

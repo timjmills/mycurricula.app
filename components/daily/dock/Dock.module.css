@@ -716,6 +716,42 @@
   }
 }
 
+/* ── Touch-tier hit areas (≥44px, CLAUDE.md §4) ──────────────────────────
+   The dock's chrome buttons are visually compact (22–34px); invisible
+   ::after pads grow the touch target without changing the layout. Gated on
+   the BUILD_STANDARD §8 width tier AND coarse pointers. The buttons all
+   create a positioning context here (none carried position before). */
+
+@media (max-width: 900px), (pointer: coarse) {
+  .slotModeBtn,
+  .slotCtrlBtn,
+  .colRailExpand,
+  .colRailIcon {
+    position: relative;
+  }
+
+  /* Vertical pad reaches 44px; horizontal stays tight — these buttons sit
+     2px from their siblings, so a wide pad would swallow the neighbor. */
+  .slotModeBtn::after,
+  .slotCtrlBtn::after {
+    content: "";
+    position: absolute;
+    inset: -11px -4px;
+  }
+
+  .colRailExpand::after {
+    content: "";
+    position: absolute;
+    inset: -7px;
+  }
+
+  .colRailIcon::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+  }
+}
+
 /* ── Reduced motion ──────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
