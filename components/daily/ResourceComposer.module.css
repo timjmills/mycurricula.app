@@ -11,7 +11,7 @@
    Anatomy:
      .scrim         — frosted full-viewport overlay (click-to-dismiss).
      .dialog        — the centered 520px card (phone: full-height sheet).
-     .dlgHead       — mode badge · stepper · 44px close.
+     .dlgHead       — mode badge · stepper · close (≥44px hit area).
      .dlgBody       — scrollable; per mode/step content.
      .dlgFoot       — session badge · cancel/back · primary commit.
 
@@ -174,7 +174,11 @@
   display: none;
 }
 
-/* Close button — 32px visual, hit-inflated to ≥44 (.rn-iconBtn.rn-44). */
+/* Close button — 32px visual on desktop, hit-inflated to ≥44 via ::after.
+   On phone/tablet (≤900px) the box itself grows to 44×44 so the touch
+   target meets WCAG 2.5.5 even when measured by getBoundingClientRect (a
+   pseudo-element doesn't enlarge the element's own box). The glyph stays
+   16px at every tier via `.closeBtn svg` below. */
 .closeBtn {
   margin-left: 0;
   width: 32px;
@@ -188,12 +192,28 @@
 .closeBtn::after {
   content: "";
   position: absolute;
-  inset: -6px;
+  inset: -6px; /* 32 + 12 = ≥44 hit area on desktop pointers */
 }
 
 .closeBtn svg {
   width: 16px;
   height: 16px;
+}
+
+/* Phone + tablet: inflate the element box itself to ≥44×44 (the glyph
+   stays 16px). The Button primitive's own ≤900px ::before only widens the
+   click overlay, not the measured box — this guarantees the probe-measured
+   target is ≥44 on touch tiers.
+   The tripled `.closeBtn` raises specificity to (0,3,0) so it beats the
+   Button primitive's compound `.icon.sm` (0,2,0) width:32px deterministically
+   (cross-file load order can't be relied on) — without resorting to
+   !important. */
+@media (max-width: 900px) {
+  .closeBtn.closeBtn.closeBtn {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
 }
 
 /* In notecard mode there's no stepper — push the close to the right. */

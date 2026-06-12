@@ -270,6 +270,13 @@ export function WeeklyGrid(): ReactNode {
   // visible week IS the current week AND today is a configured school day;
   // a holiday on today suppresses the emphasis entirely (the holiday
   // treatment carries the orientation instead — per the item-03 spec).
+  //
+  // PHASE-1B: `CURRENT_WEEK` is the mock fixture's frozen current week
+  // (lib/mock) — the right source while mock data drives the planner, wrong
+  // once the Supabase flag is ON (the current week must resolve from the
+  // configured academic year's calendar, not a fixture constant). The 1B
+  // wave must swap this comparison to the store's current-week resolution —
+  // the same hydration-aware seam WeeklyShell's initial-link apply documents.
   const schoolWeekTokens = useMemo(
     () => weekdays.map((d) => d.token),
     [weekdays],

@@ -10,7 +10,9 @@
 //
 // Security: only http(s) URLs are accepted; everything else degrades to
 // the link fallback. The renderer never injects HTML — every URL flows
-// through React `src`/`href` props.
+// through React `src`/`href` props, and every rendered `src`/`href` is
+// vetted by `isSafeUrl` (exported below) — the one sink gate shared by
+// the planner surfaces and the Teach board.
 
 import type { LessonResource, ResourceProvider } from "./types";
 
@@ -293,9 +295,35 @@ export type EmbedDenialReason = "no-url" | "unsafe-scheme" | "not-embeddable";
 
 /** Same-origin root-relative path (hosted "/api/resources/{id}" streams).
  *  Rejects protocol-relative ("//host") and backslash tricks ("/\host")
- *  that browsers normalize to a foreign origin — same guard as the
- *  renderer's isSafeUrl in components/resources/ResourceEmbed.tsx. */
+ *  that browsers normalize to a foreign origin — the same arm `isSafeUrl`
+ *  below applies at the render sinks. */
 const ROOT_RELATIVE = /^\/(?![/\\])/;
+
+/** Raw ASCII tab / newline / CR anywhere in a URL. The WHATWG URL parser
+ *  strips these BEFORE parsing, so a legitimate value never carries them
+ *  (they would arrive %09/%0A/%0D-encoded) — they only aid smuggling:
+ *  "/\t/evil" passes a root-relative test, then normalizes to "//evil"
+ *  (a foreign origin) once the browser strips the tab. */
+const SMUGGLE_CHARS = /[\t\n\r]/;
+
+/**
+ * True for http(s), blob:, and same-origin root-relative ("/…") URLs — the
+ * schemes safe to feed into an <iframe>/<img>/<video>/<audio> `src` or an
+ * <a href>. Root-relative is allowed for hosted files served via
+ * /api/resources/{id}; protocol-relative "//host" is rejected (it resolves
+ * to a foreign origin). Blocks javascript:, data:, and other dangerous
+ * schemes regardless of upstream validation.
+ *
+ * This is THE shared sink gate: ResourceEmbed and the Teach board (via
+ * lib/board-embed's `isSafeBoardUrl` re-export) all vet through this one
+ * function, so the rule can never drift per surface.
+ */
+export function isSafeUrl(url: string | null | undefined): url is string {
+  if (!url) return false;
+  if (SMUGGLE_CHARS.test(url)) return false;
+  if (/^(https?|blob):/i.test(url)) return true;
+  return ROOT_RELATIVE.test(url);
+}
 
 /** True when the mime type / provider says the row is directly renderable
  *  media (img / video / audio / pdf viewer) rather than an arbitrary page. */
@@ -323,6 +351,10 @@ function classifyEmbed(resource: LessonResource): EmbedDenialReason | null {
   if (!resource.url) return "no-url";
   const url = resource.url.trim();
   if (!url) return "no-url";
+
+  // Interior tab/newline/CR survives trim() yet is stripped by the browser
+  // pre-parse (see SMUGGLE_CHARS) — never frame it.
+  if (SMUGGLE_CHARS.test(url)) return "unsafe-scheme";
 
   // Hosted rows stream from our own origin ("/api/resources/{id}", with
   // `resourceId` set). parseResourceUrl rejects non-http(s) input, so

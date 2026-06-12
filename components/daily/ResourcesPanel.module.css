@@ -62,6 +62,13 @@
   font-weight: 700;
   color: var(--ink);
   white-space: nowrap;
+  /* §UXR — let the title yield in the flex header so the (now ≥44px on
+     touch) icon buttons never force the row wider than the 320px drawer; it
+     ellipsis-truncates instead of hard-clipping mid-word. No effect on
+     desktop where the title fits. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Count chip (rn-countChip) — the FULL deduped count, stable across tabs. */
@@ -116,6 +123,24 @@
   content: "";
   position: absolute;
   inset: -6px;
+}
+
+/* §UXR — touch tiers: the ::after above (and the Button primitive's own
+   ::before) inflate the TAP area but a getBoundingClientRect() audit only
+   sees the Button's 32px box, so the add "+" / back / collapse / close
+   controls measured under 44px. Grow the real box to ≥44×44 on phone/tablet
+   (the 16px glyph stays centred via the Button's flex). At ≤900px the panel
+   only ever renders inside the 320px overflow drawer, where the header title
+   truncates (flex-shrink) so the wider buttons never force document scroll. */
+@media (max-width: 900px) {
+  .iconBtn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .iconBtn::after {
+    content: none;
+  }
 }
 
 /* Drag grip — rail-supplied reorder activator. Same 32px chrome. */
@@ -260,6 +285,26 @@
   content: "";
   position: absolute;
   inset: -7px 0;
+}
+
+/* §UXR — touch tiers (phone 360–480 + tablet 600–900): the `::after`
+   inflation above does give a 44px-tall TAP region, but it is invisible to a
+   getBoundingClientRect()-based audit AND it never widens the pill past its
+   ~25px text box. Grow the pill's OWN border-box to a real ≥44px target so
+   the tap area is honest in both senses. The label glyph stays its small
+   t-12 self; only the box around it grows. The .tabs row already scrolls
+   internally (overflow-x:auto) so the wider pills never force document
+   scroll, and the tabs sit on one row with their own gap so growth doesn't
+   overlap neighbours. */
+@media (max-width: 900px) {
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 6px 14px;
+  }
 }
 
 .tab:hover {
@@ -650,6 +695,22 @@
   inset: -9px;
 }
 
+/* §UXR — touch tiers: grow the trigger's OWN border-box to a real 44×44 so
+   the audit (and a fingertip) see a full target, not the 26px glyph box plus
+   an invisible pseudo. The glyph stays 14px (place-items:center keeps it
+   centred); the `::after` is dropped here so the box isn't double-inflated
+   into neighbouring tiles. */
+@media (max-width: 900px) {
+  .tileMore {
+    width: 44px;
+    height: 44px;
+  }
+
+  .tileMore::after {
+    content: none;
+  }
+}
+
 /* Touch devices have no hover — secondary controls stay visible. */
 @media (hover: none) {
   .tileMore {
@@ -864,6 +925,20 @@
   inset: -9px;
 }
 
+/* §UXR — touch tiers: grow the row's ⋯ trigger to a real 44×44 box (the row
+   is already min-height:44px, so it fits exactly) and drop the pseudo so the
+   target isn't double-counted. Glyph stays 14px and centred. */
+@media (max-width: 900px) {
+  .rowMore {
+    width: 44px;
+    height: 44px;
+  }
+
+  .rowMore::after {
+    content: none;
+  }
+}
+
 @media (hover: none) {
   .rowMore {
     opacity: 1;
@@ -896,8 +971,13 @@
      area" slot the spec names, without touching the top bar itself. */
   top: 60px;
   right: 12px;
-  width: 36px;
-  height: 36px;
+  /* §UXR — a real 44×44 box. The trigger only ever renders on narrow
+     viewports (≤960px, where the inline rail is hidden), i.e. always a touch
+     context, so it carries the full target at all times rather than relying
+     on the formerly-invisible ::after inflation (audit measured the 36px
+     box). The 16px glyph stays centred via place-items. */
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: var(--r-sm);
@@ -924,12 +1004,6 @@
   outline-offset: 2px;
 }
 
-.drawerTrigger::after {
-  content: "";
-  position: absolute;
-  inset: -4px;
-}
-
 /* §4a Low 6 — Team-Curriculum ("master") mode: the sticky MasterBanner sits
    above the top bar in flow and pushes it down, so the fixed trigger's usual
    60px top would land ON the bar. The banner publishes no height variable
@@ -946,6 +1020,17 @@
   inset: 0;
   background: color-mix(in srgb, var(--ink) 32%, transparent);
   z-index: var(--z-drawer);
+}
+
+/* §UXR FIX 3 — while the inner panel's composer sheet is open, take the
+   slide-in drawer (scrim + panel) fully out of view + hit-testing so the
+   composer — which portals to <body> at the same z-band (--z-drawer /
+   --z-drawer-panel) — is never occluded by the right-docked drawer at
+   ≤960px. display:none (not unmount) keeps the ResourcesPanel, and thus the
+   composer it renders, alive; closing the composer reveals the drawer again
+   with its slide-in replayed. */
+.drawerHidden {
+  display: none;
 }
 
 .drawerPanel {

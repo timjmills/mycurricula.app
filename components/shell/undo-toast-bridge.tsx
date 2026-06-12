@@ -20,7 +20,12 @@
 //     gesture's own message. Suppressed outside Personal mode as
 //     defense-in-depth (the reducer's transition detection only fires from
 //     Personal-mode flows anyway).
-//   • restoreLesson — "Restored the team's version".
+//   • restoreLesson — honest copy (FIX 1): "Restored the team's version" when
+//     the affected lesson carries a masterSnapshot (a real content restore),
+//     else "Cleared your personal-edit markers" (flags-only). The decision
+//     reads the snapshot off the POST-action lesson passed below — the store's
+//     restoreLesson reducer resets only modified/moved/isPersonal and never
+//     strips masterSnapshot, so the post-action lesson still carries it.
 // Undo for all of these dispatches the store's existing `undo` — the same
 // single history step the top bar would revert.
 //
@@ -149,6 +154,9 @@ export function UndoToastBridge(): null {
       // from Personal-mode flows, but never educate about forking while the
       // viewer is deliberately editing the Team Curriculum.
       firstFork: lastChange.firstFork === true && editMode === "personal",
+      // The post-action lesson from the CURRENT array. For restoreLesson it
+      // still carries `masterSnapshot` (the reducer never strips it on
+      // restore), so the honest-copy decision (FIX 1) reads it correctly.
       lesson,
       prevLesson,
       isCopy,

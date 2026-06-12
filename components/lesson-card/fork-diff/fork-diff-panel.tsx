@@ -39,12 +39,15 @@
 //     it stays personal. editLesson never toasts BY DESIGN (the undo-toast
 //     matrix excludes edit bursts), so per-field revert relies on ⌘Z / the
 //     top-bar undo for its way back; we deliberately add no new toast kinds.
-//   • Per-field SCHEDULING revert goes through moveLesson (M4) — NOT a bare
-//     editLesson day/week patch: editLesson's persist tee forwards only the
-//     content fields LessonPatch accepts, so a bare patch would move the
-//     lesson locally yet silently never persist, and it would bypass
-//     moveLesson's CellLayout pruning. The follow-up editLesson clears
-//     `moved` (two dispatches → two ⌘Z steps; documented at the callsite).
+//   • Per-field SCHEDULING revert goes through the store's revertPlacement
+//     verb (M4 / FIX 4) — NOT a bare editLesson day/week patch: editLesson's
+//     persist tee forwards only the content fields LessonPatch accepts, so a
+//     bare patch would move the lesson locally yet silently never persist,
+//     and it would bypass the move reducer's CellLayout pruning.
+//     revertPlacement applies the move AND clears `moved` in ONE reducer pass
+//     (and tees persist the same way moveLesson does), so it is a SINGLE
+//     undoable step — one ⌘Z, matching the per-field tooltip's singular
+//     "Undo with ⌘Z" (documented at the callsite).
 //   • Per-field revert leaves `modified` set: the snapshot is PARTIAL
 //     (directions, notes, resources, and tasks are not captured), so "every
 //     field now matches the master" cannot be proven cheaply — and under
@@ -78,7 +81,8 @@ export interface ForkDiffPanelProps {
 }
 
 export function ForkDiffPanel({ lesson, onClose }: ForkDiffPanelProps) {
-  const { editLesson, moveLesson, restoreLesson, getSections } = usePlanner();
+  const { editLesson, revertPlacement, restoreLesson, getSections } =
+    usePlanner();
   const { editMode, setEditMode } = useAppState();
 
   // Weekday names resolve through the CONFIGURED school week — injected
@@ -146,28 +150,25 @@ export function ForkDiffPanel({ lesson, onClose }: ForkDiffPanelProps) {
         editLesson(lesson.id, { standards: [...snapshot.standards] }, coalesce);
         break;
       case "scheduling":
-        // (M4) Placement goes down the store's MOVE path, never a bare
-        // editLesson day/week patch: editLesson's persist tee
-        // (planner-store ~"updateLesson" note) forwards only the content
-        // fields the source's LessonPatch accepts — a bare patch would move
-        // the lesson locally yet silently never persist, and would skip
-        // moveLesson's CellLayout pruning. moveLesson is the store's plain
-        // move verb AND tees persist("moveLesson") with the resolved slot;
-        // relocateLesson(id, target, false) runs the same reducer but is
-        // not teed, so moveLesson it is. We do NOT dispatch the
-        // snapshot-aware restoreLesson here — it would also revert CONTENT,
-        // and a scheduling-only revert must keep the teacher's text edits.
+        // (M4 / FIX 4) Placement goes down the store's dedicated
+        // revertPlacement verb — never a bare editLesson day/week patch:
+        // editLesson's persist tee forwards only the content fields the
+        // source's LessonPatch accepts, so a bare patch would move the lesson
+        // locally yet silently never persist, and would skip the CellLayout
+        // pruning. revertPlacement applies the move (reusing the moveLesson
+        // reducer for that pruning) AND clears `moved` in ONE reducer pass,
+        // and tees persist("moveLesson") with the resolved slot exactly like
+        // moveLesson — so this is a SINGLE undoable history step (one ⌘Z),
+        // matching the per-field tooltip's singular "Undo with ⌘Z". We do NOT
+        // dispatch the snapshot-aware restoreLesson here — it would also revert
+        // CONTENT, and a scheduling-only revert must keep the teacher's text
+        // edits (`modified` stays as-is; see header).
         //
         // Placement reconvergence IS cheaply provable (the snapshot fully
-        // captures day+week), so the follow-up edit clears `moved` — the
-        // move-arrow / stripe state resets immediately; `modified` stays
-        // as-is (see header). `moved` is not a LessonPatch field, so its
-        // tee is dropped by the source (flag-only, reducer-local). Cost:
-        // two dispatches → two ⌘Z steps for this one gesture — accepted
-        // for the prototype; a dedicated "revertPlacement" action would be
-        // store-surface growth the Phase 1B lineage work obsoletes.
-        moveLesson(lesson.id, { day: snapshot.day, week: snapshot.week });
-        editLesson(lesson.id, { moved: null }, coalesce);
+        // captures day+week), so clearing `moved` resets the move-arrow /
+        // stripe immediately. `moved` is reducer-local (not a LessonMoveTarget
+        // field), so it is intentionally never persisted.
+        revertPlacement(lesson.id, { day: snapshot.day, week: snapshot.week });
         break;
       case "sections":
         // Lesson-flow sections live in the store's sections record, not on

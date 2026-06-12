@@ -3,10 +3,10 @@
 // components/resources/ResourceEmbed.tsx
 //
 // The single kind-switched renderer for every resource. Used by:
-//   • components/lesson-flow/resource-tile.tsx       (section thumbnails)
-//   • components/lesson-flow/section-resources.tsx   (primary 2x2 + lists)
 //   • components/subject/ResourcesSort.tsx           (all-resources table)
-//   • components/daily/ResourceComposer.tsx          (capture-strip preview)
+//   • components/notecards/Gallery.tsx               (gallery flip-through item)
+// Its `ResourceLinkCard` + `effectiveProvider` exports are also reused by the
+// sibling ResourcePreview enlarge modal so the fallback looks identical there.
 //
 // The component does NOT call /api/og-preview itself — OG enrichment
 // happens once at link-creation time on the server (the POST /api/resources
@@ -14,14 +14,17 @@
 // preview_title/_description/_thumbnail_url already set.
 //
 // Caller contract: pass `resource.url`. When the URL is absent, this
-// component renders a hidden marker — that's how the section-resources /
-// resource-tile callers keep their legacy synthetic-glyph branches working.
+// component renders a hidden marker so a mis-call is visible in dev.
 //
-// EMBED AUTHORITY (6.12.26 redesign P5): the iframe-vs-fallback decision is
-// routed through `canEmbedResource()` in lib/resource-embed — the SINGLE
-// predicate shared with ResourcePreview. When it says no, the designed
-// link card (`ResourceLinkCard`, the §5 `.rn-linkCard` recipe) renders
-// instead — never a blank refused-to-connect iframe, never a raw URL dump.
+// EMBED AUTHORITY (6.12.26 redesign P5): this component is the SINGLE
+// authority for what every resource renders as. The iframe-vs-fallback
+// decision is routed through `canEmbedResource()` in lib/resource-embed —
+// the SAME predicate ResourcePreview consults — and every media src
+// (iframe / img / video / audio) is re-vetted through `isSafeUrl` at the
+// sink. When the predicate says no, or a URL is unsafe, the designed link
+// card (`ResourceLinkCard`, the §5 `.rn-linkCard` recipe) renders instead —
+// never a blank refused-to-connect iframe, never a raw URL dump, never an
+// ungated media element.
 
 import type { ReactNode, MouseEvent } from "react";
 import { useState } from "react";
@@ -29,6 +32,7 @@ import type { LessonResource, ResourceProvider } from "@/lib/types";
 import {
   canEmbedResource,
   embedDenialReason,
+  isSafeUrl,
   parseResourceUrl,
 } from "@/lib/resource-embed";
 import { ImageLightbox } from "./ImageLightbox";
@@ -82,9 +86,9 @@ export function ResourceEmbed({
         <ImageEmbed resource={resource} variant={variant} onClick={onClick} />
       );
     case "video":
-      return <VideoEmbed resource={resource} />;
+      return <VideoEmbed resource={resource} variant={variant} />;
     case "audio":
-      return <AudioEmbed resource={resource} />;
+      return <AudioEmbed resource={resource} variant={variant} />;
     case "website":
     default:
       // Teacher-chosen inline text renderings of a plain link keep working —
@@ -216,7 +220,21 @@ function ImageEmbed({
 
 // ── Native video / audio ──────────────────────────────────────────────────
 
-function VideoEmbed({ resource }: { resource: LessonResource }): ReactNode {
+function VideoEmbed({
+  resource,
+  variant,
+}: {
+  resource: LessonResource;
+  variant: "tile" | "row" | "card";
+}): ReactNode {
+  // §4a review — gate the <video> src through the same isSafeUrl the
+  // iframe/image/link branches use. A provider-spoofed or imported row can
+  // carry a protocol-relative ("//host/x.mp4"), data:, or javascript: URL;
+  // an unsafe src never mounts a media element — the row falls through to
+  // the designed link card (whose own href/thumb gates re-vet what it draws).
+  if (!isSafeUrl(resource.url)) {
+    return <ResourceLinkCard resource={resource} variant={variant} />;
+  }
   return (
     <div className={styles.aspect}>
       <video
@@ -230,7 +248,18 @@ function VideoEmbed({ resource }: { resource: LessonResource }): ReactNode {
   );
 }
 
-function AudioEmbed({ resource }: { resource: LessonResource }): ReactNode {
+function AudioEmbed({
+  resource,
+  variant,
+}: {
+  resource: LessonResource;
+  variant: "tile" | "row" | "card";
+}): ReactNode {
+  // §4a review — same isSafeUrl gate as VideoEmbed: an unsafe scheme never
+  // reaches an <audio src>; the row demotes to the designed link card.
+  if (!isSafeUrl(resource.url)) {
+    return <ResourceLinkCard resource={resource} variant={variant} />;
+  }
   return (
     <audio
       src={resource.url}
@@ -382,19 +411,9 @@ export function ResourceLinkCard({
   return <span className={className}>{body}</span>;
 }
 
-/** True for http(s), blob:, and same-origin root-relative ("/…") URLs — the
- *  schemes safe to feed into an <iframe> src or an <a href>. Root-relative is
- *  allowed for hosted files served via /api/resources/{id}; protocol-relative
- *  "//host" is rejected (it resolves to a foreign origin). Blocks javascript:,
- *  data:, and other dangerous schemes regardless of upstream validation. */
-function isSafeUrl(url: string | undefined): url is string {
-  if (!url) return false;
-  if (/^(https?|blob):/i.test(url)) return true;
-  // Same-origin root-relative path (e.g. /api/resources/{id}). Reject
-  // protocol-relative ("//host") and backslash tricks ("/\host") that
-  // browsers normalize to a foreign origin.
-  return /^\/(?![/\\])/.test(url);
-}
+// `isSafeUrl` lives in lib/resource-embed (the authority module) so every
+// sink — this renderer and the Teach board alike — vets through the ONE
+// implementation, including its raw tab/newline/CR smuggling rejection.
 
 function safeHost(url: string | undefined): string {
   if (!url) return "";

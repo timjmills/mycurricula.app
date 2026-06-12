@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 
 import { canEmbedResource, embedDenialReason } from "@/lib/resource-embed";
+import { boardCanEmbed, isSafeBoardUrl } from "@/lib/board-embed";
+import { toTeachResource } from "@/lib/teach/toTeachResource";
 import type { LessonResource } from "@/lib/types";
 
 // Tests for the single embed authority (6.12.26 redesign P5):
@@ -182,5 +184,123 @@ describe("canEmbedResource — fail-closed edges", () => {
     });
     expect(canEmbedResource(r)).toBe(false);
     expect(embedDenialReason(r)).toBe("unsafe-scheme");
+  });
+});
+
+describe("canEmbedResource — provider-spoofed native video/audio rows", () => {
+  // FIX 1 parity: VideoEmbed/AudioEmbed gate their <video>/<audio src> through
+  // isSafeUrl, so a crafted/imported row that CLAIMS provider:"video"/"audio"
+  // but carries a dangerous scheme must be judged non-embeddable here too (the
+  // scheme check fires before the media-kind/parse path, so the verdict is
+  // "unsafe-scheme", never embeddable).
+  it("does NOT embed a provider:video row with a data: url", () => {
+    const r = res({
+      type: "youtube",
+      provider: "video",
+      url: "data:video/mp4;base64,AAAA",
+    });
+    expect(canEmbedResource(r)).toBe(false);
+    expect(embedDenialReason(r)).toBe("unsafe-scheme");
+  });
+
+  it("does NOT embed a provider:video row with a protocol-relative url", () => {
+    const r = res({ provider: "video", url: "//evil.example/x.mp4" });
+    expect(canEmbedResource(r)).toBe(false);
+    expect(embedDenialReason(r)).toBe("unsafe-scheme");
+  });
+
+  it("does NOT embed a provider:audio row with a javascript: url", () => {
+    const r = res({ provider: "audio", url: "javascript:alert(1)" });
+    expect(canEmbedResource(r)).toBe(false);
+    expect(embedDenialReason(r)).toBe("unsafe-scheme");
+  });
+
+  it("does NOT embed a provider:audio row with a data: url", () => {
+    const r = res({
+      provider: "audio",
+      url: "data:audio/mpeg;base64,AAAA",
+    });
+    expect(canEmbedResource(r)).toBe(false);
+    expect(embedDenialReason(r)).toBe("unsafe-scheme");
+  });
+
+  it("still embeds a safe https direct-media video/audio row", () => {
+    expect(
+      canEmbedResource(res({ provider: "video", url: "https://cdn.x/a.mp4" })),
+    ).toBe(true);
+    expect(
+      canEmbedResource(res({ provider: "audio", url: "https://cdn.x/a.mp3" })),
+    ).toBe(true);
+  });
+});
+
+describe("isSafeBoardUrl — board scheme gate (parity with ResourceEmbed)", () => {
+  it("allows http(s), blob:, and same-origin root-relative", () => {
+    expect(isSafeBoardUrl("https://x.com/a.png")).toBe(true);
+    expect(isSafeBoardUrl("http://x.com/a.png")).toBe(true);
+    expect(isSafeBoardUrl("blob:https://app/abc")).toBe(true);
+    expect(isSafeBoardUrl("/api/resources/r-1")).toBe(true);
+  });
+
+  it("rejects protocol-relative, backslash tricks, and script schemes", () => {
+    expect(isSafeBoardUrl("//evil.example/x")).toBe(false);
+    expect(isSafeBoardUrl("/\\evil.example/x")).toBe(false);
+    expect(isSafeBoardUrl("javascript:alert(1)")).toBe(false);
+    expect(isSafeBoardUrl("data:text/html,<script>x</script>")).toBe(false);
+    expect(isSafeBoardUrl(undefined)).toBe(false);
+    expect(isSafeBoardUrl(null)).toBe(false);
+  });
+});
+
+describe("boardCanEmbed — single-authority parity on the board path", () => {
+  // FIX 2: boardCanEmbed now defers to canEmbedResource (re-keyed onto the
+  // resolved board src), so notecards and unsafe-scheme rows that the old
+  // `parsed?.canEmbed` check let through are correctly rejected on the board.
+  // parsed/kind are no longer consulted for the verdict — pass null/"link".
+  const board = (overrides: Partial<LessonResource>) =>
+    toTeachResource(res(overrides));
+
+  it("does NOT embed a notecard on the board (gallery container, not a frame)", () => {
+    const note = board({
+      type: "notecard",
+      label: "Notes",
+      gallery: [res({ type: "image", url: "https://a.com/x.png" })],
+    });
+    expect(boardCanEmbed(note, null, "link")).toBe(false);
+  });
+
+  it("does NOT embed an unsafe-scheme row on the board", () => {
+    const protoRel = board({ provider: "video", url: "//evil/x.mp4" });
+    expect(boardCanEmbed(protoRel, null, "video")).toBe(false);
+    const scriptPdf = board({
+      type: "pdf",
+      url: "javascript:alert(1)",
+      mimeType: "application/pdf",
+    });
+    expect(boardCanEmbed(scriptPdf, null, "pdf")).toBe(false);
+  });
+
+  it("does NOT embed a bare website link on the board", () => {
+    const link = board({ url: "https://example.com/article" });
+    expect(boardCanEmbed(link, null, "link")).toBe(false);
+  });
+
+  it("embeds a trusted-provider / direct-media row on the board", () => {
+    const yt = board({ url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" });
+    expect(boardCanEmbed(yt, null, "embed")).toBe(true);
+    const img = board({ url: "https://cdn.example.com/photo.jpg" });
+    expect(boardCanEmbed(img, null, "image")).toBe(true);
+  });
+
+  it("embeds a hosted (resourceId-only) media file via the resolved /api/resources src", () => {
+    // No top-level url — resolveBoardSrc yields "/api/resources/{id}", which
+    // canEmbedResource approves via its ROOT_RELATIVE + media-kind path.
+    const hosted = board({
+      type: "pdf",
+      resourceId: "r-pdf",
+      mimeType: "application/pdf",
+    });
+    expect(hosted.url).toBeUndefined();
+    expect(boardCanEmbed(hosted, null, "pdf")).toBe(true);
   });
 });

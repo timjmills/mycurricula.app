@@ -106,6 +106,28 @@ describe("daily links — build → parse round trip", () => {
     ).toBeNull();
   });
 
+  it("rejects calendar-impossible dates (right shape, no such day)", () => {
+    // Shape-valid but impossible — these must degrade to "right view,
+    // default focus", never hand the views an unconstructable date.
+    expect(parseDailyParams(new URLSearchParams("date=2026-02-31"))).toBeNull();
+    expect(parseDailyParams(new URLSearchParams("date=2026-04-31"))).toBeNull();
+    // 2026 is not a leap year…
+    expect(parseDailyParams(new URLSearchParams("date=2026-02-29"))).toBeNull();
+    expect(parseDailyParams(new URLSearchParams("date=2026-13-01"))).toBeNull();
+    expect(parseDailyParams(new URLSearchParams("date=2026-00-10"))).toBeNull();
+    // …while real edge days still parse.
+    expect(parseDailyParams(new URLSearchParams("date=2028-02-29"))).toEqual({
+      date: "2028-02-29",
+    });
+    expect(parseDailyParams(new URLSearchParams("date=2026-12-31"))).toEqual({
+      date: "2026-12-31",
+    });
+  });
+
+  it("buildDailyLink throws on a calendar-impossible date", () => {
+    expect(() => buildDailyLink({ date: "2026-02-30" })).toThrow();
+  });
+
   it("keeps the date when an optional field is empty (dropped, not fatal)", () => {
     const parsed = parseDailyParams(
       new URLSearchParams("date=2026-09-14&lesson="),

@@ -18,7 +18,12 @@
 //   • first-time fork — the educational copy (FIRST_FORK_MESSAGE). It WINS
 //     over the gesture's own message: the moment a lesson lazily forks is the
 //     moment the forking model explains itself (sticky-note brief).
-//   • restoreLesson (revert/unfork) — "Restored the team's version"
+//   • restoreLesson (revert/unfork) — HONEST about what was undone (FIX 1):
+//       "Restored the team's version" when the lesson carried a masterSnapshot
+//       (a real CONTENT restore happened — the captured title/objective/etc.
+//       and placement came back), else "Cleared your personal-edit markers"
+//       (snapshot-less: only the fork flags were reset, the teacher's content
+//       is untouched — the toast must not claim a restore it didn't perform).
 //   • everything else — null. Text-edit bursts (editLesson / editSection),
 //     section/resource plumbing, undo/redo/hydrate and catalog/hydration
 //     side-channels NEVER toast. The single exception: an editLesson that
@@ -36,8 +41,15 @@ import type { Lesson, LessonStatus } from "@/lib/types";
 export const FIRST_FORK_MESSAGE =
   "Saved to your personal plan — the team's version is untouched";
 
-/** Revert/unfork confirmation (restoreLesson). */
+/** Revert/unfork confirmation (restoreLesson) — a REAL content restore: the
+ *  lesson carried a master snapshot, so the captured fields + placement came
+ *  back. */
 export const RESTORE_MESSAGE = "Restored the team's version";
+
+/** Snapshot-less restore (restoreLesson) — only the fork markers were cleared;
+ *  no captured content existed to restore, so the teacher's edits stay put.
+ *  The honest copy keeps the toast from over-promising a content revert. */
+export const RESTORE_FLAGS_MESSAGE = "Cleared your personal-edit markers";
 
 /** Completion-toggle copy, keyed by the lesson's NEW status. */
 const STATUS_MESSAGE: Readonly<Record<LessonStatus, string>> = {
@@ -121,8 +133,13 @@ export function isBulkHistoryAdvance(
 
 // ── Message decision ───────────────────────────────────────────────────────
 
-/** The lesson fields the message decision reads (AFTER the action). */
-type LessonAfter = Pick<Lesson, "day" | "week" | "subject" | "status">;
+/** The lesson fields the message decision reads (AFTER the action).
+ *  `masterSnapshot` is optional and read ONLY by the restoreLesson branch:
+ *  its presence is what distinguishes a real content restore (RESTORE_MESSAGE)
+ *  from a flags-only clear (RESTORE_FLAGS_MESSAGE) — see undoToastMessage. */
+type LessonAfter = Pick<Lesson, "day" | "week" | "subject" | "status"> & {
+  masterSnapshot?: Lesson["masterSnapshot"];
+};
 
 /** The same lesson's placement BEFORE the action. */
 type LessonBefore = Pick<Lesson, "day" | "week" | "subject">;
@@ -164,7 +181,15 @@ export function undoToastMessage(input: UndoToastDecisionInput): string | null {
   // editLesson burst produces a toast.
   if (firstFork) return FIRST_FORK_MESSAGE;
 
-  if (kind === "restoreLesson") return RESTORE_MESSAGE;
+  if (kind === "restoreLesson") {
+    // Honest copy (FIX 1): only claim a content restore when one actually
+    // happened. The store's restoreLesson reducer writes the captured fields
+    // back ONLY when the lesson carries a masterSnapshot; otherwise it clears
+    // the fork flags alone (content untouched). Read the snapshot off the
+    // post-action lesson the bridge passes — the reducer never strips it on
+    // restore, so it is still present here when it was present before.
+    return lesson?.masterSnapshot ? RESTORE_MESSAGE : RESTORE_FLAGS_MESSAGE;
+  }
 
   if (kind === "setLessonStatus") {
     return lesson ? STATUS_MESSAGE[lesson.status] : null;

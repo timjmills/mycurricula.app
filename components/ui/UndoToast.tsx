@@ -66,6 +66,12 @@ export function UndoToast({
   const pausedRef = useRef(false);
   const dismissingRef = useRef(false);
   const reducedMotionRef = useRef(false);
+  // Hover and keyboard-focus are tracked INDEPENDENTLY (FIX 3): the timer may
+  // only re-arm when BOTH are false. Otherwise a pointer leaving while the
+  // Undo button still has focus would re-arm and auto-dismiss the toast out
+  // from under the keyboard user — stealing focus mid-interaction.
+  const hoverRef = useRef(false);
+  const focusRef = useRef(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -124,6 +130,38 @@ export function UndoToast({
     );
   }, []);
 
+  // Re-arm ONLY when neither the pointer is over the toast nor focus is inside
+  // it (FIX 3). A pointer-leave while the Undo button still holds focus must
+  // keep the toast alive — re-arming there would dismiss it mid-keyboard-use.
+  const maybeRearm = useCallback(() => {
+    if (hoverRef.current || focusRef.current) return;
+    armTimer();
+  }, [armTimer]);
+
+  const handlePointerEnter = useCallback(() => {
+    hoverRef.current = true;
+    pauseTimer();
+  }, [pauseTimer]);
+
+  const handlePointerLeave = useCallback(() => {
+    hoverRef.current = false;
+    maybeRearm();
+  }, [maybeRearm]);
+
+  // focusin/focusout bubble, so a single handler on the root tracks focus
+  // ANYWHERE inside the toast (message span or the Undo button) — true
+  // focus-within semantics without a CSS-only :focus-within (which can't
+  // gate a JS timer).
+  const handleFocusIn = useCallback(() => {
+    focusRef.current = true;
+    pauseTimer();
+  }, [pauseTimer]);
+
+  const handleFocusOut = useCallback(() => {
+    focusRef.current = false;
+    maybeRearm();
+  }, [maybeRearm]);
+
   useEffect(() => {
     const frame = requestAnimationFrame(() => setVisible(true));
     armTimer();
@@ -143,11 +181,12 @@ export function UndoToast({
     handleDismiss();
   }, [handleDismiss]);
 
-  const slideTransform = reducedMotion
-    ? "none"
-    : visible
-      ? "translateY(0)"
-      : "translateY(20px)";
+  // Horizontal centering is constant; vertical slide is the only animated
+  // axis. Under reduced motion we append NOTHING after translateX(-50%) — a
+  // bare "none" suffix would yield the invalid `translateX(-50%) none` and the
+  // browser would drop the whole transform, un-centering / clipping the toast.
+  const slideY = reducedMotion ? "" : visible ? "translateY(0)" : "translateY(20px)";
+  const transform = `translateX(-50%)${slideY ? ` ${slideY}` : ""}`;
   const transition = reducedMotion
     ? "opacity 150ms ease"
     : "opacity 220ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1)";
@@ -159,15 +198,21 @@ export function UndoToast({
       aria-atomic="true"
       className={styles.toast}
       style={{
-        transform: `translateX(-50%) ${slideTransform}`,
+        transform,
         opacity: visible ? 1 : 0,
         transition,
         pointerEvents: visible ? "auto" : "none",
       }}
-      onMouseEnter={pauseTimer}
-      onMouseLeave={armTimer}
-      onFocus={pauseTimer}
-      onBlur={armTimer}
+      // Hover and focus are tracked separately; the timer re-arms only when
+      // BOTH are clear (FIX 3). React's onFocus/onBlur bubble (focusin/
+      // focusout), so they fire for focus entering/leaving the message span
+      // or the Undo button — true focus-within without losing the JS timer
+      // gate. A focus hop between two children fires onBlur then onFocus
+      // synchronously, so the brief maybeRearm is immediately re-paused.
+      onMouseEnter={handlePointerEnter}
+      onMouseLeave={handlePointerLeave}
+      onFocus={handleFocusIn}
+      onBlur={handleFocusOut}
     >
       <span className={styles.message}>{message}</span>
       {onUndo && (

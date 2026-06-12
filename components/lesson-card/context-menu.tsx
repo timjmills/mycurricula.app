@@ -277,8 +277,17 @@ export function LessonContextMenu({
       // a personal overlay exists; "Copy to personal" is only relevant when
       // there is no overlay yet. The audit rule: never grey out, fully omit.
       {
+        // PERSONAL-MODE ONLY (FIX 5): restoring discards the teacher's
+        // personal overlay, which is meaningless in Team-Curriculum (master)
+        // mode — there the displayed lesson IS the shared team version, with
+        // no personal fork to drop. Gated the same way "Compare with Team
+        // Curriculum" below is (the host-threaded `isMaster` prop AND the live
+        // app-state `editMode`) so the two forking items appear/disappear
+        // together. Still offered for snapshot-LESS modified lessons in
+        // personal mode — clearing stale fork markers is legitimate, and the
+        // honest toast (FIX 1) now tells the truth about what happened.
         label: "Restore from Team Curriculum",
-        hidden: !lesson.modified,
+        hidden: !lesson.modified || isMaster || editMode === "master",
         tip: "Discard your personal edits and revert to the Team Curriculum version of this lesson",
         onSelect: () => fire("restore-master"),
       },

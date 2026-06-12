@@ -205,9 +205,9 @@ export const LESSONS: Lesson[] = [
       {
         type: "youtube",
         label: "Fraction Basics",
-        url: "https://www.youtube.com/watch?v=8E5K2dnyFOY",
+        url: "https://www.youtube.com/watch?v=n0FZhQ_GkKw",
         provider: "youtube",
-        thumbnailUrl: "https://img.youtube.com/vi/8E5K2dnyFOY/hqdefault.jpg",
+        thumbnailUrl: "https://img.youtube.com/vi/n0FZhQ_GkKw/hqdefault.jpg",
       }, // Card 1 — YouTube video embed branch
       {
         type: "slides",
@@ -218,10 +218,10 @@ export const LESSONS: Lesson[] = [
       {
         type: "image",
         label: "Fraction Wall Diagram",
-        url: "https://upload.wikimedia.org/wikipedia/commons/4/45/Equivalent_fractions.svg",
+        url: "https://commons.wikimedia.org/wiki/Special:FilePath/Cake_fractions.svg?width=480",
         provider: "image",
         thumbnailUrl:
-          "https://upload.wikimedia.org/wikipedia/commons/4/45/Equivalent_fractions.svg",
+          "https://commons.wikimedia.org/wiki/Special:FilePath/Cake_fractions.svg?width=480",
       }, // Card 3 — image branch
       {
         type: "pdf",

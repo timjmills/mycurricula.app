@@ -13,6 +13,13 @@
 // day (e.g. Saturday) the jump still returns to the current week and
 // leaves the selected day alone — there is no "today" column to land on.
 //
+// PHASE-1B: CURRENT_WEEK is the mock fixture's frozen current week
+// (lib/mock) — the right source while mock data drives the planner, wrong
+// once the Supabase flag is ON (the current week must resolve from the
+// configured academic year's calendar instead). When the 1B wave moves
+// WeeklyShell/WeekNavigator off the fixture, this button moves with them —
+// one shared current-week source, never a second clock.
+//
 // State-only navigation: writes useAppState week/selectedDay, exactly what
 // the WeekStrip pills and WeekNavigator do — no scrollIntoView, no router
 // push, so nothing outside the Daily pane moves.
@@ -31,6 +38,7 @@ import { useAppState } from "@/lib/app-state";
 import { CURRENT_WEEK } from "@/lib/mock";
 import { useSchoolWeek } from "@/lib/use-school-week";
 import { todayColumnIndex } from "@/lib/now-anchor";
+import styles from "./TodayJumpButton.module.css";
 
 export interface TodayJumpButtonProps {
   /** Optional class hook so the host header can place/space the button. */
@@ -73,11 +81,15 @@ export function TodayJumpButton({
     if (todayIdx !== null) setSelectedDay(todayIdx);
   }
 
+  // Merge the host's className (placement/spacing) with the module's
+  // touch-target floor (≥44px box on phone/tablet — §UXR FIX 1).
+  const classes = [styles.todayJump, className].filter(Boolean).join(" ");
+
   return (
     <Button
       variant="ghost"
       size="sm"
-      className={className}
+      className={classes}
       onClick={handleJump}
       disabled={!mounted || atToday}
       tooltip="Jump the day pane back to today"

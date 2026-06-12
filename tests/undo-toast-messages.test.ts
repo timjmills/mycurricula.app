@@ -6,6 +6,7 @@ import {
   undoToastMessage,
   FIRST_FORK_MESSAGE,
   RESTORE_MESSAGE,
+  RESTORE_FLAGS_MESSAGE,
 } from "@/lib/undo-toast-messages";
 import { orderedWeekdaysFrom } from "@/lib/week-order";
 import { DEFAULT_SCHOOL_WEEK } from "@/lib/use-school-week";
@@ -273,11 +274,46 @@ describe("undoToastMessage — fork education + revert", () => {
     ).toBe(FIRST_FORK_MESSAGE);
   });
 
-  it("restoreLesson (revert/unfork) → the restore copy", () => {
+  it("restoreLesson with a master snapshot → the full restore copy", () => {
     expect(
-      undoToastMessage({ kind: "restoreLesson", firstFork: false, dayLabel }),
+      undoToastMessage({
+        kind: "restoreLesson",
+        firstFork: false,
+        lesson: {
+          day: 1,
+          week: 12,
+          subject: "math",
+          status: "not_done",
+          masterSnapshot: {
+            title: "t",
+            objective: "o",
+            preview: "p",
+            standards: [],
+            day: 1,
+            week: 12,
+          },
+        },
+        dayLabel,
+      }),
     ).toBe(RESTORE_MESSAGE);
     expect(RESTORE_MESSAGE).toBe("Restored the team's version");
+  });
+
+  it("restoreLesson WITHOUT a snapshot → the honest flags-only copy", () => {
+    // A snapshot-less restore can only clear the fork markers (content
+    // stays); the toast must not claim a content restore it didn't perform.
+    expect(
+      undoToastMessage({ kind: "restoreLesson", firstFork: false, dayLabel }),
+    ).toBe(RESTORE_FLAGS_MESSAGE);
+    expect(
+      undoToastMessage({
+        kind: "restoreLesson",
+        firstFork: false,
+        lesson: { day: 1, week: 12, subject: "math", status: "not_done" },
+        dayLabel,
+      }),
+    ).toBe(RESTORE_FLAGS_MESSAGE);
+    expect(RESTORE_FLAGS_MESSAGE).toBe("Cleared your personal-edit markers");
   });
 });
 

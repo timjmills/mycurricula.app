@@ -51,7 +51,6 @@
 //   • Double-click edit on body (heading editing removed per spec).
 //   • The "+" trigger on the heading row opens ResourceComposer.
 //   • LessonFlowProps unchanged (lessonId, modified, dockTarget).
-//   • ResourceTile / resource-tile.tsx public API (additive only).
 //   • Expand all / Collapse all controls above Section 1.
 //   • "+ Add section" / "Edit lesson flow template" stubs below Section 6.
 //

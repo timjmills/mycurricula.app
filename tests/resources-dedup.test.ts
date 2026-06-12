@@ -169,3 +169,53 @@ describe("dedupeLessonResources — sections are canonical (P1)", () => {
     ).toEqual([]);
   });
 });
+
+describe("dedupeLessonResources — cross-tier aliasing (id + url)", () => {
+  // A persisted section row (has resourceId AND url) must absorb a
+  // lesson-level row that carries only the same URL — the two tiers are
+  // aliases of one content identity, not different resources. (§4a gate
+  // finding: tier preference alone left this duplicate standing.)
+  it("a resourceId+url section row absorbs a url-only lesson duplicate", () => {
+    const hosted = res({
+      resourceId: "r-1",
+      url: "https://example.com/doc",
+      label: "Hosted",
+    });
+    const urlOnly = res({ url: "https://example.com/doc", label: "Pasted" });
+    const out = dedupeLessonResources({
+      sectionResources: [hosted],
+      lessonResources: [urlOnly],
+    });
+    expect(out).toEqual([hosted]);
+  });
+
+  it("aliases work in the other direction too (url row first)", () => {
+    const urlOnly = res({ url: "https://example.com/doc" });
+    const hosted = res({ resourceId: "r-1", url: "https://example.com/doc" });
+    const out = dedupeLessonResources({
+      sectionResources: [urlOnly],
+      lessonResources: [hosted],
+    });
+    expect(out).toEqual([urlOnly]);
+  });
+
+  it("two ids sharing one normalized url collapse to the first row", () => {
+    const a = res({ resourceId: "r-1", url: "https://Example.com/doc/" });
+    const b = res({ resourceId: "r-2", url: "https://example.com/doc" });
+    const out = dedupeLessonResources({
+      sectionResources: [a],
+      lessonResources: [b],
+    });
+    expect(out).toEqual([a]);
+  });
+
+  it("different urls under different ids do NOT merge (conservatism)", () => {
+    const a = res({ resourceId: "r-1", url: "https://example.com/a" });
+    const b = res({ resourceId: "r-2", url: "https://example.com/b" });
+    const out = dedupeLessonResources({
+      sectionResources: [a],
+      lessonResources: [b],
+    });
+    expect(out).toEqual([a, b]);
+  });
+});

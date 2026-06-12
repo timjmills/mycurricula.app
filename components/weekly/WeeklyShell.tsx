@@ -122,7 +122,10 @@ import { ScheduleTimeline } from "@/components/schedule";
 import { WeeklyViewControls } from "./WeeklyViewControls";
 import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
 import { useAppState } from "@/lib/app-state";
-import { useWeeklyScheduleMode } from "@/lib/weekly-schedule-state";
+import {
+  WeeklyScheduleProvider,
+  useWeeklyScheduleMode,
+} from "@/lib/weekly-schedule-state";
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { buildWeeklyLink, type WeeklyLink } from "@/lib/deep-links";
@@ -503,7 +506,24 @@ function isSyncableWeek(week: number): boolean {
   return Number.isInteger(week) && week >= 1 && week <= 99;
 }
 
-export function WeeklyShell({ initialLink }: WeeklyShellProps = {}): ReactNode {
+/**
+ * Exported shell — mounts the <WeeklyScheduleProvider> ONCE so the
+ * Subject↔Schedule state has a single shared instance above both consumers:
+ * <WeeklyViewControls> (writer, in the WeekNavigator actions slot) and the
+ * canvas reader inside <WeeklyShellInner>. Without this single mount the
+ * writer and reader held independent useState copies and the canvas only
+ * switched Grid↔Schedule after a reload. The inner component holds all the
+ * existing shell logic and is the sole caller of useWeeklyScheduleMode().
+ */
+export function WeeklyShell(props: WeeklyShellProps = {}): ReactNode {
+  return (
+    <WeeklyScheduleProvider>
+      <WeeklyShellInner {...props} />
+    </WeeklyScheduleProvider>
+  );
+}
+
+function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // The active week + day are shared planner state — same source the
   // <WeeklyGrid> already reads. We don't pin a local copy here; the
   // RightRail just needs the current value to scope its Resources +

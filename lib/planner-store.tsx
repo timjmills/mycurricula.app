@@ -262,6 +262,18 @@ type RelocateLessonAction = {
   keepOriginal: boolean;
 };
 
+/** Revert ONLY a lesson's placement to a captured day/week in ONE history
+ *  step (fork-diff scheduling revert — FIX 4). Applies the move (reusing the
+ *  moveLesson reducer for CellLayout pruning) AND forces `moved: null`, so the
+ *  per-field revert tooltip's "Undo with ⌘Z" (singular) is honest. Content
+ *  fields are untouched — a scheduling-only revert must keep the teacher's
+ *  text edits (`modified` stays as-is). */
+type RevertPlacementAction = {
+  type: "revertPlacement";
+  id: string;
+  to: { day: number; week: number };
+};
+
 type SetSaveTargetAction = {
   type: "setSaveTarget";
   id: string;
@@ -432,6 +444,7 @@ type PlannerAction =
   | UnarchiveLessonAction
   | RestoreLessonAction
   | RelocateLessonAction
+  | RevertPlacementAction
   | SetSectionsAction
   | ReorderSectionsAction
   | EditSectionAction
@@ -477,6 +490,8 @@ function labelFor(action: PlannerAction): string {
       return "Restore lesson";
     case "relocateLesson":
       return "Relocate lesson";
+    case "revertPlacement":
+      return "Revert placement";
     case "setSections":
       return "Edit sections";
     case "reorderSections":
@@ -1001,6 +1016,33 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
       });
     }
 
+    case "revertPlacement": {
+      // Scheduling-only fork revert in ONE step (FIX 4). Run the placement
+      // through the moveLesson reducer — same delegation restore/bump/relocate
+      // use — so the source cell's CellLayout is pruned and slot handling
+      // stays consistent. moveLesson sets `moved` ("same-week"/"across-weeks");
+      // we then force it back to null in the SAME pass, because reverting to
+      // the captured placement means the lesson sits exactly where the team put
+      // it (the move-arrow / stripe must reset immediately). CONTENT is left
+      // untouched — `modified` and every text field stay as-is, so the
+      // teacher's edits survive a scheduling-only revert.
+      const lesson = doc.lessons.find((l) => l.id === action.id);
+      if (!lesson) return doc;
+
+      const placed = applyDocAction(doc, {
+        type: "moveLesson",
+        id: action.id,
+        patch: { day: action.to.day, week: action.to.week },
+      });
+
+      return {
+        ...placed,
+        lessons: placed.lessons.map((l) =>
+          l.id !== action.id ? l : { ...l, moved: null },
+        ),
+      };
+    }
+
     // ── Section actions ────────────────────────────────────────────────
 
     case "setSections": {
@@ -1441,6 +1483,7 @@ function buildLastChange(action: PlannerAction): LastChange {
     case "unarchiveLesson":
     case "restoreLesson":
     case "relocateLesson":
+    case "revertPlacement":
       return { kind: action.type, lessonIds: [action.id] };
 
     case "duplicateWeek":
@@ -1594,6 +1637,18 @@ export interface PlannerValue {
     target: { day?: number; subject?: SubjectId; week?: number },
     keepOriginal: boolean,
   ) => void;
+  /**
+   * Revert ONLY a lesson's placement to a captured day/week in ONE undoable
+   * step (fork-diff scheduling revert — FIX 4). Applies the move AND clears
+   * `moved` in a single reducer pass, so one ⌘Z brings the placement back —
+   * matching the per-field revert tooltip's singular "Undo with ⌘Z". Content
+   * fields stay untouched (a scheduling-only revert keeps the teacher's text).
+   * Tees persistence the SAME way moveLesson does (resolved {week,day} via the
+   * Personal | Team-Curriculum save target), so the reverted placement
+   * survives reload in backend mode. The reducer-local `moved` flag is NOT
+   * persisted (it is not a LessonMoveTarget field).
+   */
+  revertPlacement: (id: string, to: { day: number; week: number }) => void;
 
   // ── Section mutation actions ───────────────────────────────────────────
   /**
@@ -2273,6 +2328,34 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [],
   );
 
+  const revertPlacement = useCallback(
+    (id: string, to: { day: number; week: number }) => {
+      // One dispatch → one history step (FIX 4): the reducer applies the move
+      // AND clears `moved` in a single pass, so the fork-diff scheduling
+      // revert is a single ⌘Z (matching its singular tooltip).
+      dispatchRef.current({ type: "revertPlacement", id, to });
+      // Tee persistence the SAME way moveLesson does: send the RESOLVED final
+      // slot { week, day } (not a bare patch) under the live Personal |
+      // Team-Curriculum save target, so the reverted placement survives reload
+      // in backend mode. `to.day`/`to.week` are both required, so the resolved
+      // slot is exactly the target; we still merge over the current lesson to
+      // mirror moveLesson's defensive idiom 1:1. The reducer-local `moved`
+      // flag is intentionally NOT persisted (not a LessonMoveTarget field) —
+      // matching the two-dispatch behavior this replaces.
+      const current = present.lessons.find((l) => l.id === id);
+      const week = to.week ?? current?.week ?? 0;
+      const day = to.day ?? current?.day ?? 0;
+      persist(
+        "moveLesson",
+        id,
+        { week, day },
+        ownerIdRef.current ?? "",
+        saveTargetRef.current,
+      );
+    },
+    [persist, present.lessons],
+  );
+
   const setSections = useCallback(
     (lessonId: string, next: LessonSectionContent[]) => {
       dispatchRef.current({ type: "setSections", lessonId, next });
@@ -2568,6 +2651,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       unarchiveLesson,
       restoreLesson,
       relocateLesson,
+      revertPlacement,
       setSections,
       reorderSections,
       editSection,
@@ -2615,6 +2699,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       unarchiveLesson,
       restoreLesson,
       relocateLesson,
+      revertPlacement,
       setSections,
       reorderSections,
       editSection,

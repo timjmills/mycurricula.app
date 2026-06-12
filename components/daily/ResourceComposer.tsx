@@ -14,7 +14,7 @@
 //     (≤480px) the dialog becomes a full-height bottom sheet.
 //   • Dialog (520px, --r-xl, --sh-lg):
 //       Head    — mode badge (blue "Add resources" / honey "New notecard"),
-//                 2-dot stepper (resource mode only), 44px close.
+//                 2-dot stepper (resource mode only), close (≥44px hit area).
 //       Body    — per mode/step (below).
 //       Foot    — quiet "Session only" badge (grey pill + amber dot) while
 //                 captures are unsaved in mock mode, then Cancel/Back +
@@ -102,6 +102,20 @@ import {
 import { renderPdfThumbnail } from "@/lib/pdf-thumbnail";
 import { makeNotecard } from "@/lib/notecards";
 import { RichTextEditor } from "@/components/rich-text";
+// Shared icon vocabulary (extracted by PR #12). These six are imported from
+// the shared folder rather than re-inlined so components/icons stays the
+// single source — the composer keeps only the glyphs unique to it (Drive,
+// Camera, NoteCard, Check, Warn, Plus, Grip, ChevronLeft/Right) local below.
+// The shared icons carry intrinsic width/height; every consuming CSS slot
+// sets an explicit svg width/height, so the swap preserves visual size.
+import {
+  CloseIcon,
+  UploadIcon,
+  LinkIcon,
+  SmallXIcon,
+  MoreDotsIcon,
+  ChevronDownIcon,
+} from "@/components/icons";
 import { AllToolsMenu } from "./AllToolsMenu";
 import styles from "./ResourceComposer.module.css";
 
@@ -251,6 +265,23 @@ const FOCUSABLE =
 // A URL is "a string starting with http:// or https:// with no whitespace".
 // Stricter than the spec but good enough to recognise a pasted link.
 const URL_REGEX = /^https?:\/\/\S+$/;
+
+/** True only for a well-formed absolute http(s) URL. The paste path already
+ *  gates on URL_REGEX, but typed/manual entry (the inline Link row, the
+ *  All-tools URL row) is NOT enforced by `input type="url"` in JS — so a
+ *  `javascript:` / `data:` / `blob:` / protocol-relative / garbage string
+ *  could otherwise be captured and later rendered. We gate twice: the regex
+ *  blocks non-http(s) schemes + whitespace cheaply, then `new URL()` confirms
+ *  the value actually parses and re-checks the protocol (defence in depth). */
+function isCapturableWebUrl(value: string): boolean {
+  if (!URL_REGEX.test(value)) return false;
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 // ── Resource caps ────────────────────────────────────────────────────────
 // Mirror the API allowlist in app/api/resources/upload/route.ts so the
@@ -913,6 +944,17 @@ export function ResourceComposer({
   const onLinkConfirm = useCallback(() => {
     const raw = linkValue.trim();
     if (!raw) return;
+    // `input type="url"` does NOT enforce validity in JS, so a typed
+    // `javascript:` / `data:` / protocol-relative / garbage value would
+    // otherwise be stored and later rendered. Reject anything that isn't a
+    // well-formed http(s) URL; keep the field populated so the teacher can
+    // fix it, and surface the inline rejection message.
+    if (!isCapturableWebUrl(raw)) {
+      setRejectionStatus(
+        "That doesn't look like a web link — use an http(s) address.",
+      );
+      return;
+    }
     const parsed = linkToCapturedItem(raw);
     addItem(parsed);
     // Generic websites have no cheaply-derivable thumbnail — fetch one.
@@ -1025,6 +1067,11 @@ export function ResourceComposer({
   // this session (the body string carries the data URL through the JSONB
   // seam unchanged). Returns null (cancels insertion) on cancel/failure.
   // sanitizeHtml() drops an unsafe src at emit regardless.
+  //
+  // Caps mirror the captured-file image path (the same ALLOWED_MIMES image
+  // subset + MAX_IMAGE_BYTES): without them, mock mode would inline the full
+  // file as a `data:` URL — bloating the body + localStorage — and backend
+  // mode would upload past the 5 MB image cap the capture path enforces.
   const requestBodyImageUrl = useCallback((): Promise<string | null> => {
     return new Promise<string | null>((resolve) => {
       if (typeof document === "undefined") {
@@ -1037,6 +1084,25 @@ export function ResourceComposer({
       input.onchange = () => {
         const file = input.files?.[0];
         if (!file) {
+          resolve(null);
+          return;
+        }
+        // Enforce the image MIME allowlist + size cap BEFORE reading or
+        // uploading. On violation cancel the insertion (resolve null) and
+        // surface the same inline rejection mechanism the capture path uses
+        // — never fail silently.
+        if (!file.type.startsWith("image/") || !ALLOWED_MIMES.has(file.type)) {
+          setRejectionStatus(
+            `Skipped "${file.name || "image"}" — ${file.type || "this file type"} isn't a supported image. ` +
+              `Use PNG, JPG, WebP, or GIF.`,
+          );
+          resolve(null);
+          return;
+        }
+        if (file.size > MAX_IMAGE_BYTES) {
+          setRejectionStatus(
+            `Skipped "${file.name || "image"}" — images must be ≤ 5 MB (yours: ${formatBytes(file.size)}).`,
+          );
           resolve(null);
           return;
         }
@@ -1168,49 +1234,65 @@ export function ResourceComposer({
     if (backendOn && toCommit.some((r) => r.__file)) {
       setUploadError(null);
       setUploading(true);
-      const owner = resourceOwnerEvent(destLesson);
-      // Upload every file item, reusing any result already cached from a prior
-      // attempt so a RETRY never re-uploads a file that already succeeded
-      // (which would duplicate the R2 object + resources row and eat the
-      // per-event count quota). allSettled — not all — so one failure doesn't
-      // abandon the in-flight successes: they finish, cache, and commit on the
-      // next click.
-      const fileEntries = toCommit.filter((r) => r.__file);
-      const settled = await Promise.allSettled(
-        fileEntries.map(async (r) => {
-          const cached = r.__id ? uploadedRef.current.get(r.__id) : undefined;
-          const result =
-            cached ??
-            (await uploadHostedFile({
-              owner,
-              file: r.__file as File,
-              displayLabel: r.label,
-            }));
-          if (r.__id && !cached) uploadedRef.current.set(r.__id, result);
-          r.url = result.url;
-          r.resourceId = result.resourceId;
-          r.provider = result.provider;
-          r.mimeType = result.mimeType;
-          r.sizeBytes = result.sizeBytes;
-          // Image tiles read thumbnailUrl ?? url; the served url IS the image.
-          // For non-images keep any client-rendered poster we already have
-          // (e.g. the PDF first-page data URL) instead of clobbering it.
-          r.thumbnailUrl =
-            result.provider === "image" ? result.url : r.thumbnailUrl;
-          // The blob is no longer the resource's url — let it be revoked.
-          r.__blobUrl = undefined;
-        }),
-      );
-      setUploading(false);
-      const failure = settled.find((s) => s.status === "rejected");
-      if (failure) {
-        const reason = (failure as PromiseRejectedResult).reason;
-        setUploadError(
-          reason instanceof ResourceUploadError
-            ? reason.message
-            : "Couldn't upload your file. Please try again.",
+      // try/catch/finally so `uploading` is ALWAYS cleared: a synchronous
+      // throw (e.g. resourceOwnerEvent) or any unexpected rejection would
+      // otherwise strand the dialog with every control disabled. allSettled
+      // already keeps per-file failures from rejecting the batch; the catch
+      // is the backstop for anything outside that — it keeps the dialog open
+      // with a generic error instead of a frozen "Adding…" state.
+      try {
+        const owner = resourceOwnerEvent(destLesson);
+        // Upload every file item, reusing any result already cached from a
+        // prior attempt so a RETRY never re-uploads a file that already
+        // succeeded (which would duplicate the R2 object + resources row and
+        // eat the per-event count quota). allSettled — not all — so one
+        // failure doesn't abandon the in-flight successes: they finish,
+        // cache, and commit on the next click.
+        const fileEntries = toCommit.filter((r) => r.__file);
+        const settled = await Promise.allSettled(
+          fileEntries.map(async (r) => {
+            const cached = r.__id ? uploadedRef.current.get(r.__id) : undefined;
+            const result =
+              cached ??
+              (await uploadHostedFile({
+                owner,
+                file: r.__file as File,
+                displayLabel: r.label,
+              }));
+            if (r.__id && !cached) uploadedRef.current.set(r.__id, result);
+            r.url = result.url;
+            r.resourceId = result.resourceId;
+            r.provider = result.provider;
+            r.mimeType = result.mimeType;
+            r.sizeBytes = result.sizeBytes;
+            // Image tiles read thumbnailUrl ?? url; the served url IS the
+            // image. For non-images keep any client-rendered poster we
+            // already have (e.g. the PDF first-page data URL) rather than
+            // clobbering it.
+            r.thumbnailUrl =
+              result.provider === "image" ? result.url : r.thumbnailUrl;
+            // The blob is no longer the resource's url — let it be revoked.
+            r.__blobUrl = undefined;
+          }),
         );
-        return; // dialog stays open; succeeded uploads are cached for retry
+        const failure = settled.find((s) => s.status === "rejected");
+        if (failure) {
+          const reason = (failure as PromiseRejectedResult).reason;
+          setUploadError(
+            reason instanceof ResourceUploadError
+              ? reason.message
+              : "Couldn't upload your file. Please try again.",
+          );
+          return; // dialog stays open; succeeded uploads are cached for retry
+        }
+      } catch {
+        // Unexpected throw outside the per-file allSettled (e.g. building the
+        // owner event). Keep the dialog open with a generic error; any
+        // already-cached uploads survive for the retry.
+        setUploadError("Couldn't upload your file. Please try again.");
+        return;
+      } finally {
+        setUploading(false);
       }
     }
 
@@ -1265,6 +1347,23 @@ export function ResourceComposer({
             : {}),
         };
         if (editResource.sectionId) {
+          // Validate the target still exists before committing — a stale
+          // section/resource id makes editSectionResource a silent no-op
+          // (the reducer keys on the id), which would close the dialog and
+          // drop the teacher's edit. If it's gone, keep the dialog open and
+          // surface the inline message instead of losing the work.
+          const section = getSections(destLessonId).find(
+            (s) => s.id === editResource.sectionId,
+          );
+          const targetExists = section?.resources.some(
+            (r) => r.id === editResource.resourceId,
+          );
+          if (!targetExists) {
+            setRejectionStatus(
+              "Couldn't save — this resource has moved or been removed. Close and reopen it from the lesson.",
+            );
+            return; // dialog stays open; nothing committed
+          }
           editSectionResource(
             destLessonId,
             editResource.sectionId,
@@ -1272,10 +1371,37 @@ export function ResourceComposer({
             patch,
           );
         } else {
-          // Whole-lesson resource — patch the array slot by index (the
-          // synthesized id can't locate the row inside editLesson).
-          const idx = editResource.lessonResourceIndex ?? -1;
-          const nextResources = destLesson.resources.map((res, i) =>
+          // Whole-lesson resource — patch the array slot. The synthesized id
+          // can't locate the row inside editLesson, so resolve the index
+          // defensively: prefer the persisted resourceId, then object
+          // reference, and only then the (possibly stale) captured index.
+          // A blind `lessonResourceIndex ?? -1` would silently patch the
+          // WRONG row — or, at -1, patch nothing while still closing the
+          // dialog — losing the edit. If we can't locate it, keep the dialog
+          // open and tell the teacher.
+          const resources = destLesson.resources;
+          const byResourceId = editResource.resource.resourceId
+            ? resources.findIndex(
+                (r) => r.resourceId === editResource.resource.resourceId,
+              )
+            : -1;
+          const byReference = resources.indexOf(editResource.resource);
+          const byIndex = editResource.lessonResourceIndex ?? -1;
+          const idx =
+            byResourceId >= 0
+              ? byResourceId
+              : byReference >= 0
+                ? byReference
+                : byIndex >= 0 && byIndex < resources.length
+                  ? byIndex
+                  : -1;
+          if (idx < 0) {
+            setRejectionStatus(
+              "Couldn't save — this resource has moved or been removed. Close and reopen it from the lesson.",
+            );
+            return; // dialog stays open; nothing committed
+          }
+          const nextResources = resources.map((res, i) =>
             i === idx ? { ...res, ...patch } : res,
           );
           editLesson(destLessonId, { resources: nextResources });
@@ -1348,6 +1474,7 @@ export function ResourceComposer({
     lessonId,
     sectionId,
     getLesson,
+    getSections,
     lesson,
     addSectionResource,
     editSectionResource,
@@ -2690,58 +2817,10 @@ function RouteSelect({
 // ── Icons ────────────────────────────────────────────────────────────────
 // Stroked, Lucide-family (~2px stroke, round caps, 24×24 viewbox) — same
 // vocabulary as the rest of the repo. Sized by the CSS module.
-
-function CloseIcon(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
-function UploadIcon(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="17 8 12 3 7 8" />
-      <line x1="12" y1="3" x2="12" y2="15" />
-    </svg>
-  );
-}
-
-function LinkIcon(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-    </svg>
-  );
-}
+//
+// CloseIcon, UploadIcon, LinkIcon, SmallXIcon, MoreDotsIcon, and
+// ChevronDownIcon now come from `@/components/icons` (imported above) — only
+// the composer-unique glyphs below stay local.
 
 function DriveIcon(): ReactNode {
   // A simple triangle-fold "drive" glyph in the Lucide vocabulary.
@@ -2857,49 +2936,6 @@ function GripIcon(): ReactNode {
       <circle cx="15" cy="12" r="1.6" />
       <circle cx="9" cy="18" r="1.6" />
       <circle cx="15" cy="18" r="1.6" />
-    </svg>
-  );
-}
-
-function SmallXIcon(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
-function MoreDotsIcon(): ReactNode {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <circle cx="5" cy="12" r="1.8" />
-      <circle cx="12" cy="12" r="1.8" />
-      <circle cx="19" cy="12" r="1.8" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="6 9 12 15 18 9" />
     </svg>
   );
 }

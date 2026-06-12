@@ -1085,6 +1085,13 @@ interface ResourcesPanelProps {
    *  of the collapse chevron) and drops the standalone card chrome. Supplied
    *  by <ResourcesDrawer> below. */
   onCloseDrawer?: () => void;
+  /** Drawer presentation only: notified whenever the panel's composer opens
+   *  or closes. <ResourcesDrawer> uses this to hide its own slide-in panel
+   *  while the composer sheet is up, so the composer (portaled to <body> at
+   *  the same z-band as the drawer) isn't occluded by the right-docked drawer
+   *  (§UXR FIX 3). The panel stays MOUNTED — we only hide the drawer chrome —
+   *  so the composer it renders is never torn down. */
+  onComposerOpenChange?: (open: boolean) => void;
 }
 
 // ── ResourcesPanel ──────────────────────────────────────────────────────────
@@ -1099,6 +1106,7 @@ export function ResourcesPanel({
   week,
   onClearLesson,
   onCloseDrawer,
+  onComposerOpenChange,
 }: ResourcesPanelProps): ReactNode {
   const [activeTab, setActiveTab] = useState<PanelTab>("all");
   // SSR-safe persisted view mode: default for the server render, the saved
@@ -1133,6 +1141,15 @@ export function ResourcesPanel({
 
   // Routing default: the selected lesson, else the week's first lesson.
   const composerLesson: Lesson | null = lesson ?? lessons?.[0] ?? null;
+
+  // §UXR FIX 3 — tell the drawer host whenever the composer opens/closes so it
+  // can hide its slide-in panel while the composer sheet is up (the composer
+  // portals to <body> at the same z-band as the drawer, so a visible drawer
+  // would occlude the sheet's right edge at ≤960px). Inline (desktop)
+  // mounts pass no handler, so this is a no-op there.
+  useEffect(() => {
+    onComposerOpenChange?.(composerOpen);
+  }, [composerOpen, onComposerOpenChange]);
 
   const openComposer = useCallback((): void => {
     setEditTarget(null);
@@ -1842,6 +1859,11 @@ export function ResourcesDrawer({
   // SSR-safe narrow flag — false on the server; synced post-mount.
   const [narrow, setNarrow] = useState(false);
   const [open, setOpen] = useState(false);
+  // §UXR FIX 3 — true while the inner panel's composer sheet is open. We HIDE
+  // the slide-in drawer (not unmount it) so the composer, which portals to
+  // <body> at the same z-band, is unobstructed. Hiding (vs. closing) keeps
+  // the ResourcesPanel — and therefore the composer it renders — mounted.
+  const [composerOpen, setComposerOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -1868,6 +1890,9 @@ export function ResourcesDrawer({
 
   const close = useCallback((): void => {
     setOpen(false);
+    // Drop the composer-hidden flag so a fresh open starts with the drawer
+    // chrome visible (the inner panel re-reports its composer state on mount).
+    setComposerOpen(false);
     triggerRef.current?.focus();
   }, []);
 
@@ -1942,21 +1967,32 @@ export function ResourcesDrawer({
       {open && (
         <>
           {/* Scrim — click closes. aria-hidden: the dialog beside it carries
-              the semantics; Esc is the keyboard path. */}
+              the semantics; Esc is the keyboard path. Hidden while the
+              composer is up so the composer sheet owns the viewport (§UXR
+              FIX 3). */}
           <div
-            className={styles.drawerScrim}
+            className={`${styles.drawerScrim} ${
+              composerOpen ? styles.drawerHidden : ""
+            }`}
             aria-hidden="true"
             onClick={close}
           />
           <div
             ref={panelRef}
-            className={styles.drawerPanel}
+            className={`${styles.drawerPanel} ${
+              composerOpen ? styles.drawerHidden : ""
+            }`}
             role="dialog"
             aria-modal="true"
             aria-label="Resources drawer"
             onKeyDown={onPanelKeyDown}
           >
-            <ResourcesPanel lesson={lesson} week={week} onCloseDrawer={close} />
+            <ResourcesPanel
+              lesson={lesson}
+              week={week}
+              onCloseDrawer={close}
+              onComposerOpenChange={setComposerOpen}
+            />
           </div>
         </>
       )}

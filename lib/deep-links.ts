@@ -68,20 +68,30 @@ export interface SubjectLink {
 const SUBJECT_ID_SET = new Set<string>(SUBJECTS.map((s) => s.id));
 
 /** YYYY-MM-DD check — shape mirrors ISO_DATE_RE in lib/use-holidays.ts,
- *  plus universal range bounds (month 1–12, day 1–31): a typo'd shared
- *  link must degrade to "right view, default focus", not hand every
- *  consumer an impossible date (§4a review M4). Whether the date falls
- *  inside the academic year stays the consuming view's call, since that
- *  depends on per-school calendar configuration this pure module must
- *  not assume. */
-const ISO_DATE_RE = /^\d{4}-(\d{2})-(\d{2})$/;
+ *  plus REAL calendar validation: a typo'd shared link must degrade to
+ *  "right view, default focus", not hand every consumer an impossible date
+ *  (§4a review M4 + gate finding). Whether the date falls inside the academic
+ *  year stays the consuming view's call, since that depends on per-school
+ *  calendar configuration this pure module must not assume. */
+const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function isValidDate(value: string): boolean {
   const m = value.match(ISO_DATE_RE);
   if (!m) return false;
-  const month = Number(m[1]);
-  const day = Number(m[2]);
-  return month >= 1 && month <= 12 && day >= 1 && day <= 31;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  // Reject calendar-impossible days (Feb 30, Apr 31, non-leap Feb 29) by
+  // round-tripping through a UTC Date: if any component is rewritten, the
+  // calendar rejected it. UTC sidesteps DST/local-offset edge cases — this
+  // is a validity check, never a timezone-bearing value.
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  return (
+    dt.getUTCFullYear() === year &&
+    dt.getUTCMonth() === month - 1 &&
+    dt.getUTCDate() === day
+  );
 }
 
 /** `#unit-3` (leading `#` optional, as `location.hash` includes it but a

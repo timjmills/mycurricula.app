@@ -38,11 +38,32 @@ import type { LessonResource } from "./types";
  *
  * Tiers are prefixed (`id:` / `url:`) so a resourceId can never collide
  * with a url or a label across tiers.
+ *
+ * This returns the PRIMARY (most reliable) identity. For de-duplication use
+ * {@link resourceAliases} — a row that carries BOTH a resourceId AND a url is
+ * the same content as a row carrying only one of them, so dedup must match on
+ * EITHER (§4a gate finding: a hosted section row `{resourceId, url}` and a
+ * pasted lesson row `{url}` for the same link must collapse).
  */
 export function resourceIdentity(r: LessonResource): string {
-  if (r.resourceId) return `id:${r.resourceId}`;
-  if (r.url) return `url:${normalizeUrl(r.url)}`;
-  return `${r.type}:${r.label.trim().toLowerCase()}:${r.body ?? ""}`;
+  return resourceAliases(r)[0];
+}
+
+/**
+ * Every content-identity key a resource answers to. A persisted row exposes
+ * BOTH its server-row alias (`id:`) and its url alias (`url:`) so it merges
+ * with a url-only or id-only copy of the same content. Url-less rows fall
+ * back to the single `${type}:${label}:${body}` alias. Order is reliability-
+ * first, so `resourceIdentity` (the primary key) stays `id:` > `url:` > label.
+ */
+export function resourceAliases(r: LessonResource): string[] {
+  const aliases: string[] = [];
+  if (r.resourceId) aliases.push(`id:${r.resourceId}`);
+  if (r.url) aliases.push(`url:${normalizeUrl(r.url)}`);
+  if (aliases.length === 0) {
+    aliases.push(`${r.type}:${r.label.trim().toLowerCase()}:${r.body ?? ""}`);
+  }
+  return aliases;
 }
 
 /** Minimal identity-neutral URL normalization: lowercase the ORIGIN
@@ -87,9 +108,11 @@ export function dedupeLessonResources(input: {
   const seen = new Set<string>();
   const out: LessonResource[] = [];
   for (const r of [...input.sectionResources, ...input.lessonResources]) {
-    const id = resourceIdentity(r);
-    if (seen.has(id)) continue;
-    seen.add(id);
+    const aliases = resourceAliases(r);
+    // Drop the row if it shares ANY identity alias with a row already kept —
+    // a `{resourceId, url}` row and a `{url}`-only row are the same content.
+    if (aliases.some((a) => seen.has(a))) continue;
+    for (const a of aliases) seen.add(a);
     out.push(r);
   }
   return out;
