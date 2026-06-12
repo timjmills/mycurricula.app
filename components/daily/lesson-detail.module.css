@@ -119,14 +119,18 @@
      ensuring the band's flex row is constrained to its container width. */
   width: 100%;
   min-width: 0;
-  /* Prevent the band's own flex row from overflowing .root's clipping box.
-     The time region is `flex:0 0 auto` so it will always render; if the
-     title + left cluster push past the available width, the band clips the
-     title (via .bandTitle ellipsis) rather than hiding the time. */
   overflow: hidden;
   display: flex;
+  /* WRAP, never clip (owner report 2026-06-12): on a NARROW PANEL (which a
+     window media query cannot see) the old single-row flex overflowed and
+     the clipped side was the right cluster — the TIME. With wrap + the
+     title's 200px flex-basis: while the row fits, subject · title · time
+     share one line exactly as before; squeezed, the title (and the time
+     after it, right-aligned by its auto margin) wrap to a second row —
+     everything stays fully visible at any panel width. */
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 4px 16px;
   min-height: 72px;
   padding: 14px 20px;
   /* Flat subject-light fill â€” falls back to a neutral wash when no
@@ -246,7 +250,10 @@
    the title text gracefully truncates rather than overflowing into the
    right region and obscuring the time. */
 .bandTitle {
-  flex: 1 1 auto;
+  /* 200px basis: when the row can't give the title 200px it wraps onto a
+     fresh row (the time follows it down, right-aligned by its auto
+     margin) instead of crushing to a sliver while the time clips. */
+  flex: 1 1 200px;
   min-width: 0;
   text-align: center;
   font-size: var(--t-18);
@@ -410,12 +417,15 @@
    `min-width: 0` lets the column shrink below its content's intrinsic
    min-width inside the flex parent, so long titles + standards can
    still ellipsis-collapse on a thin pane. */
+/* FLUID WIDTH (owner direction, 2026-06-12): the former `max-width: 760px`
+   reading cap is gone. The dock's columns are teacher-resizable, and the
+   phase editors must TRACK the panel: widen the panel, the inputs widen;
+   narrow it, they narrow. The cap silently froze the content at 760px
+   nominal no matter how much room the teacher gave the column. */
 .column {
   width: 100%;
   min-width: 0;
-  max-width: 760px;
   margin: 0;
-  margin-right: auto;
   padding: 24px 24px 36px 32px;
   display: flex;
   flex-direction: column;
