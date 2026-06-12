@@ -121,9 +121,28 @@ log(
 );
 log(!s.panelOpen, `click-off closes the panel (panelOpen=${s.panelOpen})`);
 
-// 4. Open again, press "Go to lesson" → /daily.
+// 4. Open again, capture WHICH lesson the panel is showing, then press
+//    "Go to lesson" → /daily and prove Daily selected THAT same lesson.
 await clickCardHeader(card);
 await page.waitForTimeout(500);
+
+// Capture the clicked lesson's STABLE id (data-planner-item="lesson:<id>") —
+// the strongest assertion is by id, since titles can repeat across lessons.
+const targetId =
+  (await card.getAttribute("data-planner-item"))?.replace(/^lesson:/, "") ??
+  null;
+
+// Also read the panel's lesson title from the complementary region's aria-label
+// ("Lesson detail: <TITLE>") as a human-readable cross-check.
+const panelTitle = await page.evaluate(() => {
+  const panel = document.querySelector(
+    '[role="complementary"][aria-label^="Lesson detail"]',
+  );
+  const label = panel?.getAttribute("aria-label") ?? "";
+  return label.replace(/^Lesson detail:\s*/, "").trim();
+});
+log(panelTitle.length > 0, `read panel lesson title (panelTitle="${panelTitle}")`);
+
 const goBtn = page.getByRole("button", { name: "Go to lesson" });
 log((await goBtn.count()) === 1, "panel shows a Go to lesson button");
 await goBtn.click();
@@ -135,9 +154,65 @@ try {
 } catch {
   navOk = false;
 }
-await page.waitForTimeout(1500);
+// Wait for the deep-link resolver to settle: exactly one selected row present
+// in the Daily list. Polled (not a fixed sleep) so the assertion is robust to
+// dev-compile latency and the post-hydration retry path of the resolver.
+let selectedTitle = null;
+try {
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll(
+        '[data-planner-item^="lesson:"][class*="lessonRowSelected"]',
+      ).length === 1,
+    { timeout: 30000 },
+  );
+} catch {
+  // Leave selectedTitle null → the equality assertion below reports FAIL with
+  // the count, rather than throwing and aborting the rest of the probe.
+}
+await page.waitForTimeout(500);
 s = await state();
 log(navOk, `Go to lesson navigates to /daily (path=${s.path})`);
+
+// Exactly one Daily row must be selected, and its title must equal the panel's.
+// Because the Daily list only renders the currently-selected DAY's lessons, a
+// selected row carrying the panel's title can ONLY be present if the view also
+// switched to the day that contains it — so this one check proves both the
+// correct lesson selection AND the day sync.
+const selInfo = await page.evaluate(() => {
+  const rows = document.querySelectorAll(
+    '[data-planner-item^="lesson:"][class*="lessonRowSelected"]',
+  );
+  if (rows.length !== 1) return { count: rows.length, title: null, id: null };
+  const id =
+    rows[0].getAttribute("data-planner-item")?.replace(/^lesson:/, "") ?? null;
+  // Prefer the plain title span; fall back to parsing the select button's
+  // aria-label ("<Subject>: <TITLE>, <status>").
+  const span = rows[0].querySelector('[class*="lessonTitle"]');
+  let title = span?.textContent?.trim() ?? null;
+  if (!title) {
+    const btn = rows[0].querySelector("button[aria-pressed]");
+    const label = btn?.getAttribute("aria-label") ?? "";
+    const m = label.match(/^[^:]*:\s*(.*),\s*[^,]*$/);
+    title = m ? m[1].trim() : null;
+  }
+  return { count: rows.length, title, id };
+});
+selectedTitle = selInfo.title;
+log(
+  selInfo.count === 1,
+  `exactly one Daily row is selected (selectedCount=${selInfo.count})`,
+);
+// Strong check: the selected Daily row's id must equal the clicked lesson's id.
+log(
+  targetId !== null && selInfo.id === targetId,
+  `Daily selected the SAME lesson id (target=${targetId} selected=${selInfo.id})`,
+);
+log(
+  selectedTitle !== null && selectedTitle === panelTitle,
+  `Daily selected the deep-linked lesson + synced its day ` +
+    `(panelTitle="${panelTitle}" selectedTitle="${selectedTitle}")`,
+);
 // The deep link must land Daily's detail pane on THE clicked lesson, and the
 // read-only shell panel must NOT remain mounted alongside it.
 log(
