@@ -1,9 +1,8 @@
 /* NotecardFullscreen.module.css — split-screen notecard modal.
  *
- * All color/radii/type come from app/tokens.css via var(); the only literal is
- * the translucent backdrop scrim (mirrors ResourcePreview / ImageLightbox —
- * there is no token for a dim overlay). Desktop/tablet: two columns (media |
- * notes). Phone (≤640px): the columns stack (media on top, notes below). */
+ * All color/radii/type come from app/tokens.css via var(). Desktop/tablet:
+ * two columns (media | notes). Phone (≤640px): the columns stack (media on
+ * top, notes below). */
 
 .backdrop {
   position: fixed;
@@ -12,7 +11,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.78);
+  background: var(--scrim-strong);
   overflow: auto;
   animation: fade 140ms ease-out;
 }

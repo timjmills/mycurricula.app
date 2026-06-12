@@ -194,7 +194,7 @@ export function CompareToMaster({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(20, 22, 32, 0.32)",
+        background: "var(--scrim-soft)",
       }}
     >
       <div

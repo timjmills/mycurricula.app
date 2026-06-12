@@ -147,13 +147,27 @@ Documents/      Planning docs + design handoff — NOT part of the app, never im
 
 ## 4. Design system rules
 
-The visual system has two independent axes, both set as `<html>` data attributes by
+The visual system has three independent axes, all set as `<html>` data attributes by
 `lib/theme.tsx`:
 
 - `data-style` ∈ `quiet | calm | vivid` — card treatment. **The app defaults to
   `vivid`**; `quiet` and `calm` remain available as teacher preferences.
 - `data-palette` ∈ `normal | highlight` — subject-color saturation. **Defaults to
   `highlight`.**
+- `data-theme` ∈ `paper | cloud | night | mint | sky | blossom` — the app-wide color
+  theme (foundation neutrals, scrims, shadows, mesh, logo lockup). **Defaults to
+  `paper`** (the original warm-cream look; the plain `:root` block in `tokens.css`
+  IS the Paper theme). `night` is the dark mode. A teacher can also store
+  `"system"` (the "Follow system" picker option) — it resolves to `paper`/`night`
+  via `prefers-color-scheme` before reaching the DOM, so `data-theme` only ever
+  carries a concrete theme. Theme overrides live in `:root[data-theme="…"]` blocks
+  at the end of `tokens.css`, wrapped in `@media screen` so **print always renders
+  Paper**. Subject hues are deliberately NOT themed (color carries team-wide
+  meaning); Night re-tints only the subject `-tint`/`-ink` companions. The logo
+  re-colors per theme through the `--logo-*` tokens. All three axes persist to
+  localStorage (`mycurricula:user:theme*`) and paint pre-hydration via the
+  no-FOUC boot script in `lib/theme-init.tsx` — its allowlists must stay in
+  lockstep with `lib/theme.tsx`.
 
 **Hard rules:**
 

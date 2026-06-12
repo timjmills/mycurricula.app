@@ -155,7 +155,7 @@
   border: 1px solid color-mix(in oklch, var(--c) 70%, var(--ink));
   border-radius: var(--r-pill);
   background: var(--c, var(--brand-500));
-  color: var(--paper);
+  color: var(--on-solid);
   font-size: var(--t-13);
   font-weight: 600;
   letter-spacing: 0.1px;

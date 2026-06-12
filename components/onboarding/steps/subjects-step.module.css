@@ -163,8 +163,8 @@
   outline-offset: 2px;
 }
 
-/* Checkmark for the selected swatch — inherits paper color via currentColor
-   on the SVG path, so no hard-coded hex needed. */
+/* Checkmark for the selected swatch — white ink over the saturated subject
+   swatch (set inline from the palette), via currentColor on the SVG path. */
 .swatchCheck {
   position: absolute;
   inset: 0;
@@ -172,7 +172,7 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 /* ── Academic / non-academic picker ────────────────────────────────────── */

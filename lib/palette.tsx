@@ -65,9 +65,22 @@ export function PaletteCssBridge(): ReactNode {
       // v1.3 recipe (mirror resolveSubjectColor): the soft tint is the fill
       // (--cl), the bright/solid accent is the outline/stripe/dot (--c), and
       // text stays dark ink (--cd). Highlight palette → bright accent; Normal
-      // → muted solid. Legacy swatches fall back to highlight + a mixed tint.
+      // → muted solid.
+      //
+      // For v1.3 slots (id `subj-N`) emit token REFERENCES so the night theme's
+      // per-slot overrides in tokens.css cascade through. Legacy swatches have
+      // no token family, so they keep their hexes — with the tint fallback
+      // mixing toward var(--tint-base) (white on light, dark surface on night).
+      if (/^subj-\d+$/.test(swatch.id)) {
+        const c =
+          type === "highlight"
+            ? `var(--${swatch.id}-bright)`
+            : `var(--${swatch.id})`;
+        return `.cp-subj.${s.id} { --c: ${c}; --cl: var(--${swatch.id}-tint); --cd: var(--${swatch.id}-ink); }`;
+      }
       const tint =
-        swatch.tint ?? `color-mix(in oklch, ${swatch.normal} 18%, #fff)`;
+        swatch.tint ??
+        `color-mix(in oklch, ${swatch.normal} 18%, var(--tint-base))`;
       const c =
         type === "highlight"
           ? (swatch.bright ?? swatch.highlight)

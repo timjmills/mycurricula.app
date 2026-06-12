@@ -91,14 +91,14 @@
 
 .buttonActive {
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
   border-color: transparent;
   box-shadow: var(--sh-brand);
 }
 
 .buttonActive:hover {
   background: var(--brand-600);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 /* The icon sits in a centered slot — the SVG inside picks up `color` via

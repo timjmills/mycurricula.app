@@ -35,21 +35,9 @@ body {
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   background:
-    radial-gradient(
-      38% 30% at 10% 2%,
-      rgba(244, 183, 64, 0.13),
-      transparent 60%
-    ),
-    radial-gradient(
-      34% 26% at 94% 6%,
-      rgba(139, 92, 246, 0.1),
-      transparent 60%
-    ),
-    radial-gradient(
-      40% 34% at 90% 98%,
-      rgba(122, 199, 155, 0.1),
-      transparent 60%
-    ),
+    radial-gradient(38% 30% at 10% 2%, var(--mesh-a), transparent 60%),
+    radial-gradient(34% 26% at 94% 6%, var(--mesh-b), transparent 60%),
+    radial-gradient(40% 34% at 90% 98%, var(--mesh-c), transparent 60%),
     var(--canvas);
   background-attachment: fixed;
 }
@@ -111,6 +99,10 @@ body:has([data-teach-view]) nav:has([data-rail-side]) {
 
   body {
     background: white;
+    /* Force dark ink on paper. The @media screen theme wrapper already keeps
+       print on the Paper (:root) values, so a night-theme teacher's printout
+       is light — this is the belt-and-suspenders text guarantee. */
+    color: #1c1b2e;
   }
 
   #main-content {

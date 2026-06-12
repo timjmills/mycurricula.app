@@ -9,7 +9,13 @@ import {
   Caveat,
 } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider, DEFAULT_STYLE, DEFAULT_PALETTE } from "@/lib/theme";
+import {
+  ThemeProvider,
+  DEFAULT_STYLE,
+  DEFAULT_PALETTE,
+  DEFAULT_THEME,
+} from "@/lib/theme";
+import { ThemeInit } from "@/lib/theme-init";
 import { LabelsProvider } from "@/lib/labels";
 import { InstanceLabelsProvider } from "@/lib/instance-labels";
 
@@ -70,28 +76,40 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // data-style / data-palette are rendered on the server with the dev
-  // defaults so token CSS is correct before hydration; ThemeProvider then
-  // owns subsequent changes.
+  // data-style / data-palette / data-theme are rendered on the server with
+  // the app defaults so token CSS is correct before hydration. The boot
+  // script (ThemeInit, first child of <body>) then overwrites them pre-paint
+  // with the teacher's PERSISTED choices to avoid a flash; ThemeProvider owns
+  // subsequent changes. data-theme is always a RESOLVED value (never the
+  // "system" sentinel) — DEFAULT_THEME is "paper" (concrete), so the literal
+  // below stays correct; the boot script resolves a stored "system" to
+  // night/paper before it ever paints.
   return (
     <html
       lang="en"
       // suppressHydrationWarning is scoped to <html>'s own attributes (it is
       // non-recursive — it does NOT hide mismatches in the component tree
       // below). The root element is the node browser extensions (Grammarly,
-      // dark-mode/translation tools) and the ThemeProvider's post-mount dataset
-      // writes mutate before/at hydration, producing a benign attribute diff on
-      // <html>/<body>. This is the standard Next.js theme-provider mitigation.
+      // dark-mode/translation tools), the ThemeInit boot script, and the
+      // ThemeProvider's post-mount dataset writes all mutate before/at
+      // hydration, producing a benign attribute diff on <html>/<body>. This is
+      // the standard Next.js theme-provider mitigation.
       suppressHydrationWarning
       data-style={DEFAULT_STYLE}
       data-palette={DEFAULT_PALETTE}
+      data-theme="paper"
       className={`${GeistSans.variable} ${GeistMono.variable} ${poppins.variable} ${dmSans.variable} ${jakarta.variable} ${quicksand.variable} ${caveat.variable} h-full antialiased`}
     >
       <body
         suppressHydrationWarning
         className="cp-root flex min-h-full flex-col"
       >
-        <ThemeProvider>
+        {/* ThemeInit must be the FIRST child of <body>: its inline script
+            paints the persisted theme/style/palette attributes onto <html>
+            before the browser's first paint, so a Night (or any non-default)
+            theme does not flash the Paper default. See lib/theme-init.tsx. */}
+        <ThemeInit />
+        <ThemeProvider initialTheme={DEFAULT_THEME}>
           {/* LabelsProvider hosts the renameable Subject/Unit/Lesson/Section
               captions. Mounted near the root so every surface — Settings,
               the ResourceComposer's routing pickers, future breadcrumbs —

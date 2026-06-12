@@ -202,7 +202,7 @@
 
 .filterPillActive {
   background: var(--wf-purple-accent);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .filterPillFav {
@@ -212,7 +212,7 @@
 
 .filterPillFavActive {
   background: var(--wf-yellow-accent);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 /* ── Favorites band ────────────────────────────────────────────────────────── */

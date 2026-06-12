@@ -730,6 +730,92 @@
   --sh-lg: 0 22px 48px -16px rgba(28, 27, 46, 0.2);
   --sh-brand: 0 12px 26px -10px rgba(59, 108, 246, 0.45);
   --sh-honey: 0 12px 26px -10px rgba(233, 165, 38, 0.55);
+
+  /* ── Theme contract — base tokens the 6 app-wide themes swap ─────────────
+     A third visual axis, data-theme on <html> ∈ paper|cloud|night|mint|sky|
+     blossom (see lib/theme.tsx). THIS :root block IS the Paper theme — there
+     is deliberately no [data-theme="paper"] override; Paper stays the default
+     fallback and every value here is its Paper value. The 5 other themes are
+     appended at the very end of this file (after the data-style blocks) as
+     :root[data-theme="…"] overrides, all wrapped in @media screen so print
+     always falls back to these Paper values.
+
+     The tokens below are the parts of the theme surface that components must
+     reference indirectly (scrims, drag shadows, the body mesh, text
+     selection, the logo lockup, the picker chrome). Hard-coded literals in
+     components would not retheme — these vars are the seam. */
+
+  /* Scrims — modal/lightbox backdrops (themed; components reference these) */
+  --scrim: rgba(20, 22, 32, 0.42);
+  --scrim-soft: rgba(20, 22, 32, 0.32);
+  --scrim-strong: rgba(0, 0, 0, 0.78);
+  --scrim-lightbox: rgba(0, 0, 0, 0.85);
+
+  /* Drag-elevation shadows (lesson cards append their subject ring inline) */
+  --shadow-drag: 0 12px 28px rgba(20, 22, 32, 0.18);
+  --shadow-drag-soft: 0 4px 14px rgba(20, 22, 32, 0.1);
+
+  /* Atmospheric mesh glows (globals.css body background) */
+  --mesh-a: rgba(244, 183, 64, 0.13);
+  --mesh-b: rgba(139, 92, 246, 0.1);
+  --mesh-c: rgba(122, 199, 155, 0.1);
+
+  /* Text selection */
+  --selection-bg: #dce6ff;
+  --selection-fg: #1c1b2e;
+
+  /* Mix base for tint recipes — themes swap it so color-mix tints track the
+     surface (e.g. a dark theme mixes toward its dark surface, not white). */
+  --tint-base: #ffffff;
+
+  /* Ink on saturated solids (brand CTAs, status pills, day chips). NEVER
+     themed: solid accents stay saturated in every theme, so their ink stays
+     white. Use this — not var(--paper) — for text/icons over brand-500/600,
+     danger, urgent and similar solids; --paper tracks the SURFACE in dark
+     themes and would flip such text dark-on-dark. */
+  --on-solid: #ffffff;
+
+  /* Logo lockup — every theme re-colors the brand. The logo is its OWN
+     gradient (NOT --grad-honey, which buttons share), so a theme can repaint
+     the brand mark without disturbing button identity. */
+  --logo-tile-grad: linear-gradient(135deg, #f8cc5c 0%, #f4b740 100%);
+  --logo-tile-shadow: 0 12px 26px -10px rgba(233, 165, 38, 0.55);
+  --logo-book-a: #ffffff;
+  --logo-book-b: #3a2a05;
+  --logo-text: var(--ink);
+  --logo-tld: var(--honey-600);
+
+  /* Theme accent (picker chrome — the selected-theme ring/highlight) */
+  --theme-accent: var(--honey-500);
+  --theme-accent-soft: var(--honey-50);
+
+  /* Static picker swatches — NEVER themed. The theme picker previews every
+     option at once, so each option's swatch must resolve to its OWN colors
+     regardless of the active theme. These live outside every override block. */
+  --swatch-paper-canvas: #fcfaf6;
+  --swatch-paper-surface: #ffffff;
+  --swatch-paper-accent: #f4b740;
+  --swatch-paper-ink: #1c1b2e;
+  --swatch-cloud-canvas: #fdfdfe;
+  --swatch-cloud-surface: #ffffff;
+  --swatch-cloud-accent: #5b6478;
+  --swatch-cloud-ink: #1c1b2e;
+  --swatch-night-canvas: #14131d;
+  --swatch-night-surface: #1e1d2c;
+  --swatch-night-accent: #8b7fc0;
+  --swatch-night-ink: #f0eff8;
+  --swatch-mint-canvas: #eef9f2;
+  --swatch-mint-surface: #ffffff;
+  --swatch-mint-accent: #1fa85a;
+  --swatch-mint-ink: #1c1b2e;
+  --swatch-sky-canvas: #eef5fd;
+  --swatch-sky-surface: #ffffff;
+  --swatch-sky-accent: #2e6be6;
+  --swatch-sky-ink: #1c1b2e;
+  --swatch-blossom-canvas: #fcf0f6;
+  --swatch-blossom-surface: #ffffff;
+  --swatch-blossom-accent: #e84e93;
+  --swatch-blossom-ink: #1c1b2e;
 }
 
 /* ── Base resets scoped to components ─────────────────────────────────── */
@@ -780,9 +866,13 @@
   --cd: var(--math-deep);
   /* Lane-card layered-system role tokens */
   --c-surface: var(--math-light);
-  --c-surface-strong: color-mix(in srgb, var(--math) 22%, white);
+  --c-surface-strong: color-mix(in srgb, var(--math) 22%, var(--tint-base));
   --c-border: color-mix(in srgb, var(--math) 30%, transparent);
-  --c-progress-track: color-mix(in srgb, var(--math-light) 60%, white);
+  --c-progress-track: color-mix(
+    in srgb,
+    var(--math-light) 60%,
+    var(--tint-base)
+  );
   --c-progress-fill: var(--math);
   --c-deep: var(--math-deep);
 }
@@ -792,9 +882,13 @@
   --cd: var(--reading-deep);
   /* Lane-card layered-system role tokens */
   --c-surface: var(--reading-light);
-  --c-surface-strong: color-mix(in srgb, var(--reading) 22%, white);
+  --c-surface-strong: color-mix(in srgb, var(--reading) 22%, var(--tint-base));
   --c-border: color-mix(in srgb, var(--reading) 30%, transparent);
-  --c-progress-track: color-mix(in srgb, var(--reading-light) 60%, white);
+  --c-progress-track: color-mix(
+    in srgb,
+    var(--reading-light) 60%,
+    var(--tint-base)
+  );
   --c-progress-fill: var(--reading);
   --c-deep: var(--reading-deep);
 }
@@ -804,9 +898,13 @@
   --cd: var(--writing-deep);
   /* Lane-card layered-system role tokens */
   --c-surface: var(--writing-light);
-  --c-surface-strong: color-mix(in srgb, var(--writing) 22%, white);
+  --c-surface-strong: color-mix(in srgb, var(--writing) 22%, var(--tint-base));
   --c-border: color-mix(in srgb, var(--writing) 30%, transparent);
-  --c-progress-track: color-mix(in srgb, var(--writing-light) 60%, white);
+  --c-progress-track: color-mix(
+    in srgb,
+    var(--writing-light) 60%,
+    var(--tint-base)
+  );
   --c-progress-fill: var(--writing);
   --c-deep: var(--writing-deep);
 }
@@ -816,9 +914,13 @@
   --cd: var(--grammar-deep);
   /* Lane-card layered-system role tokens */
   --c-surface: var(--grammar-light);
-  --c-surface-strong: color-mix(in srgb, var(--grammar) 22%, white);
+  --c-surface-strong: color-mix(in srgb, var(--grammar) 22%, var(--tint-base));
   --c-border: color-mix(in srgb, var(--grammar) 30%, transparent);
-  --c-progress-track: color-mix(in srgb, var(--grammar-light) 60%, white);
+  --c-progress-track: color-mix(
+    in srgb,
+    var(--grammar-light) 60%,
+    var(--tint-base)
+  );
   --c-progress-fill: var(--grammar);
   --c-deep: var(--grammar-deep);
 }
@@ -828,9 +930,13 @@
   --cd: var(--spelling-deep);
   /* Lane-card layered-system role tokens */
   --c-surface: var(--spelling-light);
-  --c-surface-strong: color-mix(in srgb, var(--spelling) 22%, white);
+  --c-surface-strong: color-mix(in srgb, var(--spelling) 22%, var(--tint-base));
   --c-border: color-mix(in srgb, var(--spelling) 30%, transparent);
-  --c-progress-track: color-mix(in srgb, var(--spelling-light) 60%, white);
+  --c-progress-track: color-mix(
+    in srgb,
+    var(--spelling-light) 60%,
+    var(--tint-base)
+  );
   --c-progress-fill: var(--spelling);
   --c-deep: var(--spelling-deep);
 }
@@ -842,9 +948,13 @@
      ufli-deep (#93401e) on ufli surface-strong: color-mix(ufli 22%, white)
      is approximately #f8d6c8 — WCAG ratio ~5.2:1 (AA passes). */
   --c-surface: var(--ufli-light);
-  --c-surface-strong: color-mix(in srgb, var(--ufli) 22%, white);
+  --c-surface-strong: color-mix(in srgb, var(--ufli) 22%, var(--tint-base));
   --c-border: color-mix(in srgb, var(--ufli) 30%, transparent);
-  --c-progress-track: color-mix(in srgb, var(--ufli-light) 60%, white);
+  --c-progress-track: color-mix(
+    in srgb,
+    var(--ufli-light) 60%,
+    var(--tint-base)
+  );
   --c-progress-fill: var(--ufli);
   --c-deep: var(--ufli-deep);
 }
@@ -856,9 +966,17 @@
      explorers-deep (#7a5810) on explorers surface-strong: color-mix(explorers 22%, white)
      is approximately #f5e8c4 — WCAG ratio ~5.0:1 (AA passes). */
   --c-surface: var(--explorers-light);
-  --c-surface-strong: color-mix(in srgb, var(--explorers) 22%, white);
+  --c-surface-strong: color-mix(
+    in srgb,
+    var(--explorers) 22%,
+    var(--tint-base)
+  );
   --c-border: color-mix(in srgb, var(--explorers) 30%, transparent);
-  --c-progress-track: color-mix(in srgb, var(--explorers-light) 60%, white);
+  --c-progress-track: color-mix(
+    in srgb,
+    var(--explorers-light) 60%,
+    var(--tint-base)
+  );
   --c-progress-fill: var(--explorers);
   --c-deep: var(--explorers-deep);
 }
@@ -868,9 +986,13 @@
   --cd: var(--sel-deep);
   /* Lane-card layered-system role tokens */
   --c-surface: var(--sel-light);
-  --c-surface-strong: color-mix(in srgb, var(--sel) 22%, white);
+  --c-surface-strong: color-mix(in srgb, var(--sel) 22%, var(--tint-base));
   --c-border: color-mix(in srgb, var(--sel) 30%, transparent);
-  --c-progress-track: color-mix(in srgb, var(--sel-light) 60%, white);
+  --c-progress-track: color-mix(
+    in srgb,
+    var(--sel-light) 60%,
+    var(--tint-base)
+  );
   --c-progress-fill: var(--sel);
   --c-deep: var(--sel-deep);
 }
@@ -930,6 +1052,13 @@
   background: transparent;
 }
 
+/* Text selection — themed so highlighted text stays legible on every theme
+   surface (a dark theme needs a darker selection band than Paper's). */
+.cp-root ::selection {
+  background: var(--selection-bg);
+  color: var(--selection-fg);
+}
+
 /* ── Card-style axis ──────────────────────────────────────────────────
    The weekly grid renders one of three card styles, selected by
    data-style on <html>. Components read these flags; the values below
@@ -949,4 +1078,335 @@
 :root[data-style="vivid"] {
   --card-fill: var(--cl, var(--ink-100));
   --card-stripe-w: 4px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   THEME AXIS — data-theme on <html> ∈ paper | cloud | night | mint | sky |
+   blossom (see lib/theme.tsx). The :root block at the top of this file IS
+   the Paper theme; the five blocks below are overrides for the other five.
+
+   WHY @media screen: every override lives inside one screen-only wrapper so
+   that PRINT always falls back to the Paper (:root) values. This is the
+   cleanest "paper output stays light" guarantee — a night-theme teacher who
+   hits Print gets the same clean, ink-on-cream sheet as everyone else, with
+   no per-component print overrides needed.
+
+   WHAT IS DELIBERATELY NOT THEMED (these keep their :root values in every
+   theme because their meaning is fixed team-wide or their identity is fixed):
+     • Subject solids + brights (--subj-N, --subj-N-bright) and the 8 subject
+       solids — hue carries team-wide subject meaning; only the per-theme
+       TINT/INK recipes shift so fills track the surface.
+     • Brand indigo (--brand-*) and honey (--honey-*) — functional primary +
+       CTA identity, constant across themes.
+     • Tag mid-tones (--tag-<name>) — saturated dot identity (only the -bg/-fg
+       pill chrome retints under night).
+     • Highlighter pens (--hl-*) — the marker ink a teacher picks is constant
+       (only the pastel -hlp-* note wash retints under night).
+     • --wf-* / --board-tint-* / --teach-bg-* / --teach-hue-* and the Teach
+       traffic/alarm signals — the Teach board has its OWN appearance system.
+     • Fonts, radii (the --r- and --wf-r- ladders), spacing, z-scale, and
+       chrome geometry.
+
+   The light themes (cloud / mint / sky / blossom) are gentle re-tints of the
+   Paper neutral ramp — surface stays #ffffff, shadows/scrims/status/tags/
+   subjects unchanged; only the canvas/hairline/border steps, selection, mesh,
+   logo, and picker accent move. Night is a full dark inversion and carries
+   the heavy lifting (its own ink ramp, shadows, scrims, and tint recipes).
+   ════════════════════════════════════════════════════════════════════════ */
+@media screen {
+  /* ── Cloud — cool neutral paper (the "greyscale" light theme) ──────────── */
+  :root[data-theme="cloud"] {
+    --canvas: #fdfdfe;
+    --ink-50: #fdfdfe;
+    --surface-warm: #fafbfd;
+    --hairline: #f3f4f7;
+    --ink-100: #f3f4f7;
+    --border: #e7e9f0;
+    --ink-150: #e7e9f0;
+    --ink-200: #d6d9e4;
+    --ink-300: #bcc0d0;
+    --faint: #bcc0d0; /* alias of ink-300 — keep in sync */
+    --border-cool: #e4e7f0;
+    --selection-bg: #dce6ff;
+    --logo-tile-grad: linear-gradient(135deg, #5b6478 0%, #3b4456 100%);
+    --logo-tile-shadow: 0 12px 26px -10px rgba(59, 68, 86, 0.45);
+    --logo-book-b: #101729;
+    --logo-tld: #3b4456;
+    --theme-accent: #5b6478;
+    --theme-accent-soft: #eef0f4;
+    --mesh-a: rgba(59, 108, 246, 0.05);
+    --mesh-b: rgba(139, 92, 246, 0.04);
+    --mesh-c: rgba(71, 177, 209, 0.04);
+  }
+
+  /* ── Mint — soft green paper ───────────────────────────────────────────────
+     Wash depth note (all three washes): the canvas carries enough chroma to
+     NAME the theme at a glance — white cards floating on tinted paper — while
+     body text keeps ≥7:1 on the canvas. The mesh leans into the theme's hue
+     so the atmosphere, not the chrome, does the talking. */
+  :root[data-theme="mint"] {
+    --canvas: #eef9f2;
+    --ink-50: #eef9f2;
+    --surface-warm: #f6fbf8;
+    --hairline: #e2f2e8;
+    --ink-100: #e2f2e8;
+    --border: #d3e8db;
+    --ink-150: #d3e8db;
+    --ink-200: #c9dfd0;
+    --ink-300: #a8c4b1;
+    --faint: #a8c4b1; /* alias of ink-300 — keep in sync */
+    --border-cool: #d5e7e0;
+    --selection-bg: #d9f0df;
+    --logo-tile-grad: linear-gradient(135deg, #34b96a 0%, #1fa85a 100%);
+    --logo-tile-shadow: 0 12px 26px -10px rgba(31, 168, 90, 0.45);
+    --logo-book-b: #0d3a22;
+    --logo-tld: #166534;
+    --theme-accent: #1fa85a;
+    --theme-accent-soft: #eaf6ed;
+    --mesh-a: rgba(31, 168, 90, 0.14);
+    --mesh-b: rgba(122, 199, 155, 0.1);
+    --mesh-c: rgba(244, 183, 64, 0.06);
+  }
+
+  /* ── Sky — soft blue paper ─────────────────────────────────────────────── */
+  :root[data-theme="sky"] {
+    --canvas: #eef5fd;
+    --ink-50: #eef5fd;
+    --surface-warm: #f5f9fe;
+    --hairline: #e3eefa;
+    --ink-100: #e3eefa;
+    --border: #d2e2f3;
+    --ink-150: #d2e2f3;
+    --ink-200: #c5d8ee;
+    --ink-300: #a3bedd;
+    --faint: #a3bedd; /* alias of ink-300 — keep in sync */
+    --border-cool: #d6e4f4;
+    --selection-bg: #d8e7fd;
+    --logo-tile-grad: linear-gradient(135deg, #4788d1 0%, #2e6be6 100%);
+    --logo-tile-shadow: 0 12px 26px -10px rgba(46, 107, 230, 0.45);
+    --logo-book-b: #102a52;
+    --logo-tld: #2543b0;
+    --theme-accent: #2e6be6;
+    --theme-accent-soft: #e9f1fe;
+    --mesh-a: rgba(46, 107, 230, 0.12);
+    --mesh-b: rgba(71, 182, 209, 0.1);
+    --mesh-c: rgba(139, 92, 246, 0.05);
+  }
+
+  /* ── Blossom — soft pink paper ─────────────────────────────────────────── */
+  :root[data-theme="blossom"] {
+    --canvas: #fcf0f6;
+    --ink-50: #fcf0f6;
+    --surface-warm: #fdf6fa;
+    --hairline: #f6e6ee;
+    --ink-100: #f6e6ee;
+    --border: #eed6e3;
+    --ink-150: #eed6e3;
+    --ink-200: #e6cad8;
+    --ink-300: #d0a9bd;
+    --faint: #d0a9bd; /* alias of ink-300 — keep in sync */
+    --border-cool: #ecdcea;
+    --selection-bg: #fad3e3;
+    --logo-tile-grad: linear-gradient(135deg, #e87aa9 0%, #e84e93 100%);
+    --logo-tile-shadow: 0 12px 26px -10px rgba(232, 78, 147, 0.45);
+    --logo-book-b: #5c1033;
+    --logo-tld: #9d174d;
+    --theme-accent: #e84e93;
+    --theme-accent-soft: #fce5ee;
+    --mesh-a: rgba(232, 78, 147, 0.11);
+    --mesh-b: rgba(199, 122, 199, 0.09);
+    --mesh-c: rgba(244, 183, 64, 0.06);
+  }
+
+  /* ── Night — full dark inversion ───────────────────────────────────────────
+     The only dark theme. Owns its own ink ramp (inverted: ink-900 is now the
+     LIGHTEST text), dark surfaces, recolored shadows/scrims, and — because
+     color-mix toward white would blow out on a dark surface — its own subject /
+     status / tag / highlighter TINT recipes that mix toward --surface instead.
+     Subject solids, brand, honey, tag mid-tones, and highlighter pens stay at
+     their :root values (see "NOT THEMED" note above). */
+  :root[data-theme="night"] {
+    color-scheme: dark;
+
+    /* Inverted ink ramp — 900 is the lightest, 50 the darkest (= canvas). */
+    --ink-900: #f0eff8;
+    --ink-800: #e2e1ef;
+    --ink-700: #d4d2e4;
+    --ink-600: #c4c2d6;
+    --ink-500: #b4b2c8;
+    --ink-400: #8d8ba4;
+    /* 300 doubles as `--faint` text (time gutter, switcher hints) — must hold
+       ≥3:1 on --surface (#74728f ≈ 3.6:1) while staying below --muted (5:1). */
+    --ink-300: #74728f;
+    --ink-200: #403e58;
+    --ink-150: #34324a;
+    --ink-100: #282737;
+    --ink-50: #14131d;
+
+    /* Surfaces */
+    --canvas: #14131d;
+    --surface: #1e1d2c;
+    --paper: #1e1d2c;
+    --surface-warm: #262538;
+
+    /* Semantic neutral aliases */
+    --ink: #f0eff8;
+    --ink-soft: #d4d2e4;
+    --body: #b4b2c8;
+    --muted: #8d8ba4;
+    --faint: #74728f; /* alias of ink-300 — keep in sync */
+    --border: #34324a;
+    --border-cool: #323852;
+    --hairline: #282737;
+
+    /* Mesh + selection */
+    --mesh-a: rgba(139, 92, 246, 0.14);
+    --mesh-b: rgba(59, 108, 246, 0.1);
+    --mesh-c: rgba(244, 183, 64, 0.05);
+    --selection-bg: #4a4870;
+    --selection-fg: #f0eff8;
+
+    /* Scrims — darker than Paper so backdrops still read over a dark canvas. */
+    --scrim: rgba(5, 5, 10, 0.55);
+    --scrim-soft: rgba(5, 5, 10, 0.45);
+    --scrim-strong: rgba(0, 0, 0, 0.82);
+    --scrim-lightbox: rgba(0, 0, 0, 0.88);
+
+    /* Shadows — recolored to near-black (the warm-violet rgba reads as a
+       grey haze on dark). Each token keeps its :root geometry; only the
+       color/alpha change. */
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.36);
+    --shadow-card-hover:
+      0 2px 6px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.44);
+    --shadow-popover:
+      0 2px 4px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.55);
+    --sh-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
+    --sh-sm: 0 2px 6px rgba(0, 0, 0, 0.3);
+    --sh-md: 0 10px 24px -10px rgba(0, 0, 0, 0.45);
+    --sh-lg: 0 22px 48px -16px rgba(0, 0, 0, 0.55);
+    --shadow-drag: 0 12px 28px rgba(0, 0, 0, 0.55);
+    --shadow-drag-soft: 0 4px 14px rgba(0, 0, 0, 0.4);
+
+    /* Mix base — tints now mix toward the dark surface, not white. */
+    --tint-base: #1e1d2c;
+
+    /* Brand tint/deep pair — brand-50/100 are light tint SURFACES (selected
+       chips, active tabs) and brand-700 their deep TEXT all over the planner;
+       on a dark surface the tints re-mix dark and the text goes light, same
+       recipe as the tag pills. brand-500/600 (solid CTAs) stay saturated. */
+    --brand-50: color-mix(in srgb, #3b6cf6 16%, #1e1d2c);
+    --brand-100: color-mix(in srgb, #3b6cf6 26%, #1e1d2c);
+    --brand-200: color-mix(in srgb, #3b6cf6 36%, #1e1d2c);
+    --brand-700: color-mix(in srgb, #3b6cf6 45%, white);
+
+    /* Honey tint/deep pair — same shape as brand: honey-50/100 are eyebrow-
+       pill and "today" chip SURFACES, honey-600 is exclusively their deep
+       TEXT (verified: zero background/border consumers). The amber warms
+       instead of glares on the dark surface. honey-300..500 (logo + button
+       gradients) stay saturated. */
+    --honey-50: color-mix(in srgb, #e9a526 14%, #1e1d2c);
+    --honey-100: color-mix(in srgb, #e9a526 26%, #1e1d2c);
+    --honey-600: color-mix(in srgb, #e9a526 60%, white);
+
+    /* Logo + picker accent */
+    --logo-tile-grad: linear-gradient(135deg, #8b7fc0 0%, #564d99 100%);
+    --logo-tile-shadow: 0 12px 26px -10px rgba(139, 127, 192, 0.45);
+    --logo-book-b: #221d4a; /* --logo-book-a stays #fff via :root */
+    --logo-tld: var(--honey-400);
+    --theme-accent: #8b7fc0;
+    --theme-accent-soft: #2a2940;
+
+    /* Subject tint/ink recipes — mix toward the dark surface so fills sit on
+       night without glowing, and lift ink toward white for AA on the dark
+       tint. Solids (--subj-N) + brights are untouched, so the 8 subject
+       aliases (var() refs to slots) inherit these new tints/inks for free. */
+    --subj-1-tint: color-mix(in oklch, var(--subj-1) 24%, var(--surface));
+    --subj-1-ink: color-mix(in oklch, var(--subj-1) 62%, white);
+    --subj-2-tint: color-mix(in oklch, var(--subj-2) 24%, var(--surface));
+    --subj-2-ink: color-mix(in oklch, var(--subj-2) 62%, white);
+    --subj-3-tint: color-mix(in oklch, var(--subj-3) 24%, var(--surface));
+    --subj-3-ink: color-mix(in oklch, var(--subj-3) 62%, white);
+    --subj-4-tint: color-mix(in oklch, var(--subj-4) 24%, var(--surface));
+    --subj-4-ink: color-mix(in oklch, var(--subj-4) 62%, white);
+    --subj-5-tint: color-mix(in oklch, var(--subj-5) 24%, var(--surface));
+    --subj-5-ink: color-mix(in oklch, var(--subj-5) 62%, white);
+    --subj-6-tint: color-mix(in oklch, var(--subj-6) 24%, var(--surface));
+    --subj-6-ink: color-mix(in oklch, var(--subj-6) 62%, white);
+    --subj-7-tint: color-mix(in oklch, var(--subj-7) 24%, var(--surface));
+    --subj-7-ink: color-mix(in oklch, var(--subj-7) 62%, white);
+    --subj-8-tint: color-mix(in oklch, var(--subj-8) 24%, var(--surface));
+    --subj-8-ink: color-mix(in oklch, var(--subj-8) 62%, white);
+    --subj-9-tint: color-mix(in oklch, var(--subj-9) 24%, var(--surface));
+    --subj-9-ink: color-mix(in oklch, var(--subj-9) 62%, white);
+    --subj-10-tint: color-mix(in oklch, var(--subj-10) 24%, var(--surface));
+    --subj-10-ink: color-mix(in oklch, var(--subj-10) 62%, white);
+    --subj-11-tint: color-mix(in oklch, var(--subj-11) 24%, var(--surface));
+    --subj-11-ink: color-mix(in oklch, var(--subj-11) 62%, white);
+    --subj-12-tint: color-mix(in oklch, var(--subj-12) 24%, var(--surface));
+    --subj-12-ink: color-mix(in oklch, var(--subj-12) 62%, white);
+    --subj-13-tint: color-mix(in oklch, var(--subj-13) 24%, var(--surface));
+    --subj-13-ink: color-mix(in oklch, var(--subj-13) 62%, white);
+    --subj-14-tint: color-mix(in oklch, var(--subj-14) 24%, var(--surface));
+    --subj-14-ink: color-mix(in oklch, var(--subj-14) 62%, white);
+    --subj-15-tint: color-mix(in oklch, var(--subj-15) 24%, var(--surface));
+    --subj-15-ink: color-mix(in oklch, var(--subj-15) 62%, white);
+
+    /* Status tints — solids unchanged; tint/bg companions remix toward the
+       dark surface. --core-mode-deep is a text-on-tint fg → lift toward white. */
+    --done-tint: color-mix(in srgb, var(--done) 20%, var(--surface));
+    --progress-tint: color-mix(in srgb, var(--progress) 20%, var(--surface));
+    --idle-tint: color-mix(in srgb, var(--idle) 20%, var(--surface));
+    --warn-tint: color-mix(in srgb, var(--warn) 20%, var(--surface));
+    --danger-tint: color-mix(in srgb, var(--danger) 20%, var(--surface));
+    --urgent-bg: color-mix(in srgb, var(--urgent) 20%, var(--surface));
+    --important-bg: color-mix(in srgb, var(--important) 20%, var(--surface));
+    --fyi-bg: color-mix(in srgb, var(--fyi) 20%, var(--surface));
+    --catchup-bg: color-mix(in srgb, var(--catchup) 20%, var(--surface));
+    --core-mode-bg: color-mix(in srgb, var(--core-mode) 20%, var(--surface));
+    --core-mode-deep: color-mix(in srgb, var(--core-mode) 55%, white);
+
+    /* Tag-pill chrome — mid-tones (--tag-<name>) stay; the pastel bg/fg pairs
+       remix so pills sit on night and their text lifts to AA. */
+    --tag-pink-bg: color-mix(in srgb, var(--tag-pink) 20%, var(--surface));
+    --tag-pink-fg: color-mix(in srgb, var(--tag-pink) 55%, white);
+    --tag-blue-bg: color-mix(in srgb, var(--tag-blue) 20%, var(--surface));
+    --tag-blue-fg: color-mix(in srgb, var(--tag-blue) 55%, white);
+    --tag-red-bg: color-mix(in srgb, var(--tag-red) 20%, var(--surface));
+    --tag-red-fg: color-mix(in srgb, var(--tag-red) 55%, white);
+    --tag-gray-bg: color-mix(in srgb, var(--tag-gray) 20%, var(--surface));
+    --tag-gray-fg: color-mix(in srgb, var(--tag-gray) 55%, white);
+    --tag-amber-bg: color-mix(in srgb, var(--tag-amber) 20%, var(--surface));
+    --tag-amber-fg: color-mix(in srgb, var(--tag-amber) 55%, white);
+    --tag-green-bg: color-mix(in srgb, var(--tag-green) 20%, var(--surface));
+    --tag-green-fg: color-mix(in srgb, var(--tag-green) 55%, white);
+
+    /* Atmosphere gradients — hero + brand wash re-tuned for dark (these are
+       backdrops, not buttons). --grad-honey / --grad-dawn / --grad-mint are
+       button identity → left at :root. */
+    --grad-hero: linear-gradient(
+      118deg,
+      #2a2440 0%,
+      #232036 45%,
+      #1d2a38 100%
+    );
+    --grad-brand: linear-gradient(135deg, #232a44 0%, #2a2344 100%);
+
+    /* Highlighter note wash — pens (--hl-*) stay; the pastel -hlp-* tints (used
+       behind highlighted note text) remix toward the dark surface so a
+       highlighted run doesn't glare as a near-white block. */
+    --hlp-lemon: color-mix(in srgb, var(--hl-lemon) 30%, var(--surface));
+    --hlp-lime: color-mix(in srgb, var(--hl-lime) 30%, var(--surface));
+    --hlp-mint: color-mix(in srgb, var(--hl-mint) 30%, var(--surface));
+    --hlp-aqua: color-mix(in srgb, var(--hl-aqua) 30%, var(--surface));
+    --hlp-maya: color-mix(in srgb, var(--hl-maya) 30%, var(--surface));
+    --hlp-slate: color-mix(in srgb, var(--hl-slate) 30%, var(--surface));
+    --hlp-heliotrope: color-mix(
+      in srgb,
+      var(--hl-heliotrope) 30%,
+      var(--surface)
+    );
+    --hlp-violet: color-mix(in srgb, var(--hl-violet) 30%, var(--surface));
+    --hlp-red: color-mix(in srgb, var(--hl-red) 30%, var(--surface));
+    --hlp-cheese: color-mix(in srgb, var(--hl-cheese) 30%, var(--surface));
+  }
 }

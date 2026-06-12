@@ -44,7 +44,7 @@ import { useLabels, pluralize } from "@/lib/labels";
 import { weekKey } from "@/lib/instance-labels";
 import { InstanceRenameLabel } from "@/components/rename";
 import { useSubjectColor } from "@/lib/palette";
-import { CURRENT_WEEK, WEEK_DAYS } from "@/lib/mock";
+import { CURRENT_WEEK, SUBJECT_BY_ID, WEEK_DAYS } from "@/lib/mock";
 import { usePlanner } from "@/lib/planner-store";
 import { StatStrip } from "./StatStrip";
 import styles from "./SubjectWorkspace.module.css";
@@ -194,7 +194,11 @@ function SubjectRow({
 }: SubjectRowProps): ReactNode {
   const color = useSubjectColor(subjectId);
   const { subjectById } = usePlanner();
-  const subject = subjectById[subjectId];
+  // Catalog fallback: under the Supabase flag the store starts EMPTY on the
+  // server render (it hydrates in a client effect), so indexing the fixed
+  // 8-subject set must fall back to the locked static catalog or the
+  // prerender crashes on `.name` (cutover bug, deploy #108).
+  const subject = subjectById[subjectId] ?? SUBJECT_BY_ID[subjectId];
   // Renameable Unit caption — so the inline unit list under each subject reads
   // "Module 1" etc. when the team has renamed the level.
   const labels = useLabels();
@@ -274,7 +278,8 @@ function SubjectPane({
     subjectById,
     describeStandard,
   } = usePlanner();
-  const subject = subjectById[subjectId];
+  // Same catalog fallback as SubjectRow — see the comment there.
+  const subject = subjectById[subjectId] ?? SUBJECT_BY_ID[subjectId];
   const { setSelectedLessonId } = useAppState();
   // Renameable hierarchy captions (Subject / Unit / Week / Lesson). Picking a
   // term in Settings → Appearance retitles every heading below site-wide.

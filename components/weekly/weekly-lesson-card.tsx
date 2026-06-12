@@ -408,9 +408,9 @@ export function WeeklyLessonCard({
         ? `1px solid color-mix(in oklch, ${color.deep} 14%, transparent)`
         : "1px solid var(--ink-150)",
     boxShadow: isFloating
-      ? `0 12px 28px rgba(20,22,32,0.18), 0 0 0 1.5px ${color.stripe}`
+      ? `var(--shadow-drag), 0 0 0 1.5px ${color.stripe}`
       : hovered
-        ? "0 4px 14px rgba(20,22,32,0.10)"
+        ? "var(--shadow-drag-soft)"
         : "var(--shadow-card)",
     transform: isFloating ? "rotate(-1.2deg)" : "none",
     cursor: "pointer",

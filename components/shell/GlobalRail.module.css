@@ -167,7 +167,7 @@
   padding: 0 4px;
   border-radius: 999px;
   background: var(--urgent);
-  color: var(--paper);
+  color: var(--on-solid);
   font-size: var(--t-10);
   font-weight: 700;
   line-height: 16px;
@@ -216,7 +216,7 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--paper);
+  color: var(--on-solid);
   background: var(--catchup);
   border-radius: var(--r-4);
   padding: 2px 4px;

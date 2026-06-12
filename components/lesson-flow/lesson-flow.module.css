@@ -173,7 +173,7 @@
 
 .divergenceReset:hover {
   background: var(--important);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 .divergenceReset:focus-visible {
@@ -296,8 +296,8 @@
   border-radius: 6px 6px 8px 6px;
   background: var(--pin-color, var(--ink-400));
   /* Spec §3.1: pure white numeral on every badge regardless of pin hue.
-     `--paper` is the semantic "white surface" token. */
-  color: var(--paper);
+     `--on-solid` is white ink on a saturated solid in every theme. */
+  color: var(--on-solid);
   font-size: 13px; /* Spec §3.1: 13px numeral. */
   font-weight: 700;
   line-height: 1;
