@@ -69,6 +69,7 @@ import type { Lesson, LessonResource } from "@/lib/types";
 import type { SectionResource } from "@/lib/lesson-flow";
 import { ResourcePreview } from "@/components/resources";
 import { galleryCount, isNotecard, notecardPoster } from "@/lib/notecards";
+import { isSafeImgSrc } from "@/lib/resource-embed";
 import { dedupeLessonResources, resourceIdentity } from "@/lib/resources-dedup";
 import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
@@ -393,21 +394,10 @@ function thClassFor(r: LessonResource): string {
   }
 }
 
-// ── Safe-src + link-face helpers (local mirrors of the §0 card's, which are
-// not exported from ResourceCardFace) ───────────────────────────────────────
-
-/** Gate for every <img src> in this panel — http(s), blob:, base64
- *  data:image, or a same-origin root-relative path. Anything else (data:text,
- *  javascript:, protocol-relative //host) never reaches an <img>; the chain
- *  demotes to a designed face instead. */
-function isSafeImgSrc(url: string | undefined): url is string {
-  if (!url) return false;
-  if (/^(https?|blob):/i.test(url)) return true;
-  if (/^data:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml);base64,/i.test(url)) {
-    return true;
-  }
-  return /^\/(?![/\\])/.test(url);
-}
+// ── Link-face helpers (local mirrors of the §0 card's, which are not exported
+// from ResourceCardFace) ─────────────────────────────────────────────────────
+// <img src> safety uses the shared isSafeImgSrc (lib/resource-embed) — the one
+// sink gate every surface vets through.
 
 const TAG_TOKENS = [
   "red",

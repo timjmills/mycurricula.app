@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-import { canEmbedResource, embedDenialReason } from "@/lib/resource-embed";
+import {
+  canEmbedResource,
+  embedDenialReason,
+  isSafeUrl,
+  isSafeImgSrc,
+} from "@/lib/resource-embed";
 import { boardCanEmbed, isSafeBoardUrl } from "@/lib/board-embed";
 import { toTeachResource } from "@/lib/teach/toTeachResource";
 import type { LessonResource } from "@/lib/types";
@@ -302,5 +307,59 @@ describe("boardCanEmbed — single-authority parity on the board path", () => {
     });
     expect(hosted.url).toBeUndefined();
     expect(boardCanEmbed(hosted, null, "pdf")).toBe(true);
+  });
+});
+
+// ── Smuggle-char rejection (the shared sink gate) ──────────────────────────
+// A raw tab/newline/CR is stripped by the WHATWG URL parser BEFORE parsing, so
+// "/\t/evil.com/x" passes a naive root-relative test then normalizes to
+// "//evil.com/x" (a foreign origin). The single gate rejects it everywhere —
+// isSafeUrl, its isSafeBoardUrl re-export, isSafeImgSrc, and classifyEmbed.
+describe("isSafeUrl / isSafeImgSrc / isSafeBoardUrl — smuggle + scheme rules", () => {
+  const smuggles = ["/\t/evil.com/x", "/\n//evil", "/\r/evil", "/\t\\evil"];
+
+  it("rejects interior tab/newline/CR on every gate", () => {
+    for (const u of smuggles) {
+      expect(isSafeUrl(u)).toBe(false);
+      expect(isSafeBoardUrl(u)).toBe(false);
+      expect(isSafeImgSrc(u)).toBe(false);
+    }
+  });
+
+  it("isSafeBoardUrl IS the hardened isSafeUrl (no drift)", () => {
+    expect(isSafeBoardUrl).toBe(isSafeUrl);
+  });
+
+  it("still accepts the legitimate safe schemes", () => {
+    for (const u of [
+      "https://example.com/x",
+      "http://example.com/x",
+      "blob:https://app.example/abc",
+      "/api/resources/r-1",
+    ]) {
+      expect(isSafeUrl(u)).toBe(true);
+      expect(isSafeImgSrc(u)).toBe(true);
+    }
+  });
+
+  it("still rejects protocol-relative, backslash, and script schemes", () => {
+    for (const u of ["//evil.com/x", "/\\evil", "javascript:alert(1)", "data:text/html,x"]) {
+      expect(isSafeUrl(u)).toBe(false);
+      expect(isSafeImgSrc(u)).toBe(false);
+    }
+  });
+
+  it("isSafeImgSrc allows base64 data:image but isSafeUrl does not", () => {
+    const dataImg = "data:image/png;base64,iVBORw0KGgo=";
+    expect(isSafeImgSrc(dataImg)).toBe(true);
+    expect(isSafeUrl(dataImg)).toBe(false);
+    // non-base64 svg data: stays rejected (can carry <svg onload=…>)
+    expect(isSafeImgSrc("data:image/svg+xml,<svg onload=alert(1)>")).toBe(false);
+  });
+
+  it("classifyEmbed rejects an interior-tab media url as unsafe-scheme", () => {
+    const r = res({ type: "image", url: "/\timg.png", mimeType: "image/png" });
+    expect(canEmbedResource(r)).toBe(false);
+    expect(embedDenialReason(r)).toBe("unsafe-scheme");
   });
 });

@@ -91,7 +91,7 @@ import type { Lesson, LessonResource, SubjectId } from "@/lib/types";
 import { usePlanner } from "@/lib/planner-store";
 import { useLabels } from "@/lib/labels";
 import { Button, Tooltip } from "@/components/ui";
-import { parseResourceUrl } from "@/lib/resource-embed";
+import { parseResourceUrl, isSafeImgSrc } from "@/lib/resource-embed";
 import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
 import {
   resourceOwnerEvent,
@@ -2372,20 +2372,6 @@ function thumbClass(item: CapturedItem): string {
     default:
       return styles.thLink;
   }
-}
-
-/** Gate for every composer <img src> — local mirror of the ResourcesPanel /
- *  §0-card gate (not exported from either). http(s), blob:, base64
- *  data:image, or a same-origin root-relative path may reach an <img>;
- *  anything else (data:text/html, javascript:, protocol-relative //host)
- *  never does — the tile shows its type glyph instead. */
-function isSafeImgSrc(url: string | undefined): url is string {
-  if (!url) return false;
-  if (/^(https?|blob):/i.test(url)) return true;
-  if (/^data:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml);base64,/i.test(url)) {
-    return true;
-  }
-  return /^\/(?![/\\])/.test(url);
 }
 
 /** Safe-gated thumb src for a strip / gallery tile, plus an onError that

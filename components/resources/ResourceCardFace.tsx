@@ -55,6 +55,7 @@ import { createPortal } from "react-dom";
 import type { LessonResource } from "@/lib/types";
 import { hasNotes, isNotecard, notecardPoster } from "@/lib/notecards";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import { isSafeImgSrc } from "@/lib/resource-embed";
 import { Tooltip } from "@/components/ui";
 import styles from "./ResourceCardFace.module.css";
 
@@ -132,26 +133,6 @@ function pathOf(url: string): string | null {
   } catch {
     return null;
   }
-}
-
-/** Gate for every <img src> on this card — the same safety predicate the
- *  codebase already uses: a local mirror of ResourceEmbed's `isSafeUrl`
- *  (which is not exported there), plus the `data:image/…;base64,` slice that
- *  lib/sanitize-html's SAFE_IMG_SRC allows for inline images. Accepts
- *  http(s), blob:, base64 data:image, and same-origin root-relative paths
- *  ("/api/resources/{id}"); rejects protocol-relative "//host" and "/\host"
- *  (they resolve to a foreign origin) and every other scheme (javascript:,
- *  data:text/html, …). An unsafe src never reaches an <img> — the fallback
- *  chain demotes to the designed link card instead. */
-function isSafeImgSrc(url: string | undefined): url is string {
-  if (!url) return false;
-  if (/^(https?|blob):/i.test(url)) return true;
-  // SAFE_IMG_SRC's data: slice — raster formats, plus SVG only when base64
-  // (a non-base64 `data:image/svg+xml,<svg onload=…>` is rejected outright).
-  if (/^data:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml);base64,/i.test(url)) {
-    return true;
-  }
-  return /^\/(?![/\\])/.test(url);
 }
 
 /** First alphanumeric character, uppercased — the initial-tile glyph. */

@@ -314,15 +314,39 @@ const SMUGGLE_CHARS = /[\t\n\r]/;
  * to a foreign origin). Blocks javascript:, data:, and other dangerous
  * schemes regardless of upstream validation.
  *
- * This is THE shared sink gate: ResourceEmbed and the Teach board (via
- * lib/board-embed's `isSafeBoardUrl` re-export) all vet through this one
- * function, so the rule can never drift per surface.
+ * This is THE shared sink gate. Every render surface vets its src/href
+ * through this one function so the rule can't drift per surface: ResourceEmbed,
+ * ResourcePreview, the Resources panel, notecard card-faces, section-resource
+ * posters, the composer, and the Teach board (via lib/board-embed's
+ * `isSafeBoardUrl` re-export). Image sinks call {@link isSafeImgSrc}, which is
+ * this gate plus ONLY the base64 `data:image` schemes an `<img>` may carry.
  */
 export function isSafeUrl(url: string | null | undefined): url is string {
   if (!url) return false;
   if (SMUGGLE_CHARS.test(url)) return false;
   if (/^(https?|blob):/i.test(url)) return true;
   return ROOT_RELATIVE.test(url);
+}
+
+/** Base64 `data:image` sources an `<img>`/poster may carry beyond
+ *  {@link isSafeUrl} — raster formats, plus SVG ONLY when base64 (a non-base64
+ *  `data:image/svg+xml,<svg onload=…>` stays rejected). Mirrors
+ *  lib/sanitize-html's SAFE_IMG_SRC data: slice. */
+const DATA_IMAGE_RE =
+  /^data:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml);base64,/i;
+
+/**
+ * The image-sink gate: {@link isSafeUrl} (http(s)/blob/same-origin
+ * root-relative, smuggle-char-rejecting) OR a base64 `data:image`. This is the
+ * single source for every `<img>`/poster `src` check — the Resources panel,
+ * notecard card-faces, section-resource posters, the composer, and the
+ * preview. The smuggle/foreign-origin guard rides in via `isSafeUrl`; the
+ * data: arm is exempt (a `data:` URL never matches the root-relative arm, and
+ * legitimate wrapped base64 may contain newlines).
+ */
+export function isSafeImgSrc(url: string | null | undefined): url is string {
+  if (!url) return false;
+  return isSafeUrl(url) || DATA_IMAGE_RE.test(url);
 }
 
 /** True when the mime type / provider says the row is directly renderable

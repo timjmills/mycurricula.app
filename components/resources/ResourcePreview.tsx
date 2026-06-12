@@ -51,7 +51,11 @@ import {
   type ReactNode,
 } from "react";
 import type { LessonResource } from "@/lib/types";
-import { canEmbedResource, parseResourceUrl } from "@/lib/resource-embed";
+import {
+  canEmbedResource,
+  parseResourceUrl,
+  isSafeUrl,
+} from "@/lib/resource-embed";
 import { galleryItems, hasNotes, isNotecard } from "@/lib/notecards";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { Gallery } from "@/components/notecards";
@@ -414,18 +418,6 @@ function PreviewBody({
   );
 }
 
-/** True for http(s), blob:, and same-origin root-relative ("/…") URLs — the
- *  schemes safe to place in an <iframe>/<img>/<video> src or an <a href>.
- *  Root-relative is allowed for hosted files served via /api/resources/{id};
- *  protocol-relative "//host" is rejected. Blocks javascript:, data:, etc. */
-function isSafeUrl(url: string | undefined): url is string {
-  if (!url) return false;
-  if (/^(https?|blob):/i.test(url)) return true;
-  // Same-origin root-relative path (e.g. /api/resources/{id}). Reject
-  // protocol-relative ("//host") and backslash tricks ("/\host") that
-  // browsers normalize to a foreign origin.
-  return /^\/(?![/\\])/.test(url);
-}
 
 // ── Icons ───────────────────────────────────────────────────────────────────
 

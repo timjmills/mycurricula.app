@@ -61,6 +61,7 @@ import type { LessonResource } from "@/lib/types";
 import type { SectionResource } from "@/lib/lesson-flow";
 import { Tooltip } from "@/components/ui";
 import { ResourcePreview } from "@/components/resources";
+import { isSafeImgSrc } from "@/lib/resource-embed";
 import {
   galleryCount,
   hasNotes,
@@ -82,18 +83,6 @@ function isNotecardish(resource: LessonResource): boolean {
   );
 }
 
-/** Gate for the notecard row's poster <img src> — mirrors ResourceCardFace's
- *  isSafeImgSrc (http(s)/blob, base64 data:image, same-origin root-relative;
- *  rejects protocol-relative and every script-capable scheme). An unsafe src
- *  never reaches an <img> — the honey glyph renders instead. */
-function isSafeImgSrc(url: string | undefined): url is string {
-  if (!url) return false;
-  if (/^(https?|blob):/i.test(url)) return true;
-  if (/^data:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml);base64,/i.test(url)) {
-    return true;
-  }
-  return /^\/(?![/\\])/.test(url);
-}
 
 // ── localStorage key + helpers ───────────────────────────────────────────
 // One JSON blob `{ [lessonId:sectionId]: true }` records which (lesson,
