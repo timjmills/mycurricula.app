@@ -33,6 +33,7 @@ import {
   countDismissed,
   useTooltipDismissal,
 } from "@/lib/tooltip-dismissal";
+import { ThemePicker } from "@/components/appearance/theme-picker";
 import { StylePicker } from "@/components/appearance/style-picker";
 import { PaletteToggle } from "@/components/appearance/palette-toggle";
 import { LivePreview } from "@/components/appearance/live-preview";
@@ -69,6 +70,11 @@ export default function AppearancePage(): ReactNode {
           title="Appearance"
           subtitle="Personalise how your planner looks. Changes are yours alone."
         />
+
+        {/* App color theme — the canvas/ink/accent surface behind every
+            view. Full-width and first so it reads as the top-level look
+            choice; the style + palette axes refine it below. */}
+        <ThemePicker />
 
         {/* Style + palette pickers */}
         <div

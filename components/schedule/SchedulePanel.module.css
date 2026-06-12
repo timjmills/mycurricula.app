@@ -172,14 +172,14 @@
 .dayChipActive {
   background: var(--brand-500);
   border-color: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
   box-shadow: var(--sh-brand);
 }
 
 .dayChipActive:hover {
   background: var(--brand-600);
   border-color: var(--brand-600);
-  color: var(--paper);
+  color: var(--on-solid);
 }
 
 /* Today gets a subtle catchup ring even when not the active selection

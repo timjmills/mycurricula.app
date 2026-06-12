@@ -148,7 +148,7 @@
   gap: 3px;
   /* Pill */
   background: var(--c, var(--ink-500));
-  color: var(--paper);
+  color: var(--on-solid);
   border-radius: var(--r-4);
   font-size: var(--t-10);
   font-weight: 700;

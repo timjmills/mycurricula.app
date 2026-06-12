@@ -479,7 +479,11 @@ const NARROW_MQ = "(max-width: 900px)";
 // is reachable at every viewport where the inline pane is hidden. The
 // audit's spec ("below ~960px") would leave a 961–1280 dead-zone — fixing
 // that by aligning to the existing CSS hide is the practical answer.
-const DRAWER_MQ = "(max-width: 1280px)";
+//
+// Exported: the shell-level <RightPanel> keys its Weekly lesson-detail
+// gate off the SAME breakpoint (drawer owns ≤1280, the shell panel owns
+// wider) so the two surfaces can never mount together.
+export const DRAWER_MQ = "(max-width: 1280px)";
 
 // ── WeeklyShell ──────────────────────────────────────────────────────────
 

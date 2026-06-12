@@ -99,8 +99,15 @@ export interface PlannerDataSource {
     ownerId: string,
     opts?: ListLessonsOptions,
   ): Promise<Lesson[]>;
-  /** Units for a grade, in display order. */
-  listUnits(gradeLevelId: string): Promise<Unit[]>;
+  /** Units for a grade, in display order. Omitting `opts` scopes to the
+   *  school's ACTIVE year (plus legacy null-year units) — matching the
+   *  default `listLessons` read. An explicit `schoolYearId` (the archive
+   *  drill-in) returns exactly that year's units so archived lessons keep
+   *  their unit metadata. The mock source ignores `opts` (single year). */
+  listUnits(
+    gradeLevelId: string,
+    opts?: { schoolYearId?: string },
+  ): Promise<Unit[]>;
   /** The 8 locked subjects for a grade. */
   listSubjects(gradeLevelId: string): Promise<Subject[]>;
   /** Standards (code → description) for a grade's assigned frameworks. */

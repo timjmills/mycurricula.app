@@ -79,49 +79,17 @@ import {
   type SaveTarget,
 } from "./source";
 import { buildReverseIndex, slugToUuid } from "./id-bridge";
-import { createClient } from "../supabase/server";
+import {
+  makeUnwrap,
+  makeUnwrapMaybe,
+  sb,
+  type ServerClient,
+} from "../supabase/helpers";
 
-// ── Supabase client helper ───────────────────────────────────────────────────
-// The server client is async (it awaits `cookies()`), so every method resolves
-// it first. Resolving per call keeps the request-scoped auth session correct.
+// ── Supabase client helpers (shared, see lib/supabase/helpers.ts) ────────────
 
-type ServerClient = Awaited<ReturnType<typeof createClient>>;
-
-async function sb(): Promise<ServerClient> {
-  return createClient();
-}
-
-/** Wrap a supabase-js `{ data, error }` envelope: throw a descriptive Error on
- *  `error`, otherwise return `data`. Centralises the error-handling contract so
- *  every call site stays terse and no error is silently swallowed. */
-function unwrap<T>(
-  result: { data: T | null; error: { message: string } | null },
-  context: string,
-): T {
-  if (result.error) {
-    throw new Error(
-      `Planner repository ${context} failed: ${result.error.message}`,
-    );
-  }
-  if (result.data == null) {
-    throw new Error(`Planner repository ${context} returned no data.`);
-  }
-  return result.data;
-}
-
-/** Like `unwrap`, but tolerates a null `data` (for `.maybeSingle()` reads where
- *  "no row" is a valid answer). Still throws on a transport/SQL error. */
-function unwrapMaybe<T>(
-  result: { data: T | null; error: { message: string } | null },
-  context: string,
-): T | null {
-  if (result.error) {
-    throw new Error(
-      `Planner repository ${context} failed: ${result.error.message}`,
-    );
-  }
-  return result.data;
-}
+const unwrap = makeUnwrap("Planner repository");
+const unwrapMaybe = makeUnwrapMaybe("Planner repository");
 
 // ── Chunked `.in(...)` lookups ────────────────────────────────────────────────
 // A PostgREST `.in("col", ids)` serializes every id into the request URL, so a
@@ -286,6 +254,69 @@ async function resolveSchoolWeek(
   return promise;
 }
 
+// ── Active school-year resolution (per-request cache) ────────────────────────
+// Planner reads default to the ACTIVE school year. Without this, a grade that
+// has archived years would merge every year's lessons and units into one view
+// (the archived 2025-26 rows leaking into the 2026-27 weekly grid was the
+// motivating production bug). Resolved from the GRADE's school
+// (grade_levels.school_id → school_years.is_active) rather than the teacher so
+// owner-less callers like listUnits can share it. An explicit
+// `opts.schoolYearId` (the archive drill-in's read) always wins over this
+// default. Fail-OPEN: a school mid-setup with no active year row keeps the
+// unfiltered (all-years) read rather than an empty planner.
+
+const activeYearCache = new WeakMap<
+  object,
+  Map<string, Promise<string | null>>
+>();
+
+async function resolveActiveSchoolYearId(
+  client: ServerClient,
+  gradeLevelId: string,
+): Promise<string | null> {
+  let byGrade = activeYearCache.get(client);
+  if (!byGrade) {
+    byGrade = new Map();
+    activeYearCache.set(client, byGrade);
+  }
+  const cached = byGrade.get(gradeLevelId);
+  if (cached) return cached;
+  const promise = (async (): Promise<string | null> => {
+    try {
+      const gradeRes = await client
+        .from("grade_levels")
+        .select("school_id")
+        .eq("id", gradeLevelId)
+        .maybeSingle();
+      if (gradeRes.error) throw new Error(gradeRes.error.message);
+      const schoolId = (gradeRes.data as { school_id: string } | null)
+        ?.school_id;
+      if (!schoolId) return null;
+      // Deterministic if (against the contract) more than one year is flagged
+      // active: prefer the most recent by start_date instead of erroring.
+      const yearRes = await client
+        .from("school_years")
+        .select("id")
+        .eq("school_id", schoolId)
+        .eq("is_active", true)
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (yearRes.error) throw new Error(yearRes.error.message);
+      return (yearRes.data as { id: string } | null)?.id ?? null;
+    } catch (err) {
+      console.warn(
+        `[planner] active school-year resolution failed; reading all years: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return null;
+    }
+  })();
+  byGrade.set(gradeLevelId, promise);
+  return promise;
+}
+
 // ── Status enum ↔ domain bridge ──────────────────────────────────────────────
 // The DB `lesson_completion` enum ('not_done','done','skipped','carried_over',
 // 'partial') differs from the FLAT `LessonStatus` ('not_done','done','carried',
@@ -400,6 +431,7 @@ interface UnitRow {
   name: string;
   start_week: number;
   end_week: number;
+  school_year_id: string | null;
 }
 
 interface SubjectRow {
@@ -440,7 +472,8 @@ const COPY_COLS =
 const AUTHORED_COLS =
   "id, owner_id, grade_level_id, unit_id, subject_id, week_number, day_of_week, title, directions, learning_objectives, notes, resources, standards, display_order_within_day, status, reason_not_done, deleted_at";
 const COMPLETION_COLS = "core_lesson_event_id, status, reason_not_done";
-const UNIT_COLS = "id, grade_level_id, subject_id, name, start_week, end_week";
+const UNIT_COLS =
+  "id, grade_level_id, subject_id, name, start_week, end_week, school_year_id";
 const SUBJECT_COLS =
   "id, grade_level_id, name, color, parent_id, display_order";
 const STANDARD_COLS = "id, code, description";
@@ -741,33 +774,66 @@ export const plannerSupabaseSource: PlannerDataSource = {
         resolveSchoolWeek(client, ownerId),
       ]);
 
-    // OPTIONAL windowing: when `opts` is omitted, behaviour is unchanged (the
-    // full grade is read). `weekStart`/`weekEnd` scope the master + authored
+    // OPTIONAL windowing: `weekStart`/`weekEnd` scope the master + authored
     // reads to a `week_number` window; `schoolYearId` scopes to a school year.
-    // Defaults keep existing callers byte-identical.
+    // When no school year is requested, default to the school's ACTIVE year so
+    // archived years never merge into the live planner (see
+    // resolveActiveSchoolYearId). Explicit callers (the archive drill-in)
+    // still read exactly the year they ask for.
     const weekStart = opts?.weekStart;
     const weekEnd = opts?.weekEnd;
-    const schoolYearId = opts?.schoolYearId;
+    const explicitYearId = opts?.schoolYearId;
+    const schoolYearId =
+      explicitYearId ??
+      (await resolveActiveSchoolYearId(client, gradeLevelId));
 
     // School-year scoping is carried on `units`, NOT on the lesson tables:
     // neither `master_core_lesson_events` nor `personal_authored_lessons` has a
     // `school_year_id` column (only `units` does). So when a school year is
     // requested we first resolve the unit ids in that (grade, school_year) and
-    // constrain the lesson reads by `unit_id IN (…)`. Resolved once and reused.
+    // constrain the lesson reads by unit id. Resolved once and reused.
+    //
+    // Visibility rule differs by how the year was chosen:
+    //   • EXPLICIT (`opts.schoolYearId`, the archive drill-in): exactly that
+    //     year's units — an archived year shows precisely what it contained,
+    //     and zero units means a genuinely empty year (early return).
+    //   • DEFAULT (active year): additionally keep rows with NO unit
+    //     (untied authored lessons must never vanish from the live planner)
+    //     and, in the units query, legacy null-year units — mirroring
+    //     listUnits' fail-open visibility so lessons and their unit metadata
+    //     never disagree.
     let schoolYearUnitIds: string[] | null = null;
     if (schoolYearId != null) {
-      const unitsRes = await client
+      let unitsQuery = client
         .from("units")
         .select("id")
-        .eq("grade_level_id", gradeLevelId)
-        .eq("school_year_id", schoolYearId);
+        .eq("grade_level_id", gradeLevelId);
+      unitsQuery =
+        explicitYearId != null
+          ? unitsQuery.eq("school_year_id", schoolYearId)
+          : unitsQuery.or(
+              `school_year_id.eq.${schoolYearId},school_year_id.is.null`,
+            );
+      const unitsRes = await unitsQuery;
       const unitRows = unwrap(unitsRes, "list school-year units") as {
         id: string;
       }[];
       schoolYearUnitIds = unitRows.map((u) => u.id);
-      // No units in that school year → no master/authored lessons to read.
-      if (schoolYearUnitIds.length === 0) return [];
+      // Explicit read of a year with no units → genuinely nothing to read.
+      // The default read continues: untied (null-unit) lessons still apply.
+      if (explicitYearId != null && schoolYearUnitIds.length === 0) return [];
     }
+
+    /** Apply the unit-id year scope to a lesson query (master or authored).
+     *  Returns the query untouched when no year scope is active. The or()
+     *  in-list stays well under URL limits (a grade has tens of units, not
+     *  thousands — unlike master ids, which go through chunkedIn). */
+    const yearScopeFilter: string | null = (() => {
+      if (schoolYearUnitIds == null) return null;
+      if (explicitYearId != null) return null; // handled via .in() below
+      if (schoolYearUnitIds.length === 0) return "unit_id.is.null";
+      return `unit_id.in.(${schoolYearUnitIds.join(",")}),unit_id.is.null`;
+    })();
 
     // 2. Master events for the grade — read the DENORMALIZED local
     //    grade_level_id column directly (no units join — the #1 scale fix),
@@ -777,8 +843,12 @@ export const plannerSupabaseSource: PlannerDataSource = {
       .select(MASTER_COLS)
       .eq("grade_level_id", gradeLevelId)
       .is("deleted_at", null);
-    if (schoolYearUnitIds != null)
-      masterQuery = masterQuery.in("unit_id", schoolYearUnitIds);
+    if (schoolYearUnitIds != null) {
+      masterQuery =
+        yearScopeFilter != null
+          ? masterQuery.or(yearScopeFilter)
+          : masterQuery.in("unit_id", schoolYearUnitIds);
+    }
     if (weekStart != null)
       masterQuery = masterQuery.gte("week_number", weekStart);
     if (weekEnd != null) masterQuery = masterQuery.lte("week_number", weekEnd);
@@ -803,11 +873,17 @@ export const plannerSupabaseSource: PlannerDataSource = {
       .eq("owner_id", ownerId)
       .eq("grade_level_id", gradeLevelId)
       .is("deleted_at", null);
-    if (schoolYearUnitIds != null)
-      // Authored lessons carry a nullable unit_id; school-year scoping keeps
+    if (schoolYearUnitIds != null) {
+      // Authored lessons carry a nullable unit_id. EXPLICIT year reads keep
       // only those tied to a unit in the requested year (untied authored
-      // lessons fall outside any school-year window by construction).
-      authoredQuery = authoredQuery.in("unit_id", schoolYearUnitIds);
+      // lessons fall outside any school-year window by construction); the
+      // DEFAULT active-year read keeps untied lessons via the null branch of
+      // the shared year-scope filter.
+      authoredQuery =
+        yearScopeFilter != null
+          ? authoredQuery.or(yearScopeFilter)
+          : authoredQuery.in("unit_id", schoolYearUnitIds);
+    }
     if (weekStart != null)
       authoredQuery = authoredQuery.gte("week_number", weekStart);
     if (weekEnd != null)
@@ -917,11 +993,31 @@ export const plannerSupabaseSource: PlannerDataSource = {
     return [...masterLessons, ...authoredLessons];
   },
 
-  async listUnits(gradeLevelId) {
+  async listUnits(gradeLevelId, opts) {
     const client = await sb();
     const { rows, uuidToUnitSlug } = await loadUnitIndex(client, gradeLevelId);
     const { uuidToSubjectId } = await loadSubjectIndex(client, gradeLevelId);
-    return rows.map((row) => {
+    // Year scoping mirrors listLessons exactly:
+    //   • EXPLICIT `opts.schoolYearId` (archive drill-in) → exactly that
+    //     year's units, so archived lessons keep their unit metadata.
+    //   • DEFAULT → the active year, with null-year legacy units kept
+    //     (fail-open) so the rail never disagrees with the lesson read.
+    // (loadUnitIndex itself stays unfiltered: its uuid→slug index must cover
+    // EVERY unit so cross-year lesson mapping never loses names.)
+    const explicitYearId = opts?.schoolYearId;
+    const activeYearId =
+      explicitYearId ?? (await resolveActiveSchoolYearId(client, gradeLevelId));
+    const visibleRows =
+      activeYearId == null
+        ? rows
+        : explicitYearId != null
+          ? rows.filter((row) => row.school_year_id === explicitYearId)
+          : rows.filter(
+              (row) =>
+                row.school_year_id == null ||
+                row.school_year_id === activeYearId,
+            );
+    return visibleRows.map((row) => {
       const subject = uuidToSubjectId.get(row.subject_id) ?? "math";
       const weeks =
         row.start_week === row.end_week

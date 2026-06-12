@@ -113,7 +113,7 @@
   border: none;
   border-radius: var(--r-8);
   background: var(--w-accent);
-  color: var(--paper);
+  color: var(--on-solid);
   font-size: 1em;
   font-weight: 800;
   cursor: pointer;

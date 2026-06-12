@@ -133,10 +133,12 @@
   background: color-mix(in srgb, var(--surface) 60%, transparent);
 }
 
-/* v1.3 segmented: active chip = white surface + indigo text + soft lift. */
+/* v1.3 segmented: active chip = surface + deep-indigo text + soft lift.
+   brand-700 (not 600) — it's the ramp's TEXT member, so dark themes can
+   lighten it while brand-600 stays a solid-background color. */
 .subtle .active {
   background: var(--surface);
-  color: var(--brand-600);
+  color: var(--brand-700);
   box-shadow: var(--sh-xs);
 }
 
@@ -157,7 +159,7 @@
 
 .prominent .active {
   background: var(--surface);
-  color: var(--brand-600);
+  color: var(--brand-700);
   box-shadow: var(--sh-sm);
 }
 

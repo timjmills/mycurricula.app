@@ -9,4 +9,4 @@ export type { SaveTargetDialogProps } from "./save-target-dialog";
 // The Weekly view's 3-panel shell — icon rail + grid + right rail. Wraps
 // the existing <WeeklyGrid> unchanged in the center slot and reuses the
 // Daily-view IconRail + RightRail + PaneSplitter.
-export { WeeklyShell } from "./WeeklyShell";
+export { WeeklyShell, DRAWER_MQ } from "./WeeklyShell";

@@ -186,7 +186,12 @@ export const plannerMockSource: PlannerDataSource = {
     return lessons.filter((l) => l.archived !== true).map(cloneLesson);
   },
 
-  async listUnits(_gradeLevelId: string): Promise<Unit[]> {
+  async listUnits(
+    _gradeLevelId: string,
+    _opts?: { schoolYearId?: string },
+  ): Promise<Unit[]> {
+    // `_opts` is ignored — the mock holds a single in-memory year.
+    void _opts;
     // The contract's listUnits MUST return ALL units for the grade (the
     // full-year superset), matching the Supabase source which selects every
     // grade unit. ALL_UNITS is that superset — the set SubjectView and

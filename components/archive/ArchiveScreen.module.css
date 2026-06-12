@@ -222,7 +222,7 @@
   padding: 0 20px;
   border-radius: var(--r-pill);
   background: var(--brand-500);
-  color: var(--paper);
+  color: var(--on-solid);
   font-weight: 700;
   font-size: var(--t-14);
   text-decoration: none;

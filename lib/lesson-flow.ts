@@ -12,6 +12,7 @@
 
 import type { LessonTemplate } from "./lesson-templates";
 import type { LessonResource } from "./types";
+import { uid } from "./uid";
 
 /** A resource attached to a specific lesson section. Carries an id so it
  *  can be dragged between sections. */
@@ -34,13 +35,6 @@ export interface LessonSectionContent {
   body: string;
   /** Resources attached to this section, in display order. */
   resources: SectionResource[];
-}
-
-let seq = 0;
-/** A short unique id for sections and resources created at runtime. */
-function uid(prefix: string): string {
-  seq += 1;
-  return `${prefix}-${Date.now().toString(36)}-${seq}`;
 }
 
 /** A fresh resource for a section. */

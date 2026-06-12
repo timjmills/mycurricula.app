@@ -26,6 +26,14 @@ const PREVIEW_LESSON_IDS = ["m-12-1", "r-12-1", "w-12-1"] as const;
 
 const STYLE_LABEL = { quiet: "Quiet", calm: "Mid-Calm", vivid: "Mid-Vivid" };
 const PALETTE_LABEL = { normal: "Normal", highlight: "Highlight" };
+const THEME_LABEL = {
+  paper: "Paper",
+  cloud: "Cloud",
+  night: "Night",
+  mint: "Mint",
+  sky: "Sky",
+  blossom: "Blossom",
+};
 
 interface LivePreviewProps {
   /** Active subject → swatch mapping so reassignments preview here. */
@@ -33,7 +41,7 @@ interface LivePreviewProps {
 }
 
 export function LivePreview({ mapping }: LivePreviewProps): ReactNode {
-  const { style, palette } = useTheme();
+  const { style, palette, resolvedTheme } = useTheme();
   const lessons = PREVIEW_LESSON_IDS.map((id) => LESSON_BY_ID[id]);
 
   return (
@@ -49,7 +57,11 @@ export function LivePreview({ mapping }: LivePreviewProps): ReactNode {
       }
       action={
         <div style={{ fontSize: 11, color: "var(--ink-500)" }}>
-          Style:{" "}
+          Theme:{" "}
+          <strong style={{ color: "var(--ink-900)" }}>
+            {THEME_LABEL[resolvedTheme]}
+          </strong>{" "}
+          · Style:{" "}
           <strong style={{ color: "var(--ink-900)" }}>
             {STYLE_LABEL[style]}
           </strong>{" "}

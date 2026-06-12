@@ -18,7 +18,7 @@
   position: fixed;
   inset: 0;
   z-index: 500;
-  background: rgba(20, 22, 32, 0.42);
+  background: var(--scrim);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -28,10 +28,10 @@
 
 @keyframes backdropIn {
   from {
-    background: rgba(20, 22, 32, 0);
+    background: transparent;
   }
   to {
-    background: rgba(20, 22, 32, 0.42);
+    background: var(--scrim);
   }
 }
 
