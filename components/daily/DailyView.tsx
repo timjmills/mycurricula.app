@@ -136,7 +136,7 @@ import {
 import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
 import { DockLayout, useDockLayout, type DockPanelDef } from "./dock";
-import { Button, EmptyState, Tooltip } from "@/components/ui";
+import { Button, EmptyState, ToggleGroup, Tooltip } from "@/components/ui";
 import { DailyList } from "@/components/list/DailyList";
 import { ScheduleDayPane } from "@/components/schedule";
 import { DailySchedulePill } from "./daily-schedule-pill";
@@ -841,8 +841,12 @@ export function DailyView({
 }: DailyViewProps = {}): ReactNode {
   const router = useRouter();
   // selectedDay is shared planner state — the top bar may also change it.
-  // viewMode drives the list vs. grid rendering choice.
-  const { viewMode, week, selectedDay, setSelectedDay, setWeek } =
+  // viewMode drives the list vs. grid rendering choice. setViewMode backs
+  // the header's Grid | List toggle: viewMode is GLOBAL app state also set
+  // from Weekly/Year, so without a local setter a teacher who picked List
+  // elsewhere landed here with no way back to the grid (owner report
+  // 2026-06-12).
+  const { viewMode, setViewMode, week, selectedDay, setSelectedDay, setWeek } =
     useAppState();
 
   // Renameable hierarchy captions — a school may rename "Week" → "Module",
@@ -1516,6 +1520,33 @@ export function DailyView({
           </nav>
         </div>
         <div className={styles.headerActions}>
+          {/* Grid | List — the layout toggle. Lives in the header (rendered
+              in BOTH modes) so List mode always offers the way back to the
+              three-panel grid. Mirrors the Weekly title-row control; the
+              shared viewMode means the choice follows the teacher across
+              views, and now every view that READS it can also SET it. */}
+          <ToggleGroup<"grid" | "list">
+            ariaLabel="Daily layout"
+            variant="prominent"
+            size="sm"
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              {
+                value: "grid",
+                label: "Grid",
+                title:
+                  "Three-panel day view — lesson list, lesson detail, and side panel",
+                tooltipId: "daily-view-grid",
+              },
+              {
+                value: "list",
+                label: "List",
+                title: "One scrollable list of the day's lessons",
+                tooltipId: "daily-view-list",
+              },
+            ]}
+          />
           <DailySchedulePill />
           <Tooltip
             content="Open this day in the full-screen Teaching View for live class delivery"
