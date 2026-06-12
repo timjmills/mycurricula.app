@@ -1,65 +1,56 @@
 "use client";
 
-// lesson-flow.tsx — the per-lesson section editor ("lesson flow").
+// lesson-flow.tsx — the per-lesson PHASE editor ("lesson flow").
 //
-// REVISED 2026-05-20 per docs/historical/5.20.26 Plugin Directions §3, §4, §5, §6:
-// The lesson body is now a CANONICAL SIX-SECTION layout. Each section row
-// leads with a PIN badge (USER OVERRIDE — see CSS for the teardrop shape;
-// the spec's "circle" is REPLACED by a rounded-rect + right-pointing notch),
-// followed by a title + helper line stack, with a small chevron on the right
-// for expand / collapse. Pin badges are connected by a vertical line drawn
-// per-row in the badge's color at 50% opacity. Pin colors are the EXACT HEX
-// values from spec §3.1 (#14b8a6, #f97316, #a855f7, #eab308, #3b82f6,
-// #ec4899) — this is the spec's explicit exception to the tokens-only rule
-// for the section-cycle decorative palette.
+// REVISED 2026-06-11 per Documents/Claude Design/6.11.26
+// design_handoff_daily_view §7 "Phases" (+ §6 center-column notes). This is a
+// FULL REPLACE of the previous canonical-six-section presentation: the
+// decorative pin/teardrop badges, the §3.1 hex pin palette, the vertical
+// connector line, the helper-line stack, and the virtual Standards row are
+// all GONE. The flow now renders ONLY store-backed sections, in store order,
+// each as a bordered "phase" card:
 //
-// The six canonical sections (spec §3, in order):
-//   1. Standards
-//   2. Focus Lesson — I Do
-//   3. Guided Instruction — We Do
-//   4. Collaborative Practice — You Do Together
-//   5. Independent Practice — You Do Alone
-//   6. Debrief
+//   .phase           → bordered card (1px --border, --r-md, --surface)
+//   .phaseHead       → drag grip · title (+ "· N min") · status chip · del
+//   .statusChip      → done/progress/idle pill; BUTTON cycling the status
+//   body             → teachText reading rhythm (13px / 1.55), double-click
+//                      to edit through the existing RichTextEditor flow
+//   .phaseRes        → per-phase tagged resources as resChip rows
+//                      (see phase-resources.tsx)
+//   .addPhaseBtn     → dashed full-width "Add phase" after the last phase
 //
-// Section 1 (Standards) is a VIRTUAL section: there is no Standards section
-// in the store template, so the row renders its title + helper line + body
-// textarea + resources (sourced from lesson.resources) without touching the
-// store's structural model. Editing the Standards body is a Phase-1B
-// concern — the placeholder text input is left visually present but
-// non-functional (it is wired to local state only; nothing persists today).
+// The Standards content that used to live in the virtual row now lives in a
+// planning tab (built separately in components/daily/planning-tabs).
 //
-// Sections 2–6 map positionally to the store's first five sections (the
-// default Gradual Release template). Their bodies are still the existing
-// per-section rich text in the store; the only visual change is the row
-// chrome (title, helper line, pin badge — no more highlighter band per
-// spec §3.2). Heading editing has been REMOVED per spec §3.2: titles are
-// plain static text and cannot be renamed inline. The body remains
-// double-click-to-edit through the existing RichTextEditor flow.
+// PRESERVED from the previous implementation:
+//   • Drag-reorder via dnd-kit — now ALL rows are sortable (no virtual row).
+//   • Collapse-on-drag (lib/collapse-on-drag — every row compacts to a 40px
+//     chip while a PHASE drag is active; cited pattern doc 5.18.26).
+//   • Double-click-to-edit body through RichTextEditor (coalesced undo).
+//   • Per-phase collapse + global Expand all / Collapse all.
+//   • The "+ add" resource trigger routes into the shared ResourceComposer.
+//   • LessonFlowProps unchanged (lessonId, modified, dockTarget) —
+//     LessonDetail consumes it.
+//   • `data-flow-section` / `data-flow-title` anchors on each row (the
+//     agenda navigator scans them); NEW: `data-flow-minutes` +
+//     `data-flow-status` ride along.
 //
-// Default expansion: Section 1 is EXPANDED by default; Sections 2–6 are
-// COLLAPSED by default (spec §3.5). The teacher's overrides are tracked in
-// the existing per-section `collapsedSections` set.
+// NEW interactions (handoff §7):
+//   • Rename-on-double-click of the phase title (plain-text inline input,
+//     commits via editSection with a coalesce key).
+//   • "· N min" is click-to-edit (inline number input; empty → null; null
+//     renders NOTHING — never a dangling separator).
+//   • The status chip is a button cycling idle → progress → done → idle via
+//     editSection. Phase status NEVER touches lesson-level status and never
+//     forks the lesson.
+//   • Resource chips drag-reorder within a phase (editSection resources
+//     patch) and across phases (moveSectionResource).
 //
-// Per-section Resources: rendered by <SectionResources> (new component in
-// this folder). Each section has independent expanded ↔ minimized state for
-// its resources card, persisted in localStorage per (lessonId, sectionId).
-// See components/lesson-flow/section-resources.tsx for the full spec on
-// what those two states render.
-//
-// PRESERVED (per task brief §5):
-//   • Drag-reorder via heading grip (dnd-kit).
-//   • Double-click edit on body (heading editing removed per spec).
-//   • The "+" trigger on the heading row opens ResourceComposer.
-//   • LessonFlowProps unchanged (lessonId, modified, dockTarget).
-//   • Expand all / Collapse all controls above Section 1.
-//   • "+ Add section" / "Edit lesson flow template" stubs below Section 6.
-//
-// Store wiring (planner-store): all structural operations (reorder, add,
-// remove, duplicate; resource add/remove/move; website toggle) dispatch
-// granular store actions — one history step each. Text edits (body) call
-// editSection with a coalesce key so a typing burst collapses to a single
-// undo step. UI-only state (drag, hover, website visibility, per-section
-// collapsed, per-section minimized) stays local; never persisted or undone.
+// Store wiring (planner-store): every structural operation dispatches a
+// granular store action — one history step each. Text edits (body, title)
+// pass a coalesce key so a typing burst collapses to a single undo step.
+// UI-only state (drag, rename/minutes editing, per-phase collapsed) stays
+// local; never persisted or undone.
 
 import type { ReactNode, RefObject } from "react";
 import {
@@ -81,12 +72,17 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
+  arrayMove,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import type { LessonSectionContent, SectionResource } from "@/lib/lesson-flow";
+import type {
+  LessonSectionContent,
+  SectionResource,
+  SectionStatus,
+} from "@/lib/lesson-flow";
 import {
   type DragState,
   type Density,
@@ -96,102 +92,49 @@ import {
 } from "@/lib/collapse-on-drag";
 import { usePlanner } from "@/lib/planner-store";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import { stripHtml, escapeHtml } from "@/lib/html-text";
 import { Button, Tooltip } from "@/components/ui";
 import { RichTextEditor } from "@/components/rich-text";
-import { SectionToolbar } from "./section-toolbar";
-import { SectionResources } from "./section-resources";
+import { PhaseResources, ResourceChipGhost } from "./phase-resources";
 // ResourceComposer is the app-wide "Add resource" dialog shared with the
-// Daily right rail. The per-section "+" trigger opens this composer
-// (pre-routed to the launching lesson + section) instead of an inline
-// add-tiles popup. Imported from the deep path because the daily barrel
-// does not re-export it yet — agreed cross-agent contract.
+// Daily right rail. The per-phase "+ add" trigger opens this composer
+// (pre-routed to the launching lesson + phase) — unchanged contract.
 import { ResourceComposer } from "@/components/daily/ResourceComposer";
 import type { ResourceComposerEditTarget } from "@/components/daily/ResourceComposer";
 import styles from "./lesson-flow.module.css";
 
-// ── Body placeholder text (spec §3.4) ────────────────────────────────────
-const BODY_PLACEHOLDER = "Write lesson plan for this section…";
+// ── Body placeholder text ────────────────────────────────────────────────
+const BODY_PLACEHOLDER = "Write lesson plan for this phase…";
 
-// ── Canonical six-section schema (spec §3) ───────────────────────────────
-// Each entry carries:
-//   • title    — the spec's exact section title (plain text, no highlight).
-//   • helper   — the spec's exact helper / subtitle line.
-//   • pinColor — the spec's EXACT HEX value for the pin badge fill (and
-//                the vertical connector line color at 50% opacity).
-//
-// The HEX values are the spec's explicit exception to the tokens-only rule —
-// they are the decorative section-cycle palette listed in §3.1 (with the
-// USER OVERRIDE preserving these colors while changing the shape from circle
-// to pin/teardrop). Do NOT swap these for tokens.
-//
-// `templateMatch` is the heading text we expect to find in the store for
-// this canonical position (sections 2–6 map to the default Gradual Release
-// template). Position 1 ("Standards") has no template match — it is virtual.
+// ── Status chip vocabulary ───────────────────────────────────────────────
+// Design-system sentence case ("In progress", NOT the prototype's
+// "In Progress"). The cycle order is idle → progress → done → idle.
+const STATUS_META: Record<
+  SectionStatus,
+  { label: string; next: SectionStatus }
+> = {
+  idle: { label: "Not started", next: "progress" },
+  progress: { label: "In progress", next: "done" },
+  done: { label: "Completed", next: "idle" },
+};
 
-interface CanonicalSection {
-  readonly index: number;
-  readonly title: string;
-  readonly helper: string;
-  readonly pinColor: string;
-  /** Heading text used to locate this section in the store (case-insensitive
-   *  substring match against the section's plain-text heading). `null` means
-   *  the section is virtual and has no store backing. */
-  readonly templateMatch: string | null;
+// ── DnD id namespacing ───────────────────────────────────────────────────
+// One DndContext carries BOTH phase rows and resource chips. Ids are
+// namespaced so the drag handlers can branch:
+//   <sectionId>            → a phase row (sections sortable)
+//   res::<resourceId>      → a resource chip (per-phase sortable)
+//   phaseres::<sectionId>  → a phase's chip-list droppable (empty-list target)
+const RES_PREFIX = "res::";
+const PHASE_RES_PREFIX = "phaseres::";
+
+function isChipId(id: string): boolean {
+  return id.startsWith(RES_PREFIX);
 }
-
-// NOTE: The Standards row (index 1) carries a placeholder helper here; the
-// rendered helper is overridden at runtime in LessonFlow to show the active
-// lesson's standards codes joined into a summary line (DAILY-STANDARDS-001).
-// The static string below is intentionally blank — it is never displayed.
-const CANONICAL_SECTIONS: readonly CanonicalSection[] = [
-  {
-    index: 1,
-    title: "Standards",
-    helper: "", // runtime-derived — see resolvedSections in LessonFlow
-    pinColor: "#14b8a6", // Teal — spec §3.1
-    templateMatch: null,
-  },
-  {
-    index: 2,
-    title: "Focus Lesson — I Do",
-    helper: "Model the concept and solve examples together.",
-    pinColor: "#f97316", // Orange — spec §3.1
-    templateMatch: "focus lesson",
-  },
-  {
-    index: 3,
-    title: "Guided Instruction — We Do",
-    helper: "Practice together with teacher support.",
-    pinColor: "#a855f7", // Purple — spec §3.1
-    templateMatch: "guided instruction",
-  },
-  {
-    index: 4,
-    title: "Collaborative Practice — You Do Together",
-    helper: "Work in pairs or groups to apply the skill.",
-    pinColor: "#eab308", // Amber/Yellow — spec §3.1
-    templateMatch: "collaborative practice",
-  },
-  {
-    index: 5,
-    title: "Independent Practice — You Do Alone",
-    helper: "Students practice independently.",
-    pinColor: "#3b82f6", // Blue — spec §3.1
-    templateMatch: "independent practice",
-  },
-  {
-    index: 6,
-    title: "Debrief",
-    helper: "Reflect on learning and key takeaways.",
-    pinColor: "#ec4899", // Pink — spec §3.1
-    templateMatch: "debrief",
-  },
-] as const;
 
 // ── Props ────────────────────────────────────────────────────────────────
 
 export interface LessonFlowProps {
-  /** The lesson whose sections this editor manages. */
+  /** The lesson whose phases this editor manages. */
   lessonId: string;
   /** Personal-modification flag (kept on the public contract; the flow
    *  itself paints no fork stripe). */
@@ -199,58 +142,53 @@ export interface LessonFlowProps {
   /** Optional ref to the element the docked rich-text toolbar should center
    *  itself on. Forwarded unchanged to every RichTextEditor. */
   dockTarget?: RefObject<HTMLElement | null>;
+  /** When set, every body RichTextEditor renders chromeless (no toolbar of
+   *  its own) and registers with the shared rich-text command bus so the
+   *  /daily sticky RtToolbar drives it. Chromeless supersedes dockTarget
+   *  inside the editor. Default false. */
+  chromeless?: boolean;
+  /** The section the agenda navigator's scrollspy marks as being read —
+   *  that phase card carries the handoff's `.phase.current` treatment.
+   *  Null/omitted paints no card as current. */
+  currentSectionId?: string | null;
 }
 
-// ── Internal types ───────────────────────────────────────────────────────
+// ── SortablePhase ────────────────────────────────────────────────────────
+// One phase card. The head's drag grip drives dnd-kit reorder; the title is
+// rename-on-double-click; "· N min" is click-to-edit; the status chip cycles
+// on click; the trash deletes the phase.
 
-/** A resolved canonical row: the schema entry plus either the store-backed
- *  section content for positions 2–6 or a synthetic placeholder for the
- *  virtual Standards row. */
-interface ResolvedSection {
-  canonical: CanonicalSection;
-  /** The store-backed section for this row, when one exists. `null` for the
-   *  virtual Standards row (and for any canonical position the template
-   *  doesn't currently provide). */
-  storeSection: LessonSectionContent | null;
-  /** Runtime helper text override — used by the Standards row to surface the
-   *  active lesson's standards codes instead of the static placeholder string.
-   *  When provided, this replaces `canonical.helper` in the rendered heading. */
-  helperOverride?: string;
-}
-
-// ── SortableSection ──────────────────────────────────────────────────────
-// Renders one canonical row. The drag handle drives dnd-kit reorder — but
-// reorder is ONLY valid against store-backed positions (2–6). The virtual
-// Standards row is non-sortable; we render it OUTSIDE the SortableContext
-// so it stays anchored at index 0.
-
-interface SortableSectionProps {
-  resolved: ResolvedSection;
-  isFirst: boolean;
-  isLast: boolean;
+interface SortablePhaseProps {
+  section: LessonSectionContent;
+  index: number;
   density: Density;
   reducedMotion: boolean;
   lessonId: string;
-  lessonResources: SectionResource[];
-  onMoveUp: (id: string) => void;
-  onMoveDown: (id: string) => void;
+  canRemove: boolean;
   onRemove: (id: string) => void;
+  onCycleStatus: (id: string, current: SectionStatus) => void;
+  onCommitRename: (id: string, text: string) => void;
+  onCommitMinutes: (id: string, raw: string) => void;
   onOpenComposer: (id: string) => void;
   onOpenNoteEditor: (
     sectionId: string,
     editResource: ResourceComposerEditTarget,
   ) => void;
-  onDuplicate: (id: string) => void;
-  onToggleWebsite: (id: string) => void;
-  websiteVisible: boolean;
-  canRemove: boolean;
-  isMenuOpen: boolean;
-  onToggleMenu: (id: string) => void;
-  onCloseMenu: () => void;
+  onRenameResource: (
+    sectionId: string,
+    resourceId: string,
+    label: string,
+  ) => void;
+  onRemoveResource: (sectionId: string, resourceId: string) => void;
   isCollapsed: boolean;
   onToggleCollapsed: (id: string) => void;
   dockTarget?: RefObject<HTMLElement | null>;
-  // Double-click-to-edit (body only — heading editing is removed per spec)
+  chromeless?: boolean;
+  /** Scrollspy current — paints the `.phase.current` treatment. */
+  isCurrent: boolean;
+  /** A just-added phase opens its rename input ready to type. */
+  autoRename: boolean;
+  // Double-click-to-edit body (state owned by LessonFlow)
   editingBody: boolean;
   draftValue: string;
   onOpenBodyEditor: (id: string, e?: React.SyntheticEvent) => void;
@@ -259,54 +197,45 @@ interface SortableSectionProps {
   onCancelEdit: () => void;
 }
 
-const SortableSection = memo(function SortableSection({
-  resolved,
-  isFirst,
-  isLast,
+const SortablePhase = memo(function SortablePhase({
+  section,
+  index,
   density,
   reducedMotion,
   lessonId,
-  lessonResources,
-  onMoveUp,
-  onMoveDown,
+  canRemove,
   onRemove,
+  onCycleStatus,
+  onCommitRename,
+  onCommitMinutes,
   onOpenComposer,
   onOpenNoteEditor,
-  onDuplicate,
-  onToggleWebsite,
-  websiteVisible,
-  canRemove,
-  isMenuOpen,
-  onToggleMenu,
-  onCloseMenu,
+  onRenameResource,
+  onRemoveResource,
   isCollapsed,
   onToggleCollapsed,
   dockTarget,
+  chromeless,
+  isCurrent,
+  autoRename,
   editingBody,
   draftValue,
   onOpenBodyEditor,
   onCommitEdit,
   onCancelEdit,
   onDraftChange,
-}: SortableSectionProps): ReactNode {
-  const { canonical, storeSection } = resolved;
+}: SortablePhaseProps): ReactNode {
+  const titleText = stripHtml(section.heading) || "Untitled phase";
+  const status: SectionStatus = section.status ?? "idle";
+  const minutes = section.minutes ?? null;
 
-  // Sanitize the section body before it is injected via
+  // Sanitize the phase body before it is injected via
   // dangerouslySetInnerHTML (audit #9 — stored XSS). Under the forking model
-  // this body can come from another teacher, so it is untrusted. Memoized so
-  // the strict DOMPurify pass only re-runs when the stored body changes.
+  // this body can come from another teacher, so it is untrusted.
   const safeBody = useMemo(
-    () => sanitizeHtml(storeSection?.body ?? ""),
-    [storeSection?.body],
+    () => sanitizeHtml(section.body ?? ""),
+    [section.body],
   );
-
-  // Virtual (Standards) row has no store-backed id — use a synthetic key for
-  // sortable so it still participates (read-only) in the DnD context. The
-  // virtual row's drag listeners are detached at the parent level by the
-  // sortable items list excluding it; here we just generate a stable id.
-  const sortableId = storeSection
-    ? storeSection.id
-    : `__virtual:${canonical.index}`;
 
   const {
     attributes,
@@ -316,17 +245,12 @@ const SortableSection = memo(function SortableSection({
     transform,
     transition: sortableTransition,
     isDragging,
-  } = useSortable({
-    id: sortableId,
-    // The virtual row is not draggable.
-    disabled: !storeSection,
-  });
+  } = useSortable({ id: section.id });
 
   const isCompact = density === "compact";
 
-  // The section body + resources are hidden in TWO independent cases:
-  //   • drag density is compact (collapse-on-drag), or
-  //   • the teacher has collapsed this section to heading-only.
+  // Body + resources are hidden in TWO independent cases: drag density is
+  // compact (collapse-on-drag), or the teacher collapsed this phase.
   const bodyHidden = isCompact || isCollapsed;
 
   const collapseTransition = reducedMotion
@@ -338,269 +262,282 @@ const SortableSection = memo(function SortableSection({
     transition: sortableTransition,
   };
 
-  // Pin color is set as a CSS custom property so the row's ::before connector
-  // and the .pinBadge background both read from the same value. This is the
-  // ONE place the spec's HEX colors are applied — see CANONICAL_SECTIONS.
-  const rowStyle = {
-    ...sortableStyle,
-    "--pin-color": canonical.pinColor,
-  } as React.CSSProperties;
-
-  // ── Section-menu popup: refs + close affordances ─────────────────────
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const anchorRef = useRef<HTMLDivElement | null>(null);
-
+  // ── Inline rename (title) ─────────────────────────────────────────────
+  const [renaming, setRenaming] = useState(false);
+  const startRename = useCallback((e?: React.SyntheticEvent): void => {
+    e?.stopPropagation();
+    setRenaming(true);
+  }, []);
+  // A phase added from the flow footer arrives rename-ready (prototype
+  // addPhase parity). Transition-gated: fires once when autoRename turns
+  // on, never re-opens after the teacher commits or cancels.
   useEffect(() => {
-    if (!isMenuOpen) return;
-    function handlePointerDown(e: PointerEvent): void {
-      const target = e.target as Node | null;
-      if (
-        target &&
-        (triggerRef.current?.contains(target) ||
-          anchorRef.current?.contains(target))
-      ) {
-        return;
+    if (autoRename) setRenaming(true);
+  }, [autoRename]);
+  const commitRename = useCallback(
+    (value: string): void => {
+      setRenaming(false);
+      const trimmed = value.trim();
+      if (trimmed && trimmed !== titleText) {
+        onCommitRename(section.id, trimmed);
       }
-      onCloseMenu();
-    }
-    function handleKeyDown(e: KeyboardEvent): void {
-      if (e.key !== "Escape") return;
-      onCloseMenu();
-      triggerRef.current?.focus();
-    }
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isMenuOpen, onCloseMenu]);
-
-  // The id used to address THIS row in toggle/popup callbacks. For a virtual
-  // row we use the synthetic key; the parent's handlers know to ignore
-  // store-bound ops against it.
-  const rowId = storeSection ? storeSection.id : sortableId;
-
-  // Resources pool — store-backed sections use their own resources; the
-  // virtual Standards row uses the lesson-level resources (spec §7).
-  // SectionResource carries an `id`; lesson-level LessonResource doesn't —
-  // we synthesize ids upstream (see lessonResources prop) to keep render
-  // identity stable across rerenders.
-  const resourcesPool: SectionResource[] = storeSection
-    ? storeSection.resources
-    : lessonResources;
-
-  // Build the composer edit-target for a resource in THIS row and hand it up.
-  // A store-backed section routes the patch to its sectionId; the virtual
-  // Standards row's resources are whole-lesson, so we route to sectionId:null
-  // and recover the array index from the synthesized `lesson:<id>:res:<i>` id.
-  const handleEditNote = useCallback(
-    (resource: SectionResource): void => {
-      if (storeSection) {
-        onOpenNoteEditor(storeSection.id, {
-          lessonId,
-          sectionId: storeSection.id,
-          resourceId: resource.id,
-          resource,
-        });
-        return;
-      }
-      const m = /:res:(\d+)$/.exec(resource.id);
-      const index = m ? Number(m[1]) : undefined;
-      onOpenNoteEditor("", {
-        lessonId,
-        sectionId: null,
-        resourceId: resource.id,
-        lessonResourceIndex: index,
-        resource,
-      });
     },
-    [storeSection, lessonId, onOpenNoteEditor],
+    [section.id, titleText, onCommitRename],
   );
 
-  // The collapse-on-drag chip (sections 2–6 ride this when a drag is active).
-  // Virtual rows never enter compact density (they're not sortable), so the
-  // chip is rendered only when `storeSection` exists too.
+  // ── Inline minutes edit ───────────────────────────────────────────────
+  const [editingMinutes, setEditingMinutes] = useState(false);
+  const commitMinutes = useCallback(
+    (raw: string): void => {
+      setEditingMinutes(false);
+      onCommitMinutes(section.id, raw);
+    },
+    [section.id, onCommitMinutes],
+  );
+
+  // The collapse-on-drag chip (every row rides this when a PHASE drag is
+  // active — chips don't trigger compact density).
   const chipContent = (
     <div className={styles.chip40Row}>
-      <span className={styles.chip40Heading}>{canonical.title}</span>
+      <span className={styles.chip40Heading}>{titleText}</span>
     </div>
   );
 
-  // ── Toolbar action wrappers — close popup after each action ─────────
-  const runAndClose = (fn: () => void) => (): void => {
-    fn();
-    onCloseMenu();
-  };
+  const statusMeta = STATUS_META[status];
 
   return (
     <li
       ref={setNodeRef}
-      style={rowStyle}
-      className={[styles.row, isDragging ? styles.rowDragging : ""]
+      style={sortableStyle}
+      className={[
+        styles.row,
+        isDragging ? styles.rowDragging : "",
+        isCompact ? "" : styles.phase,
+        !isCompact && isCurrent ? styles.phaseCurrent : "",
+      ]
         .filter(Boolean)
         .join(" ")}
+      // DOM anchors for the Daily view's agenda navigator
+      // (components/daily/LessonAgendaNav) — it scans the rendered rows so
+      // it never duplicates this file's phase resolution. NEW (6.11.26):
+      // data-flow-minutes (absent when minutes is null — the optional-
+      // minutes rule) and data-flow-status ride along for the agenda's
+      // per-phase time + done-tint rendering.
+      // tabIndex -1: the navigator moves focus here after a jump so
+      // keyboard / screen-reader users continue from the phase they chose.
+      data-flow-section={section.id}
+      data-flow-title={titleText}
+      data-flow-index={index + 1}
+      data-flow-minutes={minutes ?? undefined}
+      data-flow-status={status}
+      tabIndex={-1}
     >
-      {/* Drag-compact chip (only meaningful for store-backed rows). */}
-      {isCompact && storeSection && chipContent}
+      {/* Drag-compact chip while a phase drag is in flight. */}
+      {isCompact && chipContent}
 
       {!isCompact && (
-        <div className={styles.section}>
-          {/* ── PIN badge (USER OVERRIDE — teardrop/map-pin shape) ─────────
-              aria-hidden — the section title carries the accessible name.
-              The pin color comes from `--pin-color` set on the row above. */}
-          <span className={styles.pinBadge} aria-hidden="true">
-            {canonical.index}
-          </span>
-
-          {/* ── Heading row — drag grip + title/helper + chevron ──────────
-              The drag grip is positioned BEFORE the title stack and provides
-              the dnd-kit activator. It's hidden when the row is virtual
-              (Standards). The chevron lives at the far RIGHT of the row per
-              spec §3.2. The whole row toggles expand/collapse. */}
-          <div
-            className={styles.headingRow}
-            onClick={() => onToggleCollapsed(rowId)}
-          >
-            {/* Drag grip — only on store-backed rows (Standards is fixed).
-                Kept as raw <button>: dnd-kit's setActivatorNodeRef requires a
-                DOM ref, and Button does not expose forwardRef yet. Tooltip
-                wraps it to replace the bespoke title="" attribute. */}
-            {storeSection && (
-              <Tooltip
-                content="Drag this section up or down to reorder the lesson flow — useful when you want the Debrief earlier, or to put guided practice before independent practice"
-                side="top"
-              >
-                <button
-                  type="button"
-                  ref={setActivatorNodeRef}
-                  className={styles.dragGrip}
-                  aria-label={`Drag to reorder section ${canonical.index}: ${canonical.title}`}
-                  title="Drag up or down to reorder this lesson section"
-                  // Stop click bubbling so dragging the grip doesn't toggle
-                  // collapse.
-                  onClick={(e) => e.stopPropagation()}
-                  {...listeners}
-                  {...attributes}
-                >
-                  <GripVerticalIcon />
-                </button>
-              </Tooltip>
-            )}
-
-            {/* Title + helper stack.
-                `helperOverride` is set by LessonFlow for the Standards row
-                to surface the active lesson's standards codes; all other rows
-                use the canonical static helper string (DAILY-STANDARDS-001). */}
+        <>
+          {/* ── Phase head — grip · title (+ min) · status chip · del ── */}
+          <div className={styles.phaseHead}>
+            {/* Drag grip — the dnd-kit activator. Kept as raw <button>:
+                setActivatorNodeRef requires a DOM ref and Button does not
+                expose forwardRef yet. */}
             <Tooltip
-              content={
-                canonical.title === "Standards"
-                  ? "The CCSS / curriculum standards this lesson covers — required for grade-level alignment."
-                  : `${canonical.title} — ${canonical.helper}`
-              }
+              content="Drag this phase up or down to reorder the lesson flow"
               side="top"
+              tooltipId="lesson-flow-phase-drag"
             >
-              <div className={styles.titleStack} tabIndex={0}>
-                <h3 className={styles.sectionTitle}>{canonical.title}</h3>
-                <p className={styles.sectionHelper}>
-                  {resolved.helperOverride ?? canonical.helper}
-                </p>
-              </div>
+              <button
+                type="button"
+                ref={setActivatorNodeRef}
+                className={styles.dragGrip}
+                aria-label={`Drag to reorder phase ${index + 1}: ${titleText}`}
+                title="Drag up or down to reorder this phase"
+                {...listeners}
+                {...attributes}
+              >
+                <GripVerticalIcon />
+              </button>
             </Tooltip>
 
-            {/* Right-side chevron — `v` when expanded, `>` when collapsed
-                (spec §3.2). Button variant="icon" carries the hit target;
-                aria-expanded passes through {...rest} to the native <button>. */}
-            <Button
-              variant="icon"
-              size="sm"
-              className={styles.collapseChevron}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleCollapsed(rowId);
-              }}
-              aria-expanded={!isCollapsed}
-              iconAriaLabel={
-                isCollapsed
-                  ? `Expand section ${canonical.index}: ${canonical.title}`
-                  : `Collapse section ${canonical.index}: ${canonical.title}`
-              }
-              tooltip={
-                isCollapsed
-                  ? `Expand ${canonical.title} to see its body and attached resources`
-                  : `Collapse ${canonical.title} to heading-only so you can scan the whole lesson at a glance`
-              }
-            >
-              <ChevronRightIcon collapsed={isCollapsed} />
-            </Button>
-
-            {/* Section management trigger ("···" overflow) — only on
-                store-backed rows. Clicking opens the SectionToolbar popup
-                with Move up/down, Duplicate, Show on website, Delete. The
-                "+" path (open ResourceComposer) is exposed inside the
-                SectionResources card as the "+ Add resource" button. */}
-            {storeSection && (
-              <div className={styles.menuTriggerWrap}>
-                {/* Kept as raw <button>: triggerRef is required by the
-                    click-outside handler in the parent effect, and Button does
-                    not expose forwardRef yet. */}
+            {/* Title + optional "· N min". The title renames on
+                double-click (or Enter/F2 when focused) per the handoff. */}
+            <h3 className={styles.phaseTitle}>
+              {renaming ? (
+                <input
+                  type="text"
+                  className={styles.titleInput}
+                  defaultValue={titleText}
+                  autoFocus
+                  aria-label={`Rename phase: ${titleText}`}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onBlur={(e) => commitRename(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitRename(e.currentTarget.value);
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setRenaming(false);
+                    }
+                  }}
+                />
+              ) : (
                 <Tooltip
-                  content={`Section actions for ${canonical.title} — move, duplicate, toggle on website, or delete.`}
-                  side="left"
+                  content="Double-click to rename this phase"
+                  side="top"
+                  tooltipId="lesson-flow-phase-rename"
+                >
+                  <span
+                    className={styles.phaseTitleText}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Phase ${index + 1}: ${titleText}. Press Enter to rename.`}
+                    onDoubleClick={startRename}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === "F2") startRename(e);
+                    }}
+                  >
+                    {titleText}
+                  </span>
+                </Tooltip>
+              )}
+
+              {/* "· N min" — only when minutes is set (never a dangling
+                  separator). Click to edit inline. */}
+              {editingMinutes ? (
+                <input
+                  type="number"
+                  min={0}
+                  className={styles.minInput}
+                  defaultValue={minutes ?? ""}
+                  autoFocus
+                  aria-label={`Phase length in minutes for ${titleText} — leave empty for no time`}
+                  onBlur={(e) => commitMinutes(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitMinutes(e.currentTarget.value);
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setEditingMinutes(false);
+                    }
+                  }}
+                />
+              ) : minutes != null ? (
+                <Tooltip
+                  content="Planned length of this phase — click to change the minutes"
+                  side="top"
+                  tooltipId="lesson-flow-phase-minutes"
                 >
                   <button
                     type="button"
-                    ref={triggerRef}
-                    className={[
-                      styles.menuTrigger,
-                      isMenuOpen ? styles.menuTriggerOpen : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleMenu(rowId);
-                    }}
-                    aria-haspopup="true"
-                    aria-expanded={isMenuOpen}
-                    aria-label={
-                      isMenuOpen
-                        ? `Close actions for ${canonical.title}`
-                        : `Actions for ${canonical.title}`
-                    }
-                    title={`Section actions for ${canonical.title} — move, duplicate, toggle on website, or delete`}
+                    className={styles.min}
+                    onClick={() => setEditingMinutes(true)}
+                    aria-label={`Planned length: ${minutes} minutes. Activate to edit.`}
                   >
-                    <OverflowIcon />
+                    · {minutes} min
                   </button>
                 </Tooltip>
+              ) : (
+                // No planned length — a hover/focus-revealed "+ min" ghost
+                // is the way BACK once minutes is cleared (a structured
+                // field can't be re-typed into the title the way the
+                // prototype's parsed "· 15 min" could).
+                <Tooltip
+                  content="Give this phase a planned length in minutes"
+                  side="top"
+                  tooltipId="lesson-flow-phase-minutes"
+                >
+                  <button
+                    type="button"
+                    className={styles.minAdd}
+                    onClick={() => setEditingMinutes(true)}
+                    aria-label={`No planned length for ${titleText}. Activate to add minutes.`}
+                  >
+                    · + min
+                  </button>
+                </Tooltip>
+              )}
+            </h3>
 
-                <div className={styles.toolbarAnchor} ref={anchorRef}>
-                  <SectionToolbar
-                    visible={isMenuOpen && !isCompact}
-                    onMoveUp={runAndClose(() => onMoveUp(rowId))}
-                    onMoveDown={runAndClose(() => onMoveDown(rowId))}
-                    onDuplicate={runAndClose(() => onDuplicate(rowId))}
-                    onToggleWebsite={runAndClose(() => onToggleWebsite(rowId))}
-                    onDelete={runAndClose(() => onRemove(rowId))}
-                    websiteVisible={websiteVisible}
-                    canMoveUp={!isFirst}
-                    canMoveDown={!isLast}
-                    canDelete={canRemove}
-                  />
-                </div>
-              </div>
-            )}
+            {/* Right side — status chip, collapse chevron, hover trash. */}
+            <div className={styles.phaseHeadRight}>
+              <Tooltip
+                content="Track this phase while you teach — tap to cycle Not started → In progress → Completed"
+                side="top"
+                tooltipId="lesson-flow-phase-status"
+              >
+                <button
+                  type="button"
+                  className={styles.statusChip}
+                  data-status={status}
+                  onClick={() => onCycleStatus(section.id, status)}
+                  aria-label={`Phase status: ${statusMeta.label}. Activate to mark ${STATUS_META[statusMeta.next].label}.`}
+                >
+                  {statusMeta.label}
+                </button>
+              </Tooltip>
+
+              {/* Collapse chevron — preserved behavior; `v` when expanded,
+                  `>` when collapsed. */}
+              <Button
+                variant="icon"
+                size="sm"
+                className={styles.collapseChevron}
+                onClick={() => onToggleCollapsed(section.id)}
+                aria-expanded={!isCollapsed}
+                iconAriaLabel={
+                  isCollapsed
+                    ? `Expand phase: ${titleText}`
+                    : `Collapse phase: ${titleText}`
+                }
+                tooltip={
+                  isCollapsed
+                    ? `Expand ${titleText} to see its plan and tagged resources`
+                    : `Collapse ${titleText} to its heading so you can scan the whole lesson`
+                }
+              >
+                <ChevronRightIcon collapsed={isCollapsed} />
+              </Button>
+
+              {/* Delete — hover-revealed (also visible on keyboard focus).
+                  Destructive → required tooltip (CLAUDE.md §4 always-on
+                  exception). Disabled on the last remaining phase. */}
+              <Tooltip
+                content={
+                  canRemove
+                    ? `Delete the "${titleText}" phase and everything in it — this affects the whole plan and can be undone with Ctrl+Z`
+                    : "A lesson keeps at least one phase — add another phase before deleting this one"
+                }
+                side="left"
+                required
+              >
+                <button
+                  type="button"
+                  className={styles.phaseDel}
+                  onClick={() => onRemove(section.id)}
+                  disabled={!canRemove}
+                  aria-label={`Delete phase: ${titleText}`}
+                  title={
+                    canRemove
+                      ? `Delete phase: ${titleText}`
+                      : "A lesson keeps at least one phase"
+                  }
+                >
+                  <TrashIcon />
+                </button>
+              </Tooltip>
+            </div>
           </div>
 
-          {/* ── Body + resources — collapse to nothing when heading-only ──
-              The body sits in the left column; the SectionResources card
-              docks to the right (sections 1–6 all share the 2-col layout
-              when expanded). */}
+          {/* ── Body + tagged resources — collapse to head-only ── */}
           <AnimatePresence initial={false}>
             {!bodyHidden && (
               <motion.div
-                key="section-body"
-                className={styles.sectionBody}
+                key="phase-body"
                 initial={
                   reducedMotion ? { opacity: 0 } : { height: 0, opacity: 0 }
                 }
@@ -615,92 +552,94 @@ const SortableSection = memo(function SortableSection({
                 transition={collapseTransition}
                 style={reducedMotion ? undefined : { overflow: "hidden" }}
               >
-                <div className={styles.sectionLayout}>
-                  {/* LEFT — body textarea (per spec §3.4). */}
-                  <div className={styles.leftColumn}>
-                    <div className={styles.body}>
-                      {storeSection && editingBody ? (
-                        <RichEditorWrapper
-                          onCommit={onCommitEdit}
-                          onCancel={onCancelEdit}
-                          fill
-                        >
-                          <RichTextEditor
-                            value={draftValue}
-                            onChange={onDraftChange}
-                            autoFocus
-                            placeholder={BODY_PLACEHOLDER}
-                            ariaLabel={`Body for ${canonical.title}`}
-                            dockTarget={dockTarget}
-                          />
-                        </RichEditorWrapper>
-                      ) : storeSection && stripHtml(storeSection.body) ? (
-                        <div
-                          className={styles.bodyText}
-                          tabIndex={0}
-                          role="button"
-                          aria-label={`Edit body for ${canonical.title}`}
-                          onDoubleClick={(e) => onOpenBodyEditor(rowId, e)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === "F2")
-                              onOpenBodyEditor(rowId, e);
-                          }}
-                          title={`Double-click or press Enter to edit ${canonical.title}`}
-                          // eslint-disable-next-line react/no-danger
-                          dangerouslySetInnerHTML={{
-                            __html: safeBody,
-                          }}
-                        />
-                      ) : (
-                        // Empty body — placeholder text per spec §3.4.
-                        <div
-                          className={[styles.bodyText, styles.bodyEmpty].join(
-                            " ",
-                          )}
-                          tabIndex={0}
-                          role="button"
-                          aria-label={`Add body for ${canonical.title}`}
-                          onDoubleClick={(e) =>
-                            storeSection
-                              ? onOpenBodyEditor(rowId, e)
-                              : undefined
-                          }
-                          onKeyDown={(e) => {
-                            if (
-                              storeSection &&
-                              (e.key === "Enter" || e.key === "F2")
-                            )
-                              onOpenBodyEditor(rowId, e);
-                          }}
-                          title={
-                            storeSection
-                              ? `Double-click or press Enter to edit ${canonical.title}`
-                              : undefined
-                          }
-                        >
-                          {BODY_PLACEHOLDER}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* RIGHT — SectionResources card (expanded ⇄ minimized). */}
-                  <div className={styles.resourcesColumn}>
-                    <SectionResources
-                      lessonId={lessonId}
-                      sectionId={rowId}
-                      resources={resourcesPool}
-                      onAdd={
-                        storeSection ? () => onOpenComposer(rowId) : undefined
-                      }
-                      onEditNote={handleEditNote}
-                    />
-                  </div>
+                {/* Body — teachText reading rhythm; double-click (or
+                    Enter/F2) opens the RichTextEditor. */}
+                <div className={styles.phaseBody}>
+                  {editingBody ? (
+                    <RichEditorWrapper
+                      onCommit={onCommitEdit}
+                      onCancel={onCancelEdit}
+                      fill
+                    >
+                      <RichTextEditor
+                        value={draftValue}
+                        onChange={onDraftChange}
+                        autoFocus
+                        placeholder={BODY_PLACEHOLDER}
+                        ariaLabel={`Plan for phase: ${titleText}`}
+                        dockTarget={dockTarget}
+                        chromeless={chromeless}
+                      />
+                    </RichEditorWrapper>
+                  ) : stripHtml(section.body) ? (
+                    <Tooltip
+                      content="Double-click (or press Enter) to edit this phase's plan"
+                      side="top"
+                      tooltipId="lesson-flow-edit-plan"
+                    >
+                      <div
+                        className={styles.teachText}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Edit plan for phase: ${titleText}`}
+                        onDoubleClick={(e) => onOpenBodyEditor(section.id, e)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "F2")
+                            onOpenBodyEditor(section.id, e);
+                        }}
+                        // eslint-disable-next-line react/no-danger
+                        dangerouslySetInnerHTML={{ __html: safeBody }}
+                      />
+                    </Tooltip>
+                  ) : (
+                    <Tooltip
+                      content="Double-click (or press Enter) to write this phase's plan"
+                      side="top"
+                      tooltipId="lesson-flow-edit-plan"
+                    >
+                      <div
+                        className={[styles.teachText, styles.bodyEmpty].join(
+                          " ",
+                        )}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Add a plan for phase: ${titleText}`}
+                        onDoubleClick={(e) => onOpenBodyEditor(section.id, e)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "F2")
+                            onOpenBodyEditor(section.id, e);
+                        }}
+                      >
+                        {BODY_PLACEHOLDER}
+                      </div>
+                    </Tooltip>
+                  )}
                 </div>
+
+                {/* Per-phase tagged resources — resChip rows. */}
+                <PhaseResources
+                  sectionId={section.id}
+                  resources={section.resources}
+                  onAdd={() => onOpenComposer(section.id)}
+                  onEditNote={(resource) =>
+                    onOpenNoteEditor(section.id, {
+                      lessonId,
+                      sectionId: section.id,
+                      resourceId: resource.id,
+                      resource,
+                    })
+                  }
+                  onRenameResource={(resourceId, label) =>
+                    onRenameResource(section.id, resourceId, label)
+                  }
+                  onRemoveResource={(resourceId) =>
+                    onRemoveResource(section.id, resourceId)
+                  }
+                />
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </>
       )}
     </li>
   );
@@ -711,12 +650,9 @@ const SortableSection = memo(function SortableSection({
 export function LessonFlow({
   lessonId,
   dockTarget,
+  chromeless = false,
+  currentSectionId = null,
 }: LessonFlowProps): ReactNode {
-  // ── Store ────────────────────────────────────────────────────────────
-  // Resource moves between sections (moveSectionResource) and bulk section
-  // resets (setSections) were used by the previous full lesson-flow; the
-  // current canonical layout doesn't expose either path, so they are not
-  // destructured. They remain on the store contract for the rest of the app.
   const {
     lessons,
     getSections,
@@ -724,119 +660,40 @@ export function LessonFlow({
     editSection,
     addSection: storeAddSection,
     removeSection: storeRemoveSection,
-    duplicateSection: storeDuplicateSection,
-    toggleSectionWebsite,
+    editSectionResource,
+    removeSectionResource,
+    moveSectionResource,
   } = usePlanner();
 
-  // Authoritative sections from the store.
+  // Authoritative phases from the store, in store order.
   const sections = getSections(lessonId);
 
-  // Resolve the lesson object (needed for the ResourceComposer + the
-  // canonical Standards row's resource list).
+  // Resolve the lesson object (needed by the ResourceComposer).
   const lesson = lessons.find((l) => l.id === lessonId);
-
-  // ── Lesson-level resources (Standards row's pool) ───────────────────
-  // The Standards canonical position uses lesson.resources (per spec §7).
-  // LessonResource has no `id`; SectionResource expects one. Synthesize a
-  // stable id from the (label, type, index) so SectionResources keys stay
-  // stable across rerenders. useMemo so the array identity doesn't churn.
-  const lessonResources: SectionResource[] = useMemo(() => {
-    if (!lesson) return [];
-    return lesson.resources.map((r, idx) => ({
-      // Spread the FULL resource (url, provider, body, gallery, thumbnailUrl, …)
-      // — NOT just type/label. A downstream "Edit note" reads this resource's
-      // existing gallery/body to re-merge on patch; a stripped object would make
-      // the patch overwrite (drop) a pre-existing whole-lesson gallery (M1 data
-      // loss). LessonResource has no runtime `id`; synthesize a stable one from
-      // the index so SectionResource keys stay stable across rerenders.
-      ...r,
-      id: `lesson:${lesson.id}:res:${idx}`,
-    }));
-  }, [lesson]);
-
-  // ── Resolved canonical row list ────────────────────────────────────
-  // For each of the 6 canonical entries, locate the store-backed section
-  // (positions 2–6 match by heading substring; position 1 has no template
-  // match and is intentionally virtual). The ORDER of the visible list is
-  // FIXED at the canonical order; reorder ops on store sections only affect
-  // the underlying store, not the visible mapping. (A later phase could
-  // expose drag-reorder of the canonical positions themselves.)
-  //
-  // DAILY-STANDARDS-001: the Standards row (index 1) injects a
-  // `helperOverride` derived from the active lesson's standards codes so
-  // the helper line updates within one render cycle when the selected lesson
-  // changes. When the lesson has no standards the helper is left empty.
-  const resolved: ResolvedSection[] = useMemo(() => {
-    // Build the helper string for the virtual Standards row.
-    // Shows up to 3 codes inline (e.g. "5.NF.B.3 · RL.5.6"); when more
-    // standards are present, a "+N more" trailer keeps it compact.
-    const lessonStandards = lesson?.standards ?? [];
-    let standardsHelper = "";
-    if (lessonStandards.length > 0) {
-      const MAX_SHOWN = 3;
-      const shown = lessonStandards.slice(0, MAX_SHOWN);
-      const remainder = lessonStandards.length - shown.length;
-      standardsHelper = shown.join(" · ");
-      if (remainder > 0) standardsHelper += ` +${remainder} more`;
-    }
-
-    return CANONICAL_SECTIONS.map((canonical) => {
-      if (!canonical.templateMatch) {
-        // Virtual Standards row — attach the lesson-derived helper.
-        return {
-          canonical,
-          storeSection: null,
-          helperOverride: standardsHelper,
-        };
-      }
-      const match = sections.find((s) =>
-        stripHtml(s.heading)
-          .toLowerCase()
-          .includes(canonical.templateMatch as string),
-      );
-      return { canonical, storeSection: match ?? null };
-    });
-  }, [sections, lesson]);
 
   // ── Motion / DnD ────────────────────────────────────────────────────
   const prefersReducedMotion = useReducedMotion() ?? false;
   const sensors = useDndSensors();
+  // dragState tracks PHASE drags only (it drives collapse-on-drag density);
+  // a chip drag rides `activeChip` and never compacts the layout.
   const [dragState, setDragState] = useState<DragState>({ phase: "idle" });
+  const [activeChip, setActiveChip] = useState<SectionResource | null>(null);
   const density = densityFor(dragState);
 
-  // ── Per-section collapsed state ─────────────────────────────────────
-  // Default: Section 1 EXPANDED, Sections 2–6 COLLAPSED (spec §3.5).
-  // We seed the set from the canonical indices 2–6 on first render. The
-  // teacher's edits to this set persist for the session. When the lesson
-  // changes we reset to the default.
-  const buildDefaultCollapsed = useCallback(
-    (rs: ResolvedSection[]): Set<string> => {
-      const next = new Set<string>();
-      rs.forEach((r) => {
-        if (r.canonical.index === 1) return; // Section 1 stays expanded
-        const id = r.storeSection
-          ? r.storeSection.id
-          : `__virtual:${r.canonical.index}`;
-        next.add(id);
-      });
-      return next;
-    },
-    [],
+  // ── Per-phase collapsed state ───────────────────────────────────────
+  // Default: every phase EXPANDED (the handoff renders all phases open).
+  // The teacher's overrides persist for the session; reset on lesson change.
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+    () => new Set(),
   );
 
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() =>
-    buildDefaultCollapsed(resolved),
-  );
-
-  // Reset collapsed defaults when the lesson changes — and clear any
-  // in-progress edit drafts targeting the now-unavailable section.
   const prevLessonIdRef = useRef(lessonId);
   if (prevLessonIdRef.current !== lessonId) {
     prevLessonIdRef.current = lessonId;
-    setCollapsedSections(buildDefaultCollapsed(resolved));
+    setCollapsedSections(new Set());
   }
 
-  // ── Body editor state (heading editing is removed per spec §3.2) ────
+  // ── Body editor state ───────────────────────────────────────────────
   const [editTarget, setEditTarget] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<string>("");
 
@@ -881,12 +738,39 @@ export function LessonFlow({
     setEditDraft("");
   }, []);
 
-  // ── Section management ──────────────────────────────────────────────
-  function addSection(): void {
-    storeAddSection(lessonId);
+  // ── Phase management ────────────────────────────────────────────────
+  // "New phase" is the 6.11.26 spec title (sentence case, not the store
+  // default "New section"). A footer-added phase scrolls into view and
+  // opens its rename input ready to type (prototype addPhase parity) —
+  // pendingAdd-gated so phases added elsewhere (agenda navigator,
+  // templates) don't hijack the rename.
+  const [autoRenameId, setAutoRenameId] = useState<string | null>(null);
+  const pendingAddRef = useRef(false);
+  const prevCountRef = useRef(sections.length);
+  useEffect(() => {
+    const grew = sections.length > prevCountRef.current;
+    prevCountRef.current = sections.length;
+    if (!grew || !pendingAddRef.current) return;
+    pendingAddRef.current = false;
+    const last = sections[sections.length - 1];
+    if (!last) return;
+    setAutoRenameId(last.id);
+    // window.CSS, not the dnd-kit `CSS` util this file imports.
+    const el = document.querySelector<HTMLElement>(
+      `[data-flow-section="${window.CSS.escape(last.id)}"]`,
+    );
+    el?.scrollIntoView({
+      block: "center",
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  }, [sections, prefersReducedMotion]);
+
+  function addPhase(): void {
+    pendingAddRef.current = true;
+    storeAddSection(lessonId, "New phase");
   }
 
-  const removeSection = useCallback(
+  const removePhase = useCallback(
     (id: string): void => {
       storeRemoveSection(lessonId, id);
       setCollapsedSections((prev) => {
@@ -900,59 +784,64 @@ export function LessonFlow({
     [lessonId, storeRemoveSection],
   );
 
-  const moveSectionUp = useCallback(
-    (id: string): void => {
-      const idx = sections.findIndex((s) => s.id === id);
-      if (idx <= 0) return;
-      reorderSections(lessonId, id, sections[idx - 1].id);
+  // ── Status cycle — phase-level ONLY ─────────────────────────────────
+  // Never touches lesson-level status, never forks the lesson: this is a
+  // plain editSection patch on the section row.
+  const cycleStatus = useCallback(
+    (sectionId: string, current: SectionStatus): void => {
+      editSection(lessonId, sectionId, { status: STATUS_META[current].next });
     },
-    [lessonId, sections, reorderSections],
+    [lessonId, editSection],
   );
 
-  const moveSectionDown = useCallback(
-    (id: string): void => {
-      const idx = sections.findIndex((s) => s.id === id);
-      if (idx === -1 || idx >= sections.length - 1) return;
-      reorderSections(lessonId, id, sections[idx + 1].id);
+  // ── Rename — plain-text heading commit (coalesced) ──────────────────
+  const commitRename = useCallback(
+    (sectionId: string, text: string): void => {
+      editSection(
+        lessonId,
+        sectionId,
+        { heading: escapeHtml(text) },
+        { key: `section:${lessonId}:${sectionId}:heading`, ts: Date.now() },
+      );
     },
-    [lessonId, sections, reorderSections],
+    [lessonId, editSection],
   );
 
-  const duplicateSection = useCallback(
-    (id: string): void => {
-      storeDuplicateSection(lessonId, id);
+  // ── Minutes commit — empty → null (no time shown) ───────────────────
+  const commitMinutes = useCallback(
+    (sectionId: string, raw: string): void => {
+      const trimmed = raw.trim();
+      if (trimmed === "") {
+        editSection(lessonId, sectionId, { minutes: null });
+        return;
+      }
+      const n = Number(trimmed);
+      if (!Number.isFinite(n) || n < 0) return; // ignore invalid input
+      // Clamp to a sane ceiling — an absurd value (99999999) would distort
+      // the phase head and the agenda navigator's time line.
+      editSection(lessonId, sectionId, {
+        minutes: Math.min(999, Math.round(n)),
+      });
     },
-    [lessonId, storeDuplicateSection],
+    [lessonId, editSection],
   );
 
-  // ── Website-visible toggle (local UI) ───────────────────────────────
-  const [websiteVisible, setWebsiteVisible] = useState<Record<string, boolean>>(
-    {},
-  );
-  const toggleWebsiteVisible = useCallback(
-    (id: string): void => {
-      setWebsiteVisible((prev) => ({ ...prev, [id]: !prev[id] }));
-      toggleSectionWebsite(lessonId, id);
+  // ── Resource chip actions ───────────────────────────────────────────
+  const renameResource = useCallback(
+    (sectionId: string, resourceId: string, label: string): void => {
+      editSectionResource(lessonId, sectionId, resourceId, { label });
     },
-    [lessonId, toggleSectionWebsite],
+    [lessonId, editSectionResource],
   );
 
-  // ── Section-menu popup state ────────────────────────────────────────
-  const [openMenuSectionId, setOpenMenuSectionId] = useState<string | null>(
-    null,
+  const removeResource = useCallback(
+    (sectionId: string, resourceId: string): void => {
+      removeSectionResource(lessonId, sectionId, resourceId);
+    },
+    [lessonId, removeSectionResource],
   );
-  const toggleSectionMenu = useCallback((sectionId: string): void => {
-    setOpenMenuSectionId((prev) => (prev === sectionId ? null : sectionId));
-  }, []);
-  const closeSectionMenu = useCallback((): void => {
-    setOpenMenuSectionId(null);
-  }, []);
 
   // ── ResourceComposer state ──────────────────────────────────────────
-  // `sectionId` is the destination for the ADD path. `editResource`, when set,
-  // flips the composer into "add/edit notes on THIS resource" mode (notecard
-  // mode + locked routing) so any existing section/lesson resource can gain a
-  // rich `body` / extra gallery media.
   const [composerTarget, setComposerTarget] = useState<{
     sectionId: string;
     editResource?: ResourceComposerEditTarget;
@@ -960,16 +849,11 @@ export function LessonFlow({
 
   const handleOpenComposer = useCallback((sectionId: string): void => {
     setComposerTarget({ sectionId });
-    setOpenMenuSectionId(null);
   }, []);
 
-  // Open the composer to add / edit notes on an existing resource. `sectionId`
-  // is "" for a whole-lesson (Standards row) resource — the composer reads the
-  // edit target's own sectionId/index, not this field, when editing.
   const handleOpenNoteEditor = useCallback(
     (sectionId: string, editResource: ResourceComposerEditTarget): void => {
       setComposerTarget({ sectionId, editResource });
-      setOpenMenuSectionId(null);
     },
     [],
   );
@@ -978,7 +862,7 @@ export function LessonFlow({
     setComposerTarget(null);
   }, []);
 
-  // ── Per-section collapse toggle ─────────────────────────────────────
+  // ── Per-phase collapse toggle + global controls ─────────────────────
   const toggleCollapsed = useCallback((sectionId: string): void => {
     setCollapsedSections((prev) => {
       const next = new Set(prev);
@@ -992,52 +876,59 @@ export function LessonFlow({
   }, []);
 
   const collapseAll = useCallback((): void => {
-    const all = new Set<string>(
-      resolved.map((r) =>
-        r.storeSection ? r.storeSection.id : `__virtual:${r.canonical.index}`,
-      ),
-    );
-    setCollapsedSections(all);
-  }, [resolved]);
+    setCollapsedSections(new Set(sections.map((s) => s.id)));
+  }, [sections]);
 
   const expandAll = useCallback((): void => {
     setCollapsedSections(new Set());
   }, []);
 
   const allCollapsed =
-    resolved.length > 0 &&
-    resolved.every((r) => {
-      const id = r.storeSection
-        ? r.storeSection.id
-        : `__virtual:${r.canonical.index}`;
-      return collapsedSections.has(id);
-    });
+    sections.length > 0 && sections.every((s) => collapsedSections.has(s.id));
   const noneCollapsed = collapsedSections.size === 0;
 
   // ── aria-live for drag announcements ────────────────────────────────
   const [liveAnnouncement, setLiveAnnouncement] = useState<string>("");
   const announceRegionId = useId();
 
-  // Sortable ids — only store-backed rows participate in DnD; the virtual
-  // Standards row is sortable-disabled at the row level.
-  const sortableIds = useMemo(
-    () =>
-      resolved.map((r) =>
-        r.storeSection ? r.storeSection.id : `__virtual:${r.canonical.index}`,
-      ),
-    [resolved],
+  const sortableIds = useMemo(() => sections.map((s) => s.id), [sections]);
+
+  // Normalize ANY droppable id to the phase that owns it — a chip id maps
+  // to the section carrying that resource; a phaseres:: id maps to its
+  // section; a bare section id maps to itself.
+  const ownerSectionOf = useCallback(
+    (overId: string): string | null => {
+      if (overId.startsWith(RES_PREFIX)) {
+        const rid = overId.slice(RES_PREFIX.length);
+        return (
+          sections.find((s) => s.resources.some((r) => r.id === rid))?.id ??
+          null
+        );
+      }
+      if (overId.startsWith(PHASE_RES_PREFIX)) {
+        return overId.slice(PHASE_RES_PREFIX.length);
+      }
+      return sections.some((s) => s.id === overId) ? overId : null;
+    },
+    [sections],
   );
 
   // ── dnd-kit drag lifecycle ─────────────────────────────────────────
   function handleDragStart({ active }: DragStartEvent): void {
-    setDragState({
-      phase: "dragging",
-      activeId: String(active.id),
-      overId: null,
-    });
-    setOpenMenuSectionId(null);
+    const id = String(active.id);
+    if (isChipId(id)) {
+      const rid = id.slice(RES_PREFIX.length);
+      const src = sections.find((s) => s.resources.some((r) => r.id === rid));
+      const resource = src?.resources.find((r) => r.id === rid) ?? null;
+      setActiveChip(resource);
+      setLiveAnnouncement(
+        "Picked up resource. Drop it on another position or phase to move it; Escape cancels.",
+      );
+      return;
+    }
+    setDragState({ phase: "dragging", activeId: id, overId: null });
     setLiveAnnouncement(
-      `Picked up section. Use arrow keys to move, Space to drop, Escape to cancel.`,
+      "Picked up phase. Use arrow keys to move, Space to drop, Escape to cancel.",
     );
   }
 
@@ -1049,25 +940,68 @@ export function LessonFlow({
   }
 
   function handleDragEnd({ active, over }: DragEndEvent): void {
-    if (over && active.id !== over.id) {
-      // Only commit reorder when BOTH ids are store-backed (real sections).
-      const activeId = String(active.id);
-      const overId = String(over.id);
-      if (
-        !activeId.startsWith("__virtual:") &&
-        !overId.startsWith("__virtual:")
-      ) {
-        reorderSections(lessonId, activeId, overId);
+    const id = String(active.id);
+
+    // ── Resource chip drop ─────────────────────────────────────────
+    if (isChipId(id)) {
+      setActiveChip(null);
+      if (!over) {
+        setLiveAnnouncement("Drag cancelled.");
+        return;
+      }
+      const rid = id.slice(RES_PREFIX.length);
+      const src = sections.find((s) => s.resources.some((r) => r.id === rid));
+      const resource = src?.resources.find((r) => r.id === rid);
+      const targetSectionId = ownerSectionOf(String(over.id));
+      if (!src || !resource || !targetSectionId) return;
+
+      if (targetSectionId === src.id) {
+        // Within-phase reorder — one editSection step with the moved array.
+        const overId = String(over.id);
+        if (overId.startsWith(RES_PREFIX)) {
+          const overRid = overId.slice(RES_PREFIX.length);
+          if (overRid !== rid) {
+            const from = src.resources.findIndex((r) => r.id === rid);
+            const to = src.resources.findIndex((r) => r.id === overRid);
+            if (from !== -1 && to !== -1) {
+              editSection(lessonId, src.id, {
+                resources: arrayMove(src.resources, from, to),
+              });
+            }
+          }
+        }
+      } else {
+        // Cross-phase move — appends to the target phase's list.
+        moveSectionResource(lessonId, src.id, targetSectionId, resource);
+      }
+      setLiveAnnouncement("Dropped.");
+      return;
+    }
+
+    // ── Phase drop ─────────────────────────────────────────────────
+    if (over && id !== String(over.id)) {
+      const target = ownerSectionOf(String(over.id));
+      if (target && target !== id) {
+        reorderSections(lessonId, id, target);
       }
     }
-    setLiveAnnouncement(`Dropped.`);
+    setLiveAnnouncement("Dropped.");
     setDragState({ phase: "idle" });
   }
 
   function handleDragCancel(): void {
     setDragState({ phase: "idle" });
+    setActiveChip(null);
     setLiveAnnouncement("Drag cancelled.");
   }
+
+  // Heading shown in the phase DragOverlay chip.
+  const draggedHeading =
+    dragState.phase !== "idle"
+      ? stripHtml(
+          sections.find((s) => s.id === dragState.activeId)?.heading ?? "",
+        ) || "Phase"
+      : "";
 
   // ── Render ───────────────────────────────────────────────────────────
   return (
@@ -1088,7 +1022,7 @@ export function LessonFlow({
         <div
           className={styles.globalToggles}
           role="group"
-          aria-label="Expand or collapse all sections"
+          aria-label="Expand or collapse all phases"
         >
           <Button
             variant="ghost"
@@ -1096,7 +1030,7 @@ export function LessonFlow({
             className={styles.globalToggleBtn}
             onClick={expandAll}
             disabled={noneCollapsed}
-            tooltip="Open every section of this lesson at once — useful when reviewing the full plan before teaching"
+            tooltip="Open every phase of this lesson at once — useful when reviewing the full plan before teaching"
           >
             Expand all
           </Button>
@@ -1106,14 +1040,14 @@ export function LessonFlow({
             className={styles.globalToggleBtn}
             onClick={collapseAll}
             disabled={allCollapsed}
-            tooltip="Collapse every section to heading-only — useful when reordering or scanning the lesson outline"
+            tooltip="Collapse every phase to its heading — useful when reordering or scanning the lesson outline"
           >
             Collapse all
           </Button>
         </div>
       </div>
 
-      {/* ── The section stack ─────────────────────────────────────────── */}
+      {/* ── The phase stack ───────────────────────────────────────────── */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -1126,52 +1060,38 @@ export function LessonFlow({
           items={sortableIds}
           strategy={verticalListSortingStrategy}
         >
-          <ol className={styles.list} aria-label="Lesson sections">
-            {resolved.map((r, idx) => {
-              const id = r.storeSection
-                ? r.storeSection.id
-                : `__virtual:${r.canonical.index}`;
-              const isFirst = idx === 0;
-              const isLast = idx === resolved.length - 1;
-
-              return (
-                <SortableSection
-                  key={id}
-                  resolved={r}
-                  isFirst={isFirst}
-                  isLast={isLast}
-                  density={density}
-                  reducedMotion={prefersReducedMotion}
-                  lessonId={lessonId}
-                  lessonResources={lessonResources}
-                  onMoveUp={moveSectionUp}
-                  onMoveDown={moveSectionDown}
-                  onRemove={removeSection}
-                  onDuplicate={duplicateSection}
-                  onToggleWebsite={toggleWebsiteVisible}
-                  websiteVisible={
-                    r.storeSection
-                      ? (websiteVisible[r.storeSection.id] ?? false)
-                      : false
-                  }
-                  canRemove={sections.length > 1}
-                  isMenuOpen={openMenuSectionId === id}
-                  onToggleMenu={toggleSectionMenu}
-                  onCloseMenu={closeSectionMenu}
-                  onOpenComposer={handleOpenComposer}
-                  onOpenNoteEditor={handleOpenNoteEditor}
-                  isCollapsed={collapsedSections.has(id)}
-                  onToggleCollapsed={toggleCollapsed}
-                  dockTarget={dockTarget}
-                  editingBody={editTarget !== null && editTarget === id}
-                  draftValue={editTarget === id ? editDraft : ""}
-                  onOpenBodyEditor={openBodyEditor}
-                  onDraftChange={setEditDraft}
-                  onCommitEdit={commitBodyEdit}
-                  onCancelEdit={cancelBodyEdit}
-                />
-              );
-            })}
+          <ol className={styles.list} aria-label="Lesson phases">
+            {sections.map((section, idx) => (
+              <SortablePhase
+                key={section.id}
+                section={section}
+                index={idx}
+                density={density}
+                reducedMotion={prefersReducedMotion}
+                lessonId={lessonId}
+                canRemove={sections.length > 1}
+                onRemove={removePhase}
+                onCycleStatus={cycleStatus}
+                onCommitRename={commitRename}
+                onCommitMinutes={commitMinutes}
+                onOpenComposer={handleOpenComposer}
+                onOpenNoteEditor={handleOpenNoteEditor}
+                onRenameResource={renameResource}
+                onRemoveResource={removeResource}
+                isCollapsed={collapsedSections.has(section.id)}
+                onToggleCollapsed={toggleCollapsed}
+                dockTarget={dockTarget}
+                chromeless={chromeless}
+                isCurrent={section.id === currentSectionId}
+                autoRename={section.id === autoRenameId}
+                editingBody={editTarget !== null && editTarget === section.id}
+                draftValue={editTarget === section.id ? editDraft : ""}
+                onOpenBodyEditor={openBodyEditor}
+                onDraftChange={setEditDraft}
+                onCommitEdit={commitBodyEdit}
+                onCancelEdit={cancelBodyEdit}
+              />
+            ))}
           </ol>
         </SortableContext>
 
@@ -1187,48 +1107,48 @@ export function LessonFlow({
                 }
           }
         >
-          {dragState.phase !== "idle" && (
+          {activeChip ? (
+            <ResourceChipGhost resource={activeChip} />
+          ) : dragState.phase !== "idle" ? (
             <div className={styles.overlayChip} aria-hidden="true">
               <div className={styles.chip40Row}>
-                <span className={styles.chip40Heading}>Section</span>
+                <span className={styles.chip40Heading}>{draggedHeading}</span>
               </div>
             </div>
-          )}
+          ) : null}
         </DragOverlay>
       </DndContext>
 
-      {/* ── Footer — "+ Add section" + template stub (preserved per §5) */}
+      {/* ── "Add phase" — dashed full-width button after the last phase.
+           The "Edit lesson flow / template" stub that used to live here has
+           been removed — the Templates menu now lives in the Daily agenda
+           section head (built in LessonDetail). */}
       <div className={styles.footer}>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={styles.addSectionBtn}
-          onClick={addSection}
-          leadingIcon={<AddIcon />}
-          tooltip="Append a blank section to this lesson — useful when the standard Gradual Release flow doesn't quite fit"
+        <button
+          type="button"
+          className={styles.addPhaseBtn}
+          onClick={addPhase}
+          title="Append a new phase to this lesson plan"
         >
-          Add section
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={styles.templateBtn}
-          aria-label="Edit lesson flow template (coming soon)"
-          tooltip="Edit the underlying lesson-flow template that controls the default section list — coming in a later phase"
-        >
-          Edit lesson flow / template
-        </Button>
+          <AddIcon />
+          Add a lesson phase
+        </button>
       </div>
 
-      {/* ── ResourceComposer — shared "Add resource" / "Add note" dialog ── */}
-      <ResourceComposer
-        open={composerTarget !== null && lesson !== undefined}
-        lesson={lesson!}
-        mode={composerTarget?.editResource ? "notecard" : "resource"}
-        editResource={composerTarget?.editResource}
-        initialSectionId={composerTarget?.sectionId}
-        onClose={closeComposer}
-      />
+      {/* ── ResourceComposer — shared "Add resource" / "Add note" dialog ──
+          Render-gated on the resolved lesson: the composer evaluates
+          lesson fields before its own `open` early-return, so an
+          unresolvable lessonId must not reach it at all. */}
+      {lesson && (
+        <ResourceComposer
+          open={composerTarget !== null}
+          lesson={lesson}
+          mode={composerTarget?.editResource ? "notecard" : "resource"}
+          editResource={composerTarget?.editResource}
+          initialSectionId={composerTarget?.sectionId}
+          onClose={closeComposer}
+        />
+      )}
     </div>
   );
 }
@@ -1272,11 +1192,9 @@ function RichEditorWrapper({
   );
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "").trim();
-}
+// stripHtml / escapeHtml live in lib/html-text.ts — ONE escape/decode
+// contract shared with the agenda navigator's rename-in-place, so a rename
+// through either surface round-trips identically.
 
 // ── Icons ────────────────────────────────────────────────────────────────
 
@@ -1302,18 +1220,17 @@ function ChevronRightIcon({ collapsed }: { collapsed: boolean }): ReactNode {
 function AddIcon(): ReactNode {
   return (
     <svg
-      width="16"
-      height="16"
+      width="15"
+      height="15"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="2.2"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
+      <path d="M12 5v14M5 12h14" />
     </svg>
   );
 }
@@ -1337,19 +1254,25 @@ function GripVerticalIcon(): ReactNode {
   );
 }
 
-/** Three-dot overflow glyph — the "···" management trigger. */
-function OverflowIcon(): ReactNode {
+/** Trash glyph for the phase delete button (prototype .phaseDel, 15px). */
+function TrashIcon(): ReactNode {
   return (
     <svg
-      width="16"
-      height="16"
+      width="15"
+      height="15"
       viewBox="0 0 24 24"
-      fill="currentColor"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
     >
-      <circle cx="5" cy="12" r="1.8" />
-      <circle cx="12" cy="12" r="1.8" />
-      <circle cx="19" cy="12" r="1.8" />
+      <path d="M3 6h18" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
     </svg>
   );
 }

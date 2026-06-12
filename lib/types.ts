@@ -130,6 +130,15 @@ export type LessonStatus =
 /** How a lesson was moved from its originally planned slot. */
 export type LessonMoved = "same-week" | "across-weeks" | null;
 
+/** Tiered differentiation plan for a lesson (6.11.26 daily handoff §6 —
+ *  the Differentiation planning tab). Each tier is rich-text HTML,
+ *  sanitized before render like every other rich-text lesson field. */
+export interface LessonDifferentiation {
+  support: string;
+  onLevel: string;
+  extension: string;
+}
+
 /** A sub-event inside a multi-task lesson (e.g. a center rotation). */
 export interface LessonTask {
   id: string;
@@ -201,6 +210,10 @@ export interface Lesson {
   directions: string;
   /** Teacher notes surfaced on hover. */
   notes: string;
+  /** Tiered differentiation plan (Support / On level / Extension) —
+   *  edited in the Daily planning tabs. Absent on lessons that have not
+   *  planned differentiation yet. */
+  differentiation?: LessonDifferentiation;
   resources: LessonResource[];
   standards: string[];
   /** Week number (e.g. 11, 12, 13). */

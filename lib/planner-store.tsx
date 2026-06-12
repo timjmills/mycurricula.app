@@ -399,6 +399,7 @@ type PersistableSectionAction =
   | AddSectionAction
   | RemoveSectionAction
   | DuplicateSectionAction
+  | EditSectionAction
   | MoveSectionResourceAction
   | AddSectionResourceAction
   | RemoveSectionResourceAction;
@@ -527,20 +528,38 @@ function labelFor(action: PlannerAction): string {
  *  `resources` (the fixture lesson-level array) are threaded through so the
  *  Teach Resources panel + canvas — which read a lesson's resources off its
  *  sections via `getSections(lessonId)` — see real resources. Lazily-added
- *  lessons pass no resources and seed empty sections, as before. */
+ *  lessons pass no resources and seed empty sections, as before.
+ *
+ *  Ids are re-minted DETERMINISTICALLY from the lesson id: this builder runs
+ *  during SSR and again at client store init, and the section ids are painted
+ *  into the DOM (the `data-flow-section` anchors the agenda navigator jumps
+ *  to). Timestamp-based uid() ids diverge across the two passes — hydration
+ *  flags the attribute and keeps the server ids, so navigator jumps looking
+ *  up client ids find nothing. */
 function buildInitialSections(
+  lessonId: string,
   resources: LessonResource[] = [],
 ): LessonSectionContent[] {
   const template = LESSON_TEMPLATE_BY_ID[DEFAULT_LESSON_TEMPLATE_ID];
+  let sections: LessonSectionContent[];
   if (!template) {
     const section = newLessonSection();
     section.resources = resources.map((r) => ({
       ...newSectionResource(r.type, r.label),
       ...r,
     }));
-    return [section];
+    sections = [section];
+  } else {
+    sections = instantiateSections(template, resources);
   }
-  return instantiateSections(template, resources);
+  return sections.map((section, i) => ({
+    ...section,
+    id: `lsec-seed-${lessonId}-${i}`,
+    resources: section.resources.map((resource, j) => ({
+      ...resource,
+      id: `res-seed-${lessonId}-${i}-${j}`,
+    })),
+  }));
 }
 
 /** Seed sections for every lesson in the initial fixture. Each lesson's
@@ -551,7 +570,7 @@ function seedSections(
 ): Record<string, LessonSectionContent[]> {
   const result: Record<string, LessonSectionContent[]> = {};
   for (const lesson of lessons) {
-    result[lesson.id] = buildInitialSections(lesson.resources);
+    result[lesson.id] = buildInitialSections(lesson.id, lesson.resources);
   }
   return result;
 }
@@ -561,7 +580,7 @@ function ensureSections(
   sections: Record<string, LessonSectionContent[]>,
   lessonId: string,
 ): LessonSectionContent[] {
-  return sections[lessonId] ?? buildInitialSections();
+  return sections[lessonId] ?? buildInitialSections(lessonId);
 }
 
 /** READ-ONLY synthetic-section fallback for the backend hydrate.
@@ -587,7 +606,7 @@ function fillSyntheticSections(
   const result: Record<string, LessonSectionContent[]> = { ...batched };
   for (const lesson of lessons) {
     if (result[lesson.id] === undefined) {
-      result[lesson.id] = buildInitialSections(lesson.resources);
+      result[lesson.id] = buildInitialSections(lesson.id, lesson.resources);
     }
   }
   return result;
@@ -2393,16 +2412,22 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       patch: Partial<LessonSectionContent>,
       coalesce?: { key: string; ts: number },
     ) => {
-      dispatchRef.current({
+      const action: EditSectionAction = {
         type: "editSection",
         lessonId,
         sectionId,
         patch,
         coalesceKey: coalesce?.key ?? `section:${lessonId}:${sectionId}:patch`,
         coalesceTs: coalesce?.ts ?? Date.now(),
-      });
+      };
+      dispatchRef.current(action);
+      // Persist via the full current-section-list replace, like every other
+      // section mutation. Call sites commit ONE-SHOT (body on blur, rename /
+      // minutes on Enter, status per tap) — the coalesce key batches UNDO
+      // history, not writes, so this does not flood the RPC.
+      persistSectionAction(action);
     },
-    [],
+    [persistSectionAction],
   );
 
   const addSection = useCallback(

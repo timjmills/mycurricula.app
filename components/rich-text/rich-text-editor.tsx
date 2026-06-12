@@ -1,18 +1,17 @@
 "use client";
 
-// rich-text-editor.tsx — Inline rich-text editor with a floating toolbar.
+// rich-text-editor.tsx — Inline rich-text editor with a floating dark toolbar.
 //
-// Design (6.12.26 resource-redesign §6 — THE finite toolbar vocabulary):
-// a borderless contentEditable region with a compact toolbar (floating near
-// the selection, or docked when `dockTarget` is supplied) carrying EXACTLY:
-//   • Bold / Italic / Underline                 (execCommand; ⌘B/⌘I/⌘U native)
-//   • Highlight — the 10 highlighter pens + clear (execCommand hiliteColor)
-//   • Heading (h3 toggle) / Bulleted list       (execCommand)
-//   • Link — inline popover with Save / Open / Remove (⌘K; clicking an
-//     existing link in the editor reopens the same popover to edit it)
-//   • Image (insertHTML; parent-resolved src or URL prompt)
-// The toolbar defines the entire allowed INPUT vocabulary; the sanitizer
-// (lib/sanitize-html.ts) stays the output boundary, untouched.
+// Design: a borderless contentEditable region. On text selection a compact
+// floating toolbar surfaces above/below the selection with:
+//   • Bold / Italic / Underline / Strikethrough (execCommand shortcuts)
+//   • Subscript (X₂) and Superscript (X²)      (execCommand)
+//   • Text-color palette  — ink ramp + all 8 subject colors
+//   • Highlight palette   — normal (saturated) set + pastel (soft tint) set + clear
+//   • Font-family picker  — Sans / Serif / Mono / System / Humanist (5 options)
+//   • Numbered list / Bullet list / Checklist   (execCommand / best-effort)
+//   • Link (createLink via execCommand)          (prompts for URL)
+//   • Image (insertImage via execCommand)        (prompts for URL)
 //
 // Caret safety: the component is UNCONTROLLED for typing. It syncs `value`
 // into the DOM only on mount and when an externally-driven value change is
@@ -36,6 +35,14 @@
 // universally supported in all current browsers and is the pragmatic choice
 // for a contentEditable prototype. All document/window access is guarded so
 // it never runs during SSR render.
+//
+// chromeless mode (6.11.26 daily redesign): when the `chromeless` prop is
+// set the editor renders NO toolbar of its own (neither floating nor docked)
+// and instead registers with the shared RichTextCommandBus while focused, so
+// ONE external sticky toolbar (components/daily/rt-toolbar) can drive
+// whichever editor the teacher is working in. All bus commands route through
+// the SAME pipeline the built-in toolbar uses. Omitting the prop preserves
+// today's behavior exactly.
 
 import {
   useCallback,
@@ -46,7 +53,12 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { sanitizeHtml } from "@/lib/sanitize-html";
-import { Button, Tooltip } from "@/components/ui";
+import { parseResourceUrl } from "@/lib/resource-embed";
+import {
+  notifyRichTextStateChanged,
+  useRichTextCommandTarget,
+  type RichTextCommandImpl,
+} from "./command-bus";
 import styles from "./rich-text-editor.module.css";
 
 // ── Public contract ─────────────────────────────────────────────────────────
@@ -98,6 +110,23 @@ export interface RichTextEditorProps {
    */
   dockTarget?: React.RefObject<HTMLElement | null>;
   /**
+   * Chromeless mode — the editor renders NO toolbar of its own (neither the
+   * floating selection toolbar nor the docked variant) but is otherwise
+   * identical: same commands, same sanitizing emit, same caret safety.
+   *
+   * Instead, the editor registers itself with the shared RichTextCommandBus
+   * (./command-bus.ts) while it has focus, so a single EXTERNAL toolbar —
+   * e.g. the /daily sticky `RtToolbar` (components/daily/rt-toolbar) — can
+   * drive whichever chromeless editor the teacher is working in. The editor
+   * also snapshots its last selection Range on every selection change so a
+   * bus command can restore the selection if it was lost in transit (e.g.
+   * keyboard focus sitting on the external toolbar).
+   *
+   * Default false — omitting the prop preserves today's behavior exactly.
+   * When set, `dockTarget` is ignored (chromeless replaces docking).
+   */
+  chromeless?: boolean;
+  /**
    * Resolve the source for an inline image, DECOUPLED from storage. When the
    * teacher presses the "Insert image" toolbar button, the editor calls this
    * (if provided) and inserts an <img> pointing at the returned URL — typically
@@ -123,8 +152,25 @@ interface ColorSwatch {
   variable: string;
 }
 
-// Highlighter-pen colors — the classic bright marker set. The redesign's
-// highlight control offers EXACTLY these 10 pens (plus a clear option).
+const TEXT_COLORS: ColorSwatch[] = [
+  { label: "Ink dark", variable: "--ink-900" },
+  { label: "Ink mid", variable: "--ink-700" },
+  { label: "Ink light", variable: "--ink-500" },
+  { label: "Math blue", variable: "--math" },
+  { label: "Reading green", variable: "--reading" },
+  { label: "Writing purple", variable: "--writing" },
+  { label: "Grammar teal", variable: "--grammar" },
+  { label: "Spelling pink", variable: "--spelling" },
+  { label: "UFLI orange", variable: "--ufli" },
+  { label: "Explorers gold", variable: "--explorers" },
+  { label: "SEL slate", variable: "--sel" },
+];
+
+// Highlight offers the same swatches as the text-color picker, so any
+// font color can equally be applied as a highlight (plus the pastel set).
+const HIGHLIGHT_COLORS: ColorSwatch[] = TEXT_COLORS;
+
+// Highlighter-pen colors — the classic bright marker set.
 const HIGHLIGHTERS: ColorSwatch[] = [
   { label: "Laser lemon", variable: "--hl-lemon" },
   { label: "French lime", variable: "--hl-lime" },
@@ -136,6 +182,90 @@ const HIGHLIGHTERS: ColorSwatch[] = [
   { label: "Violet web", variable: "--hl-violet" },
   { label: "Ultra red", variable: "--hl-red" },
   { label: "Mac & cheese", variable: "--hl-cheese" },
+];
+
+// Pastel highlight colors — softer tints of the highlighter hues, distinct
+// enough to tell apart while gentler than the bright markers.
+const HIGHLIGHT_PASTEL: ColorSwatch[] = [
+  { label: "Lemon pastel", variable: "--hlp-lemon" },
+  { label: "Lime pastel", variable: "--hlp-lime" },
+  { label: "Mint pastel", variable: "--hlp-mint" },
+  { label: "Aqua pastel", variable: "--hlp-aqua" },
+  { label: "Maya pastel", variable: "--hlp-maya" },
+  { label: "Slate pastel", variable: "--hlp-slate" },
+  { label: "Heliotrope pastel", variable: "--hlp-heliotrope" },
+  { label: "Violet pastel", variable: "--hlp-violet" },
+  { label: "Rose pastel", variable: "--hlp-red" },
+  { label: "Peach pastel", variable: "--hlp-cheese" },
+];
+
+interface FontOption {
+  label: string;
+  /**
+   * CSS custom-property name (e.g. "--font-sans") or a literal font-family
+   * string. Resolved to a concrete font stack at command time via
+   * getComputedStyle so execCommand('fontName') receives a real face value,
+   * not an unparseable var() string.
+   */
+  variable: string;
+  /** CSS font-family string for the preview swatch in the picker. */
+  css: string;
+}
+
+// Five distinct font options covering the main stylistic categories.
+const FONT_OPTIONS: FontOption[] = [
+  {
+    label: "Sans",
+    variable: "--font-sans",
+    css: "var(--font-sans)",
+  },
+  {
+    label: "Serif",
+    variable: "Georgia, 'Times New Roman', serif",
+    css: "Georgia, 'Times New Roman', serif",
+  },
+  {
+    label: "Mono",
+    variable: "--font-mono",
+    css: "var(--font-mono)",
+  },
+  {
+    label: "System",
+    variable: "system-ui, sans-serif",
+    css: "system-ui, sans-serif",
+  },
+  {
+    // Humanist option — warmer, rounder than geometric sans; gives
+    // teachers a friendlier alternative for lesson notes.
+    label: "Humanist",
+    variable:
+      "'Trebuchet MS', 'Gill Sans', 'Gill Sans MT', Calibri, sans-serif",
+    css: "'Trebuchet MS', 'Gill Sans', 'Gill Sans MT', Calibri, sans-serif",
+  },
+];
+
+interface SizeOption {
+  label: string;
+  /**
+   * HTML font-size value (1-7) passed to document.execCommand('fontSize').
+   * execCommand wraps the selection in <font size="N">; this is the same
+   * pragmatic deprecated-but-universal path the other commands use.
+   */
+  size: string;
+  /** CSS font-size for the preview text in the picker — a token, never a
+   *  hard-coded px value, so the preview tracks the design scale. */
+  previewVar: string;
+}
+
+// Four clear text sizes. The execCommand size values map to the browser's
+// legacy 1-7 scale: 2 ≈ small, 3 ≈ normal (browser default), 5 ≈ large,
+// 6 ≈ x-large. The preview font-size uses --t-* tokens so the popover
+// reflects the app's type scale rather than the raw legacy sizes.
+const SIZE_OPTIONS: SizeOption[] = [
+  { label: "Small", size: "2", previewVar: "--t-11" },
+  { label: "Normal", size: "3", previewVar: "--t-13" },
+  { label: "Large", size: "5", previewVar: "--t-18" },
+  { label: "X-Large", size: "6", previewVar: "--t-24" },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -152,15 +282,7 @@ const HIGHLIGHTERS: ColorSwatch[] = [
 // Supported markers:
 //   "- "  (hyphen + space)   → insertUnorderedList
 //   "* "  (asterisk + space) → insertUnorderedList
-//   "1. " "2. " … (number + period + space) → insertUnorderedList
-//
-// §6 vocabulary note (§4a review L2): EVERY marker maps to the BULLETED list.
-// The redesign's finite toolbar vocabulary contains exactly one list control
-// (bulleted); <ol> has no toolbar toggle, so an ordered list created by a
-// shortcut would be markup the teacher can see but cannot manage — outside
-// the "toolbar defines the entire allowed INPUT vocabulary" contract. We keep
-// the "1. " trigger (the muscle-memory of typing a numbered list still lands
-// in A list) but emit the sanctioned <ul>.
+//   "1. " "2. " … (number + period + space) → insertOrderedList
 //
 // Guards:
 //   • Only fires in the browser (typeof document check).
@@ -188,8 +310,7 @@ const HIGHLIGHTERS: ColorSwatch[] = [
 //   backward (execCommand 'delete' once per character) and then execute
 //   the correct list command.
 
-/** List marker patterns. All three forms trigger the same bulleted list —
- *  the §6 vocabulary has no ordered-list control (see header comment). */
+/** List marker patterns. Captured group 1 distinguishes bullet vs ordered. */
 const AUTO_LIST_RE = /^(-|\*|\d+\.)$/;
 
 /**
@@ -308,11 +429,15 @@ function tryAutoList(
     (document as any).execCommand("delete", false, undefined);
   }
 
-  // Every marker — "-", "*", AND "1." — emits the UNORDERED list: the §6
-  // finite toolbar vocabulary has a bulleted-list control only, so <ol> is
-  // never produced (see the vocabulary note in the header comment above).
+  // Determine list type: hyphen or asterisk → unordered; digit+period → ordered.
+  const marker = match[1];
+  const command =
+    marker === "-" || marker === "*"
+      ? "insertUnorderedList"
+      : "insertOrderedList";
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (document as any).execCommand("insertUnorderedList", false, undefined);
+  (document as any).execCommand(command, false, undefined);
 
   return true;
 }
@@ -380,72 +505,36 @@ function buildImageHtml(src: string, alt = ""): string {
   return `<img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}" loading="lazy" />`;
 }
 
-/** Build the HTML for a typed-URL link (used when the caret is collapsed, so
- *  createLink has no selection to wrap — the URL itself becomes the text).
- *  Escaped here, and the href is re-validated by the sanitizer on emit. */
-function buildLinkHtml(href: string): string {
-  return `<a href="${escapeAttr(href)}">${escapeAttr(href)}</a>`;
-}
-
-// ── Link-popover scheme guard (§4a review M2) ────────────────────────────────
-//
-// The popover used to write whatever the teacher typed straight into the live
-// DOM. Two failure modes:
-//   • `javascript:alert(1)` — a self-XSS foothold in the live (unsanitized)
-//     contentEditable, even though sanitizeHtml strips it on emit.
-//   • `example.com` (scheme-less) — survives the live DOM but DOMPurify's
-//     ALLOWED_URI_REGEXP (lib/sanitize-html SAFE_URI, http(s)/mailto only)
-//     silently drops the href on emit, persisting a DEAD link with zero
-//     feedback.
-// So we validate/normalize BEFORE anything touches the DOM. The accepted set
-// mirrors SAFE_URI exactly — http(s) and mailto: (the sanitizer keeps mailto,
-// so we do too); every other explicit scheme is refused and Save stays
-// disabled. Scheme-less input is upgraded by prepending "https://" so
-// "example.com" round-trips as a working link instead of dying on emit.
-
 /**
- * Normalize a typed link target to a value the sanitizer will keep, or null
- * when it cannot be made safe (Save must stay disabled / be a no-op).
- *   "https://x.org/a"  → unchanged          "example.com" → "https://example.com"
- *   "mailto:a@b.org"   → unchanged          "javascript:…" / "data:…" → null
+ * Build the HTML for an inline embed (YouTube / Vimeo / Google) given an
+ * already-parsed, embeddable URL. We emit the iframe with the SAME safe sandbox
+ * / allow / referrerpolicy the app's React <iframe> renderers ship
+ * (components/resources/ResourceEmbed.tsx) — and the sanitizer re-forces these
+ * exact values on emit, so an embed that round-trips through storage is
+ * hardened identically. The wrapper is a non-editable block (contentEditable
+ * lives in the live DOM only; the attribute is dropped by the sanitizer and is
+ * not needed at render sites) so the caret treats the embed as one atomic unit
+ * and a click lands in the player rather than splitting the frame. A trailing
+ * <p><br></p> gives the teacher a place to keep typing after the embed.
  */
-function normalizeLinkHref(raw: string): string | null {
-  const input = raw.trim();
-  if (!input) return null;
-
-  // Explicit scheme present — accept exactly the sanitizer's SAFE_URI set.
-  if (/^[a-z][a-z0-9+.-]*:/i.test(input)) {
-    if (/^mailto:/i.test(input)) return input;
-    if (!/^https?:\/\//i.test(input)) return null; // javascript:, data:, file:, …
-    try {
-      new URL(input); // must be a parseable absolute URL
-      return input;
-    } catch {
-      return null;
-    }
-  }
-
-  // Scheme-less ("example.com/page") — upgrade to https. Leading slashes are
-  // stripped first so protocol-relative "//host" can't smuggle an ambiguous
-  // target; the result must still parse as a real absolute URL.
-  const candidate = `https://${input.replace(/^\/+/, "")}`;
-  try {
-    new URL(candidate);
-    return candidate;
-  } catch {
-    return null;
-  }
+function buildEmbedHtml(embedUrl: string, title: string): string {
+  const safeUrl = escapeAttr(embedUrl);
+  const safeTitle = escapeAttr(title);
+  return (
+    `<div class="${styles.embedBlock}" contenteditable="false">` +
+    `<iframe src="${safeUrl}" title="${safeTitle}" loading="lazy" ` +
+    `allow="autoplay; encrypted-media; picture-in-picture; fullscreen" ` +
+    `referrerpolicy="no-referrer" ` +
+    `sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation" ` +
+    `allowfullscreen></iframe>` +
+    `</div><p><br></p>`
+  );
 }
 
 // ── Toolbar sub-components ────────────────────────────────────────────────────
 
 interface ToolbarButtonProps {
-  /** Accessible name (aria-label). */
   label: string;
-  /** Onboarding tooltip body (CLAUDE.md §4 voice — teaches the control). */
-  tip: string;
-  /** Stable tooltipId for W2-B3 dismissibility. */
-  tipId: string;
   active?: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   children: ReactNode;
@@ -453,39 +542,72 @@ interface ToolbarButtonProps {
 
 function ToolbarButton({
   label,
-  tip,
-  tipId,
   active = false,
   onMouseDown,
   children,
 }: ToolbarButtonProps) {
   return (
-    <Tooltip content={tip} tooltipId={tipId}>
-      <button
-        type="button"
-        aria-label={label}
-        // aria-pressed is only set when the caller passes active=true (toggle
-        // buttons: bold, italic, etc.). Action-only buttons (insert link/image)
-        // pass active={false} and must NOT carry aria-pressed at all — a
-        // persistent aria-pressed="false" tells screen readers the button is a
-        // toggle that is currently off, which is misleading for one-shot
-        // actions.
-        aria-pressed={active ? true : undefined}
-        className={`${styles.tbBtn} ${active ? styles.tbBtnActive : ""} cp-focusable`}
-        onMouseDown={onMouseDown}
-      >
-        {children}
-      </button>
-    </Tooltip>
+    <button
+      type="button"
+      aria-label={label}
+      // aria-pressed is only set when the caller passes active=true (toggle
+      // buttons: bold, italic, etc.). Action-only buttons (insert link, list
+      // commands) pass active={false} and must NOT carry aria-pressed at all —
+      // a persistent aria-pressed="false" tells screen readers the button is a
+      // toggle that is currently off, which is misleading for one-shot actions.
+      aria-pressed={active ? true : undefined}
+      title={label}
+      className={`${styles.tbBtn} ${active ? styles.tbBtnActive : ""} cp-focusable`}
+      onMouseDown={onMouseDown}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Undo / redo glyphs — curved arrows. Inline SVG keeps the toolbar
+// dependency-free; stroke uses currentColor so they inherit the white
+// toolbar text color.
+function UndoIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h9a6 6 0 0 1 0 12h-4" />
+    </svg>
+  );
+}
+
+function RedoIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15 14 20 9l-5-5" />
+      <path d="M20 9h-9a6 6 0 0 0 0 12h4" />
+    </svg>
   );
 }
 
 interface SwatchButtonProps {
   label: string;
-  /** Onboarding tooltip body. */
-  tip: string;
-  /** Stable tooltipId for dismissibility. */
-  tipId: string;
   color: string; // resolved CSS color
   isNone?: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
@@ -493,125 +615,19 @@ interface SwatchButtonProps {
 
 function SwatchButton({
   label,
-  tip,
-  tipId,
   color,
   isNone = false,
   onMouseDown,
 }: SwatchButtonProps) {
   return (
-    <Tooltip content={tip} tooltipId={tipId}>
-      <button
-        type="button"
-        aria-label={label}
-        className={`${styles.swatch} ${isNone ? styles.swatchNone : ""} cp-focusable`}
-        style={isNone ? undefined : { background: color }}
-        onMouseDown={onMouseDown}
-      />
-    </Tooltip>
-  );
-}
-
-// ── Toolbar icons — Lucide-family line glyphs (2px stroke, round caps) ───────
-
-function ListIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="9" y1="6" x2="21" y2="6" />
-      <line x1="9" y1="12" x2="21" y2="12" />
-      <line x1="9" y1="18" x2="21" y2="18" />
-      <circle cx="4.5" cy="6" r="0.5" fill="currentColor" />
-      <circle cx="4.5" cy="12" r="0.5" fill="currentColor" />
-      <circle cx="4.5" cy="18" r="0.5" fill="currentColor" />
-    </svg>
-  );
-}
-
-function LinkIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-    </svg>
-  );
-}
-
-function ImageIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <circle cx="9" cy="9" r="2" />
-      <path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21" />
-    </svg>
-  );
-}
-
-function OpenIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-      <polyline points="15 3 21 3 21 9" />
-      <line x1="10" y1="14" x2="21" y2="3" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    </svg>
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className={`${styles.swatch} ${isNone ? styles.swatchNone : ""} cp-focusable`}
+      style={isNone ? undefined : { background: color }}
+      onMouseDown={onMouseDown}
+    />
   );
 }
 
@@ -625,11 +641,13 @@ export function RichTextEditor({
   ariaLabel,
   autoFocus = false,
   dockTarget,
+  chromeless = false,
   onRequestImageUrl,
 }: RichTextEditorProps): ReactNode {
   // Docked mode is active whenever a dockTarget ref is supplied. When false,
   // every code path below behaves exactly as it did before this prop existed.
-  const docked = dockTarget != null;
+  // Chromeless mode supersedes docking — the external toolbar IS the chrome.
+  const docked = !chromeless && dockTarget != null;
   const editorRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
@@ -647,6 +665,14 @@ export function RichTextEditor({
   // this tracks the clean string instead.
   const lastEmittedRef = useRef<string>("");
 
+  // Chromeless mode: the last selection Range observed INSIDE this editor
+  // (cloned, so later DOM selection moves don't mutate it). Bus-driven
+  // commands restore it when the live selection is no longer in the editor —
+  // e.g. after keyboard focus moved onto the external toolbar, or after a
+  // prompt stole focus. Never populated outside chromeless mode, so the
+  // floating/docked paths are byte-for-byte unaffected.
+  const savedRangeRef = useRef<Range | null>(null);
+
   // Toolbar visibility & position (viewport-relative, for position:fixed).
   const [toolbarVisible, setToolbarVisible] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ top: 0, left: 0 });
@@ -656,10 +682,9 @@ export function RichTextEditor({
   const [bold, setBold] = useState(false);
   const [italic, setItalic] = useState(false);
   const [underline, setUnderline] = useState(false);
-  // Block-level toggles: heading (the current block is an <h3>) and
-  // bulleted list (the caret sits inside a <ul>).
-  const [heading, setHeading] = useState(false);
-  const [bulleted, setBulleted] = useState(false);
+  const [strikethrough, setStrikethrough] = useState(false);
+  const [subscript, setSubscript] = useState(false);
+  const [superscript, setSuperscript] = useState(false);
 
   // Whether the editor content is empty (for placeholder).
   // Initial state: treat as empty when value is blank or a bare <br>.
@@ -667,24 +692,16 @@ export function RichTextEditor({
     () => !value || value === "<br>" || value === "<br/>",
   );
 
-  // Highlight pen popover open state.
-  const [highlightOpen, setHighlightOpen] = useState(false);
+  // Font picker open state.
+  const [fontOpen, setFontOpen] = useState(false);
 
-  // Link popover (the `.rn-linkPop` anatomy: URL input + Save / Open /
-  // Remove). `anchor` is the existing <a> being edited (null when creating a
-  // new link over the saved selection). Coordinates are viewport-relative —
-  // the popover renders position:fixed in the same portal as the toolbar.
-  const [linkPop, setLinkPop] = useState<{
-    top: number;
-    left: number;
-    href: string;
-    anchor: HTMLAnchorElement | null;
-  } | null>(null);
-  const linkPopRef = useRef<HTMLDivElement>(null);
-  // The selection Range captured when the popover opened — restored before
-  // createLink/insert so the link lands where the teacher's selection was
-  // (the popover's input steals focus and collapses the live selection).
-  const savedLinkRangeRef = useRef<Range | null>(null);
+  // Text-size picker open state.
+  const [sizeOpen, setSizeOpen] = useState(false);
+
+  // Color/highlight palette open state.
+  const [paletteOpen, setPaletteOpen] = useState<"color" | "highlight" | null>(
+    null,
+  );
 
   // ── Sync value → DOM (only when it genuinely differs) ──────────────
   useEffect(() => {
@@ -717,6 +734,13 @@ export function RichTextEditor({
       // is acceptable because the content itself changed underneath the teacher.
       el.innerHTML = sanitizeHtml(value);
       lastWrittenRef.current = value;
+      // An external rewrite invalidates the last-emit baseline. Without
+      // this, undo (external rewrite to the older value) followed by redo
+      // (back to a value that EQUALS the stale last emit) would skip the
+      // rewrite above and leave a mounted editor showing the undone
+      // content — the next keystroke would then emit the stale DOM and
+      // silently destroy the redone value.
+      lastEmittedRef.current = value;
     }
     setEmpty(isEditorEmpty(el));
   }, [value]);
@@ -731,12 +755,9 @@ export function RichTextEditor({
     setBold(document.queryCommandState("bold"));
     setItalic(document.queryCommandState("italic"));
     setUnderline(document.queryCommandState("underline"));
-    setBulleted(document.queryCommandState("insertUnorderedList"));
-    // queryCommandValue("formatBlock") reports the current block tag ("h3",
-    // "p", "div", …) even at a collapsed caret.
-    setHeading(
-      String(document.queryCommandValue("formatBlock")).toLowerCase() === "h3",
-    );
+    setStrikethrough(document.queryCommandState("strikeThrough"));
+    setSubscript(document.queryCommandState("subscript"));
+    setSuperscript(document.queryCommandState("superscript"));
   }, []);
 
   // ── Docked positioning ──────────────────────────────────────────────────
@@ -751,10 +772,10 @@ export function RichTextEditor({
     if (!target) return;
 
     const rect = target.getBoundingClientRect();
-    // Single-row estimate for the finite 8-control bar — matches the
-    // estimate used by the floating path so clamping is consistent.
-    const toolbarH = 44;
-    const toolbarW = 330;
+    // The toolbar wraps to ~2 rows of buttons on narrow widths — match the
+    // generous estimate used by the floating path so clamping is consistent.
+    const toolbarH = 88;
+    const toolbarW = 520;
     const gap = 12; // pinned ~12px above the dockTarget's bottom edge
     const margin = 8;
 
@@ -778,6 +799,20 @@ export function RichTextEditor({
 
   // ── Toolbar positioning & format-state polling ──────────────────────────
   const updateToolbar = useCallback(() => {
+    // Chromeless mode renders no toolbar at all — selectionchange instead
+    // (a) snapshots the selection Range for later restore and (b) pings the
+    // command bus so the EXTERNAL toolbar re-reads its toggle states (bold
+    // lit while the caret sits in bold text, etc.).
+    if (chromeless) {
+      const el = editorRef.current;
+      const sel = window.getSelection();
+      if (el && sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
+        savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+        notifyRichTextStateChanged();
+      }
+      return;
+    }
+
     // Docked mode does not respond to selectionchange for visibility — the
     // focus-driven effect owns show/hide there. We still refresh the toggle
     // states (the caret may have moved within the editor) and the docked
@@ -796,10 +831,9 @@ export function RichTextEditor({
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
       setToolbarVisible(false);
-      setHighlightOpen(false);
-      // NOTE: the link popover is deliberately NOT closed here — opening it
-      // moves focus to its URL input, which collapses the editor selection;
-      // closing it on that collapse would make the popover undismissable.
+      setFontOpen(false);
+      setSizeOpen(false);
+      setPaletteOpen(null);
       return;
     }
 
@@ -820,11 +854,11 @@ export function RichTextEditor({
     // add window.scrollY / window.scrollX (that would misplace the toolbar on
     // any scrolled page).
     const rect = range.getBoundingClientRect();
-    // Single-row estimate for the finite 8-control bar. TOP_CHROME leaves
-    // clearance for the app's fixed top bar / nav so the floating toolbar
-    // is never tucked behind it.
-    const toolbarH = 44;
-    const toolbarW = 330;
+    // The toolbar wraps to ~2 rows of buttons, so estimate a generous
+    // height. TOP_CHROME leaves clearance for the app's fixed top bar /
+    // nav so the floating toolbar is never tucked behind it.
+    const toolbarH = 88;
+    const toolbarW = 520;
     const gap = 8;
     const margin = 8;
     const TOP_CHROME = 116;
@@ -850,7 +884,7 @@ export function RichTextEditor({
 
     setToolbarPos({ top, left });
     setToolbarVisible(true);
-  }, [docked, syncFormatState, positionDocked]);
+  }, [chromeless, docked, syncFormatState, positionDocked]);
 
   // ── Auto-focus on mount ─────────────────────────────────────────────
   // Inline editors open in response to a teacher action (double-click a
@@ -890,90 +924,11 @@ export function RichTextEditor({
     [onChange],
   );
 
-  // ── Link popover open paths ─────────────────────────────────────────
-  // Three entry points share openLinkFromSelection: the toolbar Link button,
-  // ⌘K/Ctrl+K, and clicking an existing <a> inside the editor (which passes
-  // the anchor + its rect directly to openLinkPopover).
-
-  const openLinkPopover = useCallback(
-    (rect: DOMRect, anchor: HTMLAnchorElement | null) => {
-      // Snapshot the selection before the popover's input steals focus.
-      const sel = window.getSelection();
-      savedLinkRangeRef.current =
-        sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
-
-      // Position below the selection/link, clamped inside the viewport.
-      const popW = 340;
-      const popH = 56;
-      const gap = 8;
-      const margin = 8;
-      let left = rect.left;
-      left = Math.max(
-        margin,
-        Math.min(left, window.innerWidth - popW - margin),
-      );
-      let top = rect.bottom + gap;
-      if (top + popH > window.innerHeight - margin) {
-        top = Math.max(margin, rect.top - popH - gap);
-      }
-
-      setHighlightOpen(false);
-      setLinkPop({
-        top,
-        left,
-        href: anchor?.getAttribute("href") ?? "",
-        anchor,
-      });
-    },
-    [],
-  );
-
-  const openLinkFromSelection = useCallback(() => {
-    const el = editorRef.current;
-    if (!el) return;
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    if (!el.contains(range.commonAncestorContainer)) return;
-
-    // Editing an existing link when the selection/caret sits inside one.
-    const node = range.commonAncestorContainer;
-    const elNode =
-      node.nodeType === Node.ELEMENT_NODE
-        ? (node as Element)
-        : node.parentElement;
-    const closest = elNode?.closest("a") ?? null;
-    const anchor =
-      closest && el.contains(closest) ? (closest as HTMLAnchorElement) : null;
-
-    // A collapsed caret in an empty editor yields a zero rect — anchor the
-    // popover to the editor itself so it never opens at the viewport origin.
-    let rect = anchor
-      ? anchor.getBoundingClientRect()
-      : range.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0)
-      rect = el.getBoundingClientRect();
-    openLinkPopover(rect, anchor);
-  }, [openLinkPopover]);
-
   // ── Keyboard handler ────────────────────────────────────────────────
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (singleLine && e.key === "Enter") {
         e.preventDefault();
-        return;
-      }
-
-      // ⌘K / Ctrl+K opens the link popover for the current selection (B/I/U
-      // shortcuts are the browser's native contentEditable bindings).
-      if (
-        (e.metaKey || e.ctrlKey) &&
-        !e.shiftKey &&
-        !e.altKey &&
-        e.key.toLowerCase() === "k"
-      ) {
-        e.preventDefault();
-        openLinkFromSelection();
         return;
       }
 
@@ -988,7 +943,7 @@ export function RichTextEditor({
         setEmpty(isEditorEmpty(el));
       }
     },
-    [singleLine, emitChange, openLinkFromSelection],
+    [singleLine, emitChange],
   );
 
   // ── Input handler — report changes, check empty state ──────────────
@@ -1032,18 +987,14 @@ export function RichTextEditor({
     }
 
     function handleBlur(e: FocusEvent) {
-      // Keep the toolbar open when focus is moving into the toolbar or the
-      // link popover — pressing a toolbar button / typing a URL must not
-      // dismiss the docked toolbar.
+      // Keep the toolbar open when focus is moving into the toolbar — pressing
+      // a toolbar button must not dismiss the docked toolbar.
       const next = e.relatedTarget as Node | null;
-      if (
-        next &&
-        (toolbarRef.current?.contains(next) ||
-          linkPopRef.current?.contains(next))
-      )
-        return;
+      if (next && toolbarRef.current?.contains(next)) return;
       setToolbarVisible(false);
-      setHighlightOpen(false);
+      setFontOpen(false);
+      setSizeOpen(false);
+      setPaletteOpen(null);
     }
 
     el.addEventListener("focus", handleFocus);
@@ -1075,22 +1026,22 @@ export function RichTextEditor({
     };
   }, [docked, toolbarVisible, positionDocked]);
 
-  // ── Close popups when clicking outside toolbar/editor/link popover ──
+  // ── Close popups when clicking outside toolbar/editor ──────────────
   // In floating mode an outside click dismisses the whole toolbar. In docked
   // mode the toolbar's visibility is owned by editor focus/blur, so an
-  // outside click only collapses any open popover — hiding the toolbar
-  // itself is left to the blur handler.
+  // outside click only collapses any open font/color popover — hiding the
+  // toolbar itself is left to the blur handler.
   useEffect(() => {
     function handlePointerDown(e: PointerEvent) {
       const target = e.target as Node;
       if (
         !toolbarRef.current?.contains(target) &&
-        !editorRef.current?.contains(target) &&
-        !linkPopRef.current?.contains(target)
+        !editorRef.current?.contains(target)
       ) {
         if (!docked) setToolbarVisible(false);
-        setHighlightOpen(false);
-        setLinkPop(null);
+        setFontOpen(false);
+        setSizeOpen(false);
+        setPaletteOpen(null);
       }
     }
     document.addEventListener("pointerdown", handlePointerDown);
@@ -1099,11 +1050,36 @@ export function RichTextEditor({
 
   // ── Format command helpers ──────────────────────────────────────────
 
-  /** Apply a format command while keeping focus in the editor. */
-  const applyCommand = useCallback(
-    (e: React.MouseEvent, command: string, value = "") => {
-      e.preventDefault(); // prevent blur before execCommand
-      editorRef.current?.focus();
+  /**
+   * Focus the editable region and, if the live selection is no longer inside
+   * it, restore the last Range observed there (chromeless mode tracks it on
+   * selectionchange). Outside chromeless mode savedRangeRef is always null,
+   * so this is exactly the bare `.focus()` call the pre-chromeless code made.
+   */
+  const restoreFocusAndSelection = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    const inside = sel && sel.rangeCount > 0 && el.contains(sel.anchorNode);
+    if (!inside) {
+      const saved = savedRangeRef.current;
+      if (saved && el.contains(saved.startContainer) && sel) {
+        sel.removeAllRanges();
+        sel.addRange(saved);
+      }
+    }
+  }, []);
+
+  /**
+   * Execute a format command while keeping focus + selection in the editor.
+   * The SINGLE command pipeline — the built-in toolbar's mouse handlers and
+   * the external command bus both land here, so behavior (selection
+   * preservation, sanitized emit, undo history) is identical either way.
+   */
+  const runCommand = useCallback(
+    (command: string, value = "") => {
+      restoreFocusAndSelection();
       exec(command, value);
       // Re-read all toggle-command states after the command.
       syncFormatState();
@@ -1111,8 +1087,30 @@ export function RichTextEditor({
       const html = editorRef.current?.innerHTML ?? "";
       lastWrittenRef.current = html;
       emitChange(html);
+      // Let any external toolbar refresh its toggle highlights immediately
+      // (the follow-up selectionchange also pings, but is not guaranteed for
+      // every command). No-op when this editor isn't bus-registered.
+      if (chromeless) notifyRichTextStateChanged();
     },
-    [emitChange, syncFormatState],
+    [restoreFocusAndSelection, emitChange, syncFormatState, chromeless],
+  );
+
+  /** Apply a format command from the built-in toolbar's mouse handlers. */
+  const applyCommand = useCallback(
+    (e: React.MouseEvent, command: string, value = "") => {
+      e.preventDefault(); // prevent blur before execCommand
+      runCommand(command, value);
+    },
+    [runCommand],
+  );
+
+  const applyTextColor = useCallback(
+    (e: React.MouseEvent, variable: string) => {
+      const color = resolveCssVar(variable);
+      applyCommand(e, "foreColor", color);
+      setPaletteOpen(null);
+    },
+    [applyCommand],
   );
 
   const applyHighlight = useCallback(
@@ -1121,144 +1119,97 @@ export function RichTextEditor({
       const color =
         variable === "transparent" ? "transparent" : resolveCssVar(variable);
       applyCommand(e, "hiliteColor", color);
-      setHighlightOpen(false);
+      setPaletteOpen(null);
     },
     [applyCommand],
   );
 
-  // ── Heading toggle ──────────────────────────────────────────────────
-  // The spec's single "H" control: formatBlock the current line to <h3>
-  // (the `.rn-notesBody` heading level), or back to <p> when it already is
-  // one. <h3> is within the sanitizer's allowlist.
-  const applyHeading = useCallback(
-    (e: React.MouseEvent) => {
-      const isHeading =
-        String(document.queryCommandValue("formatBlock")).toLowerCase() ===
-        "h3";
-      applyCommand(e, "formatBlock", isHeading ? "<p>" : "<h3>");
+  const applyFont = useCallback(
+    (e: React.MouseEvent, fontVariable: string) => {
+      // execCommand('fontName') wraps the selection in <font face="…">.
+      // Resolve CSS custom properties to their concrete computed value first —
+      // the <font face> attribute does not understand var() syntax, so passing
+      // "var(--font-sans)" would set a literal (invalid) font name.
+      const resolved = resolveCssVar(fontVariable);
+      applyCommand(e, "fontName", resolved);
+      setFontOpen(false);
     },
     [applyCommand],
   );
 
-  // ── Link button (toolbar) ───────────────────────────────────────────
-  // Opens the `.rn-linkPop` popover for the current selection — prefilled
-  // when the caret sits inside an existing link. mousedown + preventDefault
-  // so the editor selection survives the click.
+  const applySize = useCallback(
+    (e: React.MouseEvent, size: string) => {
+      // execCommand('fontSize') wraps the selection in <font size="N"> using
+      // the browser's legacy 1-7 scale. It is the pragmatic, universally
+      // supported choice — consistent with fontName/foreColor above — and
+      // works reliably at a collapsed caret as well as over a selection.
+      applyCommand(e, "fontSize", size);
+      setSizeOpen(false);
+    },
+    [applyCommand],
+  );
+
+  // ── Link / Image handlers ───────────────────────────────────────────
+  // These use window.prompt for the URL — acceptable for a teacher-only
+  // prototype tool. Replace with an inline popover when a richer UI is needed.
+
+  /**
+   * Best available selection Range for a command about to surrender focus:
+   * the live selection when it sits inside this editor, else the last Range
+   * tracked here (chromeless mode — covers commands arriving while keyboard
+   * focus is on the external toolbar), else the live selection unchanged
+   * (pre-chromeless behavior: savedRangeRef is null outside chromeless mode).
+   */
+  const captureSelectionRange = useCallback((): Range | null => {
+    const el = editorRef.current;
+    const sel = window.getSelection();
+    const live = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    if (live && el && el.contains(live.startContainer)) return live;
+    const saved = savedRangeRef.current;
+    if (saved && el && el.contains(saved.startContainer)) return saved;
+    return live;
+  }, []);
+
+  /**
+   * Link flow core — shared by the built-in toolbar button and the command
+   * bus (`requestLink`). Prompts for a URL, restores the pre-prompt
+   * selection, and runs createLink through the sanitizing emit.
+   */
+  const runLink = useCallback(() => {
+    // Preserve the selection range before the prompt steals focus.
+    const sel = window.getSelection();
+    const savedRange = captureSelectionRange();
+
+    const url = window.prompt("Enter link URL:", "https://");
+    if (!url || !url.trim()) return; // cancelled or empty
+
+    // Restore the selection that may have been lost while the prompt was open.
+    if (savedRange && sel) {
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+    }
+
+    editorRef.current?.focus();
+    exec("createLink", url.trim());
+    const html = editorRef.current?.innerHTML ?? "";
+    lastWrittenRef.current = html;
+    emitChange(html);
+  }, [captureSelectionRange, emitChange]);
+
   const applyLink = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      openLinkFromSelection();
+      runLink();
     },
-    [openLinkFromSelection],
-  );
-
-  // ── Link popover actions (Save / Open / Remove) ─────────────────────
-
-  const closeLinkPop = useCallback((refocus: boolean) => {
-    setLinkPop(null);
-    savedLinkRangeRef.current = null;
-    if (refocus) editorRef.current?.focus();
-  }, []);
-
-  const saveLink = useCallback(() => {
-    const pop = linkPop;
-    const el = editorRef.current;
-    if (!pop || !el) return;
-    // M2 — validate/normalize BEFORE anything touches the DOM. null covers
-    // both "nothing typed" (Remove is the unlink path) and a refused scheme
-    // (javascript:/data:/…); the Save button is disabled for both, so this is
-    // belt-and-braces for the Enter-to-save keyboard path. The NORMALIZED
-    // value is what gets written, so the click-to-edit prefill (which reads
-    // the anchor's href back) round-trips it exactly.
-    const url = normalizeLinkHref(pop.href);
-    if (!url) return;
-
-    if (pop.anchor && el.contains(pop.anchor)) {
-      // Editing an existing link: just rewrite its href. The sanitizer
-      // re-validates the scheme on emit as defence in depth.
-      pop.anchor.setAttribute("href", url);
-    } else {
-      // Creating a new link over the saved selection.
-      const sel = window.getSelection();
-      const saved = savedLinkRangeRef.current;
-      if (sel && saved) {
-        sel.removeAllRanges();
-        sel.addRange(saved);
-      }
-      el.focus();
-      const cur = window.getSelection();
-      if (cur && cur.rangeCount > 0 && !cur.getRangeAt(0).collapsed) {
-        exec("createLink", url);
-      } else {
-        // Collapsed caret — createLink has nothing to wrap, so insert the
-        // normalized URL itself as the link text (escaped; re-vetted on emit).
-        exec("insertHTML", buildLinkHtml(url));
-      }
-    }
-
-    closeLinkPop(true);
-    const html = el.innerHTML;
-    lastWrittenRef.current = html;
-    emitChange(html);
-  }, [linkPop, closeLinkPop, emitChange]);
-
-  const openLinkTarget = useCallback(() => {
-    const url = linkPop?.href.trim();
-    if (!url || !/^https?:\/\//i.test(url)) return;
-    window.open(url, "_blank", "noopener,noreferrer");
-  }, [linkPop]);
-
-  const removeLink = useCallback(() => {
-    const pop = linkPop;
-    const el = editorRef.current;
-    if (!pop || !el) return;
-
-    if (pop.anchor && el.contains(pop.anchor)) {
-      // Unwrap the anchor in place — its text content stays.
-      pop.anchor.replaceWith(...Array.from(pop.anchor.childNodes));
-    } else {
-      const sel = window.getSelection();
-      const saved = savedLinkRangeRef.current;
-      if (sel && saved) {
-        sel.removeAllRanges();
-        sel.addRange(saved);
-      }
-      el.focus();
-      exec("unlink");
-    }
-
-    closeLinkPop(true);
-    const html = el.innerHTML;
-    lastWrittenRef.current = html;
-    emitChange(html);
-  }, [linkPop, closeLinkPop, emitChange]);
-
-  // ── Click an existing link inside the editor → edit popover ─────────
-  // (Links inside contentEditable don't navigate on click; preventDefault is
-  // belt-and-braces.) The popover opens anchored to the link, prefilled.
-  const handleEditorClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const target = e.target as Element | null;
-      const anchor = (target?.closest?.("a") ??
-        null) as HTMLAnchorElement | null;
-      if (!anchor || !editorRef.current?.contains(anchor)) {
-        // A plain click back into the text dismisses an open link popover
-        // (the outside-pointerdown handler skips editor-internal clicks).
-        setLinkPop(null);
-        return;
-      }
-      e.preventDefault();
-      openLinkPopover(anchor.getBoundingClientRect(), anchor);
-    },
-    [openLinkPopover],
+    [runLink],
   );
 
   // ── Insert raw HTML at a (possibly stale) caret position ────────────────
   // Restores a previously-saved Range, focuses the editor, runs
   // execCommand('insertHTML'), then emits the sanitized result. Used by the
-  // image insert. Saving/restoring the Range matters because the path
-  // surrenders focus first — `onRequestImageUrl` awaits async parent work
-  // (or the URL prompt steals focus) — which collapses the live selection.
+  // image + embed inserts. Saving/restoring the Range matters because both
+  // paths surrender focus first — `onRequestImageUrl` awaits async parent work,
+  // and the embed prompt steals focus — which collapses the live selection.
   const insertHtmlAtSavedRange = useCallback(
     (html: string, savedRange: Range | null) => {
       const el = editorRef.current;
@@ -1295,37 +1246,127 @@ export function RichTextEditor({
   // <img> at the caret. Without the prop we fall back to prompting for a URL —
   // the original behavior. The src is sanitized on emit, so an unsafe value is
   // dropped regardless of which path produced it.
+  /**
+   * Image flow core — shared by the built-in toolbar button and the command
+   * bus (`requestImage`). Parent-driven via onRequestImageUrl when supplied
+   * (the notecards-wave upload path), URL prompt otherwise.
+   */
+  const runImage = useCallback(() => {
+    // Snapshot the caret BEFORE any focus loss (prompt or async resolver).
+    const savedRange = captureSelectionRange();
+
+    if (onRequestImageUrl) {
+      // Parent-driven path. Await the resolver, then insert. Errors and a
+      // null result both cancel silently — the parent owns user feedback.
+      void onRequestImageUrl()
+        .then((url) => {
+          if (!url || !url.trim()) return;
+          insertHtmlAtSavedRange(buildImageHtml(url.trim()), savedRange);
+        })
+        .catch(() => {
+          /* parent surfaces upload failures; nothing to insert */
+        });
+      return;
+    }
+
+    // Fallback: prompt for a URL (original behavior).
+    const url = window.prompt("Enter image URL:", "https://");
+    if (!url || !url.trim()) return;
+    insertHtmlAtSavedRange(buildImageHtml(url.trim()), savedRange);
+  }, [captureSelectionRange, onRequestImageUrl, insertHtmlAtSavedRange]);
+
   const applyImage = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      // Snapshot the caret BEFORE any focus loss (prompt or async resolver).
-      // cloneRange() — like the link path — because getRangeAt() returns a
-      // LIVE Range the browser mutates as the selection moves; an un-cloned
-      // snapshot would drift while the resolver/prompt holds focus (L3).
-      const sel = window.getSelection();
-      const savedRange =
-        sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+      runImage();
+    },
+    [runImage],
+  );
 
-      if (onRequestImageUrl) {
-        // Parent-driven path. Await the resolver, then insert. Errors and a
-        // null result both cancel silently — the parent owns user feedback.
-        void onRequestImageUrl()
-          .then((url) => {
-            if (!url || !url.trim()) return;
-            insertHtmlAtSavedRange(buildImageHtml(url.trim()), savedRange);
-          })
-          .catch(() => {
-            /* parent surfaces upload failures; nothing to insert */
-          });
+  // ── Command-bus registration (chromeless mode only) ─────────────────────
+  // The registered target object delegates through this ref, so it stays
+  // reference-stable for the editor's lifetime while always invoking the
+  // freshest closures (runCommand re-closes over onChange etc. every render).
+  const commandImplRef = useRef<RichTextCommandImpl>({
+    runCommand,
+    runLink,
+    runImage,
+  });
+  useEffect(() => {
+    commandImplRef.current = { runCommand, runLink, runImage };
+  });
+  // Registers on focus / unregisters on blur. No-op unless chromeless.
+  // singleLine editors advertise no block-command support so the external
+  // toolbar disables formatBlock/list/indent/image against them.
+  useRichTextCommandTarget(editorRef, commandImplRef, chromeless, !singleLine);
+
+  // ── Insert embed (YouTube / Vimeo / Google) ─────────────────────────────
+  // Prompt for a URL, run it through parseResourceUrl, and insert a sanitized
+  // iframe when the URL maps to an embeddable trusted host. A non-embeddable
+  // URL (arbitrary website, unsupported host) falls back to inserting a plain
+  // hyperlink so the teacher's intent isn't lost — the sanitizer would strip a
+  // foreign-origin iframe anyway, so we never even build one.
+  const applyEmbed = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const sel = window.getSelection();
+      const savedRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+
+      const raw = window.prompt(
+        "Paste a video or embed link (YouTube, Vimeo, Google Docs/Slides/Drive):",
+        "https://",
+      );
+      if (!raw || !raw.trim()) return;
+
+      const parsed = parseResourceUrl(raw.trim());
+      if (parsed.kind === "embed" && parsed.embedUrl) {
+        // Embeddable trusted host → sandboxed iframe.
+        insertHtmlAtSavedRange(
+          buildEmbedHtml(parsed.embedUrl, parsed.displayName),
+          savedRange,
+        );
         return;
       }
-
-      // Fallback: prompt for a URL (original behavior).
-      const url = window.prompt("Enter image URL:", "https://");
-      if (!url || !url.trim()) return;
-      insertHtmlAtSavedRange(buildImageHtml(url.trim()), savedRange);
+      if (parsed.kind === "image" && parsed.embedUrl) {
+        // A direct image URL pasted into the embed field → inline image.
+        insertHtmlAtSavedRange(
+          buildImageHtml(parsed.embedUrl, parsed.displayName),
+          savedRange,
+        );
+        return;
+      }
+      // Not embeddable — insert a safe hyperlink instead of silently failing.
+      // createLink only runs over a selection/caret; restore the range first.
+      if (savedRange && sel) {
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
+      }
+      editorRef.current?.focus();
+      exec("createLink", raw.trim());
+      const html = editorRef.current?.innerHTML ?? "";
+      lastWrittenRef.current = html;
+      emitChange(html);
     },
-    [onRequestImageUrl, insertHtmlAtSavedRange],
+    [insertHtmlAtSavedRange, emitChange],
+  );
+
+  // ── Checklist (best-effort) ─────────────────────────────────────────
+  // True interactive checklists in contentEditable require complex DOM
+  // bookkeeping beyond execCommand. This best-effort implementation inserts
+  // a "☐ " prefix on each selected line so teachers can visually track
+  // checkbox items. Items are plain text markers, not interactive inputs.
+  const applyChecklist = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      editorRef.current?.focus();
+      // Insert a checkbox character + non-breaking-space before the selection.
+      // execCommand('insertText') places it at the caret or replaces selection.
+      exec("insertText", "☐ ");
+      const html = editorRef.current?.innerHTML ?? "";
+      lastWrittenRef.current = html;
+      emitChange(html);
+    },
+    [emitChange],
   );
 
   // ── Paste handler ───────────────────────────────────────────────────
@@ -1350,29 +1391,7 @@ export function RichTextEditor({
         return;
       }
 
-      // Multi-line mode, HTML flavor present (§4a review L1): NEVER let the
-      // browser insert the raw clipboard HTML. The live contentEditable DOM is
-      // deliberately left unsanitized while typing (caret safety), and
-      // sanitize-on-emit only cleans the value REPORTED upward — so a pasted
-      // `<img onerror=…>`/`<script>` would execute in-session the moment the
-      // browser inserted it, before any emit. Run the clipboard string through
-      // the same sanitizeHtml gate FIRST, then insert the clean fragment.
-      const clipboardHtml = e.clipboardData.getData("text/html");
-      if (clipboardHtml) {
-        e.preventDefault();
-        const clean = sanitizeHtml(clipboardHtml);
-        if (clean) exec("insertHTML", clean);
-        const el = editorRef.current;
-        if (!el) return;
-        const html = el.innerHTML;
-        lastWrittenRef.current = html;
-        emitChange(html);
-        setEmpty(isEditorEmpty(el));
-        return;
-      }
-
-      // Plain-text-only paste: unchanged — let the browser handle the
-      // insertion natively, then report the result.
+      // Multi-line mode: let the browser handle the paste, then report.
       setTimeout(() => {
         const el = editorRef.current;
         if (!el) return;
@@ -1386,13 +1405,6 @@ export function RichTextEditor({
   );
 
   // ── Render ──────────────────────────────────────────────────────────
-
-  // M2 — the popover's Save gate, recomputed per keystroke (the input is
-  // controlled). null ⇒ the typed value can't become a sanitizer-safe href,
-  // so Save shows a visible disabled state (mirroring the Open button's
-  // scheme guard) instead of silently emitting a dead or dangerous link.
-  const normalizedLinkHref = linkPop ? normalizeLinkHref(linkPop.href) : null;
-
   return (
     <div className={styles.root}>
       {/* Formatting toolbar — position:fixed, coordinates are viewport-relative.
@@ -1409,8 +1421,12 @@ export function RichTextEditor({
           still escapes the zoomed panel while keeping its styling. A portal
           does not change fixed-positioning behaviour. The `typeof document`
           guard keeps it inert during SSR (toolbarVisible is also client-only,
-          so this never runs on the server). */}
-      {toolbarVisible &&
+          so this never runs on the server). Chromeless mode renders no
+          toolbar at all — the external RtToolbar drives this editor through
+          the command bus instead (toolbarVisible also never becomes true in
+          chromeless mode; the guard is belt-and-braces). */}
+      {!chromeless &&
+        toolbarVisible &&
         typeof document !== "undefined" &&
         createPortal(
           <div
@@ -1427,11 +1443,26 @@ export function RichTextEditor({
             // focus-driven toolbar visible) when a button is pressed.
             onMouseDown={(e) => e.preventDefault()}
           >
-            {/* ── Inline formatting: B / I / U / Highlight ── */}
+            {/* ── Group 0: Undo / Redo ── */}
+            <ToolbarButton
+              label="Undo"
+              onMouseDown={(e) => applyCommand(e, "undo")}
+            >
+              <UndoIcon />
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Redo"
+              onMouseDown={(e) => applyCommand(e, "redo")}
+            >
+              <RedoIcon />
+            </ToolbarButton>
+
+            <span className={styles.divider} aria-hidden />
+
+            {/* ── Group 1: Inline text formatting ── */}
             <ToolbarButton
               label="Bold"
-              tip="Bold (Ctrl+B / ⌘B)"
-              tipId="rte-bold"
               active={bold}
               onMouseDown={(e) => applyCommand(e, "bold")}
             >
@@ -1440,8 +1471,6 @@ export function RichTextEditor({
 
             <ToolbarButton
               label="Italic"
-              tip="Italic (Ctrl+I / ⌘I)"
-              tipId="rte-italic"
               active={italic}
               onMouseDown={(e) => applyCommand(e, "italic")}
             >
@@ -1450,175 +1479,328 @@ export function RichTextEditor({
 
             <ToolbarButton
               label="Underline"
-              tip="Underline (Ctrl+U / ⌘U)"
-              tipId="rte-underline"
               active={underline}
               onMouseDown={(e) => applyCommand(e, "underline")}
             >
               <span className={styles.iconU}>U</span>
             </ToolbarButton>
 
-            {/* Highlight — the 10 highlighter pens + clear. */}
+            <ToolbarButton
+              label="Strikethrough"
+              active={strikethrough}
+              onMouseDown={(e) => applyCommand(e, "strikeThrough")}
+            >
+              <span className={styles.iconS}>S</span>
+            </ToolbarButton>
+
+            <span className={styles.divider} aria-hidden />
+
+            {/* ── Group 2: Script formatting ── */}
+            <ToolbarButton
+              label="Subscript (X₂)"
+              active={subscript}
+              onMouseDown={(e) => applyCommand(e, "subscript")}
+            >
+              <span className={styles.iconScript}>
+                X<sub>₂</sub>
+              </span>
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Superscript (X²)"
+              active={superscript}
+              onMouseDown={(e) => applyCommand(e, "superscript")}
+            >
+              <span className={styles.iconScript}>
+                X<sup>²</sup>
+              </span>
+            </ToolbarButton>
+
+            <span className={styles.divider} aria-hidden />
+
+            {/* ── Group 3: Color pickers ── */}
+            {/* Text color trigger */}
             <div className={styles.paletteGroup}>
               <ToolbarButton
-                label="Highlight"
-                tip="Highlight — pick a pen color for the selected text"
-                tipId="rte-highlight"
-                active={highlightOpen}
+                label="Text color"
+                active={paletteOpen === "color"}
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  setHighlightOpen((v) => !v);
+                  setPaletteOpen((v) => (v === "color" ? null : "color"));
+                  setFontOpen(false);
+                  setSizeOpen(false);
                 }}
               >
-                <span className={styles.iconHl} aria-hidden />
+                {/* A colored "A" suggesting text-color */}
+                <span className={styles.iconColor}>A</span>
+                <span className={styles.iconCaret} aria-hidden>
+                  ▾
+                </span>
               </ToolbarButton>
 
-              {highlightOpen && (
+              {paletteOpen === "color" && (
                 <div
                   className={styles.palettePopover}
                   role="group"
-                  aria-label="Highlight pens"
+                  aria-label="Text color palette"
                 >
-                  <SwatchButton
-                    label="No highlight"
-                    tip="Remove the highlight from the selected text"
-                    tipId="rte-pen-clear"
-                    color="transparent"
-                    isNone
-                    onMouseDown={(e) => applyHighlight(e, "transparent")}
-                  />
-                  {HIGHLIGHTERS.map((swatch) => (
+                  {TEXT_COLORS.map((swatch) => (
                     <SwatchButton
                       key={swatch.variable}
                       label={swatch.label}
-                      tip={`Highlight with ${swatch.label.toLowerCase()}`}
-                      tipId={`rte-pen-${swatch.variable}`}
                       color={resolveCssVar(swatch.variable)}
-                      onMouseDown={(e) => applyHighlight(e, swatch.variable)}
+                      onMouseDown={(e) => applyTextColor(e, swatch.variable)}
                     />
                   ))}
                 </div>
               )}
             </div>
 
+            {/* Highlight trigger */}
+            <div className={styles.paletteGroup}>
+              <ToolbarButton
+                label="Highlight color"
+                active={paletteOpen === "highlight"}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setPaletteOpen((v) =>
+                    v === "highlight" ? null : "highlight",
+                  );
+                  setFontOpen(false);
+                  setSizeOpen(false);
+                }}
+              >
+                <span className={styles.iconHighlight}>H</span>
+                <span className={styles.iconCaret} aria-hidden>
+                  ▾
+                </span>
+              </ToolbarButton>
+
+              {paletteOpen === "highlight" && (
+                <div
+                  className={`${styles.palettePopover} ${styles.highlightPopover}`}
+                  role="group"
+                  aria-label="Highlight color palette"
+                >
+                  {/* Clear highlight */}
+                  <div className={styles.paletteSection}>
+                    <span className={styles.paletteSectionLabel} aria-hidden>
+                      Clear
+                    </span>
+                    <SwatchButton
+                      key="transparent"
+                      label="No highlight"
+                      color="transparent"
+                      isNone
+                      onMouseDown={(e) => applyHighlight(e, "transparent")}
+                    />
+                  </div>
+
+                  {/* Font-color set — the same swatches as the text-color picker */}
+                  <div className={styles.paletteSection}>
+                    <span className={styles.paletteSectionLabel} aria-hidden>
+                      Colors
+                    </span>
+                    <div className={styles.swatchRow}>
+                      {HIGHLIGHT_COLORS.map((swatch) => (
+                        <SwatchButton
+                          key={swatch.variable}
+                          label={swatch.label}
+                          color={resolveCssVar(swatch.variable)}
+                          onMouseDown={(e) =>
+                            applyHighlight(e, swatch.variable)
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Highlighter-pen set — bright marker colors */}
+                  <div className={styles.paletteSection}>
+                    <span className={styles.paletteSectionLabel} aria-hidden>
+                      Highlighters
+                    </span>
+                    <div className={styles.swatchRow}>
+                      {HIGHLIGHTERS.map((swatch) => (
+                        <SwatchButton
+                          key={swatch.variable}
+                          label={swatch.label}
+                          color={resolveCssVar(swatch.variable)}
+                          onMouseDown={(e) =>
+                            applyHighlight(e, swatch.variable)
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pastel (soft tint) highlight set */}
+                  <div className={styles.paletteSection}>
+                    <span className={styles.paletteSectionLabel} aria-hidden>
+                      Pastel
+                    </span>
+                    <div className={styles.swatchRow}>
+                      {HIGHLIGHT_PASTEL.map((swatch) => (
+                        <SwatchButton
+                          key={swatch.variable}
+                          label={swatch.label}
+                          color={resolveCssVar(swatch.variable)}
+                          onMouseDown={(e) =>
+                            applyHighlight(e, swatch.variable)
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <span className={styles.divider} aria-hidden />
 
-            {/* ── Block formatting: Heading / Bulleted list ── */}
+            {/* ── Group 4: Lists ── */}
             <ToolbarButton
-              label="Heading"
-              tip="Heading — turn the current line into a section heading"
-              tipId="rte-heading"
-              active={heading}
-              onMouseDown={applyHeading}
+              label="Numbered list"
+              active={false}
+              onMouseDown={(e) => applyCommand(e, "insertOrderedList")}
             >
-              <span className={styles.iconH}>H</span>
+              <span className={styles.iconList}>1≡</span>
             </ToolbarButton>
 
             <ToolbarButton
-              label="Bulleted list"
-              tip="Bulleted list — turn the selected lines into bullets"
-              tipId="rte-list"
-              active={bulleted}
+              label="Bullet list"
+              active={false}
               onMouseDown={(e) => applyCommand(e, "insertUnorderedList")}
             >
-              <ListIcon />
+              {/* Unicode bullet + rule approximating the list icon */}
+              <span className={styles.iconList}>•≡</span>
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Checklist (inserts ☐ marker)"
+              active={false}
+              onMouseDown={applyChecklist}
+            >
+              <span className={styles.iconList}>☐</span>
             </ToolbarButton>
 
             <span className={styles.divider} aria-hidden />
 
-            {/* ── Insert: Link / Image ── */}
+            {/* ── Group 5: Insert ── */}
             <ToolbarButton
               label="Insert link"
-              tip="Insert link (Ctrl+K / ⌘K) — link the selected text; click an existing link to edit it"
-              tipId="rte-link"
+              active={false}
               onMouseDown={applyLink}
             >
-              <LinkIcon />
+              <span className={styles.iconInsert}>🔗</span>
             </ToolbarButton>
 
             <ToolbarButton
-              label="Insert image"
-              tip="Insert image — add a picture inline in your notes"
-              tipId="rte-image"
+              label="Insert image — add a picture inline in your notes"
+              active={false}
               onMouseDown={applyImage}
             >
-              <ImageIcon />
+              <span className={styles.iconInsert}>🖼</span>
             </ToolbarButton>
-          </div>,
-          document.querySelector(".cp-root") ?? document.body,
-        )}
 
-      {/* Link popover — the `.rn-linkPop` anatomy: URL input + Save / Open /
-          Remove. Portaled alongside the toolbar (same .cp-root reasoning);
-          position:fixed at viewport coordinates computed on open. Esc closes
-          and returns focus to the editor; Enter saves. */}
-      {linkPop &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            ref={linkPopRef}
-            role="dialog"
-            aria-label="Edit link"
-            className={styles.linkPop}
-            style={{ top: linkPop.top, left: linkPop.left }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.stopPropagation();
-                closeLinkPop(true);
-              } else if (e.key === "Enter") {
-                e.preventDefault();
-                saveLink();
-              }
-            }}
-          >
-            <input
-              type="url"
-              className={styles.linkInput}
-              value={linkPop.href}
-              placeholder="https://…"
-              aria-label="Link URL"
-              autoFocus
-              onChange={(e) => {
-                const href = e.target.value;
-                setLinkPop((p) => (p ? { ...p, href } : p));
-              }}
-            />
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={saveLink}
-              disabled={normalizedLinkHref === null}
-              // Tooltip only while disabled-by-scheme — it explains WHY Save is
-              // off (CLAUDE.md §4: disabled controls explain themselves). An
-              // enabled Save is self-evident and carries no tooltip.
-              tooltip={
-                linkPop.href.trim() && normalizedLinkHref === null
-                  ? "Links must be a web address (https://…) or an email (mailto:…)"
-                  : undefined
-              }
+            <ToolbarButton
+              label="Insert embed — paste a YouTube, Vimeo or Google link to drop the player into your notes"
+              active={false}
+              onMouseDown={applyEmbed}
             >
-              Save
-            </Button>
-            <Button
-              variant="icon"
-              size="sm"
-              onClick={openLinkTarget}
-              disabled={!/^https?:\/\//i.test(linkPop.href.trim())}
-              iconAriaLabel="Open link"
-              tooltip="Open this link in a new tab"
-            >
-              <OpenIcon />
-            </Button>
-            <Button
-              variant="icon"
-              size="sm"
-              className={styles.linkRemoveBtn}
-              onClick={removeLink}
-              iconAriaLabel="Remove link"
-              tooltip="Remove the link — the text stays"
-            >
-              <TrashIcon />
-            </Button>
+              <span className={styles.iconEmbed}>▶</span>
+            </ToolbarButton>
+
+            <span className={styles.divider} aria-hidden />
+
+            {/* ── Group 6: Font family picker ── */}
+            <div className={styles.paletteGroup}>
+              <ToolbarButton
+                label="Font family"
+                active={fontOpen}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setFontOpen((v) => !v);
+                  setPaletteOpen(null);
+                  setSizeOpen(false);
+                }}
+              >
+                <span className={styles.iconFont}>Aa</span>
+                <span className={styles.iconCaret} aria-hidden>
+                  ▾
+                </span>
+              </ToolbarButton>
+
+              {fontOpen && (
+                <div
+                  className={`${styles.palettePopover} ${styles.fontPopover}`}
+                  role="group"
+                  aria-label="Font family"
+                >
+                  {FONT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.variable}
+                      type="button"
+                      aria-label={`Font: ${opt.label}`}
+                      title={opt.label}
+                      className={`${styles.fontOption} cp-focusable`}
+                      style={{ fontFamily: opt.css }}
+                      onMouseDown={(e) => applyFont(e, opt.variable)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Group 7: Text size picker ── */}
+            {/* Mirrors the font-family picker: a trigger button + a popover of
+                size options, mutually exclusive with the font/color popovers. */}
+            <div className={styles.paletteGroup}>
+              <ToolbarButton
+                label="Text size"
+                active={sizeOpen}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setSizeOpen((v) => !v);
+                  setFontOpen(false);
+                  setPaletteOpen(null);
+                }}
+              >
+                {/* A small "A" beside a large "A" suggesting size choice. */}
+                <span className={styles.iconSize}>
+                  <span className={styles.iconSizeSmall}>A</span>A
+                </span>
+                <span className={styles.iconCaret} aria-hidden>
+                  ▾
+                </span>
+              </ToolbarButton>
+
+              {sizeOpen && (
+                <div
+                  className={`${styles.palettePopover} ${styles.sizePopover}`}
+                  role="group"
+                  aria-label="Text size"
+                >
+                  {SIZE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.size}
+                      type="button"
+                      aria-label={`Text size: ${opt.label}`}
+                      title={opt.label}
+                      className={`${styles.sizeOption} cp-focusable`}
+                      // Preview each option at its own size, pulled from the
+                      // --t-* type scale (never a hard-coded px value).
+                      style={{ fontSize: `var(${opt.previewVar})` }}
+                      onMouseDown={(e) => applySize(e, opt.size)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>,
           document.querySelector(".cp-root") ?? document.body,
         )}
@@ -1642,7 +1824,6 @@ export function RichTextEditor({
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          onClick={handleEditorClick}
         />
       </div>
     </div>

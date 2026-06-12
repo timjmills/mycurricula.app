@@ -1,0 +1,771 @@
+/* Dock.module.css — the Daily view's dockable panel system.
+   Faithful translation of the 6.11.26 design handoff: three flex columns
+   whose widths are flex-grow ratios driven by a --w custom property, slot
+   tab strips, 50px collapse/pin icon rails, drag-to-dock overlay zones
+   with a ghost preview, and slim splitters. All colors / radii / shadows
+   come from app/tokens.css — zero hex here. */
+
+/* ── Body row: three columns + two splitters ─────────────────────────── */
+
+.dockBody {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  position: relative;
+}
+
+/* While a slot tab rides a drag, suppress text selection page-section
+   wide so the HTML5 drag image stays clean. */
+.dockBodyDocking {
+  user-select: none;
+}
+
+/* ── Columns ─────────────────────────────────────────────────────────── */
+/* Widths are ratios: flex-grow carries var(--w) (the splitters rewrite it
+   on both neighbors), flex-basis 0 so the ratio is the whole story. */
+
+.dockCol {
+  position: relative;
+  flex-grow: var(--w, 1);
+  flex-shrink: 1;
+  flex-basis: 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dockCol[data-slot="left"] {
+  min-width: 220px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.dockCol[data-slot="center"] {
+  min-width: 340px;
+  background: var(--canvas);
+}
+
+.dockCol[data-slot="right"] {
+  min-width: 260px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+}
+
+/* A slot with no panels disappears entirely (its drop zone in the dock
+   overlay still offers a landing strip so it can be repopulated). */
+.dockCol[data-open="false"] {
+  display: none;
+}
+
+/* Drop feedback — the destination column flashes a brand inset ring. */
+.dockFlash {
+  animation: dockFlash 0.7s ease;
+}
+
+@keyframes dockFlash {
+  0% {
+    box-shadow: inset 0 0 0 3px var(--brand-500);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+}
+
+/* ── Dock host (tab strip + panels) ──────────────────────────────────── */
+
+.colDock {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Slot tab strip ──────────────────────────────────────────────────── */
+
+.slotTabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-warm);
+  flex: 0 0 auto;
+  min-height: 40px;
+}
+
+.slotTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: none;
+  font: inherit;
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+  cursor: grab;
+  max-width: 170px;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.slotTab:hover {
+  color: var(--ink-soft);
+}
+
+.slotTab:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.slotTabActive {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--sh-xs);
+  border-color: var(--border);
+}
+
+.slotTabDragging {
+  opacity: 0.4;
+}
+
+.slotTab:active {
+  cursor: grabbing;
+}
+
+.slotTabGrip {
+  display: inline-flex;
+  color: var(--faint);
+  flex: 0 0 auto;
+  font-size: 12px; /* sizes the 1em grip svg */
+}
+
+.slotTabTitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slotTabsSpacer {
+  flex: 1;
+}
+
+/* Tabs / Stack segmented control. */
+.slotMode {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  flex: 0 0 auto;
+}
+
+.slotModeBtn {
+  width: 26px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px; /* sizes the 1em svg */
+}
+
+.slotModeBtn:hover {
+  color: var(--ink);
+}
+
+.slotModeBtn:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.slotModeBtnOn {
+  background: var(--hairline);
+  color: var(--ink);
+}
+
+/* Pin + collapse controls (side slots). */
+.slotCtrls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.slotCtrlBtn {
+  width: 26px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px; /* sizes the 1em svg */
+}
+
+.slotCtrlBtn:hover {
+  background: var(--hairline);
+  color: var(--ink);
+}
+
+.slotCtrlBtn:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.slotCtrlBtnOn {
+  color: var(--brand-600);
+  background: var(--brand-50);
+}
+
+/* ── Panels ──────────────────────────────────────────────────────────── */
+
+.dockPanel {
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.dockPanel > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Tabs mode: one visible panel. */
+.dockCol[data-mode="tabs"] .dockPanel {
+  display: none;
+}
+
+.dockCol[data-mode="tabs"] .dockPanel.dockPanelActive {
+  display: flex;
+  flex: 1 1 0;
+}
+
+/* Stack mode: every panel shares the column. */
+.dockCol[data-mode="stack"] .dockPanel {
+  display: flex;
+  flex: 1 1 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.dockCol[data-mode="stack"] .dockPanel:last-child {
+  border-bottom: none;
+}
+
+/* ── Side-column collapse / pin → 50px icon rail ─────────────────────── */
+
+.colRail {
+  display: none;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  background: var(--surface-warm);
+}
+
+/* Railed footprint: collapsed (pinned) OR floating (unpinned). The
+   !important overrides the flex-grow ratio + slot min-widths above. */
+.dockCol[data-slot="left"][data-collapsed="true"],
+.dockCol[data-slot="right"][data-collapsed="true"],
+.dockCol[data-slot="left"][data-pinned="false"],
+.dockCol[data-slot="right"][data-pinned="false"] {
+  flex: 0 0 50px !important;
+  min-width: 50px !important;
+}
+
+.dockCol[data-collapsed="true"] .colRail,
+.dockCol[data-pinned="false"] .colRail {
+  display: flex;
+}
+
+/* Pinned + collapsed: rail only — the docked content unmounts visually. */
+.dockCol[data-pinned="true"][data-collapsed="true"] .colDock {
+  display: none;
+}
+
+/* Unpinned: the dock floats over the page and peeks open on hover. */
+.dockCol[data-pinned="false"] .colDock {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 326px;
+  z-index: 45;
+  display: none;
+  background: var(--surface);
+  box-shadow: var(--sh-lg);
+}
+
+.dockCol[data-slot="left"][data-pinned="false"] .colDock {
+  left: 50px;
+  border-right: 1px solid var(--border);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+}
+
+.dockCol[data-slot="right"][data-pinned="false"] .colDock {
+  right: 50px;
+  border-left: 1px solid var(--border);
+  border-radius: var(--r-md) 0 0 var(--r-md);
+}
+
+.dockCol[data-pinned="false"]:hover .colDock,
+.dockCol[data-pinned="false"]:focus-within .colDock {
+  display: flex;
+  overflow: hidden;
+}
+
+/* Rail furniture. */
+.colRailExpand {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: var(--sh-xs);
+  flex: 0 0 auto;
+  cursor: pointer;
+  font-size: 16px; /* sizes the 1em svg */
+}
+
+.colRailExpand:hover {
+  color: var(--brand-600);
+  border-color: var(--brand-300);
+  background: var(--brand-50);
+}
+
+.colRailExpand:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.colRailIcons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 34px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border);
+}
+
+.colRailIcon {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 17px; /* sizes the 1em svg */
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.colRailIcon:hover {
+  background: var(--surface);
+  color: var(--brand-600);
+  box-shadow: var(--sh-xs);
+}
+
+.colRailIcon:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.colRailIconOn {
+  background: var(--brand-50);
+  color: var(--brand-600);
+}
+
+.railBadge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--brand-500);
+  color: var(--paper);
+  font-size: var(--t-10);
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--surface-warm);
+}
+
+.railDotBadge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--urgent);
+  box-shadow: 0 0 0 2px var(--surface-warm);
+}
+
+.colRailLabel {
+  writing-mode: vertical-rl;
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.colRailDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--brand-400);
+  flex: 0 0 auto;
+  margin-top: auto;
+}
+
+/* ── Splitters ───────────────────────────────────────────────────────── */
+
+.splitter {
+  flex: 0 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--canvas);
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.splitter[data-on="false"] {
+  display: none;
+}
+
+.splitter:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+  border-radius: var(--r-4);
+}
+
+.splitterGrip {
+  display: inline-block;
+  width: 2px;
+  height: 24px;
+  border-radius: var(--r-pill);
+  background: var(--border);
+  transition:
+    background 0.12s ease,
+    height 0.12s ease;
+}
+
+.splitter:hover .splitterGrip,
+.splitter:focus-visible .splitterGrip {
+  background: var(--faint);
+  height: 36px;
+}
+
+.splitter:active .splitterGrip {
+  background: var(--brand-400);
+}
+
+/* ── Drag-to-dock overlay ────────────────────────────────────────────── */
+
+.dockLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+}
+
+.dockZone {
+  position: absolute;
+  border: 2px dashed var(--brand-300);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--brand-50) 62%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-600);
+  font-weight: 700;
+  font-size: var(--t-13);
+  opacity: 0.9;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  overflow: hidden;
+}
+
+.dockZoneHot {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--brand-500);
+  background: color-mix(in srgb, var(--brand-100) 60%, transparent);
+  box-shadow: var(--sh-md);
+}
+
+.dzHint {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: center;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+
+.dockZoneHot .dzHint {
+  opacity: 0;
+}
+
+/* Ghost panel preview — appears inside the hot zone. */
+.dockGhost {
+  position: absolute;
+  inset: 10px;
+  display: none;
+  flex-direction: column;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid var(--brand-200);
+  box-shadow: var(--sh-lg);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.dockZoneHot .dockGhost {
+  display: flex;
+  animation: ghostIn 0.16s ease;
+}
+
+@keyframes ghostIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.dockGhostHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-warm);
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink-soft);
+  flex: 0 0 auto;
+}
+
+.dockGhostIcon {
+  display: inline-flex;
+  color: var(--brand-500);
+  font-size: 15px; /* sizes the 1em svg */
+}
+
+.dockGhostBody {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px 12px;
+}
+
+.dockGhostBody i {
+  display: block;
+  height: 10px;
+  border-radius: var(--r-6);
+  background: var(--hairline);
+}
+
+.dockGhostBody i:nth-child(1) {
+  width: 72%;
+}
+
+.dockGhostBody i:nth-child(2) {
+  width: 88%;
+}
+
+.dockGhostBody i:nth-child(3) {
+  width: 55%;
+}
+
+/* ── Responsive: relax column minimums on smaller desktops / tablets ──── */
+/* The Daily view swaps to its single-pane narrow layout below 720px (see
+   DailyView), so these tiers only need to keep three columns usable down
+   to tablet width without document-level horizontal scroll. */
+
+@media (max-width: 1100px) {
+  .dockCol[data-slot="left"] {
+    min-width: 200px;
+  }
+  .dockCol[data-slot="center"] {
+    min-width: 300px;
+  }
+  .dockCol[data-slot="right"] {
+    min-width: 240px;
+  }
+}
+
+@media (max-width: 860px) {
+  .dockCol[data-slot="left"] {
+    min-width: 180px;
+  }
+  .dockCol[data-slot="center"] {
+    min-width: 260px;
+  }
+  .dockCol[data-slot="right"] {
+    min-width: 200px;
+  }
+}
+
+/* ── Narrow (phone) layout — single pane, no dock chrome ─────────────── */
+/* ≤720px the Daily view shows ONE panel at a time (the data-narrow-pane
+   attribute on .dockBody picks it): "list" → the day panel, "detail" →
+   the lesson panel with its sticky "← Back to list" affordance. Slot tab
+   strips, splitters, icon rails, and float/collapse states are all inert
+   here — a phone has no room for multi-column docking. */
+
+@media (max-width: 720px) {
+  .dockBody {
+    flex-direction: column;
+  }
+
+  .splitter {
+    display: none !important;
+  }
+
+  .slotTabs,
+  .colRail {
+    display: none !important;
+  }
+
+  /* Neutralize collapse / pin / float footprints — every column is a
+     plain full-width block on phone. */
+  .dockCol,
+  .dockCol[data-collapsed="true"],
+  .dockCol[data-pinned="false"] {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    border-left: none;
+    border-right: none;
+  }
+
+  .dockCol .colDock,
+  .dockCol[data-pinned="true"][data-collapsed="true"] .colDock,
+  .dockCol[data-pinned="false"] .colDock {
+    display: flex !important;
+    position: static !important;
+    width: auto !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Exactly one panel visible per narrow pane choice. The side panel is
+     hidden in both — matching the pre-dock narrow behavior where the
+     rail folds away on phones. */
+  .dockBody[data-narrow-pane] .dockPanel {
+    display: none !important;
+  }
+
+  .dockBody[data-narrow-pane="list"] .dockPanel[data-panel="day"],
+  .dockBody[data-narrow-pane="detail"] .dockPanel[data-panel="lesson"] {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    border-bottom: none;
+  }
+
+  /* A column whose every panel is hidden should not reserve space. */
+  .dockBody[data-narrow-pane="list"]
+    .dockCol:not(:has(.dockPanel[data-panel="day"])),
+  .dockBody[data-narrow-pane="detail"]
+    .dockCol:not(:has(.dockPanel[data-panel="lesson"])) {
+    display: none !important;
+  }
+
+  /* While dragging is impossible on this layout, never show the overlay. */
+  .dockLayer {
+    display: none !important;
+  }
+}
+
+/* ── Touch-tier hit areas (≥44px, CLAUDE.md §4) ──────────────────────────
+   The dock's chrome buttons are visually compact (22–34px); invisible
+   ::after pads grow the touch target without changing the layout. Gated on
+   the BUILD_STANDARD §8 width tier AND coarse pointers. The buttons all
+   create a positioning context here (none carried position before). */
+
+@media (max-width: 900px), (pointer: coarse) {
+  .slotModeBtn,
+  .slotCtrlBtn,
+  .colRailExpand,
+  .colRailIcon {
+    position: relative;
+  }
+
+  /* Vertical pad reaches 44px; horizontal stays tight — these buttons sit
+     2px from their siblings, so a wide pad would swallow the neighbor. */
+  .slotModeBtn::after,
+  .slotCtrlBtn::after {
+    content: "";
+    position: absolute;
+    inset: -11px -4px;
+  }
+
+  .colRailExpand::after {
+    content: "";
+    position: absolute;
+    inset: -7px;
+  }
+
+  .colRailIcon::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .dockFlash {
+    animation: none;
+  }
+  .dockZoneHot .dockGhost {
+    animation: none;
+  }
+  .slotTab,
+  .colRailIcon,
+  .splitterGrip,
+  .dockZone,
+  .dzHint {
+    transition: none;
+  }
+}
