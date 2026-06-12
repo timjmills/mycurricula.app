@@ -35,8 +35,27 @@ interface SettingsCardProps {
    *  index.ts). When set, the card is wrapped in a <section id=…> the
    *  search results can scroll to and highlight. */
   anchorId?: string;
+  /** Eyebrow pill tone — varies by the settings sidebar group so the
+   *  domains read differently at a glance: Planning = honey (default,
+   *  the original look), Content = brand, People = teal, neutral = quiet
+   *  ink. Purely the pill chrome; titles/hints stay identical. */
+  tone?: "honey" | "brand" | "teal" | "neutral";
+  /** Small glyph rendered inside the eyebrow pill (16px slot) — the
+   *  section's icon from components/settings/section-icons.tsx. */
+  glyph?: ReactNode;
   children: ReactNode;
 }
+
+/** Eyebrow tone → module class. honey is the base .eyebrow look. */
+const TONE_CLASS: Record<
+  NonNullable<SettingsCardProps["tone"]>,
+  string | null
+> = {
+  honey: null,
+  brand: "eyebrowBrand",
+  teal: "eyebrowTeal",
+  neutral: "eyebrowNeutral",
+};
 
 /** White rounded panel with a consistent header — the A2 section frame.
  *  Delegates border / shadow / radius / background to <Card neutral>. */
@@ -48,6 +67,8 @@ export function SettingsCard({
   scope,
   savedTick,
   anchorId,
+  tone = "honey",
+  glyph,
   children,
 }: SettingsCardProps): ReactNode {
   // "Saved" pulse — visible while the timeout below is pending. The chip
@@ -70,7 +91,21 @@ export function SettingsCard({
     <div className={styles.header}>
       <div className={styles.headerText}>
         <div className={styles.eyebrowRow}>
-          <span className={styles.eyebrow}>{eyebrow}</span>
+          <span
+            className={[
+              styles.eyebrow,
+              TONE_CLASS[tone] ? styles[TONE_CLASS[tone] as string] : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {glyph && (
+              <span className={styles.eyebrowGlyph} aria-hidden>
+                {glyph}
+              </span>
+            )}
+            {eyebrow}
+          </span>
           {scope && (
             <span
               className={[
@@ -112,7 +147,18 @@ export function SettingsCard({
     </div>
   );
 
-  const card = <Card header={header}>{children}</Card>;
+  // Scope stripe — team-scoped cards wear the core-mode (team red) left
+  // stripe, extending the lesson-card stripe language into settings so a
+  // teacher reads the blast radius before the copy. Personal cards keep
+  // Card's quiet neutral stripe.
+  const card = (
+    <Card
+      header={header}
+      className={scope === "team" ? styles.cardTeam : undefined}
+    >
+      {children}
+    </Card>
+  );
 
   // Anchor wrapper — gives the settings search a scroll target. The
   // [data-settings-anchor] hook lets the search highlight the section it

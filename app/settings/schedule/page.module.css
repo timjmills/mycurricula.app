@@ -268,11 +268,15 @@
   }
 }
 
-/* ── Inputs (Curriculum-page recipe) ────────────────────────────────── */
+/* ── Inputs (Curriculum-page recipe) ──────────────────────────────────
+   Input selectors are DOUBLED: the app-wide `.cp-root input` reset
+   (0,1,1) strips font/color from single-class rules (0,1,0). <select>
+   is not in the reset but is doubled with its companions so the trio
+   stays one rule. */
 
-.timeInput,
-.select,
-.labelInput {
+.timeInput.timeInput,
+.select.select,
+.labelInput.labelInput {
   min-height: 44px;
   padding: 0 12px;
   font-family: inherit;

@@ -55,7 +55,9 @@
   font-style: italic;
 }
 
-.textInput {
+/* Doubled: `.cp-root input` (0,1,1) resets font/color on raw inputs —
+   a single module class (0,1,0) silently loses those declarations. */
+.textInput.textInput {
   min-height: 44px;
   padding: 0 12px;
   font-family: inherit;
@@ -279,7 +281,9 @@
   max-width: 480px;
 }
 
-.radioOption {
+/* Doubled: `.cp-root button` (0,1,1) strips background/border/padding
+   from single-class rules on raw buttons (0,1,0). */
+.radioOption.radioOption {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -305,7 +309,7 @@
   outline-offset: 2px;
 }
 
-.radioOptionSelected {
+.radioOption.radioOptionSelected {
   background: var(--brand-50);
   border-color: var(--brand-400);
 }

@@ -55,7 +55,9 @@ const context = await browser.newContext();
 
 // Bootstrap auth via the claude-login bypass.
 const boot = await context.newPage();
-await boot.goto(`${BASE}/auth/claude-login?token=${TOKEN}`, {
+// encodeURIComponent — the bypass token is base64 and can contain `+`,
+// which a query parser would otherwise decode as a space and fail auth.
+await boot.goto(`${BASE}/auth/claude-login?token=${encodeURIComponent(TOKEN)}`, {
   waitUntil: "domcontentloaded",
   timeout: 60000,
 });
@@ -175,6 +177,91 @@ note(
   new URL(page.url()).pathname === "/settings/workspace",
   `/settings/team redirects to /settings/workspace (landed ${new URL(page.url()).pathname})`,
 );
+
+// ── Flow F: computed-style assertions (visual pass) ────────────────────
+// The cp-root button reset (tokens.css `.cp-root button`) silently strips
+// background/border/padding from single-class module rules — a class of
+// bug the h-scroll sweep can't catch. Assert the real computed styles.
+// CSS-module classes are hashed `{file}_{class}__{hash}`, so match on the
+// `_class__` infix.
+
+// F1: selected month chip is solid (non-transparent bg) with real padding.
+await page.goto(`${BASE}/settings/calendar`, { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(2500); // hydration — chips reflect stored months
+const chipStyle = await page.evaluate(() => {
+  const chip = document.querySelector('button[class*="_monthChipOn__"]');
+  if (!chip) return null;
+  const cs = window.getComputedStyle(chip);
+  return {
+    bg: cs.backgroundColor,
+    padLeft: parseFloat(cs.paddingLeft),
+    borderW: parseFloat(cs.borderLeftWidth),
+  };
+});
+note(chipStyle !== null, "calendar renders a selected month chip");
+if (chipStyle) {
+  note(
+    chipStyle.bg !== "rgba(0, 0, 0, 0)" && chipStyle.bg !== "transparent",
+    `selected chip has a solid background (${chipStyle.bg})`,
+  );
+  note(
+    chipStyle.padLeft >= 12,
+    `selected chip keeps its padding (padding-left ${chipStyle.padLeft}px ≥ 12)`,
+  );
+  note(
+    chipStyle.borderW >= 1,
+    `selected chip keeps its border (${chipStyle.borderW}px)`,
+  );
+}
+
+// F2: account default-view radio card has a visible border.
+await page.goto(`${BASE}/settings/account`, { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(2000);
+const optionStyle = await page.evaluate(() => {
+  const opt = document.querySelector('button[class*="_option__"]');
+  if (!opt) return null;
+  const cs = window.getComputedStyle(opt);
+  return { borderW: parseFloat(cs.borderLeftWidth), pad: parseFloat(cs.paddingLeft) };
+});
+note(optionStyle !== null, "account renders a radio-card option");
+if (optionStyle) {
+  note(
+    optionStyle.borderW >= 1 && optionStyle.pad >= 8,
+    `account option keeps border+padding (border ${optionStyle.borderW}px, padding ${optionStyle.pad}px)`,
+  );
+}
+
+// F3: overview tiles carry section glyphs (SVG icons). The glyph lives on
+// the overview tiles + card eyebrows, not the narrow sidebar tabs (where
+// it crowded the label into mid-word wraps).
+await page.goto(`${BASE}/settings`, { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(2000);
+const glyphCount = await page
+  .locator('a[href="/settings/calendar"] span[class*="_glyph__"] svg')
+  .count();
+note(glyphCount >= 1, `overview tile carries a section glyph (found ${glyphCount})`);
+
+// F4: team-scoped overview tile wears the 4px scope stripe, distinct from
+// the card's regular border color (core-mode vs --border).
+const stripe = await page.evaluate(() => {
+  const tile = document.querySelector(
+    'a[href="/settings/calendar"][class*="_card"]',
+  );
+  if (!tile) return null;
+  const cs = window.getComputedStyle(tile);
+  return {
+    width: parseFloat(cs.borderLeftWidth),
+    left: cs.borderLeftColor,
+    top: cs.borderTopColor,
+  };
+});
+note(stripe !== null, "overview calendar tile found for stripe check");
+if (stripe) {
+  note(
+    stripe.width >= 4 && stripe.left !== stripe.top,
+    `team tile wears scope stripe (border-left ${stripe.width}px, ${stripe.left} ≠ ${stripe.top})`,
+  );
+}
 
 await page.close();
 await browser.close();

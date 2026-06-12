@@ -32,6 +32,7 @@ import {
   PageHeader,
   Tooltip,
 } from "@/components/ui";
+import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./lesson-templates-manager.module.css";
 
 // ── Built-in card ───────────────────────────────────────────────────────────
@@ -402,7 +403,7 @@ export function LessonTemplatesManager(): ReactNode {
 
   return (
     <div className={styles.page}>
-      <div className={styles.inner}>
+      <div className={`${styles.inner} ${reveal.reveal}`}>
         {/* Page header — breadcrumb + title + subtitle via PageHeader primitive */}
         <PageHeader
           eyebrow="Settings"

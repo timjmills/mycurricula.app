@@ -69,9 +69,12 @@
   display: inline-flex;
   align-items: center;
   font-size: var(--t-11);
-  color: var(--honey-600);
-  background: var(--honey-50);
-  border: 1px solid var(--honey-100);
+  /* Brand tone — Lesson templates sits in the settings hub's CONTENT
+     group, which carries the brand eyebrow tint (see SettingsCard's
+     tone prop in components/appearance/settings-card.tsx). */
+  color: var(--brand-600);
+  background: var(--brand-50);
+  border: 1px solid var(--brand-100);
   padding: 4px 10px;
   border-radius: var(--r-pill);
   font-weight: 800;
@@ -366,9 +369,12 @@
   display: inline-flex;
   align-items: center;
   font-size: var(--t-11);
-  color: var(--honey-600);
-  background: var(--honey-50);
-  border: 1px solid var(--honey-100);
+  /* Brand tone — Lesson templates sits in the settings hub's CONTENT
+     group, which carries the brand eyebrow tint (see SettingsCard's
+     tone prop in components/appearance/settings-card.tsx). */
+  color: var(--brand-600);
+  background: var(--brand-50);
+  border: 1px solid var(--brand-100);
   padding: 4px 10px;
   border-radius: var(--r-pill);
   font-weight: 800;

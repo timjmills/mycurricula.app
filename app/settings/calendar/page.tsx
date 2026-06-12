@@ -50,6 +50,8 @@ import {
 } from "@/lib/use-academic-year";
 import { Button, PageHeader, Tooltip } from "@/components/ui";
 import { SettingsCard } from "@/components/appearance/settings-card";
+import { SECTION_ICONS } from "@/components/settings/section-icons";
+import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./page.module.css";
 
 // ── Calendar-month metadata ────────────────────────────────────────────────
@@ -151,7 +153,7 @@ function detectPreset(months: number[]): PresetKey {
 export default function CalendarSettingsPage(): ReactNode {
   return (
     <div className={styles.page}>
-      <div className={styles.inner}>
+      <div className={`${styles.inner} ${reveal.reveal}`}>
         <PageHeader
           eyebrow="Settings"
           title="Calendar"
@@ -278,6 +280,8 @@ function SchoolMonthsSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.calendar({ size: 14 })}
+      scope="team"
       anchorId="school-months"
       eyebrow="Calendar"
       title={
@@ -397,6 +401,8 @@ function AcademicYearSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.calendar({ size: 14 })}
+      scope="team"
       anchorId="academic-year"
       eyebrow="Calendar"
       title={
@@ -525,6 +531,8 @@ function SchoolWeekSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.calendar({ size: 14 })}
+      scope="team"
       anchorId="school-week"
       eyebrow="Calendar"
       title={
@@ -643,6 +651,8 @@ function HolidaysSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.calendar({ size: 14 })}
+      scope="team"
       anchorId="holidays"
       eyebrow="Calendar"
       title={

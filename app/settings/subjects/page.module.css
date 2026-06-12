@@ -44,7 +44,8 @@
   max-width: 64ch;
 }
 
-.textInput {
+/* Doubled: `.cp-root input` (0,1,1) resets font/color on raw inputs. */
+.textInput.textInput {
   min-height: 44px;
   padding: 0 12px;
   font-family: inherit;
@@ -214,7 +215,11 @@
   max-width: 100%;
 }
 
-.renameButton {
+/* Doubled selectors throughout this file: the app-wide `.cp-root button`
+   / `.cp-root input` resets (0,1,1) beat single module classes (0,1,0)
+   on raw controls, silently stripping background/border/padding/color.
+   `.foo.foo` lifts to 0,2,0 — the repo's documented counter-idiom. */
+.renameButton.renameButton {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -278,7 +283,7 @@
   }
 }
 
-.renameInput {
+.renameInput.renameInput {
   min-height: 36px;
   width: 100%;
   max-width: 280px;
@@ -298,7 +303,7 @@
    44×24 visual track; the ::before overlay inflates the hit area to
    ≥44×44 on every device (CLAUDE.md §4 touch-target rule). */
 
-.switch {
+.switch.switch {
   position: relative;
   width: 44px;
   height: 24px;
@@ -336,7 +341,7 @@
   transition: transform 120ms ease;
 }
 
-.switchOn {
+.switch.switchOn {
   background: var(--brand-500);
   border-color: var(--brand-500);
 }
@@ -403,7 +408,7 @@
   }
 }
 
-.swatchOption {
+.swatchOption.swatchOption {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -440,7 +445,7 @@
 
 /* Selected = the borrowed family's own tint + accent ring, so the
    choice previews exactly how the personal subject will paint. */
-.swatchOptionOn {
+.swatchOption.swatchOptionOn {
   background: var(--cl);
   border-color: var(--c);
   box-shadow: inset 0 0 0 1px var(--c);
@@ -480,7 +485,7 @@
 
 /* ── Archived disclosure ───────────────────────────────────────────── */
 
-.disclosure {
+.disclosure.disclosure {
   display: inline-flex;
   align-items: center;
   gap: 8px;

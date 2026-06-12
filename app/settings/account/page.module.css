@@ -57,7 +57,8 @@
   max-width: 64ch;
 }
 
-.textInput {
+/* Doubled: `.cp-root input` (0,1,1) resets font/color on raw inputs. */
+.textInput.textInput {
   min-height: 44px;
   padding: 0 12px;
   font-family: inherit;
@@ -161,7 +162,9 @@
   gap: 8px;
 }
 
-.option {
+/* Doubled: `.cp-root button` (0,1,1) strips background/border/padding
+   from single-class rules on raw buttons (0,1,0). */
+.option.option {
   display: flex;
   align-items: center;
   gap: 10px;

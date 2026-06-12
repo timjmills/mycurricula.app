@@ -46,6 +46,8 @@ import {
 } from "@/lib/use-account-settings";
 import { Button, PageHeader, Tooltip } from "@/components/ui";
 import { SettingsCard, RadioDot } from "@/components/appearance/settings-card";
+import { SECTION_ICONS } from "@/components/settings/section-icons";
+import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./page.module.css";
 
 // ── Page ────────────────────────────────────────────────────────────────────
@@ -53,7 +55,7 @@ import styles from "./page.module.css";
 export default function AccountSettingsPage(): ReactNode {
   return (
     <div className={styles.page}>
-      <div className={styles.inner}>
+      <div className={`${styles.inner} ${reveal.reveal}`}>
         <PageHeader
           eyebrow="Settings"
           title="Account"
@@ -179,6 +181,8 @@ function ProfileSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.account({ size: 14 })}
+      tone="teal"
       eyebrow="Account"
       scope="personal"
       anchorId="profile"
@@ -290,6 +294,8 @@ function DefaultViewSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.account({ size: 14 })}
+      tone="teal"
       eyebrow="Startup"
       scope="personal"
       anchorId="default-view"
@@ -350,6 +356,8 @@ function CompletionPrivacySection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.account({ size: 14 })}
+      tone="teal"
       eyebrow="Privacy"
       scope="personal"
       anchorId="completion-privacy"
@@ -384,6 +392,8 @@ function CompletionPrivacySection(): ReactNode {
 function SignInSection(): ReactNode {
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.account({ size: 14 })}
+      tone="teal"
       eyebrow="Account"
       scope="personal"
       anchorId="sign-in-out"

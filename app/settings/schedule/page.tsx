@@ -69,6 +69,8 @@ import {
 import { useMySchedule } from "@/lib/use-my-schedule";
 import { SUBJECTS, SUBJECT_BY_ID } from "@/lib/mock";
 import type { SubjectId } from "@/lib/types";
+import { SECTION_ICONS } from "@/components/settings/section-icons";
+import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./page.module.css";
 
 // ── Page ────────────────────────────────────────────────────────────────────
@@ -76,7 +78,7 @@ import styles from "./page.module.css";
 export default function ScheduleSettingsPage(): ReactNode {
   return (
     <div className={styles.page}>
-      <div className={styles.inner}>
+      <div className={`${styles.inner} ${reveal.reveal}`}>
         <PageHeader
           eyebrow="Settings"
           title="Schedule"
@@ -169,6 +171,7 @@ function RotationSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.schedule({ size: 14 })}
       anchorId="rotation"
       scope="team"
       eyebrow="Timetable"
@@ -574,6 +577,7 @@ function TimeBlocksSection(): ReactNode {
 
   return (
     <SettingsCard
+      glyph={SECTION_ICONS.schedule({ size: 14 })}
       anchorId="time-blocks"
       scope="personal"
       eyebrow="Timetable"
@@ -606,9 +610,9 @@ function TimeBlocksSection(): ReactNode {
           <p className={styles.sampleHint}>
             {sample.blocks.length > 0 ? (
               <>
-                Using the sample day — add a block to customize. /schedule
-                shows this sample timetable for {dayLong}; your own blocks take
-                over there when the backend wave lands.
+                Using the sample day — add a block to customize. /schedule shows
+                this sample timetable for {dayLong}; your own blocks take over
+                there when the backend wave lands.
               </>
             ) : (
               <>

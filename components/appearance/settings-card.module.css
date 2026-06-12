@@ -42,6 +42,47 @@
   text-transform: uppercase;
 }
 
+/* ── Eyebrow glyph + group tones ──────────────────────────────────────
+   The settings sidebar groups each carry a tone so the domains read
+   differently at a glance: Planning keeps the base honey pill; Content
+   = brand; People = teal; neutral = quiet ink. Tints mix toward
+   var(--surface) so dark themes re-tint automatically. The glyph slot
+   hosts the section icon (components/settings/section-icons.tsx). */
+
+.eyebrowGlyph {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+}
+
+.eyebrowBrand {
+  color: var(--brand-600);
+  background: var(--brand-50);
+  border-color: var(--brand-100);
+}
+
+.eyebrowTeal {
+  color: var(--tag-teal);
+  background: color-mix(in srgb, var(--tag-teal) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--tag-teal) 28%, transparent);
+}
+
+.eyebrowNeutral {
+  color: var(--body);
+  background: var(--hairline);
+  border-color: var(--border);
+}
+
+/* ── Team scope stripe ────────────────────────────────────────────────
+   Team-scoped cards wear the core-mode (team red) left stripe — the
+   same blast-radius language as the Master banner and scope chips.
+   Doubled so it reliably beats Card's own .neutral border-left
+   (cross-module specificity ties resolve by bundle order otherwise). */
+
+.cardTeam.cardTeam {
+  border-left-color: var(--core-mode);
+}
+
 /* W2-B7 scope chip — same vocabulary + same visual contract as the
    sidebar scope chips in app/settings/layout.module.css. */
 .scopeChip {

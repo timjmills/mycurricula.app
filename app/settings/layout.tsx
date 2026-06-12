@@ -58,6 +58,10 @@ interface SettingsTab {
 interface SettingsGroup {
   /** Uppercase group heading shown in the sidebar (hidden on phone). */
   label: string;
+  /** Group tone dot next to the heading — matches the eyebrow tones the
+   *  group's section pages carry (SettingsCard `tone` prop): Planning =
+   *  honey, Content = brand, People = teal, Preferences = neutral. */
+  tone: "honey" | "brand" | "teal" | "neutral";
   items: readonly SettingsTab[];
 }
 
@@ -67,6 +71,7 @@ interface SettingsGroup {
 const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     label: "Planning",
+    tone: "honey",
     items: [
       {
         slug: "curriculum",
@@ -90,6 +95,7 @@ const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   },
   {
     label: "Content",
+    tone: "brand",
     items: [
       {
         slug: "subjects",
@@ -107,6 +113,7 @@ const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   },
   {
     label: "People",
+    tone: "teal",
     items: [
       {
         slug: "workspace",
@@ -124,6 +131,7 @@ const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   },
   {
     label: "Preferences",
+    tone: "neutral",
     items: [
       {
         slug: "appearance",
@@ -204,6 +212,14 @@ export default function SettingsLayout({
                   {SETTINGS_GROUPS.map((group) => (
                     <div key={group.label} className={styles.group}>
                       <span className={styles.groupLabel} aria-hidden>
+                        <span
+                          className={[
+                            styles.groupDot,
+                            styles[
+                              `groupDot${group.tone[0].toUpperCase()}${group.tone.slice(1)}`
+                            ],
+                          ].join(" ")}
+                        />
                         {group.label}
                       </span>
                       <ul className={styles.tabList}>

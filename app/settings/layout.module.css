@@ -63,12 +63,44 @@
 }
 
 .groupLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--t-11);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
   padding: 0 12px 4px;
+}
+
+/* Group tone dots — echo the eyebrow tones the group's pages carry
+   (SettingsCard `tone`), tying sidebar -> page identity together. The
+   sidebar tabs themselves stay glyph-free: at 220px the scope chip is
+   the meaningful per-row signal, and a glyph there only crowded the
+   label into mid-word wraps. Glyphs live on the overview tiles and card
+   eyebrows where they have room. */
+.groupDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.groupDotHoney {
+  background: var(--honey-600);
+}
+
+.groupDotBrand {
+  background: var(--brand-500);
+}
+
+.groupDotTeal {
+  background: var(--tag-teal);
+}
+
+.groupDotNeutral {
+  background: var(--ink-200);
 }
 
 .tabList {

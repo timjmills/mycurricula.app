@@ -18,6 +18,8 @@ interface OverviewCardProps {
   scope: "personal" | "team";
   /** Live one-line summary of the section's current values. */
   summary: ReactNode;
+  /** Section glyph (components/settings/section-icons.tsx, 20px). */
+  glyph?: ReactNode;
 }
 
 export function OverviewCard({
@@ -25,11 +27,15 @@ export function OverviewCard({
   label,
   scope,
   summary,
+  glyph,
 }: OverviewCardProps): ReactNode {
   return (
     <Link
       href={href}
-      className={styles.card}
+      className={[
+        styles.card,
+        scope === "team" ? styles.cardTeam : styles.cardPersonal,
+      ].join(" ")}
       title={
         scope === "team"
           ? `${label} — changes affect every teacher on your team`
@@ -37,6 +43,11 @@ export function OverviewCard({
       }
     >
       <div className={styles.top}>
+        {glyph && (
+          <span className={styles.glyph} aria-hidden>
+            {glyph}
+          </span>
+        )}
         <span className={styles.label}>{label}</span>
         <span
           className={[
