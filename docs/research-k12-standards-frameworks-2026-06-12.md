@@ -136,7 +136,73 @@ subsection + standard + student expectation), **Virginia SOL**, **Florida
 B.E.S.T.** (replaced the CCSS-derived MAFS/LAFS), plus never-adopters Texas,
 Virginia, Alaska, Nebraska (and Minnesota for math only).
 
-<!-- STATE-TABLE -->
+| State | ELA & Math standards | CCSS status | Science |
+| --- | --- | --- | --- |
+| Alabama | Alabama Courses of Study | derived | Framework-based own |
+| Alaska | Alaska Content & Performance Standards | independent (never adopted) | Framework-based own |
+| Arizona | Arizona's Academic Standards | derived | Framework-based own |
+| Arkansas | Arkansas Academic Standards (2023) | independent revision | NGSS verbatim |
+| California | California Common Core State Standards | verbatim (+CA additions) | NGSS verbatim |
+| Colorado | Colorado Academic Standards | derived | Framework-based own |
+| Connecticut | Connecticut Core Standards | verbatim (renamed) | NGSS verbatim |
+| Delaware | Delaware Academic Standards | verbatim | NGSS verbatim |
+| Florida | Florida's B.E.S.T. Standards (2020) | independent (replaced MAFS/LAFS) | Own (NGSSS) |
+| Georgia | GA Standards of Excellence (math) / Georgia's K-12 ELA Standards (2025-26) | derived → ELA independent 2025-26 | Framework-based own |
+| Hawaii | Hawaii Common Core State Standards | verbatim | NGSS verbatim |
+| Idaho | Idaho Content Standards (2022) | independent revision ⚠ | Framework-based own |
+| Illinois | Illinois Learning Standards | verbatim | NGSS verbatim |
+| Indiana | Indiana Academic Standards (2014+) | independent (first to withdraw) | Framework-based own |
+| Iowa | Iowa Core | verbatim | NGSS verbatim |
+| Kansas | Kansas College & Career Ready Standards | verbatim (renamed) | NGSS verbatim |
+| Kentucky | Kentucky Academic Standards (2019) | derived | NGSS verbatim |
+| Louisiana | Louisiana Student Standards (2016; 2025 review) | derived ⚠ | NGSS verbatim |
+| Maine | Maine Learning Results | verbatim | NGSS verbatim |
+| Maryland | Maryland College and Career-Ready Standards | verbatim | NGSS verbatim |
+| Massachusetts | Massachusetts Curriculum Frameworks (2017) | derived | Framework-based own |
+| Michigan | Michigan Academic Standards | verbatim | NGSS verbatim |
+| Minnesota | Minnesota Academic Standards | ELA verbatim; math independent | Framework-based own |
+| Mississippi | MS College- and Career-Readiness Standards | derived | Framework-based own |
+| Missouri | Missouri Learning Standards (2016) | derived | Framework-based own |
+| Montana | Montana Common Core Standards | verbatim | Framework-based own |
+| Nebraska | Nebraska College and Career Ready Standards | independent (never adopted) | Framework-based own |
+| Nevada | Nevada Academic Content Standards | verbatim | NGSS verbatim |
+| New Hampshire | NH College and Career Ready Standards | verbatim | NGSS verbatim |
+| New Jersey | New Jersey Student Learning Standards | verbatim (renamed 2016) | NGSS verbatim |
+| New Mexico | New Mexico Common Core State Standards | verbatim | NGSS verbatim |
+| New York | NY Next Generation Learning Standards (2017) | derived | Framework-based own |
+| North Carolina | NC Standard Course of Study (new ELA 2027-28) | derived | Own ⚠ |
+| North Dakota | North Dakota Academic Content Standards | derived ⚠ | Framework-based own |
+| Ohio | Ohio's Learning Standards | derived | Own ⚠ |
+| Oklahoma | Oklahoma Academic Standards (2016) | independent (repealed 2014) | Framework-based own |
+| Oregon | Oregon Academic Content Standards | verbatim (+OR additions) | NGSS verbatim |
+| Pennsylvania | PA Core Standards | derived | Own ⚠ |
+| Rhode Island | Rhode Island Common Core State Standards | verbatim | NGSS verbatim |
+| South Carolina | SC College- and Career-Ready Standards (ELA 2024, Math 2023) | independent (repealed 2014) | Own ⚠ |
+| South Dakota | South Dakota Academic Standards | verbatim | Framework-based own |
+| Tennessee | Tennessee Academic Standards (2016-17) | derived | Framework-based own |
+| Texas | Texas Essential Knowledge and Skills (TEKS) | independent (never adopted) | Own (science TEKS rev. 2024-25) |
+| Utah | Utah Core Standards | derived | Framework-based own |
+| Vermont | Vermont's Common Core State Standards | verbatim | NGSS verbatim |
+| Virginia | Virginia Standards of Learning (SOL) | independent (never adopted) | Own |
+| Washington | Washington State Learning Standards | verbatim | NGSS verbatim |
+| West Virginia | WV College- and Career-Readiness Standards ⚠ | derived | Framework-based own |
+| Wisconsin | Wisconsin Academic Standards | verbatim / lightly revised ⚠ | Framework-based own |
+| Wyoming | Wyoming Content and Performance Standards | verbatim | Framework-based own |
+| DC | DC Common Core State Standards | verbatim | NGSS verbatim |
+
+**Net picture (mid-2026):** ~34–36 of 51 jurisdictions still run verbatim-CCSS
+or closely CCSS-derived ELA/math standards under assorted names; only TX, VA,
+AK, NE never adopted; ~10–12 have made substantively independent replacements
+(FL, IN, OK, SC, AR, ID, GA-ELA…); MN is split (ELA yes, math never). CCSS or
+its close derivatives still underpin roughly 70–75% of US ELA+math standards
+environments. ⚠ marks the researcher's declared low-confidence cells (e.g.
+WV's current official title, ID's 2022 departure depth, LA's independence
+level, ND's official name, several states' science stances taken from the
+verified baseline rather than per-state DOE checks) — verify those against the
+state DOE before seeding that state's items. Sources: thecorestandards.org
+standards-in-your-state, Wikipedia CCSS-implementation-by-state, NSTA NGSS
+Hub, OpenSciEd, COPE state-adoptions PDF, and per-state DOE pages (AR, LA, GA,
+CO, OH, WI, NC, SC, TX, FL, ID, MS).
 
 ### 1.3 National subject frameworks (catalog entries seeded)
 
@@ -463,7 +529,7 @@ diocesan religion standards (Chicago, LA, Boston examples in the seed).
 
 ## 11. What landed in the codebase (2026-06-12)
 
-- **Catalog:** `lib/standards/frameworks-catalog.json` — 123 frameworks with
+- **Catalog:** `lib/standards/frameworks-catalog.json` — 174 frameworks (incl. one entry per US state + DC) with
   authority, region, kind, lineage, grade range, subject scope, coding scheme,
   version/reform status, licence + commercial-use gate, machine-readable
   sources, links, and notes. Doubles as the Supabase `standards_frameworks`

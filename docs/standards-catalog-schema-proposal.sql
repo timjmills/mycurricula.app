@@ -127,9 +127,18 @@ alter table standards
 -- ---------------------------------------------------------------------------
 -- 4. Seeding
 -- ---------------------------------------------------------------------------
--- docs/standards-frameworks-catalog.seed.json holds one object per framework
--- with keys matching the columns above. Load it with a one-off script (or a
--- generated insert migration) AFTER this migration is applied:
+-- lib/standards/frameworks-catalog.json (also the data behind the in-app
+-- standards menu) holds one object per framework with keys matching the
+-- columns above. Load it with a one-off script (or a generated insert
+-- migration) AFTER this migration is applied.
+--
+-- ORDERING REQUIREMENT (review M-2): the bundled item sets in
+-- lib/standards/items.ts (CCSS ELA/Math + MP1–MP8, NGSS, IB ATL categories)
+-- must be inserted as `standards` rows BEFORE
+-- NEXT_PUBLIC_PLANNER_USE_SUPABASE is enabled. The flag-ON write path maps
+-- codes → uuids against the standards table and the read path DROPS uuids
+-- with no row — un-seeded picker-tagged codes would silently disappear on
+-- the first save/reload.
 --   short_code is the stable conflict key:  on conflict (short_code) where provenance='catalog' do update ...
 -- Note: short_code currently has no unique constraint; add a partial unique
 -- index for catalog rows before relying on upsert:
