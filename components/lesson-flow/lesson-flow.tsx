@@ -108,6 +108,7 @@ import { SectionResources } from "./section-resources";
 // does not re-export it yet — agreed cross-agent contract.
 import { ResourceComposer } from "@/components/daily/ResourceComposer";
 import type { ResourceComposerEditTarget } from "@/components/daily/ResourceComposer";
+import { StandardsPicker } from "@/components/standards";
 import styles from "./lesson-flow.module.css";
 
 // ── Body placeholder text (spec §3.4) ────────────────────────────────────
@@ -258,6 +259,10 @@ interface SortableSectionProps {
   onDraftChange: (value: string) => void;
   onCommitEdit: () => void;
   onCancelEdit: () => void;
+  /** Replacement body for the VIRTUAL Standards row (chips + the standards-
+   *  menu trigger). Ignored on store-backed rows — their body is the rich-
+   *  text editor. */
+  virtualBody?: ReactNode;
 }
 
 const SortableSection = memo(function SortableSection({
@@ -289,6 +294,7 @@ const SortableSection = memo(function SortableSection({
   onCommitEdit,
   onCancelEdit,
   onDraftChange,
+  virtualBody,
 }: SortableSectionProps): ReactNode {
   const { canonical, storeSection } = resolved;
 
@@ -617,10 +623,14 @@ const SortableSection = memo(function SortableSection({
                 style={reducedMotion ? undefined : { overflow: "hidden" }}
               >
                 <div className={styles.sectionLayout}>
-                  {/* LEFT — body textarea (per spec §3.4). */}
+                  {/* LEFT — body textarea (per spec §3.4). The virtual
+                      Standards row swaps in its dedicated body (tag chips +
+                      the standards-menu trigger) instead of the placeholder. */}
                   <div className={styles.leftColumn}>
                     <div className={styles.body}>
-                      {storeSection && editingBody ? (
+                      {!storeSection && virtualBody ? (
+                        virtualBody
+                      ) : storeSection && editingBody ? (
                         <RichEditorWrapper
                           onCommit={onCommitEdit}
                           onCancel={onCancelEdit}
@@ -720,13 +730,16 @@ export function LessonFlow({
   // destructured. They remain on the store contract for the rest of the app.
   const {
     lessons,
+    subjects,
     getSections,
     reorderSections,
+    editLesson,
     editSection,
     addSection: storeAddSection,
     removeSection: storeRemoveSection,
     duplicateSection: storeDuplicateSection,
     toggleSectionWebsite,
+    describeStandard,
   } = usePlanner();
 
   // Authoritative sections from the store.
@@ -735,6 +748,57 @@ export function LessonFlow({
   // Resolve the lesson object (needed for the ResourceComposer + the
   // canonical Standards row's resource list).
   const lesson = lessons.find((l) => l.id === lessonId);
+
+  // ── Standards tagging (the Standards row's REAL body) ───────────────
+  // Codes live on the lesson (lesson.standards); edits flow through
+  // editLesson so the lazy-fork + persistence semantics match every other
+  // content edit. The picker is the app-wide standards menu
+  // (components/standards) — searchable by subject/grade, pinned systems
+  // first.
+  const lessonStandardCodes = useMemo(() => lesson?.standards ?? [], [lesson]);
+  const [standardsPickerOpen, setStandardsPickerOpen] = useState(false);
+  const saveStandards = useCallback(
+    (codes: string[]): void => {
+      // Dedicated coalesce key: a standards save must never merge with an
+      // adjacent title/notes patch in the undo history.
+      editLesson(
+        lessonId,
+        { standards: codes },
+        { key: `lesson:${lessonId}:standards`, ts: Date.now() },
+      );
+    },
+    [editLesson, lessonId],
+  );
+
+  const standardsBody = (
+    <div className={styles.standardsBody}>
+      {lessonStandardCodes.length > 0 ? (
+        <ul className={styles.standardsChips} aria-label="Tagged standards">
+          {lessonStandardCodes.map((code) => (
+            <li key={code}>
+              <Tooltip content={describeStandard(code)} side="top">
+                <span className={styles.standardChip} tabIndex={0}>
+                  {code}
+                </span>
+              </Tooltip>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={styles.standardsEmpty}>
+          No standards tagged yet — tag the codes this lesson covers.
+        </p>
+      )}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => setStandardsPickerOpen(true)}
+        tooltip="Open the standards menu — search frameworks by subject and grade, pin your preferred systems to the top, and tag this lesson"
+      >
+        {lessonStandardCodes.length > 0 ? "Edit standards" : "Tag standards"}
+      </Button>
+    </div>
+  );
 
   // ── Lesson-level resources (Standards row's pool) ───────────────────
   // The Standards canonical position uses lesson.resources (per spec §7).
@@ -1170,6 +1234,16 @@ export function LessonFlow({
                   onDraftChange={setEditDraft}
                   onCommitEdit={commitBodyEdit}
                   onCancelEdit={cancelBodyEdit}
+                  virtualBody={
+                    // ONLY the true virtual Standards row (templateMatch ===
+                    // null). Positions 2–6 can ALSO resolve to a null
+                    // storeSection (removed section / non-matching template)
+                    // — those must keep the plain placeholder body, not a
+                    // second standards editor (review H-1).
+                    r.canonical.templateMatch === null
+                      ? standardsBody
+                      : undefined
+                  }
                 />
               );
             })}
@@ -1197,6 +1271,19 @@ export function LessonFlow({
           )}
         </DragOverlay>
       </DndContext>
+
+      {/* ── The standards menu (Standards row's "Tag standards" action) ──
+          Mounted once at the flow level so the dialog overlays the whole
+          pane; saves write through editLesson (lazy-fork preserved). */}
+      <StandardsPicker
+        open={standardsPickerOpen}
+        onClose={() => setStandardsPickerOpen(false)}
+        value={lessonStandardCodes}
+        onSave={saveStandards}
+        defaultSubject={lesson?.subject ?? null}
+        subjects={subjects}
+        targetLabel="this lesson"
+      />
 
       {/* ── Footer — "+ Add section" + template stub (preserved per §5) */}
       <div className={styles.footer}>

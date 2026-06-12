@@ -1,0 +1,4800 @@
+{
+ "version": 1,
+ "generated": "2026-06-12",
+ "note": "Worldwide K-12 standards/curriculum framework catalog (incl. all 50 US states + DC). Source of truth for the standards menu AND the Supabase standards_frameworks seed. See docs/research-k12-standards-frameworks-2026-06-12.md (report) and docs/standards-catalog-schema-proposal.sql (DDL).",
+ "frameworks": [
+  {
+   "short_code": "FR-PROG",
+   "name": "Programmes d'enseignement + Socle commun de connaissances, de compétences et de culture",
+   "authority": "Ministère de l'Éducation nationale (DGESCO)",
+   "country_code": "FR",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Cycles 1–4 (ages 3–15) + lycée (15–18)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose objectives per cycle per subject; socle commun = 5 domains. No alphanumeric IDs.",
+   "current_version": "Choc des savoirs wave (C1–C2 arrêté 22 Oct 2024; C3 arrêté 10 Apr 2025; C4 français/maths arrêté 18 Feb 2026)",
+   "version_year": 2025,
+   "reform_status": "Rolling implementation through 2028–29; socle commun revision in flight",
+   "licence": "Licence Ouverte / Etalab 2.0 (data.gouv.fr); arrêtés are public legal texts",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "source_links": [
+    {
+     "label": "data.gouv.fr programmes dataset",
+     "url": "https://www.data.gouv.fr/datasets/programmes-denseignement-de-lecole-elementaire-et-du-college-cycles-2-3-et-4"
+    },
+    {
+     "label": "Éduscol socle commun",
+     "url": "https://eduscol.education.gouv.fr/4761/le-socle-commun-de-connaissances-de-competences-et-de-culture"
+    }
+   ],
+   "catalog_notes": "Same programmes used by the 580-school AEFE network worldwide. Verify whether 2025–26 reform texts have reached data.gouv.fr."
+  },
+  {
+   "short_code": "DE-KMK",
+   "name": "KMK Bildungsstandards (+ per-Land Lehrpläne)",
+   "authority": "Kultusministerkonferenz (KMK); 16 Länder ministries for operative Lehrpläne",
+   "country_code": "DE",
+   "region": "europe",
+   "framework_kind": "standards",
+   "grade_range": "Checkpoints: Grade 4, Grades 9/10 (HSA/MSA), Abitur",
+   "subject_scope": [
+    "ela",
+    "math",
+    "languages",
+    "science"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose Kompetenzbereiche/Kompetenzen; no ID system. Länder Lehrpläne also prose (Kompetenzerwartungen).",
+   "current_version": "German+Maths 2022; English/French 2023; Bio/Chem/Physics (MSA) 2024; Abitur 2012/2020",
+   "version_year": 2024,
+   "reform_status": "Teacher-education standards review piloting; results expected 2026",
+   "licence": "No open licence confirmed at KMK or any sampled Land",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "source_links": [
+    {
+     "label": "KMK Bildungsstandards",
+     "url": "https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+    },
+    {
+     "label": "All 16 Länder portals (index)",
+     "url": "https://www.lehrer-online.de/fokusthemen/dossier/do/lehrplaene-der-bundeslaender/"
+    }
+   ],
+   "catalog_notes": "No single national curriculum — 16 Länder Lehrpläne (e.g. NRW Lehrplannavigator, Bavaria LehrplanPLUS, Berlin-Brandenburg RLP 1–10). Highest ingestion friction in Western Europe."
+  },
+  {
+   "short_code": "ES-LOMLOE",
+   "name": "Currículo LOMLOE (enseñanzas mínimas)",
+   "authority": "Ministerio de Educación, FP y Deportes; 17 comunidades autónomas develop regional curricula",
+   "country_code": "ES",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Infantil (0–6), Primaria 1–6, ESO 7–10, Bachillerato 11–12",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "8 coded key competencies (CCL, CP, STEM, CD, CPSAA, CC, CE, CCEC) with coded descriptors (CCL1…); subject objectives via decree article/annex numbering",
+   "current_version": "RD 95/157/217/243 of 2022 (fully implemented 2023–24)",
+   "version_year": 2022,
+   "licence": "BOE open-data reuse conditions (commercial OK with attribution; RD 806/2018)",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "api",
+    "xml",
+    "json",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "RD 157/2022 Primaria (BOE consolidated)",
+     "url": "https://www.boe.es/buscar/act.php?id=BOE-A-2022-3296"
+    },
+    {
+     "label": "BOE open-data API",
+     "url": "https://www.boe.es/datosabiertos/api/api.php"
+    }
+   ],
+   "catalog_notes": "BOE API serves full consolidated decree text (objectives embedded in annexes). Regional (CCAA) decrees need per-community licence checks."
+  },
+  {
+   "short_code": "IT-IN",
+   "name": "Indicazioni nazionali per il curricolo (primo ciclo) + Indicazioni per i licei / Linee guida tecnici-professionali",
+   "authority": "Ministero dell'Istruzione e del Merito (MIM)",
+   "country_code": "IT",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Infanzia (3–6), primaria 1–5, secondaria I grado 6–8, secondaria II grado 9–13",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Traguardi per lo sviluppo delle competenze (end-of-stage) + obiettivi di apprendimento — prose, no codes",
+   "current_version": "Primo ciclo: D.M. 221 of 9 Dec 2025 (in force 11 Feb 2026; rollout 2026/27→2030/31). Licei: new Indicazioni in consultation Apr 2026",
+   "version_year": 2026,
+   "reform_status": "Primo ciclo rollout from 2026/27; licei text not yet adopted",
+   "licence": "Gazzetta Ufficiale legal texts freely reproducible; CAD 'open by default' principle; no explicit licence statement",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "D.M. 221/2025 (Gazzetta Ufficiale)",
+     "url": "https://www.gazzettaufficiale.it/eli/id/2026/01/27/26G00021/SG"
+    }
+   ]
+  },
+  {
+   "short_code": "NL-KD",
+   "name": "Kerndoelen (PO + onderbouw VO) / Eindtermen & examenprogramma's (bovenbouw)",
+   "authority": "SLO (develops) / Ministry OCW (legislates)",
+   "country_code": "NL",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "PO grades 1–8 (ages 4–12); onderbouw VO 7–9; bovenbouw havo/vwo/vmbo",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Consecutively numbered kerndoelen (current set KD 1–58 in 7 areas; new set = 9 areas, doorgenummerd) — numbered prose, not hierarchical codes",
+   "current_version": "2006 set in force; actualisatie: Dutch+Maths expected legally in force 1 Aug 2026, remaining areas Aug 2027",
+   "version_year": 2006,
+   "reform_status": "First full revision since 2006 landing 2026–27",
+   "licence": "CC BY 4.0 (SLO Curriculum Database on data.overheid.nl)",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "api",
+    "json",
+    "pdf",
+    "html"
+   ],
+   "source_links": [
+    {
+     "label": "SLO curriculum REST API",
+     "url": "https://opendata.slo.nl/curriculum/api/v1/"
+    },
+    {
+     "label": "data.overheid.nl dataset (CC-BY 4.0)",
+     "url": "https://data.overheid.nl/en/dataset/slo-curriculumdatabase"
+    }
+   ],
+   "catalog_notes": "Most LMS-friendly in continental Europe: CC-BY + live JSON API (2006 set confirmed; new-set API status unverified)."
+  },
+  {
+   "short_code": "PL-PP",
+   "name": "Podstawa programowa kształcenia ogólnego",
+   "authority": "Ministerstwo Edukacji Narodowej (MEN)",
+   "country_code": "PL",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Preschool 3–6; grades 1–3; 4–8; liceum/technikum/branżowa",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Wymagania szczegółowe numbered Roman-domain + Arabic-item per subject (hybrid numbered prose, addressable within subject)",
+   "current_version": "2017 base; 2024 slimmed version; NEW podstawa for preschool+primary Dz.U. 2026 poz. 378 (signed 11 Mar 2026), effective 1 Sept 2026 grades 1+4, phased to 2032 ('Reforma26 — Kompas Jutra')",
+   "version_year": 2026,
+   "reform_status": "Reforma26 rollout from Sept 2026; new structure ≤8 objective elements per subject",
+   "licence": "Statutory texts public domain (Open Data Act 2021); ZPE platform content CC",
+   "commercial_use": "open",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Reforma26 hub",
+     "url": "https://reforma26.men.gov.pl"
+    },
+    {
+     "label": "ISAP record Dz.U. 2026 poz. 378",
+     "url": "https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20260000378"
+    },
+    {
+     "label": "ZPE structured browse",
+     "url": "https://zpe.gov.pl/podstawa-programowa/szkola-podstawowa/jezyk-polski"
+    }
+   ]
+  },
+  {
+   "short_code": "CH-LP21",
+   "name": "Lehrplan 21",
+   "authority": "D-EDK (Deutschschweizer Erziehungsdirektoren-Konferenz)",
+   "country_code": "CH",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "3 Zyklen, 11 years compulsory (ages ~4–15); 21 German-speaking/bilingual cantons",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Fully coded competences: Subject.Area.Aspect.Level.Sub — e.g. MA.1.A.3.c. One of Europe's most granular systems",
+   "current_version": "2014 (cantonal rollouts 2018–2022)",
+   "version_year": 2014,
+   "licence": "© D-EDK; API (api.lehrplan.ch) access by application/agreement (BKZ)",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "api",
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Lehrplan 21",
+     "url": "https://www.lehrplan21.ch"
+    },
+    {
+     "label": "LP21 API info",
+     "url": "https://www.lehrplan21.ch/api-schnittstelle-zum-lehrplan-21"
+    }
+   ],
+   "catalog_notes": "Per-canton adapted versions (zh.lehrplan.ch etc.). API exists but is access-controlled."
+  },
+  {
+   "short_code": "CH-PER",
+   "name": "Plan d'études romand (PER)",
+   "authority": "CIIP (Conférence intercantonale de l'instruction publique)",
+   "country_code": "CH",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "3 cycles, grades 1–11; French-speaking cantons (incl. bilingual BE/FR/VS)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Domain numbering (e.g. L1 21–22) + attentes fondamentales at cycle ends; less granular than LP21",
+   "current_version": "2010 (implemented by 2015)",
+   "version_year": 2010,
+   "licence": "No explicit licence found",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "PER portal",
+     "url": "https://portail.ciip.ch/per"
+    }
+   ]
+  },
+  {
+   "short_code": "CH-TI",
+   "name": "Piano di studio della scuola dell'obbligo ticinese",
+   "authority": "DECS, Canton Ticino",
+   "country_code": "CH",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "K–9 (infanzia, elementare 1–5, media 6–9)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Competency prose, HarmoS-aligned",
+   "current_version": "2015; 'perfezionato' revision Jan 2024",
+   "version_year": 2024,
+   "licence": "No explicit licence",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Piano di studio",
+     "url": "https://pianodistudio.edu.ti.ch"
+    }
+   ]
+  },
+  {
+   "short_code": "FI-POPS",
+   "name": "Perusopetuksen opetussuunnitelman perusteet 2014 (National Core Curriculum for Basic Education)",
+   "authority": "Opetushallitus (Finnish National Agency for Education, OPH/EDUFI)",
+   "country_code": "FI",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Grades 1–9 (ages 7–16); separate pre-primary + LOPS 2021 upper secondary",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose objectives T1…Tn per subject per grade band + 7 transversal competences (L1–L7) — numbered in-document, not designed as tagging codes",
+   "current_version": "POPS 2014 (phased 2016–2019); 2025 instructional-hour additions",
+   "version_year": 2014,
+   "reform_status": "Next full POPS revision expected post-2026; English-language LOPS from Aug 2026 (upper secondary)",
+   "licence": "State publication; ePerusteet API public (no auth); formal content licence unverified — confirm with OPH",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "api",
+    "json",
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "ePerusteet API (Swagger)",
+     "url": "https://opetushallitus.github.io/eperusteet/api/eperusteet"
+    },
+    {
+     "label": "ePerusteet platform",
+     "url": "https://eperusteet.opintopolku.fi"
+    }
+   ],
+   "catalog_notes": "Open-source platform (github.com/Opetushallitus/eperusteet); practically open, formally unverified."
+  },
+  {
+   "short_code": "SE-LGR22",
+   "name": "Läroplan för grundskolan, förskoleklassen och fritidshemmet (Lgr22)",
+   "authority": "Skolverket",
+   "country_code": "SE",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Preschool class (year 0) + grades 1–9",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Kursplaner: Syfte + Centralt innehåll per band (1–3, 4–6, 7–9) + betygskriterier at grades 3/6/9 — prose",
+   "current_version": "Lgr22 (autumn 2022); revised edition 1 Aug 2025 (kunskapskrav→betygskriterier)",
+   "version_year": 2022,
+   "licence": "CC0 (Syllabus API data) — most permissive in Europe",
+   "commercial_use": "open",
+   "machine_readable": [
+    "api",
+    "json",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Skolverket Syllabus API (CC0)",
+     "url": "https://www.skolverket.se/om-skolverket/webbplatser-och-tjanster/oppna-data/api-for-laroplaner-kurs--och-amnesplaner-syllabus"
+    },
+    {
+     "label": "Open data portal",
+     "url": "https://opendata.skolverket.se"
+    }
+   ]
+  },
+  {
+   "short_code": "NO-LK20",
+   "name": "Læreplanverket for Kunnskapsløftet 2020 (LK20 / Fagfornyelsen)",
+   "authority": "Utdanningsdirektoratet (Udir)",
+   "country_code": "NO",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Grades 1–10 + upper secondary (Vg1–Vg3); aims after years 2/4/7/10/Vg-levels",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Subject codes (NOR01-07, MAT01-05 = subject+seq-version) + per-aim Grep codes in the data layer (e.g. K1663); prose on site",
+   "current_version": "LK20 (2020/2021); rolling subject revisions",
+   "version_year": 2020,
+   "reform_status": "Next structural reform consultation from Spring 2026; LK20 stays in force",
+   "licence": "NLOD 2.0 (Norwegian Licence for Open Government Data) — commercial reuse with attribution",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "api",
+    "sparql",
+    "json",
+    "rdf",
+    "xml",
+    "csv",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Grep REST API",
+     "url": "https://data.udir.no/kl06/v201906/"
+    },
+    {
+     "label": "data.norge.no dataset",
+     "url": "https://data.norge.no/en/datasets/fa902439-06bb-4036-8cb2-f81c7814e45c"
+    }
+   ],
+   "catalog_notes": "Best curriculum API in Europe (REST needs API key: teknisk.grep@udir.no; SPARQL endpoint; daily updates; multilingual incl. English/Sámi)."
+  },
+  {
+   "short_code": "DK-FM",
+   "name": "Fælles Mål",
+   "authority": "Børne- og Undervisningsministeriet (UVM); EMU.dk portal (STIL)",
+   "country_code": "DK",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Folkeskole grades 0–9",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Hierarchy: fagformål → 215 binding kompetencemål → 866 advisory areas → 3,170 advisory goals (prose, no public codes)",
+   "current_version": "BEK 1715/2024; mid-tier goals advisory since 1 Jan 2025",
+   "version_year": 2015,
+   "reform_status": "REPLACEMENT in flight: simplified 'fagplaner' piloting 2025–26, in force 2027–28 — time any ingestion accordingly",
+   "licence": "Public legal text (retsinformation.dk); no explicit open licence",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "BEK 1715/2024",
+     "url": "https://www.retsinformation.dk/eli/lta/2024/1715"
+    },
+    {
+     "label": "UVM Fælles Mål",
+     "url": "https://www.uvm.dk/folkeskolen/fag-timetal-og-overgange/fag-emner-og-tvaergaaende-temaer/faelles-maal"
+    }
+   ]
+  },
+  {
+   "short_code": "AT-LP",
+   "name": "Lehrpläne ('Lehrpläne NEU' 2023)",
+   "authority": "Bundesministerium für Bildung (BMB)",
+   "country_code": "AT",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Volksschule 1–4, Mittelschule/AHS-Unterstufe 5–8, AHS-Oberstufe 9–12/13 (per school type)",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose competency-oriented; digi.komp digital strand",
+   "current_version": "BGBl. II Nr. 1/2023, rolling from Sept 2023",
+   "version_year": 2023,
+   "reform_status": "AHS-Oberstufe reform planned 2027–28",
+   "licence": "Public-sector documents; no explicit open licence",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "xml",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "BMB Lehrpläne",
+     "url": "https://www.bmb.gv.at/Themen/schule/schulpraxis/lp.html"
+    },
+    {
+     "label": "RIS consolidated law",
+     "url": "https://www.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=10008568"
+    }
+   ]
+  },
+  {
+   "short_code": "BE-FL",
+   "name": "Onderwijsdoelen / Minimumdoelen (Flemish Community)",
+   "authority": "Flemish Parliament / Departement Onderwijs en Vorming",
+   "country_code": "BE",
+   "subdivision_code": "BE-VLG",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Pre-primary through secondary",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Structured/numbered minimum goals on onderwijsdoelen.be; school networks write own leerplannen on top",
+   "current_version": "Replacement of court-annulled eindtermen (2022); new primary+pre-primary minimum goals approved 2025, phasing 2025–2026",
+   "version_year": 2025,
+   "reform_status": "Primary mandatory ~Sept 2026 (exact year unverified); secondary rolled from 2023–24",
+   "licence": "No explicit licence",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "onderwijsdoelen.be",
+     "url": "https://onderwijsdoelen.be/"
+    }
+   ]
+  },
+  {
+   "short_code": "BE-FWB",
+   "name": "Référentiels du Tronc Commun (Fédération Wallonie-Bruxelles)",
+   "authority": "FWB Ministry / Pacte pour un Enseignement d'Excellence",
+   "country_code": "BE",
+   "subdivision_code": "BE-WAL",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Tronc commun ages ~2.5–15; 9 référentiels; rollout P1–P2 2022/23 → S3 2028/29",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose competency statements by domain (replaces Socles de compétences)",
+   "current_version": "Référentiels approved 2022, rolling",
+   "version_year": 2022,
+   "reform_status": "CEB 2026 first exam on new référentiels; secondary phasing to 2028/29",
+   "licence": "No explicit licence",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Tronc commun référentiels",
+     "url": "https://ifpc-fwb.be/v5/tc_referentiels.asp"
+    }
+   ]
+  },
+  {
+   "short_code": "PT-AE",
+   "name": "Aprendizagens Essenciais + Perfil dos Alunos (PASEO)",
+   "authority": "Direção-Geral da Educação (DGE)",
+   "country_code": "PT",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Básico ciclos 1–3 (grades 1–9) + secundário (10–12)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "~70+ AE documents (subject × year): knowledge/capacities/attitudes prose structured around PASEO competency areas",
+   "current_version": "PASEO 2017; AE 2018; maths secondary revised 2024/25–2025/26; citizenship AE Sept 2025",
+   "version_year": 2018,
+   "licence": "CC BY-NC-ND 2.5 PT — NON-COMMERCIAL + no-derivatives",
+   "commercial_use": "non_commercial",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "DGE Aprendizagens Essenciais",
+     "url": "https://www.dge.mec.pt/aprendizagens-essenciais"
+    }
+   ],
+   "catalog_notes": "NC clause blocks commercial ingestion without DGE permission."
+  },
+  {
+   "short_code": "GR-NPS",
+   "name": "Νέα Προγράμματα Σπουδών (New Study Programmes)",
+   "authority": "Institute of Educational Policy (IEP) / Ministry of Education",
+   "country_code": "GR",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Dimotiko 1–6, Gymnasio 7–9, Lykeio 10–12",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose expected learning outcomes",
+   "current_version": "Universal from 2023/24 (primary+lower secondary); C' Lykeio completes 2025/26",
+   "version_year": 2023,
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "source_links": [
+    {
+     "label": "IEP new curricula",
+     "url": "https://www.iep.edu.gr/nea-programmata-spoudon/"
+    }
+   ]
+  },
+  {
+   "short_code": "CZ-RVP",
+   "name": "Rámcové vzdělávací programy (RVP PV/ZV/G/SOV)",
+   "authority": "MŠMT + NPI ČR",
+   "country_code": "CZ",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Preschool; basic grades 1–9; gymnázium; vocational",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "8 key competencies + očekávané výstupy (expected outcomes) at grades 3/5/9 — prose, portal-indexed",
+   "current_version": "Revised RVP ZV + PV approved 30 Dec 2024 (largest reform in 20 years)",
+   "version_year": 2024,
+   "reform_status": "PV mandatory Sept 2026; ZV mandatory grades 1+6 Sept 2027, all grades by 2031",
+   "licence": "Unverified (NPI ČR ©)",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "prohlednout.rvp.cz (browse + open datasets)",
+     "url": "https://prohlednout.rvp.cz/"
+    }
+   ]
+  },
+  {
+   "short_code": "SK-SVP",
+   "name": "Štátny vzdelávací program (ŠVP)",
+   "authority": "MŠVVaŠ SR + NIVAM",
+   "country_code": "SK",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–4, lower secondary 5–9, upper secondary",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose; schools write own ŠkVP on top",
+   "current_version": "New ŠVP for basic education 2023; piloted 2023–25",
+   "version_year": 2023,
+   "reform_status": "Mandatory from 2026/27 (grade 1)",
+   "licence": "CC BY 4.0 (stated on statpedu.sk)",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "ŠVP 2023",
+     "url": "https://www.minedu.sk/statny-vzdelavaci-program-pre-zakladne-vzdelavanie-2023/"
+    }
+   ]
+  },
+  {
+   "short_code": "HU-NAT",
+   "name": "Nemzeti alaptanterv (NAT 2020) + kerettantervek",
+   "authority": "Government of Hungary (decree 5/2020); Oktatási Hivatal",
+   "country_code": "HU",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Grades 1–12 (4+4+4)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose; NAT (strategic) → kerettantervek (subject) → helyi tanterv (school)",
+   "current_version": "NAT 2020 (phase-in from Sept 2020)",
+   "version_year": 2020,
+   "reform_status": "NAT evaluation/consultations open to early 2026; no revision announced",
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "source_links": [
+    {
+     "label": "Oktatási Hivatal",
+     "url": "https://www.oktatas.hu"
+    }
+   ]
+  },
+  {
+   "short_code": "RO-CN",
+   "name": "Curriculum național (planuri-cadru + programe școlare)",
+   "authority": "Ministerul Educației (+ ROCNEE); RECRED reform project 2024–2028",
+   "country_code": "RO",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primar 1–4, gimnaziu 5–8, liceu 9–12",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Competențe specifice numbered per subject per year (e.g. 1.1, 2.3) + conținuturi",
+   "current_version": "Primary/lower-secondary from 2012/13; liceu overhaul via MO 4350/2025 + MO 6930/2025 (330 new programmes)",
+   "version_year": 2025,
+   "reform_status": "New liceu plans from grade 9 in 2026/27 — first upper-secondary overhaul in ~20 years",
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "edu.ro consultations",
+     "url": "https://www.edu.ro/cons_pub_programe_scolare_liceu"
+    }
+   ]
+  },
+  {
+   "short_code": "BG-DOS",
+   "name": "Държавни образователни стандарти + учебни програми",
+   "authority": "Ministry of Education and Science (МОН)",
+   "country_code": "BG",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Grades 1–12",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose expected results per subject/grade",
+   "current_version": "2015–16 DOS under 2016 Act; curriculum-reform concept + 16 subject concepts in consultation 2025",
+   "version_year": 2016,
+   "reform_status": "Action Plan 2025–2027; integrated-task exams gr.7/10 from 2026; BG hours +12%, maths +25%",
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Digital Backpack",
+     "url": "https://edu.mon.bg/"
+    }
+   ]
+  },
+  {
+   "short_code": "HR-NK",
+   "name": "Nacionalni kurikulum + predmetni kurikulumi ('Škola za život')",
+   "authority": "Ministry of Science, Education and Youth (MZOM); AZOO",
+   "country_code": "HR",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Basic grades 1–8 (3 cycles) + secondary 9–12/13",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Odgojno-obrazovni ishodi (outcomes) prose by grade",
+   "current_version": "2019 reform, mandatory 2020/21",
+   "version_year": 2019,
+   "reform_status": "147 new vocational curricula 2024–25; AI curriculum grades 5–6 from 2025/26",
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Predmetni kurikulumi",
+     "url": "https://mzom.gov.hr/istaknute-teme/odgoj-i-obrazovanje/nacionalni-kurikulum/predmetni-kurikulumi/539"
+    }
+   ]
+  },
+  {
+   "short_code": "SI-UN",
+   "name": "Učni načrti (Kurikularna prenova 2022–2026)",
+   "authority": "Ministry of Education (MVI) + ZRSŠ",
+   "country_code": "SI",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Osnovna šola 1–9 + gimnazija/vocational",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose cilji + outcomes; 5 cross-cutting areas added 2025",
+   "current_version": "Updated učni načrti adopted May–Nov 2025 (41 basic + 88 + 52 + 19 subject curricula); in force 2025/26",
+   "version_year": 2025,
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "DUN digital curricula",
+     "url": "https://dun.zrss.augmentech.si/"
+    }
+   ]
+  },
+  {
+   "short_code": "RS-PNU",
+   "name": "Planovi i programi nastave i učenja",
+   "authority": "Ministry of Education; ZUOV (development); ZVKOV (standards)",
+   "country_code": "RS",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Basic 1–8 (two cycles) + secondary",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose ishodi (outcomes) tabled by grade; Dec 2024 bylaws define 3-level achievement standards",
+   "current_version": "Outcomes-based rollout since 2018/19; standards bylaws Dec 2024",
+   "version_year": 2024,
+   "licence": "Official Gazette texts; open in practice",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "ZUOV",
+     "url": "https://zuov.gov.rs/zakoni-i-pravilnici/"
+    }
+   ]
+  },
+  {
+   "short_code": "BA-NPP",
+   "name": "Nastavni planovi i programi (12 authorities)",
+   "authority": "RS entity ministry + 10 FBiH cantonal ministries + Brčko District; APOSO coordinates state-level",
+   "country_code": "BA",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "9-year basic + 4-year secondary",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose; varies per authority; APOSO Common Core Curriculum incomplete",
+   "current_version": "Fragmented; no unified version",
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "APOSO",
+     "url": "https://aposo.gov.ba"
+    }
+   ],
+   "catalog_notes": "Most fragmented system in Europe — 12 curriculum authorities."
+  },
+  {
+   "short_code": "MK-NP",
+   "name": "Наставни програми (Bureau for Development of Education)",
+   "authority": "Ministry of Education and Science; BDE (bro.gov.mk)",
+   "country_code": "MK",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "9-year primary (3 periods) + secondary",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose; published in 5 languages",
+   "current_version": "New Concept rollout: grade 7 curricula 2025/26, grade 8 2026/27; subjects re-separated 2024",
+   "version_year": 2025,
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "BDE curricula",
+     "url": "https://bro.gov.mk/наставни-програми/"
+    }
+   ]
+  },
+  {
+   "short_code": "AL-KK",
+   "name": "Korniza Kurrikulare e Arsimit Parauniversitar + Kurrikula Bërthamë",
+   "authority": "Ministry of Education; IZHA/ASCAP",
+   "country_code": "AL",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Preparatory + 1–5, 6–9, 10–12",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "6–7 key competencies + subject competencies, prose",
+   "current_version": "Framework 2014; subject revisions 2024–25 under Strategy 2021–2026",
+   "version_year": 2014,
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Korniza Kurrikulare 2014",
+     "url": "https://ascap.edu.al/wp-content/uploads/2020/02/Korniza-Kurrikulare-31.07.2014.pdf"
+    }
+   ]
+  },
+  {
+   "short_code": "EE-ROK",
+   "name": "Põhikooli + Gümnaasiumi riiklik õppekava",
+   "authority": "Ministry of Education and Research; HARNO (oppekava.ee)",
+   "country_code": "EE",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Basic 1–9 (bands 1–3/4–6/7–9) + upper secondary 10–12",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose outcomes by subject + school stage; 8 general competencies",
+   "current_version": "Updated March 2023; school alignment by Sept 2024",
+   "version_year": 2023,
+   "reform_status": "Estonian-medium transition through 2030; Strategy 2035 umbrella",
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Riigi Teataja (basic school)",
+     "url": "https://www.riigiteataja.ee/akt/110082024002"
+    },
+    {
+     "label": "oppekava.ee",
+     "url": "https://oppekava.ee/pohikool-2023/"
+    }
+   ]
+  },
+  {
+   "short_code": "LV-S2030",
+   "name": "Skola2030 competency-based curriculum (state standards)",
+   "authority": "IZM + VISC",
+   "country_code": "LV",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Pre-school through grade 12; 7 learning areas",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Sasniedzamie rezultāti (achievable results) per area/band, prose",
+   "current_version": "Rolled out 2019/20–2023/24; implementation complete (EU Monitor 2025)",
+   "version_year": 2020,
+   "reform_status": "Latvian-only instruction completes 2025/26; digitalization project to 2029",
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "IZM curriculum description",
+     "url": "https://www.izm.gov.lv/en/article/description-educational-curriculum-and-learning-approach"
+    },
+    {
+     "label": "mape.gov.lv planning environment",
+     "url": "https://mape.gov.lv"
+    }
+   ]
+  },
+  {
+   "short_code": "LT-BP",
+   "name": "Bendrosios programos (General Programmes)",
+   "authority": "ŠMSM + NŠA (emokykla.lt)",
+   "country_code": "LT",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Pre-primary; primary 1–4; basic 5–10; secondary 11–12",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Pasiekimai (achievements) by subject/band; some coded outcome references",
+   "current_version": "Order V-1269 of 24 Aug 2022 (~44–50 programmes); all grades by 2024–25",
+   "version_year": 2022,
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "emokykla.lt programmes",
+     "url": "https://emokykla.lt/bendrosios-programos/visos-bendrosios-programos"
+    }
+   ]
+  },
+  {
+   "short_code": "IS-ADN",
+   "name": "Aðalnámskrá grunnskóla (National Curriculum Guide)",
+   "authority": "Ministry of Education and Children's Affairs",
+   "country_code": "IS",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Grades 1–10; competence checkpoints at grades 4/7/10",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose competence criteria with A–D descriptors",
+   "current_version": "2011 general + 2013 subjects; 2023 amendment; rolling subject updates (2024 chapters)",
+   "version_year": 2013,
+   "licence": "© footer; no open licence",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "adalnamskra.is",
+     "url": "https://www.adalnamskra.is/en"
+    }
+   ]
+  },
+  {
+   "short_code": "LU-PE",
+   "name": "Plan d'études (enseignement fondamental)",
+   "authority": "MENJE + SCRIPT",
+   "country_code": "LU",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Fondamental cycles 1–4 (ages 4–12); trilingual LB/FR/DE",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Competency-based by cycle; 5 key competencies in new plan",
+   "current_version": "New plan unveiled 6 Feb 2026; cycles 1–2 from Sept 2026, cycles 3–4 Sept 2027 (replaces 2011 plan)",
+   "version_year": 2026,
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "plan d'études",
+     "url": "https://curriculum.lu/fr/enseignement-fondamental/plandetudes"
+    }
+   ],
+   "catalog_notes": "plandetudes.lu public platform launches Sept 2026 (4 languages)."
+  },
+  {
+   "short_code": "MT-NCF",
+   "name": "National Curriculum Framework (2012) + Learning Outcomes Framework (LOF)",
+   "authority": "Ministry for Education (curriculum.gov.mt)",
+   "country_code": "MT",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "KG + Years 1–11; 8 learning areas",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Learning outcomes per area/year (LOF); prose",
+   "current_version": "NCF 2012; LOF rollout completed Year 11 in 2025/26; NCF review board since 2022",
+   "version_year": 2012,
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "curriculum.gov.mt syllabi + LOF",
+     "url": "https://curriculum.gov.mt/resources/syllabi-and-learning-outcomes/"
+    }
+   ]
+  },
+  {
+   "short_code": "CY-AP",
+   "name": "Αναλυτικά Προγράμματα (Analytical Programmes)",
+   "authority": "Ministry of Education, Sport and Youth (MOEC)",
+   "country_code": "CY",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–6, Gymnasio 7–9, Lykeio 10–12",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose + δείκτες επιτυχίας/επάρκειας (success/sufficiency indicators — semi-structured)",
+   "current_version": "2010/11 base; Phase 1 update completed 2024; Phase 2 targeted Sept 2025 (completion unverified)",
+   "version_year": 2024,
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MOEC analytika programmata",
+     "url": "https://www.moec.gov.cy/analytika_programmata/"
+    }
+   ]
+  },
+  {
+   "short_code": "UA-NUS",
+   "name": "Державний стандарт загальної середньої освіти (NUS — New Ukrainian School)",
+   "authority": "Cabinet of Ministers / Ministry of Education and Science (МОН)",
+   "country_code": "UA",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–4 (2018 std); basic 5–9 (2020); profile 10–12 (2024, nationwide 2027)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Competency-based; mandatory outcomes per educational area; 9 key competencies — prose",
+   "current_version": "Profile-secondary standard Resolution No. 851 (25 Jul 2024); 'Education for Life' frameworks Sept 2025",
+   "version_year": 2024,
+   "reform_status": "Academic-lyceum pilots 2025–26; national rollout 2027–28; reform continuing despite war",
+   "licence": "Cabinet resolutions on zakon.rada.gov.ua; no open licence",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MON NUS",
+     "url": "https://mon.gov.ua/en/nova-ukrainska-shkola"
+    },
+    {
+     "label": "Resolution 851/2024",
+     "url": "https://zakon.rada.gov.ua/laws/show/851-2024-п"
+    }
+   ]
+  },
+  {
+   "short_code": "MD-CN",
+   "name": "Curriculum Național (+ Cadrul de Referință 2025)",
+   "authority": "Ministerul Educației și Cercetării; ANCE",
+   "country_code": "MD",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–4, gymnasium 5–9, liceu 10–12",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Unități de competență (competency units) — tiered prose",
+   "current_version": "Current curriculum + Cadrul de Referință al Curriculumului Național 2025 adopted",
+   "version_year": 2025,
+   "reform_status": "Full redesign: pilots 2026/27, nationwide 2027/28 (OECD/UNICEF-supported, EU-accession aligned)",
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MEC Moldova",
+     "url": "https://mecc.gov.md/ro/content/invatamint-general"
+    }
+   ]
+  },
+  {
+   "short_code": "TR-TYMM",
+   "name": "Öğretim Programları — Türkiye Yüzyılı Maarif Modeli (TYMM)",
+   "authority": "Millî Eğitim Bakanlığı (MEB) / Talim ve Terbiye Kurulu",
+   "country_code": "TR",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "İlkokul 1–4, Ortaokul 5–8, Lise 9–12",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Kazanımlar (outcomes) numbered within units/themes; no global cross-subject codes confirmed",
+   "current_version": "TYMM approved 27 May 2024; phased from Sept 2024 (grades 1/5/9), rollout through ~2027",
+   "version_year": 2024,
+   "licence": "Government publication; free PDFs; no open licence",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "mufredat.meb.gov.tr",
+     "url": "https://mufredat.meb.gov.tr/"
+    },
+    {
+     "label": "TYMM portal",
+     "url": "https://tymm.meb.gov.tr/ogretim-programlari"
+    }
+   ],
+   "catalog_notes": "Europe-adjacent; 35% content reduction; values framework."
+  },
+  {
+   "short_code": "RU-FGOS",
+   "name": "ФГОС (Federal State Educational Standards) + ФОП (Federal Basic Educational Programmes)",
+   "authority": "Ministry of Enlightenment of the Russian Federation",
+   "country_code": "RU",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–4, basic 5–9, secondary 10–11",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose planned results per subject; ФОП adds detailed content + hour allocations (centralized 2023)",
+   "current_version": "3rd-gen FGOS (Orders 286/287 of 2021, in force 2022–23); ФОП mandatory Sept 2023; updated secondary FGOS in force Sept 2027",
+   "version_year": 2023,
+   "licence": "Official orders; no open licence",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "docs.edu.gov.ru",
+     "url": "https://docs.edu.gov.ru"
+    },
+    {
+     "label": "edsoo.ru (ФОП portal)",
+     "url": "https://edsoo.ru"
+    }
+   ],
+   "catalog_notes": "Europe-adjacent."
+  },
+  {
+   "short_code": "XK-KCF",
+   "name": "Korniza Kurrikulare e Kosovës (Kosovo Curriculum Framework)",
+   "authority": "MESTI",
+   "country_code": "XK",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Preparatory + grades 1–12; 7 curriculum areas",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Essential Learning Outcomes (ELOs) by key stage; 6 key competencies — prose",
+   "current_version": "KCF 2016 (rollout 2017–18); ECE curriculum piloted 2024",
+   "version_year": 2016,
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MESTI",
+     "url": "https://masht.rks-gov.net"
+    }
+   ]
+  },
+  {
+   "short_code": "ME-NPP",
+   "name": "Nastavni planovi i programi (Montenegro)",
+   "authority": "Zavod za školstvo + Ministry of Education, Science and Innovation",
+   "country_code": "ME",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–9 + secondary 4yr",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose subject programmes; EU Key Competences alignment",
+   "current_version": "Education Reform Strategy 2025–2035 adopted; semester system from 2024",
+   "version_year": 2025,
+   "licence": "Unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Zavod za školstvo",
+     "url": "https://zavodzaskolstvo.gov.me"
+    }
+   ]
+  },
+  {
+   "short_code": "QA-NCS",
+   "name": "Qatar National Curriculum Standards (QNCF)",
+   "authority": "Ministry of Education and Higher Education (MOEHE)",
+   "country_code": "QA",
+   "region": "mena",
+   "framework_kind": "national_curriculum",
+   "grade_range": "KG1–KG2, Primary 1–6, Preparatory 7–9, Secondary 10–12",
+   "subject_scope": [
+    "ela",
+    "math",
+    "science",
+    "social_studies",
+    "languages",
+    "religious_values",
+    "pe_health"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Standards-table format (English standards CEFR-aligned, exit B2 at grade 12); coding structure unverified",
+   "current_version": "National Education Strategy 2024–2030 ('Igniting the Spark of Learning'); English standards doc 2018",
+   "version_year": 2024,
+   "licence": "Qatar government ©; no open licence — MOEHE permission needed",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MOEHE Curriculum Section",
+     "url": "https://www.edu.gov.qa/en/Content/CurriculumSection"
+    },
+    {
+     "label": "English standards KG–12 (ABEGS-hosted)",
+     "url": "https://cdn-files.abegs.org/abegs-marsad-prod/uploads/e6ad4393-a0fa-4b0c-8bfb-f7f530c76a4b.pdf"
+    }
+   ],
+   "catalog_notes": "FIRST-DEPLOYMENT MARKET. All private/international schools + KGs must teach: Arabic (all students), Islamic education (Muslim students), Qatar history (all students) — MOEHE-approved assessments required; teacher competency assessed from 2025–26. Documents primarily Arabic."
+  },
+  {
+   "short_code": "AE-MOE",
+   "name": "UAE National Curriculum (mandatory-subjects overlay for private schools)",
+   "authority": "UAE Ministry of Education; regulators KHDA (Dubai), ADEK (Abu Dhabi), SPEA (Sharjah)",
+   "country_code": "AE",
+   "region": "mena",
+   "framework_kind": "national_curriculum",
+   "grade_range": "KG + Cycles 1 (1–4), 2 (5–9), 3 (10–12)",
+   "subject_scope": [
+    "ela",
+    "math",
+    "science",
+    "social_studies",
+    "religious_values",
+    "languages"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Standards tables; no confirmed code system",
+   "current_version": "2025–26: increased Islamic education/Arabic/Social Studies allocations in private schools",
+   "version_year": 2025,
+   "licence": "UAE government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "KHDA curriculum requirements (private schools)",
+     "url": "https://www.khda.gov.ae/CMS/WebParts/TextEditor/Documents/Curriculum_Requirements_for_Private_Schools_in_Dubai_Eng.pdf"
+    }
+   ],
+   "catalog_notes": "All private schools regardless of curriculum must teach Arabic (all), Islamic education (Muslim students), Social/UAE Studies + Moral Education (all)."
+  },
+  {
+   "short_code": "SA-MOE",
+   "name": "Saudi National Curriculum",
+   "authority": "Ministry of Education (Saudi Arabia)",
+   "country_code": "SA",
+   "region": "mena",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–6, Intermediate 7–9, Secondary 10–12",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose goals",
+   "current_version": "Vision 2030 reform wave (21st-century skills, computational thinking)",
+   "version_year": 2024,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MoE KSA courses",
+     "url": "https://moe.gov.sa/en/knowledgecenter/eservices/Pages/courses.aspx"
+    }
+   ]
+  },
+  {
+   "short_code": "KW-MOE",
+   "name": "National Curriculum of Kuwait",
+   "authority": "Ministry of Education (Kuwait)",
+   "country_code": "KW",
+   "region": "mena",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–5, Intermediate 6–8, Secondary 9–12",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "current_version": "Competency-based reform ongoing",
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MOE Kuwait",
+     "url": "https://www.moe.edu.kw/"
+    }
+   ],
+   "catalog_notes": "Private schools must teach Arabic, Islamic studies, Kuwait social studies."
+  },
+  {
+   "short_code": "BH-MOE",
+   "name": "National Curriculum of Bahrain",
+   "authority": "Ministry of Education (Bahrain)",
+   "country_code": "BH",
+   "region": "mena",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Basic 1–9 (3 cycles) + Secondary 10–12 (credit-hour system)",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MoE Bahrain basic education",
+     "url": "https://moe.gov.bh/en/basic-education"
+    }
+   ]
+  },
+  {
+   "short_code": "OM-MOE",
+   "name": "Oman National Curriculum",
+   "authority": "Ministry of Education (Oman)",
+   "country_code": "OM",
+   "region": "mena",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Basic 1–10 + Post-Basic 11–12",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "current_version": "2024 restructuring of grades 1–4; Cambridge maths/science integration; Vision 2040",
+   "version_year": 2024,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MoE Oman",
+     "url": "https://main.moe.gov.om/en/topics/0/show/2279"
+    }
+   ]
+  },
+  {
+   "short_code": "JO-NCF",
+   "name": "Jordan National Curriculum Framework",
+   "authority": "Ministry of Education (Jordan)",
+   "country_code": "JO",
+   "region": "mena",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Basic 1–10 + Secondary 11–12",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "2024 English K–12 standards framework uses performance indicators (CEFR-aligned)",
+   "current_version": "ESP 2026–2030 (UNESCO-supported)",
+   "version_year": 2024,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MoE Jordan",
+     "url": "https://moe.gov.jo/en/Education-System-in-Jordan"
+    }
+   ]
+  },
+  {
+   "short_code": "EG-E2",
+   "name": "Egypt Education 2.0 curriculum (+ Egyptian Knowledge Bank)",
+   "authority": "Ministry of Education and Technical Education (MoETE)",
+   "country_code": "EG",
+   "region": "mena",
+   "framework_kind": "national_curriculum",
+   "grade_range": "KG1–2, Primary 1–6, Preparatory 7–9, Secondary 10–12",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Competency/skills prose; rolled out grade-by-grade since 2018",
+   "current_version": "Education 2.0 (2018–)",
+   "version_year": 2018,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Egyptian Knowledge Bank",
+     "url": "https://ekb.eg"
+    }
+   ]
+  },
+  {
+   "short_code": "IL-MOE",
+   "name": "Israel National Curriculum",
+   "authority": "Ministry of Education (Israel)",
+   "country_code": "IL",
+   "region": "mena",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–6, Middle 7–9, High 10–12 (Bagrut at 3–5 units)",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "current_version": "2024 humanities emphasis",
+   "version_year": 2024,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Ministry of Education",
+     "url": "https://www.gov.il/en/departments/ministry_of_education"
+    }
+   ]
+  },
+  {
+   "short_code": "LB-CRDP",
+   "name": "Lebanese National Curriculum (CERD/CRDP)",
+   "authority": "Centre for Educational Research and Development (CRDP) under MEHE",
+   "country_code": "LB",
+   "region": "mena",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Elementary 1–6, Intermediate 7–9, Secondary 10–12 (tracks)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "current_version": "2000 curriculum; 2022 reform framework adopted (implementation disrupted by crises)",
+   "version_year": 2000,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "CRDP",
+     "url": "https://www.crdp.org/"
+    }
+   ]
+  },
+  {
+   "short_code": "SG-MOE",
+   "name": "Singapore MOE Syllabuses (+ SEAB exam syllabuses)",
+   "authority": "Ministry of Education (Singapore); SEAB co-badged with Cambridge",
+   "country_code": "SG",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary P1–P6; Secondary S1–S5 (Full Subject-Based Banding, Posting Groups 1–3, from 2024); JC/Pre-U",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "4-digit SEAB syllabus codes (1184 English, 4052 Maths) identify subject-level combos, NOT individual standards; outcomes prose by topic/strand",
+   "current_version": "Full SBB from 2024 S1 cohort",
+   "version_year": 2024,
+   "licence": "© MOE & Cambridge University Press & Assessment",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MOE primary syllabuses",
+     "url": "https://www.moe.gov.sg/primary/curriculum/syllabus"
+    },
+    {
+     "label": "SEAB",
+     "url": "https://www.seab.gov.sg/"
+    }
+   ]
+  },
+  {
+   "short_code": "IN-NCF",
+   "name": "NCF-SE 2023 (National Curriculum Framework for School Education) / NCERT",
+   "authority": "NCERT under Ministry of Education (NEP 2020); boards: CBSE, CISCE, 30+ state boards",
+   "country_code": "IN",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "5+3+3+4: Foundational (3–8), Preparatory 3–5, Middle 6–8, Secondary 9–12",
+   "subject_scope": [
+    "all_subjects",
+    "vocational"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose learning outcomes; CBSE Competency-Based Education framework separate",
+   "current_version": "NCF-SE Aug 2023; NCERT textbooks transitioning through 2026–27; CISCE NEP reforms from 2025–26",
+   "version_year": 2023,
+   "licence": "Government of India publication; no open licence confirmed",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "NCF portal",
+     "url": "https://www.ncf.ncert.gov.in/"
+    },
+    {
+     "label": "CBSE CBE framework",
+     "url": "https://cbseacademic.nic.in/cbe/learning-framework.html"
+    }
+   ],
+   "catalog_notes": "Board landscape: CBSE (~25k+ schools, NCERT-aligned), CISCE (ICSE/ISC), state boards, IB/Cambridge internationals."
+  },
+  {
+   "short_code": "CN-CES",
+   "name": "Compulsory Education Curriculum Program and Standards (2022 edition)",
+   "authority": "Ministry of Education of the PRC",
+   "country_code": "CN",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Grades 1–9 (senior secondary separate, 2017 rev.)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "学业质量标准 (academic quality standards) per grade band by core concept/domain — no compact codes",
+   "current_version": "2022 (16 subject standards revised)",
+   "version_year": 2022,
+   "licence": "PRC government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MOE PRC announcement",
+     "url": "http://en.moe.gov.cn/news/press_releases/202205/t20220507_625532.html"
+    }
+   ]
+  },
+  {
+   "short_code": "JP-COS",
+   "name": "学習指導要領 Courses of Study (MEXT)",
+   "authority": "MEXT (Japan)",
+   "country_code": "JP",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Elementary 1–6 (2017 rev., impl. 2020), Lower Sec 7–9 (2021), Upper Sec 10–12 (2022–24)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Outline-numbered content items ((1)(ア)) — not searchable IDs",
+   "current_version": "2017/2018 revision; next revision deliberating (~2029–30 expected)",
+   "version_year": 2017,
+   "licence": "Government of Japan ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MEXT Courses of Study",
+     "url": "https://www.mext.go.jp/en/policy/education/elsec/title02/detail02/1373859.htm"
+    }
+   ]
+  },
+  {
+   "short_code": "KR-2022",
+   "name": "2022 개정 교육과정 (2022 Revised National Curriculum)",
+   "authority": "Ministry of Education (Korea) + KICE; NCIC portal",
+   "country_code": "KR",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Rollout 2024–2027 (full by Mar 2027); elementary/middle/high",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "성취기준 achievement standards coded e.g. [4국01-01] = grade band + subject + domain + sequence (granular, BNCC-like)",
+   "current_version": "2022 revision; AI digital textbooks from 2025",
+   "version_year": 2022,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "NCIC (National Curriculum Information Centre)",
+     "url": "https://ncic.re.kr"
+    }
+   ]
+  },
+  {
+   "short_code": "HK-EDB",
+   "name": "Hong Kong Curriculum Guides (8 Key Learning Areas)",
+   "authority": "Education Bureau (EDB) / Curriculum Development Council",
+   "country_code": "HK",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "P1–P6, S1–S3, S4–S6",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "current_version": "PECG 2024; Primary Science + Primary Humanities mandatory from 2025/26 (all levels by 2027/28)",
+   "version_year": 2024,
+   "licence": "© HKSAR Government",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "EDB KLAs",
+     "url": "https://www.edb.gov.hk/en/curriculum-development/kla/overview.html"
+    }
+   ]
+  },
+  {
+   "short_code": "TW-108",
+   "name": "108 Curriculum (12-Year Basic Education Guidelines)",
+   "authority": "Ministry of Education (Taiwan) / NAER",
+   "country_code": "TW",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Grades 1–12 (3 stages); implemented 2019, full 2021",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Competency indicators coded by learning stage within subject guidelines (structure unverified)",
+   "version_year": 2019,
+   "licence": "NAER/MoE ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "NAER curriculum",
+     "url": "https://www.naer.edu.tw/eng/PageSyllabus?fid=148"
+    }
+   ]
+  },
+  {
+   "short_code": "PH-MATATAG",
+   "name": "MATATAG Curriculum (Revised K to 10)",
+   "authority": "Department of Education (DepEd, Philippines)",
+   "country_code": "PH",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "K–10 (rollout: K/1/4/7 2024–25 → grade 10 2027–28); SHS 11–12 separate",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Predecessor K-12 used coded MELCs; MATATAG coding scheme unverified",
+   "current_version": "DepEd Order 010 s. 2024; competencies reduced >70%",
+   "version_year": 2024,
+   "licence": "DepEd ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "DepEd MATATAG",
+     "url": "https://www.deped.gov.ph/revised-k-to-10-curriculum/"
+    }
+   ]
+  },
+  {
+   "short_code": "ID-KM",
+   "name": "Kurikulum Merdeka",
+   "authority": "Kemendikbudristek (Indonesia); Permendikbudristek No. 12/2024",
+   "country_code": "ID",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "PAUD, SD 1–6, SMP 7–9, SMA/SMK 10–12; full compliance 2026/27 (remote 2027/28)",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Capaian Pembelajaran (learning achievements) by subject + PHASE (not year); Profil Pelajar Pancasila 6 dimensions",
+   "current_version": "National curriculum since 26 Mar 2024",
+   "version_year": 2024,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Kurikulum portal",
+     "url": "https://kurikulum.kemendikdasmen.go.id/"
+    }
+   ]
+  },
+  {
+   "short_code": "MY-KSSM",
+   "name": "KSSR + KSSM (Primary/Secondary School Standard Curriculum)",
+   "authority": "Kementerian Pendidikan Malaysia (BPK)",
+   "country_code": "MY",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–6 (KSSR rev. 2017); Forms 1–5 (KSSM 2017)",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Standard Pembelajaran in decimal outline (1.1.1) — structured but not compact codes",
+   "version_year": 2017,
+   "licence": "KPM ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "BPK",
+     "url": "https://bpk.moe.gov.my/"
+    }
+   ]
+  },
+  {
+   "short_code": "TH-BEC",
+   "name": "Basic Education Core Curriculum B.E. 2551 (2008)",
+   "authority": "OBEC, Ministry of Education (Thailand)",
+   "country_code": "TH",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Grades 1–12; 8 learning areas",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "ตัวชี้วัด indicators numbered per subject/strand/grade (decimal outline)",
+   "current_version": "2008 (major overhaul requested June 2024; status unverified)",
+   "version_year": 2008,
+   "reform_status": "Competency-based replacement drafted 2022, not adopted; overhaul in motion",
+   "licence": "Thai government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "OBEC English translation",
+     "url": "https://academic.obec.go.th/images/document/1559878841_d_1.pdf"
+    }
+   ]
+  },
+  {
+   "short_code": "VN-GDPT",
+   "name": "Chương trình Giáo dục phổ thông 2018",
+   "authority": "MOET (Vietnam), Circular 32/2018 (am. 13/2022)",
+   "country_code": "VN",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Grades 1–9 basic + 10–12 orientation; all grades implemented by 2024–25",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Yêu cầu cần đạt (required achievements) numbered in documents",
+   "version_year": 2018,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Overview (Lawnet)",
+     "url": "https://lawnet.vn/giao-duc/en/vietnam-what-is-the-general-education-program-2018-5973.html"
+    }
+   ]
+  },
+  {
+   "short_code": "PK-NCP",
+   "name": "National Curriculum of Pakistan (Single National Curriculum)",
+   "authority": "Ministry of Federal Education / National Curriculum Council",
+   "country_code": "PK",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Phases: 1–5 (2021–22), 6–8 (2022–23), 9–12 (2023–24)",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Student Learning Outcomes (SLOs) numbered per subject/grade",
+   "version_year": 2023,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "National Curriculum Council",
+     "url": "https://ncpak.edu.pk/"
+    }
+   ],
+   "catalog_notes": "Sindh rejected the SNC (18th Amendment devolution); other provinces adopted."
+  },
+  {
+   "short_code": "ZA-CAPS",
+   "name": "Curriculum and Assessment Policy Statement (CAPS)",
+   "authority": "Department of Basic Education (South Africa)",
+   "country_code": "ZA",
+   "region": "africa",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Grades R–12: Foundation R–3, Intermediate 4–6, Senior 7–9, FET 10–12",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Topics per term per grade with weighting tables — prose, no codes; ~70+ subject documents",
+   "current_version": "2012–14 rollout; ongoing per-subject amendments (CAT/IT 2024; SASL added)",
+   "version_year": 2012,
+   "licence": "© DBE; educational reproduction permitted; commercial unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "DBE CAPS",
+     "url": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements(CAPS).aspx"
+    }
+   ]
+  },
+  {
+   "short_code": "KE-CBC",
+   "name": "Competency-Based Curriculum / Education (CBC/CBE)",
+   "authority": "Kenya Institute of Curriculum Development (KICD)",
+   "country_code": "KE",
+   "region": "africa",
+   "framework_kind": "national_curriculum",
+   "grade_range": "PP1–PP2, 1–6, Junior Sec 7–9, Senior Sec 10–12 (pioneer cohort grade 10 Jan 2026)",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Strand/sub-strand outcomes, prose",
+   "current_version": "From 2018; 2024 rationalization (PWPER); first KJSEA exam Oct 2025",
+   "version_year": 2024,
+   "licence": "KICD ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "KICD",
+     "url": "https://kicd.ac.ke/"
+    }
+   ]
+  },
+  {
+   "short_code": "NG-NERDC",
+   "name": "NERDC Basic + Senior Secondary Curriculum",
+   "authority": "Nigerian Educational Research and Development Council",
+   "country_code": "NG",
+   "region": "africa",
+   "framework_kind": "national_curriculum",
+   "grade_range": "ECCE, Primary 1–6, JSS 1–3, SSS 1–3",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Performance objectives per topic/term/grade",
+   "licence": "NERDC ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "e-Curriculum portal",
+     "url": "https://nerdc.org.ng/ecurriculum/"
+    }
+   ],
+   "catalog_notes": "Minimum standard for ALL Nigerian schools incl. private."
+  },
+  {
+   "short_code": "GH-SBC",
+   "name": "Standards-Based Curriculum (2019) + Common Core Programme",
+   "authority": "NaCCA (Ghana)",
+   "country_code": "GH",
+   "region": "africa",
+   "framework_kind": "national_curriculum",
+   "grade_range": "KG–B6 (2019); B7–9 CCP (2021+); SHS in development (English Nov 2024)",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Strand → sub-strand → content standard → indicator with decimal numbering",
+   "version_year": 2019,
+   "licence": "NaCCA ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "NaCCA SBC",
+     "url": "https://nacca.gov.gh/learning-areas-subjects/new-standards-based-curriculum-2019/"
+    }
+   ]
+  },
+  {
+   "short_code": "RW-CBC",
+   "name": "Competence-Based Curriculum (Rwanda)",
+   "authority": "Rwanda Education Board (REB)",
+   "country_code": "RW",
+   "region": "africa",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Pre-primary, Primary 6yr, Lower + Upper Secondary 3+3",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "version_year": 2016,
+   "licence": "REB ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "REB",
+     "url": "https://reb.rw/"
+    }
+   ]
+  },
+  {
+   "short_code": "MA-MEN",
+   "name": "Morocco National Curriculum (Vision 2030 reform)",
+   "authority": "Ministère de l'Éducation nationale (Morocco)",
+   "country_code": "MA",
+   "region": "africa",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–6, Collège 7–9, Lycée 10–12",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MEN Morocco",
+     "url": "https://men.gov.ma/"
+    }
+   ]
+  },
+  {
+   "short_code": "TN-MOE",
+   "name": "Tunisia National Curriculum",
+   "authority": "Ministry of Education (Tunisia)",
+   "country_code": "TN",
+   "region": "africa",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary 1–6, collège, lycée 4yr (5 tracks)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MoE Tunisia",
+     "url": "https://education.gov.tn/"
+    }
+   ]
+  },
+  {
+   "short_code": "BR-BNCC",
+   "name": "Base Nacional Comum Curricular (BNCC)",
+   "authority": "Ministério da Educação (MEC, Brazil)",
+   "country_code": "BR",
+   "region": "latin_america",
+   "framework_kind": "standards",
+   "grade_range": "EI (0–5), EF 1–9, EM 1–3",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Coded habilidades: EF05MA01 = stage EF + year 05 + subject MA + seq 01 (multi-year EF69LP01; EM13CO01). Subject codes LP/MA/CI/GE/HI/AR/EF/ER. ~600 skills in EF",
+   "current_version": "EI+EF Dec 2017; EM Nov 2018",
+   "version_year": 2018,
+   "licence": "Government publication (Lei 9.610/98 state-works doctrine suggests free use); explicit commercial licence unverified",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "source_links": [
+    {
+     "label": "BNCC portal",
+     "url": "https://basenacionalcomum.mec.gov.br/"
+    },
+    {
+     "label": "CIEB code lookup (3rd party)",
+     "url": "https://curriculo.cieb.net.br/buscar/EF05MA01"
+    }
+   ],
+   "catalog_notes": "Download portal historically offered structured skill matrix (503 at fetch; verify)."
+  },
+  {
+   "short_code": "CL-BC",
+   "name": "Bases Curriculares + Planes y Programas de Estudio",
+   "authority": "MINEDUC / Unidad de Currículum y Evaluación (Chile)",
+   "country_code": "CL",
+   "region": "latin_america",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Parvularia; Básica 1°–6°; 7°–2° Medio; 3°–4° Medio (diferenciada 2019)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Objetivos de Aprendizaje coded e.g. TE01 OA 05 (subject + grade + OA + number)",
+   "current_version": "Bases 2012/2013–15/2019; 1°–10° update consulted 2023–24, NOT yet decreed (CNED approval pending)",
+   "version_year": 2019,
+   "reform_status": "New bases awaiting decree; PADIC implementation plan",
+   "licence": "Government ©; no explicit open licence",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf",
+    "excel"
+   ],
+   "source_links": [
+    {
+     "label": "curriculumnacional.cl",
+     "url": "https://www.curriculumnacional.cl/"
+    }
+   ]
+  },
+  {
+   "short_code": "MX-NEM",
+   "name": "Plan de Estudios 2022 (Nueva Escuela Mexicana)",
+   "authority": "Secretaría de Educación Pública (SEP)",
+   "country_code": "MX",
+   "region": "latin_america",
+   "framework_kind": "national_curriculum",
+   "grade_range": "6 phases: ages 0–3, preschool, grades 1–2, 3–4, 5–6, secondary 7–9",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "4 formative fields replace subjects + 7 transversal axes; 'learning situations' prose",
+   "version_year": 2022,
+   "licence": "SEP ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Nueva Escuela Mexicana",
+     "url": "https://nuevaescuelamexicana.sep.gob.mx/"
+    }
+   ]
+  },
+  {
+   "short_code": "AR-NAP",
+   "name": "Núcleos de Aprendizajes Prioritarios (NAP)",
+   "authority": "Ministerio de Educación + Consejo Federal de Educación (Argentina)",
+   "country_code": "AR",
+   "region": "latin_america",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Initial, Primary (2 cycles), Secondary — national floors; provinces extend",
+   "subject_scope": [
+    "all_subjects",
+    "computing"
+   ],
+   "has_item_codes": false,
+   "licence": "Government publication; educ.ar educational use",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "NAP collection",
+     "url": "https://www.educ.ar/recursos/150199"
+    }
+   ]
+  },
+  {
+   "short_code": "CO-EBC",
+   "name": "Estándares Básicos de Competencias (EBC) + Derechos Básicos de Aprendizaje (DBA)",
+   "authority": "Ministerio de Educación Nacional (Colombia)",
+   "country_code": "CO",
+   "region": "latin_america",
+   "framework_kind": "standards",
+   "grade_range": "EBC by bands (1–3, 4–5, 6–7, 8–9, 10–11); DBA per grade 1–11",
+   "subject_scope": [
+    "ela",
+    "math",
+    "science",
+    "social_studies"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "DBA numbered per grade + subject (no alphanumeric codes)",
+   "version_year": 2016,
+   "licence": "MEN ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "DBA hub",
+     "url": "https://www.colombiaaprende.edu.co/contenidos/coleccion/derechos-basicos-de-aprendizaje"
+    }
+   ]
+  },
+  {
+   "short_code": "PE-CNEB",
+   "name": "Currículo Nacional de la Educación Básica (CNEB)",
+   "authority": "MINEDU (Peru)",
+   "country_code": "PE",
+   "region": "latin_america",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Initial 3–5, Primary 1–6, Secondary 1–5",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Exit profile → 31 competencies → capacidades → band standards → performance criteria (prose)",
+   "version_year": 2016,
+   "licence": "MINEDU ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MINEDU currículo",
+     "url": "https://www.minedu.gob.pe/curriculo/"
+    }
+   ]
+  },
+  {
+   "short_code": "EC-CN",
+   "name": "Currículo Nacional (Ecuador)",
+   "authority": "Ministerio de Educación (Ecuador)",
+   "country_code": "EC",
+   "region": "latin_america",
+   "framework_kind": "national_curriculum",
+   "grade_range": "EGB 1–10 + BGU 11–13",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Destrezas con criterio de desempeño coded (e.g. CN.1.1.1 pattern; unverified)",
+   "version_year": 2016,
+   "licence": "Government ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MinEduc currículo",
+     "url": "https://educacion.gob.ec/curriculo/"
+    }
+   ]
+  },
+  {
+   "short_code": "UY-MCN",
+   "name": "Marco Curricular Nacional (MCN)",
+   "authority": "ANEP (Uruguay)",
+   "country_code": "UY",
+   "region": "latin_america",
+   "framework_kind": "national_curriculum",
+   "grade_range": "6 curricular units, ages 0–19",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "version_year": 2022,
+   "licence": "ANEP ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "ANEP MCN",
+     "url": "https://www.anep.edu.uy/marco-curricular-nacional"
+    }
+   ]
+  },
+  {
+   "short_code": "CR-MEP",
+   "name": "Programas de Estudio (Costa Rica)",
+   "authority": "Ministerio de Educación Pública (MEP)",
+   "country_code": "CR",
+   "region": "latin_america",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Preschool, Primary 1–6, Secondary 7–11 (Ciclo III + Diversificado)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "licence": "MEP ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MEP",
+     "url": "https://www.mep.go.cr/"
+    }
+   ]
+  },
+  {
+   "short_code": "ENG-NC",
+   "name": "National Curriculum in England",
+   "authority": "Department for Education (DfE)",
+   "country_code": "GB",
+   "subdivision_code": "GB-ENG",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Key Stages 1–4 (Years 1–11, ages 5–16)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose programmes of study per subject per key stage; no statement-level codes",
+   "current_version": "2014 framework (still statutory)",
+   "version_year": 2014,
+   "reform_status": "Revised NC due spring 2027, first teaching Sept 2028 (Curriculum & Assessment Review, Nov 2025); a machine-readable version announced for the revised curriculum",
+   "licence": "Open Government Licence v3.0",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "National curriculum collection",
+     "url": "https://www.gov.uk/government/collections/national-curriculum"
+    },
+    {
+     "label": "Review final report + response",
+     "url": "https://www.gov.uk/government/publications/curriculum-and-assessment-review-final-report"
+    }
+   ],
+   "catalog_notes": "KS4/KS5 de-facto objectives = exam-board specifications (AQA, OCR, Pearson Edexcel, WJEC/Eduqas) — Ofqual-regulated, separately copyrighted."
+  },
+  {
+   "short_code": "SCO-CFE",
+   "name": "Curriculum for Excellence (Experiences & Outcomes + Benchmarks)",
+   "authority": "Education Scotland",
+   "country_code": "GB",
+   "subdivision_code": "GB-SCT",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Levels: Early/First/Second (primary), Third/Fourth (S1–S3), Senior Phase (S4–S6, National Qualifications)",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Es&Os coded: [area][level]-[seq][sub] — e.g. MNU 2-03a (areas: MNU, ENG, SCI, SOC, TCH, HWB, EXA, RME, MFL)",
+   "current_version": "2010–12; Es&Os document set 2018; Benchmarks 2016–17",
+   "version_year": 2018,
+   "licence": "Education Scotland website default OGL (Crown ©); PDF-level OGL coverage unverified",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Experiences and Outcomes",
+     "url": "https://education.gov.scot/curriculum-for-excellence/experiences-and-outcomes/"
+    }
+   ]
+  },
+  {
+   "short_code": "WAL-CFW",
+   "name": "Curriculum for Wales",
+   "authority": "Welsh Government (Hwb)",
+   "country_code": "GB",
+   "subdivision_code": "GB-WLS",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Progression Steps 1–5 (ages ~5–16); 6 Areas of Learning and Experience",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "27 Statements of What Matters + Descriptions of Learning per progression step — prose",
+   "current_version": "2022 (secondary phased through 2026)",
+   "version_year": 2022,
+   "licence": "GOV.WALES policy = OGL v3 (page-level declaration unverified)",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Curriculum for Wales (Hwb)",
+     "url": "https://hwb.gov.wales/curriculum-for-wales"
+    }
+   ]
+  },
+  {
+   "short_code": "NIR-NIC",
+   "name": "Northern Ireland Curriculum",
+   "authority": "CCEA / Department of Education NI",
+   "country_code": "GB",
+   "subdivision_code": "GB-NIR",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Foundation (P1–2), KS1 (P3–4), KS2 (P5–7), KS3 (Y8–10), KS4",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Prose statutory requirements per Area of Learning",
+   "current_version": "2007 curriculum (rolling updates)",
+   "version_year": 2007,
+   "licence": "CCEA terms PROHIBIT commercial use of site content; DENI-document licence status unverified",
+   "commercial_use": "non_commercial",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "CCEA curriculum",
+     "url": "https://ccea.org.uk/about/what-we-do/curriculum"
+    }
+   ]
+  },
+  {
+   "short_code": "IE-NCCA",
+   "name": "Ireland: Primary Curriculum Framework + Junior/Senior Cycle (NCCA)",
+   "authority": "National Council for Curriculum and Assessment (NCCA)",
+   "country_code": "IE",
+   "region": "europe",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Primary (Junior Infants–6th Class); Junior Cycle (3yr); Senior Cycle (Leaving Cert)",
+   "subject_scope": [
+    "all_subjects",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Numbered learning outcomes within subject specifications; 24 Statements of Learning (JC); no cross-curriculum codes",
+   "current_version": "PCF 2023 (phased); Senior Cycle redevelopment tranches 2025/26–2027",
+   "version_year": 2023,
+   "licence": "NCCA copyright = personal use only; commercial redistribution requires permission",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Primary Curriculum Framework",
+     "url": "https://ncca.ie/en/primary/primary-curriculum-framework-and-curriculum-areas/"
+    },
+    {
+     "label": "curriculumonline.ie",
+     "url": "https://www.curriculumonline.ie/primary/"
+    }
+   ]
+  },
+  {
+   "short_code": "AU-AC9",
+   "name": "Australian Curriculum v9.0",
+   "authority": "ACARA",
+   "country_code": "AU",
+   "region": "asia_pacific",
+   "framework_kind": "standards",
+   "grade_range": "Foundation–Year 10 (+ separate senior secondary)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Content descriptions coded AC9M5N01 = AC9 + learning area (M) + year (5) + strand (N) + seq (01); achievement standards per year level",
+   "current_version": "v9.0 (2022; MRAC updated Jun 2024)",
+   "version_year": 2022,
+   "licence": "CC BY 4.0 (most content; Literacy/Numeracy Progressions CC BY-NC; media excluded)",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "api",
+    "sparql",
+    "rdf",
+    "json",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Copyright & terms",
+     "url": "https://www.australiancurriculum.edu.au/copyright-and-terms-of-use"
+    },
+    {
+     "label": "MRAC (SPARQL: rdf.australiancurriculum.edu.au/api/sparql)",
+     "url": "https://www.australiancurriculum.edu.au/machine-readable-australian-curriculum"
+    }
+   ],
+   "catalog_notes": "Gold standard for ingestion: coded + CC-BY + machine-readable (RDF/XML, JSON-LD, SPARQL). VERIFIED 3/3."
+  },
+  {
+   "short_code": "AU-NSW",
+   "name": "NSW Syllabuses (NESA)",
+   "authority": "NSW Education Standards Authority",
+   "country_code": "AU",
+   "subdivision_code": "AU-NSW",
+   "region": "asia_pacific",
+   "framework_kind": "standards",
+   "parent_short_code": "AU-AC9",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "NSW outcome codes (e.g. MA5-1WM pattern; post-2022 formats vary by syllabus)",
+   "current_version": "AC9-aligned syllabuses rolling from 2024 (curriculum.nsw.edu.au)",
+   "version_year": 2024,
+   "licence": "NESA ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "NSW curriculum",
+     "url": "https://curriculum.nsw.edu.au"
+    }
+   ]
+  },
+  {
+   "short_code": "AU-VIC",
+   "name": "Victorian Curriculum F–10 Version 2.0",
+   "authority": "VCAA",
+   "country_code": "AU",
+   "subdivision_code": "AU-VIC",
+   "region": "asia_pacific",
+   "framework_kind": "standards",
+   "parent_short_code": "AU-AC9",
+   "grade_range": "F–10",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Victorian content descriptions + achievement standards (AC9-derived)",
+   "current_version": "v2.0 (Jun 2024); English/Maths full 2026, other areas through 2027",
+   "version_year": 2024,
+   "licence": "VCAA ©",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "VC F–10 v2.0",
+     "url": "https://www.vcaa.vic.edu.au/curriculum/foundation-10/victorian-curriculum-f-10-version-20"
+    }
+   ]
+  },
+  {
+   "short_code": "NZ-TM",
+   "name": "New Zealand Curriculum / Te Mātaiaho (+ Te Marautanga o Aotearoa)",
+   "authority": "NZ Ministry of Education (Tāhūrangi)",
+   "country_code": "NZ",
+   "region": "asia_pacific",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Years 0–13; bands 0–2/3–4/5–6/7–8/9–10; NCEA Levels 1–3 senior",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Poutama progressions, phases, prose objectives; NCEA achievement standards (NZQA) for senior",
+   "current_version": "Te Mātaiaho refresh: English + Maths mandatory Term 1 2026; Science/Social Sciences/HPE + Y9–10 2027; Arts/Tech/Languages 2028; Y11–13 2028–2030; final gazetted version mid-2026",
+   "version_year": 2026,
+   "licence": "CC BY-NC 4.0 New Zealand (education.govt.nz) — NON-COMMERCIAL; gazetted-document licence unverified",
+   "commercial_use": "non_commercial",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Tāhūrangi NZ Curriculum",
+     "url": "https://newzealandcurriculum.tahurangi.education.govt.nz/"
+    },
+    {
+     "label": "MoE copyright",
+     "url": "https://www.education.govt.nz/copyright"
+    }
+   ],
+   "catalog_notes": "Commercial LMS needs Ministry permission. TMoA = parallel Māori-medium curriculum (not a translation)."
+  },
+  {
+   "short_code": "CA-ON",
+   "name": "The Ontario Curriculum",
+   "authority": "Ontario Ministry of Education",
+   "country_code": "CA",
+   "subdivision_code": "CA-ON",
+   "region": "north_america",
+   "framework_kind": "national_curriculum",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Overall Expectations (B1) + Specific Expectations (B1.1); strand letters per subject; 5-char secondary course codes (MTH1W)",
+   "current_version": "Per-subject (Math 2020, Language 2023)",
+   "version_year": 2023,
+   "licence": "Crown © (King's Printer for Ontario); non-commercial with credit; commercial needs permission",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Curriculum and Resources (DCP)",
+     "url": "https://www.dcp.edu.gov.on.ca/en/"
+    }
+   ]
+  },
+  {
+   "short_code": "CA-BC",
+   "name": "British Columbia Curriculum (Know-Do-Understand)",
+   "authority": "BC Ministry of Education and Child Care",
+   "country_code": "CA",
+   "subdivision_code": "CA-BC",
+   "region": "north_america",
+   "framework_kind": "national_curriculum",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Big Ideas / Curricular Competencies / Content — prose, no codes",
+   "current_version": "Redesigned curriculum (2015–16), per-subject revisions",
+   "version_year": 2016,
+   "licence": "Crown ©; permission required beyond personal/non-commercial (OGL-equivalent status unverified)",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "curriculum.gov.bc.ca",
+     "url": "https://curriculum.gov.bc.ca/curriculum/overview"
+    }
+   ]
+  },
+  {
+   "short_code": "CA-AB",
+   "name": "Alberta Programs of Study (new K–6)",
+   "authority": "Alberta Education",
+   "country_code": "CA",
+   "subdivision_code": "CA-AB",
+   "region": "north_america",
+   "framework_kind": "national_curriculum",
+   "grade_range": "K–12 (new K–6 phased 2022–2025; Gr 7–9 drafts in field-testing)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Outcomes-based: guiding questions → learner/specific outcomes — no cross-subject codes",
+   "version_year": 2025,
+   "licence": "Crown ©; commercial redistribution requires permission (exact terms unverified)",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "curriculum.learnalberta.ca",
+     "url": "https://curriculum.learnalberta.ca/curriculum/en"
+    }
+   ]
+  },
+  {
+   "short_code": "CA-QC",
+   "name": "Québec Education Program (PFEQ)",
+   "authority": "Ministère de l'Éducation du Québec",
+   "country_code": "CA",
+   "subdivision_code": "CA-QC",
+   "region": "north_america",
+   "framework_kind": "national_curriculum",
+   "grade_range": "Preschool; Elementary cycles 1–3; Secondary cycles 1–2",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Competency-based: broad areas of learning + 9 cross-curricular competencies + subject competencies",
+   "version_year": 2007,
+   "licence": "© Gouvernement du Québec; commercial requires permission",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "QEP",
+     "url": "https://www.education.gouv.qc.ca/en/teachers/quebec-education-program"
+    }
+   ],
+   "catalog_notes": "Other provinces (MB, SK, NS, NB, NL, PE, territories): own outcomes-based frameworks; Western + Atlantic shared math frameworks; all Crown ©, PDF-only."
+  },
+  {
+   "short_code": "IB-PYP",
+   "name": "IB Primary Years Programme",
+   "authority": "International Baccalaureate Organization (IBO)",
+   "country_code": null,
+   "region": "global",
+   "framework_kind": "international_programme",
+   "grade_range": "Ages 3–12",
+   "subject_scope": [
+    "ela",
+    "math",
+    "science",
+    "social_studies",
+    "arts",
+    "pe_health",
+    "sel"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Subject continuums by phase (~5) with overall expectations + conceptual understandings + learning outcomes; 6 transdisciplinary themes — no codes",
+   "current_version": "New subject continuums Apr 2025 (replace Scope & Sequence); theme descriptors Dec 2024; schools transition by Sept 2027",
+   "version_year": 2025,
+   "licence": "© IBO — licensing policy explicitly prohibits unlicensed use by app developers / curriculum-mapping platforms; written licence via copyright@ibo.org (may be refused; fees)",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "PYP curriculum",
+     "url": "https://ibo.org/programmes/primary-years-programme/curriculum/"
+    },
+    {
+     "label": "IB licensing policies",
+     "url": "https://www.ibo.org/become-an-ib-school/ib-publishing/licensing/licensing-policies/"
+    }
+   ],
+   "catalog_notes": "Documents via MyIB only. VERIFIED 3/3: do NOT ingest IB objective text without a written IBO licence."
+  },
+  {
+   "short_code": "IB-MYP",
+   "name": "IB Middle Years Programme",
+   "authority": "IBO",
+   "country_code": null,
+   "region": "global",
+   "framework_kind": "international_programme",
+   "grade_range": "Ages 11–16 (MYP 1–5)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "8 subject groups × assessment criteria A–D; objectives prose in subject guides; ATL skills; 16 key concepts; 6 global contexts",
+   "current_version": "'Next Chapter' framework (2019); stable",
+   "version_year": 2019,
+   "licence": "© IBO (same licensing policy as PYP)",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "MYP curriculum",
+     "url": "https://ibo.org/programmes/middle-years-programme/curriculum/"
+    }
+   ]
+  },
+  {
+   "short_code": "IB-DP",
+   "name": "IB Diploma Programme",
+   "authority": "IBO",
+   "country_code": null,
+   "region": "global",
+   "framework_kind": "international_programme",
+   "grade_range": "Ages 16–19; 6 subject groups + TOK/EE/CAS core",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Subject guides: aims + assessment objectives (AO1–4) + numbered topics (guide-internal)",
+   "current_version": "Sciences revised 2023 (first assessment 2025); ~7-year cycles",
+   "version_year": 2023,
+   "licence": "© IBO",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "DP curriculum",
+     "url": "https://ibo.org/programmes/diploma-programme/curriculum/"
+    }
+   ]
+  },
+  {
+   "short_code": "IB-CP",
+   "name": "IB Career-related Programme",
+   "authority": "IBO",
+   "country_code": null,
+   "region": "global",
+   "framework_kind": "international_programme",
+   "grade_range": "Ages 16–19; ≥2 DP courses + career-related study + CP core",
+   "subject_scope": [
+    "vocational",
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "current_version": "Core revision effective 2024 (Reflective Project externally assessed)",
+   "version_year": 2024,
+   "licence": "© IBO",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "CP core",
+     "url": "https://ibo.org/programmes/career-related-programme/curriculum/the-cp-core/"
+    }
+   ]
+  },
+  {
+   "short_code": "CAM-PRI",
+   "name": "Cambridge Primary + Lower Secondary curriculum frameworks",
+   "authority": "Cambridge International (UCLES)",
+   "country_code": null,
+   "region": "global",
+   "framework_kind": "international_programme",
+   "grade_range": "Stages 1–6 (ages 5–11) + Stages 7–9 (11–14); 13 primary subjects",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Coded objectives: 3Nc.01 = Stage 3 + strand N (Number) + sub-strand c + seq .01 (e.g. 7Nf.05 lower secondary); '*' = multi-stage",
+   "current_version": "2020 series (Maths 0096, Science 0097, English 0058; Humanities 0065/0839 newer)",
+   "version_year": 2020,
+   "licence": "© UCLES; centres may copy internally; commercial third-party reuse requires written permission",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Cambridge Primary curriculum",
+     "url": "https://www.cambridgeinternational.org/programmes-and-qualifications/cambridge-primary/curriculum/"
+    },
+    {
+     "label": "Permission application",
+     "url": "https://help.cambridgeinternational.org/hc/en-gb/articles/115004418469-How-do-I-apply-for-permission-to-use-Cambridge-copyrighted-material"
+    }
+   ],
+   "catalog_notes": "Best-coded international programme; PDFs publicly downloadable. VERIFIED 3/3 on permission requirement."
+  },
+  {
+   "short_code": "CAM-IGCSE",
+   "name": "Cambridge IGCSE / O Level + AS & A Level syllabuses",
+   "authority": "Cambridge International (UCLES)",
+   "country_code": null,
+   "region": "global",
+   "framework_kind": "assessment_framework",
+   "grade_range": "Ages 14–16 (70+ IGCSE subjects, 4-digit codes) + 16–19 (~60 AS/A, 9xxx codes)",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Assessment objectives (AO1–AO4) + numbered topics; syllabus codes (0580 Maths, 9702 Physics)",
+   "version_year": 2023,
+   "licence": "© UCLES; written permission for reuse",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Cambridge qualifications",
+     "url": "https://www.cambridgeinternational.org/programmes-and-qualifications/"
+    }
+   ]
+  },
+  {
+   "short_code": "EDX-INT",
+   "name": "Pearson Edexcel international (iPrimary, iLowerSecondary, International GCSE, IAL)",
+   "authority": "Pearson Education Ltd",
+   "country_code": null,
+   "region": "global",
+   "framework_kind": "international_programme",
+   "grade_range": "Ages 3–19",
+   "subject_scope": [
+    "ela",
+    "math",
+    "science",
+    "computing",
+    "social_studies"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Spec codes (4MA1, WMA11); AO1–3/4 + numbered units; iPrimary/iLowerSecondary objectives via ActiveLearn (coding unverified)",
+   "version_year": 2021,
+   "licence": "© Pearson; approved-centre internal use only; commercial use needs written permission (copyrightPQS@pearson.com)",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Edexcel iPrimary",
+     "url": "https://qualifications.pearson.com/en/qualifications/edexcel-international-primary-curriculum.html"
+    }
+   ]
+  },
+  {
+   "short_code": "OXAQA",
+   "name": "OxfordAQA International GCSEs + International AS/A Level",
+   "authority": "OxfordAQA (OUP + AQA joint venture)",
+   "country_code": null,
+   "region": "global",
+   "framework_kind": "assessment_framework",
+   "grade_range": "Ages 14–19; 40+ IGCSE subjects + full AS/A suite",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "AO1–3 + numbered sections; spec codes (9630 Physics)",
+   "current_version": "7 new subjects Sept 2024, first exams 2026",
+   "version_year": 2024,
+   "licence": "© OxfordAQA, all rights reserved",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "OxfordAQA subjects",
+     "url": "https://www.oxfordaqa.com/subjects/"
+    }
+   ]
+  },
+  {
+   "short_code": "IPC",
+   "name": "International Primary Curriculum (+ IEYC, IMYC)",
+   "authority": "Fieldwork Education / International Curriculum Association (Nord Anglia family)",
+   "country_code": null,
+   "region": "global",
+   "framework_kind": "proprietary_curriculum",
+   "grade_range": "IEYC 2–5; IPC 5–11 (3 stages); IMYC 11–14",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Subject Learning Goals + International Learning Goals + 8 Personal Learning Goals — prose, no codes; ~80+ thematic units",
+   "current_version": "Continuously updated (edition year unverified); 1,000+ schools in 90+ countries",
+   "licence": "© Fieldwork Education Ltd — member-school access only (Members' Lounge)",
+   "commercial_use": "member_only",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "International Curriculum Association",
+     "url": "https://internationalcurriculum.com/"
+    }
+   ]
+  },
+  {
+   "short_code": "AERO",
+   "name": "AERO (American Education Reaches Out) standards",
+   "authority": "Project AERO / US State Dept Office of Overseas Schools",
+   "country_code": null,
+   "region": "global",
+   "framework_kind": "standards",
+   "grade_range": "K–12 grade bands",
+   "subject_scope": [
+    "ela",
+    "math",
+    "science",
+    "social_studies",
+    "languages",
+    "arts"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "CCSS-inherited codes for ELA/Math ('Common Core Plus'); science = 2011 framework + NGSS crosswalk",
+   "current_version": "Active (20th Summer Institute Jun 2024); science framework 2011",
+   "version_year": 2011,
+   "licence": "© AERO notices on PDFs (US-government public-domain status unverified)",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Project AERO",
+     "url": "http://www.projectaero.org/"
+    }
+   ],
+   "catalog_notes": "Free public PDFs; used by American-curriculum international schools."
+  },
+  {
+   "short_code": "AEFE",
+   "name": "French programmes abroad (AEFE network)",
+   "authority": "AEFE (delivery) / Ministère de l'Éducation nationale (curriculum)",
+   "country_code": "FR",
+   "region": "global",
+   "framework_kind": "international_programme",
+   "parent_short_code": "FR-PROG",
+   "grade_range": "Ages 3–18 (cycles 1–4 + lycée); 580+ schools, 139 countries",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Identical to France's national programmes",
+   "version_year": 2025,
+   "licence": "Licence Ouverte / Etalab 2.0 (per éduscol mentions légales; excludes third-party media)",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "source_links": [
+    {
+     "label": "AEFE",
+     "url": "https://www.aefe.fr/"
+    }
+   ]
+  },
+  {
+   "short_code": "ZFA-DIA",
+   "name": "German Schools Abroad (ZfA) / Deutsches Internationales Abitur (DIA)",
+   "authority": "ZfA (Bundesverwaltungsamt) + KMK + associated Bundesland",
+   "country_code": "DE",
+   "region": "global",
+   "framework_kind": "international_programme",
+   "parent_short_code": "DE-KMK",
+   "grade_range": "K–13; ~140 Deutsche Auslandsschulen + ~1,100 DSD schools",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Follows associated Bundesland Lehrplan + KMK Bildungsstandards; DIA = 5-exam bilingual Abitur",
+   "licence": "Varies by Bundesland; KMK PDFs free; no open licence",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "ZfA",
+     "url": "https://www.auslandsschulwesen.de/"
+    }
+   ]
+  },
+  {
+   "short_code": "AP-CED",
+   "name": "Advanced Placement Course and Exam Descriptions (College Board)",
+   "authority": "College Board",
+   "country_code": "US",
+   "region": "global",
+   "framework_kind": "assessment_framework",
+   "grade_range": "High school (ages ~14–19); AP International Diploma recognition",
+   "subject_scope": [
+    "all_subjects"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Big Ideas → Enduring Understandings → Learning Objectives → Essential Knowledge, coded (e.g. BIO-1.A.1)",
+   "current_version": "Per-course CED revisions; APID language-proficiency change deadline Sept 2025",
+   "version_year": 2024,
+   "licence": "© College Board; free public PDFs; commercial redistribution requires permission; explicitly NO generative-AI training use",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "AP Central courses",
+     "url": "https://apcentral.collegeboard.org/courses"
+    },
+    {
+     "label": "Copyright permissions",
+     "url": "https://privacy.collegeboard.org/copyright-trademark"
+    }
+   ],
+   "catalog_notes": "Community CASE mappings exist (Common Standards Project covers AP)."
+  },
+  {
+   "short_code": "NAD-SDA",
+   "name": "Adventist Education (NAD) Curriculum Standards",
+   "authority": "North American Division Office of Education, Seventh-day Adventist Church",
+   "country_code": "US",
+   "region": "global",
+   "framework_kind": "standards",
+   "grade_range": "PreK–12 (elementary by subject; secondary per course, 30+ courses)",
+   "subject_scope": [
+    "ela",
+    "math",
+    "science",
+    "social_studies",
+    "arts",
+    "pe_health",
+    "computing",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Standards by subject/grade with Adventist worldview lens, incorporating national/state standards content",
+   "current_version": "Rolling (Technology standards rev. 2022)",
+   "version_year": 2022,
+   "licence": "Free PDFs but '© — may not be used without permission' — contact NAD before ingesting",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Elementary standards",
+     "url": "https://adventisteducation.org/elementary-standards"
+    },
+    {
+     "label": "Secondary standards",
+     "url": "https://www.adventistedge.com/secondary/standards/"
+    }
+   ],
+   "catalog_notes": "Most complete faith-based standards set found."
+  },
+  {
+   "short_code": "CNS-CCS",
+   "name": "Catholic Curriculum Standards (Cardinal Newman Society)",
+   "authority": "Cardinal Newman Society",
+   "country_code": "US",
+   "region": "global",
+   "framework_kind": "standards",
+   "grade_range": "Bands K–6 and 7–12 (not per-grade)",
+   "subject_scope": [
+    "ela",
+    "math",
+    "social_studies",
+    "science"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "3 standard types per discipline (general/intellectual/dispositional); designed to overlay state standards with a Catholic lens",
+   "current_version": "© 2023",
+   "version_year": 2023,
+   "licence": "Free download (PDF/Word/Excel); no licence terms published — contact before ingesting",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "excel"
+   ],
+   "source_links": [
+    {
+     "label": "Download page",
+     "url": "https://cardinalnewmansociety.org/educator-resources/resources/academics/catholic-curriculum-standards/downloading-the-standards/"
+    }
+   ],
+   "catalog_notes": "US dioceses typically adopt state standards + diocesan religion standards (e.g. Archdioceses of Chicago, LA, Boston) — fragmented, no national Catholic academic standard."
+  },
+  {
+   "short_code": "LCMS-LAS",
+   "name": "Lutheran Academic Standards (LCMS)",
+   "authority": "The Lutheran Church—Missouri Synod / Concordia Publishing House",
+   "country_code": "US",
+   "region": "global",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math",
+    "science",
+    "social_studies",
+    "arts",
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "current_version": "Publication imminent (delivery to CPH May/June 2026 per LCMS Reporter — unverified)",
+   "version_year": 2026,
+   "licence": "TBD at publication (CPH)",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "LCMS Reporter announcement",
+     "url": "https://reporter.lcms.org/2026/lutheran-academic-standards-near-completion/"
+    }
+   ]
+  },
+  {
+   "short_code": "CK-SEQ",
+   "name": "Core Knowledge Sequence",
+   "authority": "Core Knowledge Foundation (E.D. Hirsch)",
+   "country_code": "US",
+   "region": "global",
+   "framework_kind": "standards",
+   "grade_range": "PreK–8",
+   "subject_scope": [
+    "ela",
+    "social_studies",
+    "math",
+    "science",
+    "arts"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Detailed per-grade content topics + skills (taggable granularity, no codes)",
+   "current_version": "2023 Edition",
+   "version_year": 2023,
+   "licence": "CC BY-NC-SA 4.0 (terms-of-use page) — NON-COMMERCIAL + ShareAlike",
+   "commercial_use": "non_commercial",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Core Knowledge Sequence",
+     "url": "https://www.coreknowledge.org/core-knowledge-sequence/"
+    },
+    {
+     "label": "Terms of use",
+     "url": "https://www.coreknowledge.org/terms-of-use/"
+    }
+   ],
+   "catalog_notes": "Whether a school-paid SaaS counts as 'commercial' under NC needs CKF confirmation (info@coreknowledge.org). VERIFIED licence 2/3+terms page."
+  },
+  {
+   "short_code": "HILLSDALE",
+   "name": "Hillsdale K-12 Program Guides + 1776 Curriculum",
+   "authority": "Hillsdale College K-12 Education Office",
+   "country_code": "US",
+   "region": "global",
+   "framework_kind": "proprietary_curriculum",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math",
+    "science",
+    "social_studies",
+    "arts",
+    "languages"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Program guides = scope & sequence (not coded standards); 1776 Curriculum = full history/civics lessons",
+   "current_version": "1776 Curriculum free with account (unverified); full curriculum = member-school licence",
+   "licence": "© Hillsdale College",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Curriculum overview",
+     "url": "https://k12.hillsdale.edu/Curriculum/Overview/"
+    }
+   ]
+  },
+  {
+   "short_code": "ZEKELMAN",
+   "name": "Zekelman Standards for Judaic Studies",
+   "authority": "Menachem Education Foundation",
+   "country_code": "US",
+   "region": "global",
+   "framework_kind": "standards",
+   "grade_range": "Chumash grades 1–8; Talmud (4 levels); Kriah",
+   "subject_scope": [
+    "religious_values"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Grade-by-grade benchmarks for Judaic text skills",
+   "current_version": "v2.0 (2017; overview 2024)",
+   "version_year": 2017,
+   "licence": "Free open-access (login removed — per secondary source; direct fetch failed)",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Zekelman Standards",
+     "url": "https://mymef.org/zekelman-standards/"
+    }
+   ]
+  },
+  {
+   "short_code": "EL-ED",
+   "name": "EL Education K-8 Language Arts (open curriculum)",
+   "authority": "EL Education (+ Open Up Resources)",
+   "country_code": "US",
+   "region": "global",
+   "framework_kind": "proprietary_curriculum",
+   "grade_range": "K–8 (ELA)",
+   "subject_scope": [
+    "ela"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "Standards-based learning targets aligned explicitly to CCSS ELA",
+   "current_version": "2025 Edition (K–5)",
+   "version_year": 2025,
+   "licence": "Open source / free for educational use",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "EL Education curriculum",
+     "url": "https://curriculum.eleducation.org/"
+    }
+   ]
+  },
+  {
+   "short_code": "ACSI",
+   "name": "ACSI Inspire Accreditation Standards (+ Purposeful Design curriculum)",
+   "authority": "Association of Christian Schools International",
+   "country_code": "US",
+   "region": "global",
+   "framework_kind": "accreditation",
+   "grade_range": "School-level (6 domains, 20 standards); PDP curriculum K–8 commercial",
+   "subject_scope": [
+    "cross_curricular"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "School-quality standards — NOT lesson-taggable academic content standards",
+   "current_version": "Inspire standards (current)",
+   "licence": "Inspire manual free PDF; PDP curriculum commercial",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "ACSI accreditation",
+     "url": "https://www.acsi.org/accreditation-certification"
+    }
+   ],
+   "catalog_notes": "Pattern for faith/classical networks: most publish accreditation criteria or proprietary scope-&-sequence, not taggable standards. Same classification: ACCS, SCL (classical accreditors), NCEA NSBECS (Catholic school-effectiveness), CISNA/Tarbiyah/ISLA (Islamic — no public standards; Gulf Islamic studies via ministries), Abeka/BJU/ACE/Memoria/Sonlight/Veritas/Classical Conversations (proprietary curricula w/ free scope-&-sequence), AmblesideOnline (free CM schedules), Montessori AMI/AMS (training-embedded albums; age bands), Waldorf AWSNA/SWSF (commercial 'Yellow Book' outline), Reggio Emilia (no standards by design), CSI Bible standards K-8 (purchasable), JTS Tanakh/Rabbinics standards (PD-program-embedded), SABIS (fully proprietary points system)."
+  },
+  {
+   "short_code": "CCSS-ELA",
+   "name": "Common Core State Standards — English Language Arts/Literacy",
+   "authority": "NGA Center for Best Practices + CCSSO",
+   "country_code": "US",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "CCSS.ELA-LITERACY.[strand].[grade].[standard](.[sub]) — e.g. RL.5.3 = Reading: Literature, Grade 5, std 3; anchor standards CCRA.[strand].[n]",
+   "current_version": "2010 (unchanged); states publish renamed derivatives",
+   "version_year": 2010,
+   "licence": "CCSS Public License: royalty-free copy/publish/distribute/display 'for purposes that support the CCSS Initiative'; mandatory verbatim © notice; no altering",
+   "commercial_use": "open_attribution",
+   "licence_notes": "Purpose-scoped grant (not blanket CC). Include: '© Copyright 2010. National Governors Association Center for Best Practices and Council of Chief State School Officers. All rights reserved.' Counsel check recommended for commercial-product scope.",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Public license",
+     "url": "https://www.thecorestandards.org/public-license/"
+    },
+    {
+     "label": "ELA standards",
+     "url": "https://www.thecorestandards.org/ELA-Literacy/"
+    }
+   ],
+   "catalog_notes": "Third-party machine-readable via Common Standards Project API + CASE providers."
+  },
+  {
+   "short_code": "CCSS-MATH",
+   "name": "Common Core State Standards — Mathematics (Content)",
+   "authority": "NGA Center + CCSSO",
+   "country_code": "US",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12 (K–8 by grade; HS by conceptual category)",
+   "subject_scope": [
+    "math"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "CCSS.MATH.CONTENT.[grade].[domain].[cluster].[n] — e.g. 5.NBT.B.5 = Grade 5, Number & Operations in Base Ten, cluster B, std 5",
+   "current_version": "2010",
+   "version_year": 2010,
+   "licence": "CCSS Public License (as CCSS-ELA)",
+   "commercial_use": "open_attribution",
+   "licence_notes": "Same notice requirement as CCSS-ELA.",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Math standards",
+     "url": "https://www.thecorestandards.org/Math/"
+    }
+   ]
+  },
+  {
+   "short_code": "CCSS-SMP",
+   "name": "CCSS Standards for Mathematical Practice",
+   "authority": "NGA Center + CCSSO",
+   "country_code": "US",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "parent_short_code": "CCSS-MATH",
+   "grade_range": "K–12 (grade-independent practices)",
+   "subject_scope": [
+    "math"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "CCSS.MATH.PRACTICE.MP1–MP8 (8 practices)",
+   "current_version": "2010",
+   "version_year": 2010,
+   "licence": "CCSS Public License",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "Mathematical Practice",
+     "url": "https://www.thecorestandards.org/Math/Practice/"
+    }
+   ],
+   "catalog_notes": "The 8 process practices (MP1 'Make sense of problems and persevere…' → MP8). Tag-friendly across every grade."
+  },
+  {
+   "short_code": "NGSS",
+   "name": "Next Generation Science Standards",
+   "authority": "NGSS Lead States (Achieve; WestEd/NSTA stewardship)",
+   "country_code": "US",
+   "region": "north_america",
+   "framework_kind": "subject_framework",
+   "grade_range": "K–12 (grade levels K–5; grade-banded MS/HS)",
+   "subject_scope": [
+    "science"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Performance expectations: [grade]-[discipline][core idea]-[n] — e.g. 5-PS1-1 (Grade 5, Physical Sciences DCI 1, PE 1); 3D structure: SEPs × DCIs × CCCs",
+   "current_version": "2013",
+   "version_year": 2013,
+   "licence": "© Achieve/NGSS Lead States — free use with attribution per NGSS terms of use; trademark rules for 'aligned' claims",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "nextgenscience.org",
+     "url": "https://www.nextgenscience.org/"
+    }
+   ],
+   "catalog_notes": "~20 states adopted verbatim + ~24 adapted Framework-based standards (per-state stance in state entries)."
+  },
+  {
+   "short_code": "C3-SS",
+   "name": "C3 Framework for Social Studies State Standards",
+   "authority": "National Council for the Social Studies (NCSS)",
+   "country_code": "US",
+   "region": "north_america",
+   "framework_kind": "subject_framework",
+   "grade_range": "K–12 (grade bands)",
+   "subject_scope": [
+    "social_studies"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "Dimension-coded indicators, e.g. D2.His.1.3-5",
+   "current_version": "2013",
+   "version_year": 2013,
+   "licence": "© NCSS; free PDF",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "C3 Framework",
+     "url": "https://www.socialstudies.org/standards/c3"
+    }
+   ]
+  },
+  {
+   "short_code": "CASEL",
+   "name": "CASEL SEL Framework (5 competencies)",
+   "authority": "Collaborative for Academic, Social, and Emotional Learning",
+   "country_code": "US",
+   "region": "north_america",
+   "framework_kind": "subject_framework",
+   "grade_range": "PreK–12 (not grade-differentiated)",
+   "subject_scope": [
+    "sel"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "5 competencies (Self-Awareness, Self-Management, Social Awareness, Relationship Skills, Responsible Decision-Making) — framework, not granular standards",
+   "current_version": "2020 update",
+   "version_year": 2020,
+   "licence": "© CASEL",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "html",
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "CASEL framework",
+     "url": "https://casel.org/fundamentals-of-sel/"
+    }
+   ],
+   "catalog_notes": "Maps to the app's SEL subject; many states publish their own SEL competencies derived from it."
+  },
+  {
+   "short_code": "WIDA-ELD",
+   "name": "WIDA English Language Development Standards Framework, 2020 Edition",
+   "authority": "WIDA Consortium (Univ. of Wisconsin–Madison)",
+   "country_code": "US",
+   "region": "north_america",
+   "framework_kind": "subject_framework",
+   "grade_range": "K–12 (grade-level clusters)",
+   "subject_scope": [
+    "ela",
+    "languages"
+   ],
+   "has_item_codes": true,
+   "coding_scheme": "5 ELD standards × Key Language Uses × proficiency levels (e.g. ELD-SI, ELD-LA)",
+   "current_version": "2020 Edition",
+   "version_year": 2020,
+   "licence": "© WIDA; use per WIDA terms (consortium membership for assessments)",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "WIDA ELD 2020",
+     "url": "https://wida.wisc.edu/teach/standards/eld"
+    }
+   ],
+   "catalog_notes": "De-facto EL framework in 40+ US states and many international schools."
+  },
+  {
+   "short_code": "IB-ATL",
+   "name": "IB Approaches to Learning (ATL) skills framework",
+   "authority": "International Baccalaureate Organization",
+   "country_code": null,
+   "region": "global",
+   "framework_kind": "subject_framework",
+   "parent_short_code": "IB-MYP",
+   "grade_range": "All IB programmes (PYP/MYP/DP/CP, ages 3–19)",
+   "subject_scope": [
+    "cross_curricular",
+    "sel"
+   ],
+   "has_item_codes": false,
+   "coding_scheme": "5 skill categories (Thinking, Communication, Self-management, Research, Social) with sub-skill clusters (e.g. MYP: 10 clusters) — prose, no codes",
+   "current_version": "Embedded in current programme guides",
+   "licence": "© IBO — same licensing policy as all IB content (written licence required for app use)",
+   "commercial_use": "permission_required",
+   "machine_readable": [
+    "pdf"
+   ],
+   "source_links": [
+    {
+     "label": "IB ATL overview",
+     "url": "https://www.ibo.org/benefits-of-the-ib/why-the-ib-is-different/approaches-to-teaching-and-learning/"
+    }
+   ],
+   "catalog_notes": "App ships CATEGORY-LEVEL reference only (5 categories + cluster names, facts not expression); full descriptor text requires an IBO licence or school-uploaded provenance."
+  },
+  {
+   "short_code": "US-AL",
+   "name": "Alabama Courses of Study",
+   "authority": "Alabama state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-AL",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-AK",
+   "name": "Alaska Content & Performance Standards",
+   "authority": "Alaska state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-AK",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: independent. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available."
+  },
+  {
+   "short_code": "US-AZ",
+   "name": "Arizona's Academic Standards",
+   "authority": "Arizona state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-AZ",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-AR",
+   "name": "Arkansas Academic Standards (2023)",
+   "authority": "Arkansas state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-AR",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: independent. Science: NGSS verbatim. LOW CONFIDENCE: science stance per baseline, not re-verified. As of 2026-06; via Common Standards Project / CASE where available."
+  },
+  {
+   "short_code": "US-CA",
+   "name": "California Common Core State Standards",
+   "authority": "California state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-CA",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-CO",
+   "name": "Colorado Academic Standards",
+   "authority": "Colorado state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-CO",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-CT",
+   "name": "Connecticut Core Standards",
+   "authority": "Connecticut state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-CT",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-DE",
+   "name": "Delaware Academic Standards",
+   "authority": "Delaware state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-DE",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-FL",
+   "name": "Florida's B.E.S.T. Standards (2020)",
+   "authority": "Florida state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-FL",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: independent. Science: Own (NGSSS, independent). As of 2026-06; via Common Standards Project / CASE where available."
+  },
+  {
+   "short_code": "US-GA",
+   "name": "Georgia Standards of Excellence (math) / Georgia's K-12 ELA Standards (2025-26)",
+   "authority": "Georgia state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-GA",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. LOW CONFIDENCE: math-revision status unverified; ELA newly independent 2025-26. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-HI",
+   "name": "Hawaii Common Core State Standards",
+   "authority": "Hawaii state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-HI",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-ID",
+   "name": "Idaho Content Standards (2022 revision)",
+   "authority": "Idaho state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-ID",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: independent. Science: Framework-based own. LOW CONFIDENCE: degree of 2022 departure from CCSS unclear. As of 2026-06; via Common Standards Project / CASE where available."
+  },
+  {
+   "short_code": "US-IL",
+   "name": "Illinois Learning Standards",
+   "authority": "Illinois state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-IL",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-IN",
+   "name": "Indiana Academic Standards (2014+)",
+   "authority": "Indiana state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-IN",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: independent. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available."
+  },
+  {
+   "short_code": "US-IA",
+   "name": "Iowa Core",
+   "authority": "Iowa state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-IA",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-KS",
+   "name": "Kansas College & Career Ready Standards",
+   "authority": "Kansas state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-KS",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-KY",
+   "name": "Kentucky Academic Standards (2019)",
+   "authority": "Kentucky state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-KY",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-LA",
+   "name": "Louisiana Student Standards (2016; 2025 review underway)",
+   "authority": "Louisiana state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-LA",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: NGSS verbatim. LOW CONFIDENCE: independence level disputed; 2025 review may shift. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-ME",
+   "name": "Maine Learning Results",
+   "authority": "Maine state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-ME",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-MD",
+   "name": "Maryland College and Career-Ready Standards",
+   "authority": "Maryland state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-MD",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-MA",
+   "name": "Massachusetts Curriculum Frameworks (2017)",
+   "authority": "Massachusetts state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-MA",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-MI",
+   "name": "Michigan Academic Standards",
+   "authority": "Michigan state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-MI",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-MN",
+   "name": "Minnesota Academic Standards",
+   "authority": "Minnesota state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-MN",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. LOW CONFIDENCE: CCSS ELA only; math never adopted (independent). As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-MS",
+   "name": "Mississippi College- and Career-Readiness Standards",
+   "authority": "Mississippi state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-MS",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-MO",
+   "name": "Missouri Learning Standards (2016)",
+   "authority": "Missouri state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-MO",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-MT",
+   "name": "Montana Common Core Standards",
+   "authority": "Montana state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-MT",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-NE",
+   "name": "Nebraska College and Career Ready Standards",
+   "authority": "Nebraska state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-NE",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: independent. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available."
+  },
+  {
+   "short_code": "US-NV",
+   "name": "Nevada Academic Content Standards",
+   "authority": "Nevada state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-NV",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-NH",
+   "name": "New Hampshire College and Career Ready Standards",
+   "authority": "New Hampshire state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-NH",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-NJ",
+   "name": "New Jersey Student Learning Standards",
+   "authority": "New Jersey state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-NJ",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-NM",
+   "name": "New Mexico Common Core State Standards",
+   "authority": "New Mexico state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-NM",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-NY",
+   "name": "New York Next Generation Learning Standards (2017)",
+   "authority": "New York state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-NY",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-NC",
+   "name": "NC Standard Course of Study (new ELA SCoS 2027-28)",
+   "authority": "North Carolina state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-NC",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Own (independent). LOW CONFIDENCE: science stance per baseline, not directly verified. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-ND",
+   "name": "North Dakota Academic Content Standards",
+   "authority": "North Dakota state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-ND",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. LOW CONFIDENCE: current official name not confirmed from ND DOE. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-OH",
+   "name": "Ohio's Learning Standards",
+   "authority": "Ohio state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-OH",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Own (independent). LOW CONFIDENCE: science stance per baseline, not fetched. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-OK",
+   "name": "Oklahoma Academic Standards (2016)",
+   "authority": "Oklahoma state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-OK",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: independent. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available."
+  },
+  {
+   "short_code": "US-OR",
+   "name": "Oregon Academic Content Standards",
+   "authority": "Oregon state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-OR",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-PA",
+   "name": "PA Core Standards",
+   "authority": "Pennsylvania state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-PA",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Own (independent). LOW CONFIDENCE: science stance per baseline, not verified. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-RI",
+   "name": "Rhode Island Common Core State Standards",
+   "authority": "Rhode Island state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-RI",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-SC",
+   "name": "South Carolina College- and Career-Ready Standards (ELA 2024, Math 2023)",
+   "authority": "South Carolina state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-SC",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: independent. Science: Own (independent). LOW CONFIDENCE: science stance per baseline, not verified. As of 2026-06; via Common Standards Project / CASE where available."
+  },
+  {
+   "short_code": "US-SD",
+   "name": "South Dakota Academic Standards",
+   "authority": "South Dakota state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-SD",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-TN",
+   "name": "Tennessee Academic Standards (2016-17)",
+   "authority": "Tennessee state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-TN",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-TX",
+   "name": "Texas Essential Knowledge and Skills (TEKS)",
+   "authority": "Texas state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-TX",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: independent. Science: Own (independent; science TEKS revised 2024-25). As of 2026-06; via Common Standards Project / CASE where available."
+  },
+  {
+   "short_code": "US-UT",
+   "name": "Utah Core Standards",
+   "authority": "Utah state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-UT",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-VT",
+   "name": "Vermont's Common Core State Standards",
+   "authority": "Vermont state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-VT",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-VA",
+   "name": "Virginia Standards of Learning (SOL)",
+   "authority": "Virginia state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-VA",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: independent. Science: Own (independent). As of 2026-06; via Common Standards Project / CASE where available."
+  },
+  {
+   "short_code": "US-WA",
+   "name": "Washington State Learning Standards",
+   "authority": "Washington state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-WA",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-WV",
+   "name": "West Virginia College- and Career-Readiness Standards",
+   "authority": "West Virginia state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-WV",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "State publication",
+   "commercial_use": "unverified",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS-derived revision. Science: Framework-based own. LOW CONFIDENCE: official current title not confirmed from DOE. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-WI",
+   "name": "Wisconsin Academic Standards",
+   "authority": "Wisconsin state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-WI",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: Framework-based own. LOW CONFIDENCE: 2021 math revision scope not directly reviewed. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-WY",
+   "name": "Wyoming Content and Performance Standards",
+   "authority": "Wyoming state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-WY",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: Framework-based own. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  },
+  {
+   "short_code": "US-DC",
+   "name": "DC Common Core State Standards",
+   "authority": "District of Columbia state education agency",
+   "country_code": "US",
+   "subdivision_code": "US-DC",
+   "region": "north_america",
+   "framework_kind": "standards",
+   "grade_range": "K–12",
+   "subject_scope": [
+    "ela",
+    "math"
+   ],
+   "has_item_codes": true,
+   "licence": "CCSS Public License (state adoption) / state publication",
+   "commercial_use": "open_attribution",
+   "machine_readable": [
+    "pdf",
+    "html"
+   ],
+   "catalog_notes": "ELA/Math: CCSS verbatim/renamed. Science: NGSS verbatim. As of 2026-06; via Common Standards Project / CASE where available.",
+   "parent_short_code": "CCSS-ELA"
+  }
+ ]
+}

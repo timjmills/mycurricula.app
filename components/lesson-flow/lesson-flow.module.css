@@ -1273,3 +1273,50 @@
     transform: none;
   }
 }
+
+/* ── Standards row body — tag chips + the standards-menu trigger ─────────
+ * The virtual Standards row's real body (replaces the placeholder): the
+ * lesson's tagged codes as chips, then the "Tag/Edit standards" button that
+ * opens the StandardsPicker. Tokens only; chip text uses --t-11 (the
+ * standards-code size per tokens.css). */
+
+.standardsBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.standardsChips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.standardChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 2px 12px;
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--ink-700);
+  background: var(--ink-50);
+  border: var(--line-strong);
+  border-radius: var(--r-12);
+}
+
+.standardChip:focus-visible {
+  outline: 2px solid var(--fyi);
+  outline-offset: 1px;
+}
+
+.standardsEmpty {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--ink-400);
+  font-style: italic;
+}

@@ -70,6 +70,13 @@ import {
   STANDARDS,
   describeStandard as mockDescribeStandard,
 } from "@/lib/mock";
+import { bundledDescriptions } from "@/lib/standards/items";
+
+// Module-level snapshot of the bundled standards descriptions (NGSS, CCSS
+// practices, IB ATL categories). Used twice: merged into INITIAL_CATALOG, and
+// as the describeStandard fallback after a flag-ON hydrate replaces the
+// catalog slice (review M-2).
+const BUNDLED_STANDARD_DESCRIPTIONS = bundledDescriptions();
 import { useAppState } from "@/lib/app-state";
 import { plannerClient } from "@/lib/planner/client";
 import { resolveGrade } from "@/lib/planner/grade";
@@ -617,13 +624,17 @@ function pickInitialDoc(): PlannerDoc {
  *                  active-unit-per-subject map is derived in the provider from
  *                  this superset and, under the flag OFF, pinned to the mock
  *                  UNITS map for byte-identical WeeklyGrid output.)
- *   • `standards`= the STANDARDS map (referential — describeStandard reads it).
+ *   • `standards`= the STANDARDS map (referential — describeStandard reads it)
+ *                  EXTENDED with the bundled framework sets (NGSS, CCSS
+ *                  practices, IB ATL) from lib/standards/items so codes tagged
+ *                  through the StandardsPicker describe everywhere. Additive
+ *                  superset — every original CCSS entry is untouched.
  *   • `activeGradeId` = "g5" — the single mock grade (mirrors
  *                  plannerMockSource.getActiveGradeLevelId). */
 const INITIAL_CATALOG: PlannerCatalog = {
   subjects: [...SUBJECTS],
   units: [...ALL_UNITS],
-  standards: STANDARDS,
+  standards: { ...STANDARDS, ...BUNDLED_STANDARD_DESCRIPTIONS },
   activeGradeId: "g5",
 };
 
@@ -2243,7 +2254,11 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
 
   const addSection = useCallback(
     (lessonId: string, heading?: string) => {
-      const action: AddSectionAction = { type: "addSection", lessonId, heading };
+      const action: AddSectionAction = {
+        type: "addSection",
+        lessonId,
+        heading,
+      };
       dispatchRef.current(action);
       persistSectionAction(action);
     },
@@ -2451,9 +2466,16 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
 
   const describeStandard = useCallback(
     (code: string): string => {
-      // PARITY: mirrors the mock describeStandard exactly — return the mapped
-      // description, else the code itself for an unknown standard.
-      return catalog.standards[code] ?? code;
+      // PARITY: mirrors the mock describeStandard — return the mapped
+      // description, else the code itself for an unknown standard. The
+      // bundled framework sets (NGSS / CCSS practices / IB ATL — see
+      // lib/standards/items.ts) backstop the hydrated map so flag-ON
+      // hydration (which replaces the catalog slice wholesale) doesn't
+      // degrade picker-tagged codes to bare strings before the DB carries
+      // their rows (review M-2).
+      return (
+        catalog.standards[code] ?? BUNDLED_STANDARD_DESCRIPTIONS[code] ?? code
+      );
     },
     [catalog.standards],
   );

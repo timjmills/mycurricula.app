@@ -4,7 +4,8 @@
 > (compiled **2026-06-12**). Standards bodies revise frameworks and licences
 > continuously — several entries below are mid-reform. Verify against the cited
 > primary source before acting on any single fact. Companion artifacts:
-> `docs/standards-frameworks-catalog.seed.json` (machine-readable catalog) and
+> `lib/standards/frameworks-catalog.json` (the machine-readable catalog — also
+> the Supabase seed, and the data behind the in-app standards menu) and
 > `docs/standards-catalog-schema-proposal.sql` (DB schema proposal).
 
 **Goal.** Catalog and put in order, for the mycurricula.app database, every major
@@ -106,11 +107,66 @@ Suggested ingestion phases for mycurricula:
 
 ## 1. United States
 
-*(Section completed from the dedicated US research agent — CCSS, the 50-state
-table, national subject frameworks, and the standards-data infrastructure — see
-§1.1–§1.4 below.)*
+### 1.1 Common Core State Standards (CCSS) ✅
 
-<!-- US-SECTION -->
+- **Bodies:** NGA Center for Best Practices + CCSSO (2010). ELA/Literacy +
+  Mathematics; states publish renamed/revised derivatives (§1.2).
+- **Code anatomy:** ELA `CCSS.ELA-LITERACY.RL.5.3` = strand (RL = Reading:
+  Literature; RI, RF, W, SL, L) + grade + standard (+ sub-letter); anchor
+  standards `CCRA.R.1`. Math `CCSS.MATH.CONTENT.5.NBT.B.5` = grade + domain
+  (NBT = Number & Operations in Base Ten…) + cluster letter + standard.
+  **Standards for Mathematical Practice:** `CCSS.MATH.PRACTICE.MP1–MP8` —
+  grade-independent, tag-friendly (bundled in the app's picker).
+- **Licence (verified by direct primary check):** royalty-free public licence
+  to copy/publish/distribute/display "for purposes that support the CCSS
+  Initiative", with the mandatory verbatim notice "© Copyright 2010. National
+  Governors Association Center for Best Practices and Council of Chief State
+  School Officers. All rights reserved." Purpose-scoped, not a blanket CC
+  grant — ubiquitous in commercial edtech, but have counsel confirm scope.
+
+### 1.2 The 50-state landscape
+
+Every state owns its standards; CCSS survives in most states under revised
+names while a substantial bloc is independent. Science splits into NGSS
+verbatim (20 states + DC: AR, CA, CT, DE, HI, IL, IA, KS, KY, ME, MD, MI, NV,
+NH, NJ, NM, OR, RI, VT, WA), Framework-based own standards (24 states), and
+fully independent (TX, FL, VA among them). Marquee independent ELA/math sets:
+**Texas TEKS** (code anatomy `111.5.b.2.A` = chapter/subject + grade section +
+subsection + standard + student expectation), **Virginia SOL**, **Florida
+B.E.S.T.** (replaced the CCSS-derived MAFS/LAFS), plus never-adopters Texas,
+Virginia, Alaska, Nebraska (and Minnesota for math only).
+
+<!-- STATE-TABLE -->
+
+### 1.3 National subject frameworks (catalog entries seeded)
+
+| Framework | Body | Codes | Licence/use |
+| --- | --- | --- | --- |
+| **NGSS** (science) | NGSS Lead States / Achieve | `5-PS1-1` (grade + DCI + PE); 3D (SEP×DCI×CCC) | free w/ attribution; trademark rules ✅ |
+| **C3 Framework** (social studies) | NCSS | `D2.His.1.3-5` | © NCSS, free PDF |
+| **CASEL SEL** | CASEL | 5 competencies (no granular codes) | © CASEL — maps to the app's SEL subject |
+| **WIDA ELD 2020** (English learners) | WIDA/UW–Madison | 5 standards × Key Language Uses | consortium terms — permission |
+| **AP CEDs** | College Board | `BIO-1.A.1` | free PDFs; permission for redistribution; **no generative-AI training use** |
+| National Core Arts / SHAPE PE / ACTFL / CSTA / ISTE | various | varies | per-body; catalog entries pending the state-pass follow-up |
+
+### 1.4 Standards-data infrastructure (how the text actually gets ingested)
+
+- **1EdTech CASE** — the interchange spec for machine-readable frameworks.
+  The "CASE Network 2" registry is being phased out in favor of a **CASE
+  Global Ecosystem**; **Satchel Rosetta Exchange** (Common Good Learning
+  Tools, rosetta.commongoodlt.com) remains a live access point for US K-12
+  standards; commercial CASE providers include **EdGate, LearningMate,
+  Instructure (Academic Benchmarks)**.
+- **Common Standards Project** (commonstandardsproject.com) — free community
+  API of US standards, all 50 states; **verified alive ✅** (repo commits into
+  2026; low-frequency maintenance — verify endpoint at ingestion time).
+- **OpenSALT** — open-source CASE editor/host for building/serving frameworks
+  (useful for the `school_uploaded` path).
+- **Commercial licensing route:** Academic Benchmarks (Instructure) and EdGate
+  license normalized, GUID-stable standards data (incl. frameworks that are
+  otherwise permission-locked) — the realistic path if mycurricula later needs
+  guaranteed-current 50-state + international coverage without per-body
+  negotiations.
 
 ---
 
@@ -405,6 +461,51 @@ standards (real but embedded in a PD programme).
 US diocesan pattern: most Catholic dioceses adopt their state's standards +
 diocesan religion standards (Chicago, LA, Boston examples in the seed).
 
-<!-- CONTINUES -->
+## 11. What landed in the codebase (2026-06-12)
+
+- **Catalog:** `lib/standards/frameworks-catalog.json` — 123 frameworks with
+  authority, region, kind, lineage, grade range, subject scope, coding scheme,
+  version/reform status, licence + commercial-use gate, machine-readable
+  sources, links, and notes. Doubles as the Supabase `standards_frameworks`
+  seed (schema: `docs/standards-catalog-schema-proposal.sql`).
+- **Query layer:** `lib/standards/catalog.ts` (search + subject/grade filters,
+  pinned-first ordering), `lib/standards/items.ts` (bundled taggable sets:
+  CCSS ELA/Math, CCSS Mathematical Practices MP1–8, NGSS grade-5 PEs + 3–5
+  engineering band, IB ATL categories at licence-safe category level),
+  `lib/standards/pinned.ts` (per-teacher pinned frameworks).
+- **UI:** `components/standards/StandardsPicker` — the standards menu (search,
+  subject + grade filters, pin-to-top, per-framework licence badges), wired
+  into the lesson editor's Standards row; saves through `editLesson` so the
+  lazy-fork model is preserved end-to-end (mock + Supabase sources both accept
+  `standards` in `LessonPatch`).
+
+## 12. Verification appendix (3-voter adversarial pass)
+
+Method: three independent fact-check agents each voted CONFIRM/REFUTE/UNSURE
+on the 14 highest-consequence claims; 2/3 refutes kills a claim. Europe was
+additionally verified by running the entire regional sweep twice with
+independent agents (all load-bearing facts agreed).
+
+| # | Claim | Verdict |
+| --- | --- | --- |
+| 1 | IB prohibits unlicensed app/platform use of its content | ✅ 3/3 |
+| 2 | ACARA v9 CC-BY 4.0 + MRAC (RDF/JSON-LD/SPARQL) | ✅ |
+| 3 | NZ curriculum CC-BY-NC (non-commercial) | ◑ NC confirmed; "4.0 NZ" per education.govt.nz |
+| 4 | England OGL v3; revised NC 2027, first teaching 2028 | ✅ 3/3 |
+| 5 | CCSS licence allows free commercial use w/ attribution | ✏️ corrected: purpose-scoped royalty-free + mandatory notice (primary text checked directly) |
+| 6 | Cambridge: public PDFs; written permission for reuse | ✅ 3/3 |
+| 7 | Qatar mandates Arabic / Islamic ed (Muslims) / Qatar history in private schools | ◑ consistent across sources; primary regulation gated |
+| 8 | BNCC coded skills (EF05MA01) | ✅ 3/3 |
+| 9 | Skolverket Syllabus API public, CC0 | ✅ 3/3 |
+| 10 | Norway Grep REST+SPARQL under NLOD | ✅ 3/3 |
+| 11 | Common Standards Project alive in 2026 | ✅ (community-maintained) |
+| 12 | Core Knowledge Sequence CC BY-NC-SA 4.0 | ✅ |
+| 13 | Denmark: 866 goals advisory since 1 Jan 2025; fagplaner replace 2027–28 | ✅ 3/3 |
+| 14 | France programmes under Licence Ouverte/Etalab 2.0 | ✅ 3/3 |
+
+Per-claim evidence URLs live in the voters' outputs; per-section source links
+are inline throughout this report. Remaining UNVERIFIED items are marked ⚠ in
+place and carried as `commercial_use: "unverified"` / `catalog_notes` in the
+seed so the import UI inherits the caveats.
 
 
