@@ -144,6 +144,30 @@ then the seed (dev only). Apply order:
    re-running against a non-empty DB errors on the duplicate keys rather than
    overwriting — run it only against a fresh dev database, never production.
 
+### Standards catalog (worldwide frameworks + taggable standards)
+
+The standards menu's backend lives in two files, applied after the base
+migrations and dev seed:
+
+1. `supabase/migrations/20260612200000_standards_catalog.sql` — catalog
+   columns on `standards_frameworks` (+ `band_label`/`item_kind` on
+   `standards`). Applied automatically by `supabase db push`.
+2. `supabase/seed-standards-catalog.sql` — **idempotent** (safe to rerun):
+   174 catalog frameworks, the bundled taggable standards (CCSS ELA/Math,
+   the 8 Mathematical Practices, NGSS grade-5 PEs, IB ATL categories), and
+   default framework assignments for every grade. Run via psql or the SQL
+   editor. Regenerate after editing `lib/standards/frameworks-catalog.json`
+   or `lib/standards/items.ts`:
+   `npx tsx scripts/gen-standards-catalog-sql.mjs`.
+
+**Order matters:** run the catalog seed BEFORE enabling
+`NEXT_PUBLIC_PLANNER_USE_SUPABASE` for standards tagging — the planner
+source maps tagged codes → `standards` row uuids, so codes tagged against
+an unseeded database are dropped at write time. The seed also re-homes the
+mock importer's legacy `CCSS` framework rows into the split
+`CCSS-ELA`/`CCSS-MATH` catalog entries (same deterministic uuids — existing
+lesson tags survive) and retires the legacy framework row.
+
 ### Path A — Supabase CLI (`db push`)
 
 ```sh

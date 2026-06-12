@@ -1,7 +1,11 @@
 -- ============================================================================
--- PROPOSAL — NOT YET APPLIED. Companion to:
+-- PROMOTED (2026-06-12): this proposal is now the real migration
+--   supabase/migrations/20260612200000_standards_catalog.sql
+-- with generated seed supabase/seed-standards-catalog.sql
+--   (regenerate: npx tsx scripts/gen-standards-catalog-sql.mjs).
+-- Kept as the annotated design rationale. Companions:
 --   docs/research-k12-standards-frameworks-2026-06-12.md  (the research report)
---   docs/standards-frameworks-catalog.seed.json           (catalog seed data)
+--   lib/standards/frameworks-catalog.json                 (catalog seed data)
 --
 -- Extends the live standards tables (supabase/migrations/20260518102823
 -- _initial_schema.sql §5 — standards_frameworks / grade_framework_assignments
