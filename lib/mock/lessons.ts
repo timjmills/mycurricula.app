@@ -7,6 +7,7 @@
 
 import type {
   Lesson,
+  LessonMasterSnapshot,
   LessonResource,
   LessonStatus,
   LessonMoved,
@@ -48,6 +49,14 @@ interface LessonInput {
   commentCount?: number;
   unreadComments?: number;
   tasks?: Partial<LessonTask>[];
+  /**
+   * PROTOTYPE seam (UX roadmap item 01 — fork diff view): the pre-fork
+   * Master values this personally-forked lesson diverged from. Carried by a
+   * handful of fixtures below so the diff UI can be designed and exercised
+   * against mock data; Phase 1B replaces this with persisted fork lineage
+   * from Supabase. Additive + optional — every other consumer is untouched.
+   */
+  masterSnapshot?: LessonMasterSnapshot;
 }
 
 /** Normalize a lesson input into a fully-typed Lesson with defaults. */
@@ -82,6 +91,9 @@ function L(o: LessonInput): Lesson {
       isPersonal: !!t.isPersonal,
       subjectHint: t.subjectHint ?? null,
     })),
+    // Only present on the few fork-diff prototype fixtures; spread-omitted
+    // (rather than `undefined`-assigned) so JSON round-trips stay clean.
+    ...(o.masterSnapshot ? { masterSnapshot: o.masterSnapshot } : {}),
   };
 }
 
@@ -255,6 +267,19 @@ export const LESSONS: Lesson[] = [
       },
     ],
     standards: ["5.NF.B.3"],
+    // Fork-diff prototype fixture (roadmap item 01) — MODIFIED-only tier:
+    // the teacher rewrote the anchor problem (title/objective/preview) but
+    // never moved the lesson, so the diff shows content rows and NO
+    // scheduling row. day/week mirror the live values.
+    masterSnapshot: {
+      title: "Fractions as division — sharing problems",
+      objective: "I can interpret a fraction as division of the numerator.",
+      preview:
+        "Anchor problem: 3 sandwiches shared by 4 students. Students use bar models to connect fractions and division.",
+      standards: ["5.NF.B.3"],
+      day: 1,
+      week: 12,
+    },
   }),
   // Same subject, same day, second event — math centers extension
   L({
@@ -377,6 +402,20 @@ export const LESSONS: Lesson[] = [
     resources: [{ type: "doc", label: "Role cards" }],
     standards: ["RL.5.3"],
     isPersonal: true,
+    // Fork-diff prototype fixture (roadmap item 01) — BOTH tiers: content
+    // edits (title/objective/preview/standards) AND a same-week move
+    // (Sunday → Monday under the configured Sun-first week), so the diff
+    // shows content rows plus the scheduling row.
+    masterSnapshot: {
+      title: "Literature circles — Via's chapters",
+      objective:
+        "I can take a role in literature circles and contribute to discussion.",
+      preview:
+        "Pre-assigned literature circle roles: discussion leader, connector, vocabulary detective, summarizer. 15-minute discussion, 5-minute share.",
+      standards: ["RL.5.3", "RL.5.6"],
+      day: 0,
+      week: 12,
+    },
   }),
   // Literacy Centers — the multi-task example. One lesson, three rotating
   // stations, each its own task with resources and a sub-subject hint.
@@ -512,6 +551,18 @@ export const LESSONS: Lesson[] = [
     status: "carried",
     reasonNotDone:
       "Fire drill ate 15 min — pushed drafting to Wed. Half the class hadn't even finished the warm-up.",
+    // Fork-diff prototype fixture (roadmap item 01) — MOVED-only tier
+    // (across weeks): content fields match the master exactly, so the diff
+    // shows JUST the scheduling row (Week 11 Thursday → Week 12 Tuesday).
+    masterSnapshot: {
+      title: "Drafting day — narrative middle",
+      objective: "I can draft the rising action of my personal narrative.",
+      preview:
+        "30-minute sustained drafting block on the rising action of their personal narrative. Quiet writing, music optional.",
+      standards: ["W.5.3"],
+      day: 4,
+      week: 11,
+    },
   }),
   L({
     id: "w-12-2",

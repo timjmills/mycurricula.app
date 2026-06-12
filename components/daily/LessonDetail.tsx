@@ -78,12 +78,37 @@ import type { ReactNode, SyntheticEvent } from "react";
 import type { Lesson } from "@/lib/types";
 import { dateForWeekDay, lessonTime } from "@/lib/mock";
 import { buildDailyLink } from "@/lib/deep-links";
+import { canCompareWithTeam, COMPARE_REQUEST_EVENT } from "@/lib/fork-diff";
+import type { CompareRequestDetail } from "@/lib/fork-diff";
+import { useAppState } from "@/lib/app-state";
 import { useCopyLink } from "@/lib/use-copy-link";
+import { ForkDiffPanel } from "@/components/lesson-card";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip } from "@/components/ui";
 import detailStyles from "./lesson-detail.module.css";
+
+// ── Compare deep-link consumption (M6) ───────────────────────────────────
+
+/**
+ * Remove `compare` from the current URL in place (history.replaceState —
+ * no navigation, no history entry), keeping `lesson` and every other param.
+ * Called whenever the `?compare=1` signal is consumed (acted on OR rejected
+ * by the gates) and when the teacher closes the panel, so a stale `compare`
+ * can never re-open a diff the teacher dismissed.
+ */
+function stripCompareParam(): void {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("compare")) return;
+  params.delete("compare");
+  const qs = params.toString();
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`,
+  );
+}
 
 // ── Completion checkbox (status-aware) ───────────────────────────────────
 
@@ -243,6 +268,83 @@ export function LessonDetail({
       }),
     );
   }
+
+  // ── Fork diff (UX roadmap item 01) ────────────────────────────────────
+  // Inline Master-vs-personal diff, mounted as a collapsible section of the
+  // detail body (between the action row and the lesson flow) — the item-01
+  // spec's "inline diff … within the lesson detail layout the teacher
+  // already knows". Entry points: the compare button in the header band's
+  // icon cluster (below) and the card context menu, which deep-links here
+  // as `/daily?lesson=<id>&compare=1`. All of them are gated on:
+  //   • canCompareWithTeam() — a master snapshot exists AND the lesson
+  //     actually diverged (modified and/or moved); never on unedited
+  //     lessons; and
+  //   • editMode === "personal" (M1) — the panel's per-field reverts write
+  //     through editLesson/moveLesson, whose persist tee targets the ACTIVE
+  //     save target; in Team-Curriculum mode those writes would land on the
+  //     shared master rows, and the diff's contract is personal-scoped
+  //     ("what did *I* change") — so in master mode the diff simply does
+  //     not offer itself (button hidden, panel unmounted, deep-link
+  //     consumed without opening).
+  const { editMode } = useAppState();
+  const comparable = editMode === "personal" && canCompareWithTeam(lesson);
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  // The gates above, readable from the long-lived listeners below without
+  // re-subscribing on every render (only `lesson.id` re-wires them).
+  const compareGateRef = useRef(comparable);
+  compareGateRef.current = comparable;
+
+  // ── `?compare=1` consumption — EXACTLY once (M6) ──────────────────────
+  // One effect, three triggers:
+  //   1. Mount + lesson change: read the param off window.location (not
+  //      useSearchParams — that carries an App-Router Suspense requirement
+  //      into a deep client component, which this codebase avoids), act on
+  //      it, then STRIP `compare` via history.replaceState (keeping
+  //      `lesson` and everything else). Stripping happens whether or not
+  //      the gates allowed the panel to open — the signal is consumed
+  //      either way, so a teacher's close sticks: nothing re-opens.
+  //   2. The COMPARE_REQUEST_EVENT custom event: the card menu's
+  //      router.push may not change `lesson.id` (the lesson can already be
+  //      selected here), and the router commits the URL only after the RSC
+  //      round-trip — so the menu also dispatches a same-document event
+  //      carrying the lesson id, which we act on directly. This is the
+  //      "listen for the router param" mechanism, chosen as a plain window
+  //      event for reliability + zero router coupling (see lib/fork-diff).
+  //   3. popstate: back/forward can resurface a URL still carrying
+  //      `compare=1` (e.g. an entry created before the strip) — consume it
+  //      with the same once-only semantics.
+  useEffect(() => {
+    function consumeCompareParam(): void {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("compare") !== "1") return;
+      // Another lesson's pending signal (its own mount consumes it) — ours
+      // only when the `lesson` param matches the lesson rendered here.
+      if (params.get("lesson") !== lesson.id) return;
+      stripCompareParam();
+      if (compareGateRef.current) setCompareOpen(true);
+    }
+    function onCompareRequest(e: Event): void {
+      const detail = (e as CustomEvent<CompareRequestDetail>).detail;
+      if (detail?.lessonId !== lesson.id) return;
+      if (compareGateRef.current) setCompareOpen(true);
+      // The push's `compare=1` may already be in the URL (or arrive only
+      // after the RSC commit, where DailyView's deep-link cleanup replaces
+      // the whole query) — strip what is visible now; the close handler
+      // and the next consume run cover a late arrival.
+      stripCompareParam();
+    }
+    // Lesson changed (or first mount): start closed, then honor a pending
+    // deep-link signal for THIS lesson.
+    setCompareOpen(false);
+    consumeCompareParam();
+    window.addEventListener(COMPARE_REQUEST_EVENT, onCompareRequest);
+    window.addEventListener("popstate", consumeCompareParam);
+    return () => {
+      window.removeEventListener(COMPARE_REQUEST_EVENT, onCompareRequest);
+      window.removeEventListener("popstate", consumeCompareParam);
+    };
+  }, [lesson.id]);
 
   // ── Docked-toolbar target ref ────────────────────────────────────────
   // cellRef is attached to the scrollable detail body region — the "cell"
@@ -496,6 +598,41 @@ export function LessonDetail({
                 />
               </svg>
             </Button>
+            {/* Compare with Team Curriculum (UX roadmap item 01) — only on
+                lessons that diverged AND carry a master snapshot, and only
+                in PERSONAL mode (M1 — see the `comparable` gate above).
+                Toggles the inline ForkDiffPanel in the body below. */}
+            {comparable && (
+              <Button
+                variant="icon"
+                iconAriaLabel={
+                  compareOpen
+                    ? "Hide the Team Curriculum comparison"
+                    : "Compare with Team Curriculum"
+                }
+                className={detailStyles.bandIconBtn}
+                aria-expanded={compareOpen}
+                onClick={() => setCompareOpen((open) => !open)}
+                tooltip="See exactly what you changed — every field where your version differs from the Team Curriculum, with per-field revert"
+              >
+                {/* Two opposing arrows — "your version ⇄ the team's". */}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2.5 5.5h9m0 0L9 3m2.5 2.5L9 8M13.5 10.5h-9m0 0L7 8m-2.5 2.5L7 13"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </Button>
+            )}
             <Button
               variant="icon"
               iconAriaLabel="More options"
@@ -786,6 +923,28 @@ export function LessonDetail({
               </Button>
             </div>
           </div>
+
+          {/* ── Fork diff — inline Master-vs-personal comparison ────────
+              UX roadmap item 01. A collapsible section between the action
+              row and the lesson flow: the diff renders old → new inside
+              the layout the teacher already reads, per the spec ("inline
+              diff, not side-by-side, as the default"). Opened from the
+              header band's compare button or the card menu's deep link;
+              closed by the panel's own close / footer actions. The
+              `comparable` gate also unmounts it the moment a whole-lesson
+              revert clears the fork flags. */}
+          {compareOpen && comparable && (
+            <ForkDiffPanel
+              lesson={lesson}
+              onClose={() => {
+                setCompareOpen(false);
+                // Teacher-close must stick (M6): drop any `compare` still
+                // sitting in the URL so a later remount cannot re-open a
+                // dismissed diff.
+                stripCompareParam();
+              }}
+            />
+          )}
 
           {/* ── Lesson Flow — structured section editor ─────────────────
               Sits directly on the white body — no bordered/shaded box,

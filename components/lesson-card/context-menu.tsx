@@ -26,7 +26,9 @@ import { useRouter } from "next/navigation";
 import type { Lesson, LessonStatus } from "@/lib/types";
 import { Button } from "@/components/ui";
 import { buildWeeklyLink } from "@/lib/deep-links";
+import { canCompareWithTeam, requestCompare } from "@/lib/fork-diff";
 import { useCopyLink } from "@/lib/use-copy-link";
+import { useAppState } from "@/lib/app-state";
 import { useCatalogOptional } from "@/lib/planner-store";
 import { Icon } from "./icon";
 import { STATUS_LABEL } from "./status";
@@ -122,6 +124,14 @@ export function LessonContextMenu({
   // which mounts lesson cards with no planner-shell providers.
   const copyLink = useCopyLink();
   const { activeGradeId } = useCatalogOptional();
+  // M1: the LIVE Personal | Team-Curriculum mode. The `isMaster` prop is the
+  // host-threaded signal (today only the destructive delete item consumes
+  // it, and no current host threads it), so the compare gate reads the mode
+  // from app-state directly — the cleanest existing seam. Safe here: every
+  // host of this menu (weekly cards, lesson cards, the Settings → Appearance
+  // preview) mounts under a layout that provides <AppStateProvider>; only
+  // the PLANNER providers are optional in the preview (see the hooks above).
+  const { editMode } = useAppState();
 
   // Clamp the menu inside the viewport once it has measured itself.
   useLayoutEffect(() => {
@@ -184,7 +194,8 @@ export function LessonContextMenu({
         label: "Open in Daily",
         tip: "Switch to Daily view with this lesson opened in the detail pane",
         onSelect: () => {
-          router.push(`/daily?lesson=${lesson.id}`);
+          // L6 (same class as the compare push below): encode the id.
+          router.push(`/daily?lesson=${encodeURIComponent(lesson.id)}`);
           onClose();
         },
       },
@@ -272,10 +283,37 @@ export function LessonContextMenu({
         onSelect: () => fire("restore-master"),
       },
       {
-        label: "Compare to Team Curriculum",
-        hidden: !lesson.modified,
-        tip: "Side-by-side view of your version next to the Team Curriculum — so you can see exactly what you changed",
-        onSelect: () => fire("compare-master"),
+        // UX roadmap item 01 — opens the REAL fork diff (ForkDiffPanel),
+        // rendered inline in the Daily lesson detail. Self-contained like
+        // "Open in Daily" above (no onAction round trip), so every host of
+        // this menu gets the diff for free and the old stub wiring
+        // ("compare-master" → placeholder modal) is fully replaced. Only
+        // offered when a master snapshot exists AND the lesson actually
+        // diverged (canCompareWithTeam) — never on unedited lessons — AND
+        // only in PERSONAL mode (M1): the diff's per-field reverts write
+        // with the active save target, and its contract is personal-scoped
+        // ("what did *I* change"), so in Team-Curriculum mode the item
+        // simply doesn't offer itself. Gated on BOTH the host-threaded
+        // `isMaster` prop and the live app-state mode (belt and braces —
+        // see the editMode note above).
+        // ≤2 clicks from the Weekly grid: ⋯ menu → this item → diff.
+        label: "Compare with Team Curriculum",
+        hidden:
+          isMaster || editMode === "master" || !canCompareWithTeam(lesson),
+        tip: "See exactly what you changed — every field where your version differs from the Team Curriculum, with per-field revert",
+        onSelect: () => {
+          // L6: lesson ids are query-string data — always encoded.
+          router.push(
+            `/daily?lesson=${encodeURIComponent(lesson.id)}&compare=1`,
+          );
+          // M6: the push may not change LessonDetail's `lesson.id` (the
+          // lesson can already be selected in Daily), and the App Router
+          // commits the URL only after the RSC round-trip — so a mounted
+          // LessonDetail is ALSO nudged directly via the same-document
+          // compare-request event (see lib/fork-diff.ts).
+          requestCompare(lesson.id);
+          onClose();
+        },
       },
       {
         label: "Copy to my personal",

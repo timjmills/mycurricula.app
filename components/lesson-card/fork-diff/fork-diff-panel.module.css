@@ -1,0 +1,262 @@
+/* fork-diff-panel.module.css — inline Master-vs-personal diff (UX roadmap
+   item 01). Renders INSIDE the lesson-detail body, so the panel reads as a
+   quiet bordered section of the layout the teacher already knows — not a
+   modal.
+
+   Diff coloring uses the SEMANTIC layer only — removed (Team value) in
+   --danger-tint, added (personal value) in --done-tint — never subject
+   colors, per the item-01 spec ("consistent on every subject"). Zero hex;
+   every color is a token. */
+
+.panel {
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  margin: 2px 0 18px;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.headText {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.sub {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-500);
+}
+
+/* Close button — compact glyph, ≥44px effective target via inflation. */
+.closeBtn {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.closeBtn::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+/* ── Diff rows ──────────────────────────────────────────────────────────── */
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 2px 0;
+}
+
+.row {
+  padding: 9px 16px 11px;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  min-height: 24px;
+}
+
+.fieldLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+/* One side of the old → new pair. */
+.value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--r-6);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-900);
+}
+
+.removed {
+  background: var(--danger-tint);
+}
+
+.added {
+  background: var(--done-tint);
+  margin-top: 4px;
+}
+
+/* "Team" / "Yours" tag — doubles as the screen-reader-visible naming of
+   which side is which (no color-only meaning). */
+.valueTag {
+  flex: 0 0 auto;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.removed .valueTag {
+  /* AA: --danger (#ef5a5a) on --danger-tint (#fdecec) is only ~2.93:1 —
+     9.5px uppercase text needs ≥4.5:1. --tag-red-fg (#991b1b, the deep
+     chip-text red the tag-pill chrome pairs already use on a near-identical
+     #fee2e2 tint) clears it at ~7.28:1 on this tint (~8.31:1 on white).
+     The tint background stays — only the small-text color deepens. */
+  color: var(--tag-red-fg);
+}
+
+.added .valueTag {
+  /* AA: --done (#16a06b) on --done-tint (#e4f6ee) is only ~2.98:1 — same
+     small-text ≥4.5:1 bar as above. --tag-green-fg (#166534, the deep
+     chip-text green of the tag-pill chrome) clears it at ~6.35:1 on this
+     tint (~7.13:1 on white). Tint background unchanged. */
+  color: var(--tag-green-fg);
+}
+
+.valueText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.valueEmpty {
+  font-style: italic;
+  color: var(--ink-500);
+}
+
+/* Side-by-side mode (long fields) — two columns that wrap back to a stack
+   when the pane is narrow, so phone/tablet never overflow sideways. */
+.columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.columns .value {
+  flex: 1 1 220px;
+  margin-top: 0;
+}
+
+/* ── Per-field revert (hover-revealed, Weekly-card pattern) ─────────────── */
+
+.revertBtn {
+  position: relative;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--ink-150);
+  border-radius: var(--r-pill);
+  background: var(--paper);
+  color: var(--ink-700);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.12s,
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.row:hover .revertBtn,
+.row:focus-within .revertBtn {
+  opacity: 1;
+}
+
+.revertBtn:hover {
+  background: var(--danger-tint);
+  border-color: var(--danger);
+  /* AA: --danger (#ef5a5a) on --danger-tint (#fdecec) is ~2.93:1 — this
+     11px label needs ≥4.5:1. --tag-red-fg (#991b1b) reads ~7.28:1 on the
+     tint, keeping the destructive-red semantics. The tint background and
+     the (non-text) --danger border stay. */
+  color: var(--tag-red-fg);
+}
+
+.revertBtn:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--ink-400);
+  outline-offset: 2px;
+}
+
+/* ≥44px EFFECTIVE touch target (CLAUDE.md §4): the visual stays a compact
+   ~24px pill; the hit area inflates via the pseudo-element — the same
+   inflation idiom as UndoToast / AllToolsMenu. */
+.revertBtn::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+}
+
+/* Hover-reveal is meaningless on touch — keep the control always visible
+   where hover does not exist (tablet/phone). */
+@media (hover: none) {
+  .revertBtn {
+    opacity: 1;
+  }
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+
+.empty {
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-500);
+}
+
+/* ── Footer actions ─────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--ink-100);
+}
+
+.footNote {
+  flex: 1 1 220px;
+  min-width: 180px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-500);
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .revertBtn {
+    transition: none;
+  }
+}

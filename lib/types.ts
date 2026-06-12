@@ -142,6 +142,47 @@ export interface LessonTask {
   subjectHint: SubjectId | null;
 }
 
+/**
+ * PROTOTYPE seam — UX roadmap item 01 (fork diff view).
+ *
+ * A frozen copy of the Master / Team-Curriculum values a personally-forked
+ * lesson diverged FROM, captured at fork time. The fork-diff panel
+ * (components/lesson-card/fork-diff) diffs the live lesson against this to
+ * show "what's different from the Team Curriculum".
+ *
+ * Phase 1B replaces this field with persisted fork lineage from Supabase
+ * (the master row IS the snapshot once the backend stores both sides of a
+ * fork); until then a handful of mock fixtures carry it so the diff UI can
+ * be designed and exercised. Deliberately JSONB-safe: plain strings,
+ * numbers, and string arrays only — no Dates, functions, or class
+ * instances — so the shape can persist as a JSONB column unchanged if
+ * Phase 1B chooses to keep it.
+ *
+ * The captured fields mirror the diffable surface of the item-01 spec
+ * (title / objective / preview / standards / scheduling / sections). It is
+ * intentionally PARTIAL — directions, notes, resources, and tasks are not
+ * captured — which is why per-field reverts can never cheaply prove "full
+ * reconvergence" with the master (see lib/fork-diff.ts).
+ */
+export interface LessonMasterSnapshot {
+  /** Master lesson title (may contain rich-text HTML, like Lesson.title). */
+  title: string;
+  /** Master "I Can" objective statement. */
+  objective: string;
+  /** Master weekly-card summary. */
+  preview: string;
+  /** Master standards codes. */
+  standards: string[];
+  /** Master placement — day index into the CONFIGURED school week. */
+  day: number;
+  /** Master placement — week number. */
+  week: number;
+  /** Master lesson-flow sections flattened to plain text, when captured.
+   *  Optional: live sections are store-owned (not on Lesson), so the diff
+   *  only renders a sections row when both sides are supplied. */
+  sections?: string;
+}
+
 /** The core lesson model — one per academic block in the weekly grid. */
 export interface Lesson {
   id: string;
@@ -188,6 +229,14 @@ export interface Lesson {
    * Falsy by default — the field is absent on fixture lessons.
    */
   archived?: boolean;
+  /**
+   * PROTOTYPE seam (UX roadmap item 01) — the pre-fork Master values this
+   * personally-forked lesson diverged from. Present only on a few mock
+   * fixtures today; Phase 1B replaces it with persisted fork lineage.
+   * Additive + optional so every existing consumer is untouched, and
+   * JSONB-safe (see LessonMasterSnapshot).
+   */
+  masterSnapshot?: LessonMasterSnapshot;
 }
 
 export type NoteScope = "shared" | "personal";

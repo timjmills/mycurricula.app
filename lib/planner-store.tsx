@@ -70,6 +70,7 @@ import {
   describeStandard as mockDescribeStandard,
 } from "@/lib/mock";
 import { useAppState } from "@/lib/app-state";
+import { snapshotRestorePatch } from "@/lib/fork-diff";
 import { plannerClient } from "@/lib/planner/client";
 import { resolveGrade } from "@/lib/planner/grade";
 import { isPlannerSupabaseConfigured } from "@/lib/planner/source";
@@ -909,21 +910,59 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
     }
 
     case "restoreLesson": {
-      // Revert a personally-modified lesson back to its master/core appearance.
-      // Sets the forking flags to their "unforked" state: modified=false,
-      // moved=null, isPersonal=false.
+      // Revert a personally-forked lesson back to the team's version.
       //
-      // NOTE: This does NOT revert content fields (title, objective, preview,
-      // directions, etc.) because the master snapshot is not yet stored in the
-      // data model. When master snapshots land (planned alongside the Supabase
-      // backend), this case must also restore the content fields from the
-      // snapshot. Until then only the forking metadata is cleared.
+      // PROTOTYPE — reads the `Lesson.masterSnapshot` seam (the mock-fixture
+      // capture of the team's values); Phase 1B replaces that source with
+      // persisted fork lineage, same shape. When the lesson carries a
+      // snapshot, "restore" must MEAN restore (roadmap-01 finding H1): the
+      // captured content fields (title / objective / preview / standards —
+      // via the pure, unit-tested snapshotRestorePatch) are written back AND
+      // the captured placement (day / week) is re-applied through the
+      // moveLesson delegation below. All of it happens inside this ONE
+      // action, so the gesture stays one history step — one ⌘Z brings the
+      // whole fork back — and the existing "Restored the team's version"
+      // toast stays honest.
+      //
+      // Lessons WITHOUT a snapshot keep the previous flags-only behavior
+      // (clear modified / moved / isPersonal, content untouched): there is
+      // nothing captured to restore FROM, and refusing the action would
+      // strand a teacher unable to clear stale fork flags on snapshot-less
+      // lessons. Phase 1B's persisted lineage closes that gap for every
+      // fork; until then the three-tier card signal is only fully truthful
+      // where a snapshot exists.
+      const lesson = doc.lessons.find((l) => l.id === action.id);
+      if (!lesson) return doc;
+      const snapshot = lesson.masterSnapshot;
+
+      // Placement first, THROUGH the moveLesson reducer — the same
+      // delegation bumpLesson / relocateLesson use — so the source cell's
+      // CellLayout is pruned and slot handling stays consistent. moveLesson
+      // sets `moved` ("same-week"/"across-weeks"); the flag reset below
+      // overrides it to null, which is correct: after a restore the lesson
+      // sits exactly where the team put it.
+      const placed =
+        snapshot &&
+        (lesson.day !== snapshot.day || lesson.week !== snapshot.week)
+          ? applyDocAction(doc, {
+              type: "moveLesson",
+              id: action.id,
+              patch: { day: snapshot.day, week: snapshot.week },
+            })
+          : doc;
+
       return {
-        ...doc,
-        lessons: doc.lessons.map((l) =>
+        ...placed,
+        lessons: placed.lessons.map((l) =>
           l.id !== action.id
             ? l
-            : { ...l, modified: false, moved: null, isPersonal: false },
+            : {
+                ...l,
+                ...(snapshot ? snapshotRestorePatch(snapshot) : {}),
+                modified: false,
+                moved: null,
+                isPersonal: false,
+              },
         ),
       };
     }

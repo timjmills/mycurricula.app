@@ -1,21 +1,18 @@
 /* rich-text-editor.module.css
-   Floating dark toolbar + borderless contentEditable region.
+   Compact light toolbar (floating or docked) + borderless contentEditable.
 
-   Design language:
-     • Toolbar: near-black pill surface (--ink-900), compact 28px buttons,
-       white glyphs, popover shadow. Appears above the selection. Can wrap
-       on narrow viewports — groups stay visually intact with flex-wrap.
-     • Swatches: 28×28 touch targets (16×16 visual) in the palette popovers.
-     • Highlight popover: two labeled sections — Normal (saturated) and
-       Pastel (soft tint) — plus a Clear row, separated by section labels.
-     • Editor: no border itself — the parent card/field provides the frame.
-     • All sizing via var(--t-*) and var(--r-*) tokens; no hard-coded px on
-       colors, fonts, or semantic spacing.
-
-   Touch targets: toolbar buttons are 28px visual / 36px touch (comfortable
-   for a dense formatting bar). Swatch buttons are 28×28 touch targets with
-   16×16 visual swatches inside.
-*/
+   Restyled to the 6.12.26 resource-redesign §6 artboard (rn.css `.rn-rte*`):
+     • Toolbar strip: --surface-warm fill, hairline-bordered, 30px buttons
+       (--r-xs) inflated to ≥44px effective via `::after { inset: -7px }`,
+       1×18px hairline separators, active state --ink-100 / --ink.
+     • Highlight popover: the 10 highlighter pens + clear, 22px swatches
+       inflated to 44px hits (`::after { inset: -11px }`).
+     • Link popover (`.rn-linkPop`): surface card, --shadow-popover, URL
+       input + Save / Open / Remove.
+     • Editor: no border itself — the parent card/field provides the frame
+       (e.g. the composer's .rteShell supplies the 96px-min body).
+     • All color/type via var(--token); raw px is layout math only
+       (BUILD_STANDARD §3). Reduced-motion blocks drop every transition. */
 
 /* ── Root wrapper ──────────────────────────────────────────────────────────── */
 .root {
@@ -24,7 +21,7 @@
   flex-direction: column;
 }
 
-/* ── Floating toolbar ─────────────────────────────────────────────────────── */
+/* ── Toolbar (floating or docked) ─────────────────────────────────────────── */
 .toolbar {
   position: fixed; /* fixed so it floats above all stacking contexts */
   z-index: 9999;
@@ -34,14 +31,12 @@
      truncating — controls stay in their logical groups */
   flex-wrap: wrap;
   gap: 2px;
-  padding: 4px 6px;
-  background: var(--ink);
-  /* White text for every button glyph. Set on the toolbar itself because
-     `.cp-root button { color: inherit }` (tokens.css) out-specifies a
-     class on the button, so buttons must inherit white from this parent. */
-  color: var(--paper);
+  padding: 6px 8px;
+  background: var(--surface-warm);
+  color: var(--ink-soft);
+  border: 1px solid var(--border);
   border-radius: var(--r-md);
-  box-shadow: var(--sh-lg);
+  box-shadow: var(--shadow-popover);
   user-select: none;
   /* Cap width so the toolbar doesn't span the full page on wide screens */
   max-width: calc(100vw - 16px);
@@ -69,11 +64,10 @@
 /* ── Docked toolbar variant ───────────────────────────────────────────────────
    Applied when a `dockTarget` is supplied: the toolbar is pinned (by JS) to
    the bottom-center of the dock target instead of floating by the selection.
-   The base `.toolbar` already supplies position:fixed, z-index, the dark pill
-   surface, wrapping, and the viewport-width cap — all of which the docked
-   variant keeps. The only visual difference is the entrance motion: a docked
-   toolbar lifts UP from the field's bottom edge, which reads better than the
-   downward drift of the floating reveal. Coordinates are still set inline by
+   The base `.toolbar` already supplies position:fixed, z-index, the surface,
+   wrapping, and the viewport-width cap — all of which the docked variant
+   keeps. The only visual difference is the entrance motion: a docked toolbar
+   lifts UP from the field's bottom edge. Coordinates are still set inline by
    the component. */
 .toolbarDocked {
   animation: tbDockReveal 0.14s ease both;
@@ -98,19 +92,20 @@
   }
 }
 
-/* ── Toolbar button ────────────────────────────────────────────────────────── */
+/* ── Toolbar button — per `.rn-rteBtn` ────────────────────────────────────── */
 .tbBtn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  min-width: 28px;
-  min-height: 28px;
-  /* Expand touch target to 36px without inflating the visual toolbar size */
-  padding: 4px 5px;
-  border-radius: var(--r-4);
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border-radius: var(--r-xs);
   background: transparent;
-  color: var(--paper);
+  color: var(--ink-soft);
+  font-size: var(--t-13);
+  font-weight: 700;
   border: none;
   cursor: pointer;
   transition:
@@ -118,19 +113,26 @@
     color 0.1s ease;
 }
 
+/* Hit-area inflation: 30px visual → 44px effective. */
+.tbBtn::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+
 .tbBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--paper);
+  background: var(--hairline);
+  color: var(--ink-soft);
 }
 
 .tbBtn:focus-visible {
-  outline: 2px solid var(--paper);
+  outline: 2px solid var(--brand-500);
   outline-offset: -2px;
 }
 
 .tbBtnActive {
-  background: rgba(255, 255, 255, 0.15);
-  color: var(--paper);
+  background: var(--ink-100);
+  color: var(--ink);
 }
 
 /* ── Format glyphs ─────────────────────────────────────────────────────────── */
@@ -145,7 +147,7 @@
   font-size: var(--t-13);
   font-style: italic;
   font-family: var(--font-sans);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -153,122 +155,44 @@
   font-size: var(--t-13);
   text-decoration: underline;
   font-family: var(--font-sans);
-  font-weight: 500;
-  line-height: 1;
-}
-
-/* Strikethrough glyph */
-.iconS {
-  font-size: var(--t-13);
-  text-decoration: line-through;
-  font-family: var(--font-sans);
-  font-weight: 500;
-  line-height: 1;
-}
-
-/* Subscript / superscript — compact, using native HTML sub/sup inside the span
-   so the visual matches the actual effect in the editor. */
-.iconScript {
-  font-size: var(--t-12);
-  font-family: var(--font-sans);
   font-weight: 600;
   line-height: 1;
-  letter-spacing: -0.01em;
 }
 
-.iconScript sub,
-.iconScript sup {
-  font-size: 0.65em;
-  font-weight: 500;
-}
-
-/* List icons — short text glyphs approximating list controls */
-.iconList {
-  font-size: var(--t-12);
-  font-family: var(--font-sans);
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  /* Prevent emoji rendering on the checklist ☐ */
-  font-variant-emoji: text;
-}
-
-/* Insert icons (link, image) — emoji rendered at toolbar scale */
-.iconInsert {
-  font-size: var(--t-14);
-  line-height: 1;
-  /* Force emoji presentation for the unicode icons */
-  font-variant-emoji: emoji;
-}
-
-.iconColor {
+.iconH {
   font-size: var(--t-13);
   font-weight: 700;
   font-family: var(--font-sans);
   line-height: 1;
-  /* Gradient spanning math-blue → spelling-pink → ufli-orange to suggest
-     the full color palette. var() works inside linear-gradient in all
-     browsers that support CSS custom properties (every browser we support). */
-  background: linear-gradient(
-    135deg,
-    var(--math) 0%,
-    var(--spelling) 50%,
-    var(--ufli) 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
-.iconHighlight {
-  font-size: var(--t-13);
-  font-weight: 700;
-  font-family: var(--font-sans);
-  line-height: 1;
-  /* Yellow-tinted to suggest highlight — uses design tokens. */
-  background: linear-gradient(
-    135deg,
-    var(--important-bg) 20%,
-    var(--tag-amber) 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+/* Highlight trigger — a small lemon pen swatch (per the §6 artboard). */
+.iconHl {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--hl-lemon);
 }
 
-.iconFont {
-  font-size: var(--t-12);
-  font-weight: 500;
-  font-family: var(--font-sans);
-  line-height: 1;
-  color: inherit;
-}
-
-.iconCaret {
-  font-size: var(--t-10);
-  color: var(--muted);
-  line-height: 1;
-  margin-top: 1px;
-}
-
-/* ── Divider ───────────────────────────────────────────────────────────────── */
+/* ── Divider — per `.rn-rteSep` ────────────────────────────────────────────── */
 .divider {
   display: block;
   width: 1px;
-  height: var(--t-16);
-  background: rgba(255, 255, 255, 0.12);
-  margin: 0 3px;
+  height: 18px;
+  background: var(--hairline);
+  margin: 0 4px;
   flex-shrink: 0;
 }
 
-/* ── Palette groups (trigger + popover) ────────────────────────────────────── */
+/* ── Palette group (trigger + popover) ─────────────────────────────────────── */
 .paletteGroup {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
 
-/* ── Palette popover ───────────────────────────────────────────────────────── */
+/* ── Highlight-pen popover ─────────────────────────────────────────────────── */
 .palettePopover {
   position: absolute;
   /* Open downward, below the trigger. The toolbar is often pinned near the
@@ -278,14 +202,15 @@
   transform: translateX(-50%);
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
-  padding: 8px;
-  background: var(--ink);
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--r-md);
-  box-shadow: var(--sh-lg);
+  box-shadow: var(--shadow-popover);
   animation: tbReveal 0.12s ease both;
-  /* Wide enough for 6 × (16 + 4) + padding */
-  min-width: 148px;
+  /* Wide enough for 6 × (22 + 8) + padding */
+  min-width: 196px;
   z-index: 10000;
 }
 
@@ -295,133 +220,109 @@
   }
 }
 
-/* ── Highlight popover — sectioned layout ──────────────────────────────────── */
-/* Overrides the generic grid to use a column layout with labeled sections. */
-.highlightPopover {
-  /* Reset the grid and use a column flex for the section rows */
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  grid-template-columns: unset;
-  min-width: 192px;
-  padding: 10px;
-}
-
-/* A labeled section inside the highlight popover */
-.paletteSection {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* Small muted label above each swatch row ("Normal", "Pastel", "Clear") */
-.paletteSectionLabel {
-  font-size: var(--t-10);
-  font-family: var(--font-sans);
-  font-weight: 600;
-  color: var(--paper);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  line-height: 1;
-  /* Prevent the label from receiving pointer events */
-  pointer-events: none;
-  user-select: none;
-}
-
-/* Horizontal row of swatches within a section */
-.swatchRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-/* ── Swatch button ─────────────────────────────────────────────────────────── */
+/* ── Pen swatch — 22px visual, 44px effective (`::after inset: -11px`) ─────── */
 .swatch {
-  /* 28×28 touch target — uses --t-28 token (28px) */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--t-28);
-  height: var(--t-28);
-  border-radius: var(--r-4);
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
-  cursor: pointer;
-  transition:
-    transform 0.1s ease,
-    border-color 0.1s ease;
   position: relative;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: var(--r-pill);
+  border: 2px solid var(--paper);
+  box-shadow: 0 0 0 1px var(--border);
+  cursor: pointer;
   flex-shrink: 0;
+  transition: transform 0.1s ease;
+}
+
+.swatch::after {
+  content: "";
+  position: absolute;
+  inset: -11px;
 }
 
 .swatch:hover {
-  transform: scale(1.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.15);
 }
 
 .swatch:focus-visible {
-  outline: 2px solid var(--paper);
+  outline: 2px solid var(--brand-500);
   outline-offset: 1px;
 }
 
-/* "No highlight" swatch — shows the classic remove/null symbol */
+/* "No highlight" swatch — dashed ring + strike-through slash. */
 .swatchNone {
-  background: rgba(255, 255, 255, 0.06) !important;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
   border-style: dashed;
-}
-
-.swatchNone::before,
-.swatchNone::after {
-  content: "";
-  position: absolute;
-  width: 1.5px;
-  height: var(--t-14);
-  background: var(--muted);
-  border-radius: 1px;
+  border-color: var(--border);
 }
 
 .swatchNone::before {
-  transform: rotate(45deg);
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.5px;
+  height: 14px;
+  background: var(--muted);
+  border-radius: 1px;
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 
-.swatchNone::after {
-  transform: rotate(-45deg);
-}
-
-/* ── Font picker popover ───────────────────────────────────────────────────── */
-.fontPopover {
-  grid-template-columns: 1fr;
-  gap: 2px;
-  min-width: 120px;
-  padding: 6px;
-}
-
-.fontOption {
+/* ── Link popover — per `.rn-linkPop` ──────────────────────────────────────── */
+.linkPop {
+  position: fixed;
+  z-index: 10000;
   display: flex;
   align-items: center;
-  width: 100%;
-  min-height: 32px;
-  padding: 6px 9px;
-  border-radius: var(--r-4);
-  background: transparent;
-  border: none;
-  color: var(--paper);
-  font-size: var(--t-13);
-  cursor: pointer;
-  text-align: left;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-  white-space: nowrap;
+  gap: 6px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-popover);
+  max-width: calc(100vw - 16px);
+  animation: tbReveal 0.12s ease both;
 }
 
-.fontOption:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--paper);
+@media (prefers-reduced-motion: reduce) {
+  .linkPop {
+    animation: none;
+  }
 }
 
-.fontOption:focus-visible {
-  outline: 2px solid var(--paper);
-  outline-offset: -2px;
+.linkInput {
+  min-height: 36px;
+  width: 200px;
+  max-width: 45vw;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-warm);
+  font-family: var(--font-sans);
+  font-size: var(--t-12);
+  color: var(--ink-soft);
+}
+
+.linkInput:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -1px;
+}
+
+.linkInput::placeholder {
+  color: var(--faint);
+}
+
+/* Danger tint on the Remove action (compound selector out-specifies the
+   Button primitive's single-class `.icon` color). */
+.linkPop .linkRemoveBtn {
+  color: var(--danger);
+}
+
+.linkPop .linkRemoveBtn:hover:not(:disabled) {
+  background: var(--danger-tint);
+  color: var(--danger);
 }
 
 /* ── Editor wrapper + placeholder ─────────────────────────────────────────── */
@@ -453,18 +354,11 @@
   outline: none;
   /* Inherits font-size, font-family, color from parent context.
      The editor intentionally has no border — the surrounding element provides
-     the frame (card border, field border, etc.). */
+     the frame (card border, field border, the composer's .rteShell, etc.). */
   word-break: break-word;
   overflow-wrap: break-word;
   white-space: pre-wrap;
   caret-color: var(--ink);
-}
-
-/* Focus ring on the editor wrapper when the inner div is focused.
-   We style the wrapper so the ring appears outside the content area. */
-.editorWrap:focus-within {
-  /* No visible ring by default — the floating toolbar is the focus indicator
-     for rich-text interactions. Add a subtle caret-color change instead. */
 }
 
 /* For keyboard-only nav: show a ring when the editable div is focused via
@@ -484,21 +378,50 @@
   word-break: break-word;
 }
 
+/* ── In-editor vocabulary styling (`.rn-notesBody` while editing) ─────────────
+   Scoped to .editor so it never leaks. Gives the teacher live feedback that
+   matches the render sites: display-family h3, brand links, lemon marks. */
+.editor h3 {
+  margin: 14px 0 6px;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-15);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.editor a {
+  color: var(--brand-600);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--brand-200);
+  /* Edits go through the link popover, not navigation. */
+  cursor: pointer;
+}
+
+.editor mark {
+  background: var(--hlp-lemon);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
 /* ── Lists inside the editor ───────────────────────────────────────────────────
    Tailwind's preflight reset zeroes list styling globally
    (`ol, ul { list-style: none; margin: 0; padding: 0; }`). That made the
-   "Numbered list" / "Bullet list" toolbar buttons appear broken: execCommand
-   DID create real <ol>/<ul>/<li> elements, but with no marker and no indent
-   they were visually indistinguishable from plain text.
+   "Bulleted list" toolbar button appear broken: execCommand DID create real
+   <ul>/<li> elements, but with no marker and no indent they were visually
+   indistinguishable from plain text.
 
    These scoped rules re-enable proper list rendering for content the teacher
    creates INSIDE the editor only — they never leak to lists elsewhere in the
    app. Padding gives the markers room; nested lists switch marker styles the
-   way browsers do natively so multi-level lists stay readable. */
+   way browsers do natively so multi-level lists stay readable. (Ordered-list
+   styling is kept for legacy bodies the sanitizer still admits — the auto
+   "1. " typing shortcut also still produces them.) */
 .editor ol,
 .editor ul {
   /* Indent enough to seat the marker clear of the editor's left edge. */
-  padding-left: var(--t-24);
+  padding-left: 18px;
   /* Vertical breathing room around a list block; no horizontal margin so the
      list aligns with surrounding paragraph text. */
   margin: var(--t-10) 0;
@@ -542,13 +465,11 @@
   margin: var(--t-2, 2px) 0;
 }
 
-/* ── Inline media inside the editor (images + embeds) ───────────────────────────
-   Notecard bodies can carry inline images and safe embeds (YouTube / Vimeo /
-   Google), inserted via the toolbar. Both must stay within the editor's content
-   width at every viewport tier — never forcing document-level horizontal scroll
-   (CLAUDE.md responsive contract). Tailwind's preflight already sets img to
-   block + max-width:100%, but we re-assert it scoped to the editor so the rule
-   is explicit and survives reset changes. */
+/* ── Inline media inside the editor ───────────────────────────────────────────
+   Notecard bodies can carry inline images (inserted via the toolbar) and, in
+   legacy bodies, sanitizer-admitted embeds. Both must stay within the editor's
+   content width at every viewport tier — never forcing document-level
+   horizontal scroll (CLAUDE.md responsive contract). */
 .editor img {
   display: block;
   max-width: 100%;
@@ -558,92 +479,22 @@
   margin: var(--t-8, 8px) auto;
 }
 
-/* Embed wrapper — a non-editable atomic block holding the iframe. Constrained
-   to a comfortable reading width and kept 16:9 via aspect-ratio so the frame
-   scales fluidly without overflowing on phones. */
-.embedBlock {
-  position: relative;
-  width: 100%;
-  max-width: 480px;
-  aspect-ratio: 16 / 9;
-  margin: var(--t-10) 0;
-  border-radius: var(--r-md);
-  overflow: hidden;
-  background: var(--ink-100);
-  /* Hairline frame so the embed reads as a distinct object in the text flow. */
-  border: var(--line);
-}
-
-.embedBlock iframe {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+/* Legacy embeds (the toolbar no longer inserts iframes; stored bodies may
+   still carry sanitizer-trusted ones). Keep them inside the content column. */
+.editor iframe {
+  max-width: 100%;
   border: 0;
-  display: block;
+  border-radius: var(--r-md);
 }
 
-/* The play-glyph for the "Insert embed" toolbar button. Force text (not emoji)
-   presentation so it reads as a crisp triangle that inherits the white toolbar
-   color, matching the other text-glyph buttons rather than the emoji inserts. */
-.iconEmbed {
-  font-size: var(--t-13);
-  line-height: 1;
-  font-variant-emoji: text;
-}
+/* ── Reduced motion: drop the micro-transitions ───────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .tbBtn,
+  .swatch {
+    transition: none;
+  }
 
-/* ── Text-size picker popover ──────────────────────────────────────────────────
-   Mirrors the font-family picker: a single-column list of size options. Each
-   option previews its own size so the choice is visible at a glance. */
-.sizePopover {
-  grid-template-columns: 1fr;
-  gap: 2px;
-  min-width: 120px;
-  padding: 6px;
-}
-
-/* A size option row. Shares the font-option interaction styles but the inline
-   font-size on each button (set in TSX) gives the live preview. */
-.sizeOption {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: 32px;
-  padding: 6px 9px;
-  border-radius: var(--r-4);
-  background: transparent;
-  border: none;
-  color: var(--paper);
-  font-family: var(--font-sans);
-  line-height: 1;
-  cursor: pointer;
-  text-align: left;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-  white-space: nowrap;
-}
-
-.sizeOption:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--paper);
-}
-
-.sizeOption:focus-visible {
-  outline: 2px solid var(--paper);
-  outline-offset: -2px;
-}
-
-/* The text-size trigger glyph — a small/large "A" pair suggesting size choice. */
-.iconSize {
-  font-size: var(--t-13);
-  font-weight: 600;
-  font-family: var(--font-sans);
-  line-height: 1;
-  color: inherit;
-  letter-spacing: -0.04em;
-}
-
-.iconSize .iconSizeSmall {
-  font-size: var(--t-10);
+  .swatch:hover {
+    transform: none;
+  }
 }

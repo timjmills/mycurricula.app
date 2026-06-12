@@ -72,6 +72,42 @@ describe("canEmbedResource — hosted rows (same-origin /api/resources)", () => 
   });
 });
 
+describe("canEmbedResource — session blob: rows (teacher-minted uploads)", () => {
+  it("embeds a session blob: pdf (M3 — fresh upload previews in the iframe)", () => {
+    const r = res({
+      type: "pdf",
+      url: "blob:https://app.example/4f1c-9a2b",
+      mimeType: "application/pdf",
+    });
+    expect(canEmbedResource(r)).toBe(true);
+    expect(embedDenialReason(r)).toBeNull();
+  });
+
+  it("embeds blob: image/video/audio via mimeType or provider", () => {
+    expect(
+      canEmbedResource(
+        res({ url: "blob:https://app.example/img", mimeType: "image/png" }),
+      ),
+    ).toBe(true);
+    expect(
+      canEmbedResource(
+        res({ url: "blob:https://app.example/vid", provider: "video" }),
+      ),
+    ).toBe(true);
+    expect(
+      canEmbedResource(
+        res({ url: "blob:https://app.example/aud", mimeType: "audio/mpeg" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("does NOT embed a blob: row that is not media — link card instead", () => {
+    const r = res({ url: "blob:https://app.example/mystery" });
+    expect(canEmbedResource(r)).toBe(false);
+    expect(embedDenialReason(r)).toBe("not-embeddable");
+  });
+});
+
 describe("canEmbedResource — provider urls (delegates to parseResourceUrl)", () => {
   it("embeds youtube / vimeo / google slides urls", () => {
     expect(
@@ -136,5 +172,15 @@ describe("canEmbedResource — fail-closed edges", () => {
       expect(() => canEmbedResource(res({ url }))).not.toThrow();
       expect(canEmbedResource(res({ url }))).toBe(false);
     }
+  });
+
+  it("javascript: stays fail-closed even when the row claims a media kind", () => {
+    const r = res({
+      type: "pdf",
+      url: "javascript:alert(1)",
+      mimeType: "application/pdf",
+    });
+    expect(canEmbedResource(r)).toBe(false);
+    expect(embedDenialReason(r)).toBe("unsafe-scheme");
   });
 });

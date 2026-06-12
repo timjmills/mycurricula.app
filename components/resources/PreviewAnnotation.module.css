@@ -1,5 +1,7 @@
 /* PreviewAnnotation.module.css — the live-only "draw on the enlarged resource"
- * surface. All colour/radii/type via app/tokens.css var(); no hex. */
+ * surface, restyled to the 6.12.26 §5 chrome (.rn-annoBar / .rn-swatch /
+ * .rn-ephemeral recipes). All colour/radii/type via app/tokens.css var();
+ * no hex. */
 
 /* The positioned media box. The AnnotationLayer (position:absolute; inset:0)
    locks to exactly this box, so ink sits over the media and nothing else. */
@@ -13,72 +15,125 @@
   min-height: 0;
 }
 
-/* ── Floating toolbar ───────────────────────────────────────────────────────
-   Pinned to the top of the media box, centered, over the annotation canvas
-   (which sits at z-index 2 inside the box). */
+/* ── Floating pill toolbar (§5 .rn-annoBar) ─────────────────────────────────
+   Bottom-centered over the media box, above the annotation canvas (which
+   sits at z-index 2 inside the box). */
 .toolbar {
   position: absolute;
-  top: 10px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 4;
   display: flex;
   align-items: center;
-  gap: var(--r-8);
+  gap: 5px;
   flex-wrap: wrap;
   justify-content: center;
   max-width: calc(100% - 20px);
-  padding: var(--r-6) var(--r-10);
+  padding: 5px;
   border: 1px solid var(--border);
   border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--paper) 94%, transparent);
-  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-popover);
 }
 
 .tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   flex: none;
 }
 
 .divider {
   width: 1px;
-  align-self: stretch;
-  min-height: 22px;
-  background: var(--border);
+  height: 20px;
+  flex: 0 0 auto;
+  background: var(--hairline);
+  margin: 0 3px;
 }
 
-/* ── Colour swatches ──────────────────────────────────────────────────────── */
+/* ── 36px circular toolbar buttons (§5 .rn-annoBtn) ────────────────────────
+   Visual 36px; the ::after pad inflates the hit area to ≥44px. */
+.annoBtn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.annoBtn::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+
+.annoBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.annoBtn:hover:not(:disabled) {
+  background: var(--hairline);
+}
+
+.annoBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.annoBtn:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+/* Active tool — ink-900 disc, paper glyph. */
+.annoBtnOn,
+.annoBtnOn:hover:not(:disabled) {
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+/* Clear all ink — destructive glyph tint; the required tooltip carries the
+   warning (never a dialog). */
+.annoBtnDanger:not(:disabled) {
+  color: var(--danger);
+}
+
+/* ── Colour swatches (§5 .rn-swatch — 22px, paper ring, ink-900 selected) ── */
 
 .swatches {
   display: flex;
   align-items: center;
-  gap: var(--r-4);
+  gap: 5px;
 }
 
 .swatch {
   position: relative;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   padding: 0;
-  border: 2px solid var(--border);
-  border-radius: var(--r-pill);
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--border);
   cursor: pointer;
 }
 
-/* ≥44px hit area on touch via an invisible pad. */
-.swatch::before {
+/* ≥44px hit area: 22 + 11 + 11. */
+.swatch::after {
   content: "";
   position: absolute;
-  inset: -10px;
-}
-
-.swatch:hover {
-  border-color: var(--brand-300);
+  inset: -11px;
 }
 
 .swatchActive {
-  border-color: var(--paper);
-  outline: 2px solid var(--brand-500);
-  outline-offset: 1px;
+  box-shadow: 0 0 0 2px var(--ink-900);
 }
 
 .swatch:disabled {
@@ -88,49 +143,47 @@
 
 .swatch:focus-visible {
   outline: 2px solid var(--brand-500);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
-/* ── Stroke width ─────────────────────────────────────────────────────────── */
+/* ── Stroke width (kept per §5 — widths 2/4/8) ─────────────────────────────── */
 
 .widths {
   display: flex;
   align-items: center;
-  gap: var(--r-2);
+  gap: 2px;
 }
 
 .width {
   position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid transparent;
-  border-radius: var(--r-8);
   background: transparent;
+  color: var(--ink-soft);
   cursor: pointer;
-  color: var(--ink-700);
 }
 
-.width::before {
+/* ≥44px hit area: 28 + 8 + 8. */
+.width::after {
   content: "";
   position: absolute;
-  inset: -6px;
+  inset: -8px;
 }
 
 .width:hover {
   background: var(--hairline);
 }
 
-.widthActive {
-  background: var(--brand-50);
-  border-color: var(--brand-200);
-  color: var(--brand-600);
-}
-
-.widthActive .widthDot {
-  background: var(--brand-600);
+.widthActive,
+.widthActive:hover {
+  background: var(--ink-900);
+  color: var(--paper);
 }
 
 .width:focus-visible {
@@ -142,28 +195,35 @@
   display: block;
   min-width: 2px;
   min-height: 2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── Ephemeral-ink pill (§5 .rn-ephemeral — tooltip tokens) ────────────────── */
+
+.ephemeral {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+  padding: 5px 11px;
   border-radius: var(--r-pill);
-  background: var(--ink-700);
+  background: var(--tooltip-bg);
+  color: var(--tooltip-fg);
+  font-size: var(--t-11);
+  font-weight: 600;
+  box-shadow: var(--tooltip-shadow);
+  text-align: center;
+  pointer-events: none;
 }
 
-/* ── Phone: bigger touch targets on the swatch/width controls ─────────────── */
-
-@media (max-width: 640px) {
-  .swatch {
-    width: 28px;
-    height: 28px;
-  }
-
-  .width {
-    width: 36px;
-    height: 36px;
-  }
-}
-
-/* ── Motion ─────────────────────────────────────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  .swatch,
-  .width {
-    transition: none;
-  }
+.ephemeral svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
 }

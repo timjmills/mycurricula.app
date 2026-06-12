@@ -332,6 +332,18 @@ function classifyEmbed(resource: LessonResource): EmbedDenialReason | null {
     return isMediaKind(resource) ? null : "not-embeddable";
   }
 
+  // Session-minted blob: URLs — the teacher's OWN freshly-uploaded file (the
+  // composer mints them via URL.createObjectURL, same-session, same-origin by
+  // construction; a blob: URL cannot point at a foreign document). These
+  // carried full embed trust before the predicate existed — a just-uploaded
+  // PDF rendered in the preview iframe — so they embed when the row is real
+  // media (pdf / image / video / audio), exactly like the hosted root-relative
+  // path above. A blob: row that is NOT media still gets the link card.
+  // javascript:, data:text/html, file:, etc. stay fail-closed below.
+  if (/^blob:/i.test(url)) {
+    return isMediaKind(resource) ? null : "not-embeddable";
+  }
+
   // Everything else must be http(s) — javascript:, data:, file:, and
   // protocol-relative URLs never get a frame (§4a review L8: labeled as
   // a scheme failure, not a host failure, so fallback copy/telemetry
