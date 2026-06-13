@@ -84,9 +84,11 @@ import type { CSSProperties, DragEvent, KeyboardEvent, ReactNode } from "react";
 import type { Lesson, LessonDifferentiation } from "@/lib/types";
 import { describeStandard } from "@/lib/mock";
 import { usePlanner } from "@/lib/planner-store";
+import { bundledDescriptions } from "@/lib/standards/items";
 import { RichTextEditor } from "@/components/rich-text";
 import { ResourceTypePill } from "@/components/lesson-flow";
-import { Tooltip } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
+import { StandardsPicker } from "@/components/standards";
 import { Shoutbox } from "../Shoutbox";
 import {
   TOOL_KEYS,
@@ -102,6 +104,12 @@ import styles from "./planning-tabs.module.css";
 // normalize, localStorage read/write) live in ./planning-tabs-state.ts —
 // pure data, unit-tested in tests/planning-tabs-state.test.ts. This file
 // owns only the presentation metadata and behavior.
+
+/** Bundled standards-item descriptions (CCSS practices, NGSS PEs, IB ATL),
+ *  computed once. Fallback for the Standards pane so a code tagged via the
+ *  StandardsPicker that the mock catalog doesn't know still renders a human
+ *  label instead of the bare code repeated twice. */
+const BUNDLED_DESCRIPTIONS = bundledDescriptions();
 
 /** Per-tool label (sentence case per the design system) + `--pc` accent. */
 const TOOL_META: Record<PlanningToolKey, { label: string; color: string }> = {
@@ -281,7 +289,8 @@ export interface PlanningTabsProps {
 
 export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
   function PlanningTabs({ lesson }, ref): ReactNode {
-    const { editLesson } = usePlanner();
+    const { editLesson, subjects } = usePlanner();
+    const [standardsPickerOpen, setStandardsPickerOpen] = useState(false);
     const uid = useId();
 
     // ── Tool arrangement — SSR-safe persisted state ───────────────────
@@ -596,6 +605,17 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
       );
     }
 
+    function handleStandardsSave(codes: string[]): void {
+      // Same coalesced-editLesson contract as objective/notes/diff above: one
+      // undo step, routed through the store's save-target (Personal vs Master)
+      // like every other lesson edit.
+      editLesson(
+        lesson.id,
+        { standards: codes },
+        { key: `lesson:${lesson.id}:standards`, ts: Date.now() },
+      );
+    }
+
     // ── Pane renderers ────────────────────────────────────────────────
 
     function renderPaneContent(tool: PlanningToolKey): ReactNode {
@@ -628,21 +648,44 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
             </div>
           );
         case "standards":
-          return lesson.standards.length > 0 ? (
-            <div className={styles.stdList}>
-              {lesson.standards.map((code) => (
-                <div key={code} className={styles.stdItem}>
-                  <span className={styles.stdCode}>{code}</span>
-                  <span className={styles.stdDesc}>
-                    {describeStandard(code)}
-                  </span>
+          return (
+            <div className={styles.stdPane}>
+              {lesson.standards.length > 0 ? (
+                <div className={styles.stdList}>
+                  {lesson.standards.map((code) => {
+                    // Prefer the mock catalog's description; for codes only
+                    // the StandardsPicker knows (CCSS practices, NGSS PEs, IB
+                    // ATL) the mock returns the bare code — fall back to the
+                    // bundled label so the row never shows the code twice.
+                    const mock = describeStandard(code);
+                    const desc =
+                      mock === code
+                        ? (BUNDLED_DESCRIPTIONS[code] ?? code)
+                        : mock;
+                    return (
+                      <div key={code} className={styles.stdItem}>
+                        <span className={styles.stdCode}>{code}</span>
+                        <span className={styles.stdDesc}>{desc}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              ) : (
+                <p className={styles.paneEmptyText}>
+                  No standards tagged on this lesson yet.
+                </p>
+              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setStandardsPickerOpen(true)}
+                tooltip="Open the standards menu — search frameworks by subject and grade, pin your preferred systems, and tag the standards this lesson covers"
+              >
+                {lesson.standards.length > 0
+                  ? "Edit standards"
+                  : "Tag standards"}
+              </Button>
             </div>
-          ) : (
-            <p className={styles.paneEmptyText}>
-              No standards tagged on this lesson yet.
-            </p>
           );
         case "notes":
           return (
@@ -879,9 +922,10 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
                 aria-labelledby={`${uid}-tab-${k}`}
                 // Read-only panes hold no focusable content, so the panel
                 // itself joins the tab order (APG tabs pattern).
-                tabIndex={
-                  k === "standards" || k === "resources" ? 0 : undefined
-                }
+                // The standards pane now holds a focusable "Tag standards"
+                // button, so only the still-read-only resources pane joins
+                // the tab order itself (APG tabs pattern).
+                tabIndex={k === "resources" ? 0 : undefined}
                 className={`${styles.pane} ${k === active ? styles.paneOn : ""}`}
                 style={{ "--pc": TOOL_META[k].color } as CSSProperties}
               >
@@ -924,6 +968,20 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
             </button>
           </div>
         )}
+
+        {/* The standards menu — mounted once at the panel root so the modal
+            overlays the whole pane; saves route through editLesson, matching
+            every other tab's coalesced edit + save-target semantics. */}
+        <StandardsPicker
+          key={lesson.id}
+          open={standardsPickerOpen}
+          onClose={() => setStandardsPickerOpen(false)}
+          value={lesson.standards}
+          onSave={handleStandardsSave}
+          defaultSubject={lesson.subject}
+          subjects={subjects}
+          targetLabel="this lesson"
+        />
       </div>
     );
   },

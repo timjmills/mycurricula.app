@@ -1,0 +1,427 @@
+/* standards-picker.module.css — the standards menu dialog.
+ * Tokens only (CLAUDE.md §4 / BUILD_STANDARD §3). z-index follows the
+ * ResourceComposer modal convention (500/501). */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: var(--scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.dialog {
+  z-index: 501;
+  width: 100%;
+  max-width: 760px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: var(--line);
+  border-radius: var(--r-12);
+  box-shadow: var(--shadow-popover);
+  overflow: hidden;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-bottom: var(--line);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--t-16);
+  font-weight: 700;
+  color: var(--ink-900);
+  white-space: nowrap;
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  background: var(--ink-50);
+  border: var(--line-strong);
+  border-radius: var(--r-12);
+}
+
+.search:focus-visible {
+  outline: 2px solid var(--fyi);
+  outline-offset: 1px;
+}
+
+/* ── Filters ─────────────────────────────────────────────────────────── */
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: var(--line);
+  flex-wrap: wrap;
+}
+
+.subjectChips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.subjChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-700);
+  background: var(--paper);
+  border: var(--line-strong);
+  border-radius: var(--r-12);
+  cursor: pointer;
+}
+
+.subjChipActive {
+  color: var(--cd, var(--ink-900));
+  background: var(--cl, var(--fyi-bg));
+  border-color: var(--cd, var(--fyi));
+}
+
+.subjDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c, var(--ink-400));
+}
+
+.gradeWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gradeLabel {
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.gradeSelect {
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  background: var(--paper);
+  border: var(--line-strong);
+  border-radius: var(--r-12);
+}
+
+/* ── Framework list ──────────────────────────────────────────────────── */
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 16px 16px;
+}
+
+.groupLabel {
+  margin: 16px 0 4px;
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.fwList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fwItem {
+  border: var(--line);
+  border-radius: var(--r-12);
+  background: var(--paper);
+}
+
+.fwRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+
+.pinBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  border-radius: var(--r-12);
+  color: var(--ink-300);
+  cursor: pointer;
+}
+
+.pinBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pinBtn:hover,
+.pinBtn:focus-visible {
+  color: var(--ink-600);
+  background: var(--ink-100);
+}
+
+.pinned,
+.pinned:hover {
+  color: var(--fyi);
+}
+
+.fwMain {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fwName {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-900);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fwCount {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--fyi);
+  background: var(--fyi-bg);
+  border-radius: var(--r-12);
+  padding: 0 8px;
+  line-height: 18px;
+}
+
+.fwMeta {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.fwSide {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chevron {
+  font-size: var(--t-16);
+  color: var(--ink-400);
+  transform: rotate(0deg);
+  transition: transform 120ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
+/* ── Expanded framework body ─────────────────────────────────────────── */
+
+.fwBody {
+  border-top: var(--line);
+  padding: 8px 12px 12px;
+}
+
+.itemList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.itemRow {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 20px auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  border-radius: var(--r-12);
+  text-align: left;
+  cursor: pointer;
+}
+
+.itemRow:hover,
+.itemRow:focus-visible {
+  background: var(--ink-50);
+}
+
+.itemChecked {
+  background: var(--fyi-bg);
+}
+
+.itemChecked:hover,
+.itemChecked:focus-visible {
+  background: var(--fyi-bg);
+}
+
+.check {
+  width: 16px;
+  height: 16px;
+  border: var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper);
+}
+
+/* The check glyph is an inline data-URI SVG — data-URIs cannot read CSS
+ * custom properties, so the stroke is literal white on the --fyi fill.
+ * Documented exception to the tokens-only rule (cf. the pinColor block in
+ * lesson-flow.tsx). */
+.check[data-checked="true"] {
+  background: var(--fyi);
+  border-color: var(--fyi);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 14px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.itemCode {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--ink-700);
+  white-space: nowrap;
+}
+
+.itemDesc {
+  font-size: var(--t-13);
+  color: var(--ink-700);
+}
+
+.note {
+  margin: 8px 0 0;
+  font-size: var(--t-13);
+  color: var(--ink-500);
+}
+
+.licenceNote {
+  margin: 8px 0 0;
+  font-size: var(--t-11);
+  color: var(--ink-400);
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: var(--line);
+  background: var(--ink-50);
+}
+
+.tally {
+  font-size: var(--t-13);
+  color: var(--ink-600);
+  font-weight: 600;
+}
+
+.actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+/* Touch-target floor for the subject filter chips on tablet + coarse pointers
+   (the ≤640 sheet block below also bumps them on phone). */
+@media (max-width: 900px), (pointer: coarse) {
+  .subjChip {
+    min-height: 44px;
+  }
+}
+
+/* ── Phone (≤640px): edge-to-edge sheet, stacked filters ─────────────── */
+
+@media (max-width: 640px) {
+  .overlay {
+    padding: 8px;
+    align-items: stretch;
+  }
+
+  .dialog {
+    max-height: none;
+    max-width: none;
+  }
+
+  .header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .filters {
+    gap: 8px;
+  }
+
+  .subjChip {
+    min-height: 44px;
+  }
+
+  .itemRow {
+    grid-template-columns: 20px 1fr;
+  }
+
+  .itemDesc {
+    grid-column: 1 / -1;
+    padding-left: 28px;
+  }
+}
