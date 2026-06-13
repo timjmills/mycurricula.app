@@ -9,7 +9,11 @@
 // no component ever names a hex; it names a background id.
 
 /** Which tab a background lives under in the picker. */
-export type BoardBackgroundCategory = "solid" | "pattern" | "gradient";
+export type BoardBackgroundCategory =
+  | "solid"
+  | "lines"
+  | "pattern"
+  | "gradient";
 
 export interface BoardBackgroundMeta {
   /** Stable id, persisted on `Board.background` (e.g. "solid-4"). */
@@ -43,9 +47,27 @@ function build(
   });
 }
 
+/** Ruled-paper styles (Teach Wave 2, B5) — the line work teachers expect on a
+ *  sheet: ruled, graph/grid, dot grid, Cornell (cue-column), and primary
+ *  handwriting (3-line). Named ids (not numbered) since the set is curated, not
+ *  a 15-swatch family. The CSS lives in tokens.css as `--teach-bg-paper-*`. */
+const PAPER_STYLES: readonly BoardBackgroundMeta[] = [
+  { id: "lines-lined", category: "lines", label: "Lined", cssVar: "--teach-bg-paper-lined" },
+  { id: "lines-grid", category: "lines", label: "Grid", cssVar: "--teach-bg-paper-grid" },
+  { id: "lines-dot", category: "lines", label: "Dot grid", cssVar: "--teach-bg-paper-dot" },
+  { id: "lines-cornell", category: "lines", label: "Cornell", cssVar: "--teach-bg-paper-cornell" },
+  {
+    id: "lines-handwriting",
+    category: "lines",
+    label: "Handwriting",
+    cssVar: "--teach-bg-paper-handwriting",
+  },
+];
+
 /** Solids 13–15 are the dark fills; gradients 14–15 are dark too. */
 export const BOARD_BACKGROUNDS: readonly BoardBackgroundMeta[] = [
   ...build("solid", "solid", "Colour", [13, 14, 15]),
+  ...PAPER_STYLES,
   ...build("pattern", "pattern", "Pattern"),
   ...build("gradient", "gradient", "Gradient", [14, 15]),
 ];
@@ -58,6 +80,7 @@ export const BOARD_BACKGROUND_CATEGORIES: readonly {
   label: string;
 }[] = [
   { id: "solid", label: "Colours" },
+  { id: "lines", label: "Lined" },
   { id: "pattern", label: "Patterns" },
   { id: "gradient", label: "Gradients" },
 ];
