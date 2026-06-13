@@ -371,6 +371,12 @@ export default function SettingsLayout({
               aria-label="Settings"
               tabIndex={-1}
               onKeyDown={onDialogKeyDown}
+              // While the click-out confirm is open it becomes the single
+              // active modal layer; mark this outer dialog `inert` so AT and
+              // pointer/focus skip it (two sibling aria-modal regions would
+              // otherwise hide the confirm from screen readers). The confirm
+              // owns focus while open and restores it here on close.
+              inert={confirmOpen || undefined}
             >
               <SettingsHeader>
                 <SettingsSearch />
