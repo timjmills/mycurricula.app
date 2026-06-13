@@ -327,8 +327,9 @@
   background: var(--surface-warm);
 }
 
-.btnCancel,
-.btnSave {
+/* .btnCancel.btnCancel … — (0,2,0) survives the .cp-root button reset (tokens.css). */
+.btnCancel.btnCancel,
+.btnSave.btnSave {
   min-height: 44px;
   padding: 0 16px;
   font-size: var(--t-13);
@@ -344,26 +345,49 @@
   font-family: inherit;
 }
 
-.btnCancel {
-  background: var(--surface);
-  border-color: var(--border);
-  color: var(--ink-soft);
+/* .btnCancel.btnCancel — (0,2,0) survives the .cp-root button reset (tokens.css). */
+.btnCancel.btnCancel {
+  background: var(--ink-150);
+  border-color: var(--ink-300);
+  color: var(--ink);
   box-shadow: var(--sh-xs);
 }
 
+/* Bordered/secondary — hover routes through the chrome-accent tier so the
+   outline + text track the active theme (was raw --brand-*); 1px lift to match
+   the canonical Button primitive. */
 .btnCancel:hover {
-  border-color: var(--brand-300);
-  color: var(--brand-600);
+  background: var(--ink-200);
+  border-color: var(--chrome-accent-mid);
+  color: var(--chrome-accent-deep);
+  box-shadow: var(--sh-sm);
+  transform: translateY(-1px);
 }
 
-.btnSave {
-  background: var(--brand-500);
-  color: #fff;
-  box-shadow: var(--sh-brand);
+.btnCancel:active {
+  transform: translateY(0);
+  box-shadow: var(--sh-xs);
+}
+
+/* Filled primary — THEME accent fill, crisp neutral shadow (NOT a colored
+   glow; was --sh-brand). Recolours per theme via --chrome-accent; hover
+   deepens one shade and lifts 1px, matching the canonical Button primitive. */
+/* .btnSave.btnSave — (0,2,0) survives the .cp-root button reset (tokens.css). */
+.btnSave.btnSave {
+  background: var(--chrome-accent);
+  color: var(--on-solid);
+  box-shadow: var(--sh-sm);
 }
 
 .btnSave:hover:not(:disabled) {
-  background: var(--brand-600);
+  background: var(--chrome-accent-strong);
+  box-shadow: var(--sh-md);
+  transform: translateY(-1px);
+}
+
+.btnSave:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--sh-xs);
 }
 
 .btnSave:disabled,
@@ -427,6 +451,14 @@
   .closeBtn {
     transition: none;
     animation: none;
+  }
+  /* Suppress the crisp 1px hover/active lift under reduced motion (matches
+     the Button primitive). */
+  .btnCancel:hover,
+  .btnCancel:active,
+  .btnSave:hover:not(:disabled),
+  .btnSave:active:not(:disabled) {
+    transform: none;
   }
 }
 

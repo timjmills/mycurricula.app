@@ -784,6 +784,11 @@
      themes and would flip such text dark-on-dark. */
   --on-solid: #ffffff;
 
+  /* Ink over the honey gradient CTA (--grad-honey). Honey is NOT themed, so
+     this stays a fixed warm-dark; pairs ≥4.5:1 over the honey fill in every
+     theme. Use this — not a raw hex — for text/icons on a .honey button. */
+  --on-honey: #3a2a05;
+
   /* Logo lockup — every theme re-colors the brand. The logo is its OWN
      gradient (NOT --grad-honey, which buttons share), so a theme can repaint
      the brand mark without disturbing button identity. */

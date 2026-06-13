@@ -243,6 +243,100 @@ with a new prop. Do not duplicate.
 
 ---
 
+## 7a. Buttons & pills
+
+Every button in the app is the **`components/ui/Button`** primitive
+(`Button.tsx` + `Button.module.css`). There is no other button. The
+variants are `primary` · `honey` · `secondary` · `ghost` · `icon` ·
+`destructive`; the sizes are `sm` / `md` / `lg`. **Never hand-roll a pill
+CTA** — a `<button>` with its own background, border, and radius — outside
+this primitive. If you need a new look, add a variant to `Button.module.css`,
+do not invent one at the callsite.
+
+### The DON'T (the bug this section codifies)
+
+1. **No oversized colored glow as the resting shadow.** Do not set
+   `box-shadow: var(--sh-brand)` / `var(--sh-honey)` (or any other
+   color-glow token) on a button at rest. At rest a colored bloom reads as
+   a blurry halo — a "glitch", not a crisp control. Those color-glow tokens
+   are rationed to non-button accents (hero lockups, focus emphasis); a
+   button's resting shadow is a tight neutral elevation, never a color
+   wash.
+2. **No bare single-class variant/size rule for fill, border, or padding.**
+   A rule like `.primary { background … }` or `.md { padding … }` is
+   specificity **(0,1,0)**. The Settings UI and several slide-out panels
+   render inside `.cp-root`, whose base reset
+   `.cp-root button { background: none; border: none; padding: 0 }` is
+   **(0,1,1)** — so inside those contexts the reset WINS and silently
+   strips the fill, border, and padding. The visible failure: floating
+   label text with a leftover shadow halo at rest, and a zero-padding,
+   cramped pill on hover (the fill returns, the padding doesn't).
+   **Fix:** qualify every variant and size rule with the base class —
+   `.btn.primary`, `.btn.md` → **(0,2,0)** — so it outranks the reset and
+   the primitive renders identically in every context. (The double-class
+   trick — `.foo.foo` — is the same fix where there is no base class to
+   lean on; see CLAUDE.md "cp-root button reset trap" lesson.) Do not
+   de-qualify these rules.
+3. **No raw `--brand-*` for a button's hover/active color.** Raw brand
+   ignores the active theme. Active/hover button color routes through the
+   `--chrome-accent-*` tier (§4 "Chrome states"), so every theme re-hues
+   its own buttons.
+
+### The DO (the crisp, theme-recoloured design)
+
+- **Crisp solid pill.** The resting shadow is a tight neutral elevation —
+  `var(--sh-sm)` (filled variants) / `var(--sh-xs)` (secondary) — never a
+  color glow. Pill radius `var(--r-pill)`; label weight 700.
+- **Recolour per theme.** Filled `primary` uses `var(--chrome-accent)` at
+  rest and `var(--chrome-accent-strong)` on hover; the token contract
+  guarantees both clear **≥4.5:1** against `var(--on-solid)` (always-white
+  ink) on all six themes. `secondary` and `ghost` are neutral FILLED pills
+  (a fill — not a hairline — is what makes a pill read as a button):
+  `secondary` uses `var(--ink-150)` + an `var(--ink-300)` border + `var(--ink)`
+  label, `ghost` a lighter `var(--ink-100)` + `var(--ink-200)` border; both
+  deepen on hover, and `secondary`'s hover border/text route through
+  `var(--chrome-accent-mid)` / `var(--chrome-accent-deep)`. The `honey`
+  marketing CTA stays warm (`var(--grad-honey)` + `var(--on-honey)`) —
+  deliberately NOT theme-recoloured — but uses the same neutral shadow
+  scale. `destructive` stays semantic catch-up red, also NOT theme-recoloured.
+- **Distinct rest vs hover.** Hover deepens the fill one shade, steps the
+  shadow up to `var(--sh-md)`, and lifts with `transform: translateY(-1px)`;
+  `:active` returns to `translateY(0)` with `var(--sh-xs)`. Both the
+  transition and the lift are dropped under
+  `@media (prefers-reduced-motion: reduce)`.
+- **Generous pill padding** so the label never crowds the edge:
+  `sm` ~14px / `md` ~20px / `lg` ~26px horizontal. On phone/tablet (≤900px),
+  `sm` and `md` inflate to a ≥44px hit area via a transparent `::before`
+  overlay (§8) — the visual stays compact, the touch target meets WCAG 2.5.5.
+- **Tokens only, zero raw hex** — color, type, radius, and shadow all come
+  from `var(--…)`.
+
+### Before / after (so the anti-pattern is recognisable)
+
+```
+/* ✗ BEFORE — the bug: (0,1,0) loses to .cp-root's reset; colored glow blooms */
+.primary {
+  background: var(--brand-500);          /* raw brand — ignores theme */
+  box-shadow: var(--sh-brand);           /* oversized colored halo at rest */
+}
+/* Inside .cp-root: background + padding stripped → floating text + halo;
+   on hover the fill returns with zero padding → cramped pill. */
+
+/* ✓ AFTER — crisp, theme-recoloured, survives the reset */
+.btn.primary {                            /* (0,2,0) outranks the reset */
+  background: var(--chrome-accent);       /* re-hues per theme */
+  color: var(--on-solid);
+  box-shadow: var(--sh-sm);               /* tight neutral elevation */
+}
+.btn.primary:hover:not(:disabled) {
+  background: var(--chrome-accent-strong);
+  box-shadow: var(--sh-md);
+  transform: translateY(-1px);            /* deepen one shade + lift */
+}
+```
+
+---
+
 ## 8. Responsive contract
 
 Three viewport tiers. Every page works at every tier.

@@ -215,17 +215,19 @@
   flex: 1;
 }
 
-.actionBtn,
-.actionBtnMuted,
-.actionBtnPrimary {
+/* .actionBtn.actionBtn … — (0,2,0) survives the .cp-root button reset (tokens.css). */
+.actionBtn.actionBtn,
+.actionBtnMuted.actionBtnMuted,
+.actionBtnPrimary.actionBtnPrimary {
   font: inherit;
   font-size: var(--t-11);
   font-weight: 700;
-  color: var(--ink-soft);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  color: var(--ink);
+  background: var(--ink-150);
+  border: 1px solid var(--ink-300);
   border-radius: var(--r-pill);
-  padding: 8px 12px;
+  /* Match the primitive's comfortable horizontal padding (sm ≈ 14px). */
+  padding: 8px 14px;
   cursor: pointer;
   white-space: nowrap;
   box-shadow: var(--sh-xs);
@@ -235,31 +237,59 @@
     background 120ms ease,
     border-color 120ms ease,
     color 120ms ease,
-    box-shadow 120ms ease;
+    box-shadow 120ms ease,
+    transform 120ms ease;
 }
 
-.actionBtn:hover,
-.actionBtnMuted:hover {
-  border-color: var(--brand-300);
-  color: var(--brand-600);
-}
-
-.actionBtnMuted {
+/* Muted ("Skipped") rest colour. Sits BEFORE the hover rules so the hover
+   recolour still wins on hover at equal specificity — the rest rule was
+   doubled to .X.X to survive the .cp-root button reset (tokens.css), which
+   tied it with the (0,2,0) hover, so source order decides. */
+.actionBtnMuted.actionBtnMuted {
   color: var(--muted);
 }
 
-/* Primary "Carry over" (reschedule) action — indigo brand fill + glow. */
-.actionBtnPrimary {
-  color: #fff;
-  background: var(--brand-500);
+/* Bordered/secondary hover — route through the chrome-accent tier so the
+   outline + text pick up the active theme (was raw --brand-*), matching
+   .btn.secondary in the primitive. Crisp lift, no colored glow. */
+.actionBtn:hover,
+.actionBtnMuted:hover {
+  background: var(--ink-200);
+  border-color: var(--chrome-accent-mid);
+  color: var(--chrome-accent-deep);
+  box-shadow: var(--sh-sm);
+  transform: translateY(-1px);
+}
+
+.actionBtn:active,
+.actionBtnMuted:active {
+  transform: translateY(0);
+  box-shadow: var(--sh-xs);
+}
+
+/* Primary "Carry over" (reschedule) action — filled THEME accent, white
+   text, crisp neutral shadow (no colored glow). Recolours per theme via
+   --chrome-accent; hover deepens one shade and lifts, mirroring
+   .btn.primary in the canonical primitive. */
+/* .actionBtnPrimary.actionBtnPrimary — (0,2,0) survives the .cp-root button reset (tokens.css). */
+.actionBtnPrimary.actionBtnPrimary {
+  color: var(--on-solid);
+  background: var(--chrome-accent);
   border-color: transparent;
-  box-shadow: var(--sh-brand);
+  box-shadow: var(--sh-sm);
 }
 
 .actionBtnPrimary:hover {
-  background: var(--brand-600);
+  background: var(--chrome-accent-strong);
   border-color: transparent;
-  color: #fff;
+  color: var(--on-solid);
+  box-shadow: var(--sh-md);
+  transform: translateY(-1px);
+}
+
+.actionBtnPrimary:active {
+  transform: translateY(0);
+  box-shadow: var(--sh-xs);
 }
 
 .actionLink {
@@ -296,6 +326,15 @@
   .actionBtnPrimary,
   .actionLink {
     transition: none;
+  }
+  /* Suppress the crisp hover/active lift under reduced motion. */
+  .actionBtn:hover,
+  .actionBtnMuted:hover,
+  .actionBtnPrimary:hover,
+  .actionBtn:active,
+  .actionBtnMuted:active,
+  .actionBtnPrimary:active {
+    transform: none;
   }
 }
 
