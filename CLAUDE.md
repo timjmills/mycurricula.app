@@ -179,6 +179,7 @@ The visual system has three independent axes, all set as `<html>` data attribute
 - Subject colors come through the `.cp-subj.<subject>` classes (driven by the palette
   bridge in `lib/palette.tsx`) or the `useSubjectColor(subjectId)` hook. Never invent a
   subject color.
+- **Buttons:** use the `components/ui/Button` primitive only — never hand-roll a pill CTA, never give a button a colored-glow resting shadow, and qualify variant/size CSS with `.btn` so the `.cp-root` reset can't strip it. See BUILD_STANDARD.md §7a (Buttons & pills).
 - The 8 subjects (`math, reading, writing, grammar, spelling, ufli, explorers, sel`)
   and their swatch mapping are **locked team-wide**. Style + palette are per-teacher
   preference; the subject→color mapping is not.
