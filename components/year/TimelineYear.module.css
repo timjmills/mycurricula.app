@@ -151,7 +151,9 @@
 .units {
   display: flex;
   gap: 10px;
-  padding: 0 18px;
+  /* Vertical padding gives the chip hover-lift + selected ring room before the
+     row's overflow-x:auto (which makes overflow-y auto too) would clip them. */
+  padding: 6px 18px 10px;
   position: relative;
   overflow-x: auto;
   scrollbar-width: thin;
@@ -192,7 +194,10 @@
 }
 .unit .uw {
   font-size: var(--t-10, 10px);
-  color: var(--faint);
+  /* --faint is the placeholder/disabled tier (~1.7:1 on the chip tint — fails
+     AA). The week range is real info, so use the themed meta-body token
+     (--ink-500): ~6.6:1 on light chips, ~5:1 on Night's dark chip. */
+  color: var(--ink-500);
   margin-top: 5px;
   font-weight: 700;
 }
@@ -204,20 +209,9 @@
 .unit.sel .un {
   color: var(--ud);
 }
-.unit.sel::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -15px;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 12px solid var(--uc);
-  z-index: 6;
-  filter: drop-shadow(0 3px 2px var(--ush));
-}
+/* (The old `.unit.sel::after` downward arrow was removed: it overlapped the
+   row below and read as broken. Selection is now an accent ring — see the
+   `.units .unit.sel` rule at the foot of this file.) */
 .chev {
   width: 30px;
   flex: 0 0 auto;
@@ -589,7 +583,7 @@
     display: block;
   }
   .units {
-    padding: 0 14px;
+    padding: 6px 14px 10px;
   }
   .todayline {
     display: none;
@@ -599,4 +593,46 @@
     padding-left: 14px;
     padding-right: 14px;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Unit chips — cp-root recovery + subject-color vibrancy.
+
+   The .unit chip is a <button>; inside .cp-root (the planner shell wraps this
+   view in className="cp-root") the global `.cp-root button` reset (0,1,1)
+   strips a single-class .unit rule's padding / border / background — so the
+   resting chip rendered text-to-edge and plain. Scoping every chip rule under
+   its .units container lifts it to (0,2,0)+, so it wins the reset
+   deterministically. (No .root / data-hier hook is involved — those were never
+   set on this view, which is why the earlier redesign never rendered.)
+
+   Color carries meaning: a soft subject-tint fill, a 4px subject left stripe,
+   and a deep-subject title. Every mix blends toward var(--paper) (NEVER #fff)
+   so Night + the wash themes re-tint correctly. Selected = an accent ring. */
+.units .unit {
+  /* Generous, asymmetric padding — extra left clears the 4px accent stripe so
+     the title never crowds it. */
+  padding: 13px 14px 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--uc) 26%, var(--border));
+  border-left: 4px solid var(--uc);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--cl) 60%, var(--paper));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ush) 40%, transparent);
+}
+.units .unit .un {
+  color: var(--ud);
+}
+.units .unit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px -12px var(--ush);
+  border-color: var(--uc);
+  background: color-mix(in srgb, var(--cl) 82%, var(--paper));
+}
+.units .unit.sel {
+  background: var(--ut);
+  border-color: var(--uc);
+  box-shadow: 0 0 0 2px var(--uc);
+}
+.units .unit.sel .un {
+  color: var(--ud);
 }

@@ -448,7 +448,9 @@
 }
 .uleg .udt {
   font-size: 11px;
-  color: var(--faint);
+  /* Week range is real info, not a placeholder — promote off --faint (~1.8:1
+     on white, fails AA) to the themed meta-body token. */
+  color: var(--ink-500);
   margin-top: 4px;
   font-weight: 600;
 }
@@ -479,7 +481,10 @@
 .wkcard .wn {
   font-size: 12.5px;
   font-weight: 800;
-  color: var(--muted);
+  /* This is the week card's primary title; --muted left it at ~3:1 (below the
+     near-black "N lesson" count beneath it — inverted hierarchy). --ink-700 is
+     the strong-text tier (~11:1 light, light-on-dark in Night). */
+  color: var(--ink-700);
   font-family: var(--font-display-sm);
 }
 .wkcardOn .wn {
@@ -501,7 +506,8 @@
 }
 .wkcard .wdt {
   font-size: 11px;
-  color: var(--faint);
+  /* Week range is real info — promote off the placeholder tier to meta-body. */
+  color: var(--ink-500);
   font-weight: 600;
 }
 
@@ -1035,4 +1041,82 @@
   .rback .b {
     min-height: 44px;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Curriculum chips — cp-root recovery + accent treatment.
+
+   Same rationale as TimelineYear: .uleg / .wkcard / .daycard are <button>s
+   inside .cp-root (app/(planner)/layout.tsx wraps the planner in
+   className="cp-root"), so the global `.cp-root button` reset (0,1,1) stripped
+   their single-class padding / border / background — even the selected fills.
+   Scoping each rule under its container (.ulegend / .hscroll) lifts it to
+   (0,2,0)+ so the chip styling wins the reset. Mixes blend toward var(--paper)
+   (never #fff) for theme safety; selected = an accent ring. --ac/-t/-d are the
+   active subject's accent set, set inline on .app. */
+
+/* Unit chips */
+.ulegend .uleg {
+  padding: 10px 12px;
+  border: 1.5px solid color-mix(in srgb, var(--ac) 24%, var(--border));
+  border-left: 4px solid var(--ac);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+}
+.ulegend .uleg .ud {
+  color: var(--ac-d);
+}
+.ulegend .uleg:hover {
+  background: color-mix(in srgb, var(--ac-t) 38%, var(--paper));
+  transform: translateY(-1px);
+  box-shadow: var(--sh-md);
+}
+.ulegend .ulegOn {
+  background: var(--ac-t);
+  border-color: var(--ac);
+  box-shadow: 0 0 0 2px var(--ac);
+}
+.ulegend .ulegOn .ud,
+.ulegend .ulegOn .un,
+.ulegend .ulegOn .udt {
+  color: var(--ac-d);
+}
+
+/* Week cards */
+.hscroll .wkcard {
+  padding: 12px 13px;
+  border: 1.5px solid color-mix(in srgb, var(--ac) 22%, var(--border));
+  border-left: 4px solid var(--ac);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--ac-t) 28%, var(--paper));
+  box-shadow: var(--sh-sm);
+}
+.hscroll .wkcard:hover {
+  box-shadow: var(--sh-md);
+  transform: translateY(-2px);
+}
+.hscroll .wkcard.wkcardOn {
+  background: var(--ac-t);
+  border-color: var(--ac);
+  box-shadow: 0 0 0 2px var(--ac);
+}
+
+/* Day / lesson cards */
+.hscroll .daycard {
+  padding: 12px 13px;
+  border: 1.5px solid color-mix(in srgb, var(--ac) 18%, var(--border));
+  border-left: 4px solid var(--ac);
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+}
+.hscroll .daycard:hover {
+  box-shadow: var(--sh-md);
+  transform: translateY(-2px);
+}
+.hscroll .daycard.daycardOn {
+  background: var(--ac-t);
+  border-color: var(--ac);
+  box-shadow: 0 0 0 2px var(--ac);
 }
