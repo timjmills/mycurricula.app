@@ -24,7 +24,7 @@
 // Usage:
 //   npx tsx scripts/gen-standards-catalog-sql.mjs
 //   → review supabase/seed-standards-catalog.sql
-//   → apply AFTER supabase/migrations/20260612200000_standards_catalog.sql
+//   → apply AFTER supabase/migrations/20260613120000_standards_catalog.sql
 //     (supabase db push first, then run the seed in the SQL editor or psql).
 
 import { writeFileSync } from "node:fs";
@@ -64,7 +64,7 @@ let out = `-- supabase/seed-standards-catalog.sql — GENERATED, do not hand-edi
 --         + lib/standards/items.ts bundled taggable sets.
 -- Idempotent: frameworks/standards upsert on their deterministic ids
 -- (lib/planner/id-bridge.ts uuidv5); grade assignments insert-if-absent.
--- APPLY AFTER migrations/20260612200000_standards_catalog.sql and BEFORE
+-- APPLY AFTER migrations/20260613120000_standards_catalog.sql and BEFORE
 -- enabling NEXT_PUBLIC_PLANNER_USE_SUPABASE for standards tagging.
 
 begin;
@@ -155,13 +155,26 @@ on conflict (id) do update set
 }
 
 // ── Legacy mock-importer framework ("ccss") retirement ─────────────────────
+// GUARDED: retire the legacy single "ccss" framework ONLY when every one of
+// its standards was re-homed above (none remain). A real deployment can carry
+// curriculum standards beyond the bundled SAMPLE set (e.g. the Grade-5 load's
+// full CCSS list, ~69 codes vs the 15 bundled). In that case the framework
+// stays ACTIVE and keeps its grade assignment, so existing lesson tags
+// (standards uuid[], resolved via the grade's assigned frameworks) still
+// resolve. On a fresh/mock DB (all 15 codes bundled → re-homed) it deactivates
+// as before. Idempotent either way.
 const legacy = slugToUuid("framework", "ccss");
 out += `
--- ── Legacy mock-importer CCSS framework: retire after re-home ───────────────
--- Its standards rows were re-homed above (same deterministic ids). Drop its
--- grade assignments (replaced by the defaults below) and deactivate the row.
-delete from grade_framework_assignments where framework_id = ${q(legacy)};
-update standards_frameworks set is_active = false where id = ${q(legacy)};
+-- ── Legacy mock-importer CCSS framework: retire ONLY if fully re-homed ──────
+-- Guarded with NOT EXISTS so a real DB with curriculum standards beyond the
+-- bundled sample keeps the framework active + assigned (existing lesson tags
+-- still resolve). Fresh/mock DBs (every code bundled) still deactivate.
+delete from grade_framework_assignments
+ where framework_id = ${q(legacy)}
+   and not exists (select 1 from standards where framework_id = ${q(legacy)});
+update standards_frameworks set is_active = false
+ where id = ${q(legacy)}
+   and not exists (select 1 from standards where framework_id = ${q(legacy)});
 `;
 
 // ── Default grade assignments ───────────────────────────────────────────────

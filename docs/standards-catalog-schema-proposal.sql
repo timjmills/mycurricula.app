@@ -1,6 +1,6 @@
 -- ============================================================================
 -- PROMOTED (2026-06-12): this proposal is now the real migration
---   supabase/migrations/20260612200000_standards_catalog.sql
+--   supabase/migrations/20260613120000_standards_catalog.sql
 -- with generated seed supabase/seed-standards-catalog.sql
 --   (regenerate: npx tsx scripts/gen-standards-catalog-sql.mjs).
 -- Kept as the annotated design rationale. Companions:

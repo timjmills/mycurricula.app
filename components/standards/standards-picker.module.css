@@ -223,8 +223,13 @@
   font-weight: 700;
   color: var(--ink-900);
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  /* Long framework titles wrap within their column instead of spilling over
+     the licence badge in the narrow (≤640px) sheet. */
+  overflow-wrap: anywhere;
 }
 
 .fwCount {

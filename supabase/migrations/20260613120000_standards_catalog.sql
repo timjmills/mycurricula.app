@@ -1,4 +1,4 @@
--- 20260612200000_standards_catalog.sql — worldwide standards-catalog metadata.
+-- 20260613120000_standards_catalog.sql — worldwide standards-catalog metadata.
 --
 -- Promotes docs/standards-catalog-schema-proposal.sql to a real migration:
 -- extends standards_frameworks with the catalog columns the 2026-06-12

@@ -4,7 +4,7 @@
 --         + lib/standards/items.ts bundled taggable sets.
 -- Idempotent: frameworks/standards upsert on their deterministic ids
 -- (lib/planner/id-bridge.ts uuidv5); grade assignments insert-if-absent.
--- APPLY AFTER migrations/20260612200000_standards_catalog.sql and BEFORE
+-- APPLY AFTER migrations/20260613120000_standards_catalog.sql and BEFORE
 -- enabling NEXT_PUBLIC_PLANNER_USE_SUPABASE for standards tagging.
 
 begin;
@@ -5296,11 +5296,16 @@ on conflict (id) do update set
   description = excluded.description, band_label = excluded.band_label,
   item_kind = excluded.item_kind;
 
--- ── Legacy mock-importer CCSS framework: retire after re-home ───────────────
--- Its standards rows were re-homed above (same deterministic ids). Drop its
--- grade assignments (replaced by the defaults below) and deactivate the row.
-delete from grade_framework_assignments where framework_id = '9bf19ac5-57a2-553e-a83c-9f35df33a996';
-update standards_frameworks set is_active = false where id = '9bf19ac5-57a2-553e-a83c-9f35df33a996';
+-- ── Legacy mock-importer CCSS framework: retire ONLY if fully re-homed ──────
+-- Guarded with NOT EXISTS so a real DB with curriculum standards beyond the
+-- bundled sample keeps the framework active + assigned (existing lesson tags
+-- still resolve). Fresh/mock DBs (every code bundled) still deactivate.
+delete from grade_framework_assignments
+ where framework_id = '9bf19ac5-57a2-553e-a83c-9f35df33a996'
+   and not exists (select 1 from standards where framework_id = '9bf19ac5-57a2-553e-a83c-9f35df33a996');
+update standards_frameworks set is_active = false
+ where id = '9bf19ac5-57a2-553e-a83c-9f35df33a996'
+   and not exists (select 1 from standards where framework_id = '9bf19ac5-57a2-553e-a83c-9f35df33a996');
 
 -- ── Default framework assignments for every existing grade ──────────────────
 -- (matches the picker's default pins + IB-ATL; leads can unassign in Settings)
