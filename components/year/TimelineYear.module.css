@@ -153,11 +153,20 @@
   gap: 10px;
   padding: 0 18px;
   position: relative;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  /* WRAP instead of scroll. The old `overflow-x: auto` turned every subject
+     row into its own independent horizontal scroller, so on tablet/phone the
+     later-month units hid behind a scrollbar AND the fixed month header no
+     longer lined up with the scrolled units. Wrapping keeps every unit
+     visible and reflows them within the row width — no scrollbars at any
+     tier. Desktop is unchanged: the units still fit on one line. */
+  flex-wrap: wrap;
 }
 .unit {
-  flex: 1 0 116px;
+  /* `1 1` (was `1 0`) lets a unit shrink as well as grow, so a row of units
+     wraps to the next line instead of forcing horizontal overflow. The 116px
+     basis is kept so the desktop row still lays the full set of units out on
+     a single line exactly as before. */
+  flex: 1 1 116px;
   min-width: 0;
   border-radius: 11px;
   padding: 11px 13px;
