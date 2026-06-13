@@ -14,7 +14,7 @@ export { TeachSubBar, TEACH_CENTER_PANEL_ID } from "./TeachSubBar";
 export type { TeachSubBarProps } from "./TeachSubBar";
 
 export { TeachFooter } from "./TeachFooter";
-export type { TeachFooterProps, TeachFooterModule } from "./TeachFooter";
+export type { TeachFooterProps } from "./TeachFooter";
 
 export { PresentBar } from "./PresentBar";
 export type { PresentBarProps } from "./PresentBar";

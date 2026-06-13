@@ -1,7 +1,7 @@
 "use client";
 
 // useFocusTrap — a minimal, correct focus trap for the Teach modal-like
-// overlays (FocusMode, WidgetPicker — both declare `role="dialog"
+// overlays (e.g. BoardSettingsPopover declares `role="dialog"
 // aria-modal="true"`, audit A1, docs/teach-view-plan.md §7.7).
 //
 // `aria-modal="true"` is a promise to assistive tech that the rest of the page

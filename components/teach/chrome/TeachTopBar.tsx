@@ -18,7 +18,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { VIEWS } from "@/components/shell/top-bar";
-import { FutureControl, Tooltip } from "@/components/ui";
+import { Tooltip } from "@/components/ui";
 import styles from "./TeachChrome.module.css";
 
 // ── Props ──────────────────────────────────────────────────────────────────
@@ -111,29 +111,9 @@ export function TeachTopBar({
       <div className={styles.spacer} aria-hidden="true" />
 
       <div className={styles.rightCluster}>
-        {/* Search — not wired in v1. Rendered as an honest "Soon" affordance
-            (audit B2) instead of a live pill that does nothing on click. */}
-        <FutureControl
-          variant="ghost"
-          leadingIcon={<SearchIcon />}
-          label="Search"
-          tooltip="Search lessons, standards, and resources — coming after beta"
-        />
-
-        {/* Quick-add — not wired in v1. Honest "Soon" icon affordance. */}
-        <FutureControl
-          variant="icon-only"
-          leadingIcon={<PlusIcon />}
-          tooltip="Quick add a board, lesson, or resource — coming after beta"
-        />
-
-        {/* Notifications — not wired in v1. Honest "Soon" icon affordance; the
-            unread badge is hidden until there's a real feed to count. */}
-        <FutureControl
-          variant="icon-only"
-          leadingIcon={<BellIcon />}
-          tooltip="Team activity — mentions, board shares, and replies — coming after beta"
-        />
+        {/* Wave 1 declutter: Search / quick-add / notifications were
+            non-functional "Soon" affordances crowding the bar — removed until they
+            ship for real. Only live controls remain. */}
 
         {/* Help — LIVE (audit B2). Opens the Teach shortcuts/help overlay. */}
         <Tooltip
@@ -196,62 +176,8 @@ function ChevronDownIcon(): ReactNode {
   );
 }
 
-function SearchIcon(): ReactNode {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
-
-function PlusIcon(): ReactNode {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  );
-}
-
-function BellIcon(): ReactNode {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 2h16z" />
-      <path d="M10 21a2 2 0 0 0 4 0" />
-    </svg>
-  );
-}
+// SearchIcon / PlusIcon / BellIcon were removed with their "Soon" controls
+// (Wave 1 declutter).
 
 function HelpIcon(): ReactNode {
   return (

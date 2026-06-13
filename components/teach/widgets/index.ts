@@ -71,6 +71,7 @@ export type { TeachIconName, TeachIconProps } from "./icons";
 
 export {
   WIDGET_CATALOG,
+  CORE_WIDGET_TYPES,
   widgetMeta,
   CATEGORY_LABEL,
   CATEGORY_ORDER,

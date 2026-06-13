@@ -7,9 +7,9 @@
 // auto-surfaces the board in a matching lesson/day context and powers Library
 // filtering — so editing here changes where the board shows up everywhere.
 //
-// Persistence mirrors BoardBackgroundPicker.apply / BoardSettingsPopover: it
-// optimistically updates local state, writes through `teach.updateBoard` (the
-// `{ tags }` patch is the board-tag write path), then re-reads the board set.
+// Persistence mirrors BoardSettingsPopover: it optimistically updates local
+// state, writes through `teach.updateBoard` (the `{ tags }` patch is the
+// board-tag write path), then re-reads the board set.
 // Mutations run in a fire-and-forget `void (async …)()` wrapper so the click
 // handlers stay synchronous.
 //
