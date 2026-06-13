@@ -43,6 +43,9 @@ export function BoardSettingsPopover({
   const [busy, setBusy] = useState(false);
   // Two-step confirm gate for the destructive board reset.
   const [confirmReset, setConfirmReset] = useState(false);
+  // Save-as-template flow: show an inline name input when savingTemplate is true.
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
   // Authoritative widget count ACROSS ALL PAGES (gate G3-2). `board.widgets` is
   // only the page-0 mirror, so gating the reset on it would wrongly disable the
   // button — and mislabel the count — for a board whose widgets live on later
@@ -87,6 +90,30 @@ export function BoardSettingsPopover({
     try {
       await teach.updateBoard(board.id, { title: next });
       await reloadBoards();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSaveTemplate(): Promise<void> {
+    const name = templateName.trim();
+    if (!name) return;
+    setBusy(true);
+    try {
+      // TODO(Wave 5): thread the flag-aware ownerId (ME.id under the mock flag,
+      // the auth uid under Supabase) instead of `board.ownerId ?? "me"`. The
+      // `"me"` fallback is correct for the mock source (identity owner ids) but
+      // would write a non-uuid into an RLS column once Supabase is the live path.
+      await teach.saveBoardAsTemplate(
+        board.id,
+        name,
+        "personal",
+        board.ownerId ?? "me",
+      );
+      setSavingTemplate(false);
+      setTemplateName("");
+      showConsequence({ message: `"${name}" saved as a personal template.` });
       onClose();
     } finally {
       setBusy(false);
@@ -185,6 +212,58 @@ export function BoardSettingsPopover({
           To reorder boards, drag a board thumbnail up or down in the Boards
           panel on the left.
         </p>
+
+        {/* ── Save as template ─────────────────────────────────────────────── */}
+        <div className={styles.section}>
+          <div className={styles.fieldLabel}>Save as template</div>
+          <p className={styles.hint}>
+            Save this board&apos;s layout as a reusable template for future boards.
+          </p>
+          {savingTemplate ? (
+            <div className={styles.renameRow}>
+              <input
+                className={styles.input}
+                value={templateName}
+                placeholder="Template name…"
+                disabled={busy}
+                autoFocus
+                aria-label="Template name"
+                onChange={(e) => setTemplateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleSaveTemplate();
+                  if (e.key === "Escape") setSavingTemplate(false);
+                }}
+              />
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={busy || !templateName.trim()}
+                onClick={() => void handleSaveTemplate()}
+              >
+                Save
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => setSavingTemplate(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setTemplateName(board.title);
+                setSavingTemplate(true);
+              }}
+            >
+              Save as template…
+            </Button>
+          )}
+        </div>
 
         {/* ── Reset board (DESTRUCTIVE) ───────────────────────────────────── */}
         <div className={styles.dangerZone}>

@@ -18,6 +18,7 @@ import type {
   Board,
   BoardScope,
   BoardTag,
+  BoardTemplate,
   RepeatSchedule,
   Widget,
   WidgetGridPosition,
@@ -426,4 +427,39 @@ export const TEAM_LIBRARY_BOARDS: Board[] = [
       }),
     ],
   }),
+];
+
+/** Starter templates surfaced in "New from template". Scope 'team' so every
+ *  teacher can see them; ownerId null = no individual owner. */
+export const STARTER_TEMPLATES: BoardTemplate[] = [
+  {
+    id: "tpl-blank",
+    title: "Blank",
+    scope: "team",
+    ownerId: null,
+    widgets: [],
+    gradeLevelId: MOCK_GRADE_LEVEL_ID,
+    createdAt: "2026-06-01T00:00:00Z",
+    updatedAt: "2026-06-01T00:00:00Z",
+  },
+  {
+    id: "tpl-warmup-minilesson",
+    title: "Warm-Up + Mini Lesson",
+    scope: "team",
+    ownerId: null,
+    widgets: [],
+    gradeLevelId: MOCK_GRADE_LEVEL_ID,
+    createdAt: "2026-06-01T00:00:00Z",
+    updatedAt: "2026-06-01T00:00:00Z",
+  },
+  {
+    id: "tpl-do-now-exit",
+    title: "Do Now / Exit Ticket",
+    scope: "team",
+    ownerId: null,
+    widgets: [],
+    gradeLevelId: MOCK_GRADE_LEVEL_ID,
+    createdAt: "2026-06-01T00:00:00Z",
+    updatedAt: "2026-06-01T00:00:00Z",
+  },
 ];

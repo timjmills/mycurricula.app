@@ -62,6 +62,7 @@ import {
 import type {
   Board,
   BoardPage,
+  BoardTemplate,
   CanvasPosition,
   SubjectId,
   TeachResource,
@@ -707,6 +708,40 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     boardGradeId,
   ]);
 
+  // Use a board template → create ONE board ALREADY ATTACHED to the active lesson
+  // (or the sandbox sentinel) and select it directly. Mirrors handleAddBoard's
+  // lesson/sandbox + identity guards and its reload→selectBoard tail. Because the
+  // board is created lesson-attached here, it must NOT be routed through
+  // onOpenBoard's lesson-detached pull branch (which would create a SECOND copy +
+  // double-hit the cap). The Board Library's `onUseTemplate` calls this directly.
+  const handleUseTemplate = useCallback(
+    async (template: BoardTemplate): Promise<void> => {
+      const targetLesson = state.sandbox ? SANDBOX_LESSON_ID : activeLessonId;
+      if (targetLesson == null) return;
+      const gradeLevelId = boardGradeId(activeBoard);
+      if (ownerId == null || gradeLevelId == null) return;
+      await teach.createBoardFromTemplate(template.id, {
+        ownerId,
+        gradeLevelId,
+        // Attach to the lesson in view (or the sandbox sentinel) so the create is
+        // a single lesson-attached board — no detach→copy second board.
+        masterLessonId: targetLesson,
+      });
+      const next = await reloadBoards();
+      const created = next[next.length - 1];
+      if (created) dispatch({ type: "selectBoard", boardId: created.id });
+      setLibraryOverlay(null);
+    },
+    [
+      activeLessonId,
+      state.sandbox,
+      ownerId,
+      activeBoard,
+      reloadBoards,
+      boardGradeId,
+    ],
+  );
+
   // Whether "Start blank" can create a board right now — mirrors handleAddBoard's
   // guards (a target lesson or the sandbox + a resolved owner/grade). When false
   // the empty state hides the primary action rather than offering a dead button
@@ -878,11 +913,47 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
             await teach.setBoardTheme(board.id, intent.theme);
             await Promise.all([reloadBoards(), reloadPages()]);
             return;
+          case "setBoardSize":
+            await teach.updateBoard(board.id, { size: intent.size });
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
           case "setBackground":
-            // Board paper/surface. Same field + repo method the ⚙ settings
-            // popover used; now reachable from the editor's appearance popover
-            // so paper lives in ONE place next to the board (#11).
-            await teach.updateBoard(board.id, { background: intent.background });
+            // Board paper/surface, scoped to the whole board or a single page.
+            if (intent.scope === "page" && intent.pageId) {
+              await teach.updatePage(board.id, intent.pageId, {
+                background: intent.background,
+              });
+            } else {
+              await teach.updateBoard(board.id, { background: intent.background });
+            }
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          case "clearPageBackground":
+            // Remove the page's own background → it inherits the board again.
+            // `background: undefined` signals updatePage to DELETE the key (not
+            // store undefined), so the tri-state truly returns to "inherit".
+            await teach.updatePage(board.id, intent.pageId, {
+              background: undefined,
+            });
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          case "deletePage":
+            await teach.deletePage(board.id, intent.pageId);
+            // If the deleted page was active, fall back to the first remaining page.
+            if (intent.pageId === activePageId) {
+              const remaining = pages.filter((p) => p.id !== intent.pageId);
+              setActivePageId(remaining[0]?.id ?? null);
+            }
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          case "reorderPages":
+            await teach.reorderPages(board.id, intent.orderedPageIds);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          case "renamePage":
+            await teach.updatePage(board.id, intent.pageId, {
+              title: intent.title,
+            });
             await Promise.all([reloadBoards(), reloadPages()]);
             return;
           case "clearAllWidgetAppearance": {
@@ -921,6 +992,7 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
       ownerId,
       openLeftPanel,
       boardGradeId,
+      activePageId,
     ],
   );
 
@@ -1483,6 +1555,10 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                         }
                       })();
                     }}
+                    // Template-use creates ONE lesson-attached board + selects it
+                    // directly (bypasses onOpenBoard's detach→copy branch, which
+                    // would otherwise make a duplicate board).
+                    onUseTemplate={handleUseTemplate}
                     // Finding 3 fix: thread the flag-aware owner id so library
                     // operations never use the hard-coded `ME.id` slug under
                     // the live flag.

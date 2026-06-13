@@ -39,6 +39,7 @@ import type {
   Board,
   BoardTag,
   BoardTagKind,
+  BoardTemplate,
   RepeatSchedule,
 } from "@/lib/types";
 import { TEACHER_BY_ID } from "@/lib/mock/teachers";
@@ -125,6 +126,13 @@ export interface BoardLibraryModuleProps {
   gradeLevelId?: string;
   /** Parent wires opening a board into the workspace. */
   onOpenBoard?: (board: Board) => void;
+  /** Parent wires "use this template" — it creates ONE board attached to the
+   *  active lesson (mirroring the normal add-board flow) and selects it directly,
+   *  so the new board never routes through the lesson-detached copy path in
+   *  `onOpenBoard` (which would make a SECOND, duplicate board). When omitted
+   *  (e.g. a standalone Boards page with no active lesson), the module falls back
+   *  to creating a detached board + handing it to `onOpenBoard`. */
+  onUseTemplate?: (template: BoardTemplate) => Promise<void>;
   // ── Owner identity (Finding 3 fix) ─────────────────────────────────────────
   // Threaded from TeachWorkspace: `ME.id` under the mock flag, `currentUser.id`
   // (auth uid) under the live flag. Null briefly while the session resolves; the
@@ -188,6 +196,7 @@ function applyScope(list: Board[], scope: LibraryScope): Board[] {
 export function BoardLibraryModule({
   gradeLevelId,
   onOpenBoard,
+  onUseTemplate,
   ownerId,
 }: BoardLibraryModuleProps): ReactNode {
   const { showConsequence } = useConsequenceToast();
@@ -206,6 +215,9 @@ export function BoardLibraryModule({
   const [myCount, setMyCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [capNotice, setCapNotice] = useState(false);
+  // Templates: load once + surface below the board grid on the Personal segment.
+  const [templates, setTemplates] = useState<BoardTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(
     null,
   );
@@ -258,6 +270,20 @@ export function BoardLibraryModule({
     setScope("all");
     void refresh();
   }, [refresh]);
+
+  // ── Load templates (Personal segment) ───────────────────────────────────
+  useEffect(() => {
+    if (!ownerId) {
+      setTemplates([]);
+      return;
+    }
+    let alive = true;
+    setTemplatesLoading(true);
+    void teach.listBoardTemplates(ownerId).then((list) => {
+      if (alive) { setTemplates(list); setTemplatesLoading(false); }
+    }).catch(() => { if (alive) setTemplatesLoading(false); });
+    return () => { alive = false; };
+  }, [ownerId]);
 
   // ── Derived: tag-value filter pills present across the loaded boards ──────
   const filterPills = useMemo<BoardTag[]>(() => {
@@ -439,6 +465,42 @@ export function BoardLibraryModule({
       await refresh();
     },
     [repeatingBoard, refresh],
+  );
+
+  // Use a template → create ONE board and select it.
+  const handleUseTemplate = useCallback(
+    async (tpl: BoardTemplate): Promise<void> => {
+      if (!ownerId) return;
+      setCapNotice(false);
+      try {
+        if (onUseTemplate) {
+          // Preferred path: the parent creates the board ALREADY ATTACHED to the
+          // active lesson and selects it directly. This avoids the bug where a
+          // detached board handed to `onOpenBoard` gets copied a second time by
+          // the lesson-detached pull branch (two boards + a double cap hit).
+          await onUseTemplate(tpl);
+        } else {
+          // Fallback (no active-lesson context, e.g. a standalone Boards page):
+          // create a detached board and hand it to `onOpenBoard`.
+          const board = await teach.createBoardFromTemplate(tpl.id, {
+            ownerId,
+            gradeLevelId: tpl.gradeLevelId,
+          });
+          onOpenBoard?.(board);
+        }
+        await refresh();
+      } catch (err) {
+        if (
+          err instanceof BoardCapError ||
+          (err as { name?: string } | null)?.name === "BoardCapError"
+        ) {
+          setCapNotice(true);
+        } else {
+          showConsequence({ message: "Couldn't create board — please try again." });
+        }
+      }
+    },
+    [ownerId, refresh, showConsequence, onOpenBoard, onUseTemplate],
   );
 
   // ── Filter toggles ──────────────────────────────────────────────────────
@@ -687,6 +749,42 @@ export function BoardLibraryModule({
               />
             </section>
           ) : null}
+
+          {/* ── Templates (Personal segment only) ──────────────────────── */}
+          {tab === "mine" && (
+            <section className={styles.teamLibrary} style={{ marginTop: "var(--r-16)" }}>
+              <div className={styles.teamLibraryHead}>
+                <span className={styles.teamLibraryTitle}>Templates</span>
+              </div>
+              <p className={styles.teamLibrarySub}>
+                Start a new board from a saved template
+              </p>
+              {templatesLoading ? (
+                <p className={styles.teamEmpty}>Loading templates…</p>
+              ) : templates.length === 0 ? (
+                <p className={styles.teamEmpty}>
+                  No templates yet — save a board as a template using its ⚙ settings.
+                </p>
+              ) : (
+                <div className={styles.teamStrip}>
+                  {templates.map((tpl) => (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      className={styles.teamCard}
+                      onClick={() => void handleUseTemplate(tpl)}
+                      title={`Create a new board from "${tpl.title}"`}
+                    >
+                      <span className={styles.teamCardTitle}>{tpl.title}</span>
+                      <span className={styles.teamCardBy}>
+                        {tpl.scope === "team" ? "Team template" : "My template"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Explainer + Team Library strip */}
           <div className={styles.footerGrid}>

@@ -74,6 +74,17 @@ const MAX_W = 640;
 const DEFAULT_W = 320;
 const LS_KEY = "be-board-v1";
 
+/** Canvas stage pixel dimensions per size preset (width × height). The outer
+ *  `.canvas` scrollable container fits the stage via a CSS scale transform so
+ *  the stage always fills the available width without requiring horizontal scroll
+ *  on a wide preset. "wide" is the original 16∶9 default; A4 and A3 are
+ *  landscape print sizes. */
+const STAGE_SIZES = {
+  wide: { w: 1280, h: 720 },
+  a4: { w: 1123, h: 794 },
+  a3: { w: 1587, h: 1123 },
+} as const;
+
 /** Widget types offered in the toolbar "+ Widget" popover. The six CORE
  *  teaching widgets (single source of truth in the catalogue, #18) — every one
  *  an addable survivor, never a retired generic. A "More widgets…" row opens the
@@ -105,6 +116,9 @@ const SAMPLE_RESOURCES: readonly ResourceItem[] = [
 export type BoardEditorIntent =
   | { type: "selectPage"; pageId: string }
   | { type: "addPage" }
+  | { type: "deletePage"; pageId: string }
+  | { type: "reorderPages"; orderedPageIds: string[] }
+  | { type: "renamePage"; pageId: string; title: string }
   | {
       type: "addWidget";
       pageId: string;
@@ -135,8 +149,19 @@ export type BoardEditorIntent =
     }
   | { type: "resetWidgetAppearance"; pageId: string; widgetId: string }
   | { type: "setBoardTheme"; theme: ThemeOverride }
-  /** Set the board's paper/background id (null → default white paper). */
-  | { type: "setBackground"; background: string | null }
+  /** Set the board's paper/background id with scope: board-wide or per-page.
+   *  `background: null` = explicit white; a paper id = that paper. */
+  | {
+      type: "setBackground";
+      background: string | null;
+      scope: "page" | "board";
+      pageId?: string;
+    }
+  /** Clear a PAGE's own background back to inheriting the board (page scope only:
+   *  removes the page's `background` key so the tri-state returns to `undefined`).
+   *  There is no board-scope twin — a board has nothing to inherit from. */
+  | { type: "clearPageBackground"; pageId: string }
+  | { type: "setBoardSize"; size: "wide" | "a4" | "a3" }
   | { type: "clearAllWidgetAppearance" }
   | { type: "present" }
   | { type: "share" }
@@ -178,10 +203,20 @@ function liveCanvas(w: Widget, draft: GeomDraft): CanvasPosition {
 
 const clampW = (w: number) => Math.min(MAX_W, Math.max(MIN_W, w));
 
+/** Read a usable scale for the gesture math: a non-finite or ≤0 scale (hidden
+ *  canvas, mid-layout) would turn a `delta / scale` into Infinity/NaN and poison
+ *  the persisted geometry, so fall back to 1 (un-scaled). */
+const safeScale = (s: number): number =>
+  Number.isFinite(s) && s > 0 ? s : 1;
+
 // ── One placed widget on the canvas ─────────────────────────────────────────
 interface PlacedProps {
   widget: Widget;
   canvas: CanvasPosition;
+  /** Current stage bounds — used to clamp the RENDER position so a widget placed
+   *  on a larger preset stays reachable after the board shrinks (e.g. wide→a4). */
+  stageW: number;
+  stageH: number;
   selected: boolean;
   present: boolean;
   boardTheme: ThemeOverride | undefined;
@@ -200,6 +235,8 @@ interface PlacedProps {
 function Placed({
   widget,
   canvas,
+  stageW,
+  stageH,
   selected,
   present,
   boardTheme,
@@ -219,6 +256,14 @@ function Placed({
   );
   const twStyle = themeVars(eff) as CSSProperties;
   const label = widgetMeta(widget.type).label;
+
+  // Render-time clamp ONLY (no repo write): after the board shrinks (wide→a4/a3),
+  // a widget whose stored x/y is past the new stage edge would be unreachable.
+  // Clamp left/top into bounds so it stays on-canvas; the stored canvas is left
+  // intact, so growing the board back restores the original position. 60px is a
+  // safe minimum visible band for height (widget heights vary by content).
+  const left = Math.max(0, Math.min(canvas.x, stageW - canvas.w));
+  const top = Math.max(0, Math.min(canvas.y, stageH - 60));
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (present) return;
@@ -254,7 +299,7 @@ function Placed({
       className={`${styles.placed} ${selected && !present ? styles.placedSel : ""} ${
         present ? styles.present : ""
       }`}
-      style={{ left: canvas.x, top: canvas.y, width: canvas.w }}
+      style={{ left, top, width: canvas.w }}
       role="button"
       tabIndex={present ? -1 : 0}
       aria-label={`${label} widget`}
@@ -405,14 +450,27 @@ function AddWidgetPopover({
 function PaperPicker({
   current,
   onPick,
+  onInherit,
 }: {
-  current: string | null;
+  /** The OWN value of the scope being edited. Tri-state in page scope:
+   *  `undefined` → inheriting the board (nothing highlighted); `null` → explicit
+   *  White; a paper id → that paper. Board scope only ever passes `null`/id. */
+  current: string | null | undefined;
   onPick: (id: string | null) => void;
+  /** PAGE scope only: clear the page's own background → inherit the board. When
+   *  provided, an "Inherit" chip renders before "White". Omitted in board scope. */
+  onInherit?: () => void;
 }): ReactNode {
   const [tab, setTab] = useState<BoardBackgroundCategory>(
     findBackground(current)?.category ?? "solid",
   );
   const swatches = BOARD_BACKGROUNDS.filter((b) => b.category === tab);
+  // Only highlight "White" when it's the EXPLICIT value (null), not when the page
+  // is merely inheriting the board (undefined) — otherwise an inheriting page
+  // would look like it had chosen white.
+  const whiteSelected = current === null;
+  // In page scope, `undefined` means the page is inheriting the board.
+  const inheritSelected = current === undefined;
   return (
     <div className={styles.paper}>
       {/* Family filter — which swatch set is shown (a toggle group, not tabs). */}
@@ -429,15 +487,29 @@ function PaperPicker({
           </button>
         ))}
       </div>
+      {/* PAGE scope: an "Inherit board" chip that clears the page override. */}
+      {onInherit ? (
+        <button
+          type="button"
+          className={`${styles.paperInherit} ${
+            inheritSelected ? styles.paperInheritOn : ""
+          }`}
+          aria-pressed={inheritSelected}
+          title="Use the board's background for this page"
+          onClick={onInherit}
+        >
+          Inherit board
+        </button>
+      ) : null}
       {/* The paper VALUE — White (none) + the selected family's swatches. */}
       <div className={styles.paperGrid} role="group" aria-label="Board paper">
         <button
           type="button"
           title="White (no background)"
           aria-label="White (no background)"
-          aria-pressed={current === null}
+          aria-pressed={whiteSelected}
           className={`${styles.paperSw} ${styles.paperNone} ${
-            current === null ? styles.paperSwOn : ""
+            whiteSelected ? styles.paperSwOn : ""
           }`}
           onClick={() => onPick(null)}
         />
@@ -561,6 +633,209 @@ function TBtn({
   );
 }
 
+// ── Multi-page filmstrip ─────────────────────────────────────────────────────
+// Shows when pages.length >= 2. Each tile is draggable (HTML5 DnD), double-click
+// renames, and a delete button shows a two-step confirm on hover.
+function PageFilmstrip({
+  pages,
+  activePage,
+  onSelect,
+  onAdd,
+  onDelete,
+  onRename,
+  onReorder,
+}: {
+  pages: BoardPage[];
+  activePage: BoardPage;
+  onSelect: (id: string) => void;
+  onAdd: () => void;
+  onDelete: (pageId: string) => void;
+  onRename: (pageId: string, title: string) => void;
+  onReorder: (orderedIds: string[]) => void;
+}): ReactNode {
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameVal, setRenameVal] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  const commitRename = (id: string) => {
+    const val = renameVal.trim();
+    if (val) onRename(id, val);
+    setRenamingId(null);
+  };
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggingId(id);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/page-id", id);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const srcId = e.dataTransfer.getData("text/page-id");
+    if (!srcId || srcId === targetId) {
+      setDraggingId(null);
+      setDragOverId(null);
+      return;
+    }
+    const ids = pages
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map((p) => p.id);
+    const from = ids.indexOf(srcId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) {
+      setDraggingId(null);
+      setDragOverId(null);
+      return;
+    }
+    ids.splice(from, 1);
+    ids.splice(to, 0, srcId);
+    onReorder(ids);
+    setDraggingId(null);
+    setDragOverId(null);
+  };
+
+  const sorted = pages.slice().sort((a, b) => a.order - b.order);
+
+  if (pages.length < 2) {
+    return (
+      <div className={styles.filmstripSingle}>
+        <button
+          type="button"
+          className={styles.pageAdd}
+          aria-label="Add page"
+          onClick={onAdd}
+        >
+          <TeachIcon name="plus" size={15} />
+          Add page
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.filmstrip} role="tablist" aria-label="Board pages">
+      {sorted.map((p, i) => {
+        const isActive = p.id === activePage.id;
+        const isRenaming = renamingId === p.id;
+        const confirmingDelete = confirmDeleteId === p.id;
+        return (
+          <div
+            key={p.id}
+            className={`${styles.filmTile} ${isActive ? styles.filmTileActive : ""} ${
+              draggingId === p.id ? styles.filmTileDragging : ""
+            } ${dragOverId === p.id ? styles.filmTileOver : ""}`}
+            role="tab"
+            aria-selected={isActive}
+            // Keyboard-reachable (regression vs the old <button> tabs): the tile
+            // itself is the tab — Enter/Space selects it, F2 starts a rename. The
+            // nested rename/delete affordances are real <button>s, so they're
+            // already in the tab order; this only restores the tile's own.
+            tabIndex={isRenaming ? -1 : 0}
+            draggable
+            onDragStart={(e) => handleDragStart(e, p.id)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOverId(p.id);
+            }}
+            onDragLeave={() => setDragOverId(null)}
+            onDrop={(e) => handleDrop(e, p.id)}
+            onClick={() => {
+              if (!isRenaming) onSelect(p.id);
+            }}
+            onKeyDown={(e) => {
+              if (isRenaming) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(p.id);
+              } else if (e.key === "F2") {
+                // F2 = the conventional "rename" key (mirrors the double-click).
+                e.preventDefault();
+                setRenamingId(p.id);
+                setRenameVal(p.title ?? `Page ${i + 1}`);
+              }
+            }}
+            onDoubleClick={(e) => {
+              e.preventDefault();
+              setRenamingId(p.id);
+              setRenameVal(p.title ?? `Page ${i + 1}`);
+            }}
+          >
+            {isRenaming ? (
+              <input
+                className={styles.filmRename}
+                value={renameVal}
+                autoFocus
+                onChange={(e) => setRenameVal(e.target.value)}
+                onBlur={() => commitRename(p.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitRename(p.id);
+                  if (e.key === "Escape") setRenamingId(null);
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span className={styles.filmLabel}>{p.title ?? `Page ${i + 1}`}</span>
+            )}
+            {!isRenaming && confirmingDelete ? (
+              <span className={styles.filmDelConfirm}>
+                <button
+                  type="button"
+                  className={`${styles.filmDelBtn} ${styles.filmDelConfirmBtn}`}
+                  aria-label="Confirm delete page"
+                  title="Permanently delete this page and all its widgets"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(p.id);
+                    setConfirmDeleteId(null);
+                  }}
+                >
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  className={styles.filmDelBtn}
+                  aria-label="Cancel delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDeleteId(null);
+                  }}
+                >
+                  ✕
+                </button>
+              </span>
+            ) : !isRenaming ? (
+              <button
+                type="button"
+                className={styles.filmDel}
+                aria-label={`Delete page ${i + 1}`}
+                title="Delete this page — removes all widgets on it"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmDeleteId(p.id);
+                }}
+              >
+                <TeachIcon name="x" size={12} />
+              </button>
+            ) : null}
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        className={styles.pageAdd}
+        aria-label="Add page"
+        onClick={onAdd}
+      >
+        <TeachIcon name="plus" size={15} />
+        Add page
+      </button>
+    </div>
+  );
+}
+
 // ── Editor shell ─────────────────────────────────────────────────────────────
 export function BoardEditor({
   board,
@@ -579,13 +854,25 @@ export function BoardEditor({
   // The appearance editor opens ON DEMAND only (one popover, never docked) — a
   // clean board is the default; the toolbar "Appearance" button toggles it.
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  // Background scope: "board" sets board.background; "page" sets activePage.background.
+  const [bgScope, setBgScope] = useState<"page" | "board">("board");
   const [geomDraft, setGeomDraft] = useState<GeomDraft>({});
   // Mirror the latest draft into a ref so gesture handlers can read the live
   // position at gesture-start without re-subscribing on every draft update
   // (avoids a stale-base jump when a second drag starts before props echo back).
   const geomDraftRef = useRef<GeomDraft>(geomDraft);
   geomDraftRef.current = geomDraft;
+  // Canvas fit-to-width scale. The inner stage has a fixed px size (from STAGE_SIZES);
+  // the outer .canvas div is flexible. A ResizeObserver keeps `scale` current so the
+  // stage fills the available width without horizontal scroll.
+  const [scale, setScale] = useState(1);
+  // Use a ref alongside state so gesture handlers read the live scale without
+  // stale-closure issues (the pointermove handlers capture the ref, not the state).
+  const scaleRef = useRef(1);
   const canvasRef = useRef<HTMLDivElement>(null);
+  // The scaled inner stage element — its on-screen rect (post-transform) anchors
+  // the resource-drop math so a drop on a shrunken A4/A3 stage lands at the cursor.
+  const stageRef = useRef<HTMLDivElement>(null);
   const headingId = useId();
   // Focus trap for the appearance popover — it declares `aria-modal`, so the
   // contract is that focus is contained + restored while it's open (gate F5).
@@ -655,6 +942,34 @@ export function BoardEditor({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // ── Canvas fit-to-width (ResizeObserver) ────────────────────────────────────
+  // Keep the inner stage fitting the available container width via a CSS scale
+  // transform. The outer `.canvas` div is the scroll container; the inner stage
+  // has a fixed px width from STAGE_SIZES. On every container resize we recompute
+  // the scale factor and store it in both state (for the JSX) and a ref (for
+  // gesture handlers that run outside the React render cycle).
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const stage = STAGE_SIZES[board.size ?? "wide"];
+    const update = () => {
+      // 24px = 12px padding on each side of the stage inside the container.
+      const available = el.clientWidth - 24;
+      const raw = available / stage.w;
+      // Clamp to a sane floor: a hidden/0-width container (clientWidth 0, or
+      // narrower than the padding) would yield 0/negative/non-finite, which then
+      // poisons the gesture math (delta / scale → Infinity). 0.1 is the floor.
+      const s =
+        Number.isFinite(raw) && raw > 0 ? Math.min(1, Math.max(0.1, raw)) : 1;
+      scaleRef.current = s;
+      setScale(s);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [board.size]);
+
   // Trap + restore focus while the appearance popover is open (matches its
   // `aria-modal` semantics). Inert when closed; the hook no-ops if the
   // container isn't mounted yet.
@@ -680,8 +995,15 @@ export function BoardEditor({
       let lastY = oy;
 
       const move = (ev: PointerEvent) => {
-        lastX = Math.max(0, ox + ev.clientX - sx);
-        lastY = Math.max(0, oy + ev.clientY - sy);
+        const s = safeScale(scaleRef.current);
+        const stage = STAGE_SIZES[board.size ?? "wide"];
+        // Divide pointer delta by scale so a 1px screen move = 1px canvas move
+        // even when the stage is scaled down. Clamp within stage bounds.
+        lastX = Math.max(
+          0,
+          Math.min(stage.w - start.w, ox + (ev.clientX - sx) / s),
+        );
+        lastY = Math.max(0, Math.min(stage.h - 80, oy + (ev.clientY - sy) / s));
         setGeomDraft((d) => ({ ...d, [id]: { ...d[id], x: lastX, y: lastY } }));
       };
       const up = () => {
@@ -698,7 +1020,8 @@ export function BoardEditor({
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
     },
-    [widgets, activePage.id, emit],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [widgets, activePage.id, emit, board.size],
   );
 
   // ── Resize (pointer) ────────────────────────────────────────────────────────
@@ -712,7 +1035,9 @@ export function BoardEditor({
       let lastW = ow;
 
       const move = (ev: PointerEvent) => {
-        lastW = clampW(ow + ev.clientX - sx);
+        const s = safeScale(scaleRef.current);
+        // Divide pointer delta by scale so resize tracks the scaled handle.
+        lastW = clampW(ow + (ev.clientX - sx) / s);
         setGeomDraft((d) => ({ ...d, [id]: { ...d[id], w: lastW } }));
       };
       const up = () => {
@@ -758,13 +1083,23 @@ export function BoardEditor({
     if (!id) return;
     const r = resources.find((x) => x.id === id);
     if (!r) return;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    const x = rect
-      ? e.clientX - rect.left + canvasRef.current!.scrollLeft - 150
-      : 160;
-    const y = rect
-      ? e.clientY - rect.top + canvasRef.current!.scrollTop - 30
-      : 160;
+    // Anchor to the SCALED inner stage's on-screen rect (its getBoundingClientRect
+    // already reflects the CSS scale transform), then divide the in-rect offset by
+    // the same scale so the drop maps to UNSCALED stage coordinates — the same
+    // fit-to-width correction the drag gesture uses. Without this, a drop on a
+    // shrunken A4/A3 stage lands far from the cursor. Center the DEFAULT_W-wide
+    // widget under the pointer (−DEFAULT_W/2, −30) and clamp inside the stage.
+    const stage = STAGE_SIZES[board.size ?? "wide"];
+    const rect = stageRef.current?.getBoundingClientRect();
+    const s = safeScale(scaleRef.current);
+    let x = 160;
+    let y = 160;
+    if (rect) {
+      x = (e.clientX - rect.left) / s - DEFAULT_W / 2;
+      y = (e.clientY - rect.top) / s - 30;
+    }
+    x = Math.max(0, Math.min(stage.w - DEFAULT_W, x));
+    y = Math.max(0, Math.min(stage.h - 80, y));
     addResource(r, x, y);
   };
 
@@ -803,14 +1138,36 @@ export function BoardEditor({
   };
   const clearAllOverrides = () => emit({ type: "clearAllWidgetAppearance" });
 
-  // Board paper / background (board-mode only). null → default white paper.
-  const setBackground = (background: string | null) =>
-    emit({ type: "setBackground", background });
+  // Board paper / background. Scoped to either the whole board or the active
+  // page only. null → default white paper (for the chosen scope).
+  const setBackground = (background: string | null, scope: "page" | "board") =>
+    emit({
+      type: "setBackground",
+      background,
+      scope,
+      pageId: scope === "page" ? activePage.id : undefined,
+    });
 
-  // The board's paper surface. Undefined id → the canvas CSS default (white,
-  // C8). Dark fills flag the stage so chrome/empty-hint text can read light.
-  const surfaceBg = boardBackgroundCss(board.background);
-  const surfaceDark = isDarkBackground(board.background);
+  // Clear the active page's own background → it inherits the board again (page
+  // scope only; the board has nothing to inherit from).
+  const inheritPageBackground = () =>
+    emit({ type: "clearPageBackground", pageId: activePage.id });
+
+  // The current stage dimensions (one lookup, reused by the canvas + the
+  // render-time widget clamp).
+  const stageSize = STAGE_SIZES[board.size ?? "wide"];
+
+  // The active page's effective background (tri-state, page beats board):
+  //   page.background === undefined → inherit board.background
+  //   page.background === null      → explicit WHITE (override board)
+  //   page.background === "id"      → that paper
+  // `?? board.background` would be wrong here: it can't distinguish "inherit"
+  // (undefined) from "explicit white" (null), so a page could never override a
+  // dark/pattern board back to white. The `!== undefined` check fixes that.
+  const effectiveBg =
+    activePage.background !== undefined ? activePage.background : board.background;
+  const surfaceBg = boardBackgroundCss(effectiveBg);
+  const surfaceDark = isDarkBackground(effectiveBg);
 
   // The effective theme reflected in the panel.
   const panelEff: EffectiveTheme = selectedWidget
@@ -911,37 +1268,20 @@ export function BoardEditor({
         </div>
       </div>
 
-      {/* ── Page tab bar ────────────────────────────────────────────────── */}
+      {/* ── Page filmstrip ──────────────────────────────────────────────── */}
       {!present && (
-        <div className={styles.pageBar} role="tablist" aria-label="Board pages">
-          {pages.map((p, i) => {
-            const isActive = p.id === activePage.id;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                className={`${styles.pageTab} ${isActive ? styles.pageTabActive : ""}`}
-                onClick={() => {
-                  setSelectedId(null);
-                  emit({ type: "selectPage", pageId: p.id });
-                }}
-              >
-                {p.title ?? `Page ${i + 1}`}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            className={styles.pageAdd}
-            aria-label="Add page"
-            onClick={() => emit({ type: "addPage" })}
-          >
-            <TeachIcon name="plus" size={15} />
-            Add page
-          </button>
-        </div>
+        <PageFilmstrip
+          pages={pages}
+          activePage={activePage}
+          onSelect={(id) => {
+            setSelectedId(null);
+            emit({ type: "selectPage", pageId: id });
+          }}
+          onAdd={() => emit({ type: "addPage" })}
+          onDelete={(pageId) => emit({ type: "deletePage", pageId })}
+          onRename={(pageId, title) => emit({ type: "renamePage", pageId, title })}
+          onReorder={(orderedPageIds) => emit({ type: "reorderPages", orderedPageIds })}
+        />
       )}
 
       {/* ── Body: canvas + appearance panel ─────────────────────────────── */}
@@ -956,10 +1296,25 @@ export function BoardEditor({
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
         >
+          {/* Wrapper that reserves space for the scaled inner stage so the outer
+              scroll container sizes correctly (scale doesn't affect layout). */}
           <div
+            style={{
+              height: stageSize.h * scale + 24,
+              position: "relative",
+            }}
+          >
+          <div
+            ref={stageRef}
             className={styles.canvasInner}
             data-dark={surfaceDark || undefined}
-            style={surfaceBg ? { background: surfaceBg } : undefined}
+            style={{
+              width: stageSize.w,
+              height: stageSize.h,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+              ...(surfaceBg ? { background: surfaceBg } : {}),
+            }}
             onPointerDown={(e) => {
               if (e.target === e.currentTarget) setSelectedId(null);
             }}
@@ -969,6 +1324,8 @@ export function BoardEditor({
                 key={w.id}
                 widget={w}
                 canvas={liveCanvas(w, geomDraft)}
+                stageW={stageSize.w}
+                stageH={stageSize.h}
                 selected={w.id === selectedId}
                 present={present}
                 boardTheme={board.boardTheme}
@@ -1024,6 +1381,7 @@ export function BoardEditor({
               />
             ))}
           </div>
+          </div>
         </div>
 
         {/* No docked panel — the board canvas owns the full body width. The
@@ -1066,10 +1424,77 @@ export function BoardEditor({
               {!selectedWidget && (
                 <div className={styles.paperSection}>
                   <div className={styles.paperHead}>Paper</div>
+                  {/* Background scope: Whole board vs This page only */}
+                  <div
+                    className={styles.segCtrl}
+                    role="group"
+                    aria-label="Apply background to"
+                    style={{ marginBottom: "var(--r-8)" }}
+                  >
+                    {(["board", "page"] as const).map((s) => {
+                      const labels: Record<string, string> = {
+                        board: "Whole board",
+                        page: "This page",
+                      };
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-pressed={bgScope === s}
+                          className={`${styles.segBtn} ${bgScope === s ? styles.segBtnOn : ""}`}
+                          onClick={() => setBgScope(s)}
+                        >
+                          {labels[s]}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <PaperPicker
-                    current={board.background ?? null}
-                    onPick={setBackground}
+                    current={
+                      bgScope === "page"
+                        ? // Page scope: pass the page's OWN value verbatim so an
+                          // inheriting page (undefined) highlights "Inherit", while
+                          // an explicit white (null) highlights White.
+                          activePage.background
+                        : (board.background ?? null)
+                    }
+                    onPick={(bg) => setBackground(bg, bgScope)}
+                    // Page scope only: the "Inherit board" chip clears the override.
+                    onInherit={
+                      bgScope === "page" ? inheritPageBackground : undefined
+                    }
                   />
+                  {/* Board size segmented control */}
+                  <div className={styles.sizeSection}>
+                    <div className={styles.sizeLabel}>Size</div>
+                    <div
+                      className={styles.segCtrl}
+                      role="group"
+                      aria-label="Board size"
+                    >
+                      {(["wide", "a4", "a3"] as const).map((s) => {
+                        const labels: Record<string, string> = {
+                          wide: "16∶9",
+                          a4: "A4",
+                          a3: "A3",
+                        };
+                        const on = (board.size ?? "wide") === s;
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            aria-pressed={on}
+                            className={`${styles.segBtn} ${on ? styles.segBtnOn : ""}`}
+                            onClick={() =>
+                              emit({ type: "setBoardSize", size: s })
+                            }
+                          >
+                            {labels[s]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
               <AppearancePanel {...panelProps} headingId={headingId} />
