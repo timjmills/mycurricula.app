@@ -106,27 +106,37 @@
   overflow: hidden;
 }
 
-/* Thin tab header strip across the top of the panel. Tightened to hug the tabs
-   (no dead bar): the "+" trigger occupies the right side. The tab strip scrolls
-   horizontally on its own so the "+" stays reachable. */
-.tabHeader {
+/* Lean panel header (Wave 1 item 3): the active module's title + icon on the
+   left, the "+" trigger flush right. The left RAIL is the module switcher now —
+   the old in-panel multi-tab strip (a duplicate switcher) was removed, so this
+   header just labels what the panel is showing. */
+.panelHead {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: var(--r-4) var(--r-6);
+  gap: var(--r-8);
+  padding: var(--r-8) var(--r-12);
   border-bottom: var(--line);
 }
 
-/* The horizontally-scrolling tab strip — keeps overflow off the header so the
-   "+" trigger never scrolls out of view. */
-.tabStrip {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+.panelHeadTitle {
   flex: 1;
   min-width: 0;
-  overflow-x: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--r-6);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.panelHeadIcon {
+  display: inline-flex;
+  flex: none;
+  color: var(--ink-soft);
 }
 
 /* ── Panel-bar "+" hover-reveal ──────────────────────────────────────────────

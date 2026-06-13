@@ -22,7 +22,6 @@ import { useConsequenceToast } from "@/lib/consequence-toast";
 import { teachClient as teach } from "@/lib/teach/client";
 import type { Board } from "@/lib/types";
 import { useFocusTrap } from "./useFocusTrap";
-import { BoardBackgroundPicker } from "./BoardBackgroundPicker";
 import styles from "./BoardSettingsPopover.module.css";
 
 export interface BoardSettingsPopoverProps {
@@ -44,10 +43,27 @@ export function BoardSettingsPopover({
   const [busy, setBusy] = useState(false);
   // Two-step confirm gate for the destructive board reset.
   const [confirmReset, setConfirmReset] = useState(false);
+  // Authoritative widget count ACROSS ALL PAGES (gate G3-2). `board.widgets` is
+  // only the page-0 mirror, so gating the reset on it would wrongly disable the
+  // button — and mislabel the count — for a board whose widgets live on later
+  // pages. Load the real page model once on open; fall back to the flat mirror
+  // until it resolves.
+  const [allWidgetCount, setAllWidgetCount] = useState<number | null>(null);
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   useFocusTrap({ containerRef: dialogRef, initialFocusRef: inputRef });
+
+  // Load the authoritative all-pages widget count for the reset gate/label.
+  useEffect(() => {
+    let alive = true;
+    void teach.listPages(board.id).then((pages) => {
+      if (alive) setAllWidgetCount(pages.flatMap((p) => p.widgets).length);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [board.id]);
 
   // Esc closes (focus trap owns Tab containment; Esc-to-close lives here).
   useEffect(() => {
@@ -81,9 +97,15 @@ export function BoardSettingsPopover({
     setConfirmReset(false);
     setBusy(true);
     try {
-      // Clear every widget on the active board (delete one-by-one through the
-      // repo so the mock + future Supabase impls behave identically).
-      const ids = board.widgets.map((w) => w.id);
+      // Clear every widget on the active board, ACROSS ALL PAGES. `board.widgets`
+      // is only the page-0 flat mirror, so a multi-page board would keep its
+      // later-page widgets while the toast claimed "all removed" (gate N3). Read
+      // the authoritative page model and gather every page's widgets; fall back
+      // to the flat mirror if the repo returned no pages. Delete one-by-one so
+      // the mock + future Supabase impls behave identically.
+      const pages = await teach.listPages(board.id);
+      const pageIds = pages.flatMap((p) => p.widgets).map((w) => w.id);
+      const ids = pageIds.length > 0 ? pageIds : board.widgets.map((w) => w.id);
       for (const id of ids) {
         await teach.deleteWidget(id);
       }
@@ -97,7 +119,8 @@ export function BoardSettingsPopover({
     }
   }
 
-  const widgetCount = board.widgets.length;
+  // All-pages count once loaded; the page-0 mirror as the loading fallback.
+  const widgetCount = allWidgetCount ?? board.widgets.length;
 
   return (
     <div
@@ -153,15 +176,9 @@ export function BoardSettingsPopover({
           </Button>
         </div>
 
-        {/* ── Board background ────────────────────────────────────────────── */}
-        <div className={styles.section}>
-          <div className={styles.fieldLabel}>Board background</div>
-          <p className={styles.hint}>
-            A colour, pattern, or gradient shown behind the widgets — pick one
-            to set the mood for this board.
-          </p>
-          <BoardBackgroundPicker board={board} reloadBoards={reloadBoards} />
-        </div>
+        {/* Board paper/background now lives in the editor's appearance popover
+            (the "Appearance" toolbar button) so it sits next to the board and
+            renders live — one place, #11. */}
 
         {/* ── Reorder hint ────────────────────────────────────────────────── */}
         <p className={styles.hint}>

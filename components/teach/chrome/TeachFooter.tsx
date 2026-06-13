@@ -1,12 +1,13 @@
 "use client";
 
 // TeachFooter.tsx — the Teach workspace's status footer
-// (docs/teach-view-plan.md §3; Agent A). Left-to-right (prototype `Footer`):
-//   Panels ▴ · module dots (Lessons / Resources• / Notes) · spacer ·
-//   Board N of M · · Saved · spacer · shortcut hints (⌘P / ⌘/ / ⌘?).
+// (docs/teach-view-plan.md §3). Wave 1 declutter: the footer used to echo every
+// other zone — module-jump dots (the rails already do that), a "Board N of M"
+// count (the sub-bar pill strip already shows it), and ⌘P/⌘//⌘? shortcut hints
+// (the Help overlay owns those, and ⌘/ "Layout" was dead). All removed. What
+// remains is single-purpose: the panels toggle + the auto-save status.
 //
-// A PURE presentational component. Board position + save status arrive via
-// props; the "Panels ▴" toggle and module dots dispatch / call back so the
+// A PURE presentational component. The "Panels ▴" toggle calls back so the
 // integrating component owns the panel state.
 
 import type { ReactNode } from "react";
@@ -15,32 +16,12 @@ import styles from "./TeachChrome.module.css";
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
-export interface TeachFooterModule {
-  /** Stable module id (matches a TEACH_MODULE_IDS entry). */
-  id: string;
-  /** Human label shown in the footer. */
-  label: string;
-  /** Whether this module's panel is currently open (renders as the active
-   *  dot / bold label). */
-  active?: boolean;
-  /** Whether the module has fresh/unread content (renders a status dot). */
-  hasActivity?: boolean;
-}
-
 export interface TeachFooterProps {
-  /** 1-based index of the active board (e.g. 1). */
-  boardIndex: number;
-  /** Total board count for the active lesson. */
-  boardCount: number;
-  /** Quick-jump module dots shown after the Panels toggle. */
-  modules?: readonly TeachFooterModule[];
   /** Whether both side panels are currently collapsed (drives the chevron
    *  direction + the toggle's aria-expanded). */
   panelsCollapsed?: boolean;
   /** Toggle the side panels open/closed. Optional. */
   onTogglePanels?: () => void;
-  /** Focus / open a module by id. Optional. */
-  onSelectModule?: (id: string) => void;
   /** Save-state label (e.g. "Saved to MyCurricula"). Defaults to that. */
   savedLabel?: string;
 }
@@ -48,12 +29,8 @@ export interface TeachFooterProps {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function TeachFooter({
-  boardIndex,
-  boardCount,
-  modules = [],
   panelsCollapsed = false,
   onTogglePanels,
-  onSelectModule,
   savedLabel = "Saved to MyCurricula",
 }: TeachFooterProps): ReactNode {
   return (
@@ -80,40 +57,7 @@ export function TeachFooter({
         </button>
       </Tooltip>
 
-      {/* Module quick-jump dots. */}
-      {modules.map((m) => (
-        <Tooltip
-          key={m.id}
-          content={`Jump to the ${m.label} panel`}
-          side="top"
-          tooltipId="teach-footer-module"
-        >
-          <button
-            type="button"
-            className={styles.panelsToggle}
-            onClick={() => onSelectModule?.(m.id)}
-            aria-label={`Open ${m.label}`}
-            aria-pressed={m.active}
-          >
-            <span className={m.active ? styles.footerStrong : undefined}>
-              {m.label}
-            </span>
-            {m.hasActivity ? (
-              <span className={styles.moduleDot} aria-hidden="true" />
-            ) : null}
-          </button>
-        </Tooltip>
-      ))}
-
       <div className={styles.footerSpacer} aria-hidden="true" />
-
-      {/* Board N of M. */}
-      <span aria-label={`Board ${boardIndex} of ${boardCount}`}>
-        Board {boardIndex} of {boardCount}
-      </span>
-      <span className={styles.footerSep} aria-hidden="true">
-        ·
-      </span>
 
       {/* Save status. */}
       <Tooltip
@@ -125,22 +69,6 @@ export function TeachFooter({
           {savedLabel}
         </span>
       </Tooltip>
-
-      <div className={styles.footerSpacer} aria-hidden="true" />
-
-      {/* Shortcut hints. */}
-      <span className={styles.shortcutsLabel} aria-hidden="true">
-        Shortcuts:
-      </span>
-      <span aria-hidden="true">
-        <span className={`cp-mono ${styles.kbd}`}>⌘P</span> Present
-      </span>
-      <span aria-hidden="true">
-        <span className={`cp-mono ${styles.kbd}`}>⌘/</span> Layout
-      </span>
-      <span aria-hidden="true">
-        <span className={`cp-mono ${styles.kbd}`}>⌘?</span> Help
-      </span>
     </div>
   );
 }

@@ -206,7 +206,12 @@ export function BoardFullscreen({
   subjectId,
 }: BoardFullscreenProps): ReactNode {
   // ── Local UI state (mirrors the handoff's BoardFull state) ────────────────
-  const [bg, setBg] = useState<string>("dusk");
+  // Present opens on clean WHITE paper by default (matches the editor's white
+  // sheet + the content-first north star, #11). The teacher can still pick a
+  // backdrop from the present fav-bar. Full editor→present paper sync (carrying
+  // board.background's exact catalogue paper into present) is a follow-up — the
+  // present picker speaks its own preset vocabulary (C9: present = display-only).
+  const [bg, setBg] = useState<string>("plain");
   const [tool, setTool] = useState<PanelTool>("select");
   const [colorId, setColorId] = useState<string>("purple");
   const [side, setSide] = useState<"left" | "right">("left");

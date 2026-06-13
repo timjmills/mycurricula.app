@@ -203,11 +203,19 @@
      touch via `touch-action: none` on the draggable widget + resize handle. */
   touch-action: pan-x pan-y;
 }
+/* The paper sheet the teacher builds on. Defaults to WHITE in every theme
+   (C8 / H21: themed chrome, neutral white board) and reads its background from
+   the board's chosen paper via an inline `background` override when one is set.
+   Opaque, so the desk dots behind it don't bleed through — a board opens clean
+   and white, not as a dotted grid (#11). */
 .canvasInner {
   position: relative;
   width: 1180px;
   height: 840px;
   margin: var(--r-12);
+  background: var(--teach-board-paper);
+  border-radius: var(--wf-r-card);
+  box-shadow: var(--wf-shadow-card);
 }
 
 /* ── Placed widget wrapper ──────────────────────────────────────────────── */
@@ -289,40 +297,60 @@
   z-index: 6;
 }
 
-/* ── Right appearance panel (desktop dock) ──────────────────────────────── */
+/* ── Appearance popover (on-demand; never docked) ───────────────────────────
+   ONE surface, opened by the toolbar "Appearance"/"Style widget" button. The
+   board canvas keeps the full body width; this never docks (#11, "no
+   crowding"). Desktop: a floating card pinned to the editor's right. Phone /
+   tablet: a full-width bottom sheet. Both gated on the same open state. */
 .panel {
-  width: 312px;
-  flex: none;
-  border-left: var(--line);
   padding: var(--r-12);
+  background: var(--surface);
   overflow: auto;
-  height: clamp(420px, 70vh, 880px);
-  background: var(--paper);
 }
-
-/* On tablet + phone the panel becomes a bottom sheet so it never squeezes
-   the canvas, and the canvas takes full width. */
-.panelSheet {
+.panelFloat {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 84px;
+  right: 16px;
   z-index: 70;
-  max-height: 70vh;
-  width: 100%;
-  border-left: none;
-  border-top: 1px solid var(--border);
-  border-top-left-radius: var(--wf-r-card);
-  border-top-right-radius: var(--wf-r-card);
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  max-height: min(80vh, 720px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--wf-r-card);
   box-shadow: var(--sh-lg);
-  height: auto;
+  padding: var(--r-12) var(--r-12) var(--r-16);
+}
+.panelTopBar {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  margin-bottom: var(--r-8);
+}
+.panelClose {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-8);
+  color: var(--ink-500);
+  flex: none;
+}
+.panelClose:hover {
+  background: var(--ink-50);
+}
+.panelScroll {
+  overflow: auto;
+  min-height: 0;
 }
 .sheetGrip {
   width: 40px;
   height: 4px;
   border-radius: var(--r-pill);
   background: var(--ink-200);
-  margin: 0 auto var(--r-8);
 }
 .sheetBackdrop {
   position: fixed;
@@ -330,43 +358,141 @@
   z-index: 69;
   background: color-mix(in srgb, var(--ink-900) 35%, transparent);
 }
-
-/* The floating "Appearance" button that opens the sheet on small screens. */
-.panelFab {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 60;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--r-8);
-  min-height: 44px;
-  padding: var(--r-8) var(--r-12);
-  border-radius: var(--r-pill);
-  font-size: var(--t-14);
-  font-weight: 700;
-  color: var(--on-solid);
-  background: var(--wf-blue-accent);
-  box-shadow: var(--sh-md);
-}
-
-/* Tier switch: desktop docks the panel and hides the FAB; tablet/phone hides
-   the docked panel (so the canvas keeps full width) and surfaces the FAB +
-   bottom sheet instead. 960px is the cutover between "room for a dock" and
-   "give the canvas the width". */
+/* Desktop: the floating card doesn't dim the board (transparent backdrop still
+   captures the click-outside-to-close), and the sheet grip is hidden. */
 @media (min-width: 961px) {
-  .panelFab {
+  .panelFloat .sheetGrip {
     display: none;
   }
-  .panelSheet,
   .sheetBackdrop {
-    display: none;
+    background: transparent;
   }
 }
+/* Phone/tablet: the card drops to a full-width bottom sheet. */
 @media (max-width: 960px) {
-  .panel:not(.panelSheet) {
-    display: none;
+  .panelFloat {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    max-height: 78vh;
+    border: none;
+    border-top: 1px solid var(--border);
+    border-top-left-radius: var(--wf-r-card);
+    border-top-right-radius: var(--wf-r-card);
   }
+  .panelTopBar {
+    position: relative;
+    justify-content: center;
+  }
+  .panelFloat .sheetGrip {
+    margin: 0 auto;
+  }
+  .panelClose {
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+}
+
+/* ── Paper picker (board-mode appearance) ───────────────────────────────── */
+.paperSection {
+  margin-bottom: var(--r-16);
+  padding-bottom: var(--r-12);
+  border-bottom: var(--line);
+}
+.paperHead {
+  font-family: var(--font-display-sm);
+  font-size: var(--t-16);
+  font-weight: 800;
+  margin-bottom: var(--r-8);
+}
+.paper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--r-10);
+}
+.paperTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--r-6);
+}
+.paperTab {
+  min-height: 32px;
+  padding: var(--r-4) var(--r-10);
+  border-radius: var(--r-pill);
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink-500);
+  border: var(--line);
+  background: var(--paper);
+}
+.paperTab:hover {
+  background: var(--ink-50);
+}
+.paperTabOn {
+  color: var(--wf-blue-accent);
+  border-color: var(--wf-blue-accent);
+  background: var(--wf-blue-chip);
+}
+.paperGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--r-8);
+}
+.paperSw {
+  aspect-ratio: 1 / 1;
+  border-radius: var(--r-8);
+  border: 2px solid transparent;
+  cursor: pointer;
+  background: var(--swatch-bg, var(--paper));
+  box-shadow: inset 0 0 0 1px var(--ink-150);
+}
+.paperSw:hover {
+  box-shadow:
+    inset 0 0 0 1px var(--ink-150),
+    var(--sh-sm);
+}
+.paperSwOn {
+  border-color: var(--wf-blue-accent);
+  box-shadow:
+    inset 0 0 0 1px var(--ink-150),
+    0 0 0 2px var(--wf-blue-accent);
+}
+/* The "White (no background)" value — a true-white chip (the default paper),
+   not the themed --paper fallback the other swatches use when --swatch-bg is
+   unset. A faint corner slash hints "none / default". */
+.paperNone {
+  background: var(--teach-board-paper);
+  position: relative;
+}
+.paperNone::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    transparent calc(50% - 1px),
+    var(--ink-200) calc(50% - 1px),
+    var(--ink-200) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+  opacity: 0.5;
+}
+
+/* "More widgets…" row in the add-widget popover — divided + accented. */
+.popMore {
+  margin-top: var(--r-4);
+  padding-top: var(--r-12);
+  border-top: var(--line);
+  color: var(--wf-blue-accent);
+}
+.popMore .popIcon {
+  background: var(--ink-50);
+  color: var(--ink-600);
 }
 
 /* ── Add-widget popover ─────────────────────────────────────────────────── */
@@ -620,7 +746,7 @@
   .resCard,
   .pageTab,
   .popItem,
-  .panelFab {
+  .paperSw {
     transition:
       background-color 120ms ease,
       box-shadow 120ms ease,

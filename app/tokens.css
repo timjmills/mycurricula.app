@@ -360,6 +360,13 @@
   --teach-alarm: #e5404a;
   --teach-go: #34b96a;
 
+  /* The board editor's default paper sheet. Deliberately WHITE and NOT themed
+     (no override in the per-theme blocks below), so a board opens white in every
+     theme — themed chrome, neutral white board (C8 / H21). A teacher can still
+     choose a coloured/patterned paper via the appearance popover, which sets an
+     inline `background` from the --teach-bg-* catalogue on top of this. */
+  --teach-board-paper: #ffffff;
+
   /* ── Teaching-board backgrounds (Teach Phase 3, plan §4.2) ──────────────
      The classroomscreen-style board background picker: 15 solid colours, 15
      repeating patterns, and 15 seamless repeating gradients. Each is a single

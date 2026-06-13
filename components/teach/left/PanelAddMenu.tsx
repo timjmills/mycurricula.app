@@ -1,12 +1,16 @@
 "use client";
 
-// PanelAddMenu — the panel-bar "+" trigger + popover menu shared by BOTH the
-// left and right Teach panels. It surfaces:
-//   • Tools — the dockable tool-widgets (timer, dice, poll, …). Selecting one
-//     calls `onAddTool(type)` (the caller docks it via useDockedTools().add and
-//     activates the Tools module on its side).
-//   • Browse widget library — only when `onOpenWidgetLibrary` is supplied
-//     (wired by the lead to the existing Widget Library overlay).
+// PanelAddMenu — the panel-bar "+" trigger + popover shared by BOTH the left and
+// right Teach panels. Wave 1 declutter: it used to ALSO list the dockable
+// tool-widgets (timer/dice/poll/…), duplicating the Tools module's own add path
+// (audit C1 — Tools was reachable from 5–6 places). That list is gone; Tools now
+// lives in ONE place (the Tools module, reached from the left rail / its body,
+// which has its own add picker). The "+" now surfaces only:
+//   • Browse widget library — opens the Widget Library overlay (the single
+//     canonical place to add a board widget).
+//
+// When `onOpenWidgetLibrary` is absent the trigger renders nothing (there is
+// nothing left to add from here).
 //
 // Behaviour (CLAUDE.md §4):
 //   • Hover-reveal on desktop (handled by the panel CSS via `.addTrigger`
@@ -25,34 +29,14 @@ import {
   useRef,
   useState,
 } from "react";
-import type { WidgetType } from "@/lib/types";
-import { TeachIcon, widgetMeta } from "@/components/teach/widgets";
+import { TeachIcon } from "@/components/teach/widgets";
 import styles from "./PanelAddMenu.module.css";
-
-/** The tool-widget types offered from the panel "+" (the dockable live tools).
- *  Order mirrors the request; labels + icons come from `widgetMeta(type)`. */
-const TOOL_TYPES: readonly WidgetType[] = [
-  "timer",
-  "stopwatch",
-  "clock",
-  "countdown",
-  "dice",
-  "scoreboard",
-  "poll",
-  "namepick",
-  "sound",
-  "traffic",
-  "work-sound",
-  "class-points",
-];
 
 export interface PanelAddMenuProps {
   /** Which side this menu lives on — aligns the popover to the panel edge and
    *  scopes the generated ids so left/right menus never collide. */
   side: "left" | "right";
-  /** Dock a tool-widget into this panel's Tools stack + activate it. */
-  onAddTool: (type: WidgetType) => void;
-  /** Open the Widget Library overlay. When absent, the entry is hidden. */
+  /** Open the Widget Library overlay. When absent, the trigger is hidden. */
   onOpenWidgetLibrary?: () => void;
   /** Extra class for the trigger (the panels pass their hover-reveal class). */
   triggerClassName?: string;
@@ -80,7 +64,6 @@ function PlusIcon({ size = 16 }: { size?: number }): ReactNode {
 
 export function PanelAddMenu({
   side,
-  onAddTool,
   onOpenWidgetLibrary,
   triggerClassName,
 }: PanelAddMenuProps): ReactNode {
@@ -148,15 +131,13 @@ export function PanelAddMenu({
     items[nextIndex]?.focus();
   }
 
-  function handleToolClick(type: WidgetType): void {
-    onAddTool(type);
-    close(true);
-  }
-
   function handleLibraryClick(): void {
     onOpenWidgetLibrary?.();
     close(true);
   }
+
+  // Nothing to add from here when no widget-library opener is wired.
+  if (!onOpenWidgetLibrary) return null;
 
   return (
     <div className={styles.root} ref={rootRef}>
@@ -167,8 +148,8 @@ export function PanelAddMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label="Add a tool or widget to this panel"
-        title="Add a tool or widget to this panel"
+        aria-label="Add a widget to the board"
+        title="Add a widget to the board"
         onClick={() => (open ? close(true) : setOpen(true))}
       >
         <PlusIcon size={16} />
@@ -179,51 +160,25 @@ export function PanelAddMenu({
           ref={menuRef}
           id={menuId}
           role="menu"
-          aria-label="Add a tool or widget"
+          aria-label="Add a widget"
           className={`${styles.menu} ${side === "right" ? styles.menuRight : styles.menuLeft}`}
           onKeyDown={handleMenuKeyDown}
         >
           <p className={styles.groupLabel} aria-hidden="true">
-            Tools
+            Widgets
           </p>
-          {TOOL_TYPES.map((type) => {
-            const meta = widgetMeta(type);
-            return (
-              <button
-                key={type}
-                type="button"
-                role="menuitem"
-                tabIndex={-1}
-                className={styles.item}
-                onClick={() => handleToolClick(type)}
-              >
-                <span className={styles.itemIcon} aria-hidden="true">
-                  <TeachIcon name={meta.icon} size={16} />
-                </span>
-                <span className={styles.itemLabel}>{meta.label}</span>
-              </button>
-            );
-          })}
-
-          {onOpenWidgetLibrary ? (
-            <>
-              <p className={styles.groupLabel} aria-hidden="true">
-                Widgets
-              </p>
-              <button
-                type="button"
-                role="menuitem"
-                tabIndex={-1}
-                className={styles.item}
-                onClick={handleLibraryClick}
-              >
-                <span className={styles.itemIcon} aria-hidden="true">
-                  <TeachIcon name="grid" size={16} />
-                </span>
-                <span className={styles.itemLabel}>Browse widget library</span>
-              </button>
-            </>
-          ) : null}
+          <button
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            className={styles.item}
+            onClick={handleLibraryClick}
+          >
+            <span className={styles.itemIcon} aria-hidden="true">
+              <TeachIcon name="grid" size={16} />
+            </span>
+            <span className={styles.itemLabel}>Browse widget library</span>
+          </button>
         </div>
       ) : null}
     </div>

@@ -127,6 +127,59 @@
   z-index: 2;
 }
 
+/* ── Board empty state (no board open) ──────────────────────────────────────
+   The clean, content-first surface a board opens to when nothing is open yet
+   (Wave 1, #10). Centered card on the shell's warm backdrop; tokens only. */
+.emptyState {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--r-12);
+  padding: var(--r-12);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-xs);
+  color: var(--muted);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-20);
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.emptyBody {
+  margin: 0;
+  max-width: 38ch;
+  font-size: var(--t-14);
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--r-8);
+  margin-top: var(--r-4);
+}
+
 /* The drag ghost shown in the DragOverlay portal. */
 .dragGhost {
   padding: var(--r-8) var(--r-12);
