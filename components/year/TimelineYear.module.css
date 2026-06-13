@@ -12,17 +12,59 @@
  */
 
 .tlVars {
-  /* Map the prototype's cascade vars onto the app's .cp-subj tokens. */
+  /* Map the prototype's cascade vars onto the app's .cp-subj tokens. Every
+     mix blends toward var(--paper) (the theme's surface base), NEVER literal
+     #fff — #fff would not re-tint on Night/dark themes (dark-on-dark text). */
   --uc: var(--c); /* bright accent — stripe, selected border, arrow */
   --ud: var(--cd); /* deep text */
   --ut: var(--cl); /* soft tint — selected fill */
-  --us: color-mix(in srgb, var(--c) 62%, #fff); /* mid tone — icon tiles */
+  --us: color-mix(in srgb, var(--c) 62%, var(--paper)); /* mid tone — icon tiles */
   --ush: color-mix(in srgb, var(--c) 32%, transparent); /* shadow tint */
-  --rt: color-mix(in srgb, var(--cl) 70%, #fff); /* row wash */
+  --rt: color-mix(in srgb, var(--cl) 70%, var(--paper)); /* row wash */
+
+  /* ── Hierarchy depth-shading scale (Unit ⊃ Week ⊃ Day) ──────────────────
+     Three nesting levels each get their OWN background so the containment
+     reads instantly. All derive from the subject family + var(--paper):
+       --lvl-unit  — unit container fill (soft subject tint)
+       --lvl-week  — week-card fill (mid-strength subject tint, one step up)
+       --lvl-day   — day/lesson-card fill (the plain surface)
+     Zebra shading nudges alternate siblings one notch toward --paper. */
+  --lvl-unit: var(--cl);
+  --lvl-week: color-mix(in srgb, var(--cl) 55%, var(--paper));
+  --lvl-day: var(--paper);
+  /* Zebra wash for :nth-child(even) siblings — a faint step toward --paper so
+     adjacent rows separate without a hard line. */
+  --zebra-week: color-mix(in srgb, var(--cl) 32%, var(--paper));
+  --zebra-day: color-mix(in srgb, var(--cl) 14%, var(--paper));
+  /* Hairline divider between siblings — a translucent subject-tinted rule. */
+  --hair: color-mix(in srgb, var(--c) 18%, transparent);
+}
+
+/* ── Root: height-bounded flex column ────────────────────────────────────
+   Fills <main> (height:100%) so the .tl timeline card can claim the leftover
+   height (flex:1) and host the ZoomPanCanvas, which needs a bounded parent to
+   compute "Fit". min-height:0 lets the card actually shrink inside the column.
+   Owns the page padding (main supplies none — matches SubjectView's .page). */
+.root {
+  /* Content height — NOT height:100%. The ZoomPanCanvas self-bounds its own
+     height to the viewport, so forcing .root to fill the (top-bar-offset,
+     oversized) <main> only re-introduced a scrollbar-worth of phantom height
+     below the canvas. Letting .root hug its content lets <main> collapse to
+     the viewport, so there is no page scroll. */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px 10px;
+}
+@media (max-width: 560px) {
+  .root {
+    padding: 14px 12px 8px;
+  }
 }
 
 /* ── Page heading ── */
 .head {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -54,20 +96,34 @@
 }
 
 .statWrap {
+  flex: 0 0 auto;
   margin-bottom: 18px;
 }
 
-/* ── Timeline card ── */
+/* ── Timeline card ──
+   Claims the leftover column height (flex:1, min-height:0) and becomes a flex
+   column itself: the months header (.tlhead) is a fixed top legend, the canvas
+   takes the rest. overflow:hidden clips the canvas's scaled board. */
 .tl {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--sh-sm);
   padding: 6px 0 0;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   overflow: hidden;
 }
+/* The canvas fills the card body below the months header. */
+.canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .tlhead {
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: 230px 1fr;
   border-bottom: 1px solid var(--hairline);
@@ -107,7 +163,7 @@
   display: grid;
   grid-template-columns: 230px 1fr;
   align-items: center;
-  padding: 14px 0;
+  padding: 20px 0;
   transition: background 0.15s;
 }
 .subrow.hot {
@@ -150,20 +206,32 @@
 }
 .units {
   display: flex;
-  gap: 10px;
-  padding: 0 18px;
+  gap: 14px;
+  padding: 4px 22px;
   position: relative;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  /* WRAP instead of scroll: the old overflow-x:auto silently clipped
+     weeks/lessons behind a horizontal scrollbar. Wrapping keeps every unit
+     visible; the ZoomPanCanvas owns any whole-board scaling/scrolling. */
+  flex-wrap: wrap;
+  align-items: stretch;
 }
 .unit {
-  flex: 1 0 116px;
+  /* grow to fill the row but ALSO shrink (1 1) so a wrapped row of units never
+     forces horizontal overflow — they reflow within the canvas width. A
+     roomier basis keeps multi-word unit names off the cramped edge. */
+  flex: 1 1 150px;
   min-width: 0;
-  border-radius: 11px;
-  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  /* Generous, asymmetric padding — extra on the left clears the accent stripe
+     so the title never crowds it (issues: padding + text-to-edge). */
+  padding: 14px 16px 13px;
   cursor: pointer;
-  border: 1.5px solid var(--border);
+  border: 1px solid var(--border);
   background: var(--surface);
+  /* Soft resting shadow so each unit reads as a real card, not a flat box. */
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ush) 45%, transparent);
   transition:
     transform 0.12s,
     box-shadow 0.12s,
@@ -174,49 +242,55 @@
 }
 .unit:hover {
   transform: translateY(-2px);
-  box-shadow: var(--sh-md);
-  border-color: var(--us);
+  box-shadow: 0 12px 24px -12px var(--ush);
+  border-color: var(--uc);
+}
+/* The global `.cp-root button` reset (tokens.css) strips a <button>'s padding,
+   border-style, and background. The .unit chip IS a button, so re-assert
+   padding + a full hairline border at a specificity that outranks the reset
+   (.root .unit = 0,2,0 > .cp-root button = 0,1,1). Without this the chip text
+   crams to the very edge (padding:0) and only the high-specificity left stripe
+   shows. The mode-specific fills/stripes below layer on top. */
+.root .unit {
+  padding: 14px 16px 13px;
+  border: 1px solid var(--border);
 }
 .unit .un {
   font-family: var(--font-display-sm);
   font-size: var(--t-13, 13px);
   font-weight: 800;
-  color: var(--ink);
+  /* Deep subject tone — the title itself carries the subject color (vibrancy)
+     while staying legible on the soft tint. */
+  color: var(--ud);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 .unit .us {
   font-size: var(--t-11, 11px);
   color: var(--muted);
-  margin-top: 3px;
-  line-height: 1.25;
+  margin-top: 4px;
+  line-height: 1.3;
   font-weight: 500;
 }
 .unit .uw {
   font-size: var(--t-10, 10px);
   color: var(--faint);
-  margin-top: 5px;
+  /* Pushed to the bottom of the card with auto top-margin so the week span
+     always anchors the chip regardless of title length — keeps a tidy,
+     even baseline across a wrapped row of stretched cards. */
+  margin-top: auto;
+  padding-top: 8px;
   font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 .unit.sel {
   background: var(--ut);
   border-color: var(--uc);
-  box-shadow: 0 10px 22px -10px var(--ush);
+  box-shadow: 0 12px 26px -12px var(--ush);
 }
 .unit.sel .un {
   color: var(--ud);
-}
-.unit.sel::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -15px;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 10px solid transparent;
-  border-right: 10px solid transparent;
-  border-top: 12px solid var(--uc);
-  z-index: 6;
-  filter: drop-shadow(0 3px 2px var(--ush));
 }
 .chev {
   width: 30px;
@@ -273,7 +347,9 @@
   background: var(--us);
   display: grid;
   place-items: center;
-  color: #fff;
+  /* Icon sits on the saturated --us mid-tone: --on-solid stays light in every
+     theme (never --paper, which flips dark on Night → dark-on-dark). */
+  color: var(--on-solid);
   flex: 0 0 auto;
   font-family: var(--font-display-sm);
   font-size: var(--t-13, 13px);
@@ -343,7 +419,7 @@
   text-align: left;
 }
 .wk:hover {
-  box-shadow: 0 6px 16px -8px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 6px 16px -8px var(--ush);
 }
 .wk .wn {
   font-family: var(--font-display-sm);
@@ -392,11 +468,12 @@
 .cir.done svg {
   width: 11px;
   height: 11px;
-  color: #fff;
+  /* Check sits on the solid --done fill — --on-solid, never --paper. */
+  color: var(--on-solid);
 }
 .cir.cur {
   border-color: var(--uc);
-  background: color-mix(in srgb, var(--uc) 22%, #fff);
+  background: color-mix(in srgb, var(--uc) 22%, var(--paper));
 }
 
 .daysrow {
@@ -538,6 +615,7 @@
 
 /* ── Legend ── */
 .leg {
+  flex: 0 0 auto;
   display: flex;
   gap: 18px;
   flex-wrap: wrap;
@@ -555,6 +633,207 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   HIERARCHY LAYOUTS — Unit ⊃ Week ⊃ Day made visually DISTINCT.
+
+   The complaint was that all three levels looked identical, so you couldn't
+   tell a unit from a week from a lesson, nor sibling from sibling. Two layouts
+   switch off `data-hier` on .root:
+
+     GRID (default) — nested cards + depth shading. Each level has its OWN
+       background (unit tint → mid week tint → plain day surface), border,
+       shadow, and indentation, so the containment reads instantly.
+     LIST — color-coded bands. Unit = bold subject band (on-color text),
+       Week = soft tint band, Lesson = plain row + stripe. Flatter + denser.
+
+   Sibling differentiation ships ALL THREE mechanisms in BOTH layouts so the
+   user can prune later: (1) bordered cards with real gaps, (2) :nth-child(even)
+   zebra toward --paper, (3) numbered labels + hairline dividers. The selected
+   state stays DISTINCT from zebra via an accent ring.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Shared: indentation + sibling cues that apply to BOTH layouts ──────── */
+
+/* Week cards get a subject left-stripe so the week tier is unmistakable;
+   day cards too (one tier deeper, brighter). */
+.wk {
+  border-left: 4px solid color-mix(in srgb, var(--uc) 55%, transparent);
+}
+.day {
+  border-left: 4px solid var(--uc);
+}
+
+/* Sibling cue (2): zebra. Alternate week/day siblings wash one notch toward
+   --paper so adjacent cards separate even when their content is similar. The
+   selected state overrides this below, so zebra never hides the selection. */
+.weeks .wk:nth-child(even) {
+  background: var(--zebra-week);
+}
+.days .day:nth-child(even) {
+  background: var(--zebra-day);
+}
+
+/* Selected ring — DISTINCT from zebra/tint: an outset accent ring + offset so
+   a selected card reads as selected regardless of its zebra parity. */
+.unit.sel,
+.wk.sel,
+.day.sel {
+  outline: 2px solid var(--uc);
+  outline-offset: 1px;
+}
+
+/* GRID selected fills — restate at tier-override specificity so the selected
+   card keeps a stronger tint than its sibling tier background (the .sel ring
+   alone could otherwise read as the only cue). */
+.root[data-hier="grid"] .unit.sel {
+  background: var(--ut);
+}
+.root[data-hier="grid"] .wk.sel,
+.root[data-hier="grid"] .weeks .wk.sel:nth-child(even),
+.root[data-hier="grid"] .day.sel {
+  background: var(--ut);
+}
+
+/* ── GRID layout — nested depth-shaded cards ────────────────────────────── */
+
+/* Unit tier: the collapsed unit pills wear the unit tint so the unit level is
+   its own shaded tier (not the plain surface the week/day cards downshift to). */
+.root[data-hier="grid"] .unit {
+  background: color-mix(in srgb, var(--cl) 78%, var(--paper));
+  border-color: color-mix(in srgb, var(--uc) 32%, var(--paper));
+  /* Bright subject left-stripe — the strongest, most legible subject signal
+     (matches the app's card-stripe language) and the main "make the colours
+     vibrant" lever. */
+  border-left: 4px solid var(--uc);
+}
+.root[data-hier="grid"] .unit:hover {
+  background: color-mix(in srgb, var(--cl) 92%, var(--paper));
+}
+/* Unit CONTAINER (the open detail) — the deepest tint; its header is deeper
+   still so "this is the unit you opened" reads as the outermost box. */
+.root[data-hier="grid"] .detail {
+  background: var(--lvl-unit);
+  border-top: 2px solid var(--uc);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--uc) 22%, transparent);
+}
+.root[data-hier="grid"] .dhead {
+  background: color-mix(in srgb, var(--ud) 12%, var(--lvl-unit));
+}
+/* Week tier — mid-strength tint, indented inside the unit container, with its
+   own border + soft shadow so the week box sits visibly INSIDE the unit. */
+.root[data-hier="grid"] .weeks {
+  padding-left: 10px;
+  border-left: 2px solid var(--hair);
+  margin-left: 2px;
+}
+.root[data-hier="grid"] .wk {
+  background: var(--lvl-week);
+  border-color: color-mix(in srgb, var(--uc) 22%, var(--paper));
+  box-shadow: 0 2px 6px -4px var(--ush);
+}
+.root[data-hier="grid"] .weeks .wk:nth-child(even) {
+  background: color-mix(in srgb, var(--lvl-week) 78%, var(--paper));
+}
+/* Day tier — the plain surface (brightest), indented inside the week group,
+   with a full subject stripe so the leaf level pops against the week tint. */
+.root[data-hier="grid"] .daysrow {
+  padding-left: 10px;
+  border-left: 2px solid var(--hair);
+  margin-left: 2px;
+}
+.root[data-hier="grid"] .day {
+  background: var(--lvl-day);
+  box-shadow: 0 1px 4px -2px var(--ush);
+}
+
+/* ── LIST layout — color-coded bands, flatter + denser ──────────────────── */
+
+/* Unit band — bold subject fill with on-color text so the unit row is the
+   loudest tier. The collapsed unit pills become solid subject chips. */
+/* Units → thin OUTLINE chips (was a solid subject band): a light subject-tint
+   fill, a thin subject border, subject-deep text. Reads lighter than the old
+   bold band while keeping the subject colour unmistakable. */
+.root[data-hier="list"] .unit {
+  background: color-mix(in srgb, var(--cl) 26%, var(--paper));
+  border: 1.5px solid var(--uc);
+  border-radius: 12px;
+}
+.root[data-hier="list"] .unit .un {
+  color: var(--ud);
+}
+.root[data-hier="list"] .unit .us,
+.root[data-hier="list"] .unit .uw {
+  color: var(--muted);
+}
+.root[data-hier="list"] .unit.sel {
+  background: var(--ut);
+  border-color: var(--uc);
+}
+.root[data-hier="list"] .unit.sel .un {
+  color: var(--ud);
+}
+/* Open unit container header → the bold band; body sits on a faint tint. */
+.root[data-hier="list"] .detail {
+  background: color-mix(in srgb, var(--cl) 60%, var(--paper));
+  border-top: 2px solid var(--uc);
+}
+.root[data-hier="list"] .dhead {
+  background: var(--uc);
+}
+.root[data-hier="list"] .dhead .dt,
+.root[data-hier="list"] .dhead .dt b,
+.root[data-hier="list"] .dhead .dd {
+  color: var(--on-solid);
+}
+/* Week tier — soft tint band, denser. Single-column rows read top-to-bottom. */
+.root[data-hier="list"] .weeks {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+/* Weeks → thin OUTLINE chips too: a whisper-light fill, a thin subject border
+   with a bolder left stripe, rounded corners. */
+.root[data-hier="list"] .wk {
+  background: color-mix(in srgb, var(--cl) 16%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--uc) 42%, var(--paper));
+  border-left: 4px solid var(--uc);
+  border-radius: 10px;
+  padding: 10px 13px;
+  box-shadow: none;
+}
+.root[data-hier="list"] .weeks .wk:nth-child(even) {
+  background: color-mix(in srgb, var(--cl) 7%, var(--paper));
+}
+.root[data-hier="list"] .wk .wn {
+  color: var(--ud);
+}
+.root[data-hier="list"] .wk .wd {
+  min-height: 0;
+}
+/* Lesson tier — plain rows + stripe, the quietest band; hairline-separated. */
+.root[data-hier="list"] .days {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+.root[data-hier="list"] .day {
+  background: var(--paper);
+  border: none;
+  border-bottom: 1px solid var(--hair);
+  border-left: 4px solid var(--uc);
+  border-radius: 0;
+  padding: 9px 12px;
+  box-shadow: none;
+}
+.root[data-hier="list"] .day .dttl {
+  min-height: 0;
+}
+/* In LIST the selected ring would clip on a borderless full-bleed row, so use
+   an inset ring instead of the shared outset outline. */
+.root[data-hier="list"] .wk.sel,
+.root[data-hier="list"] .day.sel {
+  outline: none;
+  box-shadow: inset 3px 0 0 0 var(--uc), inset 0 0 0 2px var(--uc);
 }
 
 /* ── Responsive ── */

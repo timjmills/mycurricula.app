@@ -1,36 +1,96 @@
-/* Settings layout — sidebar + content shell.
+/* Settings layout — POPUP (backdrop + dialog) wrapping the header +
+ * sidebar + content shell.
  *
- * Desktop: sidebar pinned left, content fills the remainder.
- * Tablet:  sidebar narrows; content keeps its centered max-width.
- * Phone:   sidebar collapses to a horizontal pill strip above content.
+ * Settings presents as a centered dialog card floating over a dimmed
+ * `--scrim` backdrop (the route is unchanged — every /settings/<section>
+ * deep-link still resolves here). The DIALOG owns scroll: the header stays
+ * pinned at the dialog top while the shell below it scrolls.
+ *
+ * Desktop: sticky header row on top; grouped sidebar pinned left; content
+ *          fills the remainder.
+ * Tablet:  sidebar narrows; content keeps its centered max-width; the
+ *          backdrop padding tightens.
+ * Phone:   the dialog becomes a full-screen sheet (no radius/border/inset)
+ *          and the sidebar collapses to a horizontal pill strip above
+ *          content (group labels hidden — one flat scrollable row).
  *
  * All values via var(--token) — no hex. Mirrors the visual feel of the
  * existing settings pages so the sub-page bodies don't have to change.
  */
 
-/* ── Outer surface (replaces the prior <main> styles) ─────────────────── */
+/* ── Backdrop ─────────────────────────────────────────────────────────────
+   Full-viewport dim behind the dialog. Click-out is handled in layout.tsx
+   (press + release both on the backdrop element). z-index 800 sits above
+   the planner side panels (500) and command palette (500). */
 
-.main {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  background: var(--canvas);
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  background: var(--scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: backdropIn 0.15s ease forwards;
+}
+
+@keyframes backdropIn {
+  from {
+    background: transparent;
+  }
+  to {
+    background: var(--scrim);
+  }
+}
+
+/* ── Dialog (the popup card) ──────────────────────────────────────────────
+   The card owns its own scroll: the header is pinned (sticky inside) and
+   the shell scrolls beneath it. `overflow: hidden` clips the rounded
+   corners; the inner `.shell` is the actual scroll container. */
+
+.dialog {
+  width: 100%;
+  max-width: 1100px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-popover);
+  outline: none;
+  animation: dialogIn 0.15s ease forwards;
+}
+
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .shell {
+  /* Scroll owner inside the dialog: fills the space below the pinned
+     header and scrolls vertically while the dialog frame stays put. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: 0;
-  max-width: 1400px;
-  margin: 0 auto;
-  min-height: 100%;
 }
 
 /* ── Sidebar ───────────────────────────────────────────────────────────── */
 
 .sidebar {
   border-right: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--rail-bg); /* per-theme whisper wash */
   padding: 24px 12px 24px 24px;
   /* As a grid item the sidebar's automatic minimum (min-width: auto) would
      adopt the pill strip's nowrap min-content (~890px) at phone and blow the
@@ -40,12 +100,78 @@
   min-width: 0;
 }
 
-/* Sticky wrapper around the tab list + theme strip — sticky lives here
-   (not on the ul) so both stick together instead of the list sliding over
-   the strip on scroll. */
+/* Sticky wrapper around the groups + theme strip — sticky lives here
+   (not on the lists) so everything sticks together instead of the lists
+   sliding over the strip on scroll. The dialog header is a flex sibling
+   ABOVE the scrolling shell (not inside it), so the sidebar sticks to the
+   top of the shell's own scrollport — top: 0 sits it directly under the
+   pinned header, no header-height offset needed. */
 .sidebarSticky {
   position: sticky;
-  top: 24px;
+  top: 0;
+}
+
+/* ── Domain groups ─────────────────────────────────────────────────────── */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group + .group {
+  margin-top: 18px;
+}
+
+.groupLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 12px 4px;
+}
+
+/* Group tone dots — echo the eyebrow tones the group's pages carry
+   (SettingsCard `tone`), tying sidebar → page identity together. */
+.groupDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.groupDotHoney {
+  background: var(--honey-600);
+}
+
+.groupDotBrand {
+  background: var(--brand-500);
+}
+
+.groupDotTeal {
+  background: var(--tag-teal);
+}
+
+.groupDotNeutral {
+  background: var(--ink-200);
+}
+
+/* Tab glyph — the section's icon (components/settings/section-icons). */
+.tabGlyph {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.tabLink:hover .tabGlyph,
+.tabLinkActive .tabGlyph,
+.tabLinkActive:hover .tabGlyph {
+  color: inherit;
 }
 
 .tabList {
@@ -64,9 +190,12 @@
 .tabLink {
   display: flex;
   align-items: center;
-  gap: 8px;
+  /* Tightened from 8px/12px to reclaim the horizontal room the section
+     glyph now occupies, so single-word labels ("Appearance" beside the
+     wider PERSONAL chip) keep rendering on one line. */
+  gap: 5px;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 10px;
   border-radius: var(--r-sm);
   font-size: var(--t-13);
   font-weight: 700;
@@ -81,9 +210,18 @@
 .tabLabel {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Wrap at spaces ("Workspace & Team", "Lesson templates" read in full
+     across two lines). The phone pill strip restores nowrap. hyphens:auto
+     is the graceful last resort for any single word still too long for
+     its row — it breaks at a syllable ("Appear-ance"), never mid-cluster
+     the way overflow-wrap:anywhere/break-word do under this flex item's
+     min-width:0. The tightened tabLink gap/padding above keeps today's
+     labels on one line so this rarely fires. <html lang="en"> supplies
+     the hyphenation dictionary. */
+  white-space: normal;
+  hyphens: auto;
+  line-height: 1.25;
+  padding: 6px 0;
 }
 
 /* W2-B7 scope chip — "Team" (shared) or "Personal" (this teacher only).
@@ -92,9 +230,14 @@
   flex: 0 0 auto;
   font-size: var(--t-10);
   font-weight: 700;
-  letter-spacing: 0.04em;
+  /* Compact: tighter tracking + padding keeps the "PERSONAL" chip from
+     crowding single-word labels ("Appearance") off their row in the
+     220px sidebar. The chip is a secondary scope cue — the card stripes
+     and overview tiles carry it too — so a lighter footprint reads
+     cleaner without losing the signal. */
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: var(--r-4);
   border: 1px solid transparent;
   line-height: 1;
@@ -118,14 +261,15 @@
 }
 
 .tabLink:focus-visible {
-  outline: 2px solid var(--brand-500);
+  outline: 2px solid var(--chrome-accent);
   outline-offset: 2px;
 }
 
+/* Chrome-accent tier — the active tab carries each theme's own accent. */
 .tabLinkActive,
 .tabLinkActive:hover {
-  background: var(--brand-50);
-  color: var(--brand-700);
+  background: var(--chrome-accent-soft);
+  color: var(--chrome-accent-deep);
   font-weight: 700;
 }
 
@@ -136,7 +280,7 @@
 }
 
 /* ── Theme quick-switch (sidebar) ──────────────────────────────────────
-   Chip strip below the tab list — see components/appearance/
+   Chip strip below the groups — see components/appearance/
    theme-quick-switch. Hidden on phone where the sidebar is a pill strip
    (the Appearance tab carries the affordance there). */
 
@@ -166,6 +310,12 @@
 /* ── Tablet ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
+  /* Tighten the dim margin so the card claims more of the narrower
+     viewport without touching the edges. */
+  .backdrop {
+    padding: 16px;
+  }
+
   .shell {
     grid-template-columns: 180px 1fr;
   }
@@ -175,15 +325,30 @@
   }
 }
 
-/* ── Phone: collapse sidebar to a horizontal strip ───────────────────── */
+/* ── Phone: full-screen sheet + collapse sidebar to a horizontal strip ── */
 
 @media (max-width: 600px) {
+  /* The popup reads as a full-screen sheet: no dim inset, no frame. */
+  .backdrop {
+    padding: 0;
+  }
+
+  .dialog {
+    max-width: none;
+    max-height: 100vh;
+    height: 100%;
+    border-radius: 0;
+    border: none;
+  }
+
   .shell {
     grid-template-columns: 1fr;
   }
 
   .sidebar {
     position: sticky;
+    /* The dialog header sits outside the scrolling shell, so the strip
+       sticks to the top of the shell's own scrollport. */
     top: 0;
     z-index: 1;
     border-right: none;
@@ -191,18 +356,36 @@
     padding: 8px 12px;
   }
 
+  /* One flat scrollable row: the sticky wrapper becomes the strip, the
+     groups lay out inline, the group labels disappear. */
   .sidebarSticky {
     position: static;
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .group {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .group + .group {
+    margin-top: 0;
+  }
+
+  .groupLabel {
+    display: none;
   }
 
   .tabList {
     flex-direction: row;
     gap: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    /* Hide the horizontal scrollbar visually but keep panning working */
-    scrollbar-width: thin;
-    -webkit-overflow-scrolling: touch;
   }
 
   .tabItem {
@@ -216,14 +399,30 @@
     border: 1px solid var(--border);
   }
 
+  .tabLabel {
+    white-space: nowrap;
+    padding: 0;
+  }
+
   .sidebarTheme {
     display: none;
   }
 
   .tabLinkActive,
   .tabLinkActive:hover {
-    background: var(--brand-50);
-    color: var(--brand-700);
-    border-color: var(--brand-200);
+    background: var(--chrome-accent-soft);
+    color: var(--chrome-accent-deep);
+    border-color: var(--chrome-accent-soft-edge);
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────
+   No entry fade/slide for the popup — paint it in place. */
+@media (prefers-reduced-motion: reduce) {
+  .backdrop {
+    animation-duration: 0.001ms !important;
+  }
+  .dialog {
+    animation-duration: 0.001ms !important;
   }
 }

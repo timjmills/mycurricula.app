@@ -249,13 +249,28 @@
   display: flex;
 }
 
-/* ── Center ── */
+/* ── Center ── The center column is the ZoomPanCanvas's height-bounded parent:
+   it must NOT scroll itself (the canvas owns fit/scale/pan), so overflow is
+   hidden and it's a flex column whose single child (the canvas) fills it.
+   flex:1 + min-height:0 give the canvas a real box to measure against. The old
+   padding moved onto .roadmap so the board's NATURAL extent (what the canvas
+   scales to Fit) is the actual card stack, not card-stack-plus-gutter. */
 .center {
   flex: 1;
   min-width: 0;
-  overflow: auto;
-  padding: 18px 20px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--canvas);
+}
+/* The roadmap board the canvas lays out at 100% width and scales to fit. The
+   ZoomPanCanvas measures scrollWidth/Height, so the padding here defines the
+   board's natural bounds. The last .ecard's margin is stripped (see below) so
+   the measured height hugs the content. */
+.roadmap {
+  width: 100%;
+  padding: 18px 20px;
 }
 .ecard {
   background: var(--surface);
@@ -264,6 +279,9 @@
   box-shadow: var(--sh-sm);
   padding: 16px 18px;
   margin-bottom: 16px;
+}
+.roadmap .ecard:last-child {
+  margin-bottom: 0;
 }
 .ech {
   display: flex;
@@ -371,28 +389,36 @@
   width: 10px;
   height: 10px;
 }
+/* ── Unit level — the deepest-shaded tier, so the eye reads it as the parent.
+   The ulegend grid wraps (auto-fit), never scrolls horizontally. The depth
+   shading + per-level treatment is driven by [data-hier] on .app (see the
+   GRID / LIST blocks at the foot of this file). */
 .ulegend {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
 }
 .uleg {
+  position: relative;
   display: block;
   width: 100%;
   text-align: left;
-  background: transparent;
-  border: 1.5px solid transparent;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
   border-radius: 10px;
   padding: 8px 9px;
   cursor: pointer;
   transition: 0.12s;
 }
 .uleg:hover {
-  background: var(--canvas);
+  box-shadow: var(--sh-sm);
+  transform: translateY(-1px);
 }
+/* Selected = an accent RING, kept visually distinct from the zebra fill so a
+   selected even-row card still reads as selected (the ring wins). */
 .ulegOn {
-  background: var(--ac-t);
   border-color: var(--ac);
+  box-shadow: 0 0 0 1.5px var(--ac);
 }
 .uleg .ud {
   display: flex;
@@ -972,7 +998,9 @@
   .viewbar {
     padding: 10px 14px 4px;
   }
-  .center {
+  /* Padding lives on .roadmap (the canvas board), not .center (the canvas's
+     bounded frame) — see the .center / .roadmap note above. */
+  .roadmap {
     padding: 14px;
   }
 }
@@ -1003,4 +1031,211 @@
   .rback .b {
     min-height: 44px;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HIERARCHY TREATMENT — Unit → Week → Lesson visual differentiation.
+
+   The center roadmap shows three nested levels that, before this pass, all
+   looked alike. Now each level is visually distinct, and the WHOLE roadmap
+   switches between two layouts via [data-hier] on .app (set from the Grid|List
+   toggle, persisted under app-state's "subject" view key):
+
+     • GRID (default) — nested cards + depth shading. The Unit container is the
+       most-tinted (parent); Week cards a lighter accent mix; Lesson cards sit
+       on --paper with an accent left-stripe. Each level keeps its own border +
+       shadow + a small left indent so the nesting reads at a glance.
+     • LIST — flat, color-coded bands. Unit = a bold solid --ac band with
+       on-solid text; Week = an --ac-t tint band; Lesson = --paper + stripe.
+       Denser, with hairline dividers doing the separating work.
+
+   Sibling differentiation (in BOTH layouts): every item is a bordered card with
+   gap; even siblings get a subtle zebra mix toward --paper; the selected item
+   wins with an accent RING that stays distinct from the zebra fill.
+
+   THEME SAFETY: every fill is --ac-t / --paper / a color-mix toward var(--paper)
+   (NEVER #fff), and solid-band text uses --on-solid — so all six themes
+   (paper|cloud|night|mint|sky|blossom) re-hue correctly, dark themes included.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Level container depth shading (GRID) ──────────────────────────────────────
+   The three .ecard wrappers ARE the three levels. In grid mode the Unit card is
+   tinted (the parent), Week sits one step lighter, Lesson stays on surface — so
+   even the card backdrops step down in saturation as you descend. */
+.app[data-hier="grid"] .lvUnit {
+  background: var(--ac-t);
+  border-color: var(--ac);
+}
+.app[data-hier="grid"] .lvUnit .ech h3 {
+  color: var(--ac-d);
+}
+/* On the tinted Unit card a few accent-tinted children would vanish (same fill
+   as the card). Re-ground them on --paper so they stay legible in grid mode. */
+.app[data-hier="grid"] .lvUnit .ech .ci {
+  background: var(--paper);
+}
+.app[data-hier="grid"] .lvUnit .months2 span.on {
+  background: var(--paper);
+}
+.app[data-hier="grid"] .lvWeek {
+  background: color-mix(in srgb, var(--ac-t) 45%, var(--paper));
+}
+/* Same vanish risk for the Week card's header chip on its tinted backdrop. */
+.app[data-hier="grid"] .lvWeek .ech .ci {
+  background: var(--paper);
+}
+/* Lesson level stays on --surface (the lightest) — left as the base .ecard. */
+
+/* Indentation so the nesting reads: Week steps in, Lesson steps in further. */
+.app[data-hier="grid"] .lvWeek .hscroll,
+.app[data-hier="grid"] .lvWeek .empty {
+  margin-left: 10px;
+  padding-left: 12px;
+  border-left: 3px solid var(--ac-t);
+}
+.app[data-hier="grid"] .lvLesson .hscroll,
+.app[data-hier="grid"] .lvLesson .empty {
+  margin-left: 18px;
+  padding-left: 12px;
+  border-left: 3px solid var(--ac);
+}
+
+/* ── Unit roadmap cards (.uleg) ──────────────────────────────────────────────
+   GRID: nested cards on --surface inside the tinted Unit container, with an
+   accent left-stripe marking them as the deepest level + numbered tag. */
+.app[data-hier="grid"] .uleg {
+  border-left: 4px solid var(--ac);
+}
+/* Zebra: every even sibling gets a faint mix toward --paper to break the grid
+   into rows. The selected ring (.ulegOn) is declared after, so it still wins. */
+.app[data-hier="grid"] .uleg:nth-child(even) {
+  background: color-mix(in srgb, var(--ac-t) 22%, var(--paper));
+}
+
+/* LIST: units become a bold solid --ac band with on-solid text — the loudest
+   level. The ulegend collapses to a single column of full-width bands. */
+.app[data-hier="list"] .ulegend {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+/* LIST: units → thin OUTLINE chips — a light accent-tint fill, a thin accent
+   border, accent-deep text (was a bold solid band). */
+.app[data-hier="list"] .uleg {
+  background: color-mix(in srgb, var(--ac-t) 30%, var(--paper));
+  border: 1.5px solid var(--ac);
+  border-radius: 10px;
+  padding: 9px 12px;
+}
+.app[data-hier="list"] .uleg:hover {
+  background: color-mix(in srgb, var(--ac-t) 48%, var(--paper));
+  transform: none;
+}
+.app[data-hier="list"] .uleg .ud,
+.app[data-hier="list"] .uleg .un,
+.app[data-hier="list"] .uleg .udt {
+  color: var(--ac-d);
+}
+/* The colour dot reads on the light fill — keep it the accent. */
+.app[data-hier="list"] .uleg .ud .d {
+  background: var(--ac) !important;
+  opacity: 1;
+}
+/* Zebra: a whisper-lighter even row. */
+.app[data-hier="list"] .uleg:nth-child(even) {
+  background: color-mix(in srgb, var(--ac-t) 16%, var(--paper));
+}
+/* Selected: a solid accent ring reads clearly on the light chip. */
+.app[data-hier="list"] .ulegOn {
+  box-shadow: 0 0 0 2px var(--ac);
+}
+
+/* ── Week cards (.wkcard) ────────────────────────────────────────────────────
+   GRID: an accent mix toward --paper (one step lighter than the Unit tint),
+   with an accent left-stripe + zebra. */
+.app[data-hier="grid"] .wkcard {
+  background: color-mix(in srgb, var(--ac-t) 55%, var(--paper));
+  border-left: 4px solid var(--ac);
+}
+.app[data-hier="grid"] .wkcard:nth-child(even) {
+  background: color-mix(in srgb, var(--ac-t) 32%, var(--paper));
+}
+
+/* LIST: a flat --ac-t tint band, full-width, denser, divided by gaps. */
+.app[data-hier="list"] .hscroll {
+  grid-template-columns: 1fr;
+  gap: 5px;
+}
+/* LIST: weeks → thin OUTLINE chips — light fill, thin accent border + a bolder
+   left stripe, rounded. */
+.app[data-hier="list"] .wkcard {
+  background: color-mix(in srgb, var(--ac-t) 18%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--ac) 42%, var(--paper));
+  border-left: 4px solid var(--ac);
+  border-radius: 9px;
+  padding: 9px 13px;
+}
+.app[data-hier="list"] .wkcard:hover {
+  transform: none;
+}
+.app[data-hier="list"] .wkcard .wt {
+  min-height: 0;
+}
+.app[data-hier="list"] .wkcard:nth-child(even) {
+  background: color-mix(in srgb, var(--ac-t) 8%, var(--paper));
+}
+
+/* ── Lesson/day cards (.daycard) ─────────────────────────────────────────────
+   Both layouts keep the Lesson level on --paper with the accent left-stripe —
+   the lightest, leaf level. They differ only in density + zebra. */
+.app[data-hier="grid"] .daycard {
+  background: var(--paper);
+}
+.app[data-hier="grid"] .daycard:nth-child(even) {
+  background: color-mix(in srgb, var(--ac-t) 16%, var(--paper));
+}
+.app[data-hier="list"] .daycard {
+  background: var(--paper);
+  border-radius: 9px;
+  padding: 9px 13px;
+}
+.app[data-hier="list"] .daycard:hover {
+  transform: none;
+}
+.app[data-hier="list"] .daycard .dt2 {
+  min-height: 0;
+}
+.app[data-hier="list"] .daycard:nth-child(even) {
+  background: color-mix(in srgb, var(--ac-t) 22%, var(--paper));
+}
+
+/* Selected state stays an accent ring in BOTH layouts for week + lesson cards,
+   so a selected even-row (zebra) card still reads as selected. The zebra rules
+   above are specificity (0,4,0) — `.app[data-hier="…"] .wkcard:nth-child(even)`
+   — so these re-assertions MUST match that weight to win the `background`
+   property. Doubling the class (`.wkcard.wkcardOn`) reaches (0,4,0) and, sitting
+   LATER in the file, wins on equal specificity. The accent box-shadow ring is
+   the consistent "selected" signal; it sits above any zebra fill underneath. */
+.app[data-hier="grid"] .wkcard.wkcardOn,
+.app[data-hier="list"] .wkcard.wkcardOn {
+  background: var(--ac-t);
+  border-color: var(--ac);
+  box-shadow: 0 0 0 1.5px var(--ac);
+}
+.app[data-hier="grid"] .daycard.daycardOn,
+.app[data-hier="list"] .daycard.daycardOn {
+  background: var(--ac-t);
+  border-color: var(--ac);
+  box-shadow: 0 0 0 1.5px var(--ac);
+}
+/* Unit selected ring — same reasoning. The unit zebra is (0,4,0); doubling the
+   class keeps the ring on top of an even-row selected card. Grid mode keeps the
+   surface/tint fill (ring over it); list mode keeps the paper-over-accent ring
+   declared earlier — re-assert both here so order is deterministic. */
+.app[data-hier="grid"] .uleg.ulegOn {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 1.5px var(--ac);
+}
+.app[data-hier="list"] .uleg.ulegOn {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 2px var(--ac);
 }

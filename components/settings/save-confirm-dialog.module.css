@@ -1,0 +1,138 @@
+/* save-confirm-dialog.module.css — layout and visual treatment for the
+   SaveConfirmDialog courtesy confirm.
+
+   Architecture:
+     • .backdrop — full-viewport fixed dim overlay; click-to-close target.
+                   z-index 900 sits ABOVE the Settings popup backdrop (800).
+     • .panel    — small centered modal card; surface + shadow.
+     • .heading  — question heading.
+     • .body     — reassuring "your changes are saved" line.
+     • .actions  — right-aligned button row (Keep editing · Save & close).
+
+   Token rules: all color + type + spacing via var(--token). Never hard-code
+   hex or px values for color/type. Reduced motion collapses the fade-in to
+   near-instant, mirroring save-target-dialog.module.css. */
+
+/* ── Backdrop ────────────────────────────────────────────────────────────── */
+/* Full-viewport overlay. z-index 900 so it layers ABOVE the Settings popup
+   (whose backdrop builder-shell sets to 800). */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: var(--scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  /* Backdrop + panel fade/slide in together. */
+  animation: confirmBackdropIn 0.18s ease forwards;
+}
+
+@keyframes confirmBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Panel ───────────────────────────────────────────────────────────────── */
+/* Compact centered card — this is a small confirm, not a full modal. Token
+   choices match save-target-dialog.module.css (--surface, --r-xl, --sh-lg,
+   --border). */
+.panel {
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-lg);
+  border: 1px solid var(--border);
+  width: 100%;
+  max-width: 420px;
+  padding: 24px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  outline: none; /* panel is not itself focusable — focus goes to buttons */
+  animation: confirmPanelIn 0.18s ease forwards;
+}
+
+@keyframes confirmPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Heading ─────────────────────────────────────────────────────────────── */
+.heading {
+  margin: 0;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-18);
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--ink);
+  letter-spacing: -0.2px;
+}
+
+/* ── Body line ───────────────────────────────────────────────────────────── */
+.body {
+  margin: 0;
+  font-size: var(--t-14);
+  color: var(--ink-soft);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────────── */
+/* Right-aligned button row. Primary ("Save & close") sits last so it reads as
+   the affirmative end of the row. */
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* ── Button fill restoration (cp-root reset workaround) ─────────────────────
+   The global `.cp-root button` reset in tokens.css (specificity 0,1,1) out-
+   ranks the Button primitive's single-class size/variant rules (0,1,0) and
+   strips their horizontal padding + fill inside the app shell — leaving the
+   actions as cramped, unfilled text. These panel-scoped rules (0,2,0) re-
+   assert what the primitive intends, in tokens only, so the row reads as a
+   real ghost + filled-primary pair. Values mirror Button.module.css
+   `.md` (padding) and `.primary` (fill/text/shadow). */
+.panel .keepBtn,
+.panel .saveBtn {
+  padding: 0 18px;
+}
+
+.panel .keepBtn:hover {
+  background: var(--hairline);
+}
+
+.panel .saveBtn {
+  background: var(--brand-500);
+  color: var(--on-solid);
+  border: 1px solid transparent;
+  box-shadow: var(--sh-brand);
+}
+
+.panel .saveBtn:hover {
+  background: var(--brand-600);
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+/* Collapse the fade/slide to near-instant; matches the tokens.css /
+   save-target-dialog.module.css pattern. */
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .panel {
+    animation-duration: 0.001ms !important;
+  }
+}
