@@ -427,6 +427,15 @@
 
 /* ── Standards pane ─────────────────────────────────────────────────── */
 
+/* Stacks the tagged-standards list (or empty note) above the "Tag standards"
+   trigger that opens the StandardsPicker. */
+.stdPane {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
 .stdList {
   display: flex;
   flex-direction: column;
