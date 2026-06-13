@@ -6,3 +6,5 @@ export { SettingsHeader } from "./settings-header";
 export { SettingsSearch } from "./settings-search";
 export { OverviewCard } from "./overview-card";
 export { WorkspaceSettings } from "./workspace-settings";
+export { SaveConfirmDialog } from "./save-confirm-dialog";
+export type { SaveConfirmDialogProps } from "./save-confirm-dialog";
