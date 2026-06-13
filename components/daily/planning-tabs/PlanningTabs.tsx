@@ -82,7 +82,6 @@ import {
 } from "react";
 import type { CSSProperties, DragEvent, KeyboardEvent, ReactNode } from "react";
 import type { Lesson, LessonDifferentiation } from "@/lib/types";
-import { describeStandard } from "@/lib/mock";
 import { usePlanner } from "@/lib/planner-store";
 import { bundledDescriptions } from "@/lib/standards/items";
 import { RichTextEditor } from "@/components/rich-text";
@@ -289,7 +288,7 @@ export interface PlanningTabsProps {
 
 export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
   function PlanningTabs({ lesson }, ref): ReactNode {
-    const { editLesson, subjects } = usePlanner();
+    const { editLesson, subjects, describeStandard } = usePlanner();
     const [standardsPickerOpen, setStandardsPickerOpen] = useState(false);
     const uid = useId();
 
@@ -653,15 +652,17 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
               {lesson.standards.length > 0 ? (
                 <div className={styles.stdList}>
                   {lesson.standards.map((code) => {
-                    // Prefer the mock catalog's description; for codes only
-                    // the StandardsPicker knows (CCSS practices, NGSS PEs, IB
-                    // ATL) the mock returns the bare code — fall back to the
-                    // bundled label so the row never shows the code twice.
-                    const mock = describeStandard(code);
+                    // describeStandard is flag-aware (planner-store): under the
+                    // Supabase flag it resolves codes against the hydrated DB
+                    // catalog (standards.description); flag-off it is the mock.
+                    // If it returns the bare code (unknown to that catalog),
+                    // fall back to the bundled label so the row never shows the
+                    // code twice.
+                    const fromCatalog = describeStandard(code);
                     const desc =
-                      mock === code
+                      fromCatalog === code
                         ? (BUNDLED_DESCRIPTIONS[code] ?? code)
-                        : mock;
+                        : fromCatalog;
                     return (
                       <div key={code} className={styles.stdItem}>
                         <span className={styles.stdCode}>{code}</span>
