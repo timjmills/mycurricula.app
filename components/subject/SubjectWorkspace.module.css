@@ -448,7 +448,9 @@
 }
 .uleg .udt {
   font-size: 11px;
-  color: var(--faint);
+  /* Week range is real info, not a placeholder — promote off --faint (~1.8:1
+     on white, fails AA) to the themed meta-body token. */
+  color: var(--ink-500);
   margin-top: 4px;
   font-weight: 600;
 }
@@ -479,7 +481,10 @@
 .wkcard .wn {
   font-size: 12.5px;
   font-weight: 800;
-  color: var(--muted);
+  /* This is the week card's primary title; --muted left it at ~3:1 (below the
+     near-black "N lesson" count beneath it — inverted hierarchy). --ink-700 is
+     the strong-text tier (~11:1 light, light-on-dark in Night). */
+  color: var(--ink-700);
   font-family: var(--font-display-sm);
 }
 .wkcardOn .wn {
@@ -501,7 +506,8 @@
 }
 .wkcard .wdt {
   font-size: 11px;
-  color: var(--faint);
+  /* Week range is real info — promote off the placeholder tier to meta-body. */
+  color: var(--ink-500);
   font-weight: 600;
 }
 
