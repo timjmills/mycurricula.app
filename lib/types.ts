@@ -613,6 +613,10 @@ export interface BoardPage {
   order: number;
   /** Optional page label (defaults to "Page N" when absent). */
   title?: string;
+  /** Per-page background override. Tri-state: `undefined` → inherit the board's
+   *  background; `null` → explicitly WHITE (override a dark/pattern board back to
+   *  white for this page); a paper id → that paper. */
+  background?: string | null;
   /** Widgets placed on this page (free-form canvas). */
   widgets: Widget[];
 }
@@ -636,6 +640,9 @@ export interface Board {
    *  (`lib/teach/backgrounds.ts`), e.g. "pattern-3". Null/absent → the default
    *  paper surface. Display-only structure — safe to persist to the DB. */
   background?: string | null;
+  /** Canvas stage size preset. "wide" (16∶9, default) is the original 1280×720
+   *  stage. "a4" and "a3" are print-landscape sizes. Absent/null → "wide". */
+  size?: "wide" | "a4" | "a3";
   /** Library/auto-surface tags. Absent/empty → an untagged board (it never
    *  auto-surfaces; it's reachable only via its lesson or the library list).
    *  See `lib/teach/board-tags.ts` for the matching + display helpers. */
@@ -685,8 +692,20 @@ export interface BoardTemplate {
   scope: BoardScope;
   /** Owning teacher for a personal template; null for a team template. */
   ownerId: string | null;
-  /** Widget skeletons (no live state) that materialize when applied. */
+  /** Widget skeletons (no live state) that materialize when applied. The page-0
+   *  mirror of `pages` when a template carries the full page model (back-compat:
+   *  a template with no `pages` is a single implicit page built from `widgets`). */
   widgets: Omit<Widget, "boardId">[];
+  /** Full multi-page model snapshot (5.31). When present this is authoritative —
+   *  `createBoardFromTemplate` materializes every page (titles, per-page
+   *  backgrounds, widgets) with fresh ids. Absent → single-page from `widgets`. */
+  pages?: BoardPage[];
+  /** Board-wide background id captured at save time (null/absent → default). */
+  background?: string | null;
+  /** Board stage size captured at save time (absent → "wide"). */
+  size?: "wide" | "a4" | "a3";
+  /** Board-wide appearance theme captured at save time. */
+  boardTheme?: ThemeOverride;
   gradeLevelId: string;
   createdAt: string;
   updatedAt: string;

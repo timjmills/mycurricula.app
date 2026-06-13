@@ -26,6 +26,7 @@ import type {
 import {
   BOARDS,
   MOCK_GRADE_LEVEL_ID,
+  STARTER_TEMPLATES,
   TEAM_LIBRARY_BOARDS,
 } from "../mock/boards";
 import { boardMatchesContext, type BoardContext } from "./board-tags";
@@ -41,7 +42,7 @@ import { SANDBOX_LESSON_ID } from "./constants";
 // Cloned from the fixtures so editing the live store never mutates the exported
 // fixture arrays (which other modules may read).
 const boards: Board[] = [...BOARDS, ...TEAM_LIBRARY_BOARDS].map(cloneBoard);
-const templates: BoardTemplate[] = [];
+const templates: BoardTemplate[] = [...STARTER_TEMPLATES];
 
 let idSeq = 0;
 function nextId(prefix: string): string {
@@ -447,24 +448,41 @@ export const mockTeachSource: TeachDataSource = {
     const board = boards.find((b) => b.id === boardId);
     if (!board) throw new Error(`Board not found: ${boardId}`);
     const now = new Date().toISOString();
+    // Snapshot the FULL page model (titles, per-page backgrounds, widgets) so a
+    // multi-page board doesn't collapse to page-0 when re-instantiated. Widgets
+    // are stripped of boardId (a template is board-agnostic). The page-0 widgets
+    // also become the flat `widgets` mirror for back-compat readers.
+    const snapWidget = (w: Widget): Omit<Widget, "boardId"> => ({
+      id: w.id,
+      type: w.type,
+      title: w.title,
+      position: { ...w.position },
+      canvas: w.canvas ? { ...w.canvas } : undefined,
+      appearance: w.appearance ? { ...w.appearance } : undefined,
+      displayOrder: w.displayOrder,
+      pinned: w.pinned,
+      config: w.config,
+      state: w.state,
+      persistence: w.persistence,
+      gradeLevelId: w.gradeLevelId,
+    });
+    const snapPages: BoardPage[] = pagesOf(board).map((p) => ({
+      id: p.id,
+      order: p.order,
+      title: p.title,
+      background: p.background,
+      widgets: p.widgets.map((w) => snapWidget(w) as Widget),
+    }));
     const template: BoardTemplate = {
       id: nextId("tpl"),
       title,
       scope,
       ownerId: scope === "team" ? null : resolveOwnerId(ownerId),
-      // Strip boardId from each widget — a template is board-agnostic.
-      widgets: board.widgets.map((w) => ({
-        id: w.id,
-        type: w.type,
-        title: w.title,
-        position: { ...w.position },
-        displayOrder: w.displayOrder,
-        pinned: w.pinned,
-        config: w.config,
-        state: w.state,
-        persistence: w.persistence,
-        gradeLevelId: w.gradeLevelId,
-      })),
+      widgets: (snapPages[0]?.widgets ?? []).map((w) => snapWidget(w as Widget)),
+      pages: snapPages,
+      background: board.background ?? null,
+      size: board.size,
+      boardTheme: board.boardTheme ? { ...board.boardTheme } : undefined,
       gradeLevelId: board.gradeLevelId,
       createdAt: now,
       updatedAt: now,
@@ -982,6 +1000,109 @@ export const mockTeachSource: TeachDataSource = {
         reordered.push({ ...p, order: reordered.length });
     }
     commitPages(board, reordered);
+    return cloneBoard(board);
+  },
+
+  async updatePage(boardId, pageId, patch) {
+    const board = boards.find((b) => b.id === boardId);
+    if (!board) throw new Error(`Board not found: ${boardId}`);
+    const pages = pagesOf(board).map((p) => {
+      if (p.id !== pageId) return p;
+      const next = { ...p, ...patch };
+      // `background: undefined` in the patch means "clear the override → inherit
+      // the board": REMOVE the key entirely so the tri-state is truly `undefined`
+      // (a stored `background: undefined` reads the same in JS but would round-trip
+      // as an explicit key in jsonb — deleting keeps mock + Supabase identical).
+      if ("background" in patch && patch.background === undefined) {
+        delete next.background;
+      }
+      if ("title" in patch && patch.title === undefined) {
+        delete next.title;
+      }
+      return next;
+    });
+    commitPages(board, pages);
+    return cloneBoard(board);
+  },
+
+  async createBoardFromTemplate(templateId, ctx) {
+    const tpl = templates.find((t) => t.id === templateId);
+    if (!tpl) throw new Error(`Template not found: ${templateId}`);
+    const owner = resolveOwnerId(ctx.ownerId);
+    // SANDBOX SENTINEL (mirrors createBoard / createBlankBoard, audit F4): the
+    // "sandbox" key is NOT a real lesson — store the board lesson-LESS + ephemeral
+    // (uncapped, disposable scratch), so it surfaces in the sandbox view (which
+    // queries lesson-less ephemeral boards) instead of a board pinned to a fake
+    // "sandbox" lesson id. A real lesson id is stored verbatim (attached board).
+    const isSandbox = ctx.masterLessonId === SANDBOX_LESSON_ID;
+    // A lesson-attached / detached personal board counts toward the cap; an
+    // ephemeral sandbox board does not (cap is enforced at keepBoard).
+    if (!isSandbox) assertUnderCap(owner);
+    const id = nextId("b");
+    const now = new Date().toISOString();
+    const lesson =
+      ctx.masterLessonId == null || isSandbox
+        ? null
+        : resolveLessonId(ctx.masterLessonId);
+    const siblings = boards.filter(
+      (b) =>
+        b.masterLessonId === lesson &&
+        b.scope === "personal" &&
+        b.ownerId === owner,
+    );
+    const nextOrder = siblings.reduce(
+      (max, b) => Math.max(max, b.displayOrderWithinLesson + 1),
+      0,
+    );
+    // Materialize the FULL page model with fresh page + widget ids when the
+    // template carries one; fall back to a single page from the flat widgets for
+    // a legacy (pre-Wave-2) template. Board background/size/theme are restored.
+    const tplPages: BoardPage[] =
+      tpl.pages && tpl.pages.length > 0
+        ? tpl.pages
+        : [{ id: "tpl-p0", order: 0, widgets: tpl.widgets as Widget[] }];
+    const newPages: BoardPage[] = tplPages
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map((p, i) => ({
+        id: nextId("pg"),
+        order: i,
+        title: p.title,
+        background: p.background,
+        widgets: p.widgets.map((w, j) => ({
+          ...w,
+          id: nextId("w"),
+          boardId: id,
+          displayOrder: j,
+          position: { ...w.position },
+          canvas: w.canvas ? { ...w.canvas } : undefined,
+          appearance: w.appearance ? { ...w.appearance } : undefined,
+        })),
+      }));
+    const board: Board = {
+      id,
+      masterLessonId: lesson,
+      ownerId: owner,
+      scope: "personal",
+      title: tpl.title,
+      displayOrderWithinLesson: nextOrder,
+      templateId,
+      background: tpl.background ?? null,
+      size: tpl.size,
+      boardTheme: tpl.boardTheme ? { ...tpl.boardTheme } : undefined,
+      tags: [],
+      // A sandbox-created board is ephemeral (uncapped scratch) — mirrors the
+      // createBoard / createBlankBoard sandbox path.
+      ...(isSandbox ? { ephemeral: true } : {}),
+      // commitPages below makes `pages` authoritative and mirrors page-0 onto
+      // `widgets`; seed `widgets` from page-0 so the shape is valid pre-commit.
+      widgets: newPages[0]?.widgets ?? [],
+      gradeLevelId: ctx.gradeLevelId ?? MOCK_GRADE_LEVEL_ID,
+      createdAt: now,
+      updatedAt: now,
+    };
+    boards.push(board);
+    commitPages(board, newPages);
     return cloneBoard(board);
   },
 };

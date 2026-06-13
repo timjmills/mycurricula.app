@@ -239,6 +239,10 @@ export interface TeachDataSource {
   deletePage(boardId: string, pageId: string): Promise<Board>;
   /** Re-order a board's pages by id. */
   reorderPages(boardId: string, orderedPageIds: string[]): Promise<Board>;
+  /** Update a page's mutable fields (title, background). */
+  updatePage(boardId: string, pageId: string, patch: Partial<Pick<BoardPage, "background" | "title">>): Promise<Board>;
+  /** Create a new board from a template (widget shapes → fresh board). */
+  createBoardFromTemplate(templateId: string, ctx: { ownerId: string; gradeLevelId: string; masterLessonId?: string | null }): Promise<Board>;
 }
 
 /**

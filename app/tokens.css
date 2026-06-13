@@ -367,6 +367,10 @@
      inline `background` from the --teach-bg-* catalogue on top of this. */
   --teach-board-paper: #ffffff;
 
+  /* ── Board size / scope segmented control ────────────────────────────────── */
+  --teach-seg-bg: var(--ink-100);
+  --teach-seg-on: var(--surface);
+
   /* ── Teaching-board backgrounds (Teach Phase 3, plan §4.2) ──────────────
      The classroomscreen-style board background picker: 15 solid colours, 15
      repeating patterns, and 15 seamless repeating gradients. Each is a single

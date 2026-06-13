@@ -209,9 +209,10 @@
    Opaque, so the desk dots behind it don't bleed through — a board opens clean
    and white, not as a dotted grid (#11). */
 .canvasInner {
+  /* Width + height come from inline style (STAGE_SIZES); these are fallbacks. */
   position: relative;
-  width: 1180px;
-  height: 840px;
+  width: 1280px;
+  height: 720px;
   margin: var(--r-12);
   background: var(--teach-board-paper);
   border-radius: var(--wf-r-card);
@@ -433,6 +434,28 @@
   background: var(--ink-50);
 }
 .paperTabOn {
+  color: var(--wf-blue-accent);
+  border-color: var(--wf-blue-accent);
+  background: var(--wf-blue-chip);
+}
+/* "Inherit board" chip (page scope only) — clears the page's override. A
+   full-width pill above the swatches so it reads as a distinct value, not a
+   family filter. */
+.paperInherit {
+  align-self: flex-start;
+  min-height: 32px;
+  padding: var(--r-4) var(--r-12);
+  border-radius: var(--r-pill);
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink-500);
+  border: var(--line);
+  background: var(--paper);
+}
+.paperInherit:hover {
+  background: var(--ink-50);
+}
+.paperInheritOn {
   color: var(--wf-blue-accent);
   border-color: var(--wf-blue-accent);
   background: var(--wf-blue-chip);
@@ -751,5 +774,163 @@
       background-color 120ms ease,
       box-shadow 120ms ease,
       filter 120ms ease;
+  }
+}
+
+/* ── Board size + background scope segmented control ───────────────────────── */
+.sizeSection {
+  margin-top: var(--r-12);
+  padding-top: var(--r-12);
+  border-top: var(--line);
+}
+.sizeLabel {
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink-700);
+  margin-bottom: var(--r-8);
+}
+.segCtrl {
+  display: flex;
+  gap: var(--r-4);
+  background: var(--teach-seg-bg, var(--ink-100));
+  border-radius: var(--r-pill);
+  padding: var(--r-3);
+}
+.segBtn {
+  flex: 1;
+  min-height: 32px;
+  border-radius: var(--r-pill);
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink-500);
+  transition: background-color 100ms ease, color 100ms ease, box-shadow 100ms ease;
+}
+.segBtnOn {
+  background: var(--teach-seg-on, var(--surface));
+  color: var(--ink-800);
+  box-shadow: var(--sh-sm);
+}
+
+/* ── Filmstrip (multi-page tab bar) ─────────────────────────────────────────── */
+.filmstrip {
+  display: flex;
+  align-items: center;
+  gap: var(--r-6);
+  padding: var(--r-8) var(--r-12);
+  border-bottom: var(--line);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.filmstripSingle {
+  display: flex;
+  align-items: center;
+  padding: var(--r-8) var(--r-12);
+  border-bottom: var(--line);
+}
+.filmTile {
+  display: flex;
+  align-items: center;
+  gap: var(--r-4);
+  min-height: 44px;
+  padding: var(--r-6) var(--r-10);
+  border-radius: var(--r-8);
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-500);
+  border: var(--line);
+  background: var(--paper);
+  cursor: pointer;
+  flex: none;
+  position: relative;
+  user-select: none;
+}
+.filmTile:hover {
+  background: var(--ink-50);
+}
+.filmTileActive {
+  color: var(--wf-blue-accent);
+  border-color: var(--wf-blue-accent);
+  background: var(--wf-blue-chip);
+}
+.filmTileDragging {
+  opacity: 0.4;
+}
+.filmTileOver {
+  border-color: var(--wf-blue-accent);
+  background: var(--wf-blue-chip);
+}
+.filmLabel {
+  white-space: nowrap;
+}
+.filmDel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-4);
+  color: var(--ink-400);
+  /* Hidden state uses `visibility: hidden` (NOT just opacity) so the button is
+     removed from the tab order — a keyboard user can't tab to an invisible
+     destructive control (a11y). It's revealed (and made focusable again) on tile
+     hover, when the tile or anything in it has focus (:focus-within — so keyboard
+     focus into the tile surfaces it), and when the tile is active. */
+  visibility: hidden;
+  opacity: 0;
+  flex: none;
+}
+.filmTile:hover .filmDel,
+.filmTile:focus-within .filmDel,
+.filmTileActive .filmDel {
+  visibility: visible;
+  opacity: 1;
+}
+.filmDel:hover {
+  background: var(--ink-100);
+  color: var(--wf-pink-accent);
+}
+.filmDel:focus-visible {
+  visibility: visible;
+  opacity: 1;
+}
+.filmDelConfirm {
+  display: flex;
+  align-items: center;
+  gap: var(--r-4);
+}
+.filmDelBtn {
+  font-size: var(--t-11);
+  font-weight: 700;
+  padding: var(--r-2) var(--r-6);
+  border-radius: var(--r-4);
+  min-height: 24px;
+  color: var(--ink-600);
+  border: var(--line);
+  background: var(--paper);
+}
+.filmDelConfirmBtn {
+  color: var(--wf-pink-accent);
+  border-color: var(--wf-pink-accent);
+}
+.filmRename {
+  font-size: var(--t-13);
+  font-weight: 700;
+  border: none;
+  outline: 2px solid var(--wf-blue-accent);
+  border-radius: var(--r-4);
+  padding: var(--r-2) var(--r-6);
+  min-width: 80px;
+  background: var(--surface);
+  color: var(--ink-800);
+}
+.sizeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--r-8);
+  margin-top: var(--r-8);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .filmTile {
+    transition: background-color 120ms ease, border-color 120ms ease;
   }
 }

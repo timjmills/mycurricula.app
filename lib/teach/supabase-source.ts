@@ -309,18 +309,48 @@ function rowToBoard(row: BoardRow, widgetRows: WidgetRow[]): Board {
   };
 }
 
-/** Map a board-template row → a domain BoardTemplate. `widgets` jsonb is the
- *  array of board-agnostic widget skeletons saved at template-creation time. */
+/** The envelope shape stored in `board_templates.widgets` jsonb for Wave-2
+ *  templates that carry the full page model + board cosmetics. The DB schema has
+ *  no dedicated columns for pages/background/size/board_theme (migration is a
+ *  later wave), so we pack them into the existing flexible `widgets` jsonb. A
+ *  legacy template stored a bare Widget[] there; `rowToTemplate` detects which. */
+interface TemplateEnvelope {
+  widgets: Omit<Widget, "boardId">[];
+  pages?: BoardPage[];
+  background?: string | null;
+  size?: "wide" | "a4" | "a3";
+  boardTheme?: ThemeOverride;
+}
+
+/** True for the Wave-2 envelope object (vs a legacy bare Widget[] array). */
+function isTemplateEnvelope(v: unknown): v is TemplateEnvelope {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    !Array.isArray(v) &&
+    Array.isArray((v as { widgets?: unknown }).widgets)
+  );
+}
+
+/** Map a board-template row → a domain BoardTemplate. The `widgets` jsonb is
+ *  either a legacy bare `Widget[]` (pre-Wave-2) or a `TemplateEnvelope` carrying
+ *  the full page model + board cosmetics; both round-trip to the same domain
+ *  shape. */
 function rowToTemplate(row: BoardTemplateRow): BoardTemplate {
-  const widgets = Array.isArray(row.widgets)
-    ? (row.widgets as Omit<Widget, "boardId">[])
-    : [];
+  const raw = row.widgets;
+  const env: TemplateEnvelope = isTemplateEnvelope(raw)
+    ? raw
+    : { widgets: Array.isArray(raw) ? (raw as Omit<Widget, "boardId">[]) : [] };
   return {
     id: row.id,
     title: row.title,
     scope: row.scope,
     ownerId: row.owner_id,
-    widgets,
+    widgets: env.widgets,
+    pages: env.pages,
+    background: env.background,
+    size: env.size,
+    boardTheme: env.boardTheme,
     gradeLevelId: row.grade_level_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -954,6 +984,8 @@ export const supabaseTeachSource: TeachDataSource = {
     if (patch.displayOrderWithinLesson !== undefined)
       safePatch.displayOrderWithinLesson = patch.displayOrderWithinLesson;
     if (patch.background !== undefined) safePatch.background = patch.background;
+    // Board.size persistence lands with Wave 5 Supabase parity (no `size`
+    // column / BOARD_COLS mapping yet — mock is the live path today).
     if (patch.tags !== undefined) safePatch.tags = patch.tags;
     if (patch.boardTheme !== undefined) safePatch.boardTheme = patch.boardTheme;
     if (patch.repeat !== undefined) safePatch.repeat = patch.repeat;
@@ -1281,9 +1313,9 @@ export const supabaseTeachSource: TeachDataSource = {
   async saveBoardAsTemplate(boardId, title, scope, ownerId) {
     const client = await sb();
     const board = await loadBoard(client, boardId);
-    // Strip boardId from each widget — a template is board-agnostic — and strip
+    // Strip boardId from a widget — a template is board-agnostic — and strip
     // name-bearing config/state defensively (privacy).
-    const widgets = board.widgets.map((w) => ({
+    const snapWidget = (w: Widget): Omit<Widget, "boardId"> => ({
       id: w.id,
       type: w.type,
       title: w.title,
@@ -1296,14 +1328,33 @@ export const supabaseTeachSource: TeachDataSource = {
       state: stripNames(w.state ?? {}),
       persistence: w.persistence,
       gradeLevelId: w.gradeLevelId,
+    });
+    // Snapshot the FULL page model so a multi-page board doesn't collapse to
+    // page-0 on re-instantiation. The DB has no pages/background/size/theme
+    // columns on board_templates (Wave-5 migration), so we pack everything into
+    // the existing flexible `widgets` jsonb as a TemplateEnvelope; rowToTemplate
+    // unpacks it (and still reads a legacy bare Widget[] for old rows).
+    const pages: BoardPage[] = pagesOf(board).map((p) => ({
+      id: p.id,
+      order: p.order,
+      title: p.title,
+      background: p.background,
+      widgets: p.widgets.map((w) => snapWidget(w) as Widget),
     }));
+    const envelope: TemplateEnvelope = {
+      widgets: (pages[0]?.widgets ?? []).map((w) => snapWidget(w as Widget)),
+      pages,
+      background: board.background ?? null,
+      size: board.size,
+      boardTheme: board.boardTheme ? { ...board.boardTheme } : undefined,
+    };
     const res = await client
       .from("board_templates")
       .insert({
         title,
         scope,
         owner_id: scope === "team" ? null : resolveOwnerId(ownerId),
-        widgets,
+        widgets: envelope,
         grade_level_id: board.gradeLevelId,
       })
       .select(TEMPLATE_COLS)
@@ -2075,6 +2126,112 @@ export const supabaseTeachSource: TeachDataSource = {
     await commitPages(client, boardId, reordered);
     return loadBoard(client, boardId);
   },
+
+  async updatePage(boardId, pageId, patch) {
+    const client = await sb();
+    const board = await loadBoard(client, boardId);
+    const pages = pagesOf(board).map((p) => {
+      if (p.id !== pageId) return p;
+      const next = { ...p, ...patch };
+      // `background: undefined` means "clear the override → inherit the board":
+      // DELETE the key so the persisted pages jsonb omits it entirely (a stored
+      // `"background": null` would read as explicit white, not inherit). Mirrors
+      // the mock's updatePage so the tri-state round-trips identically.
+      if ("background" in patch && patch.background === undefined) {
+        delete next.background;
+      }
+      if ("title" in patch && patch.title === undefined) {
+        delete next.title;
+      }
+      return next;
+    });
+    await commitPages(client, boardId, pages);
+    return loadBoard(client, boardId);
+  },
+
+  async createBoardFromTemplate(templateId, ctx) {
+    const client = await sb();
+    const res = await client
+      .from("board_templates")
+      .select(TEMPLATE_COLS)
+      .eq("id", templateId)
+      .single();
+    if (res.error || !res.data)
+      throw new Error(`Template not found: ${templateId}`);
+    const tpl = rowToTemplate(res.data as BoardTemplateRow);
+    const owner = assertUuid(resolveOwnerId(ctx.ownerId), "ownerId");
+    // SANDBOX SENTINEL (mirrors createBoard, audit F4): the "sandbox" key is NOT a
+    // real lesson — treat it like `masterLessonId == null` (grade from the
+    // caller-supplied uuid, never a fake-uuid lesson lookup that would throw),
+    // force the board ephemeral (uncapped scratch), and SKIP the cap check.
+    const isSandbox = ctx.masterLessonId === SANDBOX_LESSON_ID;
+    if (!isSandbox) await assertUnderCap(client, owner);
+    const lesson =
+      ctx.masterLessonId == null || isSandbox
+        ? null
+        : resolveLessonId(ctx.masterLessonId);
+    const gradeLevelId = lesson
+      ? await gradeIdForLesson(client, lesson)
+      : resolveGradeId(ctx.gradeLevelId);
+    const nextOrder = await nextLessonOrder(client, lesson, "personal", owner);
+    const ins = await client
+      .from("boards")
+      .insert({
+        master_core_lesson_event_id: lesson,
+        owner_id: owner,
+        scope: "personal",
+        title: tpl.title,
+        display_order_within_lesson: nextOrder,
+        template_id: templateId,
+        grade_level_id: gradeLevelId,
+        // Restore the board-wide cosmetics captured at save time. `size` is NOT
+        // written here (no `size` column yet — Wave 5 Supabase parity; mock keeps it).
+        background: tpl.background ?? null,
+        board_theme: tpl.boardTheme ?? null,
+        tags: [],
+        whiteboard: false,
+        // A sandbox-created board is ephemeral (uncapped scratch); else kept.
+        ephemeral: isSandbox,
+        library_visibility: "private",
+        published_by: null,
+        source_board_id: null,
+      })
+      .select(BOARD_COLS)
+      .single();
+    const boardRow = unwrap(ins, "create board from template") as BoardRow;
+    // Materialize the FULL page model with fresh page + widget ids when the
+    // template carries one (mock parity), syncing the page-0 widget mirror via
+    // commitPages. A legacy template (pages absent) falls back to the flat copy.
+    if (tpl.pages && tpl.pages.length > 0) {
+      const newPages: BoardPage[] = tpl.pages
+        .slice()
+        .sort((a, b) => a.order - b.order)
+        .map((p, i) => ({
+          id: newPageId(),
+          order: i,
+          title: p.title,
+          background: p.background,
+          widgets: p.widgets.map((w, j) => ({
+            ...w,
+            id: crypto.randomUUID(),
+            boardId: boardRow.id,
+            displayOrder: j,
+            position: { ...w.position },
+            canvas: w.canvas ? { ...w.canvas } : undefined,
+            appearance: w.appearance ? { ...w.appearance } : undefined,
+          })),
+        }));
+      await commitPages(client, boardRow.id, newPages);
+    } else if (tpl.widgets.length > 0) {
+      // Templates store widget skeletons without boardId; inject the new board id.
+      const seededWidgets: Widget[] = tpl.widgets.map((w) => ({
+        ...w,
+        boardId: boardRow.id,
+      }));
+      await copyWidgetsOnto(client, seededWidgets, boardRow.id);
+    }
+    return loadBoard(client, boardRow.id);
+  },
 };
 
 // ── Module-private write helpers that need the client ─────────────────────────
@@ -2391,6 +2548,7 @@ function boardPatchToRow(
     row.grade_level_id = resolveGradeId(patch.gradeLevelId);
   // 5.31 columns.
   if (patch.background !== undefined) row.background = patch.background ?? null;
+  // Board.size persistence lands with Wave 5 Supabase parity.
   if (patch.tags !== undefined)
     row.tags = patch.tags ? patch.tags.map((t) => ({ ...t })) : null;
   if (patch.whiteboard !== undefined)
