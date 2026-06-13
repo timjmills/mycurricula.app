@@ -583,6 +583,48 @@
     #2b3346 22px 44px
   );
 
+  /* Paper styles (Teach Wave 2, B5) — ruled / grid / dot / Cornell / primary
+     handwriting sheets. Line work on white, as self-contained tileable
+     `background` shorthands (white base baked in so the inline override fully
+     replaces the canvas surface). Soft hue line colours keep them calm + quiet;
+     these are the same family used by the pattern set above. */
+  --teach-bg-paper-lined: repeating-linear-gradient(
+    to bottom,
+    #ffffff 0 27px,
+    var(--teach-hue-sky) 27px 28px
+  );
+  --teach-bg-paper-grid:
+    linear-gradient(var(--teach-hue-slate) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, var(--teach-hue-slate) 1px, transparent 1px) 0 0 /
+      24px 24px,
+    #ffffff;
+  --teach-bg-paper-dot:
+    radial-gradient(circle, var(--teach-hue-ink) 1.5px, transparent 1.7px) 0 0 /
+      24px 24px,
+    #ffffff;
+  --teach-bg-paper-cornell:
+    linear-gradient(
+        90deg,
+        transparent 0 64px,
+        var(--teach-hue-rose) 64px 66px,
+        transparent 66px
+      )
+      0 0 / 100% 100% no-repeat,
+    repeating-linear-gradient(
+      to bottom,
+      #ffffff 0 27px,
+      var(--teach-hue-sky) 27px 28px
+    );
+  --teach-bg-paper-handwriting: repeating-linear-gradient(
+    to bottom,
+    var(--teach-hue-sky) 0 1px,
+    transparent 1px 18px,
+    var(--teach-hue-rose) 18px 19px,
+    transparent 19px 36px,
+    var(--teach-hue-sky) 36px 37px,
+    transparent 37px 56px
+  );
+
   /* ── Teach widget visual system (5.31 Boards & Widgets redesign) ────────
      The pastel-paper widget system from the 5.31 design handoff. Six colour
      families + three neutrals, each exposing -bg / -chip / -accent / -soft /
