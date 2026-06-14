@@ -5,7 +5,9 @@
 //   1. creates a server client whose cookies read from the incoming
 //      request and write to the outgoing response,
 //   2. calls supabase.auth.getUser() to refresh an expiring session,
-//   3. redirects unauthenticated visitors of protected paths to /login.
+//   3. redirects unauthenticated visitors of protected paths to /login —
+//      except the root path "/", which forwards to the public marketing
+//      page (/welcome) so signed-out visitors land there, not on login.
 //
 // Footgun: the response object the client mutates cookies on is the
 // one we must ultimately return. If a redirect is issued we copy those
@@ -16,8 +18,12 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { tryClaudeBypassInMiddleware } from "@/lib/claude-bypass";
 
-/** Path prefixes that must pass through without an authenticated user. */
-const PUBLIC_PATHS = ["/login", "/auth"];
+/**
+ * Path prefixes that must pass through without an authenticated user.
+ * `/welcome` is the public marketing landing page — anyone can view it
+ * signed-out; its CTAs funnel into `/login`.
+ */
+const PUBLIC_PATHS = ["/login", "/auth", "/welcome"];
 
 /** True when `pathname` is a public route or a Next internal / static asset. */
 function isPublicPath(pathname: string) {
@@ -37,7 +43,8 @@ function isPublicPath(pathname: string) {
 /**
  * Refresh the Supabase session and enforce auth for the current request.
  * Returns the NextResponse to send — either the cookie-mutated passthrough
- * response, or a redirect to /login carrying those same cookies.
+ * response, or a redirect (to /welcome for a signed-out root visit, else to
+ * /login) carrying those same cookies.
  */
 export async function updateSession(request: NextRequest) {
   // Claude auth-bypass (lib/claude-bypass.ts). When the request carries
@@ -83,15 +90,21 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // No session on a protected path → bounce to /login, preserving the
-  // originally-requested path so the OAuth callback can return there.
+  // No session on a protected path → redirect. The root path forwards to
+  // the public marketing page so signed-out visitors land there; every
+  // other protected path bounces to /login, preserving the originally-
+  // requested path so the OAuth callback can return there.
   if (!user && !isPublicPath(pathname)) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.search = "";
-    loginUrl.searchParams.set("next", pathname + request.nextUrl.search);
+    const target = request.nextUrl.clone();
+    target.search = "";
+    if (pathname === "/") {
+      target.pathname = "/welcome";
+    } else {
+      target.pathname = "/login";
+      target.searchParams.set("next", pathname + request.nextUrl.search);
+    }
 
-    const redirect = NextResponse.redirect(loginUrl);
+    const redirect = NextResponse.redirect(target);
     // Carry the refreshed-session cookies onto the redirect response.
     for (const cookie of response.cookies.getAll()) {
       redirect.cookies.set(cookie);
