@@ -224,7 +224,15 @@ export interface Lesson {
    *  planned differentiation yet. */
   differentiation?: LessonDifferentiation;
   resources: LessonResource[];
+  /** Standards CODES this lesson is tagged with (for display via
+   *  describeStandard). Codes are unique only PER framework. */
   standards: string[];
+  /** The REAL `standards.id` UUIDs behind `standards`, index-aligned with it
+   *  (same position = same standard). Populated on read under the Supabase flag
+   *  so an edit persists the EXACT standard the teacher picked — codes alone are
+   *  ambiguous across frameworks that share a code (e.g. AERO + WIDA-ELD `S1`).
+   *  Optional/absent under the mock flag and on lessons with no tags. */
+  standardIds?: string[];
   /** Week number (e.g. 11, 12, 13). */
   week: number;
   /** Day index, 0 = Sunday … 4 = Thursday. */

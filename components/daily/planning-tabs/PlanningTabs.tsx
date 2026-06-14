@@ -87,7 +87,8 @@ import { bundledDescriptions } from "@/lib/standards/items";
 import { RichTextEditor } from "@/components/rich-text";
 import { ResourceTypePill } from "@/components/lesson-flow";
 import { Button, Tooltip } from "@/components/ui";
-import { StandardsPicker } from "@/components/standards";
+import { StandardsTaggingPicker } from "@/components/standards/StandardsTaggingPicker";
+import type { StandardsMap } from "@/lib/types";
 import { Shoutbox } from "../Shoutbox";
 import {
   TOOL_KEYS,
@@ -106,7 +107,7 @@ import styles from "./planning-tabs.module.css";
 
 /** Bundled standards-item descriptions (CCSS practices, NGSS PEs, IB ATL),
  *  computed once. Fallback for the Standards pane so a code tagged via the
- *  StandardsPicker that the mock catalog doesn't know still renders a human
+ *  tagging picker that the mock catalog doesn't know still renders a human
  *  label instead of the bare code repeated twice. */
 const BUNDLED_DESCRIPTIONS = bundledDescriptions();
 
@@ -288,7 +289,7 @@ export interface PlanningTabsProps {
 
 export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
   function PlanningTabs({ lesson }, ref): ReactNode {
-    const { editLesson, subjects, describeStandard } = usePlanner();
+    const { editLesson, describeStandard, mergeStandards } = usePlanner();
     const [standardsPickerOpen, setStandardsPickerOpen] = useState(false);
     const uid = useId();
 
@@ -604,13 +605,22 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
       );
     }
 
-    function handleStandardsSave(codes: string[]): void {
-      // Same coalesced-editLesson contract as objective/notes/diff above: one
-      // undo step, routed through the store's save-target (Personal vs Master)
-      // like every other lesson edit.
+    function handleStandardsApply(
+      codes: string[],
+      descriptions: StandardsMap,
+      ids: string[] | null,
+    ): void {
+      // Merge the picked codes' wording into the catalog FIRST so describeStandard
+      // resolves any code from a framework outside the grade's baseline catalog
+      // instantly (no reload). Then persist with the same coalesced-editLesson
+      // contract as objective/notes/diff above: one undo step, routed through the
+      // store's save-target (Personal vs Master) like every other lesson edit.
+      // Carry the EXACT standard ids when the picker knows them all (codes alone
+      // are ambiguous across frameworks that share a code); else persist by code.
+      mergeStandards(descriptions);
       editLesson(
         lesson.id,
-        { standards: codes },
+        ids ? { standards: codes, standardIds: ids } : { standards: codes },
         { key: `lesson:${lesson.id}:standards`, ts: Date.now() },
       );
     }
@@ -680,7 +690,7 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
                 variant="secondary"
                 size="sm"
                 onClick={() => setStandardsPickerOpen(true)}
-                tooltip="Open the standards menu — search frameworks by subject and grade, pin your preferred systems, and tag the standards this lesson covers"
+                tooltip="Open the standards menu — search your frameworks by stage, subject, and strand, and tag the standards this lesson covers (set which frameworks you use in Settings → Standards)"
               >
                 {lesson.standards.length > 0
                   ? "Edit standards"
@@ -970,18 +980,30 @@ export const PlanningTabs = forwardRef<PlanningTabsHandle, PlanningTabsProps>(
           </div>
         )}
 
-        {/* The standards menu — mounted once at the panel root so the modal
-            overlays the whole pane; saves route through editLesson, matching
-            every other tab's coalesced edit + save-target semantics. */}
-        <StandardsPicker
+        {/* The standards menu — the scoped tagging picker (search the full
+            worldwide catalog limited to the teacher's effective frameworks).
+            Mounted once at the panel root so the modal overlays the whole pane;
+            saves route through editLesson, matching every other tab's coalesced
+            edit + save-target semantics. Seeded with the current codes' wording
+            so already-tagged chips read with descriptions before any search. */}
+        <StandardsTaggingPicker
           key={lesson.id}
           open={standardsPickerOpen}
           onClose={() => setStandardsPickerOpen(false)}
-          value={lesson.standards}
-          onSave={handleStandardsSave}
-          defaultSubject={lesson.subject}
-          subjects={subjects}
-          targetLabel="this lesson"
+          initialCodes={lesson.standards}
+          initialIds={lesson.standardIds}
+          initialDescriptions={Object.fromEntries(
+            lesson.standards.map((code) => {
+              const fromCatalog = describeStandard(code);
+              return [
+                code,
+                fromCatalog === code
+                  ? (BUNDLED_DESCRIPTIONS[code] ?? code)
+                  : fromCatalog,
+              ];
+            }),
+          )}
+          onApply={handleStandardsApply}
         />
       </div>
     );

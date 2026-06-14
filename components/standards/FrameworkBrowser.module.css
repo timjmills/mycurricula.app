@@ -1,0 +1,246 @@
+/* FrameworkBrowser.module.css — shared standards-framework picker.
+ *
+ * cp-root note: `.cp-root button` (tokens.css) strips background/border/padding
+ * from single-class button rules, so the `.row` button properties are written
+ * with a DOUBLED class (`.row.row`) to out-specify the reset. The selected
+ * variant doubles too and is placed after so equal specificity resolves to it.
+ * `<summary>`/`<details>` are not reset; the search `<input>` keeps its box (the
+ * cp-root input reset only inherits font/color), but we set those explicitly. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Search ───────────────────────────────────────────────────────────────── */
+.searchRow {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.search.search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  min-height: 44px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--t-14);
+}
+.search.search::placeholder {
+  color: var(--muted);
+}
+.search.search:focus-visible {
+  border-color: var(--brand-400);
+}
+
+/* ── Groups (featured strip + search results) ─────────────────────────────── */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.groupTitle {
+  font-size: var(--t-13);
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+
+.groupHint {
+  font-size: var(--t-12);
+  color: var(--muted);
+}
+
+/* ── Region collapsibles ──────────────────────────────────────────────────── */
+.region {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.summary::-webkit-details-marker {
+  display: none;
+}
+.summary:hover {
+  background: var(--surface-warm);
+}
+
+.summaryTitle {
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.summaryMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.count {
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 22px;
+  text-align: right;
+}
+
+.region[open] .summary {
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Lists + rows ─────────────────────────────────────────────────────────── */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.region .list {
+  padding: 8px;
+}
+
+.item {
+  display: block;
+}
+
+.row.row {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  min-height: 44px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.row.row:hover {
+  border-color: var(--brand-300);
+  background: var(--surface-warm);
+}
+.row.rowSelected {
+  border: 1.5px solid var(--brand-500);
+  background: var(--brand-50);
+}
+.row.rowSelected:hover {
+  border-color: var(--brand-500);
+  background: var(--brand-50);
+}
+
+.check {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-4);
+  border: 2px solid var(--idle);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.check[data-checked="true"] {
+  border-color: var(--brand-500);
+  background: var(--brand-500);
+}
+.check[data-checked="true"]::after {
+  content: "";
+  display: block;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--paper);
+  border-bottom: 2px solid var(--paper);
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.label {
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  padding: 1px 6px;
+}
+
+.detail {
+  font-size: var(--t-12);
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.empty {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+/* ── Responsive: featured strip becomes 2-up on wider viewports ───────────── */
+@media (min-width: 760px) {
+  .group .list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+}

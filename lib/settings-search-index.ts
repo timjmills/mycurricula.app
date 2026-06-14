@@ -36,6 +36,34 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchEntry[] = [
     anchor: "curriculum-label",
     keywords: ["name", "wordmark", "suffix", "grade", "team"],
   },
+  // ── Planning · Standards ─────────────────────────────────────────────
+  {
+    group: "Planning",
+    section: "Standards",
+    route: "/settings/standards",
+    title: "School frameworks",
+    anchor: "school-frameworks",
+    keywords: [
+      "standards",
+      "framework",
+      "ccss",
+      "common core",
+      "aero",
+      "ngss",
+      "ib",
+      "cambridge",
+      "curriculum",
+      "default",
+    ],
+  },
+  {
+    group: "Planning",
+    section: "Standards",
+    route: "/settings/standards",
+    title: "Your frameworks",
+    anchor: "my-frameworks",
+    keywords: ["standards", "framework", "my standards", "personal", "tag"],
+  },
   // ── Planning · Calendar ──────────────────────────────────────────────
   {
     group: "Planning",

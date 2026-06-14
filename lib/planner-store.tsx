@@ -431,6 +431,14 @@ type SetHydrationAction = { type: "setHydration"; hydration: PlannerHydration };
  *  non-history side-channel. Used if the catalog ever needs to settle
  *  independently of a full hydrate; the slice is never part of undo/redo. */
 type SetCatalogAction = { type: "setCatalog"; catalog: PlannerCatalog };
+/** Merge a partial code→description map into the catalog's standards without
+ *  touching the document/history. Used by the standards tagging picker so a
+ *  freshly-tagged code (which may live OUTSIDE the grade's baseline catalog —
+ *  the picker searches the teacher's full EFFECTIVE framework set) resolves to
+ *  its wording via describeStandard immediately, with no reload. Additive: it
+ *  only ever ADDS keys (existing descriptions win, so a hydrate never loses to
+ *  a stale merge). */
+type MergeStandardsAction = { type: "mergeStandards"; map: StandardsMap };
 
 type PlannerAction =
   | MoveLessonAction
@@ -461,7 +469,8 @@ type PlannerAction =
   | RedoAction
   | HydrateAction
   | SetHydrationAction
-  | SetCatalogAction;
+  | SetCatalogAction
+  | MergeStandardsAction;
 
 // ── Human labels for undo/redo tooltips ──────────────────────────────────
 
@@ -1383,6 +1392,26 @@ function historyReducer(
     return { ...state, catalog: action.catalog };
   }
 
+  // ── Merge standards descriptions ──────────────────────────────────────
+  // Fold a partial code→description map into the catalog's standards (no
+  // document/history change — like setCatalog, a side-channel). EXISTING keys
+  // win so a hydrate's authoritative wording is never clobbered by a later
+  // merge; only brand-new codes (e.g. a tag from a framework outside the
+  // grade's baseline catalog) are added. No-op when nothing new is present.
+  if (action.type === "mergeStandards") {
+    const incoming = action.map;
+    let added = false;
+    const merged: StandardsMap = { ...state.catalog.standards };
+    for (const code in incoming) {
+      if (!(code in merged)) {
+        merged[code] = incoming[code];
+        added = true;
+      }
+    }
+    if (!added) return state;
+    return { ...state, catalog: { ...state.catalog, standards: merged } };
+  }
+
   // ── Content mutations ────────────────────────────────────────────────
   const label = labelFor(action);
   const nextDoc = applyDocAction(state.history.present, action);
@@ -1832,6 +1861,15 @@ export interface PlannerValue {
    * from `standards` so it tracks the hydrated catalog under the flag.
    */
   describeStandard: (code: string) => string;
+  /**
+   * Merge freshly-resolved code→description pairs into the catalog's standards
+   * map (additive; existing keys win). The standards tagging picker calls this
+   * when a teacher tags a standard from a framework OUTSIDE the grade's baseline
+   * catalog, so describeStandard resolves its wording instantly without a reload.
+   * No-op with the Supabase flag OFF (the mock catalog already describes every
+   * mock code) and a no-op when nothing new is present.
+   */
+  mergeStandards: (map: StandardsMap) => void;
   /**
    * The resolved active grade id (the mock "g5" slug under the flag OFF, the
    * grade uuid under the flag ON), or null when no grade is resolved.
@@ -2654,6 +2692,13 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [catalog.standards],
   );
 
+  // Merge freshly-tagged code→description pairs into the catalog (additive).
+  // Stable across renders (dispatchRef), so it never destabilizes the value memo.
+  const mergeStandards = useCallback((map: StandardsMap) => {
+    if (!map || Object.keys(map).length === 0) return;
+    dispatchRef.current({ type: "mergeStandards", map });
+  }, []);
+
   // ── Stable context value ──────────────────────────────────────────────
   // Memoized on the doc and history boundaries — views re-render only when
   // the document or history flags actually change.
@@ -2705,6 +2750,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       activeUnitBySubject,
       standards: catalog.standards,
       describeStandard,
+      mergeStandards,
       activeGradeId: catalog.activeGradeId,
     }),
     [
@@ -2753,6 +2799,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       activeUnitBySubject,
       catalog.standards,
       describeStandard,
+      mergeStandards,
       catalog.activeGradeId,
     ],
   );
