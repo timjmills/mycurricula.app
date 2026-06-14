@@ -1,0 +1,278 @@
+/* TeachChooser — the Teach Boards landing chooser + lesson-picker dialog.
+   Tokens only; subject colour via the .cp-subj cascade (var(--c)). */
+
+.chooser {
+  padding: clamp(16px, 3vw, 32px) clamp(16px, 3vw, 32px) 8px;
+  flex: none;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--t-26);
+  font-weight: 700;
+  color: var(--ink-900);
+  letter-spacing: -0.01em;
+}
+
+.prompt {
+  margin: 4px 0 16px;
+  font-size: var(--t-16);
+  color: var(--ink-600);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  max-width: 760px;
+}
+
+@media (max-width: 640px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+.card:hover:not(:disabled) {
+  border-color: var(--chrome-accent);
+  box-shadow: var(--sh-md);
+}
+.card:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 2px;
+}
+.card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cardIcon {
+  font-size: var(--t-26);
+  line-height: 1;
+}
+.cardTitle {
+  font-size: var(--t-18);
+  font-weight: 650;
+  color: var(--ink-900);
+}
+.cardSub {
+  font-size: var(--t-13);
+  color: var(--ink-500);
+}
+
+/* ── Lesson-picker dialog ─────────────────────────────────────────────── */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-menu);
+  background: var(--scrim);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 100%);
+  max-height: min(80vh, 720px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-lg);
+  overflow: hidden;
+}
+
+.dialogHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 8px;
+}
+.dialogTitle {
+  margin: 0;
+  font-size: var(--t-18);
+  font-weight: 650;
+  color: var(--ink-900);
+}
+.close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-8);
+  border: none;
+  background: transparent;
+  color: var(--ink-500);
+  font-size: var(--t-16);
+  cursor: pointer;
+}
+.close:hover {
+  background: var(--ink-50);
+  color: var(--ink-900);
+}
+
+.searchRow {
+  display: block;
+  padding: 0 18px 10px;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.search {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--paper);
+  color: var(--ink-900);
+  font-size: var(--t-14);
+  font-family: var(--font-sans);
+}
+.search:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 1px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 18px 10px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 550;
+  cursor: pointer;
+}
+.chip:hover {
+  background: var(--ink-50);
+}
+.chipActive {
+  border-color: var(--ink-900);
+  background: var(--ink-900);
+  color: var(--on-solid);
+}
+.chipDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c, var(--ink-400));
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.list li {
+  display: flex;
+}
+
+.empty,
+.overflow {
+  margin: 8px;
+  font-size: var(--t-13);
+  color: var(--ink-500);
+  text-align: center;
+}
+
+.lessonRow {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  cursor: pointer;
+  overflow: hidden;
+}
+.lessonRow:hover {
+  background: var(--ink-50);
+  border-color: var(--c, var(--border));
+}
+.lessonRow:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 1px;
+}
+.stripe {
+  flex: none;
+  width: 4px;
+  background: var(--c, var(--ink-300));
+}
+.lessonMain {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  padding: 11px 0;
+}
+.lessonTitle {
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--ink-900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lessonMeta {
+  flex: none;
+  align-self: center;
+  padding-right: 12px;
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  .lessonMeta {
+    display: none;
+  }
+}
+
+.dialogFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 18px 16px;
+  border-top: 1px solid var(--border);
+}

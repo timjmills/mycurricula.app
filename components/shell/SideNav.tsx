@@ -49,7 +49,7 @@ const SECTIONS: NavSection[] = [
       { label: "Catch-up", href: "/catch-up", icon: <FlagIcon /> },
       { label: "Schedule", href: "/schedule", icon: <ClockIcon /> },
       { label: "Archive", href: "/archive", icon: <ArchiveIcon /> },
-      { label: "Boards", href: "/boards", icon: <BoardsIcon />, match: "/boards" },
+      { label: "Teach", href: "/boards", icon: <BoardsIcon />, match: "/boards" },
     ],
   },
 ];

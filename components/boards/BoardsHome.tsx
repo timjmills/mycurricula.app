@@ -27,6 +27,7 @@ import { teachClient as teach } from "@/lib/teach/client";
 import { BoardCapError } from "@/lib/teach/queries";
 import { ME } from "@/lib/mock/teachers";
 import { BoardLibraryModule } from "@/components/teach/library";
+import { TeachChooser } from "./TeachChooser";
 
 const USE_SUPABASE = process.env.NEXT_PUBLIC_TEACH_USE_SUPABASE === "1";
 const MOCK_GRADE_SLUG = "g5";
@@ -73,6 +74,15 @@ export function BoardsHome(): ReactNode {
       alive = false;
     };
   }, [ownerId]);
+
+  // "Teach from a lesson" — open the editor on that lesson (lesson-bound mode);
+  // the editor loads the lesson's board set. No board id: the lesson IS the seed.
+  const teachFromLesson = useCallback(
+    (lessonId: string): void => {
+      router.push(`/teach?lesson=${encodeURIComponent(lessonId)}`);
+    },
+    [router],
+  );
 
   // Navigate to a board in the editor. A lesson-bound board deep-links its lesson
   // so the editor loads that set; a lesson-less board opens standalone (id only).
@@ -165,15 +175,30 @@ export function BoardsHome(): ReactNode {
         flexDirection: "column",
       }}
     >
-      <BoardLibraryModule
-        gradeLevelId={gradeId}
-        ownerId={ownerId}
-        onOpenBoard={openBoard}
-        onCreateBlank={
-          ownerId != null && gradeId != null ? newBlankBoard : undefined
-        }
+      <TeachChooser
+        onTeachLesson={teachFromLesson}
+        onBlankBoard={newBlankBoard}
         creating={creating}
+        canCreateBlank={ownerId != null && gradeId != null}
       />
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <BoardLibraryModule
+          gradeLevelId={gradeId}
+          ownerId={ownerId}
+          onOpenBoard={openBoard}
+          onCreateBlank={
+            ownerId != null && gradeId != null ? newBlankBoard : undefined
+          }
+          creating={creating}
+        />
+      </div>
     </div>
   );
 }
