@@ -19,6 +19,9 @@
 // PRIVACY (§11.4): only STRUCTURE crosses the boundary — never student names.
 
 import type { TeachDataSource } from "./queries";
+// Leaf import (NOT "./queries", which pulls the server-only Supabase source into
+// the graph): keeps the client bundle free of `next/headers`.
+import { BoardCapError } from "./limits";
 import { mockTeachSource } from "./mock-source";
 import { teachDispatch } from "./actions";
 
@@ -39,7 +42,17 @@ export const teachClient: TeachDataSource = new Proxy({} as TeachDataSource, {
   get<M extends keyof TeachDataSource>(_target: TeachDataSource, prop: M) {
     return (...args: Parameters<TeachDataSource[M]>) => {
       if (USE_SUPABASE) {
-        return teachDispatch(prop, args);
+        // The server action RESOLVES with a discriminated envelope — it never lets
+        // an operational error reject across the boundary, where Next.js would
+        // redact it (stripping the BoardCapError class + its message). Unwrap it
+        // here: on success return the value; on an EXPECTED error rebuild a real
+        // typed error so callers' `instanceof BoardCapError` / `isCapError` checks
+        // behave exactly as they do on the direct mock path below.
+        return teachDispatch(prop, args).then((res) => {
+          if (res.ok) return res.value;
+          if (res.error.name === "BoardCapError") throw new BoardCapError();
+          throw new Error(res.error.message);
+        });
       }
       const fn = mockTeachSource[prop] as (
         ...a: Parameters<TeachDataSource[M]>

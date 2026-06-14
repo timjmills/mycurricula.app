@@ -509,12 +509,22 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
         if (alive) setBoards(next);
       })
       .catch(() => {
-        if (alive) setBoards([]);
+        // Don't SILENTLY render the empty state on a load failure — empty is
+        // indistinguishable from "this lesson has no boards" and can make a teacher
+        // think their boards vanished (or build a duplicate set). The mock path
+        // never rejects; under the live flag a network/RLS/server error can. Keep
+        // the set empty but SURFACE the failure so the teacher knows to retry rather
+        // than trusting a false empty.
+        if (!alive) return;
+        setBoards([]);
+        showConsequence({
+          message: "Couldn't load your boards just now — please refresh.",
+        });
       });
     return () => {
       alive = false;
     };
-  }, [boardScopeLessonId, ownerId, standaloneBoard]);
+  }, [boardScopeLessonId, ownerId, standaloneBoard, showConsequence]);
 
   // Re-fetch the active set's boards (used after a mutating repo call).
   // Captures the scope id at call time and re-checks the live ref before
