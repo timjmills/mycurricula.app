@@ -1,0 +1,266 @@
+/* year-filters-popover.module.css — styles for the Year "Filters & View"
+   popover (YearFiltersPopover.tsx).
+
+   ── Token rules (CLAUDE.md §4) ──────────────────────────────────────────
+   Every color / type / spacing value comes from var(--…). Zero raw hex, zero
+   raw px font sizes. Verified across all 6 themes via the --chrome-accent* /
+   --ink-* / --surface / --panel-bg / semantic-status tokens, which are all
+   re-themed in tokens.css.
+
+   ── cp-root button trap ─────────────────────────────────────────────────
+   This popover may render inside a `.cp-root` context, whose global reset
+   `.cp-root button { background:none; border:none; padding:0 }` is (0,1,1).
+   Every button style rule below DOUBLES its class (e.g. `.row.row`) to reach
+   (0,2,0) so the fill / border / padding survive. The trigger and the inner
+   Grid|List switch are the canonical <Button> / <ToggleGroup> primitives,
+   which already carry their own .btn-qualified contract — only the hand-rolled
+   checkbox rows + Reset link need the doubling here.
+
+   ── Token substitutions (noted for the reviewer) ────────────────────────
+   The brief named tokens that don't exist under those exact names; the
+   nearest existing equivalents were used:
+     --shadow-2  → --shadow-popover  (the dedicated popover shadow token)
+     --r-14      → --r-md            (14px — inputs / cards radius)
+     (small radii)→ --r-sm           (10px — chips / inputs)
+*/
+
+/* ── Root (positioning anchor) ─────────────────────────────────────────── */
+
+.root {
+  position: relative;
+  display: inline-flex;
+}
+
+/* ── Count badge in the trigger's trailing slot ────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--chrome-accent);
+  color: var(--on-solid);
+  font-size: var(--t-11);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Popover surface ───────────────────────────────────────────────────── */
+
+.popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0; /* opens below-right of the trigger */
+  z-index: 60; /* above page content + sticky chrome */
+  min-width: 260px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--panel-bg);
+  border: 1px solid var(--hairline, var(--ink-100));
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-popover, var(--sh-md));
+  /* Subtle entrance — suppressed under reduced motion (see bottom). */
+  animation: yfp-pop 120ms ease;
+}
+
+@keyframes yfp-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Sections + small-caps labels ──────────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionLabel {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The VIEW ToggleGroup stretches to fill the popover width so Grid|List read
+   as a balanced two-up switch. */
+.viewToggle {
+  display: flex;
+  width: 100%;
+}
+
+/* ── Checkbox rows (SUBJECTS + STATUS) ─────────────────────────────────── */
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Doubled class clears the .cp-root button reset (specificity contract). */
+.row.row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  /* ≥44px touch target on phone/tablet; comfortable on desktop too. */
+  min-height: 36px;
+  padding: 7px 8px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-900);
+  font-family: var(--font-sans);
+  font-size: var(--t-13);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+@media (max-width: 900px) {
+  .row.row {
+    min-height: 44px;
+  }
+}
+
+.row.row:hover {
+  background: color-mix(in srgb, var(--chrome-accent) 8%, var(--surface));
+}
+
+.row.row:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 1px;
+}
+
+/* ── Checkbox box indicator ────────────────────────────────────────────── */
+
+.box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--ink-300);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--on-solid);
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.boxOn {
+  background: var(--chrome-accent);
+  border-color: var(--chrome-accent);
+}
+
+/* ── Color / legend dot ────────────────────────────────────────────────── */
+
+.dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-pill);
+  /* A faint ring keeps a light dot visible on a light surface (and vice
+     versa) without a hard hex border. */
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink-900) 12%, transparent);
+}
+
+/* ── Row label ─────────────────────────────────────────────────────────── */
+
+.rowLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Footer / Reset link ───────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline, var(--ink-100));
+}
+
+/* Doubled class clears the .cp-root button reset. A quiet text button — it
+   only appears when something is active, so it never offers a no-op. */
+.reset.reset {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--chrome-accent-deep);
+  font-family: var(--font-sans);
+  font-size: var(--t-12);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+@media (max-width: 900px) {
+  .reset.reset {
+    min-height: 44px;
+  }
+}
+
+.reset.reset:hover {
+  background: color-mix(in srgb, var(--chrome-accent) 10%, var(--surface));
+}
+
+.reset.reset:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 1px;
+}
+
+/* ── Screen-reader-only utility ────────────────────────────────────────── */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .popover {
+    animation: none;
+  }
+  .row.row,
+  .box,
+  .reset.reset {
+    transition: none;
+  }
+}

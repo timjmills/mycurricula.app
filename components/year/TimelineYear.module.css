@@ -12,17 +12,85 @@
  */
 
 .tlVars {
-  /* Map the prototype's cascade vars onto the app's .cp-subj tokens. */
+  /* Map the prototype's cascade vars onto the app's .cp-subj tokens. Every
+     mix blends toward var(--paper) (the theme's surface base), NEVER literal
+     #fff — #fff would not re-tint on Night/dark themes (dark-on-dark text). */
   --uc: var(--c); /* bright accent — stripe, selected border, arrow */
   --ud: var(--cd); /* deep text */
   --ut: var(--cl); /* soft tint — selected fill */
-  --us: color-mix(in srgb, var(--c) 62%, #fff); /* mid tone — icon tiles */
+  --us: color-mix(
+    in srgb,
+    var(--c) 62%,
+    var(--paper)
+  ); /* mid tone — icon tiles */
   --ush: color-mix(in srgb, var(--c) 32%, transparent); /* shadow tint */
-  --rt: color-mix(in srgb, var(--cl) 70%, #fff); /* row wash */
+  --rt: color-mix(in srgb, var(--cl) 70%, var(--paper)); /* row wash */
+
+  /* ── Hierarchy depth-shading scale (Unit ⊃ Week ⊃ Day) ──────────────────
+     Three nesting levels each get their OWN background so the containment
+     reads instantly. All derive from the subject family + var(--paper):
+       --lvl-unit  — unit container fill (soft subject tint)
+       --lvl-week  — week-card fill (mid-strength subject tint, one step up)
+       --lvl-day   — day/lesson-card fill (the plain surface)
+     Zebra shading nudges alternate siblings one notch toward --paper. */
+  --lvl-unit: var(--cl);
+  --lvl-week: color-mix(in srgb, var(--cl) 55%, var(--paper));
+  --lvl-day: var(--paper);
+  /* Zebra wash for :nth-child(even) siblings — a faint step toward --paper so
+     adjacent rows separate without a hard line. */
+  --zebra-week: color-mix(in srgb, var(--cl) 32%, var(--paper));
+  --zebra-day: color-mix(in srgb, var(--cl) 14%, var(--paper));
+  /* Hairline divider between siblings — a translucent subject-tinted rule. */
+  --hair: color-mix(in srgb, var(--c) 18%, transparent);
+}
+
+/* Visually-hidden text (B4): keeps status labels in the a11y tree for screen
+   readers while removing them from the visual layout. Used behind the colour-
+   only WeekCircle + day status dots so their state is announced, not just shown
+   in colour. Standard clip-rect pattern — no layout impact. */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Root: height-bounded flex column ────────────────────────────────────
+   Fills <main> (height:100%) so the .tl timeline card can claim the leftover
+   height (flex:1) and host the ZoomPanCanvas, which needs a bounded parent to
+   compute "Fit". min-height:0 lets the card actually shrink inside the column.
+   Owns the page padding (main supplies none — matches SubjectView's .page). */
+.root {
+  /* Content height — NOT height:100%. The ZoomPanCanvas self-bounds its own
+     height to the viewport, so forcing .root to fill the (top-bar-offset,
+     oversized) <main> only re-introduced a scrollbar-worth of phantom height
+     below the canvas. Letting .root hug its content lets <main> collapse to
+     the viewport, so there is no page scroll. */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Wider desktop side gutter (#2): the heading/stat-strip used to hug the
+     content edge at 20px while the timeline content starts ~230px in, so the
+     page read lopsided. ~32px lets the heading, stat strip, and timeline card
+     breathe symmetrically. The today-line `left:` math is anchored to the card's
+     own 230px label gutter + its inner 18px grid pad (NOT .root padding), so it
+     stays aligned regardless of this value. The ≤560px reduced gutter is kept. */
+  padding: 18px 32px 10px;
+}
+@media (max-width: 560px) {
+  .root {
+    padding: 14px 12px 8px;
+  }
 }
 
 /* ── Page heading ── */
 .head {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -54,44 +122,94 @@
 }
 
 .statWrap {
+  flex: 0 0 auto;
   margin-bottom: 18px;
 }
 
-/* ── Timeline card ── */
+/* ── Timeline card (GRID mode) ──
+   Renders the month-tied timeline DIRECTLY at full size — no ZoomPanCanvas, no
+   fit-to-screen scaling. The card flows to its natural height (the months
+   header `.tlhead` + the subject rows stacked below); the DOCUMENT scrolls
+   vertically when the board is taller than the viewport. No overflow clip — the
+   timeline must show in full. */
 .tl {
-  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  /* --panel-bg (theme-aware, lightly translucent) lets the body gradient swash
+     show through, so the timeline card floats over the wash (hybrid look). */
+  background: var(--panel-bg);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--sh-sm);
   padding: 6px 0 0;
-  margin-bottom: 18px;
-  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+/* ── List outline wrapper (LIST mode only) ──
+   Replaces the `.tl` card + ZoomPanCanvas in list mode: the outline renders at
+   full size with NO scaling and NO overflow clip, so it flows to its natural
+   height and the document scrolls normally (a normal list scrollbar is fine).
+   `.root` hugs its content height (no height:100%), so this block extends the
+   page and the document — not an inner box — scrolls. Full width; the rows lay
+   out at 100% and wrap/stack, so there is no horizontal scroll. */
+.listWrap {
+  width: 100%;
+  margin-bottom: 14px;
 }
 .tlhead {
+  flex: 0 0 auto;
   display: grid;
-  grid-template-columns: 230px 1fr;
+  grid-template-columns: 230px minmax(0, 1fr);
   border-bottom: 1px solid var(--hairline);
+}
+/* Axis column (the 1fr cell of .tlhead) — stacks the years row over the months
+   row, both sharing the same 18px side padding so they line up with the units. */
+.axisCol {
+  min-width: 0;
+}
+.corner {
+  /* The 230px label-rail spacer in the timeline header grid. */
 }
 .years {
   display: flex;
+  justify-content: space-between;
   padding: 10px 18px 0;
 }
 .years .y {
   font-family: var(--font-display-sm);
   font-size: var(--t-12, 12px);
   font-weight: 800;
-  color: var(--faint);
+  /* AA-legible year labels across all six themes (was --faint). */
+  color: var(--ink-500);
+  letter-spacing: 0.02em;
 }
+/* Months axis — a CSS grid whose `grid-template-columns: repeat(totalWeeks,1fr)`
+   is set inline (from the JS axis) so it matches the rows' week grid exactly.
+   Each month label spans the columns its weeks occupy (gridColumn inline). The
+   18px side padding mirrors the grid-mode `.units` padding so the month columns
+   line up with the unit columns directly underneath. */
 .months {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
   padding: 2px 18px 10px;
+  /* Border-box so the side padding is shared space, keeping column widths in
+     lockstep with the rows below (which use the same padding + border-box). */
+  box-sizing: border-box;
 }
 .months span {
   font-size: var(--t-11, 11px);
   font-weight: 700;
-  color: var(--faint);
+  /* B7: --faint was too low-contrast for the month axis; --ink-500 (the meta
+     tone) holds WCAG AA across all six themes while staying quieter than body
+     text. Centering + ellipsis below are unchanged. */
+  color: var(--ink-500);
   letter-spacing: 0.04em;
+  /* Center each month label across its week-span and clip if a 1-week month
+     can't fit the text — the axis stays aligned regardless. */
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rows {
@@ -105,9 +223,9 @@
 }
 .subrow {
   display: grid;
-  grid-template-columns: 230px 1fr;
+  grid-template-columns: 230px minmax(0, 1fr);
   align-items: center;
-  padding: 14px 0;
+  padding: 20px 0;
   transition: background 0.15s;
 }
 .subrow.hot {
@@ -150,22 +268,36 @@
 }
 .units {
   display: flex;
-  gap: 10px;
-  /* Vertical padding gives the chip hover-lift + selected ring room before the
-     row's overflow-x:auto (which makes overflow-y auto too) would clip them. */
-  padding: 6px 18px 10px;
+  gap: 14px;
+  padding: 4px 22px;
   position: relative;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  align-items: stretch;
+}
+
+/* Per-unit outline wrapper. It is the layout ITEM in both modes now:
+   • GRID — a timeline grid cell, positioned across the week columns via an
+     inline `grid-column` (see `.root[data-hier="grid"] .units` for the grid
+     template). The `.unit` button fills it.
+   • LIST — the stacking row that holds the unit AND its nested weeks/days
+     (its flex-column display is set in the list block below). */
+.unode {
+  display: block;
+  min-width: 0;
 }
 .unit {
-  flex: 1 0 116px;
+  width: 100%;
   min-width: 0;
-  border-radius: 11px;
-  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  /* Generous, asymmetric padding — extra on the left clears the accent stripe
+     so the title never crowds it (issues: padding + text-to-edge). */
+  padding: 14px 16px 13px;
   cursor: pointer;
-  border: 1.5px solid var(--border);
+  border: 1px solid var(--border);
   background: var(--surface);
+  /* Soft resting shadow so each unit reads as a real card, not a flat box. */
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ush) 45%, transparent);
   transition:
     transform 0.12s,
     box-shadow 0.12s,
@@ -176,49 +308,67 @@
 }
 .unit:hover {
   transform: translateY(-2px);
-  box-shadow: var(--sh-md);
-  border-color: var(--us);
+  box-shadow: 0 12px 24px -12px var(--ush);
+  border-color: var(--uc);
+}
+/* The global `.cp-root button` reset (tokens.css) strips a <button>'s padding,
+   border-style, and background. The .unit chip IS a button, so re-assert
+   padding + a full hairline border at a specificity that outranks the reset
+   (.root .unit = 0,2,0 > .cp-root button = 0,1,1). Without this the chip text
+   crams to the very edge (padding:0) and only the high-specificity left stripe
+   shows. The mode-specific fills/stripes below layer on top. */
+.root .unit {
+  padding: 14px 16px 13px;
+  border: 1px solid var(--border);
 }
 .unit .un {
   font-family: var(--font-display-sm);
   font-size: var(--t-13, 13px);
   font-weight: 800;
-  color: var(--ink);
+  /* Deep subject tone — the title itself carries the subject color (vibrancy)
+     while staying legible on the soft tint. */
+  color: var(--ud);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 .unit .us {
   font-size: var(--t-11, 11px);
   color: var(--muted);
-  margin-top: 3px;
-  line-height: 1.25;
+  margin-top: 4px;
+  line-height: 1.3;
   font-weight: 500;
 }
 .unit .uw {
   font-size: var(--t-10, 10px);
-  /* --faint is the placeholder/disabled tier (~1.7:1 on the chip tint — fails
-     AA). The week range is real info, so use the themed meta-body token
-     (--ink-500): ~6.6:1 on light chips, ~5:1 on Night's dark chip. */
-  color: var(--ink-500);
-  margin-top: 5px;
+  color: var(--faint);
+  /* Pushed to the bottom of the card with auto top-margin so the week span
+     always anchors the chip regardless of title length — keeps a tidy,
+     even baseline across a wrapped row of stretched cards. */
+  margin-top: auto;
+  padding-top: 8px;
   font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 .unit.sel {
   background: var(--ut);
   border-color: var(--uc);
-  box-shadow: 0 10px 22px -10px var(--ush);
+  box-shadow: 0 12px 26px -12px var(--ush);
 }
 .unit.sel .un {
   color: var(--ud);
 }
-/* (The old `.unit.sel::after` downward arrow was removed: it overlapped the
-   row below and read as broken. Selection is now an accent ring — see the
-   `.units .unit.sel` rule at the foot of this file.) */
-.chev {
-  width: 30px;
+/* Doubled class beats the global `.cp-root button` reset (0,1,1) so the chevron
+   keeps its sizing/centering even if padding/border are added later. */
+.chev.chev {
+  width: 34px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  color: var(--faint);
+  color: var(--ink-400);
   background: transparent;
+  border: none;
+  align-self: stretch;
 }
 .chev svg {
   width: 18px;
@@ -226,13 +376,21 @@
   transition: transform 0.2s;
 }
 
+/* Today marker. Positioned on the week timeline via `--today-frac` (0–1, set
+   inline on .rows from the JS axis): left = label gutter (230px) + the grid's
+   18px left padding + the fraction across the timeline track (total width minus
+   the gutter and both 18px paddings). Token-driven (brand tokens + color-mix to
+   --paper), so it re-tints per theme and prints correctly. */
 .todayline {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(230px + (100% - 230px) * 0.855);
+  left: calc(230px + 18px + (100% - 230px - 36px) * var(--today-frac, 0.855));
   width: 2px;
-  background: linear-gradient(var(--brand-500), rgba(59, 108, 246, 0.1));
+  background: linear-gradient(
+    var(--brand-500),
+    color-mix(in srgb, var(--brand-500) 12%, transparent)
+  );
   pointer-events: none;
   z-index: 3;
 }
@@ -245,7 +403,7 @@
   height: 8px;
   border-radius: 50%;
   background: var(--brand-500);
-  box-shadow: 0 0 0 3px rgba(59, 108, 246, 0.18);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-500) 20%, transparent);
 }
 
 /* ── Detail (expand under row) ── */
@@ -267,7 +425,9 @@
   background: var(--us);
   display: grid;
   place-items: center;
-  color: #fff;
+  /* Icon sits on the saturated --us mid-tone: --on-solid stays light in every
+     theme (never --paper, which flips dark on Night → dark-on-dark). */
+  color: var(--on-solid);
   flex: 0 0 auto;
   font-family: var(--font-display-sm);
   font-size: var(--t-13, 13px);
@@ -337,7 +497,7 @@
   text-align: left;
 }
 .wk:hover {
-  box-shadow: 0 6px 16px -8px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 6px 16px -8px var(--ush);
 }
 .wk .wn {
   font-family: var(--font-display-sm);
@@ -386,11 +546,12 @@
 .cir.done svg {
   width: 11px;
   height: 11px;
-  color: #fff;
+  /* Check sits on the solid --done fill — --on-solid, never --paper. */
+  color: var(--on-solid);
 }
 .cir.cur {
   border-color: var(--uc);
-  background: color-mix(in srgb, var(--uc) 22%, #fff);
+  background: color-mix(in srgb, var(--uc) 22%, var(--paper));
 }
 
 .daysrow {
@@ -483,6 +644,10 @@
 .statusDot.skipped {
   background: var(--catchup);
 }
+/* "Open lesson" affordance (#6). The label used to be opacity:0 until hover, so
+   at rest only a bare document icon showed — ambiguous. Now the label is ALWAYS
+   visible (in subject ink), so the day card plainly reads "open this lesson".
+   The trailing arrow (.dgo) is the only hover-revealed motion cue. */
 .day .dopen {
   margin-left: auto;
   font-size: var(--t-11, 11px);
@@ -491,34 +656,52 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  opacity: 0;
-  transition: 0.12s;
-}
-.day:hover .dopen,
-.day.sel .dopen {
-  opacity: 1;
 }
 .day .dopen svg {
   width: 13px;
   height: 13px;
 }
+/* Arrow nudges in on hover/focus/select — a small affordance the resting label
+   doesn't need, so it stays subtle until the card is engaged. */
+.day .dgo {
+  opacity: 0;
+  transform: translateX(-2px);
+  transition:
+    opacity 0.12s,
+    transform 0.12s;
+}
+.day:hover .dgo,
+.day:focus-visible .dgo,
+.day.sel .dgo {
+  opacity: 1;
+  transform: translateX(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .day .dgo {
+    transition: none;
+    transform: none;
+  }
+}
 
+/* "Select a week above…" hint (B5). Was a big empty dashed box; now a compact,
+   on-brand inline pill — a soft subject-tinted chip with the info icon, sized to
+   its text rather than spanning the row. */
 .dhint {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 9px;
-  font-size: var(--t-12, 12.5px);
-  color: var(--muted);
+  gap: 7px;
+  font-size: var(--t-12, 12px);
+  color: var(--ud);
   font-weight: 600;
-  padding: 13px 14px;
-  background: var(--surface);
-  border: 1px dashed var(--border);
-  border-radius: 11px;
+  padding: 7px 12px;
+  background: color-mix(in srgb, var(--cl) 40%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--uc) 28%, var(--paper));
+  border-radius: 999px;
   margin-top: 4px;
 }
 .dhint svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   color: var(--uc);
   flex: 0 0 auto;
 }
@@ -530,8 +713,21 @@
   padding: 10px 14px;
 }
 
+/* Zero-units subject row (B5). A subject with no units used to leave an empty,
+   awkwardly-padded track; this quiet inline note keeps the row legible. In grid
+   mode it spans the full timeline width (the `.units` grid has no explicit
+   columns when empty, so a normal block fills the row). */
+.norow {
+  font-size: var(--t-12, 12.5px);
+  color: var(--muted);
+  font-weight: 600;
+  font-style: italic;
+  padding: 6px 2px;
+}
+
 /* ── Legend ── */
 .leg {
+  flex: 0 0 auto;
   display: flex;
   gap: 18px;
   flex-wrap: wrap;
@@ -551,16 +747,808 @@
   border-radius: 50%;
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   HIERARCHY LAYOUTS — Unit ⊃ Week ⊃ Day made visually DISTINCT.
+
+   The complaint was that all three levels looked identical, so you couldn't
+   tell a unit from a week from a lesson, nor sibling from sibling. Two layouts
+   switch off `data-hier` on .root:
+
+     GRID (default) — nested cards + depth shading. Each level has its OWN
+       background (unit tint → mid week tint → plain day surface), border,
+       shadow, and indentation, so the containment reads instantly.
+     LIST — color-coded bands. Unit = bold subject band (on-color text),
+       Week = soft tint band, Lesson = plain row + stripe. Flatter + denser.
+
+   Sibling differentiation ships ALL THREE mechanisms in BOTH layouts so the
+   user can prune later: (1) bordered cards with real gaps, (2) :nth-child(even)
+   zebra toward --paper, (3) numbered labels + hairline dividers. The selected
+   state stays DISTINCT from zebra via an accent ring.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Shared: indentation + sibling cues that apply to BOTH layouts ──────── */
+
+/* Week cards get a subject left-stripe so the week tier is unmistakable;
+   day cards too (one tier deeper, brighter). */
+.wk {
+  border-left: 4px solid color-mix(in srgb, var(--uc) 55%, transparent);
+}
+.day {
+  border-left: 4px solid var(--uc);
+}
+
+/* Sibling cue (2): zebra. Alternate week/day siblings wash one notch toward
+   --paper so adjacent cards separate even when their content is similar. The
+   selected state overrides this below, so zebra never hides the selection. */
+.weeks .wk:nth-child(even) {
+  background: var(--zebra-week);
+}
+.days .day:nth-child(even) {
+  background: var(--zebra-day);
+}
+
+/* Selected ring — DISTINCT from zebra/tint: an outset accent ring + offset so
+   a selected card reads as selected regardless of its zebra parity. */
+.unit.sel,
+.wk.sel,
+.day.sel {
+  outline: 2px solid var(--uc);
+  outline-offset: 1px;
+}
+
+/* GRID selected fills — restate at tier-override specificity so the selected
+   card keeps a stronger tint than its sibling tier background (the .sel ring
+   alone could otherwise read as the only cue). The unit's own selected fill +
+   elevation live in the dedicated `.root[data-hier="grid"] .unit.sel` block
+   below (deeper than these so it wins on source order). */
+.root[data-hier="grid"] .wk.sel,
+.root[data-hier="grid"] .weeks .wk.sel:nth-child(even),
+.root[data-hier="grid"] .day.sel {
+  background: var(--ut);
+}
+
+/* ── GRID layout — MONTH-TIED horizontal timeline ───────────────────────── */
+
+/* The units row is a CSS grid of one column per instructional week
+   (`grid-template-columns: repeat(totalWeeks,1fr)` is set INLINE from the JS
+   axis). Each `.unode` spans its unit's [start,end] week columns (inline
+   `grid-column`), so units sit UNDER their real months. The row fills 100%
+   width — gaps between units show as empty timeline space (when units run),
+   and there is NO wrap and NO horizontal scroll. The 18px side padding mirrors
+   the `.months` header so the columns line up top-to-bottom. */
+/* Equal-width unit cards in a single row (Curriculy design): a flex row where
+   every unit card flexes to the same width and a trailing chevron caps the row.
+   No month-tied grid columns — the months header above is a decorative guide.
+   The cards fill the timeline width with no wrap and no horizontal scroll. */
+.root[data-hier="grid"] .units {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px 18px 14px;
+  box-sizing: border-box;
+}
+/* Each card flexes to an equal share of the row; min-width:0 lets long titles
+   clamp rather than widen the card and force overflow. */
+.root[data-hier="grid"] .unode {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Unit tier: the collapsed unit pills wear a soft subject GRADIENT (#4) so the
+   unit level is its own shaded tier and the colour reads as a vibrant band, not
+   a flat wash. Mirrors the Weekly card's band tint (Weekly mixes cl→surface);
+   here a 160° gradient runs a lighter subject tint at the top into a stronger
+   one at the bottom, both mixed toward --surface so every theme re-tints (never
+   #fff → no dark-on-dark on Night). The 4px --uc left-stripe + soft shadow are
+   the app's standard card-stripe language. */
+/* Unit card (Curriculy design): a clean WHITE/surface card by default — the
+   subject identity comes from the row's icon + label, not a tinted card — so
+   the row reads calm and the SELECTED card's solid fill pops. */
+.root[data-hier="grid"] .unit {
+  height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ush) 35%, transparent);
+  padding: 13px 14px;
+  min-height: 64px;
+}
+.root[data-hier="grid"] .unit:hover {
+  /* Hover lifts the card + warms it a touch toward the subject hue. */
+  background: color-mix(in srgb, var(--cl) 22%, var(--surface));
+  border-color: color-mix(in srgb, var(--uc) 45%, var(--border));
+  box-shadow: 0 12px 24px -12px var(--ush);
+}
+/* Selected unit: a solid subject fill (the mockup's filled card), a strong
+   accent border, and clear elevation so the open unit is unmistakable. The
+   downward connector (::after) ties it to the drawer that opens beneath. */
+.root[data-hier="grid"] .unit.sel {
+  /* Same-subject-color gradient (lighter top → richer bottom) so the selected
+     card reads as a vivid filled chip, not a flat block. Both stops mix toward
+     --surface, so every theme re-tints (never #fff → no dark-on-dark on Night). */
+  background: linear-gradient(
+    158deg,
+    color-mix(in srgb, var(--c) 56%, var(--surface)),
+    color-mix(in srgb, var(--c) 84%, var(--surface))
+  );
+  border-color: var(--uc);
+  /* Layered shadow: a soft ambient drop + a tight contact shadow tinted by the
+     subject hue, so the chip lifts off the row with depth instead of looking flat. */
+  box-shadow:
+    0 16px 30px -14px var(--ush),
+    0 3px 8px -3px color-mix(in srgb, var(--uc) 45%, transparent);
+}
+.root[data-hier="grid"] .unit.sel::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 11px solid var(--uc);
+  z-index: 6;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .root[data-hier="grid"] .unit {
+    transition: none;
+  }
+}
+/* Mid-word title breaks (B1): the old `word-break:break-word` split normal words
+   ("Multiplicatio n & Divisio n"). Wrap at word boundaries only — break a long
+   UNBREAKABLE token if it would overflow the narrow week column, but never a
+   normal word — and let hyphenation soften the rare long word. Titles clamp to
+   2 lines then ellipsize so a verbose unit name can't blow the card height. */
+.root[data-hier="grid"] .unit .un,
+.root[data-hier="grid"] .unit .us,
+.root[data-hier="grid"] .unit .uw {
+  min-width: 0;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+.root[data-hier="grid"] .unit .un,
+.root[data-hier="grid"] .unit .us {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+/* White-card text: near-ink title + muted meta by default; on the SELECTED
+   solid-fill card switch to the deep subject tone so the text stays legible and
+   carries the subject identity. */
+.root[data-hier="grid"] .unit .un {
+  color: var(--ink-900);
+}
+.root[data-hier="grid"] .unit .us {
+  color: var(--ink-500);
+}
+.root[data-hier="grid"] .unit .uw {
+  color: var(--ink-400);
+}
+.root[data-hier="grid"] .unit.sel .un,
+.root[data-hier="grid"] .unit.sel .us,
+.root[data-hier="grid"] .unit.sel .uw {
+  color: var(--ud);
+}
+/* TIER 1 — Unit detail container (#5). The open unit's body is the OUTER shell
+   that holds the week + day tiers, so it wears the softest subject tint
+   (--lvl-unit), a 2px subject top edge, and an inset hairline so it reads as a
+   distinct container the inner tiers sit INSIDE. */
+.root[data-hier="grid"] .detail {
+  background: var(--lvl-unit);
+  border-top: 2px solid var(--uc);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--uc) 22%, transparent);
+}
+.root[data-hier="grid"] .dhead {
+  background: color-mix(in srgb, var(--ud) 12%, var(--lvl-unit));
+}
+/* TIER 2 — Week cards (#5). The chips used to read "stuck together"/low
+   contrast: a faint border + 8px gap on a tint not far from the container. Fix:
+   a mid-strength tint (--lvl-week) on a SURFACE-leaning card so the chip lifts
+   off the container tint, a real 1px subject-tinted border all round, a clear
+   gap (set on `.weeks` below), and a soft drop shadow so each week reads as its
+   own raised box inside the unit shell. */
+.root[data-hier="grid"] .weeks {
+  padding-left: 12px;
+  border-left: 2px solid var(--hair);
+  margin-left: 2px;
+  gap: 10px;
+}
+.root[data-hier="grid"] .wk {
+  background: color-mix(in srgb, var(--lvl-week) 85%, var(--surface));
+  /* Real 1px border on three sides + a brighter subject border than before, so
+     the week chip reads as its own bordered box (the old faint border made them
+     look "stuck together"). The 4px subject LEFT-stripe (shared `.wk` rule) is
+     re-asserted so the box border doesn't clobber the week-tier signal. */
+  border-top: 1px solid color-mix(in srgb, var(--uc) 38%, var(--paper));
+  border-right: 1px solid color-mix(in srgb, var(--uc) 38%, var(--paper));
+  border-bottom: 1px solid color-mix(in srgb, var(--uc) 38%, var(--paper));
+  border-left: 4px solid color-mix(in srgb, var(--uc) 60%, transparent);
+  box-shadow: 0 3px 8px -5px var(--ush);
+  /* Roomier padding so the week-card text breathes instead of crowding the
+     chip edges (text was running up against the border). */
+  padding: 14px 16px 13px;
+}
+/* Keep the title/objective clear of the absolute status circle (top-right) so
+   nothing runs underneath it. */
+.root[data-hier="grid"] .wk .wn,
+.root[data-hier="grid"] .wk .wd {
+  padding-right: 22px;
+}
+.root[data-hier="grid"] .wk .wst {
+  top: 13px;
+  right: 14px;
+}
+.root[data-hier="grid"] .weeks .wk:nth-child(even) {
+  background: color-mix(in srgb, var(--lvl-week) 64%, var(--surface));
+}
+/* Strong selected week (#5): the old `.wk.sel` barely changed. Give it the
+   strong tint (--ut), the accent ring (shared .sel rule), a brighter border,
+   and clear elevation so the open week is unmistakable among its siblings. */
+.root[data-hier="grid"] .wk.sel,
+.root[data-hier="grid"] .weeks .wk.sel:nth-child(even) {
+  background: color-mix(in srgb, var(--ut) 90%, var(--surface));
+  border-color: var(--uc);
+  box-shadow: 0 12px 24px -12px var(--ush);
+}
+/* TIER 3 — Day/lesson cards (#5). The leaf tier: the brightest, plainest
+   surface so it reads one step deeper than the week tint, a full bright subject
+   left-stripe (already set on `.day`), and a tight neutral border so the leaf
+   cards group cleanly without competing with the week border. */
+.root[data-hier="grid"] .daysrow {
+  padding-left: 12px;
+  border-left: 2px solid var(--hair);
+  margin-left: 2px;
+}
+.root[data-hier="grid"] .days {
+  gap: 10px;
+}
+.root[data-hier="grid"] .day {
+  background: var(--lvl-day);
+  box-shadow: 0 1px 4px -2px var(--ush);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   LIST layout — COLOR-CODED GRAPHIC OUTLINE (file-explorer / org tree).
+
+   NOT filled bands. Backgrounds stay neutral (--paper / --surface /
+   transparent); the subject colour appears ONLY as accents — chevrons,
+   markers, the 3px unit accent, and the vertical guide lines that draw the
+   nesting. Units STACK vertically; weeks indent ~20px under their unit;
+   lessons indent ~40px. Each nested group draws a low-opacity subject guide
+   line on its left, with a short horizontal branch tick to each child.
+
+   Indent reads:
+     v Unit 3 · Fractions          chevron + bold subject-ink title, 3px accent
+     | v Week 5                     guide line + smaller chevron/ring
+     | |  · Mon · Add fractions     deeper guide + dot + plain title
+     > Unit 4 · Decimals (collapsed)
+
+   All colour-mix targets var(--paper) (never #fff) so every theme re-tints;
+   subject colour flows through the .cp-subj → --uc/--cl/--cd/--ud cascade.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* The units container stops being a wrapping pill row and becomes a vertical
+   stack — one outline node per row. The redundant `.chev` end-handle is hidden
+   (each unit row carries its own disclosure chevron). */
+.root[data-hier="list"] .units {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 22px 8px;
+}
+.root[data-hier="list"] .units > .chev {
+  display: none;
+}
+
+/* Each outline node stacks its unit row above its (optional) nested detail. */
+.root[data-hier="list"] .unode {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ── Unit row (indent 0) ── neutral background, 3px subject accent, a
+   disclosure chevron in subject ink, and the unit name BOLD in subject ink.
+   No fill — colour is accent-only. */
+.root[data-hier="list"] .unit {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px; /* ≥44px touch target for the expand row (phone) */
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hair);
+  border-left: 3px solid color-mix(in srgb, var(--uc) 70%, transparent);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 7px 10px 7px 12px;
+  transition: background 0.12s;
+}
+.root[data-hier="list"] .unit:hover {
+  transform: none;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--cl) 30%, var(--paper));
+}
+/* Disclosure chevron — a CSS caret (▸ collapsed → ▾ expanded) in subject ink.
+   Pure pseudo-element so no extra DOM; rotates on aria-expanded. */
+.root[data-hier="list"] .unit::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  /* Right-pointing triangle ▸ built from borders; the left border is the
+     visible subject-ink edge, top/bottom are transparent. */
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid var(--ud);
+  margin-right: 2px;
+  transition: transform 0.18s ease;
+  transform-origin: 25% 50%;
+}
+.root[data-hier="list"] .unit[aria-expanded="true"]::before {
+  transform: rotate(90deg); /* ▸ → ▾ */
+}
+.root[data-hier="list"] .unit .un {
+  /* Hug the prefix ("Unit 3") when a subtitle follows; for no-prefix units
+     `.un` IS the full name and may shrink-with-ellipsis. The subtitle (.us)
+     grows to fill, so the row reads "Unit 3 · Fractions ……… WK". */
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--ud); /* subject ink, bold (inherits .un weight 800) */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Sub-title + week span collapse to a quiet inline trailer on the row. */
+.root[data-hier="list"] .unit .us {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.root[data-hier="list"] .unit .uw {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding-top: 0;
+  color: var(--faint);
+}
+.root[data-hier="list"] .unit.sel {
+  background: color-mix(in srgb, var(--cl) 34%, var(--paper));
+  /* Selected = a stronger inset subject bar on top of the 3px accent. */
+  box-shadow: inset 3px 0 0 0 var(--uc);
+}
+.root[data-hier="list"] .unit.sel .un {
+  color: var(--ud);
+}
+/* The shared .sel outline ring is for the grid cards; list rows use the inset
+   bar above, so clear the ring here. */
+.root[data-hier="list"] .unit.sel {
+  outline: none;
+}
+
+/* ── Nested detail ── the open unit's body, indented one level under its row
+   and carrying the subject GUIDE LINE on its left (low-opacity subject
+   colour). This is the "graphic outline" spine for the week tier. */
+.root[data-hier="list"] .detail {
+  background: transparent;
+  border-top: none;
+  margin-left: 20px; /* Week tier indent ≈ 20px from the unit's left edge */
+  border-left: 2px solid color-mix(in srgb, var(--uc) 30%, transparent);
+}
+/* The unit-repeat header inside the detail is redundant in the outline (the
+   unit row already names + collapses it), so hide it; the weeks read directly
+   under the unit row. */
+.root[data-hier="list"] .detail .dhead {
+  display: none;
+}
+.root[data-hier="list"] .dbody {
+  padding: 4px 0 8px 0;
+}
+.root[data-hier="list"] .weeksLabel {
+  color: var(--muted);
+  font-size: var(--t-11, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-left: 14px;
+  margin-bottom: 4px;
+}
+.root[data-hier="list"] .empty {
+  padding-left: 14px;
+}
+
+/* ── Week rows (indent ~20px) ── neutral, a hollow subject ring marker + a
+   smaller chevron, label in subject ink (--cd / --ud). Single-column stack;
+   each row gets a horizontal branch tick from the guide line. */
+.root[data-hier="list"] .weeks {
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: none;
+  gap: 0;
+}
+.root[data-hier="list"] .wk {
+  position: relative;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hair);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 6px 10px 6px 22px;
+  min-height: 44px; /* touch target */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Kill the shared zebra band in list mode — outline rows stay NEUTRAL. The
+   shared `.weeks .wk:nth-child(even)` (0,3,0) ties the base list rule on
+   specificity, so neutralize even rows explicitly at a higher specificity. */
+.root[data-hier="list"] .weeks .wk:nth-child(even) {
+  background: transparent;
+}
+/* Horizontal branch tick (~10px) from the parent guide line to this week. */
+.root[data-hier="list"] .wk::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 10px;
+  height: 0;
+  border-top: 2px solid color-mix(in srgb, var(--uc) 30%, transparent);
+}
+.root[data-hier="list"] .wk:hover {
+  background: color-mix(in srgb, var(--cl) 30%, var(--paper));
+  box-shadow: none;
+}
+/* Smaller disclosure chevron for the week tier (▸ → ▾ on expand). */
+.root[data-hier="list"] .wk::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid color-mix(in srgb, var(--uc) 75%, var(--paper));
+  transform: translateY(-50%);
+  transition: transform 0.18s ease;
+  transform-origin: 30% 50%;
+}
+.root[data-hier="list"] .wk[aria-expanded="true"]::after {
+  transform: translateY(-50%) rotate(90deg);
+}
+.root[data-hier="list"] .wk .wst {
+  position: static;
+  flex: 0 0 auto;
+}
+/* Shrink the week circle marker to a small hollow subject ring. */
+.root[data-hier="list"] .wk .cir {
+  width: 12px;
+  height: 12px;
+  border-color: color-mix(in srgb, var(--uc) 60%, var(--paper));
+}
+.root[data-hier="list"] .wk .wn {
+  flex: 0 0 auto;
+  color: var(--cd);
+  font-size: var(--t-12, 12.5px);
+}
+.root[data-hier="list"] .wk .wd {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  margin-top: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.root[data-hier="list"] .wk .wdt {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+.root[data-hier="list"] .wk.sel {
+  background: color-mix(in srgb, var(--cl) 26%, var(--paper));
+}
+.root[data-hier="list"] .wk.sel .wn {
+  color: var(--ud);
+}
+
+/* ── Days row (indent ~40px) ── one more guide line; lessons are the quietest
+   tier: a small filled subject dot + title in --ink-700. */
+.root[data-hier="list"] .daysrow {
+  margin-top: 0;
+  margin-left: 20px; /* Lesson tier → ~40px total from the unit edge */
+  border-left: 2px solid color-mix(in srgb, var(--uc) 24%, transparent);
+}
+.root[data-hier="list"] .daysrow .dlabel {
+  padding: 6px 10px 4px 14px;
+  font-size: var(--t-11, 11px);
+}
+.root[data-hier="list"] .daysrow .dhint {
+  margin: 4px 10px 4px 14px;
+}
+.root[data-hier="list"] .days {
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: none;
+  gap: 0;
+}
+.root[data-hier="list"] .day {
+  position: relative;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hair);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 6px 10px 6px 24px;
+  /* ≥44px touch target (project a11y floor) — list-mode lesson rows are the
+     leaf tap target on phone/tablet. */
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Neutralize the shared day zebra band in list mode (same tie as weeks). */
+.root[data-hier="list"] .days .day:nth-child(even) {
+  background: transparent;
+}
+/* Branch tick from the day guide line to each lesson. */
+.root[data-hier="list"] .day::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 10px;
+  height: 0;
+  border-top: 2px solid color-mix(in srgb, var(--uc) 24%, transparent);
+}
+.root[data-hier="list"] .day:hover {
+  background: color-mix(in srgb, var(--cl) 28%, var(--paper));
+  box-shadow: none;
+}
+/* Small FILLED subject dot marking the leaf lesson. */
+.root[data-hier="list"] .day::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--uc);
+  transform: translateY(-50%);
+}
+.root[data-hier="list"] .day .dtop {
+  margin-bottom: 0;
+  flex: 0 0 auto;
+}
+.root[data-hier="list"] .day .dn {
+  color: var(--cd);
+  font-size: var(--t-12, 12px);
+}
+.root[data-hier="list"] .day .dttl {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  font-size: var(--t-12, 12.5px);
+  font-weight: 600;
+  color: var(--ink-700); /* quietest tier */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.root[data-hier="list"] .day .dfoot {
+  margin-top: 0;
+  flex: 0 0 auto;
+}
+/* Compact outline rows (#6): the spacious grid day CARDS show the "Open lesson"
+   text at rest, but in the dense list outline every row ending in "Open lesson →"
+   is repetitive — so here the bare document icon carries the affordance at rest
+   (the button's aria-label still names the action for screen readers) and the
+   text label reveals on hover/focus. */
+.root[data-hier="list"] .day .dopen {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.root[data-hier="list"] .day:hover .dopen,
+.root[data-hier="list"] .day:focus-visible .dopen,
+.root[data-hier="list"] .day.sel .dopen {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .root[data-hier="list"] .day .dopen {
+    transition: none;
+  }
+}
+.root[data-hier="list"] .day.sel {
+  background: color-mix(in srgb, var(--cl) 26%, var(--paper));
+}
+.root[data-hier="list"] .day.sel .dn {
+  color: var(--ud);
+}
+
+/* In LIST the selected ring would clip on a borderless full-bleed row, so use
+   an inset subject bar instead of the shared outset outline. */
+.root[data-hier="list"] .wk.sel,
+.root[data-hier="list"] .day.sel {
+  outline: none;
+  box-shadow: inset 3px 0 0 0 var(--uc);
+}
+
+/* Reduced motion — freeze the chevron/marker transitions (the rotated end
+   state still applies; only the animation is removed). */
+@media (prefers-reduced-motion: reduce) {
+  .root[data-hier="list"] .unit::before,
+  .root[data-hier="list"] .wk::after,
+  .root[data-hier="grid"] .unit::before,
+  .root[data-hier="grid"] .wk::after {
+    transition: none;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   NARROW GRID → VERTICAL OUTLINE (≤600px).
+
+   The month-tied horizontal timeline is too cramped on a phone, so GRID mode
+   adopts the same vertical OUTLINE treatment as LIST mode: units STACK
+   vertically, the unit rows get the disclosure chevron + 3px subject accent,
+   and the open unit's weeks/days (rendered as the depth-shaded `.detail` block
+   below the row) gain the indentation + subject guide lines + markers. These
+   rules override grid's wide timeline rules (later in the file + inside the
+   media query, so they win at ≤600px; above 600px they don't apply and the
+   horizontal timeline stands). No horizontal scroll at any phone width.
+
+   The recipe is shared with the LIST outline above — same token recipes, same
+   markers — re-pointed at `[data-hier="grid"]` here. (Grid keeps the detail as
+   a sibling block, not DOM-nested inline, so only the visual treatment is
+   shared, not the inline nesting.)
+   ════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 600px) {
+  /* Drop the horizontal-timeline chrome — meaningless once units stack. */
+  .root[data-hier="grid"] .tlhead {
+    display: none;
+  }
+  .root[data-hier="grid"] .todayline {
+    display: none;
+  }
+
+  /* Units stack vertically. `display:flex` makes the inline grid-template /
+     per-unit grid-column (set in JS for the wide timeline) inert. */
+  .root[data-hier="grid"] .units {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 2px;
+    padding: 2px 12px 6px;
+  }
+  .root[data-hier="grid"] .unode {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* Unit row — neutral, 3px subject accent, disclosure chevron in subject ink
+     (same recipe as the LIST outline). */
+  .root[data-hier="grid"] .unit {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: auto;
+    min-height: 44px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--hair);
+    border-left: 3px solid color-mix(in srgb, var(--uc) 70%, transparent);
+    border-radius: 0;
+    box-shadow: none;
+    padding: 7px 10px 7px 12px;
+    transition: background 0.12s;
+  }
+  .root[data-hier="grid"] .unit:hover {
+    transform: none;
+    box-shadow: none;
+    background: color-mix(in srgb, var(--cl) 30%, var(--paper));
+  }
+  .root[data-hier="grid"] .unit::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 6px solid var(--ud);
+    margin-right: 2px;
+    transition: transform 0.18s ease;
+    transform-origin: 25% 50%;
+  }
+  .root[data-hier="grid"] .unit[aria-expanded="true"]::before {
+    transform: rotate(90deg);
+  }
+  .root[data-hier="grid"] .unit .un {
+    flex: 0 1 auto;
+    min-width: 0;
+    /* Reset the desktop 2-line clamp (display:-webkit-box) — the compact phone
+       outline row is a single ellipsized line. */
+    display: block;
+    -webkit-line-clamp: none;
+    line-clamp: none;
+    color: var(--ud);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .root[data-hier="grid"] .unit .us {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-top: 0;
+    display: block;
+    -webkit-line-clamp: none;
+    line-clamp: none;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .root[data-hier="grid"] .unit .uw {
+    flex: 0 0 auto;
+    margin-top: 0;
+    padding-top: 0;
+    color: var(--faint);
+  }
+  .root[data-hier="grid"] .unit.sel {
+    background: color-mix(in srgb, var(--cl) 34%, var(--paper));
+    outline: none;
+    box-shadow: inset 3px 0 0 0 var(--uc);
+  }
+  .root[data-hier="grid"] .unit.sel .un {
+    color: var(--ud);
+  }
+
+  /* Open unit detail → indented under the row with a subject guide line; the
+     header is redundant in the outline, so hide it. The depth-shaded week/day
+     cards keep their grid styling but inherit the indentation + guide spine. */
+  .root[data-hier="grid"] .detail {
+    margin-left: 14px;
+    border-top: none;
+    border-left: 2px solid color-mix(in srgb, var(--uc) 30%, transparent);
+    box-shadow: none;
+  }
+  .root[data-hier="grid"] .detail .dhead {
+    display: none;
+  }
+  .root[data-hier="grid"] .dbody {
+    padding: 6px 10px 10px;
+  }
+  /* Single-column week/day stacks so nothing overflows sideways on a phone. */
+  .root[data-hier="grid"] .weeks,
+  .root[data-hier="grid"] .days {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .tlhead {
-    grid-template-columns: 150px 1fr;
+    grid-template-columns: 150px minmax(0, 1fr);
   }
   .subrow {
-    grid-template-columns: 150px 1fr;
+    grid-template-columns: 150px minmax(0, 1fr);
   }
+  /* Today marker tracks the narrower 150px gutter (same 18px grid paddings). */
   .todayline {
-    left: calc(150px + (100% - 150px) * 0.855);
+    left: calc(150px + 18px + (100% - 150px - 36px) * var(--today-frac, 0.855));
   }
   .slabel .sg {
     display: none;
@@ -572,7 +1560,7 @@
     display: none;
   }
   .subrow {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     padding: 12px 0;
   }
@@ -583,7 +1571,12 @@
     display: block;
   }
   .units {
-    padding: 6px 14px 10px;
+    padding: 0 14px;
+  }
+  /* List outline keeps tighter side gutters on phone (the base `.units` rule
+     above is out-specified by the list selector, so restate it here). */
+  .root[data-hier="list"] .units {
+    padding: 2px 12px 6px;
   }
   .todayline {
     display: none;
@@ -593,46 +1586,4 @@
     padding-left: 14px;
     padding-right: 14px;
   }
-}
-
-/* ════════════════════════════════════════════════════════════════════════
-   Unit chips — cp-root recovery + subject-color vibrancy.
-
-   The .unit chip is a <button>; inside .cp-root (the planner shell wraps this
-   view in className="cp-root") the global `.cp-root button` reset (0,1,1)
-   strips a single-class .unit rule's padding / border / background — so the
-   resting chip rendered text-to-edge and plain. Scoping every chip rule under
-   its .units container lifts it to (0,2,0)+, so it wins the reset
-   deterministically. (No .root / data-hier hook is involved — those were never
-   set on this view, which is why the earlier redesign never rendered.)
-
-   Color carries meaning: a soft subject-tint fill, a 4px subject left stripe,
-   and a deep-subject title. Every mix blends toward var(--paper) (NEVER #fff)
-   so Night + the wash themes re-tint correctly. Selected = an accent ring. */
-.units .unit {
-  /* Generous, asymmetric padding — extra left clears the 4px accent stripe so
-     the title never crowds it. */
-  padding: 13px 14px 12px 16px;
-  border: 1px solid color-mix(in srgb, var(--uc) 26%, var(--border));
-  border-left: 4px solid var(--uc);
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--cl) 60%, var(--paper));
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--ush) 40%, transparent);
-}
-.units .unit .un {
-  color: var(--ud);
-}
-.units .unit:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px -12px var(--ush);
-  border-color: var(--uc);
-  background: color-mix(in srgb, var(--cl) 82%, var(--paper));
-}
-.units .unit.sel {
-  background: var(--ut);
-  border-color: var(--uc);
-  box-shadow: 0 0 0 2px var(--uc);
-}
-.units .unit.sel .un {
-  color: var(--ud);
 }

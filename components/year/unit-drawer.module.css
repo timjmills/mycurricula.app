@@ -1,0 +1,679 @@
+/* unit-drawer.module.css — the tabbed Year drill-down drawer (UnitDrawer.tsx).
+ *
+ * The PARENT wraps the drawer in `.cp-subj.<subject.cls>`, so the palette
+ * bridge's --c (bright accent), --cl (soft tint), --cd (deep text) tokens
+ * cascade in. Every accent here is DERIVED from those three via color-mix
+ * toward var(--surface) — never #fff (which would not re-tint on Night → dark-
+ * on-dark). The recipes match the component contract:
+ *   accent (bright)  → var(--cd)
+ *   soft tint        → color-mix(in srgb, var(--c) 12%, var(--surface))
+ *   selected tint    → color-mix(in srgb, var(--c) 18%, var(--surface))
+ *   accent border    → color-mix(in srgb, var(--c) 45%, transparent)
+ *
+ * cp-root BUTTON TRAP: tokens.css carries a global `.cp-root button` reset
+ * (specificity 0,1,1) that strips padding/border/background from any single-
+ * class module button rule. EVERY button rule below DOUBLES its class selector
+ * (e.g. `.wk.wk`, `.tabBtn.tabBtn`) so it outranks the reset (0,2,0 > 0,1,1).
+ *
+ * Tokens only — no hex, no px font sizes (var(--t-XX) throughout).
+ */
+
+/* Local accent aliases derived from the subject cascade — set once on the
+   drawer root so every descendant reads them. */
+.drawer {
+  --accent: var(--cd); /* bright accent — text, stripes, icons */
+  --tint-soft: color-mix(in srgb, var(--c) 12%, var(--surface));
+  --tint-sel: color-mix(in srgb, var(--c) 18%, var(--surface));
+  --accent-border: color-mix(in srgb, var(--c) 45%, transparent);
+  /* Icon-tile fill + a shadow tint reused across the cards. */
+  --tile-fill: color-mix(in srgb, var(--c) 22%, var(--surface));
+  --shadow-tint: color-mix(in srgb, var(--c) 32%, transparent);
+
+  background: var(--tint-soft);
+  border-top: 1px dashed var(--accent-border);
+  /* Subtle open animation — a quick slide-down + fade, suppressed under
+     reduced motion (see the @media block at the foot of the file). */
+  animation: drawer-in 0.22s ease;
+}
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Visually-hidden text — keeps status labels in the a11y tree for screen
+   readers behind the colour-only WeekCircle / day dots. Standard clip-rect. */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.dhead {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px 20px 12px;
+  flex-wrap: wrap;
+}
+.di {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--tile-fill);
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  flex: 0 0 auto;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-13);
+  font-weight: 800;
+}
+.di svg {
+  width: 20px;
+  height: 20px;
+}
+.htext {
+  min-width: 0;
+}
+.dt {
+  font-family: var(--font-display-sm);
+  font-size: var(--t-15);
+  font-weight: 800;
+  color: var(--ink-900);
+}
+.dt b {
+  color: var(--accent);
+}
+.dd {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  margin-top: 2px;
+}
+/* Collapse button (chevron-up). DOUBLE class to beat the cp-root reset. */
+.dclose.dclose {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  color: var(--ink-500);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.dclose.dclose:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.dclose.dclose svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ── Body: 150px nav + 1fr main ──────────────────────────────────────────── */
+.dbody {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 14px;
+  padding: 4px 20px 20px;
+}
+
+/* ── Left mini-nav (tablist) ─────────────────────────────────────────────── */
+.dnav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+/* Tab button. DOUBLE class to beat the cp-root reset; ≥40px tall (touch). */
+.tabBtn.tabBtn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-700);
+  font-size: var(--t-12);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.tabBtn.tabBtn:hover {
+  background: color-mix(in srgb, var(--c) 8%, var(--surface));
+  color: var(--accent);
+}
+.tabBtn.tabActive.tabActive {
+  background: color-mix(in srgb, var(--c) 16%, var(--surface));
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+.tabIcon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+.tabLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Main panel ──────────────────────────────────────────────────────────── */
+.dmain {
+  min-width: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   OVERVIEW TAB — weeks → days (ported from TimelineYear's renderDetail)
+   ════════════════════════════════════════════════════════════════════════ */
+
+.weeksLabel {
+  font-size: var(--t-12);
+  font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.weeks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+/* Week card (button). DOUBLE class to beat the cp-root reset. */
+.wk.wk {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent-border);
+  border-radius: 11px;
+  padding: 12px 13px;
+  cursor: pointer;
+  transition: box-shadow 0.12s, background 0.12s, border-color 0.12s;
+  position: relative;
+  text-align: left;
+  /* ≥44px tap target on phone/tablet — the card content is taller than this on
+     desktop, this just guards the minimum. */
+  min-height: 44px;
+}
+.wk.wk:hover {
+  box-shadow: 0 6px 16px -8px var(--shadow-tint);
+}
+.wn {
+  font-family: var(--font-display-sm);
+  font-size: var(--t-13);
+  font-weight: 800;
+  color: var(--ink-900);
+  padding-right: 22px; /* clear the absolute status circle */
+}
+.wk.sel .wn {
+  color: var(--accent);
+}
+.wd {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  margin-top: 4px;
+  line-height: 1.3;
+  padding-right: 22px;
+  /* Single ellipsized line; min-height reserves 2 lines so a wrapped vs.
+     unwrapped chip don't jump in height. */
+  min-height: 30px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.wdt {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  margin-top: 8px;
+  font-weight: 600;
+}
+.wst {
+  position: absolute;
+  top: 11px;
+  right: 11px;
+}
+.wk.sel.sel {
+  border-color: var(--accent-border);
+  background: var(--tint-sel);
+  box-shadow: 0 10px 22px -10px var(--shadow-tint);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Week circle marker. */
+.cir {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--ink-300);
+  display: grid;
+  place-items: center;
+}
+.cir.done {
+  background: var(--done);
+  border-color: var(--done);
+}
+.cir.done svg {
+  width: 11px;
+  height: 11px;
+  color: var(--on-solid); /* check on the solid --done fill — never --paper */
+}
+.cir.cur {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--c) 22%, var(--surface));
+}
+
+/* ── Days for the selected week ──────────────────────────────────────────── */
+.daysrow {
+  margin-top: 18px;
+}
+.daysHeadRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.dlabel {
+  font-size: var(--t-13);
+  font-weight: 800;
+  min-width: 0;
+}
+.dlabel b {
+  color: var(--accent);
+}
+.dlabel span {
+  color: var(--ink-500);
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+/* Week-action toolbar — Plan Week + overflow placeholders (later phase). */
+.weekActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+/* Plan Week outline button. DOUBLE class to beat the cp-root reset. */
+.planWeek.planWeek {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: var(--t-12);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.planWeek.planWeek:hover {
+  background: color-mix(in srgb, var(--c) 8%, var(--surface));
+}
+.planIcon {
+  width: 15px;
+  height: 15px;
+}
+/* Overflow "…" button. DOUBLE class to beat the cp-root reset. */
+.weekMore.weekMore {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink-500);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.weekMore.weekMore:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--c) 8%, var(--surface));
+}
+.weekMore.weekMore svg {
+  width: 18px;
+  height: 18px;
+}
+
+.days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+/* Day card (button). DOUBLE class to beat the cp-root reset. */
+.day.day {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 11px;
+  padding: 12px 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: box-shadow 0.12s, background 0.12s, border-color 0.12s;
+  min-height: 44px; /* ≥44px tap target */
+}
+.day.day:hover {
+  box-shadow: 0 6px 16px -8px var(--shadow-tint);
+}
+.dtop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 6px;
+}
+.dn {
+  font-family: var(--font-display-sm);
+  font-size: var(--t-12);
+  font-weight: 800;
+  color: var(--ink-900);
+}
+.dttl {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-700);
+  line-height: 1.3;
+  min-height: 34px;
+}
+.dfoot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--ink-500);
+}
+.dfoot svg {
+  width: 15px;
+  height: 15px;
+}
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-300);
+  flex: 0 0 auto;
+}
+.statusDot.done {
+  background: var(--done);
+}
+.statusDot.cur {
+  background: var(--accent);
+}
+.statusDot.skipped {
+  background: var(--catchup);
+}
+/* "Open lesson" affordance — label always visible at rest; only the arrow
+   reveals on hover/focus (the resting cue stays calm). */
+.dopen {
+  margin-left: auto;
+  font-size: var(--t-11);
+  font-weight: 800;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dopen svg {
+  width: 13px;
+  height: 13px;
+}
+.dgo {
+  opacity: 0;
+  transform: translateX(-2px);
+  transition: opacity 0.12s, transform 0.12s;
+}
+.day.day:hover .dgo,
+.day.day:focus-visible .dgo {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* "Select a week above…" hint — a compact, on-brand inline pill. */
+.dhint {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--t-12);
+  color: var(--accent);
+  font-weight: 600;
+  padding: 7px 12px;
+  background: var(--tint-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  margin-top: 4px;
+}
+.dhint svg {
+  width: 15px;
+  height: 15px;
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.empty {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  font-weight: 600;
+  padding: 10px 14px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   AGGREGATION TABS — Resources · Standards · Notes
+   A simple list of rows; each row mirrors LessonPhasePanel's AttachedItem.
+   ════════════════════════════════════════════════════════════════════════ */
+.aggList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.aggRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.aggGlyph {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: var(--tint-soft);
+  color: var(--accent);
+}
+.aggGlyph svg {
+  width: 15px;
+  height: 15px;
+}
+.aggBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.aggLabel {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-900);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aggLink {
+  color: var(--accent);
+  text-decoration: none;
+}
+.aggLink:hover {
+  text-decoration: underline;
+}
+.aggNoteText {
+  font-size: var(--t-13);
+  color: var(--ink-900);
+  line-height: 1.35;
+  /* Wrap to a few lines then clamp so a long note doesn't dominate. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.aggMeta {
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--ink-500);
+  flex: 0 0 auto;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   EMPTY STATES + ASSESSMENTS STUB
+   ════════════════════════════════════════════════════════════════════════ */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 18px;
+  text-align: center;
+}
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--tint-soft);
+  color: var(--accent);
+}
+.emptyIcon svg {
+  width: 22px;
+  height: 22px;
+}
+.emptyText {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--ink-500);
+  max-width: 32ch;
+}
+
+/* Assessments stub — a centered card; honest "later phase" copy. */
+.stub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 30px 18px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px dashed var(--accent-border);
+  border-radius: 12px;
+}
+.stubIcon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--tint-soft);
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+.stubIcon svg {
+  width: 24px;
+  height: 24px;
+}
+.stubTitle {
+  font-size: var(--t-13);
+  font-weight: 800;
+  color: var(--ink-900);
+}
+.stubLine {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — ≤640px: single-column body, horizontal scrollable tab strip
+   above the main panel. The week/day grids already auto-fit, so they reflow
+   on their own; no document horizontal scroll (the strip scrolls internally).
+   ════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .dbody {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 4px 14px 16px;
+  }
+  .dhead {
+    padding: 14px 14px 10px;
+  }
+  /* Tab nav becomes a horizontal, internally-scrollable strip ABOVE the main
+     panel. -webkit-overflow-scrolling for momentum on iOS. */
+  .dnav {
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    /* Keep the strip from forcing document-level horizontal scroll. */
+    max-width: 100%;
+  }
+  .tabBtn.tabBtn {
+    flex: 0 0 auto;
+    width: auto;
+  }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .drawer {
+    animation: none;
+  }
+  .dgo {
+    transition: none;
+    transform: none;
+  }
+  .tabBtn.tabBtn,
+  .wk.wk,
+  .day.day,
+  .dclose.dclose,
+  .planWeek.planWeek,
+  .weekMore.weekMore {
+    transition: none;
+  }
+}
