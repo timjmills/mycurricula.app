@@ -53,6 +53,11 @@ import type {
   WidgetType,
 } from "@/lib/types";
 import type { BoardTool } from "@/lib/teach/types";
+import {
+  ANNOTATION_TOOLS,
+  ANNOTATION_WIDTHS,
+  ANNOTATION_DEFAULT_WIDTH,
+} from "@/lib/teach/annotation-tools";
 import { effective, themeVars } from "@/lib/teach/widget-theme";
 import { widgetDefaultTheme } from "@/lib/teach/widget-defaults";
 import {
@@ -207,6 +212,35 @@ export interface BoardFullscreenProps {
 // superset so the active-state highlighting works without polluting BoardTool.
 type PanelTool = BoardTool | "sticky";
 
+// Present-mode glyph for each engine tool. The tool SET + labels + order come
+// from the canonical `ANNOTATION_TOOLS` source (so present and the editor stay
+// in lockstep — Wave 5b); only the glyph mapping is present-local.
+const PRESENT_TOOL_GLYPH: Record<BoardTool, GlyphName> = {
+  select: "cursor",
+  pen: "pen",
+  highlighter: "highlighter",
+  eraser: "eraser",
+  rect: "rect",
+  line: "line",
+  arrow: "arrow",
+  text: "textAa",
+};
+
+/** The present-panel tool buttons: every canonical annotation tool (so present
+ *  now has shapes too), plus the present-only "sticky" widget-drop mode. */
+const PANEL_TOOLS: ReadonlyArray<{
+  t: PanelTool;
+  icon: GlyphName;
+  label: string;
+}> = [
+  ...ANNOTATION_TOOLS.map((m) => ({
+    t: m.value as PanelTool,
+    icon: PRESENT_TOOL_GLYPH[m.value],
+    label: m.ariaLabel ?? m.label,
+  })),
+  { t: "sticky", icon: "sticky", label: "Sticky note" },
+];
+
 export function BoardFullscreen({
   board,
   pages,
@@ -225,6 +259,9 @@ export function BoardFullscreen({
   const [bg, setBg] = useState<string>("plain");
   const [tool, setTool] = useState<PanelTool>("select");
   const [colorId, setColorId] = useState<string>("purple");
+  const [strokeWidth, setStrokeWidth] = useState<number>(
+    ANNOTATION_DEFAULT_WIDTH,
+  );
   const [side, setSide] = useState<"left" | "right">("left");
   const [bgOpen, setBgOpen] = useState(false);
   const [libOpen, setLibOpen] = useState(false);
@@ -307,9 +344,25 @@ export function BoardFullscreen({
         pid,
         saved && saved.strokes.length > 0 ? JSON.stringify(saved) : EMPTY_ANN_JSON,
       );
+      // No saved ink → nothing to restore. Return WITHOUT a re-hydrate so we
+      // don't reset the undo history of anything the teacher already drew on a
+      // page that simply had nothing stored (the common case).
       if (!saved || saved.strokes.length === 0) return;
-      if (sessionBuffer.current.has(pid)) return; // teacher drew meanwhile
-      sessionBuffer.current.set(pid, saved);
+      const drawn = sessionBuffer.current.get(pid);
+      if (drawn && drawn.strokes.length > 0) {
+        // The teacher drew WHILE this saved-ink read was in flight. MERGE the
+        // saved ink UNDER what they just drew rather than dropping it — closes
+        // the Wave-5a pre-seed auth race (a fast first stroke could otherwise
+        // make an exit-Save overwrite the page's previously-saved ink). The
+        // re-hydrate below resets undo history for those few pre-resolve strokes,
+        // an acceptable cost for this sub-second race.
+        sessionBuffer.current.set(pid, {
+          version: 1,
+          strokes: [...saved.strokes, ...drawn.strokes],
+        });
+      } else {
+        sessionBuffer.current.set(pid, saved);
+      }
       setHydrateNonce((n) => n + 1);
     });
     return () => {
@@ -500,20 +553,6 @@ export function BoardFullscreen({
       }
     : { background: preset.css };
 
-  // ── Markup tool buttons ────────────────────────────────────────────────────
-  const TOOLS: ReadonlyArray<{
-    t: PanelTool;
-    icon: GlyphName;
-    label: string;
-  }> = [
-    { t: "select", icon: "cursor", label: "Select" },
-    { t: "pen", icon: "pen", label: "Pen" },
-    { t: "highlighter", icon: "highlighter", label: "Highlighter" },
-    { t: "eraser", icon: "eraser", label: "Eraser" },
-    { t: "text", icon: "textAa", label: "Text" },
-    { t: "sticky", icon: "sticky", label: "Sticky note" },
-  ];
-
   const filteredLibrary = useMemo(() => {
     const q = libQuery.trim().toLowerCase();
     if (!q) return LIBRARY;
@@ -554,6 +593,7 @@ export function BoardFullscreen({
         annotations={annotations}
         tool={layerTool}
         color={resolvedColor}
+        width={strokeWidth}
       />
 
       {/* ── Top chrome ── */}
@@ -606,7 +646,7 @@ export function BoardFullscreen({
         </button>
         <span className={styles.panelDivider} aria-hidden="true" />
 
-        {TOOLS.map((t) => {
+        {PANEL_TOOLS.map((t) => {
           const active = tool === t.t;
           return (
             <button
@@ -644,6 +684,37 @@ export function BoardFullscreen({
                 style={{ background: `var(${c.token})` }}
                 onClick={() => setColorId(c.id)}
               />
+            );
+          })}
+        </div>
+
+        <span className={styles.panelDivider} aria-hidden="true" />
+
+        <div
+          className={styles.widthGrid}
+          role="radiogroup"
+          aria-label="Stroke width"
+        >
+          {ANNOTATION_WIDTHS.map((w) => {
+            const active = strokeWidth === w.value;
+            return (
+              <button
+                key={w.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                aria-label={`${w.label} stroke`}
+                className={`${styles.widthBtn} ${
+                  active ? styles.widthBtnActive : ""
+                }`}
+                onClick={() => setStrokeWidth(w.value)}
+              >
+                <span
+                  className={styles.widthDot}
+                  style={{ width: w.value + 3, height: w.value + 3 }}
+                  aria-hidden="true"
+                />
+              </button>
             );
           })}
         </div>

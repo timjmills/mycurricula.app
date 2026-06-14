@@ -17,6 +17,10 @@ import { Button, ToggleGroup, Tooltip } from "@/components/ui";
 import type { ToggleOption } from "@/components/ui";
 import type { TeachWorkspaceAction } from "@/components/teach";
 import type { BoardTool, TeachWorkspaceState } from "@/lib/teach/types";
+import {
+  ANNOTATION_TOOLS,
+  ANNOTATION_WIDTHS,
+} from "@/lib/teach/annotation-tools";
 import type { UseBoardAnnotationsApi } from "@/lib/use-board-annotations";
 import styles from "./BoardToolbar.module.css";
 
@@ -48,74 +52,35 @@ export const ANNOTATION_SWATCHES: readonly AnnotationSwatch[] = [
 ] as const;
 
 // ── Tool options ─────────────────────────────────────────────────────────
+//
+// The tool SET, labels, and tooltip copy come from the canonical
+// `ANNOTATION_TOOLS` source (lib/teach/annotation-tools.ts) so this bar and the
+// present-mode panel can't drift. Only the glyphs are surface-local — this bar
+// uses inline unicode marks, keyed by tool value.
 
-const TOOL_OPTIONS: Array<ToggleOption<BoardTool>> = [
-  {
-    value: "select",
-    label: "Select",
-    ariaLabel: "Select / interact",
-    icon: <span aria-hidden="true">⬚</span>,
-    title:
-      "Stop drawing and interact with the resource — click links, play videos, scroll the PDF",
-    tooltipId: "teach-tool-select",
-  },
-  {
-    value: "pen",
-    label: "Pen",
-    icon: <span aria-hidden="true">✎</span>,
-    title: "Draw freehand on top of the board",
-    tooltipId: "teach-tool-pen",
-  },
-  {
-    value: "highlighter",
-    label: "Highlighter",
-    ariaLabel: "Highlighter",
-    icon: <span aria-hidden="true">▰</span>,
-    title: "Highlight with a wide, see-through marker",
-    tooltipId: "teach-tool-highlighter",
-  },
-  {
-    value: "eraser",
-    label: "Eraser",
-    icon: <span aria-hidden="true">⌫</span>,
-    title: "Tap or drag over a mark to remove the whole stroke",
-    tooltipId: "teach-tool-eraser",
-  },
-  {
-    value: "rect",
-    label: "Box",
-    icon: <span aria-hidden="true">▭</span>,
-    title: "Drag to draw a rectangle around something",
-    tooltipId: "teach-tool-rect",
-  },
-  {
-    value: "line",
-    label: "Line",
-    icon: <span aria-hidden="true">╱</span>,
-    title: "Drag to draw a straight line",
-    tooltipId: "teach-tool-line",
-  },
-  {
-    value: "arrow",
-    label: "Arrow",
-    icon: <span aria-hidden="true">↗</span>,
-    title: "Drag to draw an arrow pointing at something",
-    tooltipId: "teach-tool-arrow",
-  },
-  {
-    value: "text",
-    label: "Text",
-    icon: <span aria-hidden="true">T</span>,
-    title: "Click to place a text label on the board",
-    tooltipId: "teach-tool-text",
-  },
-];
+const TOOL_GLYPHS: Record<BoardTool, string> = {
+  select: "⬚",
+  pen: "✎",
+  highlighter: "▰",
+  eraser: "⌫",
+  rect: "▭",
+  line: "╱",
+  arrow: "↗",
+  text: "T",
+};
 
-const WIDTHS: ReadonlyArray<{ value: number; label: string }> = [
-  { value: 2, label: "Thin" },
-  { value: 4, label: "Medium" },
-  { value: 8, label: "Thick" },
-];
+const TOOL_OPTIONS: Array<ToggleOption<BoardTool>> = ANNOTATION_TOOLS.map(
+  (t) => ({
+    value: t.value,
+    label: t.label,
+    ariaLabel: t.ariaLabel,
+    icon: <span aria-hidden="true">{TOOL_GLYPHS[t.value]}</span>,
+    title: t.title,
+    tooltipId: t.tooltipId,
+  }),
+);
+
+const WIDTHS = ANNOTATION_WIDTHS;
 
 // ── Props ────────────────────────────────────────────────────────────────────
 

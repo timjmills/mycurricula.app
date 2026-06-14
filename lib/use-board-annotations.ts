@@ -28,9 +28,10 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   apply,
+  composite,
   EMPTY_ANNOTATIONS,
   initAnnotationState,
-  redraw,
+  paintCommitted,
   toAnnotations,
   type AnnotationState,
   type BoardAnnotations,
@@ -368,6 +369,12 @@ export function useBoardAnnotations(
 
   // Canvas + box refs. The box is the CSS-pixel size of the board.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Offscreen cache of the COMMITTED strokes (F5/F6). Re-painted only when the
+  // committed document or the canvas size changes; every animation frame then
+  // composites this layer + the live draft onto the visible canvas, so a drag
+  // re-renders just the one draft stroke instead of every committed stroke.
+  // Created lazily, browser-only.
+  const committedRef = useRef<HTMLCanvasElement | null>(null);
   const boxRef = useRef<BoardBox>({ width: 0, height: 0 });
   const dprRef = useRef<number>(1);
   const rafRef = useRef<number | null>(null);
@@ -395,7 +402,42 @@ export function useBoardAnnotations(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subKey, uidVersion, ephemeral, hydrateKey]);
 
-  // ── rAF-batched repaint ───────────────────────────────────────────────────
+  // ── Layered redraw (F5/F6) ────────────────────────────────────────────────
+  // Lazily create + size the offscreen committed layer to match the visible
+  // canvas's device-pixel size, so a 1:1 `drawImage` blit composites it.
+  const ensureCommittedCanvas = useCallback((): HTMLCanvasElement | null => {
+    if (typeof document === "undefined") return null;
+    let c = committedRef.current;
+    if (!c) {
+      c = document.createElement("canvas");
+      committedRef.current = c;
+    }
+    const w = canvasRef.current?.width ?? 0;
+    const h = canvasRef.current?.height ?? 0;
+    if (c.width !== w || c.height !== h) {
+      c.width = w;
+      c.height = h;
+    }
+    return c;
+  }, []);
+
+  // Re-render every committed stroke onto the offscreen layer. Called only on a
+  // committed-document change (commit / undo / redo / erase / clear / hydrate)
+  // or a resize — NOT per pointer sample.
+  const repaintCommitted = useCallback(() => {
+    const c = ensureCommittedCanvas();
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    paintCommitted(
+      ctx,
+      stateRef.current.strokes,
+      boxRef.current,
+      dprRef.current,
+    );
+  }, [ensureCommittedCanvas]);
+
+  // rAF-batched composite of the cached committed layer + the live draft.
   const scheduleRedraw = useCallback(() => {
     if (rafRef.current !== null) return;
     rafRef.current = requestAnimationFrame(() => {
@@ -404,20 +446,40 @@ export function useBoardAnnotations(
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      const s = stateRef.current;
-      redraw(ctx, s.strokes, s.draft, boxRef.current, dprRef.current);
+      composite(
+        ctx,
+        committedRef.current,
+        stateRef.current.draft,
+        boxRef.current,
+        dprRef.current,
+      );
     });
   }, []);
 
-  // Repaint whenever the committed/draft state changes.
+  // Committed document changed → re-render the cached layer, then composite.
+  useEffect(() => {
+    repaintCommitted();
+    scheduleRedraw();
+  }, [state.strokes, repaintCommitted, scheduleRedraw]);
+
+  // Draft changed (every pointer sample during a drag) → composite only. The
+  // committed layer is untouched, so this is O(draft), not O(all strokes).
   useEffect(() => {
     scheduleRedraw();
-  }, [state.strokes, state.draft, scheduleRedraw]);
+  }, [state.draft, scheduleRedraw]);
 
-  // Cancel any pending frame on unmount.
+  // Cancel any pending frame on unmount AND clear the ref. Clearing is critical:
+  // React StrictMode (dev) runs effects mount → cleanup → mount. If cleanup
+  // cancelled the frame but left `rafRef.current` holding the (now-cancelled) id,
+  // the re-mount's `scheduleRedraw` would see a non-null ref, bail forever, and
+  // never composite — so the committed layer would never paint. Resetting to
+  // null lets the next mount schedule a fresh frame.
   useEffect(() => {
     return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
   }, []);
 
@@ -453,8 +515,11 @@ export function useBoardAnnotations(
       canvas.width = nextW;
       canvas.height = nextH;
     }
+    // Re-render the committed layer at the new device size (this also resizes
+    // the offscreen canvas to match), then composite.
+    repaintCommitted();
     scheduleRedraw();
-  }, [scheduleRedraw]);
+  }, [repaintCommitted, scheduleRedraw]);
 
   const attachCanvas = useCallback(
     (el: HTMLCanvasElement | null) => {
