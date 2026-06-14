@@ -21,6 +21,9 @@ export type GlyphName =
   | "pen"
   | "highlighter"
   | "eraser"
+  | "rect"
+  | "line"
+  | "arrow"
   | "textAa"
   | "sticky"
   | "undo"
@@ -130,6 +133,25 @@ export function Glyph({ name, size = 20 }: GlyphProps): ReactNode {
           <path d="M4 14 14 4l6 6-7 7H8z" />
           <path d="M8 17 5 14" />
           <line x1="3" y1="21" x2="21" y2="21" />
+        </svg>
+      );
+    case "rect":
+      return (
+        <svg {...common} {...STROKE}>
+          <rect x="4" y="6" width="16" height="12" rx="1.5" />
+        </svg>
+      );
+    case "line":
+      return (
+        <svg {...common} {...STROKE}>
+          <path d="M5 19 19 5" />
+        </svg>
+      );
+    case "arrow":
+      return (
+        <svg {...common} {...STROKE}>
+          <path d="M6 18 18 6" />
+          <path d="M10 6h8v8" />
         </svg>
       );
     case "textAa":

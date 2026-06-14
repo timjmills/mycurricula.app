@@ -516,6 +516,10 @@ function drawArrowHead(
  * Full repaint: clear the canvas (device-pixel sized) then draw every
  * committed stroke and the live draft on top. The canvas element is sized to
  * `box × dpr` by the caller; this clears that full extent.
+ *
+ * Kept for callers that want a one-shot repaint; the live hook uses the layered
+ * `paintCommitted` + `composite` pair below (F5/F6) so a drag repaints only the
+ * draft, not every committed stroke.
  */
 export function redraw(
   ctx: CanvasRenderingContext2D,
@@ -527,5 +531,45 @@ export function redraw(
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, box.width * dpr, box.height * dpr);
   for (const s of strokes) drawStroke(ctx, s, box, dpr);
+  if (draft) drawStroke(ctx, draft, box, dpr);
+}
+
+/**
+ * Paint ONLY the committed strokes onto a (typically offscreen) layer context,
+ * clearing it first. The performance half of F5/F6: the hook caches the result
+ * and re-runs this only when the committed document changes (commit / undo /
+ * erase / hydrate / resize) — NOT on every pointer sample. The context's canvas
+ * must already be sized to `box × dpr`.
+ */
+export function paintCommitted(
+  ctx: CanvasRenderingContext2D,
+  strokes: Stroke[],
+  box: BoardBox,
+  dpr: number,
+): void {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, box.width * dpr, box.height * dpr);
+  for (const s of strokes) drawStroke(ctx, s, box, dpr);
+}
+
+/**
+ * Composite the cached committed layer plus the live draft onto the visible
+ * canvas. Called every animation frame during a drag: one `drawImage` blit of
+ * the pre-rendered committed layer + a single `drawStroke` for the draft —
+ * O(draft) per frame instead of O(committed strokes) (F5/F6). The committed
+ * layer must already hold the current committed strokes (see `paintCommitted`).
+ */
+export function composite(
+  ctx: CanvasRenderingContext2D,
+  committed: HTMLCanvasElement | null,
+  draft: Stroke | null,
+  box: BoardBox,
+  dpr: number,
+): void {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, box.width * dpr, box.height * dpr);
+  if (committed && committed.width > 0 && committed.height > 0) {
+    ctx.drawImage(committed, 0, 0);
+  }
   if (draft) drawStroke(ctx, draft, box, dpr);
 }

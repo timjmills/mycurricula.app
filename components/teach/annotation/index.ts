@@ -7,6 +7,3 @@ export type { AnnotationLayerProps } from "./AnnotationLayer";
 
 export { BoardToolbar, ANNOTATION_SWATCHES } from "./BoardToolbar";
 export type { BoardToolbarProps, AnnotationSwatch } from "./BoardToolbar";
-
-export { ToolDock } from "./ToolDock";
-export type { ToolDockProps } from "./ToolDock";
