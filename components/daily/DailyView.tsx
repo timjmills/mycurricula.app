@@ -1592,7 +1592,7 @@ export function DailyView({
                   ›
                 </span>
                 <Link
-                  href={`/subject/${breadcrumbSubject.id}`}
+                  href={`/year?subject=${breadcrumbSubject.id}`}
                   className={styles.breadcrumbLink}
                 >
                   {breadcrumbSubject.name}

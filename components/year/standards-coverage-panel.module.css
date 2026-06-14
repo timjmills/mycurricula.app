@@ -1,0 +1,332 @@
+/* standards-coverage-panel.module.css — the Yearly standards coverage modal.
+   Tokens only — no hex. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--scrim-soft, color-mix(in srgb, var(--ink-900) 32%, transparent));
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 560px;
+  max-width: 100%;
+  max-height: min(80vh, 720px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-lg);
+  overflow: hidden;
+}
+
+/* ── Header ── */
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--hairline, var(--border));
+}
+.headMeta {
+  min-width: 0;
+}
+.eyebrow {
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+.title {
+  margin: 2px 0 0;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-18, 18px);
+  font-weight: 800;
+  color: var(--ink-900);
+}
+.close.close {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  color: var(--ink-500);
+  cursor: pointer;
+}
+.close:hover {
+  color: var(--ink-900);
+  border-color: var(--chrome-accent-500, var(--brand-500));
+}
+.close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Summary ── */
+.summary {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--hairline, var(--border));
+}
+.summaryNums {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.big {
+  font-family: var(--font-display);
+  font-size: var(--t-24, 24px);
+  font-weight: 800;
+  color: var(--ink-900);
+}
+.of {
+  font-size: var(--t-13);
+  color: var(--ink-500);
+  font-weight: 600;
+}
+.bar {
+  height: 8px;
+  border-radius: 5px;
+  background: var(--hairline, var(--ink-100));
+  overflow: hidden;
+  margin: 8px 0 7px;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: var(--brand-500);
+}
+.summaryMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  font-weight: 600;
+}
+.summaryMeta b {
+  color: var(--ink-900);
+}
+.gapCount {
+  color: var(--catchup);
+}
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px 0;
+  flex-wrap: wrap;
+}
+.tab.tab {
+  padding: 6px 12px;
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink-500);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill, 999px);
+  cursor: pointer;
+}
+.tab:hover {
+  color: var(--ink-900);
+}
+.tabOn.tabOn {
+  color: var(--chrome-accent-700, var(--brand-700));
+  background: color-mix(in srgb, var(--chrome-accent-500, var(--brand-500)) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--chrome-accent-500, var(--brand-500)) 30%, transparent);
+}
+.clear.clear {
+  margin-left: auto;
+  padding: 6px 10px;
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--catchup);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.clear:hover {
+  text-decoration: underline;
+}
+
+/* ── List ── */
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 14px 16px;
+}
+.empty {
+  padding: 24px 8px;
+  text-align: center;
+  font-size: var(--t-13);
+  color: var(--ink-500);
+  line-height: 1.5;
+}
+
+.row {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 8px;
+  background: var(--surface);
+}
+.rowActive.rowActive {
+  border-color: var(--chrome-accent-500, var(--brand-500));
+  background: color-mix(in srgb, var(--chrome-accent-500, var(--brand-500)) 8%, var(--surface));
+}
+.rowMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+.rowToggle.rowToggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}
+.cov {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+.cov svg {
+  width: 13px;
+  height: 13px;
+}
+.covTaught {
+  background: var(--done);
+  color: var(--on-solid);
+}
+.covGap {
+  background: color-mix(in srgb, var(--catchup) 18%, var(--surface));
+  color: var(--catchup);
+}
+.desc {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-12);
+  color: var(--ink-700);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.count.count {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 8px;
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink-500);
+  background: color-mix(in srgb, var(--ink-500) 10%, var(--surface));
+  border: none;
+  border-radius: var(--r-pill, 999px);
+  cursor: pointer;
+}
+.count:hover {
+  color: var(--ink-900);
+}
+.chev {
+  display: inline-grid;
+  place-items: center;
+  transition: transform 0.15s;
+}
+.chev svg {
+  width: 13px;
+  height: 13px;
+}
+.chevOn {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chev {
+    transition: none;
+  }
+}
+
+/* ── Covering lessons ── */
+.lessons {
+  list-style: none;
+  margin: 0;
+  padding: 0 10px 8px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.lessonRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+}
+.lessonRow:hover {
+  background: color-mix(in srgb, var(--ink-500) 7%, var(--surface));
+}
+.lessonDot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-300);
+}
+.dotDone {
+  background: var(--done);
+}
+.lessonTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-12);
+  color: var(--ink-900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lessonMeta {
+  flex: 0 0 auto;
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  font-weight: 600;
+}
+
+/* ── Responsive ── */
+@media (max-width: 560px) {
+  .scrim {
+    padding: 0;
+    place-items: stretch;
+  }
+  .panel {
+    width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+}

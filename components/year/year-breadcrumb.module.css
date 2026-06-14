@@ -1,0 +1,39 @@
+/* year-breadcrumb.module.css — scope path for the merged Yearly view. Tokens only. */
+
+.crumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+/* Crumb links are <button>s — doubled (0,2,0) so padding survives the global
+   `.cp-root button` reset (0,1,1); hover doubled to match. */
+.link.link {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--chrome-accent-600, var(--brand-600));
+  transition: background 0.12s;
+}
+.link.link:hover {
+  background: color-mix(in srgb, var(--chrome-accent-500, var(--brand-500)) 12%, var(--surface));
+  text-decoration: underline;
+}
+
+.current {
+  padding: 2px 6px;
+  font-size: var(--t-13);
+  font-weight: 800;
+  color: var(--ink-900);
+}
+
+.sep {
+  color: var(--ink-400);
+  font-size: var(--t-13);
+}

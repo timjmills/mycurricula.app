@@ -46,7 +46,7 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { EmptyState, FutureControl, ToggleGroup } from "@/components/ui";
-import { ResourceTypeIcon } from "@/components/subject/icons";
+import { ResourceTypeIcon } from "@/components/year/resource-icons";
 import {
   searchEverything,
   useSearchData,

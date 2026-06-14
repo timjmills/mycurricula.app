@@ -1,0 +1,266 @@
+/* year-subjects-sidebar.module.css — left rail of the merged Yearly view.
+   Tokens only; the subject color dot + active tint come from the `.cp-subj`
+   cascade (--c / --cl / --cd). */
+
+.nav {
+  flex: 0 0 auto;
+  width: 232px;
+  align-self: flex-start;
+  position: sticky;
+  top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px 14px;
+  background: var(--panel-bg);
+  border: 1px solid var(--hairline, var(--ink-100));
+  border-radius: var(--r-md);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 8px;
+}
+.headLabel {
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  margin-right: auto;
+}
+.count {
+  font-size: var(--t-11);
+  font-weight: 700;
+  color: var(--ink-500);
+  background: color-mix(in srgb, var(--ink-500) 12%, var(--surface));
+  border-radius: var(--r-pill, 999px);
+  padding: 1px 8px;
+}
+/* Close button — hidden inline (desktop); shown in the slide-over (narrow). */
+.close.close {
+  display: none;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  place-items: center;
+  color: var(--ink-500);
+  cursor: pointer;
+  padding: 0;
+}
+.close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* "All subjects" entry. These rows are <button>s, so each base rule is DOUBLED
+   (0,2,0) to keep its padding / border / background past the global
+   `.cp-root button` reset (0,1,1); hovers are doubled to match. */
+.allRow.allRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink-700);
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.allRow.allRow:hover {
+  background: color-mix(in srgb, var(--ink-500) 8%, var(--surface));
+}
+.allOn.allOn {
+  background: color-mix(in srgb, var(--chrome-accent-500, var(--brand-500)) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--chrome-accent-500, var(--brand-500)) 30%, transparent);
+  color: var(--ink-900);
+}
+.allIcon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: var(--chrome-accent-600, var(--brand-600));
+}
+.allIcon svg {
+  width: 17px;
+  height: 17px;
+}
+.allName {
+  font-size: var(--t-13);
+  font-weight: 700;
+}
+
+.list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Subject row (doubled — see .allRow note). */
+.subj.subj {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.subj.subj:hover {
+  background: color-mix(in srgb, var(--c) 8%, var(--surface));
+}
+.subjOn.subjOn {
+  background: color-mix(in srgb, var(--c) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--c) 35%, transparent);
+}
+.si {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--c) 16%, var(--surface));
+  color: var(--cd, var(--ink-900));
+  font-size: var(--t-13);
+}
+.si svg {
+  width: 16px;
+  height: 16px;
+}
+.smeta {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.sn {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sg {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  margin-top: 1px;
+}
+.dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c);
+}
+
+/* Nested units under the focused subject */
+.units {
+  list-style: none;
+  margin: 2px 0 6px;
+  padding: 2px 0 2px 14px;
+  border-left: 2px solid color-mix(in srgb, var(--c) 30%, transparent);
+  margin-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.uitem.uitem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink-700);
+  transition: background 0.12s;
+}
+.uitem.uitem:hover {
+  background: color-mix(in srgb, var(--c) 10%, var(--surface));
+}
+.uitemOn.uitemOn {
+  background: color-mix(in srgb, var(--c) 18%, var(--surface));
+  color: var(--cd, var(--ink-900));
+  font-weight: 700;
+}
+.ucheck {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  color: var(--done);
+}
+.ucheck svg {
+  width: 13px;
+  height: 13px;
+}
+.ucheckOn {
+  color: var(--done);
+}
+.ulabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-12);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Narrow viewports: the rail becomes a left slide-over ──────────────────
+   Below 1100px the 3-column shell can't fit a fixed 232px rail + center +
+   pane, so the rail slides in over a scrim (toggled from the toolbar) and the
+   center spans full width. Above 1100px it stays inline + sticky. */
+@media (max-width: 1100px) {
+  .nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    max-height: 100vh;
+    width: 264px;
+    max-width: 86vw;
+    z-index: 61;
+    border-radius: 0;
+    overflow-y: auto;
+    transform: translateX(-101%);
+    transition: transform 0.22s ease;
+    box-shadow: var(--sh-lg);
+  }
+  .navOpen {
+    transform: none;
+  }
+  .close.close {
+    display: grid;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav {
+    transition: none;
+  }
+}

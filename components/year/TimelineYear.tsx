@@ -1,49 +1,63 @@
 "use client";
 
-// TimelineYear — the production Year view, rebuilt on the Timeline (Curriculy)
-// design handoff. One row per subject; a subject's units sit across the year as
-// a clean row of cards under a decorative month/year axis. Click a unit → its
-// weeks + days open in a tabbed UnitDrawer under the row (Unit Overview ·
-// Resources · Standards · Assessments · Notes); click a week → that week's
-// days appear; click a day → the app's lesson-detail panel opens via
-// setSelectedLessonId.
+// TimelineYear — the production Year view (now the app's single curriculum
+// surface, after the Curriculum view was merged in). It is a progressive drill:
 //
-// Composition (each piece owns its own CSS module):
-//   • YearStatCards     — the 5 live stat cards (top of the page).
-//   • YearFiltersPopover— the single "Filters & View" control (Grid/List +
-//                         subject + status filters); replaces the old toggle.
-//   • UnitDrawer        — the tabbed expand-under-row drill-down.
-// This file orchestrates them + renders the subject rows and the timeline axis.
+//   ALL subjects (the timeline)  →  focus a SUBJECT  →  a UNIT  →  a WEEK  →
+//   a LESSON (the right-hand detail pane).
 //
-// Everything is wired to the LIVE planner store via usePlanner(): the editable
-// document (lessons) plus the catalog slice (subjects, units).
+// A LEFT subjects sidebar drives the focus; a breadcrumb walks back up. The
+// dashboard (YearStatCards) and the standards coverage re-scope to wherever you
+// are. At the "all" level the center is the all-subjects timeline (one row per
+// subject, equal-width unit cards under a decorative month/year axis); deeper
+// levels render that subject's units → weeks → day cards.
 //
-// Visual contract: each subject row carries `.cp-subj.<id>` so the palette
-// bridge's --c / --cl / --cd tokens cascade; the CSS module derives the
-// --uc/--ud/--ut/--us/--ush/--rt aliases from those. Cards float over the body
-// gradient swash via --panel-bg surfaces. Tokens only — no hex.
+// The merged view owns its OWN selected-lesson state and renders its OWN tabbed
+// lesson pane (YearLessonPane); it deliberately never writes the global
+// selectedLessonId, so the shell slide-out never double-mounts on /year (the
+// old Curriculum dual-panel bug — see right-panel.tsx `/year` gate).
+//
+// Everything is wired to the LIVE planner store via usePlanner(). Visual
+// contract: each subject row/card carries `.cp-subj.<id>` so the palette bridge
+// tokens cascade. Tokens only — no hex.
 
 import {
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
   type SVGProps,
 } from "react";
+import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { CURRENT_WEEK } from "@/lib/mock";
 import { useAcademicYear } from "@/lib/use-academic-year";
 import { weeksInRange } from "@/lib/year-calendar";
-import type { Lesson, LessonStatus, Subject, Unit } from "@/lib/types";
+import type {
+  Lesson,
+  LessonStatus,
+  Subject,
+  SubjectId,
+  Unit,
+} from "@/lib/types";
 import { YearStatCards } from "./YearStatCards";
-import { UnitDrawer } from "./UnitDrawer";
+import { YearSubjectsSidebar } from "./YearSubjectsSidebar";
+import { YearBreadcrumb } from "./YearBreadcrumb";
+import { YearLessonPane } from "./YearLessonPane";
+import { YearDayCards } from "./YearDayCards";
+import { StandardsCoveragePanel } from "./StandardsCoveragePanel";
 import {
   YearFiltersPopover,
   type YearFilterState,
   type YearStatusKey,
 } from "./YearFiltersPopover";
+import type { YearScope } from "./year-scope";
+import { standardsCoverage } from "@/lib/year-standards-coverage";
+import { Button } from "@/components/ui";
 import styles from "./TimelineYear.module.css";
 
 /** Short month labels for the timeline axis header (calendar order). */
@@ -89,10 +103,15 @@ function Svg({
     </svg>
   );
 }
-/** Chevron used by the per-row expand/collapse control (rotates when open). */
-const IconChevDown = (p: IconProps) => (
+/** Chevron pointing right — "drill in" affordance on cards. */
+const IconChevRight = (p: IconProps) => (
   <Svg {...p}>
-    <path d="m6 9 6 6 6-6" />
+    <path d="m9 18 6-6-6-6" />
+  </Svg>
+);
+const IconCheck = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 6 9 17l-5-5" />
   </Svg>
 );
 
@@ -100,34 +119,23 @@ const IconChevDown = (p: IconProps) => (
 
 /** One week inside a unit, derived from that unit's lessons. */
 interface WeekGroup {
-  /** 1-based curriculum week number. */
   week: number;
-  /** Lessons in this week, sorted by day. */
   lessons: Lesson[];
-  /** Rolled-up status for the week's circle marker. */
   state: "done" | "cur" | "todo";
 }
 
 /** A unit with its lessons grouped into weeks. */
 interface UnitGroup {
   unit: Unit;
-  /** Week-span label parsed from unit.weeks (e.g. "Wk 11–16"). */
   spanLabel: string;
-  /** Inclusive [start, end] derived from the unit's lessons (falls back to the
-   *  parsed label when the unit has no lessons yet). */
   start: number;
   end: number;
   weeks: WeekGroup[];
   total: number;
 }
 
-/** One contiguous run of weeks within a single calendar month — the month-axis
- *  header label. (The axis is decorative now: units render as equal-width cards
- *  rather than week-positioned bars, so each month is one evenly-spaced cell.) */
 interface MonthSeg {
-  /** 0–11 calendar month index. */
   month: number;
-  /** Short uppercase label (e.g. "NOV"). */
   label: string;
 }
 
@@ -145,8 +153,7 @@ function rollUpWeek(week: number, lessons: Lesson[]): WeekGroup["state"] {
   return inProgress ? "cur" : "todo";
 }
 
-/** Map a lesson's status to one of the four Year filter keys (matches the
- *  YearFiltersPopover STATUS section). */
+/** Map a lesson's status to one of the four Year filter keys. */
 function lessonStatusKey(status: LessonStatus): YearStatusKey {
   switch (status) {
     case "done":
@@ -161,10 +168,7 @@ function lessonStatusKey(status: LessonStatus): YearStatusKey {
   }
 }
 
-/** Parse a unit.weeks label like "Wk 11–16" / "Wk 12" into [start, end].
- *  Normalized so start ≤ end — a malformed/reversed label ("Wk 16–11") would
- *  otherwise render as a 1-week bar at the wrong column and make the timeline's
- *  `lastUnitWeek` undercount the real span. */
+/** Parse a unit.weeks label like "Wk 11–16" / "Wk 12" into [start, end]. */
 function parseSpan(label: string): [number, number] | null {
   const nums = label.match(/\d+/g);
   if (!nums || nums.length === 0) return null;
@@ -173,9 +177,7 @@ function parseSpan(label: string): [number, number] | null {
   return [Math.min(a, b), Math.max(a, b)];
 }
 
-/** Build the per-subject unit groups from the live lessons + unit catalog.
- *  `allUnits` is the full-year unit superset (usePlanner().units) — passed in
- *  because this is a module-level pure helper, not a component. */
+/** Build the per-subject unit groups from the live lessons + unit catalog. */
 function buildSubjectGroups(
   subject: Subject,
   lessons: Lesson[],
@@ -188,7 +190,6 @@ function buildSubjectGroups(
       (l) => l.unit === unit.id && !l.archived,
     );
 
-    // Group this unit's lessons by week.
     const byWeek = new Map<number, Lesson[]>();
     for (const l of unitLessons) {
       const arr = byWeek.get(l.week);
@@ -203,7 +204,6 @@ function buildSubjectGroups(
         return { week, lessons: sorted, state: rollUpWeek(week, sorted) };
       });
 
-    // Span: prefer the real lesson weeks; fall back to the label.
     const parsed = parseSpan(unit.weeks);
     const start = weeks.length > 0 ? weeks[0].week : parsed ? parsed[0] : 0;
     const end =
@@ -219,12 +219,10 @@ function buildSubjectGroups(
     };
   });
 
-  // Sort units left→right by their start week so the row reads chronologically.
   return groups.sort((a, b) => a.start - b.start);
 }
 
-/** Strip the "Unit N · " / "List N · " / "Lessons … · " lead-in so the unit
- *  card can show a short title and a separate prefix when present. */
+/** Strip the "Unit N · " lead-in so a card can show prefix + title separately. */
 function splitUnitName(name: string): { prefix: string; rest: string } {
   const idx = name.indexOf("·");
   if (idx === -1) return { prefix: "", rest: name.trim() };
@@ -234,8 +232,7 @@ function splitUnitName(name: string): { prefix: string; rest: string } {
   };
 }
 
-/** Does this unit contain at least one lesson in one of the selected statuses?
- *  An empty `statuses` filter matches everything (no narrowing). */
+/** Does this unit contain at least one lesson in one of the selected statuses? */
 function unitMatchesStatuses(group: UnitGroup, statuses: string[]): boolean {
   if (statuses.length === 0) return true;
   return group.weeks.some((w) =>
@@ -243,28 +240,82 @@ function unitMatchesStatuses(group: UnitGroup, statuses: string[]): boolean {
   );
 }
 
-// ── Component ───────────────────────────────────────────────────────────────
+/** True when every one of a unit's lessons is done (sidebar check). */
+function unitAllDone(g: UnitGroup): boolean {
+  return g.total > 0 && g.weeks.every((w) => w.state === "done");
+}
 
-/** Identifies the open unit: `${subjectId}:${unitId}`. */
-type OpenKey = string | null;
+// ── Component ───────────────────────────────────────────────────────────────
 
 export function TimelineYear(): ReactNode {
   const { lessons, subjects, units: allUnits } = usePlanner();
-  const { setSelectedLessonId, viewMode, setViewMode } = useAppState();
+  const { viewMode, setViewMode, filters, updateFilters } = useAppState();
+  const router = useRouter();
 
-  // Team-scoped academic-year window (Settings → Curriculum → Academic year).
-  // Drives the month/year axis labels — never a hard-coded term anchor.
+  // Global standards filter (shared with Weekly via app-state). Active when any
+  // code is selected; narrows the lessons SHOWN (timeline units, week cards, day
+  // cards) but never the dashboard/coverage denominators (those stay scope-only
+  // so the numbers are stable — the approved "scope-only dashboard" rule).
+  const standardsFilter = filters.standards;
+  const standardsActive = standardsFilter.length > 0;
+  const lessonMatchesStandards = useCallback(
+    (l: Lesson): boolean =>
+      !standardsActive || standardsFilter.some((c) => l.standards.includes(c)),
+    [standardsActive, standardsFilter],
+  );
+  const toggleStandard = useCallback(
+    (code: string) => {
+      const next = standardsFilter.includes(code)
+        ? standardsFilter.filter((c) => c !== code)
+        : [...standardsFilter, code];
+      updateFilters({ standards: next });
+    },
+    [standardsFilter, updateFilters],
+  );
+  const clearStandards = useCallback(
+    () => updateFilters({ standards: [] }),
+    [updateFilters],
+  );
+
+  // Standards coverage panel (opened from the STANDARDS stat card OR the toolbar).
+  const [coverageOpen, setCoverageOpen] = useState(false);
+
+  // Subjects rail slide-over (narrow viewports only; inline + sticky on desktop).
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Team-scoped academic-year window (drives the month/year axis labels).
   const { start: yearStart, end: yearEnd } = useAcademicYear();
 
-  // Hierarchy layout — Grid (timeline cards) vs List (color-coded bands).
-  // Uses the app-wide Grid/List preference (SSR-safe: default render = "grid",
-  // the stored value arrives post-mount → no hydration jump).
+  // ── Drill scope + selected lesson (both local to this view) ──────────────
+  const [scope, setScope] = useState<YearScope>({ level: "all" });
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+
+  // ── `?subject=<id>` deep link (from the retired /subject/[slug] redirect or
+  //    the command palette / `g s` shortcut) — drill straight to that subject.
+  //    Read from the URL on mount (client-only, so no Suspense boundary is
+  //    needed), applied once the catalog has the subject. The ref guards
+  //    against re-applying after the teacher navigates away from the subject.
+  const deepLinkApplied = useRef(false);
+  useEffect(() => {
+    if (deepLinkApplied.current) return;
+    if (typeof window === "undefined") return;
+    const param = new URLSearchParams(window.location.search).get("subject");
+    if (!param) {
+      deepLinkApplied.current = true;
+      return;
+    }
+    // Wait for the catalog to carry the subject (it hydrates async under the
+    // Supabase flag); only then is the slug resolvable.
+    if (subjects.some((s) => s.id === param)) {
+      setScope({ level: "subject", subjectId: param as SubjectId });
+      deepLinkApplied.current = true;
+    }
+  }, [subjects]);
+
+  // Grid/List preference (only governs the all-subjects timeline).
   const storedHier = viewMode;
 
-  // Small-screen fallback. The Grid layout is a horizontal timeline; below its
-  // viable width it always renders the stacked List outline regardless of the
-  // stored preference (the choice re-applies on a wide screen). SSR-safe: assume
-  // desktop on the server + first paint, then read the real viewport post-mount.
+  // Small-screen fallback for the all-subjects timeline.
   const [isNarrow, setIsNarrow] = useState(false);
   useEffect(() => {
     if (
@@ -283,16 +334,10 @@ export function TimelineYear(): ReactNode {
     return () => mql.removeListener(sync);
   }, []);
 
-  // The effective layout the surface actually renders.
   const hier = isNarrow ? "list" : storedHier;
   const isGrid = hier !== "list";
 
-  // Progressive selection — nothing open by default.
-  const [openUnit, setOpenUnit] = useState<OpenKey>(null);
-  const [openWeek, setOpenWeek] = useState<number | null>(null);
-
-  // Filter state — subjects + statuses (the view lives in app-state via the
-  // stored hierarchy). `[]` for either means "all" (no narrowing).
+  // Filter state — subjects + statuses (all-subjects timeline only).
   const [filterSubjects, setFilterSubjects] = useState<string[]>([]);
   const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
 
@@ -306,20 +351,116 @@ export function TimelineYear(): ReactNode {
     [lessons, subjects, allUnits],
   );
 
-  // Stat cards must match the timeline, which excludes archived (soft-deleted)
-  // lessons (buildSubjectGroups filters !l.archived). The store keeps archived
-  // rows in `lessons`, so filter here too — otherwise DONE/total/%/standards/
-  // skipped/resources would count deleted lessons and disagree with the rows.
+  // Archived-excluded lessons (the store keeps soft-deleted rows in `lessons`).
   const visibleLessons = useMemo(
     () => lessons.filter((l) => !l.archived),
     [lessons],
   );
 
-  // ── Month / year axis ───────────────────────────────────────────────────
-  // The axis is the configured academic year's months, evenly spaced. We also
-  // compute a 0–1 "today" fraction so the now-marker sits at the right point in
-  // the year. (Units now render as equal-width cards rather than week-tied bars,
-  // so the months are a decorative guide, not a positioning grid.)
+  // ── Scoped lesson set → drives the dashboard + standards coverage ────────
+  const scopedLessons = useMemo(() => {
+    if (scope.level === "all") return visibleLessons;
+    let ls = visibleLessons.filter((l) => l.subject === scope.subjectId);
+    if (scope.level === "subject") return ls;
+    ls = ls.filter((l) => l.unit === scope.unitId);
+    if (scope.level === "unit") return ls;
+    return ls.filter((l) => l.week === scope.week);
+  }, [scope, visibleLessons]);
+
+  // ── Focused entities derived from scope ──────────────────────────────────
+  const focusedEntry =
+    scope.level === "all"
+      ? null
+      : (subjectGroups.find((sg) => sg.subject.id === scope.subjectId) ?? null);
+  const focusedSubject = focusedEntry?.subject ?? null;
+  const focusedGroups = focusedEntry?.groups ?? [];
+  const focusedUnit =
+    scope.level === "unit" || scope.level === "week"
+      ? (focusedGroups.find((g) => g.unit.id === scope.unitId) ?? null)
+      : null;
+  const focusedWeek =
+    scope.level === "week" && focusedUnit
+      ? (focusedUnit.weeks.find((w) => w.week === scope.week) ?? null)
+      : null;
+
+  // Day-card lessons for the current week (also the prev/next pool for the
+  // pane). Narrowed by the active standards filter so the leaf view reflects it.
+  const weekLessons = useMemo(
+    () =>
+      focusedWeek ? focusedWeek.lessons.filter(lessonMatchesStandards) : [],
+    [focusedWeek, lessonMatchesStandards],
+  );
+
+  // ── Standards coverage for the current scope (scope-only; matches the
+  //    STANDARDS stat card numbers exactly). ────────────────────────────────
+  const coverage = useMemo(
+    () => standardsCoverage(scopedLessons),
+    [scopedLessons],
+  );
+
+  // The selected lesson + its subject (for the pane).
+  const selectedLesson = selectedLessonId
+    ? (visibleLessons.find((l) => l.id === selectedLessonId) ?? null)
+    : null;
+  const selectedSubject = selectedLesson
+    ? (subjects.find((s) => s.id === selectedLesson.subject) ?? null)
+    : null;
+
+  // Sidebar data.
+  const sidebarSubjects = useMemo(
+    () =>
+      subjectGroups.map(({ subject, groups }) => ({
+        id: subject.id,
+        name: subject.name,
+        cls: subject.cls,
+        icon: subject.icon,
+        units: groups.map((g) => ({
+          id: g.unit.id,
+          label: splitUnitName(g.unit.name).rest || g.unit.name,
+          done: unitAllDone(g),
+        })),
+      })),
+    [subjectGroups],
+  );
+
+  // ── Scope navigation ─────────────────────────────────────────────────────
+  const goAll = useCallback(() => {
+    setScope({ level: "all" });
+    setSelectedLessonId(null);
+    setSidebarOpen(false);
+  }, []);
+  const goSubject = useCallback((subjectId: SubjectId) => {
+    setScope({ level: "subject", subjectId });
+    setSelectedLessonId(null);
+    setSidebarOpen(false);
+  }, []);
+  const goUnit = useCallback((subjectId: SubjectId, unitId: string) => {
+    setScope({ level: "unit", subjectId, unitId });
+    setSelectedLessonId(null);
+    setSidebarOpen(false);
+  }, []);
+  const goWeek = useCallback(
+    (subjectId: SubjectId, unitId: string, week: number) => {
+      setScope({ level: "week", subjectId, unitId, week });
+      setSelectedLessonId(null);
+    },
+    [],
+  );
+  // Breadcrumb "back to subject/unit" use the current scope's ids.
+  const backToSubject = useCallback(() => {
+    if (scope.level !== "all") goSubject(scope.subjectId);
+  }, [scope, goSubject]);
+  const backToUnit = useCallback(() => {
+    if (scope.level === "unit" || scope.level === "week")
+      goUnit(scope.subjectId, scope.unitId);
+  }, [scope, goUnit]);
+
+  const openInDaily = useCallback(
+    (id: string) => router.push(`/daily?lesson=${encodeURIComponent(id)}`),
+    [router],
+  );
+
+  // ── Month / year axis (all-subjects timeline only) ───────────────────────
   const yearStartMs = yearStart.getTime();
   const yearEndMs = yearEnd.getTime();
   const axis = useMemo(() => {
@@ -329,9 +470,6 @@ export function TimelineYear(): ReactNode {
         if (g.end > lastUnitWeek) lastUnitWeek = g.end;
       }
     }
-
-    // Normalize the configured window (lo = earlier endpoint) so the week count
-    // and the month anchor agree even if start > end ever slips through.
     const lo = Math.min(yearStartMs, yearEndMs);
     const hi = Math.max(yearStartMs, yearEndMs);
     const start = new Date(lo);
@@ -339,9 +477,6 @@ export function TimelineYear(): ReactNode {
     const configWeeks = weeksInRange(start, end);
     const totalWeeks = Math.max(configWeeks, lastUnitWeek, 1);
 
-    // Walk each instructional week, projecting it onto its calendar month (7-day
-    // strides from the year-start anchor), and bucket contiguous same-month runs
-    // into one segment each — left→right reading order, one label per month.
     const anchor = new Date(
       start.getFullYear(),
       start.getMonth(),
@@ -361,9 +496,6 @@ export function TimelineYear(): ReactNode {
       }
     }
 
-    // "Today" marker fraction (0–1) across the timeline, from the REAL current
-    // date against the CONFIGURED year. Null (hidden) when today is outside the
-    // window — a misplaced marker is worse than none.
     const now = Date.now();
     let todayFrac: number | null = null;
     if (now >= lo && now <= hi) {
@@ -371,70 +503,39 @@ export function TimelineYear(): ReactNode {
       todayFrac = Math.min(1, Math.max(0, (elapsedWeeks + 0.5) / totalWeeks));
     }
 
-    // Calendar years the window spans (for the axis year labels).
     const yearA = Math.min(start.getFullYear(), end.getFullYear());
     const yearB = Math.max(start.getFullYear(), end.getFullYear());
 
     return { totalWeeks, months, todayFrac, yearA, yearB };
   }, [subjectGroups, yearStartMs, yearEndMs]);
 
-  function toggleUnit(subjectId: string, unitId: string) {
-    const key = `${subjectId}:${unitId}`;
-    setOpenUnit((cur) => (cur === key ? null : key));
-    setOpenWeek(null);
-  }
-  function pickWeek(week: number) {
-    setOpenWeek((cur) => (cur === week ? null : week));
-  }
-  function openLesson(id: string) {
-    setSelectedLessonId(id);
-  }
-  function closeDrawer() {
-    setOpenUnit(null);
-    setOpenWeek(null);
-  }
-
-  // Row-level expand/collapse (the trailing chevron). Opening a closed row jumps
-  // to the unit that contains the current week (the most useful entry point),
-  // falling back to the first unit; a second click collapses the whole row.
-  function toggleRow(subjectId: string, groups: UnitGroup[]) {
-    const isOpen = openUnit?.startsWith(`${subjectId}:`) ?? false;
-    if (isOpen || groups.length === 0) {
-      closeDrawer();
-      return;
-    }
-    const current =
-      groups.find((g) => CURRENT_WEEK >= g.start && CURRENT_WEEK <= g.end) ??
-      groups[0];
-    setOpenUnit(`${subjectId}:${current.unit.id}`);
-    setOpenWeek(null);
-  }
-
-  // The tabbed drill-down for the open unit. Placed differently per layout:
-  // GRID renders it once below the whole `.units` row; LIST nests it under the
-  // open unit's own node so the outline reads top-to-bottom.
-  function renderDrawer(subject: Subject, openGroup: UnitGroup): ReactNode {
-    return (
-      <UnitDrawer
-        subject={subject}
-        unitName={openGroup.unit.name}
-        spanLabel={openGroup.spanLabel}
-        totalLessons={openGroup.total}
-        weeks={openGroup.weeks}
-        lessons={openGroup.weeks.flatMap((w) => w.lessons)}
-        openWeek={openWeek}
-        onPickWeek={pickWeek}
-        onOpenLesson={openLesson}
-        onClose={closeDrawer}
-      />
-    );
-  }
-
-  // `--today-frac` (0–1) positions the today marker on the timeline (grid only).
+  // ── All-subjects timeline (the "all" scope center) ───────────────────────
   const showToday = isGrid && axis.todayFrac != null;
   const rowsStyle = showToday
     ? ({ "--today-frac": axis.todayFrac } as CSSProperties)
     : undefined;
+
+  function renderUnitCard(
+    subjectId: SubjectId,
+    g: UnitGroup,
+    onClick: () => void,
+  ): ReactNode {
+    const { prefix, rest } = splitUnitName(g.unit.name);
+    return (
+      <div key={g.unit.id} className={styles.unode}>
+        <button
+          type="button"
+          className={styles.unit}
+          onClick={onClick}
+          title={g.unit.name}
+        >
+          <div className={styles.un}>{prefix || rest}</div>
+          {prefix ? <div className={styles.us}>{rest}</div> : null}
+          <div className={styles.uw}>{g.spanLabel}</div>
+        </button>
+      </div>
+    );
+  }
 
   const rowsContent = (
     <div className={styles.rows} style={rowsStyle}>
@@ -443,30 +544,29 @@ export function TimelineYear(): ReactNode {
       ) : null}
 
       {subjectGroups
-        // Subject filter: hide unselected subjects' rows entirely.
         .filter(
           ({ subject }) =>
             filterSubjects.length === 0 || filterSubjects.includes(subject.id),
         )
         .map(({ subject, groups }) => {
-          // Status filter: keep only units with a matching lesson.
-          const visibleGroups = groups.filter((g) =>
-            unitMatchesStatuses(g, filterStatuses),
+          const visibleGroups = groups.filter(
+            (g) =>
+              unitMatchesStatuses(g, filterStatuses) &&
+              (!standardsActive ||
+                g.weeks.some((w) => w.lessons.some(lessonMatchesStandards))),
           );
-          // The open unit, only if it survived filtering (else render closed).
-          const openGroup =
-            visibleGroups.find(
-              (g) => `${subject.id}:${g.unit.id}` === openUnit,
-            ) ?? null;
-          const isOpen = openGroup != null;
-
           return (
             <div
               key={subject.id}
               className={`${styles.rowwrap} ${styles.tlVars} cp-subj ${subject.cls}`}
             >
-              <div className={`${styles.subrow} ${isOpen ? styles.hot : ""}`}>
-                <div className={styles.slabel}>
+              <div className={styles.subrow}>
+                <button
+                  type="button"
+                  className={styles.slabel}
+                  onClick={() => goSubject(subject.id)}
+                  title={`Focus ${subject.name}`}
+                >
                   <span className={styles.si} aria-hidden="true">
                     {subject.icon}
                   </span>
@@ -474,7 +574,7 @@ export function TimelineYear(): ReactNode {
                     <div className={styles.sn}>{subject.name}</div>
                     <div className={styles.sg}>Grade 5</div>
                   </div>
-                </div>
+                </button>
 
                 <div className={styles.units}>
                   {groups.length === 0 ? (
@@ -484,161 +584,348 @@ export function TimelineYear(): ReactNode {
                       No units match the current filters.
                     </div>
                   ) : (
-                    visibleGroups.map((g) => {
-                      const key = `${subject.id}:${g.unit.id}`;
-                      const sel = key === openUnit;
-                      const { prefix, rest } = splitUnitName(g.unit.name);
-                      return (
-                        // Each unit is a self-contained outline node. GRID: an
-                        // equal-width flex card. LIST: a stacking row that nests
-                        // its drawer directly beneath it (file-explorer style).
-                        <div key={g.unit.id} className={styles.unode}>
-                          <button
-                            type="button"
-                            className={`${styles.unit} ${sel ? styles.sel : ""}`}
-                            onClick={() => toggleUnit(subject.id, g.unit.id)}
-                            aria-expanded={sel}
-                            title={g.unit.name}
-                          >
-                            <div className={styles.un}>{prefix || rest}</div>
-                            {prefix ? (
-                              <div className={styles.us}>{rest}</div>
-                            ) : null}
-                            <div className={styles.uw}>{g.spanLabel}</div>
-                          </button>
-
-                          {/* LIST mode nests the drawer under the open unit. */}
-                          {hier === "list" && sel
-                            ? renderDrawer(subject, g)
-                            : null}
-                        </div>
-                      );
-                    })
+                    visibleGroups.map((g) =>
+                      renderUnitCard(subject.id, g, () =>
+                        goUnit(subject.id, g.unit.id),
+                      ),
+                    )
                   )}
-
-                  {/* Per-row expand/collapse chevron (grid only — list stacks
-                      vertically and has no trailing slot). Opens the current
-                      unit / collapses the row. */}
-                  {isGrid && visibleGroups.length > 0 ? (
-                    <button
-                      type="button"
-                      className={styles.chev}
-                      onClick={() => toggleRow(subject.id, visibleGroups)}
-                      aria-expanded={isOpen}
-                      aria-label={
-                        isOpen
-                          ? `Collapse ${subject.name}`
-                          : `Expand ${subject.name}`
-                      }
-                    >
-                      <IconChevDown
-                        style={{
-                          transform: isOpen ? "rotate(180deg)" : undefined,
-                          transition: "transform .2s",
-                        }}
-                      />
-                    </button>
-                  ) : null}
                 </div>
               </div>
-
-              {/* GRID mode renders the drawer once below the whole units row. */}
-              {isGrid && openGroup ? renderDrawer(subject, openGroup) : null}
             </div>
           );
         })}
     </div>
   );
 
+  const allCenter = isGrid ? (
+    <div className={styles.tl}>
+      <div className={styles.tlhead}>
+        <div className={styles.corner} />
+        <div className={styles.axisCol}>
+          <div className={styles.years}>
+            <span className={styles.y}>{axis.yearA}</span>
+            {axis.yearB !== axis.yearA ? (
+              <span className={styles.y}>{axis.yearB}</span>
+            ) : null}
+          </div>
+          <div
+            className={styles.months}
+            style={{
+              gridTemplateColumns: `repeat(${axis.months.length}, 1fr)`,
+            }}
+          >
+            {axis.months.map((m, i) => (
+              <span key={`${m.label}-${i}`}>{m.label}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+      {rowsContent}
+    </div>
+  ) : (
+    <div className={styles.listWrap}>{rowsContent}</div>
+  );
+
+  // ── Subject scope: that subject's units as cards ─────────────────────────
+  // Units narrow to those with a lesson matching the active standards filter.
+  const subjectUnitGroups = focusedGroups.filter(
+    (g) =>
+      !standardsActive ||
+      g.weeks.some((w) => w.lessons.some(lessonMatchesStandards)),
+  );
+  const subjectCenter =
+    focusedSubject != null ? (
+      <div className={`${styles.focus} ${styles.tlVars} cp-subj ${focusedSubject.cls}`}>
+        <h2 className={styles.focusTitle}>
+          <span className={styles.si} aria-hidden="true">
+            {focusedSubject.icon}
+          </span>
+          {focusedSubject.name}
+          <span className={styles.focusSub}>Units across the year</span>
+        </h2>
+        {focusedGroups.length === 0 ? (
+          <div className={styles.norow}>No units planned yet.</div>
+        ) : subjectUnitGroups.length === 0 ? (
+          <div className={styles.norow}>
+            No units match the current standards filter.
+          </div>
+        ) : (
+          <div className={styles.unitGrid}>
+            {subjectUnitGroups.map((g) =>
+              renderUnitCard(focusedSubject.id, g, () =>
+                goUnit(focusedSubject.id, g.unit.id),
+              ),
+            )}
+          </div>
+        )}
+      </div>
+    ) : null;
+
+  // ── Unit scope: that unit's weeks as cards ───────────────────────────────
+  // Weeks narrow to those with a lesson matching the active standards filter.
+  const unitWeeks =
+    focusedUnit != null
+      ? focusedUnit.weeks.filter(
+          (w) =>
+            !standardsActive || w.lessons.some(lessonMatchesStandards),
+        )
+      : [];
+  const unitCenter =
+    focusedSubject != null && focusedUnit != null ? (
+      <div className={`${styles.focus} ${styles.tlVars} cp-subj ${focusedSubject.cls}`}>
+        <h2 className={styles.focusTitle}>
+          {splitUnitName(focusedUnit.unit.name).rest || focusedUnit.unit.name}
+          <span className={styles.focusSub}>
+            {focusedUnit.spanLabel} · {focusedUnit.total}{" "}
+            {focusedUnit.total === 1 ? "lesson" : "lessons"}
+          </span>
+        </h2>
+        {focusedUnit.weeks.length === 0 ? (
+          <div className={styles.norow}>No weeks planned for this unit yet.</div>
+        ) : unitWeeks.length === 0 ? (
+          <div className={styles.norow}>
+            No weeks match the current standards filter.
+          </div>
+        ) : (
+          <div className={styles.wkGrid}>
+            {unitWeeks.map((w) => (
+              <button
+                key={w.week}
+                type="button"
+                className={styles.wkCard}
+                onClick={() => goWeek(focusedSubject.id, focusedUnit.unit.id, w.week)}
+              >
+                <span className={styles.wkHead}>
+                  Week {w.week}
+                  {w.state === "done" ? (
+                    <span className={styles.wkDone} aria-label="all done">
+                      <IconCheck sw={3} />
+                    </span>
+                  ) : null}
+                </span>
+                <span className={styles.wkCount}>
+                  {w.lessons.length}{" "}
+                  {w.lessons.length === 1 ? "lesson" : "lessons"}
+                </span>
+                <span className={styles.wkGo} aria-hidden="true">
+                  <IconChevRight />
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    ) : null;
+
+  // ── Week scope: that week's day cards (rich — pills + status dots) ────────
+  const weekCenter =
+    focusedSubject != null && focusedUnit != null && focusedWeek != null ? (
+      <div className={`${styles.focus} ${styles.tlVars} cp-subj ${focusedSubject.cls}`}>
+        <h2 className={styles.focusTitle}>
+          Week {focusedWeek.week}
+          <span className={styles.focusSub}>
+            {splitUnitName(focusedUnit.unit.name).rest || focusedUnit.unit.name}
+          </span>
+        </h2>
+        {standardsActive &&
+        weekLessons.length === 0 &&
+        focusedWeek.lessons.length > 0 ? (
+          <div className={styles.norow}>
+            No lessons in this week match the current standards filter.
+          </div>
+        ) : (
+          <YearDayCards
+            lessons={weekLessons}
+            selectedId={selectedLessonId}
+            onPick={(id) => setSelectedLessonId(id)}
+          />
+        )}
+      </div>
+    ) : null;
+
+  let center: ReactNode = allCenter;
+  if (scope.level === "subject") center = subjectCenter;
+  else if (scope.level === "unit") center = unitCenter;
+  else if (scope.level === "week") center = weekCenter;
+
+  const subjectNameForCrumb = focusedSubject?.name;
+  const unitNameForCrumb = focusedUnit
+    ? splitUnitName(focusedUnit.unit.name).rest || focusedUnit.unit.name
+    : undefined;
+
+  // Human label for the coverage panel header, reflecting the current scope.
+  const scopeLabel =
+    scope.level === "all"
+      ? "the whole year"
+      : scope.level === "subject"
+        ? (focusedSubject?.name ?? "this subject")
+        : scope.level === "unit"
+          ? (unitNameForCrumb ?? "this unit")
+          : `Week ${scope.week}`;
+
   return (
-    <div className={styles.root} data-hier={hier}>
+    <div className={styles.root} data-hier={hier} data-scope={scope.level}>
       {/* Page heading + the single Filters & View control */}
       <div className={styles.head}>
         <div>
           <div className={styles.eyebrow}>Plan</div>
           <h1>Yearly View</h1>
           <div className={styles.sub}>
-            The whole year at a glance — open a unit to plan its weeks and daily
-            lessons.
+            The whole year at a glance — open a subject to plan its units, weeks,
+            and daily lessons.
           </div>
         </div>
 
-        <YearFiltersPopover
-          value={{
-            view: storedHier,
-            subjects: filterSubjects,
-            statuses: filterStatuses,
-          }}
-          subjects={subjects.map((s) => ({
-            id: s.id,
-            name: s.name,
-            cls: s.cls,
-          }))}
-          onChange={(next: YearFilterState) => {
-            if (next.view !== storedHier) setViewMode(next.view);
-            setFilterSubjects(next.subjects);
-            setFilterStatuses(next.statuses);
-          }}
+        <div className={styles.toolbar}>
+          {/* Subjects rail toggle — only shown on narrow viewports (CSS), where
+              the rail is a slide-over rather than an inline column. */}
+          <span className={styles.subjectsToggle}>
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => setSidebarOpen(true)}
+              tooltip="Open the subjects panel to jump between subjects and their units"
+            >
+              Subjects
+            </Button>
+          </span>
+
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => setCoverageOpen(true)}
+            tooltip="See which standards are taught vs. still a gap for the current scope, and the lessons that cover each — click a standard to filter the year to it"
+          >
+            Standards coverage
+          </Button>
+
+          <YearFiltersPopover
+            showViewToggle={scope.level === "all"}
+            value={{
+              view: storedHier,
+              subjects: filterSubjects,
+              statuses: filterStatuses,
+            }}
+            subjects={subjects.map((s) => ({
+              id: s.id,
+              name: s.name,
+              cls: s.cls,
+            }))}
+            onChange={(next: YearFilterState) => {
+              if (next.view !== storedHier) setViewMode(next.view);
+              setFilterSubjects(next.subjects);
+              setFilterStatuses(next.statuses);
+            }}
+            selectedStandards={standardsFilter}
+            onToggleStandard={toggleStandard}
+            onClearStandards={clearStandards}
+            onOpenCoverage={() => setCoverageOpen(true)}
+          />
+        </div>
+      </div>
+
+      {/* Contextual dashboard — re-scopes to the current drill level. The
+          STANDARDS card opens the coverage panel. */}
+      <div className={styles.statWrap}>
+        <YearStatCards
+          lessons={scopedLessons}
+          onStandardsClick={() => setCoverageOpen(true)}
         />
       </div>
 
-      {/* Live year-wide stat cards (archived lessons excluded — see above). */}
-      <div className={styles.statWrap}>
-        <YearStatCards lessons={visibleLessons} />
-      </div>
+      {/* 3-column shell: subjects sidebar | center | lesson pane */}
+      <div className={styles.shell}>
+        <YearSubjectsSidebar
+          subjects={sidebarSubjects}
+          scope={scope}
+          onPickAll={goAll}
+          onPickSubject={goSubject}
+          onPickUnit={goUnit}
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
 
-      {hier === "list" ? (
-        <div className={styles.listWrap}>{rowsContent}</div>
-      ) : (
-        <div className={styles.tl}>
-          <div className={styles.tlhead}>
-            <div className={styles.corner} />
-            <div className={styles.axisCol}>
-              <div className={styles.years}>
-                <span className={styles.y}>{axis.yearA}</span>
-                {axis.yearB !== axis.yearA ? (
-                  <span className={styles.y}>{axis.yearB}</span>
-                ) : null}
-              </div>
-              <div
-                className={styles.months}
-                style={{
-                  gridTemplateColumns: `repeat(${axis.months.length}, 1fr)`,
-                }}
-              >
-                {axis.months.map((m, i) => (
-                  <span key={`${m.label}-${i}`}>{m.label}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {rowsContent}
-        </div>
-      )}
-
-      {/* Legend */}
-      <div className={styles.leg}>
-        <span className={styles.lg}>
-          <span className={styles.d} style={{ background: "var(--done)" }} />
-          Completed
-        </span>
-        <span className={styles.lg}>
-          <span
-            className={styles.d}
-            style={{ background: "var(--brand-500)" }}
+        <div className={styles.center}>
+          <YearBreadcrumb
+            scope={scope}
+            subjectName={subjectNameForCrumb}
+            unitName={unitNameForCrumb}
+            onAll={goAll}
+            onSubject={backToSubject}
+            onUnit={backToUnit}
           />
-          In progress
-        </span>
-        <span className={styles.lg}>
-          <span className={styles.d} style={{ background: "var(--faint)" }} />
-          Not started
-        </span>
-        <span className={styles.lg}>
-          <span className={styles.d} style={{ background: "var(--catchup)" }} />
-          Skipped
-        </span>
+          {center}
+
+          {/* Legend (only meaningful on the all-subjects timeline) */}
+          {scope.level === "all" ? (
+            <div className={styles.leg}>
+              <span className={styles.lg}>
+                <span className={styles.d} style={{ background: "var(--done)" }} />
+                Completed
+              </span>
+              <span className={styles.lg}>
+                <span
+                  className={styles.d}
+                  style={{ background: "var(--brand-500)" }}
+                />
+                In progress
+              </span>
+              <span className={styles.lg}>
+                <span className={styles.d} style={{ background: "var(--faint)" }} />
+                Not started
+              </span>
+              <span className={styles.lg}>
+                <span
+                  className={styles.d}
+                  style={{ background: "var(--catchup)" }}
+                />
+                Skipped
+              </span>
+            </div>
+          ) : null}
+        </div>
+
+        {selectedLesson && selectedSubject ? (
+          <YearLessonPane
+            lesson={selectedLesson}
+            subject={selectedSubject}
+            weekLabel={
+              scope.level === "week" ? `Week ${scope.week}` : undefined
+            }
+            siblings={weekLessons}
+            onSelect={(id) => setSelectedLessonId(id)}
+            onClose={() => setSelectedLessonId(null)}
+            onOpenInDaily={() => openInDaily(selectedLesson.id)}
+          />
+        ) : null}
       </div>
+
+      {/* Scrim behind the narrow-viewport slide-overs (subjects rail + lesson
+          pane). Hidden on desktop via CSS even when an overlay's state is set
+          (there the rail/pane are inline columns). Click closes both. */}
+      {sidebarOpen || selectedLesson ? (
+        <div
+          className={styles.scrim}
+          onClick={() => {
+            setSidebarOpen(false);
+            setSelectedLessonId(null);
+          }}
+          aria-hidden="true"
+        />
+      ) : null}
+
+      {coverageOpen ? (
+        <StandardsCoveragePanel
+          coverage={coverage}
+          scopeLabel={scopeLabel}
+          activeStandards={standardsFilter}
+          onToggleStandard={toggleStandard}
+          onClearStandards={clearStandards}
+          onClose={() => setCoverageOpen(false)}
+          onOpenLesson={(id) => openInDaily(id)}
+        />
+      ) : null}
     </div>
   );
 }

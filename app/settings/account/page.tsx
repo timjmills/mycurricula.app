@@ -267,18 +267,10 @@ const DEFAULT_VIEW_OPTIONS: readonly ChoiceOption<DefaultViewRoute>[] = [
   {
     value: "/year",
     label: "Yearly",
-    desc: "The whole year's roadmap and progression.",
+    desc: "The whole year — units, weeks, lessons, and standards by subject.",
     tooltip:
-      "Start the app on the Yearly view — the roadmap of every unit across the school year. Only changes where the app opens for you.",
+      "Start the app on the Yearly view — the roadmap of every unit across the school year, drilling into weeks, lessons, and standards (the Curriculum view now lives here). Only changes where the app opens for you.",
     tooltipId: "account-default-view-year",
-  },
-  {
-    value: "/subject",
-    label: "Curriculum",
-    desc: "Units and lessons organised by subject.",
-    tooltip:
-      "Start the app on the Curriculum view — one subject's units and lessons in teaching order. Only changes where the app opens for you.",
-    tooltipId: "account-default-view-subject",
   },
 ] as const;
 

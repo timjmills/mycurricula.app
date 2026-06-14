@@ -22,3 +22,32 @@ export { MonthPicker } from "./MonthPicker";
 export type { MonthPickerProps } from "./MonthPicker";
 export { AddUnitDialog } from "./AddUnitDialog";
 export type { AddUnitDialogProps } from "./AddUnitDialog";
+export { ResourcesSort } from "./ResourcesSort";
+export type { ResourceEntry, ResourcesSortProps } from "./ResourcesSort";
+
+// Merged Curriculum↔Yearly view (progressive drill: all → subject → unit →
+// week → lesson). TimelineYear orchestrates these; they are also exported for
+// any future direct consumers.
+export { YearStatCards } from "./YearStatCards";
+export { YearSubjectsSidebar } from "./YearSubjectsSidebar";
+export type {
+  YearSubjectsSidebarProps,
+  YearSidebarSubject,
+  YearSidebarUnit,
+} from "./YearSubjectsSidebar";
+export { YearBreadcrumb } from "./YearBreadcrumb";
+export type { YearBreadcrumbProps } from "./YearBreadcrumb";
+export { YearDayCards } from "./YearDayCards";
+export type { YearDayCardsProps } from "./YearDayCards";
+export { YearLessonPane } from "./YearLessonPane";
+export type { YearLessonPaneProps } from "./YearLessonPane";
+export { StandardsCoveragePanel } from "./StandardsCoveragePanel";
+export type { StandardsCoveragePanelProps } from "./StandardsCoveragePanel";
+export { YearFiltersPopover } from "./YearFiltersPopover";
+export type {
+  YearFiltersPopoverProps,
+  YearFilterState,
+  YearStatusKey,
+} from "./YearFiltersPopover";
+export type { YearScope } from "./year-scope";
+export { scopeSubjectId } from "./year-scope";

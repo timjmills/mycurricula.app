@@ -121,6 +121,44 @@
   margin-top: 3px;
 }
 
+/* Head controls cluster — the Standards-coverage button + the Filters & View
+   popover trigger sit together on the right of the page heading. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Subjects-rail toggle — only meaningful on narrow viewports, where the rail
+   is a slide-over. Inline (desktop) the rail is always visible, so hide it. */
+.subjectsToggle {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .subjectsToggle {
+    display: inline-flex;
+  }
+}
+
+/* Scrim behind the narrow-viewport slide-overs. Below the rail (z 61) and the
+   pane (z 60); hidden entirely on desktop where both are inline columns. */
+.scrim {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 54;
+    background: var(
+      --scrim-soft,
+      color-mix(in srgb, var(--ink-900) 30%, transparent)
+    );
+  }
+}
+
 .statWrap {
   flex: 0 0 auto;
   margin-bottom: 18px;
@@ -231,11 +269,24 @@
 .subrow.hot {
   background: var(--rt);
 }
-.slabel {
+/* .slabel is a <button> (focuses the subject). Double the class so the global
+   `.cp-root button` reset (0,1,1) can't strip its padding/background/border. */
+.slabel,
+.slabel.slabel {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 0 18px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.slabel:hover {
+  background: color-mix(in srgb, var(--c) 8%, transparent);
 }
 .slabel .si {
   width: 42px;
@@ -723,6 +774,168 @@
   font-weight: 600;
   font-style: italic;
   padding: 6px 2px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   MERGED-VIEW SHELL — subjects sidebar | center | lesson pane.
+
+   The three columns are laid out by flex; the sidebar (.nav, 232px) and the
+   lesson pane (.pane, 340px) are sticky and own their own widths + responsive
+   slide-over behavior in their modules. The center flexes to fill the gap and
+   must be allowed to shrink (min-width:0) so its cards/timeline don't force a
+   document-level horizontal scroll.
+   ════════════════════════════════════════════════════════════════════════ */
+.shell {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-height: 0;
+}
+.center {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ── Focused level (subject / unit / week) center container ── */
+.focus {
+  margin-bottom: 14px;
+}
+.focusTitle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-18, 18px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink-900);
+}
+.focusTitle .si {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  background: var(--cl);
+  color: var(--cd);
+}
+.focusTitle .si svg {
+  width: 18px;
+  height: 18px;
+}
+.focusSub {
+  font-family: var(--font-sans);
+  font-size: var(--t-12);
+  font-weight: 600;
+  color: var(--ink-500);
+  letter-spacing: 0;
+}
+
+/* ── Subject scope: that subject's units as a responsive card grid ── */
+.unitGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+/* The unit cards inside .unitGrid reuse the timeline `.unit` chip styling, but
+   here each fills its own grid cell (the wide-timeline flex rules above only
+   apply under [data-hier]). */
+.unitGrid .unode {
+  min-width: 0;
+}
+
+/* ── Unit scope: that unit's weeks as cards ── */
+.wkGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.wkCard.wkCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 15px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--c);
+  border-radius: var(--r-md);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ush) 45%, transparent);
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s,
+    border-color 0.12s;
+  position: relative;
+}
+.wkCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -12px var(--ush);
+  border-color: var(--uc);
+}
+.wkHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-14, 14px);
+  font-weight: 800;
+  color: var(--ud);
+}
+.wkDone {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--done);
+  color: var(--on-solid);
+}
+.wkDone svg {
+  width: 12px;
+  height: 12px;
+}
+.wkCount {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  font-weight: 600;
+}
+.wkGo {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: var(--ink-400);
+  opacity: 0;
+  transform: translateX(-2px);
+  transition:
+    opacity 0.12s,
+    transform 0.12s;
+}
+.wkGo svg {
+  width: 16px;
+  height: 16px;
+}
+.wkCard:hover .wkGo,
+.wkCard:focus-visible .wkGo {
+  opacity: 1;
+  transform: translateX(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wkGo {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* On narrow viewports the sidebar + pane drop out of the flow (their modules
+   turn them into overlays), so the center spans full width. */
+@media (max-width: 1100px) {
+  .shell {
+    gap: 0;
+  }
 }
 
 /* ── Legend ── */

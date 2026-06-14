@@ -106,7 +106,6 @@ const VIEW_LABEL: Record<string, string> = {
   "/weekly": "Weekly",
   "/daily": "Daily",
   "/year": "Yearly",
-  "/subject": "Curriculum",
 };
 
 // ── Page ────────────────────────────────────────────────────────────────────

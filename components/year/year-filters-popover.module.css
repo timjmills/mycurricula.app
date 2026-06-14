@@ -196,6 +196,73 @@
   white-space: nowrap;
 }
 
+/* ── STANDARDS facet (active chips + open-coverage button) ─────────────── */
+
+.stdChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* Removable active-standard chip. Doubled class clears the cp-root reset. */
+.stdChip.stdChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--chrome-accent) 35%, transparent);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--chrome-accent) 12%, var(--surface));
+  color: var(--chrome-accent-deep);
+  font-size: var(--t-11);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.stdChip.stdChip:hover {
+  background: color-mix(in srgb, var(--chrome-accent) 20%, var(--surface));
+}
+.stdChipX {
+  font-size: var(--t-13);
+  line-height: 1;
+  color: var(--ink-500);
+}
+.stdHint {
+  margin: 0;
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  line-height: 1.45;
+}
+/* Doubled class clears the cp-root reset. A filled-secondary-style button. */
+.coverageBtn.coverageBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--chrome-accent) 30%, var(--border));
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--chrome-accent) 10%, var(--surface));
+  color: var(--chrome-accent-deep);
+  font-family: var(--font-sans);
+  font-size: var(--t-12);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+@media (max-width: 900px) {
+  .coverageBtn.coverageBtn {
+    min-height: 44px;
+  }
+}
+.coverageBtn.coverageBtn:hover {
+  background: color-mix(in srgb, var(--chrome-accent) 18%, var(--surface));
+}
+.coverageBtn.coverageBtn:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 1px;
+}
+
 /* ── Footer / Reset link ───────────────────────────────────────────────── */
 
 .footer {
