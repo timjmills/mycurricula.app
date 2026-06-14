@@ -25,6 +25,9 @@ import type {
   WidgetPersistence,
   WidgetType,
 } from "../types";
+// Phase-tag slug: shared with the board tag editor's validated phase picker
+// (Wave 4 #3) so a seeded `phase:warm-up` tag matches a "Warm-Up" section.
+import { phaseSlug } from "../teach/lesson-phases";
 
 /** The Grade 5 grade-level id every Teach fixture entity is scoped to. The app
  *  launches Grade 5-only but the shape never assumes a single grade. */
@@ -91,15 +94,6 @@ interface BoardInput {
   templateId?: string | null;
   tags?: BoardTag[];
   widgets?: Omit<Widget, "boardId" | "gradeLevelId">[];
-}
-
-/** Slugify a phase title for the `phase` tag value (e.g. "Warm-Up" →
- *  "warm-up"). Keeps the tag value stable + matchable across boards. */
-function phaseSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 }
 
 const SEED_AT = "2026-05-29T08:00:00.000Z";

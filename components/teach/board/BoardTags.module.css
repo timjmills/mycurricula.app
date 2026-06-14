@@ -60,6 +60,19 @@
   color: var(--cd, var(--ink-500));
 }
 
+/* An orphaned phase tag (#3) — the phase was renamed/removed from the lesson.
+   A dashed warn-tinted chip signals "this link is broken" without alarm-red. */
+.chipOrphan {
+  background: var(--warn-tint);
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+  color: var(--ink-700, var(--ink-soft));
+}
+
+.chipOrphan .chipKind {
+  color: color-mix(in srgb, var(--warn) 80%, var(--ink-700));
+}
+
 /* "+N" overflow chip — neutral, non-interactive. */
 .chipOverflow {
   background: var(--ink-100);

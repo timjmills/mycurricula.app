@@ -2,3 +2,5 @@
 // the folder (@/components/boards), never a deep file.
 
 export { BoardsHome } from "./BoardsHome";
+export { OpenInBoardDialog } from "./OpenInBoardDialog";
+export type { OpenInBoardDialogProps } from "./OpenInBoardDialog";

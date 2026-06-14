@@ -16,7 +16,7 @@
 // Privacy: tags are STRUCTURE only — never a student name. Tokens-only.
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button, Tooltip } from "@/components/ui";
 import {
   AUTO_SURFACE_KINDS,
@@ -24,7 +24,9 @@ import {
   dedupeTags,
   makeTag,
 } from "@/lib/teach/board-tags";
+import { phasesForLesson } from "@/lib/teach/lesson-phases";
 import { teachClient as teach } from "@/lib/teach/client";
+import { usePlanner } from "@/lib/planner-store";
 import type { Board, BoardTag, BoardTagKind } from "@/lib/types";
 import { BoardTagChips } from "./BoardTagChips";
 import styles from "./BoardTags.module.css";
@@ -105,6 +107,22 @@ export function BoardTagPicker({
     defaultValueForKind("subject"),
   );
 
+  // The lesson's REAL phases (#3) — when the board hangs off a lesson, the phase
+  // tag is a validated PICKER over these (not free text), and the chips flag a
+  // phase tag that no longer matches one. A lesson-less board (library/scratch)
+  // has no phases to validate against → phase falls back to free text.
+  const { getSections } = usePlanner();
+  const lessonPhases = useMemo(
+    () =>
+      board.masterLessonId ? phasesForLesson(getSections(board.masterLessonId)) : [],
+    [board.masterLessonId, getSections],
+  );
+  const validPhaseSlugs = useMemo(
+    () => new Set(lessonPhases.map((p) => p.slug)),
+    [lessonPhases],
+  );
+  const usePhasePicker = kind === "phase" && lessonPhases.length > 0;
+
   // Persist a tag list: optimistic local update, then repo write + reload.
   // Fire-and-forget so callers stay synchronous (BoardSettingsPopover idiom).
   function persist(next: BoardTag[]): void {
@@ -124,11 +142,20 @@ export function BoardTagPicker({
   function handleAdd(): void {
     const v = value.trim();
     if (!v) return;
-    // Subjects/weekdays already carry a readable derived label; free-text kinds
-    // (phase/week/slot/label) use the typed value as the label too.
-    persist([...tags, makeTag(kind, v)]);
-    // Reset the value for the next entry; keep the kind selection sticky.
-    setValue(defaultValueForKind(kind));
+    // A phase picked from the validated list carries its readable heading as the
+    // chip label (so the chip reads "Warm-Up", not "warm-up"); other kinds use
+    // their derived/typed value as the label.
+    const label = usePhasePicker
+      ? lessonPhases.find((p) => p.slug === v)?.label
+      : undefined;
+    persist([...tags, makeTag(kind, v, label)]);
+    // Reset the value for the next entry; keep the kind selection sticky. The
+    // phase picker re-seeds to its first option so Add stays live.
+    setValue(
+      kind === "phase" && lessonPhases.length > 0
+        ? (lessonPhases[0]?.slug ?? "")
+        : defaultValueForKind(kind),
+    );
   }
 
   function handleRemove(tag: BoardTag): void {
@@ -138,9 +165,15 @@ export function BoardTagPicker({
   }
 
   // Switching kind resets the value to a sensible default for that input type.
+  // For phase on a lesson-bound board, seed the validated picker's first option
+  // so Add is immediately live (mirrors the subject/weekday selects).
   function handleKindChange(nextKind: BoardTagKind): void {
     setKind(nextKind);
-    setValue(defaultValueForKind(nextKind));
+    if (nextKind === "phase" && lessonPhases.length > 0) {
+      setValue(lessonPhases[0]?.slug ?? "");
+    } else {
+      setValue(defaultValueForKind(nextKind));
+    }
   }
 
   // Whether the current draft can be added (non-empty after trim).
@@ -161,8 +194,15 @@ export function BoardTagPicker({
         you filter for it in the Library.
       </p>
 
-      {/* Current tags — removable. Empty ⇒ BoardTagChips renders nothing. */}
-      <BoardTagChips tags={tags} size="md" onRemove={handleRemove} />
+      {/* Current tags — removable. Empty ⇒ BoardTagChips renders nothing. A
+          lesson-bound board passes its valid phase slugs so an orphaned phase
+          tag (renamed/removed phase) is flagged; lesson-less → no flagging. */}
+      <BoardTagChips
+        tags={tags}
+        size="md"
+        onRemove={handleRemove}
+        validPhaseSlugs={board.masterLessonId ? validPhaseSlugs : undefined}
+      />
 
       {/* ── Add a tag ───────────────────────────────────────────────────── */}
       <div className={styles.addRow}>
@@ -212,6 +252,23 @@ export function BoardTagPicker({
             {WEEKDAY_OPTIONS.map((name, i) => (
               <option key={i} value={String(i)}>
                 {name}
+              </option>
+            ))}
+          </select>
+        ) : usePhasePicker ? (
+          // Validated phase picker (#3): choose from the lesson's REAL phases
+          // (sections) so a board can't be tagged to a phase that doesn't
+          // exist. The option value is the slug the tag stores.
+          <select
+            className={styles.valueSelect}
+            value={value}
+            disabled={busy}
+            aria-label="Lesson phase"
+            onChange={(e) => setValue(e.target.value)}
+          >
+            {lessonPhases.map((p) => (
+              <option key={p.slug} value={p.slug}>
+                {p.label}
               </option>
             ))}
           </select>
