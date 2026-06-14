@@ -87,6 +87,13 @@ export const ANNOTATION_TOOLS: readonly AnnotationToolMeta[] = [
     title: "Click to place a text label on the board",
     tooltipId: "teach-tool-text",
   },
+  {
+    value: "laser",
+    label: "Laser",
+    title:
+      "Point at the board with a glowing trail that fades — nothing is saved",
+    tooltipId: "teach-tool-laser",
+  },
 ] as const;
 
 /** Look up a tool's metadata by value (undefined for an unknown value). */

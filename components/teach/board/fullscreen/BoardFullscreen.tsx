@@ -224,6 +224,7 @@ const PRESENT_TOOL_GLYPH: Record<BoardTool, GlyphName> = {
   line: "line",
   arrow: "arrow",
   text: "textAa",
+  laser: "laser",
 };
 
 /** The present-panel tool buttons: every canonical annotation tool (so present
