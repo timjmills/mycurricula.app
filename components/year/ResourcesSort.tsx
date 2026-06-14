@@ -26,7 +26,7 @@ import { useRouter } from "next/navigation";
 import type { LessonResource } from "@/lib/types";
 import { Chip, ToggleGroup, Tooltip } from "@/components/ui";
 import { ResourceEmbed } from "@/components/resources";
-import { ResourceTypeIcon } from "./icons";
+import { ResourceTypeIcon } from "./resource-icons";
 import styles from "./ResourcesSort.module.css";
 
 // ── Type metadata ─────────────────────────────────────────────────────────

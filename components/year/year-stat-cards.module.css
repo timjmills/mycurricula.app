@@ -30,6 +30,39 @@
   );
 }
 
+/* Clickable card variant (STANDARDS → coverage panel). The card is a <button>,
+   so the global `.cp-root button` reset (0,1,1) strips its padding/background/
+   border (which only live in the single-class `.card` rule). Doubling the class
+   (0,2,0) lets us RE-DECLARE those three here so they survive the reset; hover/
+   focus are likewise doubled so they out-rank this base. */
+.cardButton.cardButton {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  padding: 14px;
+  background: var(--panel-bg);
+  border: 1px solid var(--hairline, var(--ink-100));
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s,
+    border-color 0.12s;
+}
+.cardButton.cardButton:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--hairline, var(--ink-100)));
+  box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.cardButton.cardButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cardButton.cardButton {
+    transition: none;
+  }
+}
+
 /* ── Rounded-square icon badge ──────────────────────────────────────────── */
 .badge {
   flex: 0 0 auto;

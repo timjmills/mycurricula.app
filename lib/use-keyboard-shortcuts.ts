@@ -8,7 +8,7 @@
 //   T  jump to current week  setWeek(CURRENT_WEEK)
 //   1  navigate to /weekly
 //   2  navigate to /daily
-//   3  navigate to /subject/<current subjectView>
+//   3  navigate to /year?subject=<current subjectView> (the merged Yearly view)
 //   4  navigate to /schedule
 //   /  focus the top-bar search input
 //   ⌘/Ctrl+K  open command palette
@@ -163,9 +163,10 @@ export function useKeyboardShortcuts({
           break;
 
         case "3":
-          // Navigate to the subject view scoped to the current subjectView.
+          // The Curriculum view merged into the Yearly view — land on /year
+          // focused on the last-viewed subject (TimelineYear reads ?subject=).
           e.preventDefault();
-          router.push(`/subject/${subjectView}`);
+          router.push(`/year?subject=${subjectView}`);
           break;
 
         case "4":

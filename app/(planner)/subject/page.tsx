@@ -1,11 +1,11 @@
-// /subject — redirect to the default subject slug.
+// /subject — legacy route.
 //
-// The canonical URL for the Subject view is now /subject/[slug]. A bare
-// /subject visit (e.g. from a side-nav link that hasn't been updated yet, or
-// a user's bookmark) is silently forwarded to the default subject so no one
-// lands on a dead page.  MED-4 / SUBJECT-DEEPLINK-001.
+// The Curriculum view was merged into the Yearly view (/year), which is now a
+// progressive drill: all subjects → a subject → a unit → a week → a lesson.
+// A bare /subject visit (old bookmark, stale link) forwards to the all-subjects
+// Yearly view. The dynamic /subject/[slug] forwards to /year?subject=<slug>.
 import { redirect } from "next/navigation";
 
 export default function SubjectPage() {
-  redirect("/subject/math");
+  redirect("/year");
 }

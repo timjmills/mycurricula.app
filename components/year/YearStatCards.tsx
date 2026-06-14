@@ -7,7 +7,7 @@
 // the two surfaces never drift.
 //
 // Cards (left→right):
-//   DONE       — lessons marked done / total, with a cumulative-done sparkline
+//   DONE       — lessons marked done / total
 //   COMPLETE   — % of the year taught (done / total), with a progress bar
 //   STANDARDS  — unique standards taught at least once / total unique standards
 //   SKIPPED    — lessons with status "skipped" (red value when > 0)
@@ -84,12 +84,30 @@ interface StatCardProps {
   warn?: boolean;
   /** Slot below the value (sparkline or progress bar). */
   children?: ReactNode;
+  /**
+   * When set the whole card becomes a button (used by STANDARDS → opens the
+   * coverage panel). The card gets a hover lift + a "view" affordance via the
+   * `.cardButton` class.
+   */
+  onClick?: () => void;
+  /** Tooltip / accessible hint for the clickable variant. */
+  actionLabel?: string;
 }
 
-function StatCard({ label, value, caption, icon, accent, warn = false, children }: StatCardProps): ReactNode {
+function StatCard({
+  label,
+  value,
+  caption,
+  icon,
+  accent,
+  warn = false,
+  children,
+  onClick,
+  actionLabel,
+}: StatCardProps): ReactNode {
   // `--accent` drives both the badge tint and the icon color via the module CSS.
-  return (
-    <div className={styles.card} style={{ "--accent": accent } as React.CSSProperties}>
+  const inner = (
+    <>
       <div className={styles.badge} aria-hidden="true">
         {icon}
       </div>
@@ -101,13 +119,42 @@ function StatCard({ label, value, caption, icon, accent, warn = false, children 
         {children}
         <div className={styles.caption}>{caption}</div>
       </div>
+    </>
+  );
+  const cardStyle = { "--accent": accent } as React.CSSProperties;
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={`${styles.card} ${styles.cardButton}`}
+        style={cardStyle}
+        onClick={onClick}
+        aria-label={actionLabel ?? `${label}: ${value}`}
+        title={actionLabel}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <div className={styles.card} style={cardStyle}>
+      {inner}
     </div>
   );
 }
 
 // ── YearStatCards ───────────────────────────────────────────────────────────
 
-export function YearStatCards({ lessons }: { lessons: Lesson[] }): ReactNode {
+export function YearStatCards({
+  lessons,
+  onStandardsClick,
+}: {
+  lessons: Lesson[];
+  /** When set, the STANDARDS card becomes a button opening the coverage panel. */
+  onStandardsClick?: () => void;
+}): ReactNode {
   const total = lessons.length;
 
   // Done count — lessons whose status is "done".
@@ -166,6 +213,8 @@ export function YearStatCards({ lessons }: { lessons: Lesson[] }): ReactNode {
         caption="taught at least once"
         icon={<IconTarget />}
         accent="var(--brand-500)"
+        onClick={onStandardsClick}
+        actionLabel="View standards coverage — which standards are taught vs. still a gap, and the lessons that cover each"
       />
 
       <StatCard

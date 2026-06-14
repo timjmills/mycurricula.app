@@ -236,7 +236,9 @@ export function CommandPalette({
         ...r,
         action: () => {
           setSubjectView(subjectId);
-          router.push(`/subject/${subjectId}`);
+          // Curriculum view merged into Yearly — land on /year focused on the
+          // subject (TimelineYear reads ?subject= and drills the scope).
+          router.push(`/year?subject=${subjectId}`);
           onClose();
         },
       };

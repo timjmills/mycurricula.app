@@ -113,13 +113,7 @@ export const VIEWS: ViewDef[] = [
     label: "Yearly",
     href: "/year",
     tooltip:
-      "High-level roadmap of units across the year — see the whole arc at a glance",
-  },
-  {
-    label: "Curriculum",
-    href: "/subject",
-    tooltip:
-      "The full year of units and lessons per subject, with the standards each covers",
+      "The whole year — units across every subject, drilling into weeks, lessons, and standards (the Curriculum view now lives here)",
   },
   {
     label: "Teach",

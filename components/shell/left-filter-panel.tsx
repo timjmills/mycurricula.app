@@ -17,14 +17,12 @@
 // routes, not just Subject). We use next/navigation's `usePathname` (which is
 // why this file must remain a client component) to detect the active route.
 //
-// ── Subject-aware STANDARDS list (BUG-004 / MED-6) ─────────────────────────
-// On /subject, the STANDARDS filter list derives from the standards actually
-// used by lessons of the active subject (useAppState().subjectView). When the
-// teacher switches subjects the list updates within one render cycle — no
-// stale Math standards appear while Reading is active. On all other routes
-// the old curated FILTER_STANDARD_CODES list is used as a global fallback.
+// ── STANDARDS list ─────────────────────────────────────────────────────────
+// The STANDARDS filter offers a curated global list on the routes where this
+// panel renders. The richer, scope-aware standards facet + coverage panel
+// lives on the Yearly view (which absorbed the old per-subject Curriculum
+// route and its subject-derived standards list).
 
-import { useMemo } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -80,10 +78,9 @@ const ALL_STATUSES: LessonStatus[] = [
   "skipped",
 ];
 
-// ── Global fallback standards (non-subject routes) ───────────────────────────
-// A curated handful surfaced on routes that are not scoped to a single
-// subject. The /subject route derives its list from the active subject's
-// lessons instead (see the component body below).
+// ── Global standards list ────────────────────────────────────────────────────
+// A curated handful surfaced on the routes where this panel renders. The
+// scope-aware standards facet lives on the Yearly view.
 
 const FILTER_STANDARD_CODES_GLOBAL = [
   "5.NF.B.3",
@@ -118,34 +115,18 @@ export function LeftFilterPanel(): ReactNode {
   // renders, so `usePathname`, `useAppState`, and `usePlanner` all run before
   // any early return below (Rules of Hooks require a stable call order).
   const pathname = usePathname();
-  const { filters, updateFilters, resetFilters, leftPanelOpen, subjectView } =
-    useAppState();
+  const { filters, updateFilters, resetFilters, leftPanelOpen } = useAppState();
   // Catalog reference data now flows through the planner store (catalog
   // migration). Flag OFF these mirror the mock SUBJECTS / UNITS / describeStandard
   // byte-identically; flag ON they track the hydrated grade catalog.
-  const { lessons, subjects, activeUnitBySubject, describeStandard } =
-    usePlanner();
+  const { subjects, activeUnitBySubject, describeStandard } = usePlanner();
 
-  // ── Subject-aware standards (BUG-004 / MED-6) ─────────────────────────
-  // On /subject the panel shows only standards that appear in lessons of the
-  // active subject, de-duplicated and sorted alphabetically. Switching the
-  // subject updates this list within one render cycle.
-  // On all other routes, fall back to the global curated list.
-  const isSubjectRoute = pathname?.startsWith("/subject") ?? false;
-
-  const standardCodes = useMemo<readonly string[]>(() => {
-    if (!isSubjectRoute) return FILTER_STANDARD_CODES_GLOBAL;
-    const seen = new Set<string>();
-    for (const l of lessons) {
-      if (l.subject === subjectView) {
-        for (const code of l.standards) {
-          seen.add(code);
-        }
-      }
-    }
-    // Stable sort so the list order doesn't jump around on each render.
-    return [...seen].sort();
-  }, [isSubjectRoute, lessons, subjectView]);
+  // ── Standards filter list ─────────────────────────────────────────────
+  // A curated global handful. (The old per-subject derivation lived on the
+  // Curriculum route, which has merged into the Yearly view; the Yearly view
+  // now owns its own scope-aware standards facet + coverage panel, so the
+  // global panel just offers the curated set on the routes where it renders.)
+  const standardCodes: readonly string[] = FILTER_STANDARD_CODES_GLOBAL;
 
   // Route-based suppression — the Daily view supplies its own slim IconRail
   // in place of the global filter panel (TOPBAR-004). Weekly no longer hard-
@@ -153,15 +134,10 @@ export function LeftFilterPanel(): ReactNode {
   // so another agent can wire its filter pills to the weekly grid without
   // changing this file. Bailing with `null` keeps the panel entirely out of
   // the DOM and out of the accessibility tree on `/daily*` routes.
-  // Suppressed on /daily (own IconRail), and on /year + /subject: the v1.3
-  // Year (Timeline) view ships filter-free, and the v1.3 Subject (Workspace)
-  // view has its own left subjects panel — the global filter panel would be
-  // redundant/conflicting on both.
-  if (
-    pathname?.startsWith("/daily") ||
-    pathname?.startsWith("/year") ||
-    pathname?.startsWith("/subject")
-  ) {
+  // Suppressed on /daily (own IconRail) and on /year (the merged Yearly view
+  // ships its own Filters & View popover + standards facet, so the global
+  // filter panel would be redundant/conflicting there).
+  if (pathname?.startsWith("/daily") || pathname?.startsWith("/year")) {
     return null;
   }
 
@@ -424,17 +400,17 @@ export function LeftFilterPanel(): ReactNode {
         </section>
 
         {/* ── 4. Standards filter ────────────────────────────────────────── */}
-        {/* On /subject this list is derived from the active subject's lessons
-            (standardCodes). On all other routes it uses the global curated
-            list. An empty list renders the section as a no-op placeholder. */}
+        {/* A curated global standards list. The Yearly view owns the richer,
+            scope-aware standards facet + coverage panel. An empty list renders
+            the section as a no-op placeholder. */}
         <section className={styles.section}>
           <Tooltip
-            content="Filter to lessons that cover a specific standard (CCSS code). On a subject page the list narrows to that subject's standards only."
+            content="Filter to lessons that cover a specific standard (CCSS code). The Yearly view has a fuller standards coverage breakdown."
             side="right"
           >
             <p
               className={styles.sectionLabel}
-              title="Filter to lessons that cover a specific standard (CCSS code). On a subject page the list narrows to that subject's standards only."
+              title="Filter to lessons that cover a specific standard (CCSS code). The Yearly view has a fuller standards coverage breakdown."
             >
               Standards
             </p>

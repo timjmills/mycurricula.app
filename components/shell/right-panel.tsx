@@ -436,9 +436,10 @@ function CommentsPanel(): ReactNode {
   }
 
   function jumpToUnit(subjectId: string): void {
-    // Subject pages show the unit lanes; jumping there is the closest
-    // analogue to "open this unit" until the dedicated /unit route lands.
-    router.push(`/subject/${subjectId}`);
+    // The Yearly view (which absorbed the Curriculum view) shows the unit lanes;
+    // jumping there focused on the subject is the closest analogue to "open this
+    // unit" until a dedicated /unit route lands.
+    router.push(`/year?subject=${subjectId}`);
     toggleCommentsPanel();
   }
 
@@ -1099,6 +1100,18 @@ export function RightPanel(): ReactNode {
     if (todoPanelOpen || commentsPanelOpen) return null;
     if (selectedLessonId && !weeklyDrawerBand)
       return <LessonDetailPanel lessonId={selectedLessonId} />;
+    return null;
+  }
+
+  // ── /year gate (Curriculum↔Yearly merge) ────────────────────────────────
+  // The merged Yearly view renders its OWN in-layout, tabbed lesson pane and
+  // deliberately never writes selectedLessonId, so the shell-level
+  // LessonDetailPanel must not mount here — otherwise selecting a lesson would
+  // pop a redundant second panel (the old Curriculum dual-panel bug). The
+  // to-do and Shoutbox slide-outs still work on /year.
+  if (pathname?.startsWith("/year")) {
+    if (todoPanelOpen) return <TodoPanel />;
+    if (commentsPanelOpen) return <CommentsPanel />;
     return null;
   }
 

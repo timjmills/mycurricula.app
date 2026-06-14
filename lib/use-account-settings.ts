@@ -195,24 +195,22 @@ export function useDisplayName(): {
 // ── Default view ───────────────────────────────────────────────────────────
 
 /**
- * The routes a teacher may pick as their startup view. Matches the four
- * primary planner surfaces (CLAUDE.md §1 route map — "/subject" is the
- * Curriculum tab, "/year" the Yearly tab).
+ * The routes a teacher may pick as their startup view. The Curriculum surface
+ * ("/subject") was merged into the Yearly view ("/year"), so it is no longer a
+ * separate startup option (a stored "/subject" migrates to "/year" below).
  */
-export const DEFAULT_VIEW_ROUTES = [
-  "/weekly",
-  "/daily",
-  "/year",
-  "/subject",
-] as const;
+export const DEFAULT_VIEW_ROUTES = ["/weekly", "/daily", "/year"] as const;
 
 export type DefaultViewRoute = (typeof DEFAULT_VIEW_ROUTES)[number];
 
 /** Factory default — the Weekly view, the app's canonical surface. */
 export const DEFAULT_DEFAULT_VIEW: DefaultViewRoute = "/weekly";
 
-/** Clamp an arbitrary stored value to the allowed route set. */
+/** Clamp an arbitrary stored value to the allowed route set. A legacy
+ *  "/subject" (the retired Curriculum view) migrates to its successor "/year"
+ *  so existing teachers keep a sensible startup surface. */
 function normalizeDefaultView(input: unknown): DefaultViewRoute {
+  if (input === "/subject") return "/year";
   return DEFAULT_VIEW_ROUTES.includes(input as DefaultViewRoute)
     ? (input as DefaultViewRoute)
     : DEFAULT_DEFAULT_VIEW;

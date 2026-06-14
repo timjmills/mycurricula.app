@@ -214,7 +214,7 @@ export function TopBarMoreMenu({
               tabs are skipped (they render only as visual placeholders
               on desktop — non-interactive). The active tab matches by
               pathname equality OR pathname-starts-with so nested routes
-              like `/subject/math` still highlight the Curriculum row. */}
+              like `/boards/<id>` still highlight their parent row. */}
           {tabs && tabs.length > 0 && (
             <>
               <div

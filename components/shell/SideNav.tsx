@@ -39,8 +39,9 @@ const SECTIONS: NavSection[] = [
     items: [
       { label: "Daily", href: "/daily", icon: <CalendarIcon /> },
       { label: "Weekly", href: "/weekly", icon: <GridIcon /> },
-      { label: "Year", href: "/year", icon: <LayersIcon /> },
-      { label: "Curriculum", href: "/subject", icon: <BookIcon /> },
+      // The Curriculum view was merged into the Yearly view (/year), which now
+      // drills all subjects → subject → unit → week → lesson.
+      { label: "Yearly", href: "/year", icon: <LayersIcon /> },
     ],
   },
   {
@@ -195,14 +196,6 @@ function LayersIcon(): ReactNode {
     <svg {...svgProps()}>
       <path d="M12 3 4 7l8 4 8-4-8-4Z" />
       <path d="m4 12 8 4 8-4M4 17l8 4 8-4" />
-    </svg>
-  );
-}
-function BookIcon(): ReactNode {
-  return (
-    <svg {...svgProps()}>
-      <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z" />
-      <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z" />
     </svg>
   );
 }

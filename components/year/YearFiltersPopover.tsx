@@ -67,6 +67,26 @@ export interface YearFiltersPopoverProps {
   /** Subjects to offer; `cls` is the cp-subj class that colors the dot. */
   subjects: { id: string; name: string; cls: string }[];
   onChange: (next: YearFilterState) => void;
+  /**
+   * Show the Grid|List VIEW switch. The grid/list layout only governs the
+   * all-subjects timeline, so the merged Yearly view hides it once you drill
+   * into a subject/unit/week (where the center is a fixed card layout).
+   * Defaults to `true`.
+   */
+  showViewToggle?: boolean;
+  /**
+   * The global standards filter (`filters.standards`). When this AND
+   * `onOpenCoverage` are provided, the popover renders a STANDARDS facet: the
+   * active standard chips (each removable) plus a button into the full coverage
+   * panel where standards are browsed + toggled. Omit to hide the facet.
+   */
+  selectedStandards?: string[];
+  /** Remove one standard from the active filter (chip ×). */
+  onToggleStandard?: (code: string) => void;
+  /** Clear every active standard filter. */
+  onClearStandards?: () => void;
+  /** Open the full standards coverage panel (the rich browse/toggle surface). */
+  onOpenCoverage?: () => void;
 }
 
 // ── Static status rows ───────────────────────────────────────────────────────
@@ -193,8 +213,15 @@ export function YearFiltersPopover({
   value,
   subjects,
   onChange,
+  showViewToggle = true,
+  selectedStandards,
+  onToggleStandard,
+  onClearStandards,
+  onOpenCoverage,
 }: YearFiltersPopoverProps): ReactNode {
   const [open, setOpen] = useState(false);
+  const standardsFacet = !!onOpenCoverage;
+  const activeStandards = selectedStandards ?? [];
 
   // Root wraps BOTH the trigger and the popover so the outside-click test is a
   // single `contains` against one node. The <Button> primitive does not forward
@@ -207,7 +234,8 @@ export function YearFiltersPopover({
   // Number of active filter facets — drives the count badge and Reset state.
   // A "facet" is one chosen subject or status; an empty array contributes 0
   // (the empty array means "all", i.e. no narrowing).
-  const activeCount = value.subjects.length + value.statuses.length;
+  const activeCount =
+    value.subjects.length + value.statuses.length + activeStandards.length;
   const hasActiveFilters = activeCount > 0;
 
   // ── Dismissal: outside mousedown + Escape, both restore trigger focus ──────
@@ -276,10 +304,12 @@ export function YearFiltersPopover({
     onChange({ ...value, subjects: [] });
   }, [onChange, value]);
 
-  // Reset keeps the current view, clears both filter arrays.
+  // Reset keeps the current view, clears the local filter arrays AND the global
+  // standards filter (so "Reset filters" zeroes every active facet).
   const resetFilters = useCallback(() => {
     onChange({ view: value.view, subjects: [], statuses: [] });
-  }, [onChange, value.view]);
+    onClearStandards?.();
+  }, [onChange, value.view, onClearStandards]);
 
   const allSubjects = value.subjects.length === 0;
 
@@ -328,19 +358,23 @@ export function YearFiltersPopover({
           aria-label="Filters and view"
           className={styles.popover}
         >
-          {/* ── 1. VIEW ─────────────────────────────────────────────────── */}
-          <section className={styles.section}>
-            <p className={styles.sectionLabel}>View</p>
-            <ToggleGroup<"grid" | "list">
-              options={VIEW_OPTIONS}
-              value={value.view}
-              onChange={setView}
-              size="sm"
-              variant="subtle"
-              ariaLabel="Year layout"
-              className={styles.viewToggle}
-            />
-          </section>
+          {/* ── 1. VIEW ───────────────────────────────────────────────────
+              Only meaningful on the all-subjects timeline; hidden once a
+              subject/unit/week is focused (the center is a fixed layout). */}
+          {showViewToggle && (
+            <section className={styles.section}>
+              <p className={styles.sectionLabel}>View</p>
+              <ToggleGroup<"grid" | "list">
+                options={VIEW_OPTIONS}
+                value={value.view}
+                onChange={setView}
+                size="sm"
+                variant="subtle"
+                ariaLabel="Year layout"
+                className={styles.viewToggle}
+              />
+            </section>
+          )}
 
           {/* ── 2. SUBJECTS ─────────────────────────────────────────────── */}
           <section className={styles.section}>
@@ -439,6 +473,50 @@ export function YearFiltersPopover({
               })}
             </div>
           </section>
+
+          {/* ── 4. STANDARDS ──────────────────────────────────────────────
+              Wired to the global `filters.standards`. The rich browse/toggle
+              UI lives in the coverage panel; here we surface the ACTIVE
+              standard chips (each removable) + a button into that panel. */}
+          {standardsFacet && (
+            <section className={styles.section}>
+              <p className={styles.sectionLabel}>Standards</p>
+              {activeStandards.length > 0 ? (
+                <div className={styles.stdChips}>
+                  {activeStandards.map((code) => (
+                    <button
+                      key={code}
+                      type="button"
+                      className={styles.stdChip}
+                      onClick={() => onToggleStandard?.(code)}
+                      aria-label={`Remove standard filter ${code}`}
+                      title={`Stop filtering by ${code}`}
+                    >
+                      <span className="cp-mono">{code}</span>
+                      <span className={styles.stdChipX} aria-hidden="true">
+                        ×
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.stdHint}>
+                  No standard filter — open coverage to filter by standard and
+                  see what&apos;s taught vs. still a gap.
+                </p>
+              )}
+              <button
+                type="button"
+                className={styles.coverageBtn}
+                onClick={() => {
+                  setOpen(false);
+                  onOpenCoverage?.();
+                }}
+              >
+                Standards coverage…
+              </button>
+            </section>
+          )}
 
           {/* ── Footer: Reset ───────────────────────────────────────────────
               Hidden entirely when nothing is active, so it never offers a
