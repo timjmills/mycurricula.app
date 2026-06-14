@@ -342,7 +342,11 @@ export function BoardsModule({
   // ── Render ────────────────────────────────────────────────────────────────
 
   // Sandbox mode: no repo-backed boards yet — show the keep-it actions (§4a).
-  if (sandbox || !activeLessonId) {
+  // Gate on the REAL sandbox flag only — NOT `!activeLessonId`. A standalone
+  // board opened from /boards is lesson-less but NOT sandbox (it is already a
+  // kept board), so the "not saved / pin to lesson" UI must not show for it
+  // (Codex M); that case falls through to the board list below.
+  if (sandbox) {
     return (
       <div>
         <div className={styles.sandboxBadge}>Sandbox · not saved</div>
@@ -458,23 +462,34 @@ export function BoardsModule({
         </DndContext>
       )}
 
-      <button
-        type="button"
-        className={styles.addBtn}
-        onClick={handleAddBoard}
-        title="Add a new teaching board to this lesson"
-      >
-        <PlusIcon size={12} /> Add board
-      </button>
+      {/* Standalone single saved board (opened from /boards, no lesson): show
+          the board itself but NONE of the lesson actions below — Add Board and
+          Share-with-team both need a lesson to act on. */}
+      {!activeLessonId ? (
+        boards.length > 0 ? (
+          <p className={styles.muted}>
+            Editing a saved board — manage all your boards on the Boards page.
+          </p>
+        ) : null
+      ) : (
+        <>
+          <button
+            type="button"
+            className={styles.addBtn}
+            onClick={handleAddBoard}
+            title="Add a new teaching board to this lesson"
+          >
+            <PlusIcon size={12} /> Add board
+          </button>
 
-      {/* Share / push-to-team — destructive + team-wide. Per CLAUDE.md §4 the
-          tooltip is ALWAYS-ON (`required`) — it ignores per-id dismissal and
-          the global off switch. Button's `tooltip` prop can't carry `required`,
-          so we wrap the trigger in <Tooltip required> directly. A two-step
-          confirm gates the displacement before it applies; the consequence
-          toast then names the team-wide effect (handlePushToTeam). */}
-      <div className={styles.boardActions}>
-        {confirmPush ? (
+          {/* Share / push-to-team — destructive + team-wide. Per CLAUDE.md §4 the
+              tooltip is ALWAYS-ON (`required`) — it ignores per-id dismissal and
+              the global off switch. Button's `tooltip` prop can't carry `required`,
+              so we wrap the trigger in <Tooltip required> directly. A two-step
+              confirm gates the displacement before it applies; the consequence
+              toast then names the team-wide effect (handlePushToTeam). */}
+          <div className={styles.boardActions}>
+            {confirmPush ? (
           <>
             <Tooltip
               required
@@ -514,7 +529,9 @@ export function BoardsModule({
             </Button>
           </Tooltip>
         )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

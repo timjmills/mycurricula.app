@@ -168,24 +168,28 @@ export function TeachSubBar({
           );
         })}
 
-        {/* + Add Board */}
-        <Tooltip
-          content="Add a new board to this lesson (a new teaching phase)"
-          side="bottom"
-          tooltipId="teach-add-board"
-        >
-          {/* No chevron (audit G7): Add Board is a direct action, not a menu —
-              a dropdown caret would imply options that don't exist. */}
-          <button
-            type="button"
-            className={styles.addBoard}
-            onClick={onAddBoard}
-            aria-label="Add board"
+        {/* + Add Board — only when adding applies (a lesson or the sandbox).
+            Hidden when a single standalone board is open (no lesson to add to),
+            so the button is never a dead no-op. */}
+        {onAddBoard ? (
+          <Tooltip
+            content="Add a new board to this lesson (a new teaching phase)"
+            side="bottom"
+            tooltipId="teach-add-board"
           >
-            <PlusIcon />
-            Add Board
-          </button>
-        </Tooltip>
+            {/* No chevron (audit G7): Add Board is a direct action, not a menu —
+                a dropdown caret would imply options that don't exist. */}
+            <button
+              type="button"
+              className={styles.addBoard}
+              onClick={onAddBoard}
+              aria-label="Add board"
+            >
+              <PlusIcon />
+              Add Board
+            </button>
+          </Tooltip>
+        ) : null}
       </div>
 
       <div className={styles.spacer} aria-hidden="true" />

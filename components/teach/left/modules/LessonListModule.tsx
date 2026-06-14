@@ -56,7 +56,7 @@ function LessonRow({
       }
       aria-pressed={active}
       onClick={onSelect}
-      title="Teach this lesson — loads its boards in the center"
+      title="Open this lesson's boards in the center"
     >
       <span className={styles.lessonRowHead}>
         <span className={styles.lessonRowSubjDot} aria-hidden="true">

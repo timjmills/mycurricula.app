@@ -4,8 +4,10 @@
 //
 // Replaces the top-bar view tabs AND the icon rails (GlobalRail/RightIconRail)
 // with a single prototype-style left sidebar: brand → primary nav → tools →
-// settings → user. Mounted once in app/(planner)/layout.tsx. Teach is a
-// separate route group with its own chrome; the "Teach" item links out to it.
+// settings → user. Mounted once in app/(planner)/layout.tsx. The "Boards" item
+// links to the board home (/boards); the board editor lives in a separate route
+// group (/teach) with its own full-screen chrome and is reached by opening a
+// board, so it carries no SideNav entry of its own.
 //
 // Active highlighting derives from the pathname. The wordmark + brand live
 // here now (removed from the top bar).
@@ -47,7 +49,7 @@ const SECTIONS: NavSection[] = [
       { label: "Catch-up", href: "/catch-up", icon: <FlagIcon /> },
       { label: "Schedule", href: "/schedule", icon: <ClockIcon /> },
       { label: "Archive", href: "/archive", icon: <ArchiveIcon /> },
-      { label: "Teach", href: "/teach", icon: <PresentIcon /> },
+      { label: "Boards", href: "/boards", icon: <BoardsIcon />, match: "/boards" },
     ],
   },
 ];
@@ -219,11 +221,14 @@ function ClockIcon(): ReactNode {
     </svg>
   );
 }
-function PresentIcon(): ReactNode {
+// Learning board — a canvas with widget tiles. Distinct from the screen-shaped
+// PresentIcon it replaces; reads as "boards" rather than "present".
+function BoardsIcon(): ReactNode {
   return (
     <svg {...svgProps()}>
-      <rect x="3" y="4" width="18" height="12" rx="2" />
-      <path d="M12 16v4M8 20h8" />
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <rect x="6" y="7" width="5" height="5" rx="1" />
+      <path d="M14 7.5h4M14 11h4M6 15.5h12" />
     </svg>
   );
 }
