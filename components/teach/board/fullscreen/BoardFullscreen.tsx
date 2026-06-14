@@ -55,11 +55,22 @@ import type {
 import type { BoardTool } from "@/lib/teach/types";
 import { effective, themeVars } from "@/lib/teach/widget-theme";
 import { widgetDefaultTheme } from "@/lib/teach/widget-defaults";
-import { useBoardAnnotations } from "@/lib/use-board-annotations";
+import {
+  annotationStoreKey,
+  persistBoardAnnotations,
+  readBoardAnnotations,
+  useBoardAnnotations,
+} from "@/lib/use-board-annotations";
+import type { BoardAnnotations } from "@/lib/board-annotations";
 import { AnnotationLayer } from "@/components/teach/annotation";
 import { WidgetBody } from "@/components/teach/widgets";
+import { Button } from "@/components/ui";
 import { Glyph, type GlyphName } from "./glyphs";
 import styles from "./BoardFullscreen.module.css";
+
+/** JSON of an empty annotation document — the baseline for a page with no saved
+ *  ink, so "drew then erased to empty" reads as not-dirty (F1/F2 present-save). */
+const EMPTY_ANN_JSON = JSON.stringify({ version: 1, strokes: [] });
 
 // ── Backdrop presets ─────────────────────────────────────────────────────────
 //
@@ -220,6 +231,7 @@ export function BoardFullscreen({
   const [libQuery, setLibQuery] = useState("");
 
   const rootRef = useRef<HTMLDivElement>(null);
+  const savePromptRef = useRef<HTMLDivElement>(null);
 
   const pageList = useMemo(() => orderedPages(board, pages), [board, pages]);
   const activeIndex = Math.max(
@@ -228,15 +240,82 @@ export function BoardFullscreen({
   );
   const activePage = pageList[activeIndex] ?? pageList[0];
 
-  // ── Annotation engine (REUSED) ────────────────────────────────────────────
-  // Per-page surface so each page keeps its own ink; persistence is keyed by
-  // lesson/board/resource (resourceId = the page id here, since each page is a
-  // distinct drawing surface over the same board).
+  // ── Annotation engine (REUSED, EPHEMERAL in present — F1/F2) ───────────────
+  // Present-mode ink is EPHEMERAL: it does NOT auto-persist (the owner's rule —
+  // presenting + writing must not silently save). It lives in an in-memory
+  // per-page session buffer; on exit a "Save these annotations?" prompt either
+  // persists every annotated page or discards them. The hook hydrates the active
+  // page back FROM the session buffer so navigating pages within one session
+  // doesn't lose a page's ink. Persistence is keyed by lesson/board/page exactly
+  // like the editing surface, so a saved page's ink reloads there.
+  const sessionBuffer = useRef<Map<string, BoardAnnotations>>(new Map());
+  // Pages whose previously-SAVED ink we've already attempted to pre-load.
+  const seededRef = useRef<Set<string>>(new Set());
+  // Per-page BASELINE (JSON of the pre-seeded saved ink, or empty when none).
+  // A page is "dirty" only when its current buffer differs from this baseline —
+  // so a page that was merely VIEWED (saved ink pre-seeded, nothing drawn) or
+  // drawn-then-undone-back-to-baseline is NOT dirty. This (not a monotonic
+  // edited-set) drives the exit prompt + which pages Save writes, keeping the
+  // saved data in sync with the visible canvas.
+  const baselineRef = useRef<Map<string, string>>(new Map());
+  // Bumped after an async pre-seed so the hook re-hydrates from the now-filled
+  // buffer (the saved ink reappears without a remount).
+  const [hydrateNonce, setHydrateNonce] = useState(0);
+  const capturePage = useCallback(
+    (ann: BoardAnnotations): void => {
+      const pid = activePage?.id;
+      if (pid != null) sessionBuffer.current.set(pid, ann);
+    },
+    [activePage?.id],
+  );
   const annotations = useBoardAnnotations({
     lessonId: board.masterLessonId,
     boardId: board.id,
     resourceId: activePage?.id ?? null,
+    ephemeral: true,
+    hydrateFrom: sessionBuffer.current.get(activePage?.id ?? "") ?? null,
+    hydrateKey: hydrateNonce,
+    onChange: capturePage,
   });
+  const [savePrompt, setSavePrompt] = useState(false);
+
+  // Pre-seed the session buffer with a page's previously-SAVED ink the first
+  // time it's shown this session (F1/F2 + the write-only-persistence fix): the
+  // saved ink reappears in present, and an exit-Save then MERGES with it rather
+  // than clobbering. Ephemeral hydrate starts empty, so this async read +
+  // hydrateNonce bump fills it. Skips if the teacher already drew on the page
+  // (capturePage populated the buffer) so an in-flight read can't clobber it.
+  const lessonIdForKey = board.masterLessonId;
+  const boardIdForKey = board.id;
+  useEffect(() => {
+    const pid = activePage?.id;
+    if (pid == null || seededRef.current.has(pid)) return;
+    // NOTE: mark `seededRef` only AFTER the read resolves, and abort via a
+    // per-invocation `cancelled` flag — NOT before. React StrictMode double-
+    // invokes this effect in dev (mount → cleanup → mount); marking seeded up
+    // front would let the first invocation's cleanup abort its read while the
+    // second early-returns on the guard, so the saved ink would never apply.
+    let cancelled = false;
+    void readBoardAnnotations(
+      annotationStoreKey(lessonIdForKey, boardIdForKey, pid),
+    ).then((saved) => {
+      if (cancelled) return;
+      seededRef.current.add(pid);
+      // Record the page's baseline (its saved ink, or empty) so dirtiness is a
+      // content diff against this, not "was ever touched".
+      baselineRef.current.set(
+        pid,
+        saved && saved.strokes.length > 0 ? JSON.stringify(saved) : EMPTY_ANN_JSON,
+      );
+      if (!saved || saved.strokes.length === 0) return;
+      if (sessionBuffer.current.has(pid)) return; // teacher drew meanwhile
+      sessionBuffer.current.set(pid, saved);
+      setHydrateNonce((n) => n + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage?.id, lessonIdForKey, boardIdForKey]);
 
   // Resolve the active markup color token → a concrete CSS value the canvas
   // renderer can use (the engine needs a concrete colour string, not a token).
@@ -291,22 +370,102 @@ export function BoardFullscreen({
     [tool, addWidget],
   );
 
+  // ── Present-mode save-prompt (F1/F2) ───────────────────────────────────────
+  // Exit is INTERCEPTED: if any page's ink DIFFERS from its baseline, ask Save /
+  // Discard / Cancel before leaving. The active page's latest ink is captured
+  // into the session buffer via `onChange` (which now also fires when a user
+  // undoes back to baseline), so the diff is accurate at exit time.
+  const changedPages = useCallback((): string[] => {
+    const out: string[] = [];
+    for (const [pid, ann] of sessionBuffer.current) {
+      const base = baselineRef.current.get(pid) ?? EMPTY_ANN_JSON;
+      if (JSON.stringify(ann) !== base) out.push(pid);
+    }
+    return out;
+  }, []);
+
+  const handleExitRequest = useCallback((): void => {
+    if (changedPages().length > 0) {
+      setSavePrompt(true);
+      return;
+    }
+    onExit();
+  }, [changedPages, onExit]);
+
+  const handleDiscard = useCallback((): void => {
+    // Ephemeral — nothing was persisted; just leave (the buffer dies on unmount).
+    setSavePrompt(false);
+    onExit();
+  }, [onExit]);
+
+  const [saving, setSaving] = useState(false);
+  const handleSave = useCallback((): void => {
+    if (saving) return;
+    setSaving(true);
+    // Persist only the pages whose ink CHANGED vs baseline, under each page's
+    // lesson/board/page key. Each buffer value started from that page's saved ink
+    // (pre-seed), so this MERGES edits rather than clobbering. A page erased back
+    // to empty writes 0 strokes → writeEntry deletes the key.
+    const dirty = changedPages();
+    const buf = new Map(sessionBuffer.current);
+    void (async () => {
+      try {
+        for (const pageId of dirty) {
+          const ann = buf.get(pageId);
+          if (!ann) continue;
+          await persistBoardAnnotations(
+            annotationStoreKey(board.masterLessonId, board.id, pageId),
+            ann,
+          );
+        }
+      } finally {
+        setSaving(false);
+        setSavePrompt(false);
+        onExit();
+      }
+    })();
+  }, [saving, changedPages, board.masterLessonId, board.id, onExit]);
+
+  // Move focus into the save-prompt when it opens so a keyboard/SR user lands on
+  // its actions (not a chrome control behind the scrim). The Tab trap below
+  // scopes to the prompt while it's open so focus can't escape behind it.
+  useEffect(() => {
+    if (!savePrompt) return;
+    savePromptRef.current
+      ?.querySelector<HTMLElement>("button")
+      ?.focus({ preventScroll: true });
+  }, [savePrompt]);
+
   // ── Esc exits + focus trap ─────────────────────────────────────────────────
   const handleKeyDown = useCallback(
     (e: ReactKeyboardEvent<HTMLDivElement>) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        // CRITICAL: also stop the NATIVE event so the global window-level
+        // `useTeachShortcuts` Esc handler (which dispatches setPresent:false and
+        // would unmount this surface — destroying the unsaved session buffer
+        // before the save-prompt can act) never sees this keypress. Present mode
+        // owns Esc.
+        e.stopPropagation();
+        e.nativeEvent.stopImmediatePropagation();
+        if (savePrompt) {
+          // Esc while the save-prompt is open cancels the prompt, not present.
+          setSavePrompt(false);
+          return;
+        }
         if (bgOpen || libOpen) {
           setBgOpen(false);
           setLibOpen(false);
           return;
         }
-        onExit();
+        handleExitRequest();
         return;
       }
       if (e.key !== "Tab") return;
-      // Trap focus inside the surface while present mode is open.
-      const root = rootRef.current;
+      // Trap focus inside the surface while present mode is open — and scope the
+      // trap to the save-prompt while IT is open so focus can't reach the chrome
+      // controls behind the modal scrim (a11y: aria-modal must contain focus).
+      const root = savePrompt ? savePromptRef.current : rootRef.current;
       if (!root) return;
       const focusables = root.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [href], input, textarea, [tabindex]:not([tabindex="-1"])',
@@ -323,7 +482,7 @@ export function BoardFullscreen({
         first.focus();
       }
     },
-    [bgOpen, libOpen, onExit],
+    [bgOpen, libOpen, savePrompt, handleExitRequest],
   );
 
   // Focus the surface on mount so Esc + the trap work immediately.
@@ -403,7 +562,7 @@ export function BoardFullscreen({
           type="button"
           className={styles.chromeBtn}
           aria-label="Exit present mode and return home"
-          onClick={onExit}
+          onClick={handleExitRequest}
         >
           <Glyph name="home" />
         </button>
@@ -719,6 +878,60 @@ export function BoardFullscreen({
           <Glyph name="chevR" size={18} />
         </button>
       </div>
+
+      {/* ── Save-these-annotations prompt (F1/F2) ── */}
+      {savePrompt ? (
+        <div
+          className={styles.savePromptScrim}
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !saving) setSavePrompt(false);
+          }}
+        >
+          <div
+            ref={savePromptRef}
+            className={styles.savePromptCard}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="present-save-title"
+          >
+            <h2 id="present-save-title" className={styles.savePromptTitle}>
+              Save these annotations?
+            </h2>
+            <p className={styles.savePromptText}>
+              Keep the ink you drew while presenting, or discard it. Saved ink
+              reappears the next time you present this board.
+            </p>
+            <div className={styles.savePromptRow}>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={saving}
+                loading={saving}
+                onClick={handleSave}
+              >
+                Save
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={saving}
+                onClick={handleDiscard}
+              >
+                Discard
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={saving}
+                onClick={() => setSavePrompt(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

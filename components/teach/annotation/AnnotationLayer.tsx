@@ -26,7 +26,7 @@ import {
   type ReactNode,
 } from "react";
 import type { BoardTool } from "@/lib/teach/types";
-import type { Pt } from "@/lib/board-annotations";
+import { DEFAULT_TEXT_PX, type Pt } from "@/lib/board-annotations";
 import {
   clientToNormalized,
   type UseBoardAnnotationsApi,
@@ -68,6 +68,9 @@ export function AnnotationLayer({
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
+  // The previous erase point in a drag — used to interpolate between samples so
+  // a FAST eraser flick can't skip over strokes between two move events (F3).
+  const lastEraseRef = useRef<Pt | null>(null);
   const [textDraft, setTextDraft] = useState<TextDraft | null>(null);
 
   const { attachCanvas, resize } = annotations;
@@ -126,6 +129,7 @@ export function AnnotationLayer({
 
       if (tool === "eraser") {
         annotations.eraseAt(pt);
+        lastEraseRef.current = pt;
         drawingRef.current = true;
         return;
       }
@@ -160,8 +164,33 @@ export function AnnotationLayer({
       if (!drawingRef.current) return;
 
       if (tool === "eraser") {
-        const pt = normalizedFrom(e.clientX, e.clientY);
-        if (pt) annotations.eraseAt(pt);
+        // Erase at EVERY coalesced sample, and interpolate between consecutive
+        // samples (and across move events via lastEraseRef) so a fast flick can
+        // never skip a stroke that sits between two sparse points (F3). Step at
+        // ~half the erase tolerance (ERASE_TOL = 0.02) → no reachable gap.
+        const events =
+          typeof e.nativeEvent.getCoalescedEvents === "function"
+            ? e.nativeEvent.getCoalescedEvents()
+            : [e.nativeEvent];
+        const STEP = 0.01;
+        for (const ev of events.length ? events : [e.nativeEvent]) {
+          const pt = normalizedFrom(ev.clientX, ev.clientY);
+          if (!pt) continue;
+          const prev = lastEraseRef.current;
+          if (prev) {
+            const dist = Math.hypot(pt.x - prev.x, pt.y - prev.y);
+            const steps = Math.max(1, Math.ceil(dist / STEP));
+            for (let i = 1; i <= steps; i += 1) {
+              annotations.eraseAt({
+                x: prev.x + ((pt.x - prev.x) * i) / steps,
+                y: prev.y + ((pt.y - prev.y) * i) / steps,
+              });
+            }
+          } else {
+            annotations.eraseAt(pt);
+          }
+          lastEraseRef.current = pt;
+        }
         return;
       }
 
@@ -190,7 +219,10 @@ export function AnnotationLayer({
       if (!drawingRef.current) return;
       drawingRef.current = false;
       (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
-      if (tool === "eraser") return;
+      if (tool === "eraser") {
+        lastEraseRef.current = null;
+        return;
+      }
       annotations.endStroke();
     },
     [annotations, tool],
@@ -199,6 +231,7 @@ export function AnnotationLayer({
   const handlePointerCancel = useCallback(() => {
     if (!drawingRef.current) return;
     drawingRef.current = false;
+    lastEraseRef.current = null;
     annotations.cancelStroke();
   }, [annotations]);
 
@@ -238,6 +271,10 @@ export function AnnotationLayer({
             left: textDraft.left,
             top: textDraft.top,
             color,
+            // F9: the textarea size is driven by the SAME constant the canvas
+            // renderer uses, so typed text matches the committed stroke exactly
+            // (the old hardcoded `font-size: 22px` in the CSS module is gone).
+            fontSize: DEFAULT_TEXT_PX,
           }}
           value={textDraft.value}
           autoFocus
