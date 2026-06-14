@@ -68,6 +68,7 @@ export type LessonPatch = Partial<
     | "notes"
     | "resources"
     | "standards"
+    | "standardIds"
     | "time"
     | "status"
     | "reasonNotDone"

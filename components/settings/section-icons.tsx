@@ -47,6 +47,17 @@ export function CurriculumGlyph({ size }: GlyphProps): ReactNode {
   );
 }
 
+/** Standards — a checklist (the curriculum standards a lesson is tagged with). */
+export function StandardsGlyph({ size }: GlyphProps): ReactNode {
+  return frame(
+    size,
+    <>
+      <path d="M10 6.5h9.5M10 12h9.5M10 17.5h9.5" />
+      <path d="m4 5.6 1.2 1.2L7.4 4.5M4 11.1l1.2 1.2 2.2-2.3M4 16.6l1.2 1.2 2.2-2.3" />
+    </>,
+  );
+}
+
 /** Calendar — month grid with a marked day. */
 export function CalendarGlyph({ size }: GlyphProps): ReactNode {
   return frame(
@@ -156,6 +167,7 @@ export function OverviewGlyph({ size }: GlyphProps): ReactNode {
 /** Registry keyed by the sidebar slug (SETTINGS_GROUPS / overview tiles). */
 export const SECTION_ICONS: Record<string, (props: GlyphProps) => ReactNode> = {
   curriculum: CurriculumGlyph,
+  standards: StandardsGlyph,
   calendar: CalendarGlyph,
   schedule: ScheduleGlyph,
   subjects: SubjectsGlyph,

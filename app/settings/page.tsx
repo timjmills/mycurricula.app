@@ -156,6 +156,28 @@ function OverviewBody(): ReactNode {
     [],
   );
 
+  // Standards lives in Supabase (not localStorage), so its tile summary fetches
+  // the caller's effective framework count post-mount. Degrades to null (a
+  // neutral summary) when signed out / offline / the route fails.
+  const [standardsCount, setStandardsCount] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/standards/frameworks")
+      .then((r) => r.json())
+      .then((d: { effectiveIds?: string[] }) => {
+        if (alive)
+          setStandardsCount(
+            Array.isArray(d.effectiveIds) ? d.effectiveIds.length : null,
+          );
+      })
+      .catch(() => {
+        if (alive) setStandardsCount(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // ── Summary strings ───────────────────────────────────────────────────
   const weekPreset = detectSchoolWeekPreset(days);
   const weekLabel =
@@ -182,6 +204,12 @@ function OverviewBody(): ReactNode {
     curriculum: currentUser.curriculumLabel
       ? `Label: “${currentUser.curriculumLabel}”`
       : "No curriculum label set",
+    standards:
+      standardsCount == null
+        ? "Choose your frameworks"
+        : standardsCount === 0
+          ? "No frameworks selected"
+          : `${standardsCount} ${standardsCount === 1 ? "framework" : "frameworks"} active`,
     calendar: `${weekLabel} week · ${holidays.length} ${
       holidays.length === 1 ? "holiday" : "holidays"
     }`,
@@ -233,6 +261,13 @@ function OverviewBody(): ReactNode {
               label="Curriculum"
               scope="team"
               summary={summaries.curriculum}
+            />
+            <OverviewCard
+              href="/settings/standards"
+              glyph={SECTION_ICONS.standards({ size: 20 })}
+              label="Standards"
+              scope="team"
+              summary={summaries.standards}
             />
             <OverviewCard
               href="/settings/calendar"

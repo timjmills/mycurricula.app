@@ -86,6 +86,11 @@ import {
   sb,
   type ServerClient,
 } from "../supabase/helpers";
+import {
+  resolveCodesToStandardIds,
+  resolveStandardsByIds,
+  validateStandardIds,
+} from "@/lib/standards/code-lookup";
 
 // ── Supabase client helpers (shared, see lib/supabase/helpers.ts) ────────────
 
@@ -568,24 +573,39 @@ function jsonToSectionResources(
   return out;
 }
 
-// ── Standards uuid[] ↔ slug code[] bridge ─────────────────────────────────────
-// Standard CODES are the slugs (`5.NF.A.1`); the DB stores `standards uuid[]`.
-// `slugToUuid("standard", code)` maps code → uuid; the reverse index maps the
-// uuids back. We build the reverse index from the grade's loaded standard codes
-// once per read so a lesson's `standards uuid[]` resolve to the code slugs the
-// domain expects.
+// ── Standards uuid[] ↔ code[] bridge ──────────────────────────────────────────
+// Lessons store `standards uuid[]`; the domain carries standard CODES. The reverse
+// index (uuid → code) is built per read from the grade's loaded standards, so a
+// lesson's `standards uuid[]` resolve to the code slugs the domain expects.
+//
+// The FORWARD direction (code → uuid, for persisting an edited tag set) is NOT a
+// deterministic mint — the live catalog's `standards.id` were not minted from the
+// code, so it MUST be a real DB lookup. That lives in lib/standards/code-lookup.ts
+// (`resolveCodesToStandardIds`, scoped to the caller's effective frameworks) and is
+// awaited once at the top of updateLesson — never `slugToUuid("standard", …)`,
+// which would persist uuids that match no row.
 
-function standardUuidsToCodes(
+/** Map a lesson's stored `standards uuid[]` to INDEX-ALIGNED { codes, ids }: for
+ *  each uuid that resolves to a code, push BOTH the code (display) and the uuid
+ *  (exact identity), in the same position. Carrying the uuid lets an edit persist
+ *  the EXACT standard the teacher picked — codes alone are ambiguous across
+ *  frameworks that share a code (e.g. AERO + WIDA-ELD both define `S1`).
+ *  Augmentation (augmentStandardsIndex) ensures every referenced uuid resolves,
+ *  so the two arrays stay aligned and complete. */
+function standardsCodesAndIds(
   uuids: string[],
   uuidToCode: Map<string, string>,
-): string[] {
-  return uuids
-    .map((u) => uuidToCode.get(u))
-    .filter((c): c is string => typeof c === "string");
-}
-
-function standardCodesToUuids(codes: string[]): string[] {
-  return codes.map((c) => slugToUuid("standard", c));
+): { codes: string[]; ids: string[] } {
+  const codes: string[] = [];
+  const ids: string[] = [];
+  for (const u of uuids) {
+    const code = uuidToCode.get(u);
+    if (typeof code === "string") {
+      codes.push(code);
+      ids.push(u);
+    }
+  }
+  return { codes, ids };
 }
 
 // ── Row → domain mappers ──────────────────────────────────────────────────────
@@ -606,6 +626,8 @@ function buildLesson(args: {
   notes: string;
   resources: LessonResource[];
   standards: string[];
+  /** The real `standards.id` uuids behind `standards`, index-aligned. */
+  standardIds?: string[];
   status: LessonStatus;
   reasonNotDone: string;
   isPersonal: boolean;
@@ -628,6 +650,7 @@ function buildLesson(args: {
     notes: args.notes,
     resources: args.resources,
     standards: args.standards,
+    standardIds: args.standardIds,
     week: args.week,
     day: args.day,
     isPersonal: args.isPersonal,
@@ -757,6 +780,47 @@ async function loadStandardsIndex(
     uuidToCode.set(row.id, row.code);
   }
   return { map, uuidToCode };
+}
+
+/** Phase 7 — out-of-grade tag survival. `loadStandardsIndex` is seeded from the
+ *  grade's ASSIGNED frameworks (a fast, bounded baseline). But the tagging
+ *  picker lets a teacher tag a standard from ANY framework in their EFFECTIVE
+ *  set (school default ± personal overrides), which can be broader than the
+ *  grade's assignments. A lesson uuid pointing at such an out-of-baseline
+ *  standard isn't in `uuidToCode`, so `standardUuidsToCodes` would silently
+ *  DROP it — the tag would vanish on reload (data loss).
+ *
+ *  This patches the index IN PLACE: any referenced uuid missing from the
+ *  baseline is resolved by a direct id lookup (`resolveStandardsByIds`, RLS-
+ *  gated) and merged into BOTH `uuidToCode` (so the lesson maps back to its
+ *  code) and `map` (so describeStandard surfaces its wording). No-op when every
+ *  referenced uuid is already in the baseline (the common case for the beta,
+ *  whose effective set == the grade's frameworks). Bounded: only the handful of
+ *  uuids a lesson set actually references are looked up, never the catalog. */
+async function augmentStandardsIndex(
+  client: ServerClient,
+  standards: { map: StandardsMap; uuidToCode: Map<string, string> },
+  referencedUuids: readonly string[],
+): Promise<void> {
+  const missing = [
+    ...new Set(
+      referencedUuids.filter(
+        (u) =>
+          typeof u === "string" &&
+          u.length > 0 &&
+          !standards.uuidToCode.has(u),
+      ),
+    ),
+  ];
+  if (missing.length === 0) return;
+  const extra = await resolveStandardsByIds(client, missing);
+  for (const row of extra) {
+    standards.uuidToCode.set(row.id, row.code);
+    // Existing baseline wording wins; only add a code the baseline lacks.
+    if (!(row.code in standards.map)) {
+      standards.map[row.code] = row.description ?? row.code;
+    }
+  }
 }
 
 // ── Implementation ────────────────────────────────────────────────────────────
@@ -956,6 +1020,18 @@ export const plannerSupabaseSource: PlannerDataSource = {
     const complByMaster = new Map<string, CompletionRow>();
     for (const c of complRows) complByMaster.set(c.core_lesson_event_id, c);
 
+    // Phase 7: patch the standards index for any tag pointing at a framework
+    // OUTSIDE the grade's baseline (the picker tags from the broader effective
+    // set). Without this those uuids drop on read and the tag vanishes. Collect
+    // every referenced uuid from the EFFECTIVE source rows (copy over master)
+    // plus authored, then augment the shared index in place once.
+    await augmentStandardsIndex(client, standards, [
+      ...masterRows.flatMap((m) =>
+        (copyByMaster.get(m.id) ?? m).standards ?? [],
+      ),
+      ...authoredRows.flatMap((a) => a.standards ?? []),
+    ]);
+
     // 4. Resolve personal-over-master and map each to a FLAT Lesson, EXCLUDING
     //    masters the owner has archived for themselves (archived_at not null on
     //    their personal copy — a personal soft-delete that never touches master).
@@ -971,6 +1047,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
       const src = copy ?? master;
       const subjectId = uuidToSubjectId.get(src.subject_id) ?? "math";
       const unitSlug = uuidToUnitSlug.get(src.unit_id) ?? src.unit_id;
+      const std = standardsCodesAndIds(src.standards, standards.uuidToCode);
 
       masterLessons.push(
         buildLesson({
@@ -984,7 +1061,8 @@ export const plannerSupabaseSource: PlannerDataSource = {
           directions: src.directions ?? "",
           notes: src.notes ?? "",
           resources: jsonToResources(src.resources),
-          standards: standardUuidsToCodes(src.standards, standards.uuidToCode),
+          standards: std.codes,
+          standardIds: std.ids,
           status,
           reasonNotDone,
           isPersonal: copy != null,
@@ -1002,6 +1080,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
       const unitSlug = a.unit_id
         ? (uuidToUnitSlug.get(a.unit_id) ?? a.unit_id)
         : "";
+      const std = standardsCodesAndIds(a.standards, standards.uuidToCode);
       return buildLesson({
         id: a.id,
         subject: subjectId,
@@ -1013,7 +1092,8 @@ export const plannerSupabaseSource: PlannerDataSource = {
         directions: a.directions ?? "",
         notes: a.notes ?? "",
         resources: jsonToResources(a.resources),
-        standards: standardUuidsToCodes(a.standards, standards.uuidToCode),
+        standards: std.codes,
+        standardIds: std.ids,
         status: statusFromText(a.status),
         reasonNotDone: a.reason_not_done ?? "",
         isPersonal: true,
@@ -1161,6 +1241,23 @@ export const plannerSupabaseSource: PlannerDataSource = {
     // `personal_authored_lessons` row directly (no fork — it has no master);
     // a master-derived lesson lazily forks into `personal_core_lesson_event_copies`.
     const client = await sb();
+    // Resolve the standards to persist (uuid[]) once; every write branch reuses it.
+    //   • patch.standardIds (the tagging picker's EXACT, collision-free path):
+    //     validate the ids name real catalog standards and write them verbatim —
+    //     no ambiguous code→uuid re-resolution (a code like `S1` exists in multiple
+    //     frameworks, so codes alone can't identify the standard the teacher picked).
+    //   • patch.standards only (legacy/code-only callers): R1 fallback — resolve
+    //     codes → ids via DB lookup scoped to the effective set (first match per
+    //     code). Unresolved entries are dropped, never fabricated.
+    // `undefined` when neither standards field is in the patch (no standards write).
+    const resolvedStandards =
+      patch.standardIds !== undefined
+        ? await validateStandardIds(client, patch.standardIds)
+        : patch.standards !== undefined
+          ? await resolveCodesToStandardIds(client, patch.standards)
+          : undefined;
+    const writesStandards =
+      patch.standardIds !== undefined || patch.standards !== undefined;
     const authored = await loadAuthored(client, lessonId, ownerId);
 
     if (authored) {
@@ -1173,8 +1270,8 @@ export const plannerSupabaseSource: PlannerDataSource = {
       if (patch.resources !== undefined)
         next.resources =
           patch.resources as unknown as AuthoredLessonRow["resources"];
-      if (patch.standards !== undefined)
-        next.standards = standardCodesToUuids(patch.standards);
+      if (writesStandards)
+        next.standards = resolvedStandards ?? [];
       if (patch.differentiation !== undefined)
         next.differentiation = patch.differentiation;
       // Authored completion lives on its OWN `status`/`reason_not_done` columns
@@ -1238,8 +1335,8 @@ export const plannerSupabaseSource: PlannerDataSource = {
       if (patch.resources !== undefined)
         next.resources =
           patch.resources as unknown as MasterEventRow["resources"];
-      if (patch.standards !== undefined)
-        next.standards = standardCodesToUuids(patch.standards);
+      if (writesStandards)
+        next.standards = resolvedStandards ?? [];
       if (patch.differentiation !== undefined)
         next.differentiation = patch.differentiation;
       // `preview`/`time`/`tasks` have no master column (derived/unmodelled) —
@@ -1271,8 +1368,8 @@ export const plannerSupabaseSource: PlannerDataSource = {
       if (patch.directions !== undefined) next.directions = patch.directions;
       if (patch.notes !== undefined) next.notes = patch.notes;
       if (patch.resources !== undefined) next.resources = patch.resources;
-      if (patch.standards !== undefined)
-        next.standards = standardCodesToUuids(patch.standards);
+      if (writesStandards)
+        next.standards = resolvedStandards ?? [];
       if (patch.differentiation !== undefined)
         next.differentiation = patch.differentiation;
       // `preview`/`time`/`tasks` have no column in the copies table — they are
@@ -1459,7 +1556,10 @@ export const plannerSupabaseSource: PlannerDataSource = {
       directions: inserted.directions ?? "",
       notes: inserted.notes ?? "",
       resources: jsonToResources(inserted.resources),
-      standards: standardUuidsToCodes(inserted.standards, standards.uuidToCode),
+      standards: standardsCodesAndIds(inserted.standards, standards.uuidToCode)
+        .codes,
+      standardIds: standardsCodesAndIds(inserted.standards, standards.uuidToCode)
+        .ids,
       status: statusFromText(inserted.status),
       reasonNotDone: inserted.reason_not_done ?? "",
       isPersonal: true,
@@ -1902,6 +2002,10 @@ async function reloadLesson(
   const compl = complRes.data as CompletionRow | null;
 
   const src = copy ?? master;
+  // Phase 7: ensure an out-of-grade tag on this lesson still resolves to its
+  // code after an edit-reload (mirrors listLessons' augmentation).
+  await augmentStandardsIndex(client, standards, src.standards ?? []);
+  const std = standardsCodesAndIds(src.standards, standards.uuidToCode);
   return buildLesson({
     id: master.id,
     subject: uuidToSubjectId.get(src.subject_id) ?? "math",
@@ -1913,7 +2017,8 @@ async function reloadLesson(
     directions: src.directions ?? "",
     notes: src.notes ?? "",
     resources: jsonToResources(src.resources),
-    standards: standardUuidsToCodes(src.standards, standards.uuidToCode),
+    standards: std.codes,
+    standardIds: std.ids,
     status: compl ? statusFromDb(compl.status) : "not_done",
     reasonNotDone: compl?.reason_not_done ?? "",
     isPersonal: copy != null,
@@ -1967,6 +2072,9 @@ async function reloadAuthoredLesson(
     ? (uuidToUnitSlug.get(authored.unit_id) ?? authored.unit_id)
     : "";
 
+  // Phase 7: out-of-grade tag survival (mirrors listLessons' augmentation).
+  await augmentStandardsIndex(client, standards, authored.standards ?? []);
+  const std = standardsCodesAndIds(authored.standards, standards.uuidToCode);
   return buildLesson({
     id: authored.id,
     subject: subjectId,
@@ -1978,7 +2086,8 @@ async function reloadAuthoredLesson(
     directions: authored.directions ?? "",
     notes: authored.notes ?? "",
     resources: jsonToResources(authored.resources),
-    standards: standardUuidsToCodes(authored.standards, standards.uuidToCode),
+    standards: std.codes,
+    standardIds: std.ids,
     status: statusFromText(authored.status),
     reasonNotDone: authored.reason_not_done ?? "",
     isPersonal: true,
