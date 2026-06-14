@@ -1,0 +1,118 @@
+/* year-stat-cards.module.css — 5 stat cards for the top of the Year view.
+ *
+ * Tokens only — no hard-coded colors or font sizes. Every surface routes
+ * through --panel-bg / --ink-* / --hairline so all six themes (paper, cloud,
+ * night, mint, sky, blossom) re-tint automatically. The per-card accent
+ * arrives as the --accent custom property set inline by YearStatCards.tsx;
+ * tints mix the accent toward --surface (never #fff) so dark themes stay dark.
+ */
+
+/* ── Row container ──────────────────────────────────────────────────────── */
+.row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+/* ── Single card ────────────────────────────────────────────────────────── */
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 44px;
+  padding: 14px;
+  border-radius: var(--r-md); /* 14px */
+  background: var(--panel-bg); /* gradient wash shows through, not opaque #fff */
+  border: 1px solid var(--hairline, var(--ink-100));
+  box-shadow: var(
+    --shadow-card,
+    0 1px 3px color-mix(in srgb, var(--ink-900) 6%, transparent)
+  );
+}
+
+/* ── Rounded-square icon badge ──────────────────────────────────────────── */
+.badge {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-sm); /* 10px */
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent);
+}
+
+.badge svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── Text column ────────────────────────────────────────────────────────── */
+.body {
+  min-width: 0; /* let the value/caption ellipsis-shrink instead of overflowing */
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: var(--t-11);
+  color: var(--ink-500);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+}
+
+.value {
+  font-family: var(--font-display-sm);
+  font-size: var(--t-22);
+  font-weight: 800;
+  color: var(--ink-900);
+  letter-spacing: -0.4px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  margin-top: 2px;
+}
+
+.caption {
+  font-size: var(--t-12);
+  color: var(--ink-500);
+  margin-top: 2px;
+}
+
+/* ── Progress bar (COMPLETE card) ───────────────────────────────────────── */
+.barTrack {
+  height: 5px;
+  background: var(--c-progress-track, var(--ink-100));
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  margin: 6px 0 2px;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--brand-500);
+  border-radius: var(--r-pill);
+  transition: width 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barFill {
+    transition: none;
+  }
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+/* Tablet & down: wrap to a 2-up grid (auto-fit keeps cards a sane min width). */
+@media (max-width: 900px) {
+  .row {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+}
+
+/* Phone: single readable column (still no document-level horizontal scroll). */
+@media (max-width: 480px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}

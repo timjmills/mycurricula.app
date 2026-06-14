@@ -25,3 +25,18 @@ export const STANDARDS: StandardsMap = {
 export function describeStandard(code: string): string {
   return STANDARDS[code] ?? code;
 }
+
+/**
+ * Compact dotted code for display in a StandardPill.
+ *
+ * Stored codes are already short (e.g. "5.NBT.A.1"), so this is a no-op for
+ * today's data. It is future-proofing: if a fully-qualified framework code
+ * ever arrives (e.g. "CCSS.MATH.CONTENT.5.NBT.A.1" or
+ * "CCSS.ELA-LITERACY.RL.5.3"), strip the leading framework/subject/CONTENT
+ * prefix so the pill stays compact. Returns the code unchanged when no prefix
+ * matches.
+ */
+export function formatStandardCode(code: string): string {
+  const stripped = code.replace(/^CCSS\.[A-Z-]+\.(?:CONTENT\.)?/i, "").trim();
+  return stripped || code;
+}
