@@ -22,6 +22,7 @@
 
 import type { TeachDataSource } from "./queries";
 import { isSupabaseConfigured } from "./queries";
+import { BoardCapError } from "./limits";
 import { mockTeachSource } from "./mock-source";
 import { supabaseTeachSource } from "./supabase-source";
 
@@ -32,33 +33,71 @@ function source(): TeachDataSource {
   return isSupabaseConfigured() ? supabaseTeachSource : mockTeachSource;
 }
 
+/** Result envelope for {@link teachDispatch}. A Server Action that THROWS has its
+ *  error redacted by Next.js before it reaches the client — the message is replaced
+ *  with a generic string and the custom error class (and its `name`) is stripped —
+ *  so a thrown `BoardCapError` would arrive as an opaque `Error` and the client
+ *  could no longer tell "you hit the 50-board cap" from any other failure. We
+ *  instead RESOLVE with this discriminated envelope (the action never rejects for an
+ *  operational error): expected, client-safe errors travel as DATA with their
+ *  `name` + message intact so the client facade can rebuild a real typed error;
+ *  every unexpected error collapses to a generic message (preserving Next's
+ *  don't-leak-server-internals property) and is logged server-side. */
+export type TeachDispatchResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: { name: string; message: string } };
+
+/** Opaque message returned for any UNEXPECTED error, so DB/RLS internals never
+ *  cross the boundary. Expected errors (BoardCapError) forward their own
+ *  teacher-facing message instead. */
+const GENERIC_TEACH_ERROR = "That didn't work — please try again.";
+
 /**
  * Generic dispatch: invoke `TeachDataSource[method](...args)` on the server.
  * The client facade (lib/teach/client.ts) is the only caller; it passes the
- * method name + the exact tuple of that method's args and awaits its result.
+ * method name + the exact tuple of that method's args and unwraps the envelope.
  * Typed end-to-end via the method-name generic so the boundary stays sound.
  */
 export async function teachDispatch<M extends keyof TeachDataSource>(
   method: M,
   args: Parameters<TeachDataSource[M]>,
-): Promise<Awaited<ReturnType<TeachDataSource[M]>>> {
+): Promise<TeachDispatchResult<Awaited<ReturnType<TeachDataSource[M]>>>> {
   const src = source();
   // SECURITY: this is a `'use server'` boundary — compiled to an HTTP endpoint
   // any client can POST to — and the `keyof` generic is erased at runtime, so
   // `method` is an attacker-controlled string. Dispatch ONLY to an OWN, callable
   // property of the source (every TeachDataSource method is an own prop of the
   // source object literal); fail closed on anything else, so an inherited member
-  // (constructor / hasOwnProperty / __proto__ / …) can't be invoked or throw an
-  // uncaught error past the boundary.
+  // (constructor / hasOwnProperty / __proto__ / …) can't be invoked.
   if (
     !Object.prototype.hasOwnProperty.call(src, method) ||
     typeof src[method] !== "function"
   ) {
-    throw new Error(`teachDispatch: unknown method "${String(method)}"`);
+    return {
+      ok: false,
+      error: { name: "Error", message: GENERIC_TEACH_ERROR },
+    };
   }
   const fn = src[method] as (
     ...a: Parameters<TeachDataSource[M]>
   ) => Promise<Awaited<ReturnType<TeachDataSource[M]>>>;
-  // Bind to the source so `this` is correct for object-method implementations.
-  return fn.apply(src, args);
+  try {
+    // Bind to the source so `this` is correct for object-method implementations.
+    const value = await fn.apply(src, args);
+    return { ok: true, value };
+  } catch (e) {
+    // EXPECTED, client-safe error → forward its name + message so the client facade
+    // can rebuild a real BoardCapError and the UI shows the friendly cap prompt. Its
+    // message is authored for teachers (lib/teach/limits.ts), never a server
+    // internal. Anything else is UNEXPECTED: log it server-side for diagnosis and
+    // return an opaque message so DB/RLS details never reach the client.
+    if (e instanceof BoardCapError) {
+      return { ok: false, error: { name: e.name, message: e.message } };
+    }
+    console.error(`teachDispatch("${String(method)}") failed:`, e);
+    return {
+      ok: false,
+      error: { name: "Error", message: GENERIC_TEACH_ERROR },
+    };
+  }
 }
