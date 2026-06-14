@@ -31,6 +31,7 @@ import {
   clientToNormalized,
   type UseBoardAnnotationsApi,
 } from "@/lib/use-board-annotations";
+import { useLaserTrail } from "@/lib/use-laser-trail";
 import styles from "./AnnotationLayer.module.css";
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -75,6 +76,35 @@ export function AnnotationLayer({
 
   const { attachCanvas, resize } = annotations;
 
+  // Laser pointer (Wave 5b₂): a transient fading overlay on its own canvas. It
+  // shares the same box/DPR as the annotation canvas but is wholly separate from
+  // the annotation document (no strokes, no undo, no persistence). Uses the
+  // current ink colour as its hue — RESOLVED to a concrete value below, because
+  // the canvas 2D context cannot parse a `var(--token)` string (the editor
+  // passes one); present mode passes an already-resolved value (used as-is).
+  const [laserColor, setLaserColor] = useState(color);
+  useEffect(() => {
+    if (!color.startsWith("var(")) {
+      setLaserColor(color);
+      return;
+    }
+    const root = rootRef.current;
+    if (!root) return;
+    // "var(--ink-900)" or "var(--x, fallback)" → take only the custom-property
+    // name (up to the first comma) so a token written with a fallback still
+    // resolves to the right value.
+    const name = color.slice(4, -1).split(",")[0].trim();
+    const resolved = getComputedStyle(root).getPropertyValue(name).trim();
+    if (resolved) setLaserColor(resolved);
+  }, [color]);
+
+  const laser = useLaserTrail(laserColor);
+  const {
+    attachCanvas: attachLaser,
+    resize: resizeLaser,
+    push: pushLaser,
+  } = laser;
+
   // Bridge the local canvas ref to both the hook (which sizes + paints) and
   // our pointer math.
   const setCanvas = useCallback(
@@ -91,7 +121,9 @@ export function AnnotationLayer({
     if (!root) return;
     const measure = () => {
       const rect = root.getBoundingClientRect();
-      resize({ width: rect.width, height: rect.height });
+      const box = { width: rect.width, height: rect.height };
+      resize(box);
+      resizeLaser(box);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -101,8 +133,10 @@ export function AnnotationLayer({
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [resize]);
+  }, [resize, resizeLaser]);
 
+  // `select` passes pointers through; every other tool (incl. laser) makes the
+  // layer interactive so it captures the pointer.
   const isDrawTool = tool !== "select";
 
   // ── Pointer → normalized ──────────────────────────────────────────────────
@@ -127,13 +161,19 @@ export function AnnotationLayer({
       e.preventDefault();
       (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
 
+      if (tool === "laser") {
+        // Transient pointer trail — feed the laser overlay, never the document.
+        pushLaser(pt);
+        drawingRef.current = true;
+        return;
+      }
+
       if (tool === "eraser") {
         annotations.eraseAt(pt);
         lastEraseRef.current = pt;
         drawingRef.current = true;
         return;
       }
-
       if (tool === "text") {
         // Position a textarea at the click; commit on blur / Enter.
         const root = rootRef.current;
@@ -156,12 +196,34 @@ export function AnnotationLayer({
       });
       drawingRef.current = true;
     },
-    [annotations, color, isDrawTool, normalizedFrom, opacity, tool, width],
+    [
+      annotations,
+      color,
+      isDrawTool,
+      normalizedFrom,
+      opacity,
+      pushLaser,
+      tool,
+      width,
+    ],
   );
 
   const handlePointerMove = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       if (!drawingRef.current) return;
+
+      if (tool === "laser") {
+        // Feed every coalesced sample to the laser overlay for a smooth trail.
+        const events =
+          typeof e.nativeEvent.getCoalescedEvents === "function"
+            ? e.nativeEvent.getCoalescedEvents()
+            : [e.nativeEvent];
+        for (const ev of events.length ? events : [e.nativeEvent]) {
+          const pt = normalizedFrom(ev.clientX, ev.clientY);
+          if (pt) pushLaser(pt);
+        }
+        return;
+      }
 
       if (tool === "eraser") {
         // Erase at EVERY coalesced sample, and interpolate between consecutive
@@ -211,7 +273,7 @@ export function AnnotationLayer({
         if (pt) annotations.extendStroke(pt);
       }
     },
-    [annotations, normalizedFrom, tool],
+    [annotations, normalizedFrom, pushLaser, tool],
   );
 
   const handlePointerUp = useCallback(
@@ -219,6 +281,8 @@ export function AnnotationLayer({
       if (!drawingRef.current) return;
       drawingRef.current = false;
       (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+      // Laser: nothing to commit — the trail fades on its own.
+      if (tool === "laser") return;
       if (tool === "eraser") {
         lastEraseRef.current = null;
         return;
@@ -262,6 +326,15 @@ export function AnnotationLayer({
       onPointerCancel={handlePointerCancel}
     >
       <canvas ref={setCanvas} className={styles.canvas} aria-hidden="true" />
+
+      {/* Laser overlay (Wave 5b₂) — transient fading trail on its own canvas,
+          above the ink, never part of the document. Always pointer-transparent;
+          the layer root captures laser pointers and feeds this. */}
+      <canvas
+        ref={attachLaser}
+        className={styles.laserCanvas}
+        aria-hidden="true"
+      />
 
       {/* Text tool — a positioned textarea that commits to a text stroke. */}
       {textDraft ? (

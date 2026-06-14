@@ -37,7 +37,8 @@ export const BOARD_LAYOUT_GRID: Record<
 
 /** The live annotation/drawing tools (T3/T4). `select` leaves the layer
  *  pointer-transparent so the underlying iframe/image stays interactive;
- *  `eraser` is an OBJECT eraser (removes whole strokes, not pixels). */
+ *  `eraser` is an OBJECT eraser (removes whole strokes, not pixels); `laser` is
+ *  a transient pointer trail that fades and is NEVER committed/persisted. */
 export type BoardTool =
   | "select"
   | "pen"
@@ -46,7 +47,8 @@ export type BoardTool =
   | "rect"
   | "line"
   | "arrow"
-  | "text";
+  | "text"
+  | "laser";
 
 // ── Center mode (plan §2.4) ─────────────────────────────────────────────────
 

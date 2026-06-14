@@ -33,8 +33,10 @@ export interface BoardBox {
   height: number;
 }
 
-/** Tools that actually produce a stroke (everything except select/eraser). */
-export type StrokeTool = Exclude<BoardTool, "select" | "eraser">;
+/** Tools that actually produce a committed stroke. Excludes `select` (pointer
+ *  passthrough), `eraser` (removes strokes), and `laser` (transient overlay that
+ *  is never committed). */
+export type StrokeTool = Exclude<BoardTool, "select" | "eraser" | "laser">;
 
 /** A single committed (or in-progress draft) annotation. */
 export interface Stroke {

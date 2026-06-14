@@ -24,6 +24,7 @@ export type GlyphName =
   | "rect"
   | "line"
   | "arrow"
+  | "laser"
   | "textAa"
   | "sticky"
   | "undo"
@@ -152,6 +153,13 @@ export function Glyph({ name, size = 20 }: GlyphProps): ReactNode {
         <svg {...common} {...STROKE}>
           <path d="M6 18 18 6" />
           <path d="M10 6h8v8" />
+        </svg>
+      );
+    case "laser":
+      return (
+        <svg {...common} {...STROKE}>
+          <circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" />
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
         </svg>
       );
     case "textAa":

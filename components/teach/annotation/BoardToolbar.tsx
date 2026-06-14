@@ -67,6 +67,7 @@ const TOOL_GLYPHS: Record<BoardTool, string> = {
   line: "╱",
   arrow: "↗",
   text: "T",
+  laser: "◉",
 };
 
 const TOOL_OPTIONS: Array<ToggleOption<BoardTool>> = ANNOTATION_TOOLS.map(

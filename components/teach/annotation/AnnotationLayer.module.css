@@ -20,7 +20,8 @@
 .layer[data-interactive="true"][data-tool="highlighter"],
 .layer[data-interactive="true"][data-tool="rect"],
 .layer[data-interactive="true"][data-tool="line"],
-.layer[data-interactive="true"][data-tool="arrow"] {
+.layer[data-interactive="true"][data-tool="arrow"],
+.layer[data-interactive="true"][data-tool="laser"] {
   cursor: crosshair;
 }
 .layer[data-interactive="true"][data-tool="eraser"] {
@@ -36,6 +37,18 @@
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* Laser overlay (Wave 5b₂) — above the ink canvas, always pointer-transparent
+   (the layer root handles laser pointers). */
+.laserCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Text-tool floating input. */
