@@ -40,6 +40,7 @@ import { LivePreview } from "@/components/appearance/live-preview";
 import { SubjectColors } from "@/components/appearance/subject-colors";
 import { PaletteReference } from "@/components/appearance/palette-reference";
 import { SettingsCard } from "@/components/appearance/settings-card";
+import { HomeScreenSettings } from "@/components/home";
 import { Button, PageHeader, Tooltip } from "@/components/ui";
 import styles from "./appearance.module.css";
 
@@ -94,6 +95,12 @@ export default function AppearancePage(): ReactNode {
         <LivePreview mapping={mapping} />
         <SubjectColors mapping={mapping} onChange={setSubjectSwatch} />
         <PaletteReference />
+
+        {/* ── Home screen ───────────────────────────────────────────────
+            Personal layout for the post-login Home ("Quiet Dawn"): mode
+            (Calm / Full / Custom), per-row toggles, and the soft photo.
+            Mirrors the on-page Customize popover (shared localStorage). */}
+        <HomeScreenSettings />
 
         {/* ── Hierarchy labels ──────────────────────────────────────────
             Rename the planner concepts. The captions follow the

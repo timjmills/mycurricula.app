@@ -42,3 +42,5 @@ export type { FutureControlProps } from "./FutureControl";
 
 export { IntroSubtitle } from "./IntroSubtitle";
 export type { IntroSubtitleProps, IntroSubtitleViewKey } from "./IntroSubtitle";
+
+export { ThemeWash } from "./ThemeWash";
