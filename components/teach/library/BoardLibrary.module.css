@@ -36,7 +36,11 @@
   flex: 0 0 auto;
 }
 
-.segment {
+/* Class doubled (`.x.x`) to clear the `.cp-root button` reset (specificity
+   0,1,1) now that this module also renders on the /boards page under the planner
+   `.cp-root`. Without it, padding/border/background are stripped to bare text.
+   The :hover / :focus-visible variants already exceed that threshold. */
+.segment.segment {
   min-height: 40px;
   padding: 9px 18px;
   border: none;
@@ -57,7 +61,7 @@
   outline-offset: 1px;
 }
 
-.segmentActive {
+.segmentActive.segmentActive {
   background: var(--paper);
   color: var(--wf-blue-accent);
   box-shadow: var(--wf-shadow-inner);
@@ -180,7 +184,7 @@
   text-transform: uppercase;
 }
 
-.navItem {
+.navItem.navItem {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -211,7 +215,7 @@
   color: var(--ink-400);
 }
 
-.navItemActive {
+.navItemActive.navItemActive {
   background: var(--wf-blue-soft);
   color: var(--wf-blue-accent);
   font-weight: 700;
@@ -292,7 +296,7 @@
   gap: 8px;
 }
 
-.filterPill {
+.filterPill.filterPill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -316,7 +320,7 @@
   outline-offset: 1px;
 }
 
-.filterPillActive {
+.filterPillActive.filterPillActive {
   background: var(--wf-blue-accent);
   border-color: var(--wf-blue-accent);
   color: var(--on-solid);
@@ -604,7 +608,7 @@
   gap: 12px;
 }
 
-.teamCard {
+.teamCard.teamCard {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -680,7 +684,7 @@
   font-weight: 700;
 }
 
-.tipsClose {
+.tipsClose.tipsClose {
   display: grid;
   place-items: center;
   width: 32px;

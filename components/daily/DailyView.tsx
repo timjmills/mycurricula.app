@@ -1631,14 +1631,14 @@ export function DailyView({
           />
           <DailySchedulePill />
           <Tooltip
-            content="Open this day in the full-screen Teaching View for live class delivery"
+            content="Open this day's boards full-screen for live class delivery"
             side="bottom"
             tooltipId="daily-present"
           >
             <Button
               variant="primary"
               onClick={() => router.push("/teach?present=1")}
-              title="Open this day in the full-screen Teaching View for live class delivery"
+              title="Open this day's boards full-screen for live class delivery"
             >
               Present
             </Button>

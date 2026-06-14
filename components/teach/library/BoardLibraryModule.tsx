@@ -54,6 +54,7 @@ import {
 } from "@/lib/teach/board-tags";
 import { SearchIcon } from "../right/icons";
 import { TeachIcon, type TeachIconName } from "@/components/teach/widgets";
+import { Button } from "@/components/ui";
 import { BoardLibraryCard } from "./BoardLibraryCard";
 import { RepeatScheduleEditor } from "./RepeatScheduleEditor";
 import styles from "./BoardLibrary.module.css";
@@ -62,20 +63,14 @@ import styles from "./BoardLibrary.module.css";
 type Tab = "mine" | "team";
 
 // ── Sidebar: "My Library" scopes ─────────────────────────────────────────────
-// Sub-scopes within a segment. Each one that has backing data on the `Board`
-// shape constrains the visible grid (see `boardMatchesScope`); the axes the data
-// layer doesn't track yet (`favorites`, `archived`) honestly resolve to an empty
-// set so the control still does something visible instead of silently showing
-// the full, wrong list. Surfacing them now matches the handoff IA without faking
-// data — when the backend adds a favorite/archive flag they light up for free.
+// Sub-scopes within a segment, each backed by real data on the `Board` shape so
+// it constrains the visible grid (see `boardMatchesScope`). The handoff also drew
+// "Favorites" / "Archived", but the Board shape has no favorite/archive flag, so
+// those resolved to a permanently-empty set — a dead control. They were removed
+// (Wave 3) rather than ship a filter that can never match; re-add them when the
+// backend grows the flags.
 
-type LibraryScope =
-  | "all"
-  | "favorites"
-  | "recent"
-  | "shared"
-  | "myboards"
-  | "archived";
+type LibraryScope = "all" | "recent" | "shared" | "myboards";
 
 // How "recent" is bounded — the N most-recently-updated boards in the segment.
 const RECENT_LIMIT = 12;
@@ -86,11 +81,9 @@ const LIBRARY_SCOPES: ReadonlyArray<{
   icon: TeachIconName;
 }> = [
   { id: "all", label: "All Boards", icon: "grid" },
-  { id: "favorites", label: "Favorites", icon: "star" },
   { id: "recent", label: "Recent", icon: "timer" },
   { id: "shared", label: "Shared with Team", icon: "users" },
   { id: "myboards", label: "My Boards", icon: "notes" },
-  { id: "archived", label: "Archived", icon: "model" },
 ];
 
 // ── Sidebar: "Filter by Use" (tag-kind filters) ──────────────────────────────
@@ -140,6 +133,14 @@ export interface BoardLibraryModuleProps {
   // never reaches a uuid/RLS column.
   /** The current teacher's owner id (null while the auth session loads). */
   ownerId: string | null;
+  /** Optional "New board" action. When provided (the standalone Boards home),
+   *  the top row shows a primary "New board" button wired to this callback —
+   *  the caller creates + opens a fresh board. Omitted inside the in-editor
+   *  library overlay (creation there flows through the board strip's Add). */
+  onCreateBlank?: () => void;
+  /** True while a `onCreateBlank` creation is in flight — disables the button +
+   *  shows a spinner so a second click can't kick off a duplicate create. */
+  creating?: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -172,10 +173,6 @@ function boardMatchesScope(board: Board, scope: LibraryScope): boolean {
     case "myboards":
       // A teacher's own (owned) boards, excluding the shared team set.
       return board.ownerId != null && board.libraryVisibility !== "team";
-    case "favorites":
-    case "archived":
-      // No favorite/archive flag on the Board shape yet — match nothing.
-      return false;
     default:
       return true;
   }
@@ -198,6 +195,8 @@ export function BoardLibraryModule({
   onOpenBoard,
   onUseTemplate,
   ownerId,
+  onCreateBlank,
+  creating = false,
 }: BoardLibraryModuleProps): ReactNode {
   const { showConsequence } = useConsequenceToast();
 
@@ -583,6 +582,21 @@ export function BoardLibraryModule({
             />
           </span>
         </div>
+
+        {/* New board — only on the standalone Boards home (onCreateBlank wired).
+            Creates a fresh board and opens it; the home handles the cap. */}
+        {onCreateBlank ? (
+          <Button
+            variant="primary"
+            leadingIcon={<span aria-hidden="true">+</span>}
+            onClick={onCreateBlank}
+            disabled={creating}
+            loading={creating}
+            tooltip="Create a new blank board and open it"
+          >
+            New board
+          </Button>
+        ) : null}
       </div>
 
       {/* ── Body: sidebar + main ─────────────────────────────────────────── */}
@@ -698,13 +712,11 @@ export function BoardLibraryModule({
             <p className={styles.empty}>
               {boards.length === 0
                 ? tab === "mine"
-                  ? "No boards yet. Build one on a lesson, then it shows up here."
+                  ? onCreateBlank
+                    ? "No boards yet — click “New board” to create your first one, or start from a template below."
+                    : "No boards yet. Build one on a lesson, then it shows up here."
                   : "Your team hasn't shared any boards yet."
-                : scope === "favorites"
-                  ? "No favorite boards yet — star a board to keep it here."
-                  : scope === "archived"
-                    ? "No archived boards."
-                    : "No boards match your search and filters."}
+                : "No boards match your search and filters."}
             </p>
           ) : (
             <div className={styles.grid}>

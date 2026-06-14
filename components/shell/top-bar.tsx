@@ -76,10 +76,11 @@ interface ViewDef {
   tooltip?: string;
 }
 
-// Top-bar tab order, left → right: Daily · Teach · Weekly · Yearly · Curriculum.
-// Teach (/teach) is the full-screen live-delivery view; it sits next to Daily
-// because both answer "what am I teaching right now". Like Daily/Weekly it has
-// no narrowOnly flag, so it stays visible at every width.
+// Top-bar tab order, left → right: Daily · Weekly · Yearly · Curriculum · Boards.
+// Boards (/boards) is the board home — browse, create, and open the learning
+// boards a teacher builds and delivers; opening one enters the full-screen board
+// editor (/teach route group, its own chrome). Like Daily/Weekly it has no
+// narrowOnly flag, so it stays visible at every width.
 // Yearly is a label rename of the Year route (/year stays the canonical URL).
 // Curriculum is a label rename of the Subject route (/subject/[slug] stays the
 // canonical URL — "subject" is the data-model entity; "Curriculum" is just the
@@ -121,10 +122,10 @@ export const VIEWS: ViewDef[] = [
       "The full year of units and lessons per subject, with the standards each covers",
   },
   {
-    label: "Teach",
-    href: "/teach",
+    label: "Boards",
+    href: "/boards",
     tooltip:
-      "Go live: open the in-class teaching workspace — boards, resources, and annotation for delivering this lesson",
+      "Your learning boards — browse, create, and open a board to build or present it (resources, widgets, and annotation)",
   },
 ];
 export type { ViewDef };

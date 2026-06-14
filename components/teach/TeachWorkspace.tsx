@@ -303,6 +303,22 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
 
   // ── Boards for the active lesson (repo-driven, effect-loaded) ──────────────
   const [boards, setBoards] = useState<Board[]>([]);
+
+  // ── Standalone single-board open (Boards home → /teach?board=<id>) ──────────
+  // The Boards home opens a board the editor may have in no loaded lesson set: a
+  // lesson-LESS board (one created on the Boards page, a pulled team board, a
+  // template-created board). When `?board=` arrives WITHOUT `?lesson=` and
+  // WITHOUT `?sandbox=`, we resolve it by id (getBoard): a lesson-bound board
+  // routes into its own lesson scope; a lesson-less board becomes the sole board
+  // of a standalone scope. `standaloneResolved` gates the default-lesson seed so
+  // it can't clobber the open before the async resolve lands.
+  const standaloneRequested =
+    !!props.initialBoardId && !props.initialLessonId && !props.initialSandbox;
+  const [standaloneBoard, setStandaloneBoard] = useState<Board | null>(null);
+  const [standaloneResolved, setStandaloneResolved] = useState(
+    !standaloneRequested,
+  );
+
   // Free-form pages of the active board (5.31). A board with no explicit pages
   // yields a single implicit page built from its flat widgets (repo contract).
   // `activePageId` is a view concern local to the workspace — kept here rather
@@ -398,14 +414,64 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     state.activeResource,
   ]);
 
-  // ── Default lesson seed (only when not deep-linked + not sandbox) ──────────
+  // ── Standalone single-board resolution (?board= without ?lesson=/?sandbox=) ─
   useEffect(() => {
-    if (state.activeLessonId == null && !state.sandbox) {
+    if (!standaloneRequested) return;
+    if (ownerId == null) return; // wait for the auth uid under the live flag
+    const boardId = props.initialBoardId;
+    if (!boardId) return;
+    let alive = true;
+    void teach
+      .getBoard(boardId)
+      .then((board) => {
+        if (!alive) return;
+        if (board && board.masterLessonId != null) {
+          // Lesson-bound → route through the normal lesson scope (the load
+          // effect fetches that lesson's set; the board is part of it).
+          dispatch({ type: "selectLesson", lessonId: board.masterLessonId });
+          dispatch({ type: "selectBoard", boardId: board.id });
+          setStandaloneBoard(null);
+        } else if (board && board.ownerId === ownerId) {
+          // Lesson-less AND owned by this teacher → standalone single-board scope.
+          setStandaloneBoard(board);
+          dispatch({ type: "selectBoard", boardId: board.id });
+        } else if (board) {
+          // A lesson-less board the teacher does NOT own — a shared Team-Library
+          // board reached via a hand-crafted `?board=<sharedId>` URL. The Boards
+          // home always pulls a PRIVATE copy before opening, so this never
+          // happens through the UI. FORKING MODEL (CLAUDE.md §2): never open the
+          // shared original as an editable board. Leave standaloneBoard null so
+          // the seed below falls back to the default lesson (no shared-write,
+          // and idempotent on refresh — unlike a copy-on-load would be).
+        }
+        // Not found → leave standaloneBoard null; the seed below falls back to
+        // the default lesson so the editor is never blank.
+        setStandaloneResolved(true);
+      })
+      .catch(() => {
+        if (alive) setStandaloneResolved(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [standaloneRequested, ownerId, props.initialBoardId]);
+
+  // ── Default lesson seed (only when not deep-linked / sandbox / standalone) ──
+  // Runs once on mount, but waits for any standalone open to settle first so it
+  // can't seed the default lesson over a board the teacher explicitly opened.
+  const didDefaultSeed = useRef(false);
+  useEffect(() => {
+    if (didDefaultSeed.current) return;
+    if (!standaloneResolved) return; // a standalone open is still resolving
+    didDefaultSeed.current = true;
+    if (
+      state.activeLessonId == null &&
+      !state.sandbox &&
+      standaloneBoard == null
+    ) {
       dispatch({ type: "selectLesson", lessonId: DEFAULT_LESSON_ID });
     }
-    // Run once on mount; subsequent nulls (sandbox exit) are user-driven.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [standaloneResolved, standaloneBoard, state.activeLessonId, state.sandbox]);
 
   // ── Load boards for the active lesson ──────────────────────────────────────
   const activeLessonId = state.activeLessonId;
@@ -422,6 +488,12 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   const boardScopeLessonIdRef = useRef(boardScopeLessonId);
   boardScopeLessonIdRef.current = boardScopeLessonId;
   useEffect(() => {
+    // Standalone single-board scope: the sole board IS the resolved standalone
+    // board — there is no lesson set to list.
+    if (standaloneBoard != null) {
+      setBoards([standaloneBoard]);
+      return;
+    }
     // No scope, or (under the flag) no resolved auth uid yet → show nothing
     // rather than query with a null/slug owner against an RLS-gated table. Once
     // the session resolves `ownerId`, this effect re-runs and loads the set.
@@ -442,13 +514,23 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     return () => {
       alive = false;
     };
-  }, [boardScopeLessonId, ownerId]);
+  }, [boardScopeLessonId, ownerId, standaloneBoard]);
 
   // Re-fetch the active set's boards (used after a mutating repo call).
   // Captures the scope id at call time and re-checks the live ref before
   // committing, so a lesson switch / sandbox entry mid-fetch can't write stale
   // boards into the freshly-selected scope.
   const reloadBoards = useCallback(async (): Promise<Board[]> => {
+    // Standalone scope: re-fetch the single board by id (widget/page edits land
+    // on it directly; there is no lesson set to re-list). A deleted board
+    // collapses to an empty set.
+    if (standaloneBoard != null) {
+      const fresh = await teach.getBoard(standaloneBoard.id);
+      const next = fresh ? [fresh] : [];
+      setStandaloneBoard(fresh);
+      setBoards(next);
+      return next;
+    }
     const requested = boardScopeLessonId;
     // Same identity guard as the load effect: never query with a null owner.
     if (requested == null || ownerId == null) return [];
@@ -456,7 +538,21 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     if (boardScopeLessonIdRef.current !== requested) return next;
     setBoards(next);
     return next;
-  }, [boardScopeLessonId, ownerId]);
+  }, [boardScopeLessonId, ownerId, standaloneBoard]);
+
+  // Leave standalone mode the moment the teacher navigates to a lesson or the
+  // sandbox (e.g. via the editor's lesson list). Without this the board-load
+  // effect keeps short-circuiting to `[standaloneBoard]`, re-pinning the detached
+  // board and ignoring the chosen scope's set (Codex M). Clearing it lets the
+  // load effect re-read the lesson/sandbox boards.
+  useEffect(() => {
+    if (
+      standaloneBoard != null &&
+      (state.activeLessonId != null || state.sandbox)
+    ) {
+      setStandaloneBoard(null);
+    }
+  }, [state.activeLessonId, state.sandbox, standaloneBoard]);
 
   // Select the first board once a set loads and nothing is selected yet.
   useEffect(() => {
@@ -1248,7 +1344,14 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                 dispatch={dispatch}
                 boards={boards}
                 subject={subject}
-                onAddBoard={() => void handleAddBoard()}
+                // Standalone single-board scope has no lesson to add to — hide
+                // Add Board there (it would be a no-op). Lessons + sandbox keep
+                // it (handleAddBoard routes sandbox through the sentinel).
+                onAddBoard={
+                  standaloneBoard == null
+                    ? () => void handleAddBoard()
+                    : undefined
+                }
                 onBoardSettings={
                   activeBoard ? () => setBoardSettingsOpen(true) : undefined
                 }

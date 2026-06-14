@@ -53,6 +53,14 @@ export interface TeachDataSource {
     masterLessonId: string,
     ownerId: string,
   ): Promise<Board[]>;
+  /**
+   * Fetch a single board by id (full pages + widgets), or `null` when no board
+   * matches. The lesson-agnostic read the Boards home + the editor's standalone
+   * single-board mode use: opening a board from the library when it is NOT in
+   * the currently-loaded lesson set (a lesson-less "My Board", a pulled team
+   * board, a template-created board). Independent of lesson scope by design.
+   */
+  getBoard(boardId: string): Promise<Board | null>;
   createBoard(
     input: Omit<Board, "id" | "widgets" | "createdAt" | "updatedAt"> & {
       widgets?: Board["widgets"];

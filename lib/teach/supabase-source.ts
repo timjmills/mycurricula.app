@@ -825,6 +825,25 @@ async function gradeIdForLesson(
 
 export const supabaseTeachSource: TeachDataSource = {
   // ── Boards ────────────────────────────────────────────────────────────────
+  async getBoard(boardId) {
+    const client = await sb();
+    // Same single-board read as `loadBoard`, but returns null (not throws) when
+    // the row is absent / not visible under RLS — the lesson-agnostic fetch the
+    // Boards home + editor standalone mode use. RLS still scopes visibility.
+    const res = await client
+      .from("boards")
+      .select(BOARD_COLS)
+      .eq("id", boardId)
+      .maybeSingle();
+    if (res.error) {
+      throw new Error(`Teach repository get board failed: ${res.error.message}`);
+    }
+    const row = res.data as BoardRow | null;
+    if (!row) return null;
+    const widgets = await fetchWidgetsByBoard(client, [boardId]);
+    return rowToBoard(row, widgets.get(boardId) ?? []);
+  },
+
   async listBoardsForLesson(masterLessonId, ownerId) {
     const client = await sb();
     const owner = resolveOwnerId(ownerId);

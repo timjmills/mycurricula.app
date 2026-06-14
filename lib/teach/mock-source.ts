@@ -258,6 +258,11 @@ export const mockTeachSource: TeachDataSource = {
     return setForLesson(masterLessonId, ownerId).map(cloneBoard);
   },
 
+  async getBoard(boardId) {
+    const board = boards.find((b) => b.id === boardId);
+    return board ? cloneBoard(board) : null;
+  },
+
   async createBoard(input) {
     // SANDBOX SENTINEL (mirrors Supabase audit F4). `createBoard({ masterLessonId:
     // SANDBOX_LESSON_ID, … })` creates a lesson-LESS ephemeral scratch board: treat
