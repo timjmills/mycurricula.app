@@ -1,0 +1,641 @@
+[
+  {
+    "key": "my daughters did not go to school for a year and a half because of blue state pandemic school closure policies. the whole country is now paying the price for democratic political cowardice.",
+    "category": "leading",
+    "rule": "politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "My daughters did not go to school for a year and a half because of blue state pandemic school closure policies. The whole country is now paying the price for Democratic political cowardice.",
+    "author": "Ben Austin and Mike Petrilli",
+    "work": "A Pro-Ed-Reform President Would Cure the Blue-State Blues"
+  },
+  {
+    "key": "in red states, you get free money for the school of your choice. in blue states, you get what you get, and you do not get upset. voters now face a clear color-coded national split screen.",
+    "category": "leading",
+    "rule": "politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "In red states, you get free money for the school of your choice. In blue states, you get what you get, and you do not get upset. Voters now face a clear color-coded national split screen.",
+    "author": "Ben Austin and Mike Petrilli",
+    "work": "A Pro-Ed-Reform President Would Cure the Blue-State Blues"
+  },
+  {
+    "key": "for decades, progressive education reformers like weingarten have argued that schools spend too much time on facts and 'rote' memorization and not enough on projects, experiences, and real-world applications.",
+    "category": "learning",
+    "rule": "politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "For decades, progressive education reformers like Weingarten have argued that schools spend too much time on facts and 'rote' memorization and not enough on projects, experiences, and real-world applications.",
+    "author": "Chad Aldeman",
+    "work": "In the Age of AI Knowledge Matters More Not Less"
+  },
+  {
+    "key": "these kids in the tiktok video aren't the victims of covid and school closures, or brain-dead illiterate social media addicts... they are ken goodman's kids.",
+    "category": "learning",
+    "rule": "controversial",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "These kids in the TikTok video aren't the victims of COVID and school closures, or brain-dead illiterate social media addicts... they are Ken Goodman's kids.",
+    "author": "Andrew Ellison",
+    "work": "Search Your Feelings"
+  },
+  {
+    "key": "even the inconsistent in-person school is still better than learning remotely on screen.",
+    "category": "learning",
+    "rule": "controversial",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Even the inconsistent in-person school is still better than learning remotely on screen.",
+    "author": "Daisy Christodoulou",
+    "work": "Motorways with No Speed Limits and Car-Free Town Centres"
+  },
+  {
+    "key": "children are uncivilized little beasts and they have to be whipped into shape. their every impulse must be tightly controlled, their behavior constantly monitored, and compliance regularly enforced.",
+    "category": "leading",
+    "rule": "controversial",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Children are uncivilized little beasts and they have to be whipped into shape. Their every impulse must be tightly controlled, their behavior constantly monitored, and compliance regularly enforced.",
+    "author": "Peter Greene",
+    "work": "8 Bad Education Models"
+  },
+  {
+    "key": "there are many ways to divide up the sides of the education debates. one is between those who believe in civic democratic ideals and those who do not.",
+    "category": "leading",
+    "rule": "controversial",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "There are many ways to divide up the sides of the education debates. One is between those who believe in civic democratic ideals and those who do not.",
+    "author": "Peter Greene",
+    "work": "Undemocratic School Primer"
+  },
+  {
+    "key": "premise 1: all human beings have equal worth and are equally deserving of autonomy, opportunity, power, and privilege. under this premise, the school system would exist to provide opportunity to all students.",
+    "category": "leading",
+    "rule": "controversial",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Premise 1: All human beings have equal worth and are equally deserving of autonomy, opportunity, power, and privilege. Under this premise, the school system would exist to provide opportunity to all students.",
+    "author": "Peter Greene",
+    "work": "Undemocratic School Primer"
+  },
+  {
+    "key": "what's that big state at the bottom with 40 electoral votes? -- a 7th-grade student referring to texas, which prompted the author's entire approach.",
+    "category": "learning",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "What's that big state at the bottom with 40 electoral votes? -- a 7th-grade student referring to Texas, which prompted the author's entire approach.",
+    "author": "Lauren Brown",
+    "work": "Should Students Memorize the 50 States"
+  },
+  {
+    "key": "the timelines certainly seem to match up. england made big reforms to its education system, and mental health and social problems spiked soon after. but of course, correlation isn't causation.",
+    "category": "learning",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "The timelines certainly seem to match up. England made big reforms to its education system, and mental health and social problems spiked soon after. But of course, correlation isn't causation.",
+    "author": "Christodoulou, Daisy",
+    "work": "Do Knowledge-Rich Curriculums Cause Mental Health Problems"
+  },
+  {
+    "key": "the promise of models like alpha is not that ai can replace teachers or compress academics into two hours. the promise is that technology can free up time for experiences that traditional schools have struggled to prioritize.",
+    "category": "leading",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "The promise of models like Alpha is not that AI can replace teachers or compress academics into two hours. The promise is that technology can free up time for experiences that traditional schools have struggled to prioritize.",
+    "author": "Evolving Education",
+    "work": "If We Redesign School What Should We Build Instead"
+  },
+  {
+    "key": "most ai literacy curricula begin and end with the same lesson: here's how to use chatgpt responsibly. learn to prompt. check your sources. don't plagiarize. that's not ai literacy. that's a typing tutorial for 2023.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Most AI literacy curricula begin and end with the same lesson: here's how to use ChatGPT responsibly. Learn to prompt. Check your sources. Don't plagiarize. That's not AI literacy. That's a typing tutorial for 2023.",
+    "author": "Stefan Bauschard",
+    "work": "Beyond Appropriate Use of a Chatbot"
+  },
+  {
+    "key": "the ai crisis in education is not that students suddenly learned to outsource their thinking.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "The AI crisis in education is not that students suddenly learned to outsource their thinking.",
+    "author": "Stefan Bauschard",
+    "work": "Institutionalized Education as Cognitive Offloading"
+  },
+  {
+    "key": "when ai can produce polished written work on demand, the ability to write an essay becomes less distinctive. but ai can't participate in a live socratic dialogue.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "When AI can produce polished written work on demand, the ability to write an essay becomes less distinctive. But AI can't participate in a live Socratic dialogue.",
+    "author": "Stefan Bauschard",
+    "work": "Where Is Education Heading Four Forces Reshaping K12"
+  },
+  {
+    "key": "ai tools are amplifiers of human input. the quality of what ai produces depends heavily on the skills, knowledge, and judgment of the person using it.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "AI tools are amplifiers of human input. The quality of what AI produces depends heavily on the skills, knowledge, and judgment of the person using it.",
+    "author": "Stefan Bauschard",
+    "work": "Federal Government AI Literacy Framework Teaching AI with Complementary Human Skills"
+  },
+  {
+    "key": "post-graduate communication outside academia will generally involve speaking and debating. we need a rebalance toward orality.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Post-graduate communication outside academia will generally involve speaking and debating. We need a rebalance toward orality.",
+    "author": "Stefan Bauschard",
+    "work": "The Very Simple Case for Debate"
+  },
+  {
+    "key": "every person will spend far more time speaking, presenting, and verbally defending ideas than they will writing formal essays. job interviews are spoken. team meetings are spoken.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Every person will spend far more time speaking, presenting, and verbally defending ideas than they will writing formal essays. Job interviews are spoken. Team meetings are spoken.",
+    "author": "Bauschard, Stefan",
+    "work": "Bauschard's Initial Guide to Classroom Debate Implementation and Assessment"
+  },
+  {
+    "key": "58% of secondary teachers said they had suspected a student of using ai in the past month, even though they had been told not to. that number is striking -- but i think it is a significant underestimate.",
+    "category": "teaching",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "58% of secondary teachers said they had suspected a student of using AI in the past month, even though they had been told not to. That number is striking -- but I think it is a significant underestimate.",
+    "author": "Craig Barton",
+    "work": "AI in Education 9 Five Things I Learned from Grainne Hallahan"
+  },
+  {
+    "key": "nuance is an overused word to describe someone's views... but i don't know of a better one to describe dan's writing on edtech. here, he argues that the call to ban (or reduce) screens in schools is too blunt.",
+    "category": "teaching",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Nuance is an overused word to describe someone's views... but I don't know of a better one to describe Dan's writing on Edtech. Here, he argues that the call to ban (or reduce) screens in schools is too blunt.",
+    "author": "Craig Barton",
+    "work": "3-Read Friday #112: Non-examples, screen time, and better evidence for teachers"
+  },
+  {
+    "key": "there's plenty of research suggesting that high-quality apps like khan academy are helpful, but only for the kids who actually use them regularly.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "There's plenty of research suggesting that high-quality apps like Khan Academy are helpful, but only for the kids who actually use them regularly.",
+    "author": "Chad Aldeman",
+    "work": "Ed Tech Can Be Good, Too"
+  },
+  {
+    "key": "young people who are highly motivated to play online games tend to display higher imagination, and imagination in turn supports measurable creativity.",
+    "category": "learning",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Young people who are highly motivated to play online games tend to display higher imagination, and imagination in turn supports measurable creativity.",
+    "author": "Cheng, Yung-hsun",
+    "work": "The Impact of Online Games on Creativity and the Role of Imagination"
+  },
+  {
+    "key": "if students spend less time in traditional classrooms, what are we building in its place? because the future of education cannot simply be about reducing time in school. it must be about creating something better.",
+    "category": "leading",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "If students spend less time in traditional classrooms, what are we building in its place? Because the future of education cannot simply be about reducing time in school. It must be about creating something better.",
+    "author": "Evolving Education",
+    "work": "If We Redesign School What Should We Build Instead"
+  },
+  {
+    "key": "airlines do not make flying comfortable. but they do make discomfort psychologically survivable. that is the whole insight.",
+    "category": "classroom culture",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Airlines do not make flying comfortable. But they do make discomfort psychologically survivable. That is the whole insight.",
+    "author": "Patrick Dempsey",
+    "work": "Students Aren't Engaged, Motivated, or Interested"
+  },
+  {
+    "key": "the boys did quarrel, but they developed ways of resolving their quarrels peacefully. one of them managed to create a fire by rubbing sticks together, and they carefully kept the fire going the whole time they were there.",
+    "category": "classroom culture",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "The boys did quarrel, but they developed ways of resolving their quarrels peacefully. One of them managed to create a fire by rubbing sticks together, and they carefully kept the fire going the whole time they were there.",
+    "author": "Peter Gray",
+    "work": "Lord of the Flies A Harmful Distortion of Childrens Nature"
+  },
+  {
+    "key": "if you want to get kids to like the woods, you must find ways for them to play in the woods, more specifically, play with other kids in the woods, with no or minimal direct adult involvement.",
+    "category": "classroom culture",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "If you want to get kids to like the woods, you must find ways for them to play in the woods, more specifically, play with other kids in the woods, with no or minimal direct adult involvement.",
+    "author": "Gray, Peter",
+    "work": "Woodland Creatures at Play"
+  },
+  {
+    "key": "while competitors ran animated features, rogers stuck to physical sets and puppeteering. while “best practice",
+    "category": "classroom culture",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "While competitors ran animated features, Rogers stuck to physical sets and puppeteering. While “best practice",
+    "author": "Dave Stuart Jr.",
+    "work": "Fred Rogers the Teaching Mentor"
+  },
+  {
+    "key": "fear of being a 'bum' is the core demon of rocky's life. he's obsessed with bum-ness. perhaps, lots of us teachers do.",
+    "category": "classroom culture",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Fear of being a 'bum' is the core demon of Rocky's life. He's obsessed with bum-ness. Perhaps, lots of us teachers do.",
+    "author": "Dave Stuart Jr.",
+    "work": "You're Not a Bum"
+  },
+  {
+    "key": "i have seen data like these before, so i should not be shocked. but every time i read of a new survey showing how restricted american children are i'm shocked again.",
+    "category": "classroom culture",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "I have seen data like these before, so I should not be shocked. But every time I read of a new survey showing how restricted American children are I'm shocked again.",
+    "author": "Peter Gray",
+    "work": "New Data on the Chaining of Children and Teens"
+  },
+  {
+    "key": "chiron complicates this. he asks: what does the human bring to the hybrid that only comes from having been wounded? what if the most important thing the human half of the centaur carries is the scars?",
+    "category": "learning",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Chiron complicates this. He asks: what does the human bring to the hybrid that only comes from having been wounded? What if the most important thing the human half of the centaur carries is the scars?",
+    "author": "Jonathan Boymal",
+    "work": "The Wound That Teaches"
+  },
+  {
+    "key": "the failure calmatters found is real -- but it is a failure of local commitment, a campus where the quality process is optional, and a department let an indefensible course run. it is not a failure of online education.",
+    "category": "leading",
+    "rule": "fragment",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "The failure CalMatters found is real -- but it is a failure of local commitment, a campus where the quality process is optional, and a department let an indefensible course run. It is not a failure of online education.",
+    "author": "Hill, Phil",
+    "work": "What We've Got Here Is Failure to Extrapolate"
+  },
+  {
+    "key": "the fordham report is exhibit 729. teacher knowledge is up. three-cueing is still happening. benchmark is still on the approved list. policy is not progress.",
+    "category": "leading",
+    "rule": "fragment",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "The Fordham report is Exhibit 729. Teacher knowledge is up. Three-cueing is still happening. Benchmark is still on the approved list. Policy is not progress.",
+    "author": "Karen Vaites",
+    "work": "The New Fordham Report Is Exhibit 729 for Policy Is Not Progress"
+  },
+  {
+    "key": "the teacher wellbeing index 2025 points to accumulation, not a single breaking point.",
+    "category": "leading",
+    "rule": "fragment",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "The Teacher Wellbeing Index 2025 points to accumulation, not a single breaking point.",
+    "author": "Findlater, Sarah",
+    "work": "A More Sustainable Way Forward What Teaching Could Feel Like Next"
+  },
+  {
+    "key": "i guarantee that you will report much higher, not slightly higher, scores than the national average.",
+    "category": "leading",
+    "rule": "fragment",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "I guarantee that you will report much higher, not slightly higher, scores than the national average.",
+    "author": "Dominic Salles",
+    "work": "Student Voice Is Shocking"
+  },
+  {
+    "key": "one study suggests that students using classroom devices are off-task as much as 38 minutes of every hour.",
+    "category": "leading",
+    "rule": "fragment",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "One study suggests that students using classroom devices are off-task as much as 38 minutes of every hour.",
+    "author": "Abby Rubin and Emily Cherkin",
+    "work": "If EdTech Products Are Expensive, Ineffective, and Extractive, Why Are We Still Using Them?"
+  },
+  {
+    "key": "as we consider (or ignore) the opportunity to rethink and re-imagine education, all of our worst ideas about what education actually is have come bubbling to the surface like hippopotamus farts in a stagnant pond.",
+    "category": "leading",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "As we consider (or ignore) the opportunity to rethink and re-imagine education, all of our worst ideas about what education actually is have come bubbling to the surface like hippopotamus farts in a stagnant pond.",
+    "author": "Peter Greene",
+    "work": "8 Bad Education Models"
+  },
+  {
+    "key": "it's possible for districts to both create and implement great policies and to communicate about them effectively, which families want.",
+    "category": "learning",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "It's possible for districts to both create and implement great policies and to communicate about them effectively, which families want.",
+    "author": "Chad Aldeman",
+    "work": "Congratulations! Your Child Belongs in Algebra"
+  },
+  {
+    "key": "these high pass rates suggest that districts across virginia may be just a little too choosy about which students get access to advanced math classes.",
+    "category": "learning",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "These high pass rates suggest that districts across Virginia may be just a little too choosy about which students get access to advanced math classes.",
+    "author": "Chad Aldeman",
+    "work": "When Should You Accelerate Your Child?"
+  },
+  {
+    "key": "until recently, less than 1% (under 50) of incoming students needed remedial math... today, nearly 12% of entering students (921) require remedial math. that's nearly a thirtyfold increase.",
+    "category": "learning",
+    "rule": "fragment",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Until recently, less than 1% (under 50) of incoming students needed remedial math... Today, nearly 12% of entering students (921) require remedial math. That's nearly a thirtyfold increase.",
+    "author": "AI Learn Insights",
+    "work": "The Collapse of College Math Readiness"
+  },
+  {
+    "key": "the convenience these tools afford is real, but so are the costs, and they don't fall on the same person.",
+    "category": "teaching",
+    "rule": "fragment",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "The convenience these tools afford is real, but so are the costs, and they don't fall on the same person.",
+    "author": "Andrew Cantarutti",
+    "work": "The Right Tool for the Right Hands"
+  },
+  {
+    "key": "when the authors sorted the effects of khan academy implementation across performance levels the largest effects, by far, were for the lowest-performing students.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "When the authors sorted the effects of Khan Academy implementation across performance levels the largest effects, by far, were for the lowest-performing students.",
+    "author": "Chad Aldeman",
+    "work": "Ed Tech Can Be Good, Too"
+  },
+  {
+    "key": "public schools have the power to bridge these gaps between the haves and the have nots. to do so requires a commitment to fill in these knowledge gaps with purposeful teaching.",
+    "category": "learning",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Public schools have the power to bridge these gaps between the haves and the have nots. To do so requires a commitment to fill in these knowledge gaps with purposeful teaching.",
+    "author": "Lauren Brown",
+    "work": "Should Students Memorize the 50 States"
+  },
+  {
+    "key": "the striking feature of all of this data is the similarity of the three countries' data, not the differences. their education policies and attainment scores have definitely diverged. but happiness and wellbeing have not.",
+    "category": "learning",
+    "rule": "off-topic",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "The striking feature of all of this data is the similarity of the three countries' data, not the differences. Their education policies and attainment scores have definitely diverged. But happiness and wellbeing have not.",
+    "author": "Christodoulou, Daisy",
+    "work": "Do Knowledge-Rich Curriculums Cause Mental Health Problems"
+  },
+  {
+    "key": "for novice teachers, that mentoring relationship is irreplaceable. ai can be a useful supplement, but it should not be the dominant resource they turn to. if we have a problem with access to mentors, we fix the mentoring problem.",
+    "category": "teaching",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "For novice teachers, that mentoring relationship is irreplaceable. AI can be a useful supplement, but it should not be the dominant resource they turn to. If we have a problem with access to mentors, we fix the mentoring problem.",
+    "author": "Craig Barton",
+    "work": "AI in Education 9 Five Things I Learned from Grainne Hallahan"
+  },
+  {
+    "key": "that is trap number one: cognitive outsourcing, to use paul kirschner's phrase. the ai does the thinking, you copy and paste, and your own pedagogical reasoning slowly atrophies.",
+    "category": "teaching",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "That is trap number one: cognitive outsourcing, to use Paul Kirschner's phrase. The AI does the thinking, you copy and paste, and your own pedagogical reasoning slowly atrophies.",
+    "author": "Craig Barton",
+    "work": "How I Use AI as a Thought Partner"
+  },
+  {
+    "key": "outsourcing -- asking ai to explain, summarise, write, or produce -- transfers the thinking itself to an external agent. the student receives a finished product. nothing is encoded in long-term memory.",
+    "category": "teaching",
+    "rule": "edtech-politics",
+    "reason": "hero-pool residual (re-derived, unreviewed)",
+    "quote": "Outsourcing -- asking AI to explain, summarise, write, or produce -- transfers the thinking itself to an external agent. The student receives a finished product. Nothing is encoded in long-term memory.",
+    "author": "Jamie Lee Clark",
+    "work": "The Generation Effect"
+  },
+  {
+    "key": "the future of education is not about getting through content faster. information has already become abundant and accessible. the real challenge is helping young people discover who they are, how they contribute, how they work with others, and how they navigate an unpredictable world.",
+    "category": "leading",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "The future of education is not about getting through content faster. Information has already become abundant and accessible. The real challenge is helping young people discover who they are, how they contribute, how they work with others, and how they navigate an unpredictable world.",
+    "author": "Evolving Education",
+    "work": "If We Redesign School What Should We Build Instead"
+  },
+  {
+    "key": "what needs to change is not the importance of learning. what needs to change is what and how we learn, and the design of the ecosystem surrounding it.",
+    "category": "leading",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "What needs to change is not the importance of learning. What needs to change is what and how we learn, and the design of the ecosystem surrounding it.",
+    "author": "Evolving Education",
+    "work": "If We Redesign School What Should We Build Instead"
+  },
+  {
+    "key": "redesign requires more than subtraction. it requires imagination.",
+    "category": "leading",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "Redesign requires more than subtraction. It requires imagination.",
+    "author": "Evolving Education",
+    "work": "If We Redesign School What Should We Build Instead"
+  },
+  {
+    "key": "i will call this phenomenon the backward slide in math readiness: remediation is moving backward, from college preparation to high-school preparation, and now to middle-school foundations.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "I will call this phenomenon the Backward Slide in math readiness: remediation is moving backward, from college preparation to high-school preparation, and now to middle-school foundations.",
+    "author": "AI Learn Insights",
+    "work": "The Collapse of College Math Readiness"
+  },
+  {
+    "key": "in the stem pathway, the report's conclusion is starker: 'few, if any students who place into math 2 have successfully completed an engineering degree.'",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "In the STEM pathway, the report's conclusion is starker: 'Few, if any students who place into Math 2 have successfully completed an engineering degree.'",
+    "author": "AI Learn Insights",
+    "work": "The Collapse of College Math Readiness"
+  },
+  {
+    "key": "my working hypothesis is that the problem is likely worse at less selective institutions, including regional four-year colleges and community colleges.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "My working hypothesis is that the problem is likely worse at less selective institutions, including regional four-year colleges and community colleges.",
+    "author": "AI Learn Insights",
+    "work": "The Collapse of College Math Readiness"
+  },
+  {
+    "key": "a danger is cheating, but more consequential is cognitive offloading. students are increasingly using ai tools to bypass the very practice through which mathematical fluency is built.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "A danger is cheating, but more consequential is cognitive offloading. Students are increasingly using AI tools to bypass the very practice through which mathematical fluency is built.",
+    "author": "AI Learn Insights",
+    "work": "The Collapse of College Math Readiness"
+  },
+  {
+    "key": "ucsd has made the problem visible. now we need to know how far it extends.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "UCSD has made the problem visible. Now we need to know how far it extends.",
+    "author": "AI Learn Insights",
+    "work": "The Collapse of College Math Readiness"
+  },
+  {
+    "key": "what evidence do you have that your solution solves this math problem? and please, no hand-waving with vacuous terms such as 'personalization,' 'adaptive learning,' or 'ai-powered tutoring.'",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "What evidence do you have that your solution solves this math problem? And please, no hand-waving with vacuous terms such as 'personalization,' 'adaptive learning,' or 'AI-powered tutoring.'",
+    "author": "AI Learn Insights",
+    "work": "The Collapse of College Math Readiness"
+  },
+  {
+    "key": "when we summoned them back, we did not really account for what had just happened. we didn't own the contradiction. we said, 'no, no, you have to come back to the classroom. learning is better face-to-face.' there is a falseness there that higher education hasn't owned up to.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "When we summoned them back, we did not really account for what had just happened. We didn't own the contradiction. We said, 'No, no, you have to come back to the classroom. Learning is better face-to-face.' There is a falseness there that higher education hasn't owned up to.",
+    "author": "AI Edu Simplified",
+    "work": "Apathies and Artifices in Education (Part 1 of 3)"
+  },
+  {
+    "key": "ai has extended that same dynamic. now the apathy is not just about the classroom; it is about what we ask students to do. students are looking at us, looking at these tools, looking at the world they are being told they are preparing for, and asking: really?",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "AI has extended that same dynamic. Now the apathy is not just about the classroom; it is about what we ask students to do. Students are looking at us, looking at these tools, looking at the world they are being told they are preparing for, and asking: really?",
+    "author": "AI Edu Simplified",
+    "work": "Apathies and Artifices in Education (Part 1 of 3)"
+  },
+  {
+    "key": "i do not think the answer is that the work does not matter. reading matters. writing matters. research matters. thinking carefully and making meaning across complexity absolutely matters. but we need a better reason than a grade.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "I do not think the answer is that the work does not matter. Reading matters. Writing matters. Research matters. Thinking carefully and making meaning across complexity absolutely matters. But we need a better reason than a grade.",
+    "author": "AI Edu Simplified",
+    "work": "Apathies and Artifices in Education (Part 1 of 3)"
+  },
+  {
+    "key": "the ruling contradiction is that education is structured around efficiency and convenience to the institution's benefit -- and moments like the pandemic and now ai make that glaringly evident.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "The ruling contradiction is that education is structured around efficiency and convenience to the institution's benefit -- and moments like the pandemic and now AI make that glaringly evident.",
+    "author": "AI Edu Simplified",
+    "work": "Apathies and Artifices in Education (Part 1 of 3)"
+  },
+  {
+    "key": "ai can draft content, but humans need to revise it for tone, clarity, persuasiveness, and audience awareness. communication actually becomes more important in an ai context.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "AI can draft content, but humans need to revise it for tone, clarity, persuasiveness, and audience awareness. Communication actually becomes more important in an AI context.",
+    "author": "Stefan Bauschard",
+    "work": "Federal Government AI Literacy Framework Teaching AI with Complementary Human Skills"
+  },
+  {
+    "key": "the goal isn't to create professional debaters but to develop students who can think critically and articulate their reasoning under pressure.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "The goal isn't to create professional debaters but to develop students who can think critically and articulate their reasoning under pressure.",
+    "author": "Bauschard, Stefan",
+    "work": "Bauschard's Initial Guide to Classroom Debate Implementation and Assessment"
+  },
+  {
+    "key": "debate provides a framework where intellectual disagreement is expected and valued, teaching students that challenging an idea isn't the same as attacking a person.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "Debate provides a framework where intellectual disagreement is expected and valued, teaching students that challenging an idea isn't the same as attacking a person.",
+    "author": "Bauschard, Stefan",
+    "work": "Bauschard's Initial Guide to Classroom Debate Implementation and Assessment"
+  },
+  {
+    "key": "every time you let ai do your thinking, you're not cheating the institution, you're cheating yourself out of the cognitive development that actually makes you capable. you can't build a school culture of integrity from 8 to 3 and then send students home into an ecosystem engineered to erode their agency.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "Every time you let AI do your thinking, you're not cheating the institution, you're cheating yourself out of the cognitive development that actually makes you capable. You can't build a school culture of integrity from 8 to 3 and then send students home into an ecosystem engineered to erode their agency.",
+    "author": "Stefan Bauschard",
+    "work": "Beyond Appropriate Use of a Chatbot"
+  },
+  {
+    "key": "a student who can think well, evaluate evidence, and defend ideas under cross-examination has a portable capacity that survives any specific economic configuration. a student who has memorized the 2026 marketing curriculum does not.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "A student who can think well, evaluate evidence, and defend ideas under cross-examination has a portable capacity that survives any specific economic configuration. A student who has memorized the 2026 marketing curriculum does not.",
+    "author": "Stefan Bauschard",
+    "work": "If Private Equity Cant Model Five Years Out How Can a Sixteen-Year-Old"
+  },
+  {
+    "key": "it is that schools spent a century teaching them to do exactly that -- and then panicked when the outsourcing got too efficient.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "It is that schools spent a century teaching them to do exactly that -- and then panicked when the outsourcing got too efficient.",
+    "author": "Stefan Bauschard",
+    "work": "Institutionalized Education as Cognitive Offloading"
+  },
+  {
+    "key": "plato saw the shape of the problem twenty-four hundred years ago, and he was wrong about it in exactly the way we are now wrong about chatgpt.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "Plato saw the shape of the problem twenty-four hundred years ago, and he was wrong about it in exactly the way we are now wrong about ChatGPT.",
+    "author": "Stefan Bauschard",
+    "work": "Institutionalized Education as Cognitive Offloading"
+  },
+  {
+    "key": "thamus was right and wrong in the phaedrus , socrates tells the story of theuth, the egyptian god who invents writing and presents it to king thamus as a gift to humanity.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "Thamus was right and wrong In the Phaedrus , Socrates tells the story of Theuth, the Egyptian god who invents writing and presents it to King Thamus as a gift to humanity.",
+    "author": "Stefan Bauschard",
+    "work": "Institutionalized Education as Cognitive Offloading"
+  },
+  {
+    "key": "writing, he warns, will not strengthen memory -- it will destroy it.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "Writing, he warns, will not strengthen memory -- it will destroy it.",
+    "author": "Stefan Bauschard",
+    "work": "Institutionalized Education as Cognitive Offloading"
+  },
+  {
+    "key": "we don't tell them they're learning ai. we tell them they have a problem and we have a tool. the problem has to be real -- something they actually care about, something that affects them or someone they love. the tool is google ai studio. the rest is theirs.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "We don't tell them they're learning AI. We tell them they have a problem and we have a tool. The problem has to be real -- something they actually care about, something that affects them or someone they love. The tool is Google AI Studio. The rest is theirs.",
+    "author": "Stefan Bauschard",
+    "work": "Unleashing Kid Wizards"
+  },
+  {
+    "key": "one student built a multiplication tutor for her younger brother in about three hours. she had never programmed before. she had never heard of an api. she had a brother who struggled with math and a three-hour block of time and a very clear sense of what she wanted it to do. that was enough.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "One student built a multiplication tutor for her younger brother in about three hours. She had never programmed before. She had never heard of an API. She had a brother who struggled with math and a three-hour block of time and a very clear sense of what she wanted it to do. That was enough.",
+    "author": "Stefan Bauschard",
+    "work": "Unleashing Kid Wizards"
+  },
+  {
+    "key": "the cheating frame is the enemy of real ai education. when you teach kids that ai is the thing you use instead of doing the work, you've taught them something false and damaging. ai is a tool for doing harder work than you could do without it. the camp is designed around that premise.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "The cheating frame is the enemy of real AI education. When you teach kids that AI is the thing you use instead of doing the work, you've taught them something false and damaging. AI is a tool for doing harder work than you could do without it. The camp is designed around that premise.",
+    "author": "Stefan Bauschard",
+    "work": "Unleashing Kid Wizards"
+  },
+  {
+    "key": "what we're watching is a generation of kids develop a fundamentally different relationship to problem-solving. they don't ask 'can i do this?' they ask 'what tool do i need?' that shift in the framing of capability is what we're trying to produce, and we're watching it happen.",
+    "category": "learning",
+    "rule": "edtech-politics",
+    "reason": "off-topic source (AI/futurism/policy)",
+    "quote": "What we're watching is a generation of kids develop a fundamentally different relationship to problem-solving. They don't ask 'can I do this?' They ask 'what tool do I need?' That shift in the framing of capability is what we're trying to produce, and we're watching it happen.",
+    "author": "Stefan Bauschard",
+    "work": "Unleashing Kid Wizards"
+  }
+]

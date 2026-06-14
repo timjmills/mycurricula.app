@@ -1,0 +1,986 @@
+/* welcome.module.css — public marketing landing page.
+ *
+ * A faithful recreation of the v1.3 Curricula marketing design
+ * (Documents/Claude Design/6.3.26 …/ui_kits/marketing/marketing.css),
+ * adapted to OUR design tokens (app/tokens.css). Every color, type size,
+ * radius, and shadow comes from var(--token) — zero raw hex — so the page
+ * retints automatically across all six themes.
+ *
+ * Token map vs. the prototype:
+ *   prototype --reading-tint  → our --reading-light
+ *   prototype --reading-ink   → our --reading-deep
+ *   (same for math / writing). The prototype's "science"/"social" are NOT
+ *   our locked subjects, so the third product-peek lane and the teach-mode
+ *   "next" dot use math / writing instead.
+ *
+ * The page renders inside <body class="cp-root">, whose reset
+ * `.cp-root button { background:none;border:none;padding:0 }` (specificity
+ * 0,1,1) would strip any single-class button rule. CTAs therefore use the
+ * <Button> primitive (already double-qualified .btn.x). Nav/footer links are
+ * <a>/<Link>, unaffected by that reset.
+ */
+
+/* ── Page shell ──────────────────────────────────────────────────────── */
+
+.page {
+  /* overflow-hidden clips the hero mesh + scaled featured pricing card so
+     the document never scrolls sideways at any tier. */
+  overflow: hidden;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
+.page :global(svg) {
+  display: block;
+}
+
+/* Shared eyebrow pill — uppercase honey label that opens most sections. */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--t-12);
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--honey-600);
+  background: var(--honey-50);
+  border: 1px solid var(--honey-100);
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+}
+
+/* ── Brand lockup (nav + footer) ─────────────────────────────────────── */
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.glyph {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  background: var(--logo-tile-grad);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--logo-tile-shadow);
+  flex: 0 0 auto;
+}
+.glyph svg {
+  width: 18px;
+  height: 18px;
+}
+
+.wordmark {
+  font-family: var(--font-logo);
+  font-weight: 800;
+  font-size: var(--t-18);
+  color: var(--logo-text);
+  letter-spacing: -0.02em;
+}
+.tld {
+  color: var(--logo-tld);
+}
+
+/* ── Nav ─────────────────────────────────────────────────────────────── */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 16px 44px;
+  /* Translucent blurred chrome over the warm canvas (matches the prototype's
+     rgba(252,250,246,.82); --canvas is the same cream, color-mixed to ~82%
+     so the body shows through the blur). */
+  background: color-mix(in srgb, var(--canvas) 82%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.links {
+  display: flex;
+  gap: 24px;
+  margin-left: 14px;
+}
+.links a {
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--body);
+  text-decoration: none;
+  transition: color 140ms ease;
+}
+.links a:hover {
+  color: var(--brand-600);
+}
+
+.navcta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Hero ────────────────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  padding: 78px 44px 90px;
+  text-align: center;
+  overflow: hidden;
+}
+
+/* Atmospheric mesh — honey top-left, violet top-right, green bottom-right,
+   warm peach top — over the canvas. Uses the themed --mesh-* tokens (plus
+   a peach companion) so the wash retints with the active theme. */
+.heroMesh {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 50% at 8% 0%, var(--mesh-a), transparent 60%),
+    radial-gradient(40% 50% at 96% 4%, var(--mesh-b), transparent 62%),
+    radial-gradient(50% 60% at 90% 100%, var(--mesh-c), transparent 62%),
+    radial-gradient(
+      120% 80% at 50% -10%,
+      color-mix(in srgb, var(--honey-200) 55%, transparent),
+      transparent 60%
+    ),
+    var(--canvas);
+}
+
+.heroIn {
+  position: relative;
+  z-index: 1;
+  max-width: 880px;
+  margin: 0 auto;
+}
+.heroTitle {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 60px;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  margin: 18px 0 0;
+}
+.lead {
+  font-size: var(--t-18);
+  color: var(--body);
+  max-width: 640px;
+  margin: 18px auto 0;
+  line-height: 1.6;
+}
+.heroCta {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 30px;
+  flex-wrap: wrap;
+}
+.heroNote {
+  margin-top: 16px;
+  font-size: var(--t-13);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ── Product peek (Year Overview card) ───────────────────────────────── */
+
+.peek {
+  position: relative;
+  z-index: 1;
+  max-width: 1040px;
+  margin: 48px auto 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--sh-lg);
+  overflow: hidden;
+  text-align: left;
+}
+.peekBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-warm);
+}
+.peekBar .dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+/* Window dots — semantic status palette stands in for the prototype's three
+   literal pastels (red/amber/green traffic dots). */
+.dotR {
+  background: var(--danger);
+}
+.dotA {
+  background: var(--warn);
+}
+.dotG {
+  background: var(--done);
+}
+.peekTitle {
+  margin-left: 12px;
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--muted);
+}
+.peekBody {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* A subject lane. --c / --cs / --ct / --ck are set inline per lane to the
+   subject's bright / solid / light / deep tokens (the cascade the page is
+   selling). */
+.lane {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.laneHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  background: var(--ct);
+  border-bottom: 1px solid var(--ct);
+  font-weight: 800;
+  font-size: var(--t-14);
+  color: var(--ck);
+}
+.laneIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--cs);
+  display: grid;
+  place-items: center;
+  color: var(--on-solid);
+  flex: 0 0 auto;
+}
+.laneIcon svg {
+  width: 17px;
+  height: 17px;
+}
+.chips {
+  display: flex;
+  gap: 9px;
+  padding: 13px 14px;
+  flex-wrap: wrap;
+}
+.chip {
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--ct);
+  border: 1.5px solid var(--c);
+  border-radius: var(--r-pill);
+  padding: 7px 13px;
+  box-shadow: var(--sh-xs);
+}
+.chipCur {
+  border-width: 2px;
+}
+.chipDone {
+  color: var(--ck);
+  background: var(--surface);
+  border-color: var(--ct);
+}
+
+/* ── Trust strip ─────────────────────────────────────────────────────── */
+
+.trust {
+  text-align: center;
+  padding: 38px 44px;
+}
+.trust > span {
+  font-size: var(--t-12);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.trustRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  color: var(--ink-soft);
+}
+.trustRow b {
+  font-family: var(--font-display-sm);
+  font-weight: 700;
+  font-size: var(--t-18);
+}
+.trustRow .sep {
+  color: var(--faint);
+}
+
+/* ── Section heads ───────────────────────────────────────────────────── */
+
+.secHead {
+  max-width: 680px;
+  margin: 0 auto 44px;
+  text-align: center;
+}
+.secHead h2 {
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  font-size: 38px;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 14px 0 0;
+}
+.secHead p {
+  font-size: var(--t-16);
+  color: var(--body);
+  margin: 16px 0 0;
+}
+
+/* ── Features ────────────────────────────────────────────────────────── */
+
+.features {
+  padding: 64px 44px;
+}
+.tiles {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 24px 22px;
+  box-shadow: var(--sh-sm);
+  transition:
+    transform 160ms ease,
+    box-shadow 200ms ease;
+}
+.tile:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--sh-md);
+}
+/* --tic / --tit set inline per tile: icon color + tile-tint background. */
+.tileIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-md);
+  background: var(--tit);
+  color: var(--tic);
+  display: grid;
+  place-items: center;
+  margin-bottom: 16px;
+}
+.tileIcon svg {
+  width: 24px;
+  height: 24px;
+}
+.tile h3 {
+  font-family: var(--font-sans);
+  font-size: var(--t-16);
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0 0 7px;
+  letter-spacing: -0.01em;
+}
+.tile p {
+  font-size: var(--t-13);
+  color: var(--body);
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* ── How it works ────────────────────────────────────────────────────── */
+
+.how {
+  padding: 64px 44px;
+  background: var(--grad-brand);
+}
+.steps {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+.step {
+  background: var(--surface);
+  border: 1px solid var(--border-cool);
+  border-radius: var(--r-xl);
+  padding: 22px;
+  box-shadow: var(--sh-xs);
+}
+.stepNum {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-md);
+  background: var(--chrome-accent);
+  color: var(--on-solid);
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  font-size: var(--t-16);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--sh-sm);
+  margin-bottom: 14px;
+}
+.step h4 {
+  font-family: var(--font-sans);
+  font-size: var(--t-15);
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+.step p {
+  font-size: var(--t-13);
+  color: var(--body);
+  margin: 0;
+}
+
+/* ── Teach mode band ─────────────────────────────────────────────────── */
+
+.teachband {
+  padding: 64px 44px;
+}
+.teachbandIn {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: center;
+  background: var(--grad-dawn);
+  border-radius: var(--r-2xl);
+  padding: 44px;
+  box-shadow: var(--sh-md);
+}
+/* The dawn gradient is a warm light wash → dark warm ink reads on it.
+   --on-honey is the fixed warm-dark ink the token system guarantees over
+   warm gradients; its 78% mix gives the softer body tone. */
+.tbEyebrow {
+  color: var(--on-honey);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border-color: color-mix(in srgb, var(--surface) 50%, transparent);
+}
+.tbCopy h2 {
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  font-size: 34px;
+  letter-spacing: -0.02em;
+  color: var(--on-honey);
+  margin: 14px 0 0;
+}
+.tbCopy p {
+  font-size: var(--t-16);
+  color: color-mix(in srgb, var(--on-honey) 78%, transparent);
+  margin: 14px 0 22px;
+  line-height: 1.55;
+}
+.tbWidgets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.wbox {
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  padding: 16px;
+  box-shadow: var(--sh-sm);
+}
+.wboxWide {
+  grid-column: span 2;
+}
+.wboxHead {
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.wboxCenter {
+  text-align: center;
+}
+.wnow,
+.wnext {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink);
+}
+.wnext {
+  margin-top: 9px;
+  color: var(--muted);
+}
+.wdot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.wclock {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 34px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.wobj {
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  font-size: var(--t-15);
+  color: var(--ink);
+  line-height: 1.2;
+  text-align: left;
+}
+
+/* ── Teacher testimonial ─────────────────────────────────────────────── */
+
+.byteachers {
+  padding: 50px 44px;
+}
+.quote {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+}
+.quote p {
+  font-family: var(--font-display-sm);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.3;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.quoteFoot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+.ava {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--grad-dawn);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  font-size: var(--t-14);
+  color: var(--on-honey);
+  border: 2px solid var(--surface);
+  box-shadow: var(--sh-xs);
+}
+/* Real teacher portrait in the testimonial — a face beats initials. */
+.avaPhoto {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 20%;
+  border: 2px solid var(--surface);
+  box-shadow: var(--sh-xs);
+  flex: 0 0 auto;
+}
+.quoteFoot b {
+  display: block;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: var(--t-14);
+  color: var(--ink);
+}
+.quoteFoot span {
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+.quoteMeta {
+  text-align: left;
+}
+
+/* ── Pricing ─────────────────────────────────────────────────────────── */
+
+.pricing {
+  padding: 64px 44px;
+}
+.plans {
+  max-width: 1040px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.plan {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 26px 24px;
+  box-shadow: var(--sh-sm);
+  position: relative;
+}
+.planFeatured {
+  border-color: var(--honey-300);
+  box-shadow: var(--sh-md);
+  transform: scale(1.02);
+}
+.ptag {
+  position: absolute;
+  top: -12px;
+  left: 24px;
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--on-honey);
+  background: var(--grad-honey);
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-sm);
+}
+.plan h3 {
+  font-family: var(--font-sans);
+  font-size: var(--t-16);
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0;
+}
+.price {
+  margin: 12px 0 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.price b {
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  font-size: 34px;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.price span {
+  font-size: var(--t-13);
+  color: var(--muted);
+  font-weight: 600;
+}
+.pdesc {
+  font-size: var(--t-13);
+  color: var(--body);
+  margin: 0 0 16px;
+}
+.plan ul {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+}
+.plan li {
+  font-size: var(--t-13);
+  color: var(--ink-soft);
+  padding: 7px 0 7px 24px;
+  position: relative;
+}
+/* Done-tinted check disc. The tick glyph is an inline SVG data-URI; its
+   stroke is the --done green encoded as %2316a06b (= #16a06b, our --done). */
+.plan li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background-color: var(--done-tint);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2316a06b' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 13 4 4 10-11'/%3E%3C/svg%3E");
+  background-size: 11px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+/* The Button primitive sits inside .plan; stretch it full-width. */
+.planCta {
+  width: 100%;
+}
+
+/* ── Dark CTA band ───────────────────────────────────────────────────── */
+
+.cta {
+  padding: 30px 44px 80px;
+}
+.ctaIn {
+  max-width: 1040px;
+  margin: 0 auto;
+  text-align: center;
+  background: var(--ink);
+  border-radius: var(--r-2xl);
+  padding: 56px 40px;
+  position: relative;
+  overflow: hidden;
+}
+/* Honey + brand glows in the dark band corners. Tokenized rgba via
+   color-mix on the brand/honey solids so the glow tracks the theme accent. */
+.ctaIn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      60% 120% at 100% 0%,
+      color-mix(in srgb, var(--honey-400) 30%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      60% 120% at 0% 100%,
+      color-mix(in srgb, var(--brand-500) 32%, transparent),
+      transparent 60%
+    );
+}
+.ctaIn h2 {
+  position: relative;
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  /* The band is always the dark ink fill → on-solid white reads on it in
+     every theme. */
+  color: var(--on-solid);
+  font-size: 38px;
+  margin: 0;
+}
+.ctaIn p {
+  position: relative;
+  color: color-mix(in srgb, var(--on-solid) 72%, transparent);
+  font-size: var(--t-16);
+  margin: 14px 0 26px;
+}
+.ctaInBtn {
+  position: relative;
+  display: inline-flex;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────── */
+
+.foot {
+  padding: 48px 44px 32px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1.4fr 2fr;
+  gap: 40px;
+}
+.footBrand p {
+  font-size: var(--t-13);
+  color: var(--muted);
+  margin: 14px 0 0;
+  max-width: 280px;
+}
+.footCols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.footCols h5 {
+  font-family: var(--font-sans);
+  font-size: var(--t-12);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 12px;
+}
+.footCols a {
+  display: block;
+  font-size: var(--t-13);
+  color: var(--muted);
+  padding: 5px 0;
+  text-decoration: none;
+  transition: color 140ms ease;
+}
+.footCols a:hover {
+  color: var(--brand-600);
+}
+.footBase {
+  grid-column: 1 / -1;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--hairline);
+  font-size: var(--t-12);
+  color: var(--faint);
+}
+
+/* ── In real classrooms (photo collage) ──────────────────────────────── */
+/* An editorial, planner-scrapbook arrangement of real teaching + planning
+   moments: one tall feature crop beside a 2×2 of supporting frames. Tiles are
+   rounded and soft-shadowed; hover gently zooms the crop; a low-opacity
+   --grad-hero glaze (soft-light) ties every frame to the active theme so the
+   collage retints with the page. Photos carry their own color — captions live
+   in the section head, never as text over the image (which would invert in the
+   dark theme). */
+
+.gallery {
+  padding: 64px 44px;
+}
+.galleryGrid {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 188px;
+  gap: 14px;
+}
+.gItem {
+  position: relative;
+  margin: 0;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-sm);
+}
+.gItem img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 500ms ease;
+}
+/* theme glaze — the collage belongs to whichever theme is active */
+.gItem::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--grad-hero);
+  mix-blend-mode: soft-light;
+  opacity: 0.4;
+  pointer-events: none;
+}
+.gItem:hover {
+  box-shadow: var(--sh-md);
+}
+.gItem:hover img {
+  transform: scale(1.05);
+}
+/* the tall left feature crop */
+.gFeature {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+/* ── Responsive — mirrors the prototype's breakpoints ────────────────── */
+
+@media (max-width: 1000px) {
+  .tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .plans {
+    grid-template-columns: 1fr;
+    max-width: 440px;
+  }
+  .planFeatured {
+    transform: none;
+  }
+  .galleryGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .teachbandIn {
+    grid-template-columns: 1fr;
+  }
+  .foot {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .nav {
+    padding: 14px 20px;
+    gap: 14px;
+  }
+  .links {
+    display: none;
+  }
+  .hero {
+    padding: 54px 20px 64px;
+  }
+  .heroTitle {
+    font-size: 40px;
+  }
+  .lead {
+    font-size: var(--t-16);
+  }
+  .features,
+  .how,
+  .teachband,
+  .pricing,
+  .byteachers,
+  .gallery {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .galleryGrid {
+    grid-auto-rows: 132px;
+    gap: 10px;
+  }
+  .tiles {
+    grid-template-columns: 1fr;
+  }
+  .steps {
+    grid-template-columns: 1fr;
+  }
+  .tbWidgets {
+    grid-template-columns: 1fr;
+  }
+  .wboxWide {
+    grid-column: auto;
+  }
+  .secHead h2 {
+    font-size: 30px;
+  }
+  .cta {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .foot {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    transition: none;
+  }
+  .tile:hover {
+    transform: none;
+  }
+  .gItem img {
+    transition: none;
+  }
+  .gItem:hover img {
+    transform: none;
+  }
+}

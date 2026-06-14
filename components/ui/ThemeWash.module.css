@@ -1,0 +1,31 @@
+/* Animated theme-tinted gradient-mesh wash. Retints per theme via the
+   --mesh-a/b/c + --grad-hero tokens (defined per theme in app/tokens.css), so
+   the same element gives each theme its own living background. Extracted from
+   the /home hero (components/home/home.module.css) so any page can reuse it —
+   see components/ui/ThemeWash.tsx. Tokens only. */
+.wash {
+  position: absolute;
+  inset: -12%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 48% at 10% 4%, color-mix(in srgb, var(--mesh-a) 92%, transparent) 0%, transparent 60%),
+    radial-gradient(40% 50% at 92% 0%, color-mix(in srgb, var(--mesh-b) 92%, transparent) 0%, transparent 62%),
+    radial-gradient(52% 62% at 88% 100%, color-mix(in srgb, var(--mesh-c) 92%, transparent) 0%, transparent 62%),
+    var(--grad-hero);
+  background-size: 200% 200%, 200% 200%, 200% 200%, 160% 160%;
+  background-position: 0% 0%, 100% 0%, 100% 100%, 50% 50%;
+  animation: washDrift 28s ease-in-out infinite alternate;
+}
+
+@keyframes washDrift {
+  to {
+    background-position: 14% 10%, 86% 12%, 90% 86%, 58% 44%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wash {
+    animation: none !important;
+  }
+}

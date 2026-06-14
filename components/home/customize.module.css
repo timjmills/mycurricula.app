@@ -1,0 +1,152 @@
+/* Customize popover for the home screen. Button rules are double-qualified
+   (.x.x) to beat the .cp-root button reset. Tokens only. */
+
+.customize {
+  position: relative;
+  z-index: 3;
+  align-self: flex-end;
+  padding: 12px 18px 0;
+}
+
+.customizeBtn.customizeBtn {
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  color: var(--ink-soft);
+  font-size: var(--t-12);
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.customizeBtn.customizeBtn:hover {
+  border-color: var(--chrome-accent);
+  color: var(--chrome-accent);
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 18px;
+  width: 248px;
+  padding: 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.head {
+  margin: 0;
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.modeRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.modeBtn.modeBtn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface-warm);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.modeBtn.modeBtn:hover {
+  border-color: var(--chrome-accent);
+}
+.modeOn.modeOn {
+  border-color: var(--chrome-accent);
+  background: var(--chrome-accent-soft, var(--surface-warm));
+}
+.modeLabel {
+  font-size: var(--t-12);
+  font-weight: 800;
+  color: var(--ink);
+}
+.modeHint {
+  font-size: var(--t-10);
+  color: var(--muted);
+}
+
+.toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--hairline);
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--t-13);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--chrome-accent);
+}
+.photoToggle {
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+}
+
+/* Inline (non-popover) variant used by the Settings → Appearance card. */
+.settingsBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Quote rotation controls: topic + interval selects. */
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+}
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: var(--t-13);
+  color: var(--ink-soft);
+}
+.fieldLabel {
+  font-weight: 600;
+}
+.select {
+  flex: 0 0 auto;
+  min-width: 138px;
+  padding: 6px 9px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface-warm);
+  color: var(--ink);
+  font-size: var(--t-12);
+  font-weight: 600;
+  cursor: pointer;
+}
+.select:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 1px;
+}

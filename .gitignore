@@ -56,3 +56,8 @@ cloudflare-env.d.ts
 
 # jetbrains ide
 /.idea/
+
+# Quote-bank local-only build artifacts (raw mining inputs + full bank are
+# regenerated locally; the app bundles only insights.hero.json).
+scripts/quote-mining/output/
+lib/home/insights.data.json

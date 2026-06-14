@@ -37,6 +37,7 @@ const SECTIONS: NavSection[] = [
   {
     label: "Plan",
     items: [
+      { label: "Home", href: "/home", icon: <HomeIcon /> },
       { label: "Daily", href: "/daily", icon: <CalendarIcon /> },
       { label: "Weekly", href: "/weekly", icon: <GridIcon /> },
       { label: "Year", href: "/year", icon: <LayersIcon /> },
@@ -173,6 +174,15 @@ function svgProps() {
     strokeLinejoin: "round" as const,
     "aria-hidden": true,
   };
+}
+function HomeIcon(): ReactNode {
+  return (
+    <svg {...svgProps()}>
+      <path d="M3 11.5 12 4l9 7.5" />
+      <path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9" />
+      <path d="M9.5 20.5V14h5v6.5" />
+    </svg>
+  );
 }
 function GridIcon(): ReactNode {
   return (

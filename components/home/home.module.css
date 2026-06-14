@@ -1,0 +1,223 @@
+/* Quiet Dawn — home hero. Tokens only; the wash retints per theme through the
+   themed tokens in app/tokens.css. Interactive rules are DOUBLE-QUALIFIED (.x.x)
+   to outrank the `.cp-root button` reset (BUILD_STANDARD §7a; memory
+   cp-root-button-reset-trap). All motion is suppressed under reduced motion. */
+
+.home {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* ── Hero ──────────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  min-height: clamp(540px, 84vh, 900px);
+  padding: 64px 24px;
+  overflow: hidden;
+  text-align: center;
+}
+
+/* The themed gradient-mesh wash is now the shared <ThemeWash /> primitive
+   (components/ui/ThemeWash.tsx) so other pages can reuse it; the optional candid
+   photo montage is the <HeroPhotos /> layer (components/home/HeroPhotos.tsx). */
+
+.heroInner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  animation: riseIn 0.7s ease both;
+}
+
+.greetingDate {
+  margin: 0;
+  font-size: var(--t-12);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.greeting {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+/* ── Rolling insight ──────────────────────────────────────────────── */
+.insight {
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-height: 190px;
+  justify-content: center;
+}
+
+.insightQuote {
+  margin: 0;
+  max-width: 720px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.15rem, 2.4vw, 1.7rem);
+  line-height: 1.42;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-wrap: balance;
+  animation: fadeUp 0.6s ease both;
+}
+
+.insightCite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  font-size: var(--t-14);
+  color: var(--muted);
+  animation: fadeUp 0.6s ease both;
+}
+.insightAuthor {
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.insightWork {
+  font-style: italic;
+}
+.insightLink.insightLink {
+  margin-left: 10px;
+  color: var(--chrome-accent);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.insightLink.insightLink:hover {
+  border-bottom-color: currentColor;
+}
+
+.insightNav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+}
+.insightArrow.insightArrow {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: var(--ink-soft);
+  font-size: var(--t-20);
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.insightArrow.insightArrow:hover {
+  background: var(--surface);
+  border-color: var(--chrome-accent);
+  color: var(--chrome-accent);
+}
+.insightArrow.insightArrow:active {
+  transform: translateY(1px);
+}
+
+.insightCat {
+  font-size: var(--t-11);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  min-width: 140px;
+}
+
+.insightExpandWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.insightMore.insightMore {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--chrome-accent);
+  padding: 2px 8px;
+  border-radius: var(--r-sm);
+}
+.insightMore.insightMore:hover {
+  text-decoration: underline;
+}
+.insightExpand {
+  max-width: 660px;
+  margin: 0 auto;
+  font-size: var(--t-13);
+  line-height: 1.65;
+  color: var(--body);
+  text-align: left;
+  animation: fadeUp 0.4s ease both;
+}
+
+/* ── Scroll cue ───────────────────────────────────────────────────── */
+.scrollCue {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  font-size: var(--t-22);
+  color: var(--muted);
+  pointer-events: none;
+  animation: nudge 1.9s ease-in-out infinite;
+}
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes nudge {
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, 6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroInner,
+  .insightQuote,
+  .insightCite,
+  .insightExpand,
+  .scrollCue {
+    animation: none !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .hero {
+    min-height: clamp(460px, 80vh, 720px);
+    padding: 48px 18px;
+  }
+  .insightArrow.insightArrow {
+    width: 44px;
+    height: 44px;
+  }
+}

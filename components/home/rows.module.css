@@ -1,0 +1,326 @@
+/* Quiet Dawn below-fold day-rows — understated, borderless, hairline-divided.
+   Tokens only. Subject color comes from the .cp-subj.<id> bridge (--c). */
+
+/* Daily dashboard: a packed bento grid below the hero so the whole day —
+   schedule, lessons, to-do, progress, shoutbox — sits in roughly one view
+   instead of a long vertical scroll. Schedule + lessons anchor as tall cards;
+   the 3×3 grid fills exactly (2 tall = 4 cells + 5 single = 9 cells). Cards cap
+   their height and scroll internally so the dashboard stays ~one screen. */
+.rowsWrap {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 24px 80px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 174px;
+  grid-auto-flow: row dense;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px 18px 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-xs);
+}
+.tall {
+  grid-row: span 2;
+}
+
+.rowHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex: 0 0 auto;
+}
+.rowLabel {
+  margin: 0;
+  font-family: var(--font-display-sm);
+  font-size: var(--t-16);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.rowLink {
+  font-size: var(--t-13);
+  font-weight: 600;
+  color: var(--chrome-accent);
+  text-decoration: none;
+}
+.rowLink:hover {
+  text-decoration: underline;
+}
+
+/* Card body fills the remaining card height and scrolls if the content is
+   taller than the card (e.g. the full timetable) — keeps the grid uniform. */
+.rowBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+/* schedule */
+.schedule {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: var(--t-14);
+  color: var(--ink-soft);
+}
+.blockTime {
+  width: 72px;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: var(--t-13);
+}
+.blockDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c, var(--idle));
+  flex: 0 0 auto;
+}
+.blockName {
+  font-weight: 600;
+}
+
+/* todos */
+.todos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.todo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--t-14);
+  color: var(--ink-soft);
+}
+.todoCheck {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border);
+  flex: 0 0 auto;
+}
+.todoTitle {
+  flex: 1 1 auto;
+}
+.todoTags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tag {
+  font-size: var(--t-11);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+}
+
+/* lessons */
+.lessons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lesson {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 8px 0;
+}
+.lessonStripe {
+  width: 4px;
+  border-radius: 2px;
+  background: var(--c, var(--idle));
+  flex: 0 0 auto;
+}
+.lessonText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+}
+.lessonTitle {
+  font-size: var(--t-14);
+  font-weight: 700;
+  color: var(--ink);
+}
+.lessonObj {
+  font-size: var(--t-12);
+  color: var(--muted);
+}
+.doneTick {
+  color: var(--done);
+  font-weight: 800;
+  align-self: center;
+}
+
+/* progress */
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.progressTrack {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--ink-100);
+  overflow: hidden;
+}
+.progressFill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--chrome-accent);
+}
+.progressLabel {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+/* notes + shoutbox */
+.note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  margin-bottom: 8px;
+  font-size: var(--t-13);
+  color: var(--ink-soft);
+  background: var(--surface-warm);
+  border: 1px solid var(--hairline);
+}
+.noteBadge {
+  font-size: var(--t-10);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--ink-100);
+  color: var(--ink-soft);
+  flex: 0 0 auto;
+}
+.urgent {
+  background: var(--urgent-bg);
+}
+.urgent .noteBadge {
+  background: var(--urgent);
+  color: var(--on-solid);
+}
+.important {
+  background: var(--important-bg);
+}
+.important .noteBadge {
+  background: var(--important);
+  color: var(--on-solid);
+}
+.msg {
+  padding: 8px 0;
+}
+.msgMeta {
+  font-size: var(--t-12);
+  color: var(--muted);
+}
+.msgBody {
+  margin: 2px 0 0;
+  font-size: var(--t-13);
+  color: var(--ink-soft);
+}
+
+/* quick links */
+.links {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.jumpCard {
+  display: grid;
+  place-items: center;
+  padding: 12px 8px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-decoration: none;
+  box-shadow: var(--sh-xs);
+  transition: border-color 0.15s ease, transform 0.1s ease, color 0.15s ease;
+}
+.jumpCard:hover {
+  border-color: var(--chrome-accent);
+  color: var(--chrome-accent);
+  transform: translateY(-2px);
+}
+
+/* tips */
+.tip {
+  margin: 0;
+  font-size: var(--t-13);
+  color: var(--muted);
+}
+
+/* Tablet: 2-column dashboard (dense flow re-packs the tall cards). */
+@media (max-width: 1000px) {
+  .rowsWrap {
+    max-width: 720px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Phone: single column, natural heights, normal page scroll — no internal card
+   scroll or row spans. A phone wants the plain stack the dashboard replaced on
+   wider screens. */
+@media (max-width: 640px) {
+  .rowsWrap {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    gap: 12px;
+    padding: 16px 16px 72px;
+  }
+  .tall {
+    grid-row: auto;
+  }
+  .rowBody {
+    overflow: visible;
+  }
+  .blockTime {
+    width: 64px;
+  }
+}
