@@ -91,6 +91,7 @@ import {
   type CapturedItem,
   type ResourceComposerEditTarget,
 } from "./ResourceComposer";
+import { OpenInBoardDialog } from "@/components/boards";
 import styles from "./ResourcesPanel.module.css";
 
 // ── Icons — Lucide-family 24×24, ~2px stroke (rn-shared.jsx vocabulary) ────
@@ -582,6 +583,7 @@ interface TileMenuProps {
   canOpen: boolean;
   onOpen: () => void;
   onEnlarge: () => void;
+  onOpenInBoard: () => void;
   onEditNote: () => void;
   onRemove: () => void;
   onClose: () => void;
@@ -594,6 +596,7 @@ function TileMenu({
   canOpen,
   onOpen,
   onEnlarge,
+  onOpenInBoard,
   onEditNote,
   onRemove,
   onClose,
@@ -734,6 +737,14 @@ function TileMenu({
         type="button"
         role="menuitem"
         className={styles.menuItem}
+        onClick={() => fire(onOpenInBoard)}
+      >
+        <BoardGlyphIcon /> Open in board
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className={styles.menuItem}
         onClick={() => fire(onEditNote)}
       >
         <NotePenIcon /> {notecard ? "Edit card" : "Add / edit note"}
@@ -764,6 +775,7 @@ function MoreMenuButton({
   buttonClassName,
   onOpen,
   onEnlarge,
+  onOpenInBoard,
   onEditNote,
   onRemove,
 }: {
@@ -771,6 +783,7 @@ function MoreMenuButton({
   buttonClassName: string;
   onOpen: () => void;
   onEnlarge: () => void;
+  onOpenInBoard: () => void;
   onEditNote: () => void;
   onRemove: () => void;
 }): ReactNode {
@@ -823,6 +836,7 @@ function MoreMenuButton({
             canOpen={canOpen}
             onOpen={onOpen}
             onEnlarge={onEnlarge}
+            onOpenInBoard={onOpenInBoard}
             onEditNote={onEditNote}
             onRemove={onRemove}
             onClose={close}
@@ -838,6 +852,7 @@ function MoreMenuButton({
 interface TileActions {
   onActivate: (agg: AggregatedResource) => void;
   onOpen: (agg: AggregatedResource) => void;
+  onOpenInBoard: (agg: AggregatedResource) => void;
   onEditNote: (agg: AggregatedResource) => void;
   onRemove: (agg: AggregatedResource) => void;
 }
@@ -875,6 +890,7 @@ function ResourceTileFace({
         buttonClassName={styles.tileMore!}
         onOpen={() => actions.onOpen(agg)}
         onEnlarge={() => actions.onActivate(agg)}
+        onOpenInBoard={() => actions.onOpenInBoard(agg)}
         onEditNote={() => actions.onEditNote(agg)}
         onRemove={() => actions.onRemove(agg)}
       />
@@ -970,6 +986,7 @@ function NotecardTileFace({
         buttonClassName={styles.tileMore!}
         onOpen={() => actions.onActivate(agg)}
         onEnlarge={() => actions.onActivate(agg)}
+        onOpenInBoard={() => actions.onOpenInBoard(agg)}
         onEditNote={() => actions.onEditNote(agg)}
         onRemove={() => actions.onRemove(agg)}
       />
@@ -1023,6 +1040,7 @@ function ResourceListRow({
         buttonClassName={styles.rowMore!}
         onOpen={() => actions.onOpen(agg)}
         onEnlarge={() => actions.onActivate(agg)}
+        onOpenInBoard={() => actions.onOpenInBoard(agg)}
         onEditNote={() => actions.onEditNote(agg)}
         onRemove={() => actions.onRemove(agg)}
       />
@@ -1209,6 +1227,9 @@ export function ResourcesPanel({
   const [previewResource, setPreviewResource] = useState<LessonResource | null>(
     null,
   );
+  // The card queued for "Open in board" (#11) — drives the ask-each-time dialog.
+  const [openInBoardTarget, setOpenInBoardTarget] =
+    useState<AggregatedResource | null>(null);
 
   // ── Composer + drag-drop state ─────────────────────────────────────────
   const [composerOpen, setComposerOpen] = useState(false);
@@ -1443,6 +1464,11 @@ export function ResourcesPanel({
     [router, lesson],
   );
 
+  // "Open in board" (#11) — queue the card; the dialog asks new-vs-existing.
+  const openInBoard = useCallback((agg: AggregatedResource): void => {
+    setOpenInBoardTarget(agg);
+  }, []);
+
   // "Open" — the resource's real target in a new tab; notecards (and rows
   // with no url) open the preview instead. Never a fabricated URL (the old
   // synthUrl() approach is deleted).
@@ -1591,10 +1617,11 @@ export function ResourcesPanel({
     () => ({
       onActivate: activateResource,
       onOpen: openResource,
+      onOpenInBoard: openInBoard,
       onEditNote: openNoteEditor,
       onRemove: removeResource,
     }),
-    [activateResource, openResource, openNoteEditor, removeResource],
+    [activateResource, openResource, openInBoard, openNoteEditor, removeResource],
   );
 
   // ── Collapse animation (reduced-motion safe) ───────────────────────────
@@ -1952,6 +1979,14 @@ export function ResourcesPanel({
         <ResourcePreview
           resource={previewResource}
           onClose={() => setPreviewResource(null)}
+        />
+      )}
+
+      {openInBoardTarget && (
+        <OpenInBoardDialog
+          resource={openInBoardTarget.resource}
+          lessonId={openInBoardTarget.lessonId}
+          onClose={() => setOpenInBoardTarget(null)}
         />
       )}
     </section>

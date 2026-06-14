@@ -28,6 +28,11 @@ export interface BoardTagChipsProps {
   size?: "sm" | "md";
   /** When given, each chip gets a ✕ remove control (destructive tooltip). */
   onRemove?: (tag: BoardTag) => void;
+  /** The lesson's REAL phase slugs (Wave 4 #3). When supplied, a `phase` tag
+   *  whose value is NOT in this set is flagged as ORPHANED (the phase was
+   *  renamed/removed). Omit for lesson-less boards — nothing to validate against,
+   *  so phase tags are never flagged. */
+  validPhaseSlugs?: ReadonlySet<string>;
 }
 
 export function BoardTagChips({
@@ -35,6 +40,7 @@ export function BoardTagChips({
   max,
   size = "sm",
   onRemove,
+  validPhaseSlugs,
 }: BoardTagChipsProps): ReactNode {
   // No tags ⇒ render nothing (no add affordance lives here — that's the picker).
   if (tags.length === 0) return null;
@@ -49,16 +55,28 @@ export function BoardTagChips({
         // Subject chips tint through the app-wide palette bridge: `cp-subj
         // <subjectId>` exposes --c/--cl/--cd, which the chip styles consume.
         const isSubject = tag.kind === "subject";
+        // A phase tag that no longer matches one of the lesson's real phases
+        // (#3) — only checked when the valid set was supplied.
+        const isOrphanPhase =
+          tag.kind === "phase" &&
+          validPhaseSlugs != null &&
+          !validPhaseSlugs.has(tag.value);
         const chipClass = isSubject
           ? `${styles.chip} ${styles.chipSubject} cp-subj ${tag.value}`
-          : styles.chip;
+          : isOrphanPhase
+            ? `${styles.chip} ${styles.chipOrphan}`
+            : styles.chip;
 
         return (
           <span
             key={tagKey(tag)}
             className={chipClass}
             // Touch users hold the chip for the kind + value context.
-            title={`${TAG_KIND_LABEL[tag.kind]}: ${tagDisplayLabel(tag)}`}
+            title={
+              isOrphanPhase
+                ? `Phase "${tagDisplayLabel(tag)}" is no longer one of this lesson's phases — remove it or re-tag.`
+                : `${TAG_KIND_LABEL[tag.kind]}: ${tagDisplayLabel(tag)}`
+            }
           >
             {/* Kind prefix — tells a teacher which dimension this tag binds. */}
             <span className={styles.chipKind}>{TAG_KIND_LABEL[tag.kind]}</span>

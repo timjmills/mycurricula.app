@@ -1,0 +1,97 @@
+/* OpenInBoardDialog — portaled "open card in a board" modal (Wave 4 #11).
+   Tokens only (CLAUDE.md §4): scrim/surface/ink/radius/shadow from tokens.css,
+   so it themes with the rest of the app. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-menu);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--scrim);
+}
+
+.panel {
+  width: min(420px, 100%);
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-popover);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink-900);
+}
+
+.titleEm {
+  color: var(--ink-soft);
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pick {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-500);
+}
+
+.boardList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* A pickable existing board — full-width neutral row. Doubled class so the
+   .cp-root button reset can't strip its padding/border/background. */
+.boardRow.boardRow {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-warm);
+  color: var(--ink-900);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.boardRow.boardRow:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ink-500) 40%, var(--border));
+}
+
+.boardRow.boardRow:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.pickActions {
+  display: flex;
+  justify-content: flex-start;
+}

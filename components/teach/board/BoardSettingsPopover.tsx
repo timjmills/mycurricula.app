@@ -21,6 +21,7 @@ import { Button, Tooltip } from "@/components/ui";
 import { useConsequenceToast } from "@/lib/consequence-toast";
 import { teachClient as teach } from "@/lib/teach/client";
 import type { Board } from "@/lib/types";
+import { BoardTagPicker } from "./BoardTagPicker";
 import { useFocusTrap } from "./useFocusTrap";
 import styles from "./BoardSettingsPopover.module.css";
 
@@ -206,6 +207,14 @@ export function BoardSettingsPopover({
         {/* Board paper/background now lives in the editor's appearance popover
             (the "Appearance" toolbar button) so it sits next to the board and
             renders live — one place, #11. */}
+
+        {/* ── Board tags (auto-surface + library filter; must-haves #3/#8) ──
+            The tag editor: subject/day/phase/week/label tags drive where the
+            board auto-surfaces + the Library filter. The phase tag is a
+            VALIDATED picker over the lesson's real phases (Wave 4 #3). */}
+        <div className={styles.section}>
+          <BoardTagPicker board={board} reloadBoards={reloadBoards} />
+        </div>
 
         {/* ── Reorder hint ────────────────────────────────────────────────── */}
         <p className={styles.hint}>
