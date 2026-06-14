@@ -122,10 +122,10 @@ export const VIEWS: ViewDef[] = [
       "The full year of units and lessons per subject, with the standards each covers",
   },
   {
-    label: "Boards",
+    label: "Teach",
     href: "/boards",
     tooltip:
-      "Your learning boards — browse, create, and open a board to build or present it (resources, widgets, and annotation)",
+      "Teach Boards — start from a lesson or a blank board, then build or present it (resources, widgets, and annotation)",
   },
 ];
 export type { ViewDef };
