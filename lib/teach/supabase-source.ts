@@ -96,6 +96,8 @@ interface BoardRow {
   repeat: RepeatRule[] | null;
   tags: BoardTag[] | null;
   background: string | null;
+  // Canvas stage-size preset (20260614094731_boards_size). null ≡ absent ≡ "wide".
+  size: "wide" | "a4" | "a3" | null;
   whiteboard: boolean;
   ephemeral: boolean;
   library_visibility: BoardLibraryVisibility;
@@ -141,7 +143,7 @@ interface BoardTemplateRow {
 
 // The `select(...)` column lists, kept in one place so reads stay consistent.
 const BOARD_COLS =
-  "id, grade_level_id, subject_id, master_core_lesson_event_id, owner_id, scope, title, tint, display_order_within_lesson, template_id, pages, board_theme, repeat, tags, background, whiteboard, ephemeral, library_visibility, published_by, source_board_id, created_at, updated_at";
+  "id, grade_level_id, subject_id, master_core_lesson_event_id, owner_id, scope, title, tint, display_order_within_lesson, template_id, pages, board_theme, repeat, tags, background, size, whiteboard, ephemeral, library_visibility, published_by, source_board_id, created_at, updated_at";
 const WIDGET_COLS =
   "id, board_id, type, title, grid_row, grid_col, grid_rowspan, grid_colspan, canvas, appearance, display_order_within_board, pinned, config, state, persistence_override, created_at, updated_at";
 const TEMPLATE_COLS =
@@ -293,6 +295,7 @@ function rowToBoard(row: BoardRow, widgetRows: WidgetRow[]): Board {
     templateId: row.template_id,
     // 5.31 domain fields (jsonb / scalar columns) mapped straight through.
     background: row.background,
+    size: row.size ?? undefined,
     tags: row.tags ?? undefined,
     whiteboard: row.whiteboard,
     ephemeral: row.ephemeral,
@@ -1003,8 +1006,10 @@ export const supabaseTeachSource: TeachDataSource = {
     if (patch.displayOrderWithinLesson !== undefined)
       safePatch.displayOrderWithinLesson = patch.displayOrderWithinLesson;
     if (patch.background !== undefined) safePatch.background = patch.background;
-    // Board.size persistence lands with Wave 5 Supabase parity (no `size`
-    // column / BOARD_COLS mapping yet — mock is the live path today).
+    // Board.size — the canvas stage-size preset (wide/a4/a3). Cosmetic +
+    // user-editable, so it belongs in this whitelist (the `boards.size` column +
+    // BOARD_COLS mapping landed in 20260614094731_boards_size).
+    if (patch.size !== undefined) safePatch.size = patch.size;
     if (patch.tags !== undefined) safePatch.tags = patch.tags;
     if (patch.boardTheme !== undefined) safePatch.boardTheme = patch.boardTheme;
     if (patch.repeat !== undefined) safePatch.repeat = patch.repeat;
@@ -1685,6 +1690,7 @@ export const supabaseTeachSource: TeachDataSource = {
         tags: source.tags ?? null,
         board_theme: source.boardTheme ?? null,
         repeat: source.repeat ?? null,
+        size: source.size ?? null,
         // A duplicate is the teacher's OWN private board, never a team-library
         // copy, never ephemeral; it records its provenance (mock parity).
         whiteboard: source.whiteboard ?? false,
@@ -1890,6 +1896,7 @@ export const supabaseTeachSource: TeachDataSource = {
         tags: source.tags ?? null,
         board_theme: source.boardTheme ?? null,
         repeat: source.repeat ?? null,
+        size: source.size ?? null,
         whiteboard: source.whiteboard ?? false,
         ephemeral: false,
         library_visibility: "team",
@@ -1927,6 +1934,7 @@ export const supabaseTeachSource: TeachDataSource = {
         tags: source.tags ?? null,
         board_theme: source.boardTheme ?? null,
         repeat: source.repeat ?? null,
+        size: source.size ?? null,
         whiteboard: source.whiteboard ?? false,
         ephemeral: false,
         library_visibility: "private",
@@ -1976,6 +1984,7 @@ export const supabaseTeachSource: TeachDataSource = {
         tags: source.tags ?? null,
         board_theme: source.boardTheme ?? null,
         repeat: source.repeat ?? null,
+        size: source.size ?? null,
         whiteboard: source.whiteboard ?? false,
         ephemeral: false,
         library_visibility: "private",
@@ -2203,9 +2212,10 @@ export const supabaseTeachSource: TeachDataSource = {
         display_order_within_lesson: nextOrder,
         template_id: templateId,
         grade_level_id: gradeLevelId,
-        // Restore the board-wide cosmetics captured at save time. `size` is NOT
-        // written here (no `size` column yet — Wave 5 Supabase parity; mock keeps it).
+        // Restore the board-wide cosmetics captured at save time — background,
+        // size, theme from the template (mock parity with createBoardFromTemplate).
         background: tpl.background ?? null,
+        size: tpl.size ?? null,
         board_theme: tpl.boardTheme ?? null,
         tags: [],
         whiteboard: false,
@@ -2464,6 +2474,7 @@ function buildLessonSetPayloads(
       repeat: source.repeat ?? null,
       tags: source.tags ?? null,
       background: source.background ?? null,
+      size: source.size ?? null,
       whiteboard: source.whiteboard ?? false,
       // A board in a per-lesson set is never ephemeral and is not a library copy.
       ephemeral: false,
@@ -2567,7 +2578,8 @@ function boardPatchToRow(
     row.grade_level_id = resolveGradeId(patch.gradeLevelId);
   // 5.31 columns.
   if (patch.background !== undefined) row.background = patch.background ?? null;
-  // Board.size persistence lands with Wave 5 Supabase parity.
+  // Board.size: the stage-size preset (wide/a4/a3); null ≡ "wide".
+  if (patch.size !== undefined) row.size = patch.size ?? null;
   if (patch.tags !== undefined)
     row.tags = patch.tags ? patch.tags.map((t) => ({ ...t })) : null;
   if (patch.whiteboard !== undefined)
