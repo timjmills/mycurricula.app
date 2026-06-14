@@ -102,6 +102,15 @@ export interface LessonResource {
    *  washed — the header band + left stripe stay subject-locked. Additive
    *  and JSONB-safe like `body`/`gallery`. */
   wash?: "paper" | number;
+  /** Boards-as-resource link (Wave 4, must-have #9). When set, this resource row
+   *  REPRESENTS a learning board rather than a file/link — `boardId` is the
+   *  `Board.id` it opens. Board-aware resource lists (daily Resources, the Teach
+   *  Resources panel) render it with a board glyph and an "Open board" action
+   *  (navigate to `/teach?board=<id>`); they key on `boardId != null`. The base
+   *  `type` stays `"link"` so every `switch (resource.type)` site treats an
+   *  un-recognised board row as a harmless link — no exhaustive-switch breakage.
+   *  Additive + JSONB-safe (a plain string) like `body`/`gallery`/`wash`. */
+  boardId?: string;
 }
 
 /** Provider tag computed from the resource URL — narrows the renderer's
@@ -717,8 +726,13 @@ export interface BoardTemplate {
  *  derived `kind` the canvas renderer branches on. */
 export interface TeachResource extends LessonResource {
   /** Effective presentation kind, derived from `provider`/`type` via the
-   *  `lib/resource-embed.ts` taxonomy by `toTeachResource()`. */
-  kind: "pdf" | "link" | "video" | "doc" | "image" | "slides" | "tool";
+   *  `lib/resource-embed.ts` taxonomy by `toTeachResource()`. The `"board"`
+   *  member (Wave 4, must-have #9) marks a row produced by
+   *  `boardToTeachResource()` — a learning board surfaced AS a resource. It is a
+   *  Teach-only kind (never reaches the planner's `LessonResource["type"]`
+   *  union); board-aware UI keys on it (and on `boardId`) to render the board
+   *  glyph + "Open board" action instead of an embed/drag affordance. */
+  kind: "pdf" | "link" | "video" | "doc" | "image" | "slides" | "tool" | "board";
   /** Default surface when this resource is dropped onto / opened in the board. */
   defaultRenderTarget: ResourceRenderTarget;
   /** Free-form classifying tags (the migration's `tags text[]` column). */

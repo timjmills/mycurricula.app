@@ -64,6 +64,7 @@ import type {
   RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Lesson, LessonResource } from "@/lib/types";
 import type { SectionResource } from "@/lib/lesson-flow";
@@ -74,6 +75,12 @@ import { dedupeLessonResources, resourceIdentity } from "@/lib/resources-dedup";
 import { usePlanner } from "@/lib/planner-store";
 import { useAppState } from "@/lib/app-state";
 import { lessonResourceRefs } from "@/lib/lesson-resources";
+import { useLessonBoards } from "@/lib/teach/use-lesson-boards";
+import {
+  boardResourceHref,
+  boardResourceId,
+  boardToTeachResource,
+} from "@/lib/teach/boardToResource";
 import { useUndoToastOptional } from "@/lib/undo-toast";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
 import { Button, Tooltip } from "@/components/ui";
@@ -1023,6 +1030,90 @@ function ResourceListRow({
   );
 }
 
+// ── Board-as-resource tiles/rows (Wave 4 #9) ───────────────────────────────
+// A learning board surfaced AS a resource. Boards have no url/gallery/note, so
+// they render through DEDICATED components — never the file-resource tile/row +
+// kebab machinery above — keeping that path untouched. Their single action is
+// "Open board": the whole tile/row is the trigger (no overflow menu).
+
+function BoardGlyphIcon(): ReactNode {
+  // Mirrors the nav + Teach-panel board glyph: a canvas frame, a tile, lines.
+  return (
+    <svg {...STROKE} strokeWidth={1.9}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <rect x="6" y="7" width="5" height="5" rx="1" />
+      <path d="M14 7.5h4M14 11h4M6 15.5h12" />
+    </svg>
+  );
+}
+
+/** Grid tile for a board-resource row — same footprint as a plain tile. */
+function BoardTileFace({
+  agg,
+  onOpenBoard,
+}: {
+  agg: AggregatedResource;
+  onOpenBoard: (boardId: string) => void;
+}): ReactNode {
+  const r = agg.resource;
+  const label = r.label || "Board";
+  const boardId = r.boardId;
+  if (boardId == null) return null;
+  return (
+    <div className={styles.tile}>
+      <button
+        type="button"
+        className={styles.tileBody}
+        onClick={() => onOpenBoard(boardId)}
+        aria-label={`Open board ${label}`}
+        title={`BOARD — ${label}. Open it in the board editor.`}
+      >
+        <span className={`${styles.thumb} ${styles.thLink ?? ""}`} aria-hidden="true">
+          <BoardGlyphIcon />
+        </span>
+        <span className={styles.tileFoot}>
+          <span className={styles.tileFootIcon} aria-hidden="true">
+            <BoardGlyphIcon />
+          </span>
+          <span className={styles.tileLabel}>{label}</span>
+          <span className={styles.typeTag}>BOARD</span>
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/** List row for a board-resource row. */
+function BoardListRow({
+  agg,
+  onOpenBoard,
+}: {
+  agg: AggregatedResource;
+  onOpenBoard: (boardId: string) => void;
+}): ReactNode {
+  const r = agg.resource;
+  const label = r.label || "Board";
+  const boardId = r.boardId;
+  if (boardId == null) return null;
+  return (
+    <li className={styles.row}>
+      <button
+        type="button"
+        className={styles.rowMain}
+        onClick={() => onOpenBoard(boardId)}
+        aria-label={`Open board ${label}`}
+        title={`BOARD — ${label}. Open it in the board editor.`}
+      >
+        <span className={`${styles.rowIc} ${styles.thLink ?? ""}`} aria-hidden="true">
+          <BoardGlyphIcon />
+        </span>
+        <span className={styles.rowLabel}>{label}</span>
+      </button>
+      <span className={styles.typeTag}>BOARD</span>
+    </li>
+  );
+}
+
 // ── View-mode persistence (per teacher) ────────────────────────────────────
 
 type ViewMode = "grid" | "list";
@@ -1098,6 +1189,7 @@ export function ResourcesPanel({
   onCloseDrawer,
   onComposerOpenChange,
 }: ResourcesPanelProps): ReactNode {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<PanelTab>("all");
   // SSR-safe persisted view mode: default for the server render, the saved
   // choice loaded post-mount (same hydration idiom as RightRail).
@@ -1286,11 +1378,36 @@ export function ResourcesPanel({
     return out;
   }, [mode, lesson, lessons, getSections]);
 
+  // ── Boards-as-resources (Wave 4 #9) ─────────────────────────────────────
+  // A lesson's learning boards count as resources. DAY mode only — week mode
+  // would fan a board fetch out across every lesson; the daily lesson panel is
+  // the must-have surface. `useLessonBoards` is a pure read (no auto-seed), so
+  // it's safe to fire on mere lesson view. Board rows render through dedicated
+  // Board* components and live in the All tab only (categoryOf never sees them).
+  const lessonBoards = useLessonBoards(
+    mode === "day" ? (lesson?.id ?? null) : null,
+  );
+  const boardAggs = useMemo<AggregatedResource[]>(() => {
+    if (mode !== "day" || !lesson) return [];
+    return lessonBoards.map((b) => ({
+      resource: boardToTeachResource(b),
+      key: boardResourceId(b.id),
+      lessonId: lesson.id,
+      sectionId: null,
+    }));
+  }, [mode, lesson, lessonBoards]);
+  // The All-tab list = file/notecard resources, then board rows.
+  const allItems = useMemo<AggregatedResource[]>(
+    () => (boardAggs.length ? [...combined, ...boardAggs] : combined),
+    [combined, boardAggs],
+  );
+
   // Per-tab counts over the DEDUPED list. The header chip is the stable
   // "all" total; tab counts phrase the pills.
   const tabCounts = useMemo<Record<PanelTab, number>>(() => {
     const counts: Record<PanelTab, number> = {
-      all: combined.length,
+      // Boards count toward All only — they roll up under no file category.
+      all: allItems.length,
       files: 0,
       links: 0,
       media: 0,
@@ -1298,17 +1415,17 @@ export function ResourcesPanel({
     };
     for (const agg of combined) counts[categoryOf(agg.resource)] += 1;
     return counts;
-  }, [combined]);
+  }, [combined, allItems]);
 
   const visibleResources = useMemo<AggregatedResource[]>(
     () =>
       activeTab === "all"
-        ? combined
+        ? allItems
         : combined.filter((agg) => categoryOf(agg.resource) === activeTab),
-    [combined, activeTab],
+    [combined, allItems, activeTab],
   );
 
-  const totalCount = combined.length;
+  const totalCount = allItems.length;
   const visibleCount = visibleResources.length;
 
   // ── Tile / row actions ─────────────────────────────────────────────────
@@ -1316,6 +1433,15 @@ export function ResourcesPanel({
   const activateResource = useCallback((agg: AggregatedResource): void => {
     setPreviewResource(agg.resource);
   }, []);
+
+  // Open a board-resource row in the board editor (Wave 4 #9). A lesson-bound
+  // board keeps its lesson in the URL; the editor resolves the board by id.
+  const openBoard = useCallback(
+    (boardId: string): void => {
+      router.push(boardResourceHref(boardId, lesson?.id ?? null));
+    },
+    [router, lesson],
+  );
 
   // "Open" — the resource's real target in a new tab; notecards (and rows
   // with no url) open the preview instead. Never a fabricated URL (the old
@@ -1556,7 +1682,13 @@ export function ResourcesPanel({
         ) : viewMode === "grid" ? (
           <div className={styles.grid}>
             {visibleResources.map((agg) =>
-              isNotecard(agg.resource) ? (
+              agg.resource.boardId != null ? (
+                <BoardTileFace
+                  key={agg.key}
+                  agg={agg}
+                  onOpenBoard={openBoard}
+                />
+              ) : isNotecard(agg.resource) ? (
                 <NotecardTileFace
                   key={agg.key}
                   agg={agg}
@@ -1573,9 +1705,21 @@ export function ResourcesPanel({
           </div>
         ) : (
           <ul className={styles.list}>
-            {visibleResources.map((agg) => (
-              <ResourceListRow key={agg.key} agg={agg} actions={tileActions} />
-            ))}
+            {visibleResources.map((agg) =>
+              agg.resource.boardId != null ? (
+                <BoardListRow
+                  key={agg.key}
+                  agg={agg}
+                  onOpenBoard={openBoard}
+                />
+              ) : (
+                <ResourceListRow
+                  key={agg.key}
+                  agg={agg}
+                  actions={tileActions}
+                />
+              ),
+            )}
           </ul>
         )}
       </div>
