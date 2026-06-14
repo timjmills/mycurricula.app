@@ -75,6 +75,13 @@ export interface AnnotationState {
   draft: Stroke | null;
   undo: Stroke[][];
   redo: Stroke[][];
+  /** True when the latest reducer action was a HYDRATE (document replaced from
+   *  storage / a buffer), false after any real mutation. The persistence layer
+   *  reads this to skip echoing a hydrate back to storage / `onChange` while
+   *  still persisting a genuine edit that happens to return to the hydrated
+   *  baseline (undo / erase-all). Initialised true so the pre-hydrate empty
+   *  state is also treated as a non-edit. */
+  hydrating: boolean;
 }
 
 export function initAnnotationState(
@@ -85,6 +92,7 @@ export function initAnnotationState(
     draft: null,
     undo: [],
     redo: [],
+    hydrating: true,
   };
 }
 
@@ -118,8 +126,9 @@ function pushHistory(
   return { undo, redo: [] };
 }
 
-/** The pure reducer. Every committing mutation snapshots history first. */
-export function apply(
+/** The core reducer. Every committing mutation snapshots history first. The
+ *  exported `apply` wraps this to maintain the `hydrating` flag by action. */
+function reduceAction(
   state: AnnotationState,
   action: AnnotationAction,
 ): AnnotationState {
@@ -130,6 +139,7 @@ export function apply(
         draft: null,
         undo: [],
         redo: [],
+        hydrating: true,
       };
 
     case "ADD": {
@@ -224,6 +234,24 @@ export function apply(
     default:
       return state;
   }
+}
+
+/**
+ * The pure reducer. Delegates to `reduceAction`, then stamps the `hydrating`
+ * flag by ACTION: true only for HYDRATE, false for every real mutation. A no-op
+ * (reducer returned the same state) preserves the existing flag. This lets the
+ * persistence layer skip hydrate echoes by action — robustly across any number
+ * of re-hydrates — while still persisting a genuine edit that returns the
+ * document to the hydrated baseline (undo / erase-all).
+ */
+export function apply(
+  state: AnnotationState,
+  action: AnnotationAction,
+): AnnotationState {
+  const next = reduceAction(state, action);
+  if (next === state) return state; // no-op → preserve the existing flag
+  const hydrating = action.type === "HYDRATE";
+  return next.hydrating === hydrating ? next : { ...next, hydrating };
 }
 
 /** Serialize the live document for persistence. */
@@ -329,7 +357,12 @@ export function pointSegDist(p: Pt, a: Pt, b: Pt): number {
 
 // ── Rendering ───────────────────────────────────────────────────────────
 
-const DEFAULT_TEXT_PX = 22;
+/** The annotation text size in CSS px. SINGLE SOURCE OF TRUTH (F9): the canvas
+ *  renderer uses it (scaled by DPR) AND the AnnotationLayer textarea sets its
+ *  inline font-size from it, so the live textarea and the committed stroke can
+ *  never desync (the old duplicate `font-size: 22px` literal in
+ *  AnnotationLayer.module.css is gone). */
+export const DEFAULT_TEXT_PX = 22;
 
 /** Convert a normalized point to device pixels for a box at a given DPR. */
 function toDevice(p: Pt, box: BoardBox, dpr: number): { x: number; y: number } {
@@ -362,8 +395,13 @@ export function drawStroke(
 
   switch (stroke.tool) {
     case "highlighter": {
-      // Wide, multiply-blended so overlapping ink reads like a real marker.
-      ctx.globalCompositeOperation = "multiply";
+      // Wide + translucent (globalAlpha set above from the 0.4 opacity default)
+      // so it reads like a marker over the projected content. We deliberately do
+      // NOT use canvas `globalCompositeOperation:"multiply"` (F4): the overlay
+      // canvas is transparent, so multiply blends against (0,0,0,0) — which
+      // renders the ink invisibly or near-black depending on the browser's
+      // premultiplied-alpha handling. Plain source-over at 0.4 alpha is reliable
+      // across browsers and still darkens believably where strokes overlap.
       ctx.lineWidth = w * 3;
       drawPolyline(ctx, stroke.points, box, dpr);
       break;

@@ -116,6 +116,54 @@ function writeEntry(
   }
 }
 
+/**
+ * Persist a buffered `BoardAnnotations` to the signed-in user's annotation store
+ * ON DEMAND — the "Save these annotations?" path for ephemeral present mode
+ * (F1/F2). Present-mode ink runs through an `ephemeral` hook (in-memory only, no
+ * auto-persist); when the teacher chooses Save on exit, this writes the buffer
+ * under the same `subKey` the editing surface reads, resolving the uid the same
+ * way the hook does so it reloads under the right account. An empty buffer just
+ * clears the key (writeEntry deletes on zero strokes). Resolves after the write.
+ */
+export async function persistBoardAnnotations(
+  subKey: string,
+  annotations: BoardAnnotations,
+): Promise<void> {
+  if (typeof window === "undefined") return;
+  let uid = ANON_UID;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    uid = data.user?.id ?? ANON_UID;
+  } catch {
+    // Auth unavailable — fall back to the anon namespace (still persists locally).
+  }
+  writeEntry(uid, subKey, annotations);
+}
+
+/**
+ * Read a saved `BoardAnnotations` for a sub-key from the signed-in user's store,
+ * resolving the uid the same way the hook does. The counterpart to
+ * `persistBoardAnnotations` — present mode pre-seeds its in-memory session buffer
+ * with this on page-open so previously-saved ink REAPPEARS when presenting again
+ * (and so an exit-Save merges with, rather than clobbers, the saved set). Returns
+ * null when nothing is stored / storage is unavailable.
+ */
+export async function readBoardAnnotations(
+  subKey: string,
+): Promise<BoardAnnotations | null> {
+  if (typeof window === "undefined") return null;
+  let uid = ANON_UID;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    uid = data.user?.id ?? ANON_UID;
+  } catch {
+    // Auth unavailable — fall back to the anon namespace.
+  }
+  return readEntry(uid, subKey);
+}
+
 /** Drop the anonymous-namespace blob. Called when a real uid resolves so
  *  pre-auth scratch ink never lingers for the next signed-in user. */
 function clearAnonStorage(): void {
@@ -227,6 +275,23 @@ export interface UseBoardAnnotationsOptions {
    * no per-user namespace to resolve.
    */
   ephemeral?: boolean;
+  /**
+   * EPHEMERAL-ONLY hydrate source (F1/F2). When `ephemeral` is true the surface
+   * normally hydrates EMPTY; pass `hydrateFrom` to instead seed it from an
+   * in-memory buffer whenever the surface (sub-key) changes. Present mode uses
+   * this to restore a page's ephemeral ink when the teacher navigates back to it
+   * within the same unsaved present session — without ever touching storage.
+   * Read only at hydrate time (on sub-key change) via a ref, so updating it
+   * mid-stroke never wipes in-progress ink. Ignored when not `ephemeral`.
+   */
+  hydrateFrom?: BoardAnnotations | null;
+  /**
+   * Bump to force a re-hydrate of the CURRENT sub-key (e.g. after an async load
+   * has populated `hydrateFrom`). Part of the hydrate effect's deps. Leave
+   * stable when not needed. Present mode bumps this once a page's saved ink has
+   * been read into the session buffer so it re-hydrates from the seeded value.
+   */
+  hydrateKey?: string | number;
 }
 
 /**
@@ -243,8 +308,14 @@ export function useBoardAnnotations(
     resourceId,
     onChange,
     ephemeral = false,
+    hydrateFrom,
+    hydrateKey,
   } = options;
   const subKey = annotationStoreKey(lessonId, boardId, resourceId);
+  // Latest hydrate-from buffer, read only at hydrate time (sub-key change) so a
+  // mid-stroke update never re-hydrates and wipes in-progress ink (F1/F2).
+  const hydrateFromRef = useRef(hydrateFrom);
+  hydrateFromRef.current = hydrateFrom;
 
   const [state, dispatch] = useReducer(
     apply,
@@ -306,29 +377,23 @@ export function useBoardAnnotations(
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  // ── Persist gate (declared before the hydrate effect so the hydrate effect
-  // can reset it) ───────────────────────────────────────────────────────────
-  // The persist effect below skips its first run after each (re)hydrate so it
-  // doesn't echo the just-loaded value back to storage / `onChange`. We reset
-  // this on EVERY surface change (not just mount) because switching surface
-  // A→B re-runs HYDRATE, which changes `state.strokes` and would otherwise fire
-  // a spurious persist of B's freshly-hydrated value.
-  const hydratedRef = useRef(false);
-
   // ── Hydrate from storage post-mount (SSR-safe) + on surface OR uid change ──
   // Re-runs when the resolved uid changes (uidVersion) so an account switch on
   // a shared browser re-hydrates from the new user's namespace.
   useEffect(() => {
-    // Suppress the immediate post-hydrate persist run for THIS surface. The
-    // hydrate effect is declared before the persist effect, so this reset lands
-    // before the persist effect re-runs in the same commit.
-    hydratedRef.current = false;
-    // Ephemeral surfaces never read storage — they always hydrate empty, so the
-    // next preview open starts blank and nothing on disk is ever consulted.
-    const stored = ephemeral ? null : readEntry(uidRef.current, subKey);
-    dispatch({ type: "HYDRATE", annotations: stored ?? EMPTY_ANNOTATIONS });
+    // Ephemeral surfaces never read storage. They hydrate from the in-memory
+    // `hydrateFrom` buffer when one is supplied (present-mode session re-visit),
+    // else empty — so a fresh preview/page starts blank and nothing on disk is
+    // ever consulted.
+    const stored = ephemeral
+      ? (hydrateFromRef.current ?? null)
+      : readEntry(uidRef.current, subKey);
+    const annotations = stored ?? EMPTY_ANNOTATIONS;
+    // dispatch() records the action type ("HYDRATE") so the persist effect skips
+    // the resulting echo — however many times we re-hydrate.
+    dispatch({ type: "HYDRATE", annotations });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subKey, uidVersion, ephemeral]);
+  }, [subKey, uidVersion, ephemeral, hydrateKey]);
 
   // ── rAF-batched repaint ───────────────────────────────────────────────────
   const scheduleRedraw = useCallback(() => {
@@ -357,13 +422,15 @@ export function useBoardAnnotations(
   }, []);
 
   // ── Persist on committed-document change (not draft) ──────────────────────
-  // Skip the first run after each (re)hydrate (see `hydratedRef` above) so we
-  // don't echo the loaded value back to storage / `onChange`.
+  // Skip HYDRATE echoes by ACTION (the reducer marks `hydrating` on HYDRATE,
+  // clears it on every real mutation): a strokes change produced by a hydrate is
+  // not a user edit, so it must not write or notify `onChange`. A genuine edit
+  // that returns the document to the hydrated baseline (undo / erase-all) is NOT
+  // hydrating, so it DOES fire — keeping consumer buffers (the present-mode
+  // session buffer) in sync with the visible canvas. Robust to any number of
+  // re-hydrates (unlike a one-shot flag or a content-equality check).
   useEffect(() => {
-    if (!hydratedRef.current) {
-      hydratedRef.current = true;
-      return;
-    }
+    if (stateRef.current.hydrating) return;
     const annotations = toAnnotations(stateRef.current);
     // Ephemeral surfaces never write to disk — the ink lives only in this hook's
     // in-memory reducer and is gone the moment the component unmounts.
