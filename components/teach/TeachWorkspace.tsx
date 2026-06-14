@@ -1108,9 +1108,20 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
         displayOrder: widgets.length,
         pinned: false,
         config: {
+          // Snapshot of the source resource — the embed renders from THIS, so it
+          // keeps working if the source row is later edited or deleted (it is
+          // "detachable": deletion of the source never breaks the placed copy).
           url: resource.url ?? "",
           label: resource.label,
           kind: resource.kind,
+          // …plus a LINK back to the source row when it has a persisted id
+          // (Wave 4, item 3 "linked but detachable"). Recording the link lets a
+          // future pass resolve the resource live / offer a re-sync or detach
+          // action; today the snapshot above is still what renders. JSONB-safe
+          // (a plain string); omitted when the source has no stable id.
+          ...(resource.resourceId
+            ? { sourceResourceId: resource.resourceId }
+            : {}),
         },
         state: {},
         persistence: "inherit",
@@ -1485,10 +1496,14 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
               onCollapse={workspace.toggleRightCollapsed}
               width={rightWidth}
               activeLessonId={activeLessonId}
+              boards={boards}
               onMagnifyResource={(resource) =>
                 dispatch({ type: "openResource", resource })
               }
               onEmbedResource={handleEmbedResource}
+              onOpenBoard={(boardId) =>
+                dispatch({ type: "selectBoard", boardId })
+              }
               week={week}
               day={selectedDay}
               onOpenWidgetLibrary={

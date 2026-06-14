@@ -23,7 +23,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { DRAG_MOTION } from "@/lib/collapse-on-drag";
 import type { TeachModuleId } from "@/lib/use-teach-workspace";
-import type { TeachResource } from "@/lib/types";
+import type { Board, TeachResource } from "@/lib/types";
 import { Button, Tooltip } from "@/components/ui";
 import { PanelAddMenu } from "@/components/teach/left/PanelAddMenu";
 import { ResourcesIcon, ChatIcon, TodoIcon, ChevronIcon } from "./icons";
@@ -85,6 +85,11 @@ export interface TeachRightPanelProps {
   onMagnifyResource: (resource: TeachResource) => void;
   /** Embed a resource onto the active board (T8 explicit path). Optional. */
   onEmbedResource?: (resource: TeachResource) => void;
+  /** The active lesson's loaded boards, surfaced as board-resource rows in the
+   *  Resources module (Wave 4 #9). */
+  boards?: Board[];
+  /** Open a board-resource row in the editor (Wave 4 #9). */
+  onOpenBoard?: (boardId: string) => void;
   /** Active week/day overrides for the Chat module (defaults to app-state). */
   week?: number;
   day?: number;
@@ -106,6 +111,8 @@ export function TeachRightPanel({
   activeLessonId,
   onMagnifyResource,
   onEmbedResource,
+  boards,
+  onOpenBoard,
   week,
   day,
   onOpenWidgetLibrary,
@@ -128,8 +135,10 @@ export function TeachRightPanel({
           return (
             <ResourcesModule
               activeLessonId={activeLessonId}
+              boards={boards}
               onMagnifyResource={onMagnifyResource}
               onEmbedResource={onEmbedResource}
+              onOpenBoard={onOpenBoard}
             />
           );
         case "chat":
@@ -140,7 +149,15 @@ export function TeachRightPanel({
           return null;
       }
     },
-    [activeLessonId, onMagnifyResource, onEmbedResource, week, day],
+    [
+      activeLessonId,
+      boards,
+      onMagnifyResource,
+      onEmbedResource,
+      onOpenBoard,
+      week,
+      day,
+    ],
   );
 
   // Stable ids wire each tab to its panel (audit A4 — WAI-ARIA tabs need

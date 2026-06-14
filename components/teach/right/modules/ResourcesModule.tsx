@@ -29,12 +29,16 @@
 // per kind below — never an inline hex.
 
 import { useCallback, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { usePlanner } from "@/lib/planner-store";
 import { lessonResources } from "@/lib/lesson-resources";
 import { toTeachResource } from "@/lib/teach/toTeachResource";
-import type { TeachResource } from "@/lib/types";
+import {
+  boardResourceId,
+  boardToTeachResource,
+} from "@/lib/teach/boardToResource";
+import type { Board, TeachResource } from "@/lib/types";
 import type { TeachResourceDragData } from "@/lib/teach/types";
 import { Button } from "@/components/ui";
 import {
@@ -70,6 +74,9 @@ const KIND_STYLE: Record<TeachResource["kind"], KindStyle> = {
   video: { label: "VIDEO", pillClass: "pillRed" },
   tool: { label: "TOOL", pillClass: "pillGreen" },
   link: { label: "LINK", pillClass: "pillGray" },
+  // A learning board surfaced AS a resource (Wave 4 #9). Blue distinguishes it
+  // from a plain link; the card renders an "Open board" action, not embed/drag.
+  board: { label: "BOARD", pillClass: "pillBlue" },
 };
 
 // ── Filter chips ─────────────────────────────────────────────────────────────
@@ -124,6 +131,9 @@ interface ResourceCardProps {
   onOpenExternal: (resource: TeachResource) => void;
   /** Copy the resource URL to the clipboard. */
   onCopyLink: (resource: TeachResource) => void;
+  /** Open a BOARD resource (kind:"board") in the editor. Boards have no URL and
+   *  are never embedded/dragged — this is their only action (Wave 4 #9). */
+  onOpenBoard: (boardId: string) => void;
 }
 
 function ResourceCard({
@@ -134,8 +144,13 @@ function ResourceCard({
   onMagnify,
   onOpenExternal,
   onCopyLink,
+  onOpenBoard,
 }: ResourceCardProps): ReactNode {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // A board-as-resource row (Wave 4 #9): not draggable, not embeddable — its
+  // single action is "Open board". Everything below gates on this.
+  const isBoard = resource.kind === "board" && resource.boardId != null;
 
   const dragData: TeachResourceDragData = useMemo(
     () => ({ kind: "resource", resource }),
@@ -145,10 +160,22 @@ function ResourceCard({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: dragId,
     data: dragData,
+    // A board can't be embedded onto a board — disable its drag source entirely
+    // so it can never reach embedResourceAtCell as a bogus resource drop.
+    disabled: isBoard,
   });
 
   const kindStyle = KIND_STYLE[resource.kind] ?? KIND_STYLE.link;
   const label = resource.label || resource.kind;
+
+  // Open the board this row represents (guarded — only meaningful for isBoard).
+  const openThisBoard = useCallback((): void => {
+    if (resource.boardId != null) onOpenBoard(resource.boardId);
+    setMenuOpen(false);
+  }, [resource.boardId, onOpenBoard]);
+
+  // Drag wiring is attached only for real (embeddable) resources — never a board.
+  const dragProps = isBoard ? {} : { ...attributes, ...listeners };
 
   // The overflow menu — shared between grid + list. Closes after any action.
   const act = useCallback(
@@ -165,38 +192,51 @@ function ResourceCard({
       role="menu"
       aria-label={`Actions for ${label}`}
     >
-      <button
-        type="button"
-        role="menuitem"
-        className={styles.menuItem}
-        onClick={act(onEmbed)}
-      >
-        <EmbedIcon /> Open in board
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className={`${styles.menuItem} ${styles.menuItemAccent}`}
-        onClick={act(onMagnify)}
-      >
-        <MagnifyIcon /> Magnify (Open Large)
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className={styles.menuItem}
-        onClick={act(onOpenExternal)}
-      >
-        <ExternalIcon /> Open in new tab
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className={styles.menuItem}
-        onClick={act(onCopyLink)}
-      >
-        <CopyLinkIcon /> Copy link
-      </button>
+      {isBoard ? (
+        <button
+          type="button"
+          role="menuitem"
+          className={`${styles.menuItem} ${styles.menuItemAccent}`}
+          onClick={openThisBoard}
+        >
+          <EmbedIcon /> Open board
+        </button>
+      ) : (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.menuItem}
+            onClick={act(onEmbed)}
+          >
+            <EmbedIcon /> Open in board
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={`${styles.menuItem} ${styles.menuItemAccent}`}
+            onClick={act(onMagnify)}
+          >
+            <MagnifyIcon /> Magnify (Open Large)
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.menuItem}
+            onClick={act(onOpenExternal)}
+          >
+            <ExternalIcon /> Open in new tab
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.menuItem}
+            onClick={act(onCopyLink)}
+          >
+            <CopyLinkIcon /> Copy link
+          </button>
+        </>
+      )}
     </div>
   ) : null;
 
@@ -224,9 +264,27 @@ function ResourceCard({
       <div
         className={`${styles.listRow} ${isDragging ? styles.dragging : ""}`}
         ref={setNodeRef}
-        {...attributes}
-        {...listeners}
-        title={`${kindStyle.label} — ${label}. Drag onto a board cell to embed it.`}
+        {...dragProps}
+        // A board row is a button (opens the board); a resource row is a drag
+        // source whose label says so.
+        {...(isBoard
+          ? {
+              role: "button" as const,
+              tabIndex: 0,
+              onClick: openThisBoard,
+              onKeyDown: (e: ReactKeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openThisBoard();
+                }
+              },
+            }
+          : {})}
+        title={
+          isBoard
+            ? `Board — ${label}. Open it in the board editor.`
+            : `${kindStyle.label} — ${label}. Drag onto a board cell to embed it.`
+        }
       >
         <span
           className={`${styles.listChip} ${styles[kindStyle.pillClass] ?? ""}`}
@@ -251,9 +309,25 @@ function ResourceCard({
     <div
       className={`${styles.card} ${isDragging ? styles.dragging : ""}`}
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      title={`${kindStyle.label} — ${label}. Drag onto a board cell to embed it.`}
+      {...dragProps}
+      {...(isBoard
+        ? {
+            role: "button" as const,
+            tabIndex: 0,
+            onClick: openThisBoard,
+            onKeyDown: (e: ReactKeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openThisBoard();
+              }
+            },
+          }
+        : {})}
+      title={
+        isBoard
+          ? `Board — ${label}. Open it in the board editor.`
+          : `${kindStyle.label} — ${label}. Drag onto a board cell to embed it.`
+      }
     >
       <span
         className={`${styles.pill} ${styles.cardPill} ${
@@ -273,21 +347,38 @@ function ResourceCard({
         <ResourceKindIcon kind={resource.kind} size={28} />
       </div>
       <div className={styles.cardTitle}>{label}</div>
-      {/* Quick magnify affordance bottom-right — the most common single-click
-          action, also reachable from the ⋯ menu. */}
-      <Button
-        variant="icon"
-        iconAriaLabel={`Open ${label} large`}
-        className={styles.cardMagnifyBtn}
-        tooltip="Open this resource full-screen on the board (Open Large)"
-        onClick={(e) => {
-          e.stopPropagation();
-          onMagnify(resource);
-        }}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        <MagnifyIcon />
-      </Button>
+      {/* Quick action bottom-right: a board opens in the editor; every other
+          resource magnifies full-bleed (the most common single click). Both are
+          also reachable from the ⋯ menu. */}
+      {isBoard ? (
+        <Button
+          variant="icon"
+          iconAriaLabel={`Open board ${label}`}
+          className={styles.cardMagnifyBtn}
+          tooltip="Open this board in the board editor"
+          onClick={(e) => {
+            e.stopPropagation();
+            openThisBoard();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <EmbedIcon />
+        </Button>
+      ) : (
+        <Button
+          variant="icon"
+          iconAriaLabel={`Open ${label} large`}
+          className={styles.cardMagnifyBtn}
+          tooltip="Open this resource full-screen on the board (Open Large)"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMagnify(resource);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <MagnifyIcon />
+        </Button>
+      )}
     </div>
   );
 }
@@ -298,38 +389,52 @@ export interface ResourcesModuleProps {
   /** Active lesson id — resources are derived from its sections. Null in an
    *  empty sandbox; the module shows its empty state. */
   activeLessonId: string | null;
+  /** The active lesson's loaded boards (Wave 4 #9). Surfaced as board-resource
+   *  rows alongside files/links so a board "counts as a resource". Already
+   *  loaded by TeachWorkspace — no fetch here. Omitted/empty → none shown. */
+  boards?: Board[];
   /** Embed a resource onto the active board (T8 explicit/keyboard path).
    *  Optional — when omitted the menu item is a no-op-safe stub. */
   onEmbedResource?: (resource: TeachResource) => void;
   /** Magnify a resource — flips the center to full-bleed. Wired to the
    *  workspace reducer's `openResource` by the panel/integration. */
   onMagnifyResource: (resource: TeachResource) => void;
+  /** Open a board-resource row in the editor (Wave 4 #9). */
+  onOpenBoard?: (boardId: string) => void;
 }
 
 // ── ResourcesModule ──────────────────────────────────────────────────────────
 
 export function ResourcesModule({
   activeLessonId,
+  boards,
   onEmbedResource,
   onMagnifyResource,
+  onOpenBoard,
 }: ResourcesModuleProps): ReactNode {
   const { getSections } = usePlanner();
   const [view, setView] = useState<ViewMode>("grid");
   const [chip, setChip] = useState<string>("all");
   const [query, setQuery] = useState("");
 
-  // Derive the lesson's resources via the canonical chain. Re-derives only when
-  // the lesson or its sections change. We keep the SectionResource's stable
-  // `id` paired with the projected TeachResource — `TeachResource` itself
-  // doesn't surface `id` in its type (it extends the id-less LessonResource),
-  // so the pairing is the source of React keys + dnd ids.
+  // Derive the lesson's resources via the canonical chain, then UNION the
+  // lesson's boards as board-resource rows (Wave 4 #9 — a board counts as a
+  // resource). Boards lead so they're visible without scrolling past files.
+  // Re-derives only when the lesson, its sections, or its boards change. We keep
+  // each row's stable `id` paired with the projected TeachResource — the pairing
+  // is the source of React keys + dnd ids.
   const resources = useMemo<{ id: string; resource: TeachResource }[]>(() => {
     if (!activeLessonId) return [];
-    return lessonResources(getSections(activeLessonId)).map((r) => ({
+    const boardRows = (boards ?? []).map((b) => ({
+      id: boardResourceId(b.id),
+      resource: boardToTeachResource(b) as TeachResource,
+    }));
+    const fileRows = lessonResources(getSections(activeLessonId)).map((r) => ({
       id: r.id,
       resource: toTeachResource(r),
     }));
-  }, [activeLessonId, getSections]);
+    return [...boardRows, ...fileRows];
+  }, [activeLessonId, boards, getSections]);
 
   // Custom-tag chips derived from the resources' tags (deduped, sorted).
   const tagChips = useMemo<FilterChip[]>(() => {
@@ -374,6 +479,13 @@ export function ResourcesModule({
       onEmbedResource?.(resource);
     },
     [onEmbedResource],
+  );
+
+  const handleOpenBoard = useCallback(
+    (boardId: string): void => {
+      onOpenBoard?.(boardId);
+    },
+    [onOpenBoard],
   );
 
   const totalCount = resources.length;
@@ -468,6 +580,7 @@ export function ResourcesModule({
                 onMagnify={onMagnifyResource}
                 onOpenExternal={handleOpenExternal}
                 onCopyLink={handleCopyLink}
+                onOpenBoard={handleOpenBoard}
               />
             ))}
           </div>
@@ -483,6 +596,7 @@ export function ResourcesModule({
                 onMagnify={onMagnifyResource}
                 onOpenExternal={handleOpenExternal}
                 onCopyLink={handleCopyLink}
+                onOpenBoard={handleOpenBoard}
               />
             ))}
           </div>

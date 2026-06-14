@@ -349,6 +349,16 @@ export function ResourceKindIcon({
           <path d="M14.7 6.3a4 4 0 0 0-5.6 5.6l-6 6 2 2 6-6a4 4 0 0 0 5.6-5.6l-2.5 2.5-2-2 2.5-2.5z" />
         </svg>
       );
+    case "board":
+      // A learning board surfaced as a resource (Wave 4 #9) — mirrors the
+      // nav BoardsIcon: a canvas frame with a tile + a couple of content lines.
+      return (
+        <svg {...common}>
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <rect x="6" y="7" width="5" height="5" rx="1" />
+          <path d="M14 7.5h4M14 11h4M6 15.5h12" />
+        </svg>
+      );
     case "link":
     default:
       return (
