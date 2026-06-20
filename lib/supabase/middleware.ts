@@ -43,8 +43,9 @@ function isPublicPath(pathname: string) {
 /**
  * Refresh the Supabase session and enforce auth for the current request.
  * Returns the NextResponse to send — either the cookie-mutated passthrough
- * response, or a redirect (to /welcome for a signed-out root visit, else to
- * /login) carrying those same cookies.
+ * response, a rewrite (a signed-out root visit serves the /welcome marketing
+ * page in place, keeping the clean "/" URL), or a redirect (every other
+ * protected path bounces to /login) — all carrying those same cookies.
  */
 export async function updateSession(request: NextRequest) {
   // Claude auth-bypass (lib/claude-bypass.ts). When the request carries
@@ -90,26 +91,29 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // No session on a protected path → redirect. The root path forwards to
-  // the public marketing page so signed-out visitors land there; every
-  // other protected path bounces to /login, preserving the originally-
+  // No session on a protected path. The root path is REWRITTEN (served in
+  // place) to the public marketing page so signed-out visitors see it at the
+  // clean "/" URL — the address bar stays "/", not "/welcome". Every other
+  // protected path is REDIRECTED to /login, preserving the originally-
   // requested path so the OAuth callback can return there.
   if (!user && !isPublicPath(pathname)) {
-    const target = request.nextUrl.clone();
-    target.search = "";
+    let gateResponse: NextResponse;
     if (pathname === "/") {
-      target.pathname = "/welcome";
+      const welcome = new URL("/welcome", request.nextUrl.origin);
+      gateResponse = NextResponse.rewrite(welcome);
     } else {
-      target.pathname = "/login";
-      target.searchParams.set("next", pathname + request.nextUrl.search);
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.search = "";
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("next", pathname + request.nextUrl.search);
+      gateResponse = NextResponse.redirect(loginUrl);
     }
 
-    const redirect = NextResponse.redirect(target);
-    // Carry the refreshed-session cookies onto the redirect response.
+    // Carry the refreshed-session cookies onto the rewrite/redirect response.
     for (const cookie of response.cookies.getAll()) {
-      redirect.cookies.set(cookie);
+      gateResponse.cookies.set(cookie);
     }
-    return redirect;
+    return gateResponse;
   }
 
   return response;
