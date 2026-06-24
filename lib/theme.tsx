@@ -432,7 +432,20 @@ export function ThemeProvider({
     if (savedBg !== null) setBg(savedBg);
     const savedDim = readValidated(DIM_KEY, isThemeDim);
     if (savedDim !== null) setDim(savedDim);
-    // Theme with the one-time v1 paper/cloud → clear remap.
+    // Theme with the one-time v1 paper/cloud → clear remap. We also capture the
+    // RAW stored string at mount (rawThemeAtMount) — distinct from the migrated
+    // value — so the remote-sync race guard below can compare the live stored
+    // value against what was there at mount (an in-flight user change differs).
+    const rawThemeAtMount =
+      typeof window === "undefined"
+        ? null
+        : (() => {
+            try {
+              return window.localStorage.getItem(THEME_KEY);
+            } catch {
+              return null;
+            }
+          })();
     const savedTheme = readThemeMigrated();
     if (savedTheme !== null) setTheme(savedTheme);
 
@@ -460,7 +473,7 @@ export function ThemeProvider({
         if (
           remote.prefs.theme !== undefined &&
           remote.prefs.theme !== savedTheme &&
-          untouched(THEME_KEY, window.localStorage.getItem(THEME_KEY))
+          untouched(THEME_KEY, rawThemeAtMount)
         ) {
           setTheme(remote.prefs.theme);
         }
