@@ -351,18 +351,23 @@ const KEY = {
   dim: "mycurricula:user:theme-dim",
 };
 
-// Matrix §4 rules (first match wins): night→dark; wash→light; photo+dim→dark;
-// photo+bright→light; photo+normal→AUTO (a real photo MUST resolve to a
-// concrete light|dark via luminance — the W2-4 live proof). `auto:true` marks
-// the case that polls for the post-mount luminance result.
+// Matrix §4 rules (first match wins): night→dark; glass=light→light; wash→light;
+// photo+dim→dark; photo+bright→light; photo+normal→AUTO (a real photo MUST
+// resolve to a concrete light|dark via luminance — the W2-4 live proof).
+// `auto:true` marks the case that polls for the post-mount luminance result.
 const TONE_CASES = [
-  { id: "night", seed: { theme: "night", bg: "photo", dim: "normal" }, expectTone: "dark" },
-  { id: "wash", seed: { theme: "clear", bg: "wash", dim: "normal" }, expectTone: "light" },
-  { id: "photo-dim", seed: { theme: "clear", bg: "photo", dim: "dim" }, expectTone: "dark" },
-  { id: "photo-bright", seed: { theme: "clear", bg: "photo", dim: "bright" }, expectTone: "light" },
+  { id: "night", seed: { theme: "night", glass: "dark", bg: "photo", dim: "normal" }, expectTone: "dark" },
+  // White-frosted register forces light even on a photo+normal that would
+  // otherwise sample dark (Wave-2 re-audit MAJOR — glass now feeds deriveTone).
+  { id: "glass-light", seed: { theme: "clear", glass: "light", bg: "photo", dim: "normal" }, expectTone: "light" },
+  // Night still wins over the White-frosted register (night is the only dark theme).
+  { id: "night-over-glass-light", seed: { theme: "night", glass: "light", bg: "photo", dim: "normal" }, expectTone: "dark" },
+  { id: "wash", seed: { theme: "clear", glass: "dark", bg: "wash", dim: "normal" }, expectTone: "light" },
+  { id: "photo-dim", seed: { theme: "clear", glass: "dark", bg: "photo", dim: "dim" }, expectTone: "dark" },
+  { id: "photo-bright", seed: { theme: "clear", glass: "dark", bg: "photo", dim: "bright" }, expectTone: "light" },
   // photo+normal: AUTO. expectTone is whatever the real /stage/p1.webp luminance
   // yields — assert only that it is a CONCRETE, STABLE light|dark (not absent).
-  { id: "photo-normal-auto", seed: { theme: "clear", bg: "photo", dim: "normal" }, auto: true },
+  { id: "photo-normal-auto", seed: { theme: "clear", glass: "dark", bg: "photo", dim: "normal" }, auto: true },
 ];
 
 const toneResults = [];
@@ -375,6 +380,7 @@ for (const c of TONE_CASES) {
     ({ keys, seed }) => {
       try {
         if (seed.theme) localStorage.setItem(keys.theme, seed.theme);
+        if (seed.glass) localStorage.setItem(keys.glass, seed.glass);
         if (seed.bg) localStorage.setItem(keys.bg, seed.bg);
         if (seed.dim) localStorage.setItem(keys.dim, seed.dim);
       } catch {}
@@ -584,7 +590,10 @@ for (const theme of ["clear", "honey", "mint", "sky", "blossom"]) {
 //
 // These are ADDITIVE assertions. They may not be GREEN until the render-path
 // fix lands — that's expected; the gate proves the engine paints once it does.
-const PHOTO_FILENAME = "p1.webp"; // DEFAULT_STAGE_PHOTO basename (lib/stage-photo.ts)
+// Fallback only — the C-assert derives the EXPECTED basename from the live
+// --stage-photo (see photoBasename below) so it can't drift from
+// DEFAULT_STAGE_PHOTO (lib/stage-photo.ts). Re-audit #3 / Codex L1.
+const PHOTO_FILENAME = "p1.webp"; // DEFAULT_STAGE_PHOTO basename (fallback)
 const PAINT_WIDTHS = [390, 768, 1280]; // F. responsive tiers
 // D. a real app route + a fallback if /weekly 404s in this environment.
 const PAINT_ROUTE = "/weekly";
@@ -639,6 +648,21 @@ function bodyBgIsOpaque(color) {
   }
   // Any other non-empty color keyword/function counts as opaque.
   return true;
+}
+
+// Derive the photo basename from a `url(...)` value so the C-assert verifies the
+// .stage::before paints the SAME photo --stage-photo points at, rather than a
+// hardcoded literal that could drift from DEFAULT_STAGE_PHOTO. Falls back to the
+// static default basename when the url can't be parsed. (Re-audit #3 / Codex L1.)
+function photoBasename(urlValue, fallback) {
+  if (typeof urlValue === "string") {
+    const m = urlValue.match(/url\(\s*['"]?([^'")]+)['"]?\s*\)/i);
+    if (m && m[1]) {
+      const base = m[1].split(/[?#]/)[0].split("/").filter(Boolean).pop();
+      if (base) return base;
+    }
+  }
+  return fallback;
 }
 
 const paintResults = [];
@@ -720,17 +744,18 @@ function recordPaint(axis, width, route, bg, ok, detail) {
         );
         // C. PHOTO ACTUALLY PAINTS
         const photoVarOk = /url\(/i.test(facts.stagePhoto);
+        const expectedPhoto = photoBasename(facts.stagePhoto, PHOTO_FILENAME);
         const beforeOk =
           typeof facts.stageBeforeBg === "string" &&
           /url\(/i.test(facts.stageBeforeBg) &&
-          facts.stageBeforeBg.includes(PHOTO_FILENAME);
+          facts.stageBeforeBg.includes(expectedPhoto);
         recordPaint(
           "C:photo-paints",
           width,
           paintRoute,
           "photo",
           facts.bg === "photo" && photoVarOk && beforeOk,
-          `--stage-photo=${facts.stagePhoto} ::before=${(facts.stageBeforeBg ?? "null").slice(0, 120)} (${where})`,
+          `--stage-photo=${facts.stagePhoto} expect=${expectedPhoto} ::before=${(facts.stageBeforeBg ?? "null").slice(0, 120)} (${where})`,
         );
       }
       await page.close();

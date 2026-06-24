@@ -9,14 +9,15 @@
 // flash-of-unstyled-content, plus a SAFE non-flashing default for the DERIVED
 // data-tone.
 //
-// data-tone IS DERIVED (theme + bg + dim → light|dark; see theme.tsx
+// data-tone IS DERIVED (theme + glass + bg + dim → light|dark; see theme.tsx
 // deriveTone + WAVE-2-VALUE-MATRIX.md §4). The boot script paints the SAME
 // derivation deriveTone applies, MINUS the async photo-luminance sample (a
-// boot script cannot sample a canvas synchronously): night → dark; wash →
-// light; photo + bright → light; photo + dim|normal → dark (the matrix §4
-// pre-sample default — a scrim keeps white text readable, and the provider
-// upgrades normal → auto post-mount once luminance is sampled). This MUST equal
-// deriveTone(theme, bg, dim, null) and the SSR default in app/layout.tsx so the
+// boot script cannot sample a canvas synchronously): night → dark; glass=light →
+// light; wash → light; photo + bright → light; photo + dim|normal → dark (the
+// matrix §4 pre-sample default — a scrim keeps white text readable, and the
+// provider upgrades normal → auto post-mount once luminance is sampled). This
+// MUST equal deriveTone(theme, glass, bg, dim, null) and the SSR default in
+// app/layout.tsx so the
 // server HTML, the boot paint, and the first client render all agree (no FOUC,
 // no hydration mismatch) — and so the scripts/probe-theme-wave.mjs assertion
 // (expectTone === "dark" at the Photo+normal defaults) passes. The provider
@@ -86,13 +87,15 @@ const THEME_INIT_SCRIPT = `(function () {
     if (["dim","normal","bright"].indexOf(dim) < 0) dim = "normal";
     d.dataset.dim = dim;
 
-    // ── DERIVED tone — replicate deriveTone(theme,bg,dim,null) (see header +
-    // WAVE-2-VALUE-MATRIX.md §4). MUST match theme.tsx deriveTone, the SSR
+    // ── DERIVED tone — replicate deriveTone(theme,glass,bg,dim,null) (see header
+    // + WAVE-2-VALUE-MATRIX.md §4). MUST match theme.tsx deriveTone, the SSR
     // default in app/layout.tsx, and the probe. The async photo-luminance
     // "normal → auto" upgrade is reconciled by the provider post-mount.
-    //   night → dark · wash → light · photo+bright → light · photo+(dim|normal) → dark
+    //   night → dark · glass=light → light · wash → light · photo+bright → light
+    //   · photo+(dim|normal) → dark
     var tone;
     if (t === "night") tone = "dark";
+    else if (g === "light") tone = "light";
     else if (b === "wash") tone = "light";
     else if (dim === "bright") tone = "light";
     else tone = "dark";

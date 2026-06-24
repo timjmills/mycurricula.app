@@ -351,8 +351,9 @@ function getActivePhotoUrl(): string | null {
  * DERIVE the tone from the persisted axes (see WAVE-2-VALUE-MATRIX.md §4).
  * Evaluated top-to-bottom; first match wins:
  *   1. theme === "night"  → dark   (the only dark theme, app-wide)
- *   2. bg === "wash"      → light  (Night already handled)
- *   3. bg === "photo":
+ *   2. glass === "light"  → light  (White-frosted register = a light surface)
+ *   3. bg === "wash"      → light  (Night + White-frosted already handled)
+ *   4. bg === "photo":
  *        dim === "dim"     → dark   (manual override — scrim, white text)
  *        dim === "bright"  → light  (manual override — ink on white frosted)
  *        dim === "normal"  → AUTO. Resolve the photo-luminance-derived `autoTone`
@@ -365,11 +366,19 @@ function getActivePhotoUrl(): string | null {
  */
 function deriveTone(
   resolved: AppTheme,
+  glass: ThemeGlass,
   bg: ThemeBg,
   dim: ThemeDim,
   autoTone: ThemeTone | null,
 ): ThemeTone {
   if (resolved === "night") return "dark";
+  // The White-frosted register IS a light surface (translucent-white panels +
+  // dark ink), so it forces light tone app-wide — this is what makes the
+  // legibility contract self-consistent instead of relying on a per-element
+  // re-flip allowlist (Wave-2 re-audit MAJOR; Night still wins above). It sets
+  // the surface/text register, NOT the background, so "glass must never wash the
+  // background" still holds.
+  if (glass === "light") return "light";
   if (bg === "wash") return "light";
   // bg === "photo"
   if (dim === "dim") return "dark";
@@ -635,8 +644,8 @@ export function ThemeProvider({
   // affects the bg === "photo" + dim === "normal" branch (deriveTone); for every
   // other combination it is ignored, so its null default this wave is inert.
   const tone = useMemo<ThemeTone>(
-    () => deriveTone(resolvedTheme, bg, dim, autoTone),
-    [resolvedTheme, bg, dim, autoTone],
+    () => deriveTone(resolvedTheme, glass, bg, dim, autoTone),
+    [resolvedTheme, glass, bg, dim, autoTone],
   );
 
   // AUTO photo-luminance effect (matrix §4, rule 3, `dim === "normal"`). Runs
