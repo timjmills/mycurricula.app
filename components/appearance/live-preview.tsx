@@ -26,13 +26,17 @@ const PREVIEW_LESSON_IDS = ["m-12-1", "r-12-1", "w-12-1"] as const;
 
 const STYLE_LABEL = { quiet: "Quiet", calm: "Mid-Calm", vivid: "Mid-Vivid" };
 const PALETTE_LABEL = { normal: "Normal", highlight: "Highlight" };
-const THEME_LABEL = {
-  paper: "Paper",
-  cloud: "Cloud",
+// v2 theme set (lockstep with lib/theme.tsx APP_THEMES). The full picker
+// rewrite (per-theme copy for honey/off) is a later Wave-2 stage; this label
+// map only needs to cover the resolved v2 themes so the caption compiles.
+const THEME_LABEL: Record<string, string> = {
+  clear: "Clear",
   night: "Night",
+  honey: "Honey",
+  blossom: "Blossom",
   mint: "Mint",
   sky: "Sky",
-  blossom: "Blossom",
+  off: "Off (Photo)",
 };
 
 interface LivePreviewProps {

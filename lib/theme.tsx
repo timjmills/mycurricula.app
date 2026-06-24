@@ -1,37 +1,48 @@
 "use client";
 
-// theme.tsx — the app-wide theme provider.
+// theme.tsx — the app-wide theme provider (v2 appearance engine).
 //
-// Three independent axes drive every visual surface:
-//   • style       ∈ { quiet, calm, vivid }                      — card treatment
-//   • paletteType ∈ { normal, highlight }                       — subject-color saturation
-//   • theme       ∈ { paper, cloud, night, mint, sky, blossom } — app-wide color theme
+// THE v2 AXES (all written to <html> as data attributes so CSS reacts without a
+// re-render, and exposed via useTheme() for components that branch in JS):
+//   • frame  ∈ { glass, paper, color }                  — layout character + material
+//   • glass  ∈ { dark, light }                           — Frame A frosted register
+//   • bg     ∈ { photo, wash }                           — what lives behind the glass
+//   • theme  ∈ { clear, night, honey, blossom, mint, sky, off } (+ "system" sentinel)
+//   • dim    ∈ { dim, normal, bright }                   — Photo prominence + tone
+//   • tone   ∈ { light, dark }   — DERIVED, never user-set, never persisted
+//   • canvas ∈ { glass-dim, glass-light }                — home center panel only
 //
-// All three are written to <html> as data attributes (`data-style`,
-// `data-palette`, `data-theme`) so CSS in tokens.css can react without a
-// re-render, and are exposed via the useTheme() hook for components that
-// branch in JS. This provider also mounts PaletteProvider so subject colors
-// follow `paletteType` automatically.
+// DERIVED data-tone: tone is computed from theme + bg + dim at paint time (see
+// deriveTone). Every surface branches on data-tone, never on the theme — this is
+// the legibility contract. In THIS stage tone is derived from the persisted axes
+// only; the photo-luminance "normal → auto" sample is wired in a LATER stage, so
+// here `normal` resolves to its safe default (dark — white text on a scrim). The
+// boot script paints a deterministic light default and the post-mount effect
+// reconciles to the persisted-axes derivation.
 //
-// The theme axis also accepts the stored sentinel "system", which resolves
-// to `night` or `paper` from `prefers-color-scheme`. The SETTING (which may
-// be "system") is what we persist + expose as `theme`; the RESOLVED value
-// (always a concrete AppTheme, never "system") is what we paint and expose as
-// `resolvedTheme`. "system" must never reach the DOM.
+// DEPRECATED v1 COMPAT (kept, NOT emitted on the v2 DOM path): `style`/`palette`
+// + their setters and STYLE_VALUES/PALETTE_VALUES. ~17 components and the command
+// palette still read them, so removing them breaks tsc; they stay so a flag-OFF
+// rollback to v1 still compiles + renders. They are still persisted + still
+// mirrored to <html data-style data-palette> so a v1 rollback finds the values.
 //
-// Persistence: all three axes write through to localStorage under the
-// `mycurricula:user:*` keys so a teacher's choices survive a reload (this
-// closes the prior audit gap where style + palette reset on every load). The
-// no-FOUC boot script in lib/theme-init.tsx paints the persisted attributes
-// BEFORE first paint; the mirror effect below deliberately skips its first
-// run so it does not clobber what the boot script already painted.
+// mode (personal/team) is NOT owned here — it is sourced from
+// useAppState().editMode so the forking state is never duplicated.
 //
-// COUPLING — READ BEFORE EDITING: the theme/style/palette allowlists and the
-// "system" → night/paper resolution here MUST stay in lockstep with the
-// inline script in lib/theme-init.tsx. If they drift, a value one file accepts
-// and the other rejects breaks SILENTLY (wrong attribute, no error).
+// Persistence: every axis writes through to localStorage under the
+// `mycurricula:user:*` keys. The no-FOUC boot script in lib/theme-init.tsx paints
+// the persisted attributes BEFORE first paint; the mirror effect below skips its
+// first run so it does not clobber what the boot script already painted.
 //
-// HIGHLIGHT is the development default; NORMAL must remain fully working.
+// COUPLING — READ BEFORE EDITING (ALLOWLIST LOCKSTEP): the guard arrays here are
+// the ORIGIN of the frozen value matrix (docs/v2-rebuild/WAVE-2-VALUE-MATRIX.md).
+// They MUST stay byte-identical to FOUR other surfaces:
+//   • lib/theme-init.tsx          — the inline boot-script literal arrays
+//   • the teacher_preferences SQL CHECK constraints (the migration)
+//   • app/layout.tsx              — the SSR root attributes (defaults)
+//   • scripts/probe-theme-wave.mjs — the per-wave probe
+// If they drift, a value one surface accepts and another rejects breaks SILENTLY
+// (wrong attribute, dropped sync write — no error).
 
 import {
   createContext,
@@ -46,44 +57,123 @@ import { PaletteProvider } from "./palette";
 import type { PaletteType, SubjectMapping } from "./palette";
 import { loadRemotePrefs, saveRemotePrefs } from "./theme-sync";
 
-/** Card-style axis. */
-export type ThemeStyle = "quiet" | "calm" | "vivid";
+// ── v2 axis types ─────────────────────────────────────────────────────────
 
-/** Saturation axis — alias of the palette type. */
-export type ThemePalette = PaletteType;
+/** Layout character + material + emphasis. */
+export type ThemeFrame = "glass" | "paper" | "color";
+/** The two frosted registers of Frame A. */
+export type ThemeGlass = "dark" | "light";
+/** What lives behind the glass. */
+export type ThemeBg = "photo" | "wash";
+/** Photo prominence + text treatment (Photo only). `normal` is auto. */
+export type ThemeDim = "dim" | "normal" | "bright";
+/** DERIVED — never chosen or persisted. */
+export type ThemeTone = "light" | "dark";
+/** The home center panel only. Presentation state, not a teacher preference. */
+export type ThemeCanvas = "glass-dim" | "glass-light";
 
-/** App-wide color theme — the concrete, paintable values. */
-export type AppTheme = "paper" | "cloud" | "night" | "mint" | "sky" | "blossom";
+/** App-wide color theme — the concrete, paintable v2 values. */
+export type AppTheme =
+  | "clear"
+  | "night"
+  | "honey"
+  | "blossom"
+  | "mint"
+  | "sky"
+  | "off";
 
 /** The stored theme choice — an AppTheme, or "system" (resolved at runtime). */
 export type ThemeSetting = AppTheme | "system";
 
-/** The six concrete themes, in picker order. */
+// ── Deprecated v1 compat types (kept for flag-OFF rollback) ────────────────
+
+/** @deprecated v1 card-style axis. Kept for v1 rollback; dropped from v2 DOM. */
+export type ThemeStyle = "quiet" | "calm" | "vivid";
+/** @deprecated v1 saturation axis — alias of the palette type. */
+export type ThemePalette = PaletteType;
+
+// ── Frozen value matrix (THE origin of the five-surface lockstep) ──────────
+
+/** The seven concrete themes, in picker order. */
 export const APP_THEMES: readonly AppTheme[] = [
-  "paper",
-  "cloud",
+  "clear",
   "night",
+  "honey",
+  "blossom",
   "mint",
   "sky",
-  "blossom",
+  "off",
 ];
 
-/** App defaults — the Vivid style paired with the Highlight palette. */
+/** Frame values — LOCKSTEP. */
+export const FRAME_VALUES: readonly ThemeFrame[] = ["glass", "paper", "color"];
+/** Glass-register values — LOCKSTEP. */
+export const GLASS_VALUES: readonly ThemeGlass[] = ["dark", "light"];
+/** Background values — LOCKSTEP. */
+export const BG_VALUES: readonly ThemeBg[] = ["photo", "wash"];
+/** Theme values — LOCKSTEP (the "system" sentinel is handled separately). */
+export const THEME_VALUES: readonly AppTheme[] = APP_THEMES;
+/** Photo-brightness values — LOCKSTEP. */
+export const DIM_VALUES: readonly ThemeDim[] = ["dim", "normal", "bright"];
+/** Derived tone values — DERIVED, never persisted (not part of the SQL CHECK). */
+export const TONE_VALUES: readonly ThemeTone[] = ["light", "dark"];
+/** Canvas values — runtime presentation state, not persisted. */
+export const CANVAS_VALUES: readonly ThemeCanvas[] = ["glass-dim", "glass-light"];
+
+/** @deprecated v1 card-style values — kept for v1 rollback. */
+export const STYLE_VALUES: readonly ThemeStyle[] = ["quiet", "calm", "vivid"];
+/** @deprecated v1 palette values — kept for v1 rollback. */
+export const PALETTE_VALUES: readonly ThemePalette[] = ["normal", "highlight"];
+
+// ── Defaults (must match the SSR root attributes in app/layout.tsx) ────────
+
+/** Default frame — Frame A (Calm Glass). */
+export const DEFAULT_FRAME: ThemeFrame = "glass";
+/** Default glass register — dark frosted. */
+export const DEFAULT_GLASS: ThemeGlass = "dark";
+/** Default background — frosted glass over the classroom photo. */
+export const DEFAULT_BG: ThemeBg = "photo";
+/** Default theme — Clear, the resting theme. */
+export const DEFAULT_THEME: ThemeSetting = "clear";
+/** Default photo brightness — auto (samples luminance in a later stage). */
+export const DEFAULT_DIM: ThemeDim = "normal";
+/** Default canvas — the dark-frosted home center panel. */
+export const DEFAULT_CANVAS: ThemeCanvas = "glass-dim";
+
+/** @deprecated v1 default card style. */
 export const DEFAULT_STYLE: ThemeStyle = "vivid";
+/** @deprecated v1 default palette. */
 export const DEFAULT_PALETTE: ThemePalette = "highlight";
-/** Default theme setting. Paper is the light baseline the artboards target. */
-export const DEFAULT_THEME: ThemeSetting = "paper";
 
 interface ThemeContextValue {
-  style: ThemeStyle;
-  palette: ThemePalette;
+  // v2 axes
+  frame: ThemeFrame;
+  glass: ThemeGlass;
+  bg: ThemeBg;
   /** The stored theme choice (may be "system"). */
   theme: ThemeSetting;
   /** The concrete theme actually painted (never "system"). */
   resolvedTheme: AppTheme;
-  setStyle: (s: ThemeStyle) => void;
-  setPalette: (p: ThemePalette) => void;
+  dim: ThemeDim;
+  /** DERIVED — read-only, never a setter. */
+  tone: ThemeTone;
+  canvas: ThemeCanvas;
+  setFrame: (f: ThemeFrame) => void;
+  setGlass: (g: ThemeGlass) => void;
+  setBg: (b: ThemeBg) => void;
   setTheme: (t: ThemeSetting) => void;
+  setDim: (d: ThemeDim) => void;
+  setCanvas: (c: ThemeCanvas) => void;
+
+  // Deprecated v1 compat — kept so the ~17 v1 consumers still compile/render.
+  /** @deprecated v1 card style; dropped from the v2 DOM path. */
+  style: ThemeStyle;
+  /** @deprecated v1 palette saturation. */
+  palette: ThemePalette;
+  /** @deprecated */
+  setStyle: (s: ThemeStyle) => void;
+  /** @deprecated */
+  setPalette: (p: ThemePalette) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -100,46 +190,58 @@ export function useTheme(): ThemeContextValue {
 // ── Storage keys + allowlist validation ──────────────────────────────────
 //
 // Keys follow the repo's `mycurricula:user:*` convention. Every read is
-// validated against an allowlist; anything unrecognized is ignored so a
-// stale or hand-edited value can never paint an invalid attribute. All
-// access is SSR-guarded + try/catch wrapped (private-mode / quota safe),
-// mirroring lib/tooltip-dismissal.ts and lib/labels.tsx.
+// validated against an allowlist; anything unrecognized is ignored so a stale
+// or hand-edited value can never paint an invalid attribute. All access is
+// SSR-guarded + try/catch wrapped (private-mode / quota safe).
 
 const THEME_KEY = "mycurricula:user:theme";
+const FRAME_KEY = "mycurricula:user:theme-frame";
+const GLASS_KEY = "mycurricula:user:theme-glass";
+const BG_KEY = "mycurricula:user:theme-bg";
+const DIM_KEY = "mycurricula:user:theme-dim";
+// v1 keys — kept for the one-time migration shim + deprecated compat persistence.
 const STYLE_KEY = "mycurricula:user:theme-style";
 const PALETTE_KEY = "mycurricula:user:theme-palette";
 
-/** The card-style values, exported so consumers validate against ONE list. */
-export const STYLE_VALUES: readonly ThemeStyle[] = ["quiet", "calm", "vivid"];
-/** The palette values, exported for the same single-source reason. */
-export const PALETTE_VALUES: readonly ThemePalette[] = [
-  "normal",
-  "highlight",
-];
+// ── Allowlist guards ───────────────────────────────────────────────────────
+//
+// Exported so lib/theme-sync.ts (and any future consumer) validates against
+// THIS file's lists instead of keeping duplicates. The two copies that MUST
+// stay literal (they run before any module loads / live in SQL) are the inline
+// boot script in lib/theme-init.tsx and the migration's CHECK constraints.
 
-// Cross-fade pulse window. When the RESOLVED app theme actually changes, the
-// mirror effect sets `data-theme-transition` on <html> for this long so the CSS
-// under :root[data-theme-transition] (shipped by the theme-polish work) can
-// cross-fade the color swap, then removes it. Kept just above the CSS transition
-// duration so the attribute outlives the fade.
-const THEME_TRANSITION_MS = 220;
-
-// Debounce window for the best-effort remote write. Rapid toggling (e.g. arrow-
-// keying through the theme picker) collapses into a single saveRemotePrefs call
-// this long after the last change. Local state + localStorage update instantly;
-// only the cross-device push is deferred.
-const REMOTE_SAVE_DEBOUNCE_MS = 800;
-
-/** Allowlist guards — exported so lib/theme-sync.ts (and any future consumer)
- *  validates against THIS file's lists instead of keeping duplicates. The two
- *  copies that must stay literal regardless are the inline boot script in
- *  lib/theme-init.tsx and the SQL CHECK constraints (see COUPLING headers). */
+export function isThemeFrame(v: unknown): v is ThemeFrame {
+  return FRAME_VALUES.includes(v as ThemeFrame);
+}
+export function isThemeGlass(v: unknown): v is ThemeGlass {
+  return GLASS_VALUES.includes(v as ThemeGlass);
+}
+export function isThemeBg(v: unknown): v is ThemeBg {
+  return BG_VALUES.includes(v as ThemeBg);
+}
+export function isThemeDim(v: unknown): v is ThemeDim {
+  return DIM_VALUES.includes(v as ThemeDim);
+}
+export function isThemeCanvas(v: unknown): v is ThemeCanvas {
+  return CANVAS_VALUES.includes(v as ThemeCanvas);
+}
+/** Accepts the v2 theme set AND the "system" sentinel. */
 export function isThemeSetting(v: unknown): v is ThemeSetting {
   return v === "system" || APP_THEMES.includes(v as AppTheme);
 }
+
+// v1 theme values accepted ONLY on read for the one-time remap (paper|cloud →
+// clear). They never reach the DOM and are never returned as a ThemeSetting.
+const V1_THEME_REMAP: Record<string, ThemeSetting> = {
+  paper: "clear",
+  cloud: "clear",
+};
+
+/** @deprecated v1 guard — kept for theme-sync + the compat axis. */
 export function isThemeStyle(v: unknown): v is ThemeStyle {
   return STYLE_VALUES.includes(v as ThemeStyle);
 }
+/** @deprecated v1 guard — kept for theme-sync + the compat axis. */
 export function isThemePalette(v: unknown): v is ThemePalette {
   return PALETTE_VALUES.includes(v as ThemePalette);
 }
@@ -158,6 +260,24 @@ function readValidated<T>(
   }
 }
 
+/**
+ * Read + validate the stored theme, applying the one-time v1 remap. Accepts a
+ * v2 value (or "system") directly; remaps a v1 paper/cloud to clear; returns
+ * null for anything unrecognized. Idempotent — re-reading "clear" yields "clear".
+ */
+function readThemeMigrated(): ThemeSetting | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(THEME_KEY);
+    if (raw === null) return null;
+    if (isThemeSetting(raw)) return raw;
+    if (raw in V1_THEME_REMAP) return V1_THEME_REMAP[raw];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Persist a single key, silently ignoring storage failures (private mode). */
 function writeKey(key: string, value: string): void {
   if (typeof window === "undefined") return;
@@ -168,89 +288,168 @@ function writeKey(key: string, value: string): void {
   }
 }
 
+// Cross-fade pulse window. When the RESOLVED theme actually changes, the mirror
+// effect sets `data-theme-transition` on <html> for this long so the CSS can
+// cross-fade the color swap, then removes it. Kept just above the CSS transition
+// duration so the attribute outlives the fade.
+const THEME_TRANSITION_MS = 220;
+
+// Debounce window for the best-effort remote write. Rapid toggling collapses
+// into a single saveRemotePrefs call this long after the last change.
+const REMOTE_SAVE_DEBOUNCE_MS = 800;
+
 /** Resolve a possibly-"system" setting to a concrete theme. */
 function resolveTheme(setting: ThemeSetting, systemDark: boolean): AppTheme {
-  if (setting === "system") return systemDark ? "night" : "paper";
+  if (setting === "system") return systemDark ? "night" : "clear";
   return setting;
 }
 
+/**
+ * DERIVE the tone from the persisted axes (see WAVE-2-VALUE-MATRIX.md §4).
+ * Evaluated top-to-bottom; first match wins:
+ *   1. theme === "night"  → dark   (the only dark theme, app-wide)
+ *   2. bg === "wash"      → light  (Night already handled)
+ *   3. bg === "photo":
+ *        dim === "dim"     → dark   (manual override — scrim, white text)
+ *        dim === "bright"  → light  (manual override — ink on white frosted)
+ *        dim === "normal"  → AUTO. The photo-luminance sample lands in a LATER
+ *                            stage; until then default to dark (the safe
+ *                            white-text-on-scrim state).
+ */
+function deriveTone(
+  resolved: AppTheme,
+  bg: ThemeBg,
+  dim: ThemeDim,
+): ThemeTone {
+  if (resolved === "night") return "dark";
+  if (bg === "wash") return "light";
+  // bg === "photo"
+  if (dim === "dim") return "dark";
+  if (dim === "bright") return "light";
+  // dim === "normal" — auto (photo-luminance sample is a later stage)
+  return "dark";
+}
+
 interface ThemeProviderProps {
-  /** Initial card style. */
-  initialStyle?: ThemeStyle;
-  /** Initial palette type. */
-  initialPalette?: ThemePalette;
+  /** Initial frame. */
+  initialFrame?: ThemeFrame;
+  /** Initial glass register. */
+  initialGlass?: ThemeGlass;
+  /** Initial background. */
+  initialBg?: ThemeBg;
   /** Initial theme setting. */
   initialTheme?: ThemeSetting;
+  /** Initial photo brightness. */
+  initialDim?: ThemeDim;
+  /** Initial canvas. */
+  initialCanvas?: ThemeCanvas;
+  /** @deprecated initial card style (v1 compat). */
+  initialStyle?: ThemeStyle;
+  /** @deprecated initial palette (v1 compat). */
+  initialPalette?: ThemePalette;
   /** Core Curriculum subject → swatch mapping passed to PaletteProvider. */
   mapping?: SubjectMapping;
   children: ReactNode;
 }
 
 /**
- * Provides theme state, mirrors all three axes onto
- * <html data-style data-palette data-theme>, and wraps children in a
- * PaletteProvider bound to the palette axis.
+ * Provides theme state, mirrors the v2 axes onto
+ * <html data-frame data-glass data-bg data-theme data-dim data-tone>, and wraps
+ * children in a PaletteProvider bound to the (deprecated) palette axis.
  *
- * Hydration model: the useState initializers ALWAYS return the passed
- * initial* / defaults (never read localStorage), so the server-rendered HTML
- * and the first client render match exactly — the repo's SSR convention.
- * Persisted values are loaded in a post-mount effect; the boot script in
- * lib/theme-init.tsx has already painted them onto <html>, so the load effect
- * only reconciles React state, and the mirror effect skips its first run to
- * avoid clobbering the boot script's attributes with the defaults.
+ * Hydration model (SSR no-FOUC contract): the useState initializers ALWAYS
+ * return the passed initial* / defaults (never read localStorage), so the
+ * server-rendered HTML and the first client render match exactly. Persisted
+ * values are loaded in a post-mount effect (with the one-time v1→v2 key shim);
+ * the boot script in lib/theme-init.tsx has already painted them onto <html>,
+ * so the load effect only reconciles React state, and the mirror effect skips
+ * its first run to avoid clobbering the boot script's attributes with defaults.
  */
 export function ThemeProvider({
+  initialFrame = DEFAULT_FRAME,
+  initialGlass = DEFAULT_GLASS,
+  initialBg = DEFAULT_BG,
+  initialTheme = DEFAULT_THEME,
+  initialDim = DEFAULT_DIM,
+  initialCanvas = DEFAULT_CANVAS,
   initialStyle = DEFAULT_STYLE,
   initialPalette = DEFAULT_PALETTE,
-  initialTheme = DEFAULT_THEME,
   mapping,
   children,
 }: ThemeProviderProps): ReactNode {
+  // NOTE on mode (personal/team): the forking edit mode is owned by app-state
+  // (useAppState().editMode) and the data-mode attribute is set by the
+  // forking-aware planner shell — NOT here. ThemeProvider deliberately does NOT
+  // consume useAppState(): it lives in the ROOT layout, ABOVE the
+  // <AppStateProvider> (which is mounted per route group), so the context is not
+  // in scope at this level. Duplicating the forking state here would both
+  // violate the single-source rule and crash at mount. The mode axis stays where
+  // app-state is available, exactly as the v2 reference sets data-mode on `.home`
+  // (a descendant), never on <html>.
+
+  const [frame, setFrame] = useState<ThemeFrame>(initialFrame);
+  const [glass, setGlass] = useState<ThemeGlass>(initialGlass);
+  const [bg, setBg] = useState<ThemeBg>(initialBg);
+  const [theme, setTheme] = useState<ThemeSetting>(initialTheme);
+  const [dim, setDim] = useState<ThemeDim>(initialDim);
+  const [canvas, setCanvas] = useState<ThemeCanvas>(initialCanvas);
+  // Deprecated v1 compat axes.
   const [style, setStyle] = useState<ThemeStyle>(initialStyle);
   const [palette, setPalette] = useState<ThemePalette>(initialPalette);
-  const [theme, setTheme] = useState<ThemeSetting>(initialTheme);
   // Tracks the OS dark-mode preference, used only when theme === "system".
   const [systemDark, setSystemDark] = useState(false);
 
-  // Load effect — declared FIRST so it runs before the mirror effect on
-  // mount. Reads + validates the persisted axes and reconciles state; reads
-  // the OS color-scheme preference and subscribes to changes; subscribes to
-  // cross-tab `storage` events so a change made in another tab (e.g. via the
-  // Settings picker) reflects here. SSR never runs this path.
+  // Load effect — declared FIRST so it runs before the mirror effect on mount.
+  // Reads + validates the persisted axes (NEW v2 keys), runs the one-time v1
+  // shim, reconciles state; reads the OS color-scheme preference and subscribes
+  // to changes; subscribes to cross-tab `storage` events. SSR never runs this.
   useEffect(() => {
-    // Guards async state-sets (the remote load below) against a unmount that
+    // Guards async state-sets (the remote load below) against an unmount that
     // races the in-flight promise.
     let active = true;
 
+    // ── New v2 axes ──────────────────────────────────────────────────────
+    const savedFrameRaw = readValidated(FRAME_KEY, isThemeFrame);
+    // One-time shim: if `frame` is unset, seed it from the deprecated v1
+    // `theme-style` (calm→glass, quiet→paper, vivid→color). Mirrors the SQL
+    // migration's frame-seed UPDATE so DB + client agree.
     const savedStyle = readValidated(STYLE_KEY, isThemeStyle);
+    const seededFrame: ThemeFrame | null =
+      savedFrameRaw !== null
+        ? savedFrameRaw
+        : savedStyle === "calm"
+          ? "glass"
+          : savedStyle === "quiet"
+            ? "paper"
+            : savedStyle === "vivid"
+              ? "color"
+              : null;
+    if (seededFrame !== null) setFrame(seededFrame);
+
+    const savedGlass = readValidated(GLASS_KEY, isThemeGlass);
+    if (savedGlass !== null) setGlass(savedGlass);
+    const savedBg = readValidated(BG_KEY, isThemeBg);
+    if (savedBg !== null) setBg(savedBg);
+    const savedDim = readValidated(DIM_KEY, isThemeDim);
+    if (savedDim !== null) setDim(savedDim);
+    // Theme with the one-time v1 paper/cloud → clear remap.
+    const savedTheme = readThemeMigrated();
+    if (savedTheme !== null) setTheme(savedTheme);
+
+    // ── Deprecated v1 compat axes (still loaded so a rollback finds them) ──
     if (savedStyle !== null) setStyle(savedStyle);
     const savedPalette = readValidated(PALETTE_KEY, isThemePalette);
     if (savedPalette !== null) setPalette(savedPalette);
-    const savedTheme = readValidated(THEME_KEY, isThemeSetting);
-    if (savedTheme !== null) setTheme(savedTheme);
 
-    // Cross-device sync (best-effort, OFF unless NEXT_PUBLIC_THEME_SYNC=1). After
-    // the synchronous localStorage reconciliation above, pull the teacher's
-    // remote prefs. loadRemotePrefs() returns a discriminated result and no-ops
-    // (kind "unavailable") in the default prototype path, so this whole branch is
-    // inert until the flag flips.
+    // Cross-device sync (best-effort, OFF unless NEXT_PUBLIC_THEME_SYNC=1).
+    // theme-sync still carries the v1 triple (theme/style/palette) — it is a
+    // SEPARATE later stage to widen it to the v2 axes, so we keep it intact and
+    // only reconcile the compat axes from it here.
     void loadRemotePrefs().then((remote) => {
-      // Settle BEFORE applying/seeding: the mirror effect refuses to schedule
-      // remote saves until the initial remote read has resolved, so a device with
-      // stale localStorage can never upsert over newer remote prefs during the
-      // load race.
       remoteSettledRef.current = true;
       if (!active) return;
 
       if (remote.kind === "loaded") {
-        // A row exists — adopt its values for axes the user hasn't touched since
-        // mount, so the look follows them across devices. The mirror effect
-        // persists every user change to localStorage synchronously, so a re-read
-        // that differs from the mount-time capture means the user changed that
-        // axis while this read was in flight — their fresh choice wins over the
-        // (older) remote value. Each applied setState re-runs the mirror effect,
-        // which (now that remoteSettledRef is true) pushes the reconciled triple
-        // back, keeping every device's row in agreement.
         const untouched = (key: string, atMount: string | null): boolean => {
           try {
             return window.localStorage.getItem(key) === atMount;
@@ -258,6 +457,13 @@ export function ThemeProvider({
             return true;
           }
         };
+        if (
+          remote.prefs.theme !== undefined &&
+          remote.prefs.theme !== savedTheme &&
+          untouched(THEME_KEY, window.localStorage.getItem(THEME_KEY))
+        ) {
+          setTheme(remote.prefs.theme);
+        }
         if (
           remote.prefs.style !== undefined &&
           remote.prefs.style !== savedStyle &&
@@ -272,34 +478,17 @@ export function ThemeProvider({
         ) {
           setPalette(remote.prefs.palette);
         }
-        if (
-          remote.prefs.theme !== undefined &&
-          remote.prefs.theme !== savedTheme &&
-          untouched(THEME_KEY, savedTheme)
-        ) {
-          setTheme(remote.prefs.theme);
-        }
         return;
       }
 
       if (remote.kind === "empty") {
-        // The query succeeded and the teacher has NO row yet. This is the common
-        // first-load state at rollout for an existing teacher whose look lives
-        // only in localStorage. Seed the row from the authoritative local values
-        // (re-read here so a change made during the in-flight read is captured)
-        // so their existing look reaches their other devices. The mirror effect
-        // alone would NOT do this: its setStates from localStorage land before
-        // remoteSettledRef flips, so its post-settle save never fires without a
-        // later change. Skip brand-new users with no stored prefs at all — there
-        // is nothing to preserve, and their first real change persists via the
-        // mirror effect (remoteSettledRef is true by now). Gated on `active`
-        // like the apply path above: under React StrictMode's dev mount/unmount/
-        // remount, the first (inactive) read is skipped and only the live mount
-        // seeds, so the row is never written twice.
+        // Seed the row from local values so an existing teacher's look reaches
+        // their other devices (see the long rationale in theme-sync.ts). Only
+        // the v1 triple is synced this stage.
+        const localTheme = readThemeMigrated();
         const localStyle = readValidated(STYLE_KEY, isThemeStyle);
         const localPalette = readValidated(PALETTE_KEY, isThemePalette);
-        const localTheme = readValidated(THEME_KEY, isThemeSetting);
-        if (localStyle !== null || localPalette !== null || localTheme !== null) {
+        if (localTheme !== null || localStyle !== null || localPalette !== null) {
           void saveRemotePrefs({
             theme: localTheme ?? DEFAULT_THEME,
             style: localStyle ?? DEFAULT_STYLE,
@@ -311,9 +500,6 @@ export function ThemeProvider({
     });
 
     // OS dark-mode preference + live subscription (drives "system").
-    // `unsubscribeScheme` is assigned ONLY after addEventListener succeeds, so
-    // cleanup can never call removeEventListener on a MediaQueryList that
-    // failed to subscribe (older WebKit lacks add/removeEventListener here).
     let unsubscribeScheme: (() => void) | null = null;
     const onSchemeChange = (e: MediaQueryListEvent): void =>
       setSystemDark(e.matches);
@@ -324,21 +510,33 @@ export function ThemeProvider({
       unsubscribeScheme = () =>
         mql.removeEventListener("change", onSchemeChange);
     } catch {
-      // matchMedia/addEventListener unavailable — "system" falls back to
-      // its paper default and never live-updates on this browser.
+      // matchMedia/addEventListener unavailable — "system" falls back to its
+      // clear default and never live-updates on this browser.
     }
 
     // Cross-tab sync: re-validate + apply changes from OTHER tabs.
     const onStorage = (e: StorageEvent): void => {
-      if (e.key === STYLE_KEY) {
+      if (e.key === FRAME_KEY) {
+        const v = readValidated(FRAME_KEY, isThemeFrame);
+        if (v !== null) setFrame(v);
+      } else if (e.key === GLASS_KEY) {
+        const v = readValidated(GLASS_KEY, isThemeGlass);
+        if (v !== null) setGlass(v);
+      } else if (e.key === BG_KEY) {
+        const v = readValidated(BG_KEY, isThemeBg);
+        if (v !== null) setBg(v);
+      } else if (e.key === DIM_KEY) {
+        const v = readValidated(DIM_KEY, isThemeDim);
+        if (v !== null) setDim(v);
+      } else if (e.key === THEME_KEY) {
+        const v = readThemeMigrated();
+        if (v !== null) setTheme(v);
+      } else if (e.key === STYLE_KEY) {
         const v = readValidated(STYLE_KEY, isThemeStyle);
         if (v !== null) setStyle(v);
       } else if (e.key === PALETTE_KEY) {
         const v = readValidated(PALETTE_KEY, isThemePalette);
         if (v !== null) setPalette(v);
-      } else if (e.key === THEME_KEY) {
-        const v = readValidated(THEME_KEY, isThemeSetting);
-        if (v !== null) setTheme(v);
       }
     };
     window.addEventListener("storage", onStorage);
@@ -355,41 +553,33 @@ export function ThemeProvider({
     [theme, systemDark],
   );
 
-  // Mirror effect — declared SECOND. Writes the three axes onto <html> and
-  // persists them. It SKIPS its first invocation: the boot script in
-  // lib/theme-init.tsx already painted the correct attributes pre-paint, and
-  // running on mount would overwrite them with the (default) initializer
-  // state for a frame — the exact FOUC the boot script exists to prevent.
-  //
-  // The guard skips only the FIRST run. When the load effect's setStates land
-  // (i.e. stored values actually differed from the defaults), this effect
-  // re-runs and that second invocation DOES write/persist. If no stored
-  // values existed (fresh user), state never changes, the effect never
-  // re-runs, and that is correct: the server-rendered defaults are already on
-  // <html> and there is nothing to persist yet.
+  // DERIVED tone — recomputed from the persisted axes whenever they change.
+  // Never persisted; never a setter.
+  const tone = useMemo<ThemeTone>(
+    () => deriveTone(resolvedTheme, bg, dim),
+    [resolvedTheme, bg, dim],
+  );
+
+  // Mirror effect — declared SECOND. Writes the axes onto <html> and persists
+  // them. It SKIPS its first invocation: the boot script already painted the
+  // correct attributes pre-paint; running on mount would overwrite them with
+  // the (default) initializer state for a frame — the FOUC the boot script
+  // prevents. When the load effect's setStates land, this re-runs and DOES
+  // write/persist. Fresh users never change state, so the effect never re-runs
+  // and the server-rendered defaults already on <html> are correct.
   const mounted = useRef(false);
   // The last RESOLVED theme actually painted to <html>. Seeded on the first run
-  // from the DOM (what the boot script painted), NOT from React's default state
-  // — otherwise the load effect's catch-up to the persisted value would look
-  // like a change and fire a spurious cross-fade on every page load.
+  // from the DOM (what the boot script painted), NOT from React default state,
+  // so the load effect's catch-up does not fire a spurious cross-fade on load.
   const prevResolvedRef = useRef<AppTheme | null>(null);
-  // Timers for the cross-fade attribute removal and the debounced remote save;
-  // held in refs so successive runs can cancel a pending one (clearTimeout-safe
-  // across rapid switches).
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // True once the initial loadRemotePrefs() has resolved (with OR without a
-  // row). Until then the mirror effect must NOT schedule remote saves — a
-  // device booting with stale localStorage would otherwise upsert those stale
-  // values over newer remote prefs while the read was still in flight.
   const remoteSettledRef = useRef(false);
   useEffect(() => {
     const root = document.documentElement;
 
     if (!mounted.current) {
       mounted.current = true;
-      // Baseline the cross-fade tracker from the live DOM (boot-script paint),
-      // so the first real change is measured against what is actually on screen.
       const painted = root.dataset.theme;
       prevResolvedRef.current = APP_THEMES.includes(painted as AppTheme)
         ? (painted as AppTheme)
@@ -398,12 +588,9 @@ export function ThemeProvider({
     }
 
     // Cross-fade trigger (CONTRACT with the theme cross-fade CSS): ONLY when the
-    // resolved app theme actually changes from the previously-painted value —
-    // not on style/palette-only changes, and not on this skipped first run. Set
-    // `data-theme-transition` BEFORE writing dataset.theme so the CSS under
-    // :root[data-theme-transition] cross-fades the swap, then remove it after the
-    // pulse window. clearTimeout makes rapid theme switches collapse to one
-    // attribute lifetime rather than a premature removal mid-fade.
+    // resolved theme actually changes from the previously-painted value — not on
+    // other axis changes, and not on the skipped first run. Reduced-motion
+    // suppression lives in the CSS under :root[data-theme-transition].
     if (resolvedTheme !== prevResolvedRef.current) {
       root.setAttribute("data-theme-transition", "");
       if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
@@ -413,22 +600,32 @@ export function ThemeProvider({
       }, THEME_TRANSITION_MS);
     }
 
-    root.dataset.style = style;
-    root.dataset.palette = palette;
+    // v2 DOM attributes. data-style is INTENTIONALLY dropped from the v2 path;
+    // data-palette is kept because the PaletteProvider bridge + some v1 surfaces
+    // still read it.
+    root.dataset.frame = frame;
+    root.dataset.glass = glass;
+    root.dataset.bg = bg;
     root.dataset.theme = resolvedTheme;
+    root.dataset.dim = dim;
+    root.dataset.tone = tone;
+    root.dataset.canvas = canvas;
+    root.dataset.palette = palette;
     prevResolvedRef.current = resolvedTheme;
-    // Persist the SETTING for theme (may be "system"); style/palette are
-    // already concrete. Reads validate against the same allowlists.
+
+    // Persist. Theme persists the SETTING (may be "system"). canvas/tone are NOT
+    // persisted (tone is derived; canvas is runtime presentation state).
+    writeKey(FRAME_KEY, frame);
+    writeKey(GLASS_KEY, glass);
+    writeKey(BG_KEY, bg);
+    writeKey(THEME_KEY, theme);
+    writeKey(DIM_KEY, dim);
+    // Deprecated compat persistence (so a v1 rollback finds the values).
     writeKey(STYLE_KEY, style);
     writeKey(PALETTE_KEY, palette);
-    writeKey(THEME_KEY, theme);
 
     // Best-effort cross-device push (no-op unless NEXT_PUBLIC_THEME_SYNC=1).
-    // Debounced so rapid toggling collapses to one write; localStorage above is
-    // the immediate source of truth, so a failed/slow remote save never delays
-    // or affects the local paint. saveRemotePrefs swallows its own errors.
-    // Gated on the initial remote read having settled (remoteSettledRef) so a
-    // boot race can never push stale local values over newer remote ones.
+    // Still the v1 triple this stage (widening theme-sync is a later stage).
     if (remoteSettledRef.current) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
@@ -436,10 +633,9 @@ export function ThemeProvider({
         saveTimerRef.current = null;
       }, REMOTE_SAVE_DEBOUNCE_MS);
     }
-  }, [style, palette, resolvedTheme, theme]);
+  }, [frame, glass, bg, resolvedTheme, dim, tone, canvas, theme, style, palette]);
 
-  // Clear any pending pulse/save timers on unmount so they cannot fire against a
-  // torn-down tree.
+  // Clear any pending pulse/save timers on unmount.
   useEffect(() => {
     return () => {
       if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
@@ -449,15 +645,27 @@ export function ThemeProvider({
 
   const value = useMemo<ThemeContextValue>(
     () => ({
-      style,
-      palette,
+      frame,
+      glass,
+      bg,
       theme,
       resolvedTheme,
+      dim,
+      tone,
+      canvas,
+      setFrame,
+      setGlass,
+      setBg,
+      setTheme,
+      setDim,
+      setCanvas,
+      // deprecated compat
+      style,
+      palette,
       setStyle,
       setPalette,
-      setTheme,
     }),
-    [style, palette, theme, resolvedTheme],
+    [frame, glass, bg, theme, resolvedTheme, dim, tone, canvas, style, palette],
   );
 
   return (

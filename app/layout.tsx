@@ -11,9 +11,12 @@ import {
 import "./globals.css";
 import {
   ThemeProvider,
-  DEFAULT_STYLE,
-  DEFAULT_PALETTE,
+  DEFAULT_FRAME,
+  DEFAULT_GLASS,
+  DEFAULT_BG,
   DEFAULT_THEME,
+  DEFAULT_DIM,
+  DEFAULT_PALETTE,
 } from "@/lib/theme";
 import { ThemeInit } from "@/lib/theme-init";
 import { LabelsProvider } from "@/lib/labels";
@@ -76,14 +79,20 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // data-style / data-palette / data-theme are rendered on the server with
-  // the app defaults so token CSS is correct before hydration. The boot
-  // script (ThemeInit, first child of <body>) then overwrites them pre-paint
-  // with the teacher's PERSISTED choices to avoid a flash; ThemeProvider owns
-  // subsequent changes. data-theme is always a RESOLVED value (never the
-  // "system" sentinel) — DEFAULT_THEME is "paper" (concrete), so the literal
-  // below stays correct; the boot script resolves a stored "system" to
-  // night/paper before it ever paints.
+  // The v2 appearance axes (data-frame / data-glass / data-bg / data-theme /
+  // data-dim) plus the DERIVED data-tone are rendered on the server with the app
+  // defaults so token CSS is correct before hydration (LOCKSTEP surface #4 — the
+  // literals below mirror the DEFAULT_* exports + theme.tsx guards). The boot
+  // script (ThemeInit, first child of <body>) then overwrites them pre-paint with
+  // the teacher's PERSISTED choices to avoid a flash; ThemeProvider owns
+  // subsequent changes. data-theme is always a RESOLVED value (never the "system"
+  // sentinel) — DEFAULT_THEME is "clear" (concrete), so the attribute below stays
+  // correct; the boot script resolves a stored "system" to night/clear before it
+  // ever paints. data-tone is DERIVED: its server value matches the boot script's
+  // safe non-flashing default ("light") so server HTML == first client paint; the
+  // provider reconciles the true derived tone post-mount. data-palette is the
+  // deprecated v1 compat axis, kept for the PaletteProvider bridge + v1 surfaces;
+  // data-style is intentionally NOT emitted on the v2 DOM path.
   return (
     <html
       lang="en"
@@ -95,9 +104,13 @@ export default function RootLayout({
       // hydration, producing a benign attribute diff on <html>/<body>. This is
       // the standard Next.js theme-provider mitigation.
       suppressHydrationWarning
-      data-style={DEFAULT_STYLE}
+      data-frame={DEFAULT_FRAME}
+      data-glass={DEFAULT_GLASS}
+      data-bg={DEFAULT_BG}
+      data-theme="clear"
+      data-dim={DEFAULT_DIM}
+      data-tone="light"
       data-palette={DEFAULT_PALETTE}
-      data-theme="paper"
       className={`${GeistSans.variable} ${GeistMono.variable} ${poppins.variable} ${dmSans.variable} ${jakarta.variable} ${quicksand.variable} ${caveat.variable} h-full antialiased`}
     >
       <body
@@ -105,9 +118,10 @@ export default function RootLayout({
         className="cp-root flex min-h-full flex-col"
       >
         {/* ThemeInit must be the FIRST child of <body>: its inline script
-            paints the persisted theme/style/palette attributes onto <html>
-            before the browser's first paint, so a Night (or any non-default)
-            theme does not flash the Paper default. See lib/theme-init.tsx. */}
+            paints the persisted v2 axes (frame/glass/bg/theme/dim + a safe
+            derived tone) onto <html> before the browser's first paint, so a
+            Night/Paper/Wash (or any non-default) choice does not flash the
+            Glass · Photo · Clear default. See lib/theme-init.tsx. */}
         <ThemeInit />
         <ThemeProvider initialTheme={DEFAULT_THEME}>
           {/* LabelsProvider hosts the renameable Subject/Unit/Lesson/Section
