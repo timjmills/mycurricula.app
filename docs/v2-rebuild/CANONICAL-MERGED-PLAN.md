@@ -92,9 +92,22 @@ space isn't migrated twice.
 - **D5** Scope = preserve the data/logic core; **rebuild the view/chrome/appearance layer (render
   restructure, not pure CSS)**; build the net-new surfaces.
 
-**Still the user's to decide (from Plan B's register):** theme fold `paper`+`cloud`→`clear`; final slot-map
-confirmation; `/archive`, `/onboarding`, `/month`, `/welcome` build-vs-defer; per-wave flag-on-prod vs one
-reveal; runtime kill-switch (cookie/edge-config) vs accept redeploy-gated rollback.
+**Decisions CONFIRMED (user, this session) — all blocking decisions resolved:**
+- **Base = clean `master`** — forward-port only the WIP's non-appearance fixes (`error.tsx`/`not-found.tsx`,
+  the `.btn`/`cp-root` rule); discard the Wave-1 appearance work the v2 engine replaces.
+- **Theme fold `paper`+`cloud`→`clear`** — migrate `cloud`-persisted users to `clear`; build the v2 7-theme
+  set, no 8th theme.
+- **Adopt the v2 subject map** — Writing→5 / Spelling→9 / UFLI→2 / SEL→12 re-color team-wide (no data
+  migration; color is a derived slug).
+- **Rollout = per-wave flag-on-prod, redeploy-gated rollback** — reveal each wave behind `NEXT_PUBLIC_V2`;
+  rollback = redeploy (no runtime kill-switch / per-user dark-launch in scope; revisit only if instant
+  rollback becomes a hard requirement).
+
+**Remaining minor items (defaulted — flag to change):** `data-style`→frame seeding
+(`calm`→glass / `quiet`→paper / `vivid`→color) and dropping `data-palette` proceed as planned (mechanical,
+covered by the Wave-2 migration shim); orphan routes default to **defer** the optional ones (`/month`,
+`/welcome`, `/archive` → small post-cutover waves or v1-under-flag) and keep `/onboarding` on **v1 under the
+flag** until a dedicated wave. None block Wave 2.
 
 ---
 
