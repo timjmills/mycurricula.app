@@ -9,6 +9,16 @@
 // runs a WCAG contrast audit on the Night token pairs using browser-resolved
 // colors (covers color-mix()).
 //
+// W2-4 LIVE additions: the engine now renders a `.stage` host wired to the
+// default handoff photo (/stage/p1.webp via data-stage-photo + --stage-photo),
+// so the probe also (a) asserts the .stage host + a real url(...) --stage-photo
+// on the photo default, (b) drives the data-tone DERIVATION matrix (§4) by
+// seeding the persisted axis keys + reloading — night→dark, wash→light,
+// photo+dim→dark, photo+bright→light, photo+normal→AUTO (polled to a concrete,
+// STABLE light|dark — the live luminance proof), and (c) screenshots the
+// frame×glass×bg corners as live-QA artifacts. New assertions are additive and
+// the probe exits nonzero on any real failure.
+//
 // THE FROZEN v2 MATRIX (must stay byte-identical to lib/theme.tsx guard arrays,
 // lib/theme-init.tsx literals, the SQL CHECK, and app/layout.tsx SSR attrs):
 //   frame ∈ glass | paper | color    (default glass)
@@ -116,8 +126,14 @@ for (const t of THEMES) {
       await page.waitForTimeout(2500); // hydration + mirror effect window
       after = await page.evaluate(() => document.documentElement.dataset.theme);
       // Snapshot the full v2 axis set after hydration (the mirror effect has run).
+      // Additive (W2-4 LIVE): also capture whether the .stage host is mounted and
+      // whether --stage-photo resolves to a real url(...) — the default photo is
+      // wired via app/layout.tsx (data-stage-photo + the --stage-photo CSS var).
       axes = await page.evaluate(() => {
         const ds = document.documentElement.dataset;
+        const photoVar = getComputedStyle(document.documentElement)
+          .getPropertyValue("--stage-photo")
+          .trim();
         return {
           frame: ds.frame,
           glass: ds.glass,
@@ -126,6 +142,9 @@ for (const t of THEMES) {
           tone: ds.tone,
           // data-style must NOT be emitted on the v2 DOM path.
           style: ds.style ?? null,
+          // W2-4 live wiring (additive — see stageOk below).
+          stageHost: !!document.querySelector(".stage"),
+          stagePhoto: photoVar,
         };
       });
       await page.screenshot({
@@ -140,6 +159,15 @@ for (const t of THEMES) {
     // default Photo+normal resolve to dark; Night also resolves to dark — so the
     // expected tone here is "dark" for every seeded theme at the defaults.
     const expectTone = "dark";
+    // W2-4 LIVE wiring: the .stage host must mount and, at the photo default
+    // (every seeded theme here keeps bg=photo), --stage-photo must resolve to a
+    // real url(...) — not `none`/empty. Additive: strengthens, never weakens.
+    const stageOk =
+      !!axes &&
+      axes.stageHost === true &&
+      typeof axes.stagePhoto === "string" &&
+      /^url\(/i.test(axes.stagePhoto) &&
+      !/^url\(\s*["']?none["']?\s*\)/i.test(axes.stagePhoto);
     const axesOk =
       !!axes &&
       axes.frame === DEFAULTS.frame &&
@@ -148,7 +176,8 @@ for (const t of THEMES) {
       axes.dim === DEFAULTS.dim &&
       TONE_VALUES.includes(axes.tone) &&
       axes.tone === expectTone &&
-      axes.style === null; // data-style dropped from the v2 DOM path
+      axes.style === null && // data-style dropped from the v2 DOM path
+      stageOk;
     results.push({
       theme: t.id,
       route: r.slug,
@@ -304,6 +333,159 @@ for (const t of THEMES) {
   await ctx.close();
 }
 
+// ── data-tone DERIVATION matrix (WAVE-2-VALUE-MATRIX.md §4) ─────────────────
+// Now that the engine is LIVE, drive the axes by SEEDING the persisted
+// localStorage keys (the same boot+load+derive path the app uses) and reload,
+// then assert the resulting DERIVED data-tone. We seed (never write
+// document.documentElement.dataset.* directly) because tone is React-derived:
+// a raw dataset write would set the attribute but NOT re-run deriveTone, and
+// the next state change would clobber it. Seeding + reload exercises the real
+// derivation (incl. the post-mount luminance sample for photo+normal).
+//
+// The localStorage axis keys mirror lib/theme.tsx (FRAME/GLASS/BG/DIM/THEME_KEY).
+const KEY = {
+  theme: "mycurricula:user:theme",
+  frame: "mycurricula:user:theme-frame",
+  glass: "mycurricula:user:theme-glass",
+  bg: "mycurricula:user:theme-bg",
+  dim: "mycurricula:user:theme-dim",
+};
+
+// Matrix §4 rules (first match wins): night→dark; wash→light; photo+dim→dark;
+// photo+bright→light; photo+normal→AUTO (a real photo MUST resolve to a
+// concrete light|dark via luminance — the W2-4 live proof). `auto:true` marks
+// the case that polls for the post-mount luminance result.
+const TONE_CASES = [
+  { id: "night", seed: { theme: "night", bg: "photo", dim: "normal" }, expectTone: "dark" },
+  { id: "wash", seed: { theme: "clear", bg: "wash", dim: "normal" }, expectTone: "light" },
+  { id: "photo-dim", seed: { theme: "clear", bg: "photo", dim: "dim" }, expectTone: "dark" },
+  { id: "photo-bright", seed: { theme: "clear", bg: "photo", dim: "bright" }, expectTone: "light" },
+  // photo+normal: AUTO. expectTone is whatever the real /stage/p1.webp luminance
+  // yields — assert only that it is a CONCRETE, STABLE light|dark (not absent).
+  { id: "photo-normal-auto", seed: { theme: "clear", bg: "photo", dim: "normal" }, auto: true },
+];
+
+const toneResults = [];
+for (const c of TONE_CASES) {
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+  });
+  await ctx.addCookies(cookies);
+  await ctx.addInitScript(
+    ({ keys, seed }) => {
+      try {
+        if (seed.theme) localStorage.setItem(keys.theme, seed.theme);
+        if (seed.bg) localStorage.setItem(keys.bg, seed.bg);
+        if (seed.dim) localStorage.setItem(keys.dim, seed.dim);
+      } catch {}
+    },
+    { keys: KEY, seed: c.seed },
+  );
+  const page = await ctx.newPage();
+  let tone = null;
+  let stable = null;
+  let err = null;
+  try {
+    await page.goto(`${BASE}/weekly`, {
+      waitUntil: "domcontentloaded",
+      timeout: 90000,
+    });
+    if (c.auto) {
+      // Poll for the post-mount luminance sample to resolve, then confirm it is
+      // STABLE across a follow-up read (the AUTO path executed, not a transient).
+      let last = null;
+      for (let i = 0; i < 30; i++) {
+        last = await page.evaluate(() => document.documentElement.dataset.tone);
+        if (TONE_VALUES.includes(last)) break;
+        await page.waitForTimeout(200);
+      }
+      await page.waitForTimeout(400);
+      const again = await page.evaluate(
+        () => document.documentElement.dataset.tone,
+      );
+      tone = again;
+      stable = last === again && TONE_VALUES.includes(again);
+    } else {
+      await page.waitForTimeout(2500); // hydration + derive window
+      tone = await page.evaluate(() => document.documentElement.dataset.tone);
+      stable = true;
+    }
+    await page.screenshot({
+      path: path.join(OUT_DIR, `tone__${c.id}.png`),
+    });
+  } catch (e) {
+    err = e.message.slice(0, 200);
+  }
+  // AUTO case passes on any concrete + stable tone; fixed cases must match.
+  const ok = c.auto
+    ? !err && TONE_VALUES.includes(tone) && stable === true
+    : !err && tone === c.expectTone;
+  toneResults.push({ id: c.id, expect: c.auto ? "light|dark(auto)" : c.expectTone, tone, stable, ok, err });
+  await page.close();
+  await ctx.close();
+}
+
+// ── Frame × Glass × Background corners (live-QA artifacts) ──────────────────
+// Screenshot the matrix corners so the §4b live-QA has artifacts. Seed each
+// corner's axes via localStorage + reload. These are SCREENSHOT artifacts +
+// a light axis-applied sanity check (frame/glass/bg painted as seeded); they do
+// not re-assert tone (covered above). Missing surfaces log a skip, not a crash.
+const CORNER_CASES = [
+  { id: "glass-dark-photo", frame: "glass", glass: "dark", bg: "photo", theme: "clear" },
+  { id: "glass-light-photo", frame: "glass", glass: "light", bg: "photo", theme: "clear" },
+  { id: "paper-photo", frame: "paper", glass: "dark", bg: "photo", theme: "honey" },
+  { id: "paper-wash", frame: "paper", glass: "dark", bg: "wash", theme: "night" },
+  { id: "color-photo", frame: "color", glass: "dark", bg: "photo", theme: "blossom" },
+  { id: "color-wash", frame: "color", glass: "light", bg: "wash", theme: "mint" },
+];
+const cornerResults = [];
+for (const c of CORNER_CASES) {
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+  });
+  await ctx.addCookies(cookies);
+  await ctx.addInitScript(
+    ({ keys, seed }) => {
+      try {
+        localStorage.setItem(keys.theme, seed.theme);
+        localStorage.setItem(keys.frame, seed.frame);
+        localStorage.setItem(keys.glass, seed.glass);
+        localStorage.setItem(keys.bg, seed.bg);
+      } catch {}
+    },
+    { keys: KEY, seed: c },
+  );
+  const page = await ctx.newPage();
+  let applied = null;
+  let err = null;
+  try {
+    await page.goto(`${BASE}/settings/appearance`, {
+      waitUntil: "domcontentloaded",
+      timeout: 90000,
+    });
+    await page.waitForTimeout(2500);
+    applied = await page.evaluate(() => {
+      const ds = document.documentElement.dataset;
+      return { frame: ds.frame, glass: ds.glass, bg: ds.bg, theme: ds.theme, tone: ds.tone };
+    });
+    await page.screenshot({
+      path: path.join(OUT_DIR, `corner__${c.id}.png`),
+    });
+  } catch (e) {
+    err = e.message.slice(0, 200);
+  }
+  const ok =
+    !err &&
+    !!applied &&
+    applied.frame === c.frame &&
+    applied.glass === c.glass &&
+    applied.bg === c.bg &&
+    TONE_VALUES.includes(applied.tone);
+  cornerResults.push({ id: c.id, applied, ok, err });
+  await page.close();
+  await ctx.close();
+}
+
 // ── Chrome-accent audit across the light themes ────────────────────────────
 // Night's chrome pairs ride the main audit above; the light themes each
 // define their own --chrome-accent solids, so every one needs the AA check.
@@ -416,5 +598,31 @@ for (const c of chromeAudit) {
   );
 }
 
+console.log("\ndata-tone derivation matrix (WAVE-2-VALUE-MATRIX.md §4):");
+for (const t of toneResults) {
+  console.log(
+    `${t.ok ? "  ok  " : "  FAIL"} ${t.id.padEnd(20)} expect=${String(t.expect).padEnd(16)} got=${String(t.tone).padEnd(6)} stable=${t.stable}${t.err ? `  ${t.err}` : ""}`,
+  );
+}
+console.log("\nframe × glass × bg corners (artifacts + axis-applied check):");
+for (const c of cornerResults) {
+  const a = c.applied
+    ? `${c.applied.frame}/${c.applied.glass}/${c.applied.bg}/${c.applied.theme}/${c.applied.tone}`
+    : "—";
+  console.log(
+    `${c.ok ? "  ok  " : "  FAIL"} ${c.id.padEnd(20)} applied=${a.padEnd(36)}${c.err ? `  ${c.err}` : ""}`,
+  );
+}
+
+const routeFails = results.filter((r) => !r.ok).length;
+const toneFails = toneResults.filter((t) => !t.ok).length;
+const cornerFails = cornerResults.filter((c) => !c.ok).length;
 console.log(`\ncontrast failures: ${fails}`);
-console.log(`route checks failed: ${results.filter((r) => !r.ok).length}`);
+console.log(`route checks failed: ${routeFails}`);
+console.log(`tone-derivation checks failed: ${toneFails}`);
+console.log(`corner checks failed: ${cornerFails}`);
+
+// Exit nonzero on any real failure (contrast / route / tone / corner) so CI +
+// the live-QA pass treat a regression as a hard failure.
+const totalFails = fails + routeFails + toneFails + cornerFails;
+if (totalFails > 0) process.exitCode = 1;

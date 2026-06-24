@@ -33,6 +33,7 @@ import {
   countDismissed,
   useTooltipDismissal,
 } from "@/lib/tooltip-dismissal";
+import { AppearanceControls } from "@/components/appearance/appearance-controls";
 import { ThemePicker } from "@/components/appearance/theme-picker";
 import { StylePicker } from "@/components/appearance/style-picker";
 import { PaletteToggle } from "@/components/appearance/palette-toggle";
@@ -73,6 +74,21 @@ export default function AppearancePage(): ReactNode {
           title="Appearance"
           subtitle="Personalise how your planner looks. Changes are yours alone."
         />
+
+        {/* ── Appearance (v2 engine) ────────────────────────────────────
+            The primary v2 control surface — drives every appearance axis
+            (Frame, Frosted glass, Background, Photo brightness, Theme)
+            through the app-wide ThemeProvider, so changes re-theme the
+            whole app, not just this page. Mounted first so it reads as the
+            top-level look choice; the v1 Theme / Style / Palette pickers
+            below remain in place for this wave (their reconciliation is a
+            later UX stage). AppearanceControls renders its own stack of
+            SettingsCards (one per axis), so it slots straight into the
+            page's section-card flow under this introductory heading.
+            Presentation-only: AppearanceControls + the theme.tsx setters
+            own all persistence; nothing is wired here. */}
+        <AppearanceSectionHeading />
+        <AppearanceControls />
 
         {/* App color theme — the canvas/ink/accent surface behind every
             view. Full-width and first so it reads as the top-level look
@@ -115,6 +131,60 @@ export default function AppearancePage(): ReactNode {
             `required: true` at their callsites and ignore both controls. */}
         <OnboardingTooltipsCard />
       </div>
+    </div>
+  );
+}
+
+// ── Appearance section heading ─────────────────────────────────────────
+// A lightweight, card-less introductory heading for the v2 AppearanceControls
+// stack. AppearanceControls renders its own per-axis SettingsCards, so this
+// section is introduced by a heading row (eyebrow → title → hint) rather than
+// wrapped in another card — that would nest a card inside a card. The eyebrow/
+// title/hint shape + tokens mirror SettingsCard's header so it reads native.
+// The title carries a panel-level onboarding tooltip (CLAUDE.md §4 — every
+// named panel explains its function).
+
+function AppearanceSectionHeading(): ReactNode {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span
+        style={{
+          fontSize: "var(--t-11)",
+          fontWeight: 700,
+          color: "var(--ink-500)",
+          textTransform: "uppercase",
+          letterSpacing: 0.6,
+        }}
+      >
+        Appearance
+      </span>
+      <Tooltip
+        content="Set the app's overall look — frame and material, the frosted-glass register, what sits behind the glass, how bright the photo reads, and the color theme. Every choice re-themes the whole app for you alone."
+        side="bottom"
+      >
+        <h2
+          style={{
+            fontSize: "var(--t-18)",
+            fontWeight: 700,
+            color: "var(--ink-900)",
+            margin: 0,
+            width: "fit-content",
+          }}
+        >
+          Frame, background, theme &amp; brightness
+        </h2>
+      </Tooltip>
+      <p
+        style={{
+          fontSize: "var(--t-13)",
+          color: "var(--ink-500)",
+          lineHeight: 1.45,
+          margin: 0,
+        }}
+      >
+        The primary look controls. Changes apply across the whole app and are
+        yours alone.
+      </p>
     </div>
   );
 }

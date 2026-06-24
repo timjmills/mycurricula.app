@@ -54,7 +54,8 @@ REVIEW 1 — Codex (sandbox NEVER weakened; pipe the diff per the §4a Windows n
   file/line, severity, concrete failure scenario, fix. VERIFY against the handoff + the frozen value matrix.
   Focus: (1) ADDITIVE/back-compat — NO v1-only token tier deleted from app/tokens.css (--chrome-accent-*,
   --rail-bg/--panel-bg, --logo-*, --wf-*/--teach-*, --tag-*, --hl-*, scrims, z-scale); style/palette/
-  setStyle/setPalette still on useTheme() so flag-OFF v1 + command-palette compile. (2) ALLOWLIST LOCKSTEP —
+  setStyle/setPalette still on useTheme() so a git-level v1 rollback + the command-palette still compile —
+  STRUCTURAL compat only; there is NO NEXT_PUBLIC_V2 runtime flag (clean cutover). (2) ALLOWLIST LOCKSTEP —
   the value matrix is IDENTICAL across lib/theme.tsx guards, lib/theme-init.tsx boot arrays, the
   teacher_preferences SQL CHECK, app/layout.tsx SSR attrs, scripts/probe-theme-wave.mjs; list any mismatch.
   (3) MIGRATION safety — the localStorage + teacher_preferences migration maps paper/cloud→clear and seeds
@@ -62,8 +63,9 @@ REVIEW 1 — Codex (sandbox NEVER weakened; pipe the diff per the §4a Windows n
   reversible/forward-safe; RLS unchanged. (4) SSR no-FOUC — theme-init stays a frozen sync script, SSR
   initializers return defaults (server HTML == first client paint), data-tone is DERIVED, tainted-canvas
   (CORS R2) falls back to persisted/default tone (never force-dark→AA fail). (5) Subject map — v2 map applied
-  on the v2 read path only (pure resolveSubjectColor, no context read); dual-emit bridge keeps flag-OFF
-  .cp-subj intact; NO lesson-row migration; seed/aliases slug-compatible. (6) Tone derivation — Normal SAMPLES
+  on the v2 read path only (pure resolveSubjectColor, no context read), and NOT yet applied to live cards;
+  the dual-emit bridge keeps the existing .cp-subj surfaces intact; NO lesson-row migration; seed/aliases
+  slug-compatible. (6) Tone derivation — Normal SAMPLES
   luminance (not forced dark). (7) Night decomposed onto data-tone (subject/tag/hl recipes re-keyed). (8)
   Confirm tsc --noEmit + lint + build pass. Report only problems. If nothing is Medium+, output exactly:
   NO BLOCKING ISSUES."  → capture to CODEX-WAVE2-REVIEW.md
@@ -76,34 +78,50 @@ REVIEW 2 — independent Claude (the §4a substitute, required on cloud where Co
 ## PART B — §4b Live QA Audit Gate (REAL browser; phone 375–414 · tablet 768–834 · desktop 1280–1440)
 
 ```text
-Wave 2 has NO new v2 SCREEN yet (it's the engine), so the live-QA = a regression proof + an engine smoke,
-each run at ALL THREE device widths. Use the playwright/chrome-devtools MCP (or a local
-chromium.launch script). Sign in via the claude-login bypass. Dev server on a port ≥3010; never run
-`npm run build` while `next dev` is up.
+Wave 2 is a CLEAN CUTOVER: there is NO NEXT_PUBLIC_V2 runtime flag. The single running app emits the v2
+axes unconditionally — v2 is the only path. v1 compatibility is STRUCTURAL only: the preserved v1 token
+tiers + the deprecated style/palette/setStyle/setPalette API stay on useTheme() so a git-level rollback
+still compiles, but there is no runtime "v1 mode" to switch into. Wave 2 has NO new v2 SCREEN yet (it's
+the engine), so the live-QA = a v1-compat regression proof + a v2 engine smoke, each run at ALL THREE
+device widths. Use the playwright/chrome-devtools MCP (or a local chromium.launch script). Sign in via the
+claude-login bypass. Dev server on a port ≥3010; never run `npm run build` while `next dev` is up.
 
-B1 — FLAG-OFF regression (NEXT_PUBLIC_V2 unset) — the "v1 stays green" proof:
+B1 — v1-COMPAT regression — the "existing v1-built surfaces stay green under the cutover" proof:
   For /weekly, /daily, /year, /settings/appearance — at phone (≈390px), tablet (≈768px), desktop (≈1280px):
-  • screenshot each; confirm it renders UNCHANGED vs current prod v1 (no layout shift, no broken chrome).
-  • switch all 6 v1 themes (paper/cloud/night/mint/sky/blossom) via Settings → Appearance; confirm chrome
-    re-hues, no dark-on-dark / light-on-light, WCAG-AA text contrast (esp. Night), and SUBJECT COLORS are
-    UNCHANGED (the no-recolor proof — the v2 remap must not touch flag-OFF v1).
+  • screenshot each; confirm the existing v1-built surfaces render UNCHANGED (no layout shift, no broken
+    chrome) — the preserved v1 token tiers (--chrome-accent-*, --rail-bg/--panel-bg, --logo-*, --wf-*/
+    --teach-*, --tag-*, --hl-*, scrims, z-scale) still resolve: NO missing tokens, NO dark-on-dark /
+    light-on-light, WCAG-AA text contrast (esp. Night).
+  • switch all themes via Settings → Appearance; confirm chrome re-hues correctly and SUBJECT COLORS are
+    UNCHANGED on the existing surfaces (the no-recolor proof — the v2 subject map is DEFINED but NOT yet
+    applied to live cards, so confirm no recolor leaked onto a card/stripe/chip).
+  • the deprecated style/palette API (style/palette/setStyle/setPalette on useTheme(), the .cp-subj bridge)
+    still drives the v1 surfaces without throwing — structural compat intact.
   • browser console: zero new errors/warnings during theme switches + navigation.
 
-B2 — FLAG-ON engine smoke (NEXT_PUBLIC_V2=1) — the v2 axes paint without breaking:
-  • root <html> carries the v2 attrs (data-frame/glass/bg/theme/dim/derived data-tone); hard-reload in Clear
-    and in Night shows NO FOUC (no flash of wrong theme/tone before hydration).
-  • drive AppearanceControls: Frame (glass/paper/color), Glass register, Background (photo/wash), Theme (all 7
-    incl. Clear + off/Photo), Dim (dim/normal/bright) — confirm the stage/wash/frame material repaints and
-    tone derives (a bright photo → light tone/dark text; dark photo → dark tone/white text; Normal = auto).
-  • run the 7-theme × 3-frame × photo/wash × tone matrix on whatever surface renders; screenshot the corners
-    of the matrix (Clear/glass/photo-bright, Night/paper/wash, a color/honey case) at all three widths.
+B2 — v2 ENGINE smoke — the v2 axes paint and the engine is LIVE:
+  • root <html> carries the v2 attrs (data-frame/glass/bg/theme/dim/derived data-tone) on EVERY load (no
+    flag to set); hard-reload in Clear and in Night shows NO FOUC (no flash of wrong theme/tone before
+    hydration). data-style is NOT emitted on the v2 DOM path.
+  • the now-mounted `.stage` host renders and the default handoff photo paints: <html> carries
+    data-stage-photo=/stage/p1.webp and --stage-photo resolves to a real url(...) (not none) on the first
+    SSR frame — the photo is wired (W2-4 LIVE).
+  • drive AppearanceControls (now mounted on /settings/appearance): Frame (glass/paper/color), Glass
+    register, Background (photo/wash), Theme (all 7 incl. Clear + off/Photo), Dim (dim/normal/bright) —
+    confirm the stage/wash/frame material repaints and tone DERIVES per matrix §4: night → dark tone/white
+    text; wash → light tone/dark ink; photo+dim → dark tone/white text; photo+bright → light tone/dark text;
+    a bright photo → light tone, a dark photo → dark tone.
+  • photo + Normal is AUTO and now LIVE: the default photo (/stage/p1.webp) actually drives the AUTO tone
+    via post-mount luminance sampling — confirm photo+normal resolves to a CONCRETE light|dark (NOT absent,
+    NOT stuck at the dark fallback by accident); this is the W2-4 live proof (no longer dormant).
+  • run the 7-theme × 3-frame × photo/wash × tone matrix; screenshot the corners (Clear/glass/photo-bright,
+    Night/paper/wash, a color/honey case) at all three widths.
 
-B3 — Responsive contract at all three widths (both flag states): NO document-level horizontal scroll, every
-  control reachable, touch targets ≥44px on phone/tablet, no visible scrollbars, sticky chrome ≤~30% of
-  phone height.
+B3 — Responsive contract at all three widths: NO document-level horizontal scroll, every control reachable,
+  touch targets ≥44px on phone/tablet, no visible scrollbars, sticky chrome ≤~30% of phone height.
 
 Write findings to QA-REPORT.md: severity (critical/major/minor), description, repro, the device width +
-theme/frame/flag state, screenshot filename, suspected file/line, suggested fix. Report-only (don't fix).
+theme/frame/glass/bg/dim/tone axis state, screenshot filename, suspected file/line, suggested fix. Report-only (don't fix).
 Use video capture (Method A) if you see flicker/FOUC you can't pin from stills.
 ```
 
