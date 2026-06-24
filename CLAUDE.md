@@ -35,7 +35,7 @@ Supabase backend is the Phase 1B wave. The honest map:
 | Year (`/year`) — Roadmap + Progression + Print (the v2 "Curricular plan") | Shipped Phase 1A |
 | Lesson Plan — the unit/lesson planner (manila tabs, lesson flow) | Shipped Phase 1A |
 | Teach — the projection board (fullscreen, slides, annotation) | Shipped Phase 1A |
-| Planner Hub (`/planner`) — the v2 planning home / hub surface | v2 surface |
+| Planner Hub (`/planner`) — the v2 planning hub surface (a surface, not the default landing route; the default landing route is `/weekly`, not `/planner`) | v2 surface |
 | Resource Wall (`/post`) — the v2 resource board (per-card colors, per-section photos) | v2 surface |
 | Catch-Up (`/catch-up`) — lessons-not-covered triage | Shipped Phase 1A |
 | `/schedule` (timetable) | Shipped as deep-link + side-panel via GlobalRail (Phase 1A complete; rotation cycles deferred to Phase 1B) |
@@ -179,8 +179,9 @@ The visual system is a set of independent axes, all set as `<html>` / app-root d
 attributes by `lib/theme.tsx`. **This replaces the v1 3-axis model**
 (`data-style ∈ quiet|calm|vivid`, `data-palette ∈ normal|highlight`,
 `data-theme ∈ paper|cloud|night|mint|sky|blossom`). `data-style` and `data-palette`
-are **dropped**; `paper` + `cloud` **fold to `clear`**; `night` is now the dark **tone**,
-not a peer theme.
+are **dropped**; `paper` + `cloud` **fold to `clear`**; Night is a `data-theme` value (the only dark
+theme) that forces derived `data-tone="dark"`; dark rendering branches on `data-tone`,
+never the theme.
 
 - `data-frame` ∈ `glass | paper | color` — layout character + material + emphasis.
   Defaults to **`glass`** (Frame A · Calm Glass). The working build also carries the
@@ -288,7 +289,7 @@ all:
 - Subject colors come through the `.cp-subj.<subject>` classes (driven by the palette
   bridge in `lib/palette.tsx`) or the `useSubjectColor(subjectId)` hook. Never invent a
   subject color; pull from the `--subj-*` scale or the hook.
-- **Buttons:** use the `components/ui/Button` primitive only — never hand-roll a pill CTA, never give a button a colored-glow resting shadow, and qualify variant/size CSS with `.btn` so the `.cp-root` reset can't strip it. See BUILD_STANDARD.md §7a (Buttons & pills).
+- **Buttons:** use the `components/ui/Button` primitive only — never hand-roll a pill CTA, never give a button a colored-glow resting shadow, and qualify variant/size CSS with `.btn` so the `.cp-root` reset can't strip it. See BUILD_STANDARD.md §8 (Buttons & pills).
 - The subjects (`math, reading, writing, grammar, spelling, ufli, explorers, sel`)
   and their swatch mapping (the §4 subject map above) are **locked team-wide**. Frame,
   glass register, background, theme, and brightness are per-teacher preference; the
@@ -772,9 +773,9 @@ handoff bundle.
 - `docs/claude-bypass.sql` — DDL for `public.claude_access_log` (the bypass audit
   table). Run once in the Supabase SQL editor.
 
-**Phasing reminder:** Phase 1A shipped — Weekly/Daily/Subject/Year/Schedule/Catch-up
-views, Master/Personal toggle, Simple/Task/Advanced view modes, standards tagging,
-daily notes, basic print/export, Vivid theme as default, unified Settings hub, and
+**Phasing reminder:** Phase 1A shipped — Weekly/Daily/Year/Schedule/Catch-up
+views, Personal | Team Curriculum toggle, Simple/Task/Advanced view modes, standards tagging,
+daily notes, basic print/export, unified Settings hub, and
 the onboarding wizard (see §1 status table for the full list). Phase 1B is the
 **Supabase backend wave** — wiring persistence so the forking model writes through,
 holidays render, schedule rotation cycles work end-to-end, unit-import lands. Phase 2

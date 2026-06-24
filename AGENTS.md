@@ -30,7 +30,7 @@ Planner Hub and Resource Wall. Surfaces:
 - `/year` (Year — the v2 "Curricular plan"; `/subject` is a legacy redirect to `/year`, already retired on master)
 - Lesson Plan (the unit/lesson planner)
 - Teach (the projection board)
-- `/planner` — **Planner Hub** (v2 planning home / hub surface)
+- `/planner` — **Planner Hub** (v2 planning hub surface; the **default landing route is `/weekly`, not `/planner`**)
 - `/post` — **Resource Wall** (v2 resource board: per-card colors, per-section photos)
 - `/schedule` as a deep-link and side-panel via GlobalRail
 - `/catch-up`
@@ -76,8 +76,9 @@ The visual system is a set of independent axes, all set as `<html>` / app-root
 data attributes by `lib/theme.tsx`. **This replaces the v1 3-axis model**
 (`data-style ∈ quiet|calm|vivid`, `data-palette ∈ normal|highlight`,
 `data-theme ∈ paper|cloud|night|mint|sky|blossom`): `data-style` and
-`data-palette` are **dropped**; `paper` + `cloud` **fold to `clear`**; `night`
-is now the dark **tone**, not a peer theme.
+`data-palette` are **dropped**; `paper` + `cloud` **fold to `clear`**; Night is a `data-theme`
+value (the only dark theme) that forces derived `data-tone="dark"`; dark
+rendering branches on `data-tone`.
 
 - `data-frame` ∈ `glass | paper | color` — layout character + material + emphasis. The working build also carries the equivalent `data-version ∈ A|B|C` on the app root (A=Glass, B=Bright/paper, C=Color-forward) — **treat them as the same axis.** A frame changes layout/material, never the global tone.
 - `data-glass` ∈ `dark | light` — the two frosted **registers** of Frame A (dark frosted = translucent dark panels + white text; white frosted = translucent white panels + dark ink). Surface-only — flips a panel's fill **and** its text together; must never wash the background.
