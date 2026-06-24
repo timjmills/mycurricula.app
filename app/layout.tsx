@@ -141,6 +141,15 @@ export default function RootLayout({
             everything, so it cannot affect v1 surfaces. (The CSS-MODULE-scoped
             `.stage` in notecards/Gallery is a different, unrelated class.) */}
         <div className="stage" aria-hidden="true" />
+        {/* The whole-app theme-tint wash (app/themes.css `.theme-tint`): a
+            z-index:90, mix-blend-mode:soft-light overlay whose per-theme opacity
+            + gradient are keyed on `:root[data-theme="…"] .theme-tint`. The recipe
+            was fully styled but NEVER mounted, so the per-theme soft-light wash
+            over the whole app was dead CSS; rendering it here (sibling of .stage,
+            descendant of the <html> that carries data-theme) lights it up. Plain
+            server-rendered div, no client component. pointer-events:none means it
+            sits over the app but cannot block any interaction. */}
+        <div className="theme-tint" aria-hidden="true" />
         {/* ThemeInit's inline script must run before first paint (it precedes
             all app chrome here; the static .stage div above carries no script,
             so it does not delay this one): it

@@ -561,6 +561,302 @@ for (const theme of ["clear", "honey", "mint", "sky", "blossom"]) {
   await ctx.close();
 }
 
+// ── W2-WAVE2 RENDER-PAINT GATE (the live-QA contract) ──────────────────────
+// The v2 background-stage engine was rendering logic-correctly but NOT visibly
+// painting, and the older checks above missed it (they read data-* attrs +
+// --stage-photo, never the actual paint). This gate asserts the CONTRACT the
+// parallel render-path fix establishes — the invariants that make the stage
+// VISIBLE — across a route × viewport-width matrix:
+//
+//   A. THEME-TINT MOUNTED — exactly one `.theme-tint` (aria-hidden) exists and
+//      is a descendant of <html> (mounted as a <body> child).
+//   B. STAGE NOT OCCLUDED — `.stage` exists; `getComputedStyle(body)
+//      .backgroundImage === 'none'`; body has NO opaque background-color hiding
+//      the fixed z-index:-2 stage. (<html> keeps the --canvas base; not checked.)
+//   C. PHOTO ACTUALLY PAINTS — with data-bg="photo": `--stage-photo` on <html>
+//      contains `url(`, AND getComputedStyle(stage,'::before').backgroundImage
+//      contains both `url(` and the photo filename. data-bg="wash" still renders
+//      (its ::before backgroundImage is non-'none').
+//   D. FINAL ROUTE — run on a real app route (/weekly), not just the bare root.
+//   E. SAMPLING SIDE-EFFECT — photo + dim="normal": poll for the async luminance
+//      sample to resolve data-tone to a concrete light|dark (matrix §4 AUTO).
+//   F. RESPONSIVE — the core stage/theme-tint asserts at 390, 768, 1280 px.
+//
+// These are ADDITIVE assertions. They may not be GREEN until the render-path
+// fix lands — that's expected; the gate proves the engine paints once it does.
+const PHOTO_FILENAME = "p1.webp"; // DEFAULT_STAGE_PHOTO basename (lib/stage-photo.ts)
+const PAINT_WIDTHS = [390, 768, 1280]; // F. responsive tiers
+// D. a real app route + a fallback if /weekly 404s in this environment.
+const PAINT_ROUTE = "/weekly";
+const PAINT_ROUTE_FALLBACK = "/";
+
+// One in-page evaluation harvests every paint fact for the CURRENT data-bg.
+// Returns the values; the Node side does the asserting so failure messages can
+// name the width/route/axis. data-tone polling for the AUTO sample is done via a
+// separate evaluate loop (reuses the TONE_VALUES helper, like the §4 matrix).
+function collectPaintFacts() {
+  const html = document.documentElement;
+  const body = document.body;
+  const tints = document.querySelectorAll(".theme-tint");
+  const tint = tints[0] ?? null;
+  const stage = document.querySelector(".stage");
+  const bodyCS = getComputedStyle(body);
+  const stagePhoto = getComputedStyle(html).getPropertyValue("--stage-photo").trim();
+  const stageBeforeBg = stage
+    ? getComputedStyle(stage, "::before").backgroundImage
+    : null;
+  return {
+    bg: html.dataset.bg ?? null,
+    tone: html.dataset.tone ?? null,
+    dim: html.dataset.dim ?? null,
+    // A.
+    tintCount: tints.length,
+    tintInHtml: !!tint && html.contains(tint),
+    tintAriaHidden: tint ? tint.getAttribute("aria-hidden") : null,
+    // B.
+    stageExists: !!stage,
+    bodyBgImage: bodyCS.backgroundImage,
+    bodyBgColor: bodyCS.backgroundColor,
+    // C.
+    stagePhoto,
+    stageBeforeBg,
+  };
+}
+
+// An opaque body background-color would occlude the negative-z stage. Treat
+// transparent / fully-transparent rgba(...,0) as "not opaque"; any other
+// resolved color is opaque. (Browsers serialize transparent to rgba(0,0,0,0).)
+function bodyBgIsOpaque(color) {
+  if (!color) return false;
+  const c = color.trim().toLowerCase();
+  if (c === "transparent" || c === "none") return false;
+  const m = c.match(/^rgba?\(([^)]+)\)$/);
+  if (m) {
+    const parts = m[1].split(/[,/]+/).map((s) => s.trim());
+    // alpha is the 4th component when present; 0 alpha = not opaque.
+    if (parts.length >= 4 && Number.parseFloat(parts[3]) === 0) return false;
+    return true; // rgb(...) or rgba with nonzero alpha → opaque
+  }
+  // Any other non-empty color keyword/function counts as opaque.
+  return true;
+}
+
+const paintResults = [];
+function recordPaint(axis, width, route, bg, ok, detail) {
+  paintResults.push({ axis, width, route, bg, ok, detail });
+}
+
+{
+  // Resolve the real route once. Fall back to "/" if /weekly 404s here OR if
+  // auth bounces us to /login: an unauthenticated env answers /weekly with a
+  // 307→/login that Playwright silently follows to a 200, which would make the
+  // paint gate test /login while believing it tested /weekly (false confidence).
+  // Detect the redirect by the FINAL landing URL, not just the status code.
+  let paintRoute = PAINT_ROUTE;
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await ctx.addCookies(cookies);
+    const page = await ctx.newPage();
+    try {
+      const resp = await page.goto(`${BASE}${PAINT_ROUTE}`, {
+        waitUntil: "domcontentloaded",
+        timeout: 90000,
+      });
+      const landedOnLogin = /\/login(\?|$)/.test(page.url());
+      if ((resp && resp.status() === 404) || landedOnLogin) {
+        paintRoute = PAINT_ROUTE_FALLBACK;
+      }
+    } catch {
+      paintRoute = PAINT_ROUTE_FALLBACK;
+    }
+    await page.close();
+    await ctx.close();
+  }
+
+  // F × D: the core stage/theme-tint + photo-paint asserts at every width, on
+  // the real route. Default axes keep bg=photo (DEFAULTS.bg), so this also
+  // covers C-photo. We then flip bg=wash and re-load to cover C-wash.
+  for (const width of PAINT_WIDTHS) {
+    // ---- PHOTO (default axes) ----
+    {
+      const ctx = await browser.newContext({ viewport: { width, height: 900 } });
+      await ctx.addCookies(cookies);
+      const page = await ctx.newPage();
+      let facts = null;
+      let err = null;
+      try {
+        await page.goto(`${BASE}${paintRoute}`, {
+          waitUntil: "domcontentloaded",
+          timeout: 90000,
+        });
+        await page.waitForTimeout(2500); // hydration + mount window
+        facts = await page.evaluate(collectPaintFacts);
+      } catch (e) {
+        err = e.message.slice(0, 200);
+      }
+      const where = `w=${width} route=${paintRoute} bg=photo`;
+      if (err || !facts) {
+        recordPaint("LOAD", width, paintRoute, "photo", false, err ?? "no facts");
+      } else {
+        // A. THEME-TINT MOUNTED
+        recordPaint(
+          "A:theme-tint-mounted",
+          width,
+          paintRoute,
+          "photo",
+          facts.tintCount === 1 && facts.tintInHtml === true,
+          `count=${facts.tintCount} inHtml=${facts.tintInHtml} aria-hidden=${facts.tintAriaHidden} (${where})`,
+        );
+        // B. STAGE NOT OCCLUDED
+        recordPaint(
+          "B:stage-not-occluded",
+          width,
+          paintRoute,
+          "photo",
+          facts.stageExists === true &&
+            facts.bodyBgImage === "none" &&
+            !bodyBgIsOpaque(facts.bodyBgColor),
+          `stage=${facts.stageExists} bodyBgImage=${facts.bodyBgImage} bodyBgColor=${facts.bodyBgColor} (${where})`,
+        );
+        // C. PHOTO ACTUALLY PAINTS
+        const photoVarOk = /url\(/i.test(facts.stagePhoto);
+        const beforeOk =
+          typeof facts.stageBeforeBg === "string" &&
+          /url\(/i.test(facts.stageBeforeBg) &&
+          facts.stageBeforeBg.includes(PHOTO_FILENAME);
+        recordPaint(
+          "C:photo-paints",
+          width,
+          paintRoute,
+          "photo",
+          facts.bg === "photo" && photoVarOk && beforeOk,
+          `--stage-photo=${facts.stagePhoto} ::before=${(facts.stageBeforeBg ?? "null").slice(0, 120)} (${where})`,
+        );
+      }
+      await page.close();
+      await ctx.close();
+    }
+
+    // ---- WASH (C: wash still renders) ----
+    {
+      const ctx = await browser.newContext({ viewport: { width, height: 900 } });
+      await ctx.addCookies(cookies);
+      await ctx.addInitScript(
+        ({ keys, theme }) => {
+          try {
+            localStorage.setItem(keys.theme, theme);
+            localStorage.setItem(keys.bg, "wash");
+          } catch {}
+        },
+        { keys: KEY, theme: "clear" },
+      );
+      const page = await ctx.newPage();
+      let facts = null;
+      let err = null;
+      try {
+        await page.goto(`${BASE}${paintRoute}`, {
+          waitUntil: "domcontentloaded",
+          timeout: 90000,
+        });
+        await page.waitForTimeout(2500);
+        facts = await page.evaluate(collectPaintFacts);
+      } catch (e) {
+        err = e.message.slice(0, 200);
+      }
+      const where = `w=${width} route=${paintRoute} bg=wash`;
+      if (err || !facts) {
+        recordPaint("LOAD", width, paintRoute, "wash", false, err ?? "no facts");
+      } else {
+        // A + B still hold under wash.
+        recordPaint(
+          "A:theme-tint-mounted",
+          width,
+          paintRoute,
+          "wash",
+          facts.tintCount === 1 && facts.tintInHtml === true,
+          `count=${facts.tintCount} inHtml=${facts.tintInHtml} (${where})`,
+        );
+        recordPaint(
+          "B:stage-not-occluded",
+          width,
+          paintRoute,
+          "wash",
+          facts.stageExists === true &&
+            facts.bodyBgImage === "none" &&
+            !bodyBgIsOpaque(facts.bodyBgColor),
+          `stage=${facts.stageExists} bodyBgImage=${facts.bodyBgImage} bodyBgColor=${facts.bodyBgColor} (${where})`,
+        );
+        // C-wash: data-bg="wash" still renders — ::before backgroundImage non-'none'.
+        recordPaint(
+          "C:wash-renders",
+          width,
+          paintRoute,
+          "wash",
+          facts.bg === "wash" &&
+            typeof facts.stageBeforeBg === "string" &&
+            facts.stageBeforeBg !== "none",
+          `bg=${facts.bg} ::before=${(facts.stageBeforeBg ?? "null").slice(0, 120)} (${where})`,
+        );
+      }
+      await page.close();
+      await ctx.close();
+    }
+  }
+
+  // E. SAMPLING SIDE-EFFECT — photo + dim="normal" (the AUTO matrix §4 case):
+  // poll for the async luminance sample to resolve data-tone to a concrete,
+  // stable light|dark. Run once at the desktop width, on the real route.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await ctx.addCookies(cookies);
+    await ctx.addInitScript(
+      ({ keys }) => {
+        try {
+          localStorage.setItem(keys.theme, "clear");
+          localStorage.setItem(keys.bg, "photo");
+          localStorage.setItem(keys.dim, "normal");
+        } catch {}
+      },
+      { keys: KEY },
+    );
+    const page = await ctx.newPage();
+    let tone = null;
+    let stable = null;
+    let err = null;
+    try {
+      await page.goto(`${BASE}${paintRoute}`, {
+        waitUntil: "domcontentloaded",
+        timeout: 90000,
+      });
+      // Reuse the §4 AUTO poll shape: wait for a concrete tone, confirm stable.
+      let last = null;
+      for (let i = 0; i < 30; i++) {
+        last = await page.evaluate(() => document.documentElement.dataset.tone);
+        if (TONE_VALUES.includes(last)) break;
+        await page.waitForTimeout(200);
+      }
+      await page.waitForTimeout(400);
+      const again = await page.evaluate(
+        () => document.documentElement.dataset.tone,
+      );
+      tone = again;
+      stable = last === again && TONE_VALUES.includes(again);
+    } catch (e) {
+      err = e.message.slice(0, 200);
+    }
+    recordPaint(
+      "E:auto-tone-sampled",
+      1280,
+      paintRoute,
+      "photo",
+      !err && TONE_VALUES.includes(tone) && stable === true,
+      `tone=${tone} stable=${stable}${err ? `  ${err}` : ""} (photo+dim=normal route=${paintRoute})`,
+    );
+    await page.close();
+    await ctx.close();
+  }
+}
+
 await browser.close();
 
 console.log(`\nShots: ${OUT_DIR}`);
@@ -614,15 +910,32 @@ for (const c of cornerResults) {
   );
 }
 
+console.log(
+  "\nrender-paint gate (theme-tint / stage-occlusion / photo paint / AUTO tone) — route × width:",
+);
+for (const p of paintResults) {
+  console.log(
+    `${p.ok ? "  ok  " : "  FAIL"} ${String(p.axis).padEnd(22)} w=${String(p.width).padEnd(4)} bg=${String(p.bg).padEnd(5)} ${p.ok ? "" : `${p.detail}`}`,
+  );
+}
+
 const routeFails = results.filter((r) => !r.ok).length;
 const toneFails = toneResults.filter((t) => !t.ok).length;
 const cornerFails = cornerResults.filter((c) => !c.ok).length;
+const paintFails = paintResults.filter((p) => !p.ok).length;
 console.log(`\ncontrast failures: ${fails}`);
 console.log(`route checks failed: ${routeFails}`);
 console.log(`tone-derivation checks failed: ${toneFails}`);
 console.log(`corner checks failed: ${cornerFails}`);
+console.log(`render-paint gate checks failed: ${paintFails}`);
+if (paintFails > 0) {
+  console.log("\nrender-paint FAILURES (axis @ width/route/bg):");
+  for (const p of paintResults.filter((x) => !x.ok)) {
+    console.log(`  - ${p.axis}  @ w=${p.width} route=${p.route} bg=${p.bg}: ${p.detail}`);
+  }
+}
 
-// Exit nonzero on any real failure (contrast / route / tone / corner) so CI +
-// the live-QA pass treat a regression as a hard failure.
-const totalFails = fails + routeFails + toneFails + cornerFails;
+// Exit nonzero on any real failure (contrast / route / tone / corner / paint)
+// so CI + the live-QA pass treat a regression as a hard failure.
+const totalFails = fails + routeFails + toneFails + cornerFails + paintFails;
 if (totalFails > 0) process.exitCode = 1;
