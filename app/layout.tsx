@@ -90,7 +90,9 @@ export default function RootLayout({
   // sentinel) — DEFAULT_THEME is "clear" (concrete), so the attribute below stays
   // correct; the boot script resolves a stored "system" to night/clear before it
   // ever paints. data-tone is DERIVED: its server value equals
-  // deriveTone("clear", DEFAULT_BG, DEFAULT_DIM, null) === "dark" (matrix §4
+  // deriveTone("clear", DEFAULT_GLASS, DEFAULT_BG, DEFAULT_DIM, null) === "dark"
+  // (DEFAULT_GLASS is "dark", so the glass=light→light branch does not affect the
+  // default render) (matrix §4
   // pre-sample default for Photo+normal) and matches the boot script, so server
   // HTML == boot == first client paint; the provider reconciles the true derived
   // tone (incl. the normal→auto luminance upgrade) post-mount. data-palette is the

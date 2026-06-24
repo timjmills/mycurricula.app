@@ -104,17 +104,24 @@ ignored, never painted).
 
 ## 4. `data-tone` derivation rule (DERIVED — never persisted)
 
-Tone is computed from the theme + background + brightness at paint time. Every
-surface branches on `data-tone`, never on the theme — this is what keeps a new
-surface correct across all seven themes automatically (the legibility contract).
+Tone is computed from the theme + glass register + background + brightness at
+paint time. Every surface branches on `data-tone`, never on the theme — this is
+what keeps a new surface correct across all seven themes automatically (the
+legibility contract).
 
 Evaluate top-to-bottom; first match wins:
 
 1. **`theme === "night"` → `dark`.** Night is the only dark theme; it forces
-   dark tone app-wide regardless of background.
-2. **`bg === "wash"` → `light`.** Wash is always light tone (Night already
-   handled in rule 1).
-3. **`bg === "photo"`** — branch on `data-dim`:
+   dark tone app-wide regardless of register or background.
+2. **`glass === "light"` → `light`.** The White-frosted register is a light
+   surface (translucent-white panels + dark ink), so it forces light tone
+   app-wide (Night still wins, rule 1). It sets the surface/text register, not
+   the background, so "glass must never wash the background" still holds.
+   *(Added by the Wave-2 re-audit — White-frosted previously could not select
+   the light register because `deriveTone` ignored `glass`.)*
+3. **`bg === "wash"` → `light`.** Wash is always light tone (Night + White-frosted
+   already handled in rules 1–2).
+4. **`bg === "photo"`** — branch on `data-dim`:
    - **`dim` → `dark`** — heavy scrim, white text. Manual override.
    - **`bright` → `light`** — light tone, dark text on white frosted cards.
      Manual override.
@@ -127,6 +134,7 @@ Compact form:
 
 ```
 night                         → dark
+glass=light                   → light
 dim                           → dark
 bright                        → light
 wash                          → light

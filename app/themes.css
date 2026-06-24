@@ -248,6 +248,17 @@
     filter: saturate(1.08);
     animation: stage-drift 40s ease-in-out infinite alternate;
   }
+  /* OFF (Photo) — the true UNGRADED photo: strip the per-theme duotone wash so
+     data-theme="off" shows the raw classroom photo (CLAUDE.md §4: "off = no
+     wash/grade — the true original photo"). The global .stage had no off
+     override before (only the home's .frame/.photo layers did) — Wave-2
+     re-audit finding #4. Keeps the photo + cover sizing + drift; drops only the
+     four duotone radial blooms and their soft-light blend. */
+  [data-theme="off"][data-bg="photo"] .stage::before {
+    background-image: var(--stage-photo, none);
+    background-blend-mode: normal;
+    filter: none;
+  }
   /* WASH — brand-mesh ambient blooms over the warm canvas */
   [data-bg="wash"] .stage::before {
     background:
@@ -503,7 +514,10 @@
      Clear = none; Photo mode keeps the photo prominent so opacities drop.
      ════════════════════════════════════════════════════════════════════════ */
   .theme-tint {
-    position: absolute;
+    /* FIXED (not absolute): the whole-app wash must pin to the viewport like
+       .stage, so it covers content on scroll instead of scrolling off below the
+       first fold. Settled by the Wave-2 re-audit (unanimous, handoff-cited). */
+    position: fixed;
     inset: 0;
     z-index: 90;
     pointer-events: none;
@@ -689,17 +703,22 @@
     color: var(--ink);
   }
   [data-frame="glass"][data-bg="photo"][data-glass="light"] .fr-chrome {
-    background: rgba(255, 255, 255, 0.66);
+    /* opacity bumped 0.66→0.74 (Wave-2 re-audit): a bright photo bled through
+       the White-frosted chrome, washing out text legibility. */
+    background: rgba(255, 255, 255, 0.74);
     border: 1px solid rgba(255, 255, 255, 0.85);
     color: var(--ink-soft);
   }
   [data-frame="glass"][data-bg="photo"][data-glass="light"] .card,
   [data-frame="glass"][data-bg="photo"][data-glass="light"] .lane,
   [data-frame="glass"][data-bg="photo"][data-glass="light"] .fr-strip {
+    /* fill opacity bumped 0.76/0.58→0.86/0.72 (Wave-2 re-audit): keep the
+       white-frosted panel opaque enough that a bright photo can't bleed through
+       and hurt dark-ink contrast. */
     background: linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.76) 0%,
-      rgba(255, 255, 255, 0.58) 100%
+      rgba(255, 255, 255, 0.86) 0%,
+      rgba(255, 255, 255, 0.72) 100%
     );
     border: 1px solid rgba(255, 255, 255, 0.85);
     /* lit top-edge: inset 0 1px 0 rgba(255,255,255,.95) — white-frosted register */
