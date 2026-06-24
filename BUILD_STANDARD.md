@@ -10,8 +10,10 @@ Read this file at the start of every build session. CLAUDE.md links to it.
 > Framework.md`** (plus `colors_and_type.css`, `themes.css`, `modes.css`).
 > **The handoff wins for look and behavior; the Framework wins for rules.**
 > When this doc and the handoff disagree, the handoff is the truth — fix this
-> doc. When this doc and the code disagree, the code is the truth — fix the
-> code, then this doc.
+> doc. The v2 handoff/Framework wins for v2 look & behavior — fix the code to
+> match it, then update the docs. The code is the truth for **current-state
+> implementation facts**. BUILD_STANDARD is the authoritative checked-in
+> contract; the handoff is its upstream design origin.
 
 > **One-sentence rule:** build every new surface to match the **v2 mockup +
 > V2 Framework** — the canonical reference for material, color, type, the
@@ -50,7 +52,8 @@ all set as `<html>`/app-root data attributes. **These are LOCKED decisions.**
 This REPLACES the v1 three-axis model (`data-style quiet|calm|vivid`,
 `data-palette normal|highlight`, `data-theme paper|cloud|night|mint|sky|blossom`).
 In v2: **`data-style` is dropped, `data-palette` is dropped, `paper`+`cloud`
-FOLD into `clear`, and `night` is now the dark TONE.**
+FOLD into `clear`, and Night is a `data-theme` value (the only dark theme)
+that forces `data-tone="dark"`.**
 
 | Axis | Values | What it controls |
 | --- | --- | --- |
@@ -223,8 +226,9 @@ Radius scale: `--r-sm 10` · `--r-md 14` · `--r-lg 18` · `--r-xl 24` ·
 
 Shadows are wide, faint, and cool over the warm canvas: `--sh-xs → --sh-lg`,
 plus colored `--sh-brand` / `--sh-honey` rationed to primary actions. Never a
-hard or black drop shadow. (Resting button shadows are tight neutral
-elevations, never a color glow — §8.)
+hard or black drop shadow. (A **primary** button MAY carry a rationed colored
+shadow — `--sh-brand` / `--sh-honey` — per the v2 handoff; non-primary/secondary
+buttons keep tight neutral elevations, never a color glow — §8.)
 
 ---
 
@@ -375,8 +379,11 @@ fix where there is no base class to lean on. **Do not de-qualify these rules.**
 }
 ```
 
-Two more DON'Ts: **no oversized colored glow as the resting shadow** (a resting
-button shadow is a tight neutral elevation, never a color wash); **no raw
+Two more DON'Ts: **no oversized colored glow as the resting shadow** — a
+non-primary/secondary button's resting shadow is a tight neutral elevation,
+never a color wash; a **primary** button MAY carry a rationed colored shadow
+(`--sh-brand` / `--sh-honey`, the `--accent` fill's companion) per the v2
+handoff, but it stays rationed, never an oversized bloom; **no raw
 `--brand-*` for a button's hover/active color** (route through the
 `--chrome-accent-*` tier so every theme re-hues its own buttons). The hover lift
 and transition are dropped under `prefers-reduced-motion`.
@@ -471,7 +478,7 @@ Match the v2 design exactly:
   - Typography via the role tokens; fonts via next/font.
   - Respect the legibility contract: text flips with tone; accent only on
     interactive/emphasis; subject color wins for identity.
-  - Carry the theme on overlays (faint accent wash; see §12 surface-theming).
+  - Carry the theme on overlays (faint accent wash; see §15 surface-theming).
 
 Tokens only — zero hex in components or lib. Spacing on the 4-8-12-16-24-32 scale.
 If the surface is a v2 route/feature, gate it behind NEXT_PUBLIC_V2.
@@ -571,7 +578,7 @@ and drift slowly by default.
 | Theme | `data-theme` | Feel | Accent |
 | --- | --- | --- | --- |
 | **Clear** *(resting; formerly Normal/paper; paper+cloud fold here)* | `clear` | the original balanced brand mesh (honey · violet · sky · rose on neutral); white swatch | sky-blue, slowly cycling the four light hues in Photo mode |
-| **Night** *(the dark TONE)* | `night` | deep slate-navy dark mode | soft indigo |
+| **Night** *(the only dark theme; forces `data-tone="dark"`)* | `night` | deep slate-navy dark mode | soft indigo |
 | **Honey** | `honey` | warm gold · amber · coral · yellow | gold |
 | **Blossom** | `blossom` | pink · violet · periwinkle · soft coral | pink |
 | **Mint** | `mint` | blue-green with a touch of yellow | green |
@@ -602,7 +609,10 @@ combination legible and calm.
 
 ### The legibility contract (text × surface) — non-negotiable
 
-- **Dark tone (Night, or Photo Dim/Normal):** text is **white** (`#fff →
+- **Tone derivation:** Dim forces dark tone; Bright forces light tone;
+  **Normal samples the photo's luminance** to derive light/dark (light
+  photo→dark text, dark photo→light text); Night forces dark.
+- **Dark tone:** text is **white** (`#fff →
   rgba(255,255,255,.7)`); glass is translucent-dark; menus/popups are dark glass
   with white text. Subject cells deepen their floor so white labels hold.
 - **Light tone (Wash, Photo Bright, or any light theme):** text is
@@ -678,9 +688,11 @@ share/export/print viewer) — allowed **only when documented as deliberate**.
 
 Update this file when a new primitive lands in `components/ui/`, a token is
 added to `app/tokens.css`, a responsive breakpoint changes, or a new interaction
-pattern is established across more than one surface. The doc and the code should
-always agree — if they disagree, the code is the truth; update the doc
-immediately. For look/behavior questions the **v2 mockup + V2 Framework** is the
-origin authority; cite it.
+pattern is established across more than one surface. The v2 handoff/Framework
+wins for v2 look & behavior — fix the code to match it, then update the docs.
+The code is the truth for **current-state implementation facts**.
+BUILD_STANDARD is the authoritative checked-in contract; the handoff is its
+upstream design origin. For look/behavior questions the **v2 mockup + V2
+Framework** is the origin authority; cite it.
 
 _This is the contract. Build to it, and the product stays calm, light, and alive._
