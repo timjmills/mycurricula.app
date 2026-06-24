@@ -151,6 +151,17 @@ update public.teacher_preferences
 set theme = 'clear'
 where theme in ('paper', 'cloud');
 
+-- 4a′ · Re-point the column DEFAULT off the deprecated v1 value 'paper' onto the
+--      v2 resting theme 'clear'. The base table declared `theme ... default
+--      'paper'`; left unchanged, an INSERT that omits `theme` would write a v1
+--      value the v2 client guard (isThemeSetting) no longer recognizes, and
+--      loadRemotePrefs would drop it on read. The sole writer (saveRemotePrefs)
+--      always sends an explicit resolved theme, so this default is not reached
+--      today — but aligning it to 'clear' keeps the column correct once a later
+--      stage wires the new axes. Idempotent (unconditional SET DEFAULT).
+alter table public.teacher_preferences
+  alter column theme set default 'clear';
+
 -- 4b · Seed `frame` from the deprecated `theme_style` for rows that have not
 --      yet chosen a v2 frame (frame IS NULL). The v1 card-style axis maps onto
 --      the v2 layout character:

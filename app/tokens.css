@@ -995,6 +995,25 @@
   --swatch-blossom-surface: #ffffff;
   --swatch-blossom-accent: #e84e93;
   --swatch-blossom-ink: #1c1b2e;
+  /* v2 theme swatches — clear (the default), honey, off. APP_THEMES renamed
+     paper/cloud → clear and added honey/off in lib/theme.tsx, but this swatch
+     family was not migrated, so the picker chips for these three rendered
+     blank (var(--swatch-clear|honey|off-*) was undefined). clear folds the
+     resting light canvas + the live clear accent (#3b6cf6, themes.css);
+     honey uses the warm honey canvas + the live honey accent (#e59a12);
+     off (true ungraded Photo) uses a neutral placeholder. */
+  --swatch-clear-canvas: #fcfaf6;
+  --swatch-clear-surface: #ffffff;
+  --swatch-clear-accent: #3b6cf6;
+  --swatch-clear-ink: #1c1b2e;
+  --swatch-honey-canvas: #fdf4e3;
+  --swatch-honey-surface: #ffffff;
+  --swatch-honey-accent: #e59a12;
+  --swatch-honey-ink: #1c1b2e;
+  --swatch-off-canvas: #e9e6e1;
+  --swatch-off-surface: #ffffff;
+  --swatch-off-accent: #6e6c82;
+  --swatch-off-ink: #1c1b2e;
 }
 
 /* ── v2 SEMANTIC TYPE CLASSES (6.24.26 design handoff — ADDED) ────────────
