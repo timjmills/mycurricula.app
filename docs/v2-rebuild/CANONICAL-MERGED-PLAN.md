@@ -63,6 +63,20 @@
 | themes.css counts | B: "179 `.home[data-version]`" | **12 `data-version="A"`** (no B/C); ~186 `.home`, mostly `data-theme/bg` | my audit C4 |
 | Auto-luminance | both: "first photo" | **averages first 6 photos** (`slice(0,6)`) | their review / my audit H9 |
 
+### 0.3 Third audit (final pass) — verified against `master` + integrated
+Verdict mirrored both prior audits (Plan A NO-GO standalone / Plan B GO-WITH-CHANGES) — already reflected here. Verification + deltas:
+
+**TRUE — adopted** (most already present; refinements folded in): presentation-gate too loose (→ reworded, §6); lockstep omits persisted-value migration + SSR attrs (→ migrate **all three** axes: theme `paper/cloud/night`, style `quiet/calm/vivid`, palette `normal/highlight`; include `app/layout.tsx`, §3.7/§7.1); "port modes.css" insufficient (§0.1.2); backend "complete" overclaim (§0.1.5); Plan B additive-token conflict, theme-key-space, luminance cadence, share-link security, Resource-Wall-schema-first, `.cp-subj` per-surface checks, `/subject` docs, luminance CORS — all adopted/strengthened.
+
+**NET-NEW deltas this audit adds (verified):**
+1. **To-dos = extend the EXISTING table, don't create one.** `todos` exists in `initial_schema.sql:735` (due/priority/completion + grade/author/assignee); only the TS type (`types.ts:212-221`) is thin → widen the type + client/store over the existing table.
+2. **Data-Foundation checkpoint** (schema/types/source contracts) lands **before** Resource Wall / Lesson Library / Unit Explorer / Hub / Share; the duplicate Phase-4 migration repeat is removed (see §4 + §7).
+3. **Share links = signed, expiring, server-issued tokens + explicit RLS public-read model + auth smoke tests + security review** — NOT raw base64 `?share=`. (Current `PUBLIC_PATHS`=login/auth/welcome; `/invite/[token]` is an authed token flow — the model to mirror.)
+4. **D1 widened:** "no *lesson-row* migration" (precise) — but DO verify subject-slug compatibility in `supabase/seed.sql` + provisioning + the `.cp-subj` aliases (color is a stable slug, `initial_schema.sql:300-302`).
+5. **Per-wave verification** = flag-OFF v1 regression + deep-links/auth + responsive/theme sweep + **Supabase round-trip on every surface that writes data**.
+
+**FALSE for our locked base — branch divergence, NOT adopted:** the audit's "`/` defaults to `/home`" and "`/subject` live → `/subject/math`" describe the **WIP branch**, not `master`. Verified on `master` (`277129e11`): `DEFAULT_DEFAULT_VIEW="/weekly"` (`use-account-settings.ts:207`); `app/page.tsx`→`/weekly`; `subject/page.tsx`→`redirect("/year")` (retired). `/home` route **exists** on master but is **not** the default. Base is clean `master`, so §2's baseline stands. *(Self-correction to my own delta: `/home` is a real route on master, not a dead link — that was the WIP state.)*
+
 ---
 
 ## 1. Locked decisions & base
@@ -81,7 +95,10 @@ space isn't migrated twice.
   (mapping in `palette-data.ts:140-149` + the 4 `--math/reading/science/social` aliases + static
   `.cp-subj`), via the **pure `resolveSubjectColor(id,type,V2_MAP)` resolver** on the v2 path (never
   `useSubjectColor()` which reads context); extend `PaletteCssBridge` to emit **both** `--sc/--sct/--sci`
-  and `--c/--cl/--cd`.
+  and `--c/--cl/--cd`. **Precise scope: "no *lesson-row* migration"** — color is a stable slug
+  (`initial_schema.sql:300-302`) — **but DO verify slug compatibility in `supabase/seed.sql` +
+  provisioning + the `.cp-subj` aliases**, and add per-surface acceptance checks proving v2 views use the
+  inline vars before applying the remap.
 - **D2** Engine = `data-frame` naming, **bundle behavior** (per §0.1.2); drop `data-style` **but keep
   `style/palette/setStyle/setPalette` as deprecated compat fields through cutover** (typed-API used by 17
   components; `theme_style` is `NOT NULL DEFAULT 'vivid'` in prod — needs a follow-up nullable/drop
@@ -163,13 +180,21 @@ The critical path. Sequence inside Wave 2:
    that's gone).
 7. **Lesson Plan** — binds section CRUD + `setSaveTarget`; data-model adds (differentiation/materials/
    per-section minutes+notes/standards `{code,desc}`).
+**7.5 Data-Foundation checkpoint (HARD gate before every NET-NEW surface — Waves 8/9/9b + Hub browse areas).**
+Land the schema/types/source contracts first: `ResourceWall`/`WallSection`/`WallBackground`,
+**unscheduled-lesson date**, `UnitDetail`, lesson-section fields (differentiation/materials/minutes/notes,
+standards `{code,desc}`), and **widen the EXISTING `todos` table's TS type + client/store — do NOT create a
+new table** (`todos` already has due/priority/completion). This replaces the duplicated Phase-4 migration
+step (schema work moves here, before the UI that needs it; only flag-cutover stays late).
 8. **Planner Hub** (NET-NEW) — Hub `.ph-root` **writes its own `data-tone`** (a local writer with a
    formula reconciled to the global writer — not "reads from a shared context"). **Add Wave 8 to the §4a
    gate list.**
 9. **Resource Wall** (NET-NEW) — bind the **already-exported** `isSafeUrl`/`isSafeImgSrc` (no "promote"
    step); land ResourceWall types first.
-9b. **Share-link system** (NET-NEW, security) — new `PUBLIC_PATHS` entry + read-only path; mandatory §4a +
-   claude-login+cookie smoke test.
+9b. **Share-link system** (NET-NEW, **security surface — not presentation**) — **signed, expiring,
+   server-issued tokens** (NOT raw base64 `?share=`) + an explicit **RLS public-read model** + new
+   `PUBLIC_PATHS` entry + read-only render path; mandatory §4a security review + **auth smoke tests** +
+   claude-login+cookie test. Mirror the authed `/invite/[token]` flow, not a guessable query param.
 10. **Catch-Up** — re-skin (current is richer than the demo) + Hub browse area.
 11. **Teach** — D3 (keep infra, re-skin); `getActiveGradeLevelId` is on `lib/planner` (teach-flag-ON
    requires planner-flag-ON or it throws on "g5").
@@ -196,9 +221,11 @@ otherwise validate the mock).
   (both plans' enumerated lists dropped them).
 - **Token-migration-first is a HARD barrier**: serialize edits to `tokens.css` + `components/ui/*` (143
   importers); **no surface fan-out until Phase 0/Wave 2 lands.**
-- **Down-scope the per-surface verify gate** from "presentation-scoped diff (no state change)" to "**no
-  change to the data/logic core (stores/hooks/types)**" — the strict version false-positives on every
-  restructured view.
+- **Rewrite the per-surface verify gate** from "presentation-scoped diff (no state change)" to "**no
+  domain/source-contract change unless declared**" — and require a per-surface **hook/state/forking
+  migration checklist** (the strict "no state change" version false-positives on every restructured view).
+- **Per-wave verification (every wave):** flag-OFF v1 regression + deep-links/auth intact + responsive +
+  six-theme sweep + **a Supabase round-trip test on every surface that writes data**.
 - **a11y/WCAG gates** (keyboard, focus, contrast — incl. AA on white-text-over-uploaded-photo with a scrim
   floor), **print suppression** (pink glow/`.stage`/`data-veil` under `@media print`), and **rotation
   caveat** (don't assert a calendar read-wire — it's vacuous today).
@@ -226,7 +253,15 @@ otherwise validate the mock).
 12. **Runtime kill-switch decision + a11y gates + migration rollback/safety.** *[A-F10]*
 13. **Re-baseline recon to master** (the §0.2 table): `/weekly`, `/subject` retired, `isSafeUrl` exported,
     `PUBLIC_PATHS`+`/welcome`, `UndoToastProvider`, `getViewMode`→`viewMode`, themes.css counts, 6-photo
-    luminance, Hub local-tone-writer, gate coverage 8/12. *[my audit]*
+    luminance, Hub local-tone-writer, gate coverage 8/12. *[my audit + 3rd audit; route claims that say
+    `/home`-default or `/subject`-live are WIP-branch, false for master]*
+14. **Data-Foundation checkpoint before all net-new surfaces** (§7.5) — schema/types/source contracts land
+    first; **extend the existing `todos` table, don't create a new one**. *[3rd audit]*
+15. **Migrate ALL THREE persisted axes** (theme + style + palette) in the localStorage + `teacher_preferences`
+    migration, and include `app/layout.tsx` SSR attrs in the lockstep. *[3rd audit]*
+16. **Share links = signed/expiring server tokens + RLS public-read + auth smoke tests** (not base64). *[3rd audit + my audit]*
+17. **Per-wave verification** adds a **Supabase round-trip test on every data-writing surface** + the verify
+    gate is reworded to "no domain/source-contract change unless declared" + a hook/state/forking checklist. *[3rd audit]*
 
 ---
 
