@@ -12,6 +12,12 @@
  * loading them before `@tailwind base` is correct.
  */
 @import "./tokens.css";
+/* v2 appearance engine — frame/theme/material (consumes tokens.css vars; keyed
+   on the v2 axis attributes so v1 screens are unaffected flag-OFF). Imported
+   after tokens.css so the per-theme --accent overrides land after the :root
+   token defaults. All of themes.css lives inside @media screen → print stays
+   light (no stage/photo/glass float/glow on paper). */
+@import "./themes.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -31,20 +31,17 @@ interface ThemeOption {
 
 // Descriptions + first-time-teacher tooltips. The tooltip tells a teacher what
 // the choice ACCOMPLISHES (a personal look change), not just what it is named.
+// v2 theme set (lockstep with lib/theme.tsx APP_THEMES). The full per-theme
+// picker copy (Honey/Off, the Clear/Wash relationship) is refined in a later
+// Wave-2 stage; this stage only re-points the option ids to the v2 values so
+// the picker compiles + drives the new theme axis.
 const THEME_OPTIONS: readonly ThemeOption[] = [
   {
-    id: "paper",
-    label: "Paper",
-    desc: "Warm cream — the classic planner look.",
+    id: "clear",
+    label: "Clear",
+    desc: "The resting theme — balanced brand wash.",
     tooltip:
-      "Switch the whole planner to a warm cream background — the classic, on-paper planner look. Only changes how the app looks for you.",
-  },
-  {
-    id: "cloud",
-    label: "Cloud",
-    desc: "Clean white, minimal warmth.",
-    tooltip:
-      "Switch the whole planner to a clean white background with minimal warmth. Only changes how the app looks for you.",
+      "Switch the whole planner to the Clear theme — the balanced resting look. Only changes how the app looks for you.",
   },
   {
     id: "night",
@@ -52,6 +49,20 @@ const THEME_OPTIONS: readonly ThemeOption[] = [
     desc: "Dark ink-violet for low-light planning.",
     tooltip:
       "Switch the whole planner to a dark color scheme — easier on the eyes in dim rooms. Only changes how the app looks for you.",
+  },
+  {
+    id: "honey",
+    label: "Honey",
+    desc: "Warm gold, amber, and coral.",
+    tooltip:
+      "Switch the whole planner to a warm gold/amber wash. Only changes how the app looks for you.",
+  },
+  {
+    id: "blossom",
+    label: "Blossom",
+    desc: "Soft pink wash.",
+    tooltip:
+      "Switch the whole planner to a soft pink wash. Only changes how the app looks for you.",
   },
   {
     id: "mint",
@@ -68,18 +79,18 @@ const THEME_OPTIONS: readonly ThemeOption[] = [
       "Switch the whole planner to a soft blue wash. Only changes how the app looks for you.",
   },
   {
-    id: "blossom",
-    label: "Blossom",
-    desc: "Soft pink wash.",
+    id: "off",
+    label: "Off (Photo)",
+    desc: "No wash — the true, ungraded photo.",
     tooltip:
-      "Switch the whole planner to a soft pink wash. Only changes how the app looks for you.",
+      "Turn the color wash off so the original classroom photo shows through, ungraded. Only changes how the app looks for you.",
   },
   {
     id: "system",
     label: "Follow system",
-    desc: "Matches your device — Paper by day, Night in dark mode.",
+    desc: "Matches your device — Clear by day, Night in dark mode.",
     tooltip:
-      "Let the planner match your device — the Paper look in light mode, the Night look in dark mode — and follow it automatically. Only changes how the app looks for you.",
+      "Let the planner match your device — the Clear look in light mode, the Night look in dark mode — and follow it automatically. Only changes how the app looks for you.",
   },
 ] as const;
 
@@ -87,12 +98,13 @@ const THEME_OPTIONS: readonly ThemeOption[] = [
 // caption when "Follow system" is selected. Kept local so the picker does not
 // depend on a label export from another module.
 const RESOLVED_LABEL: Record<AppTheme, string> = {
-  paper: "Paper",
-  cloud: "Cloud",
+  clear: "Clear",
   night: "Night",
+  honey: "Honey",
+  blossom: "Blossom",
   mint: "Mint",
   sky: "Sky",
-  blossom: "Blossom",
+  off: "Off (Photo)",
 };
 
 export function ThemePicker(): ReactNode {
