@@ -19,6 +19,7 @@ import {
   DEFAULT_PALETTE,
 } from "@/lib/theme";
 import { ThemeInit } from "@/lib/theme-init";
+import { DEFAULT_STAGE_PHOTO } from "@/lib/stage-photo";
 import { LabelsProvider } from "@/lib/labels";
 import { InstanceLabelsProvider } from "@/lib/instance-labels";
 
@@ -113,13 +114,36 @@ export default function RootLayout({
       data-dim={DEFAULT_DIM}
       data-tone="dark"
       data-palette={DEFAULT_PALETTE}
+      // The active stage photo (W2-4): feed the bundled, same-origin default so
+      // (a) getActivePhotoUrl() in lib/theme.tsx reads it from
+      // dataset.stagePhoto post-mount → the dim==="normal" AUTO tone samples the
+      // photo's (the handoff default, /stage/p1.webp) luminance and upgrades the
+      // pre-sample dark default to the photo's TRUE tone, and (b) themes.css
+      // `[data-bg="photo"] .stage::before`
+      // paints the photo on the FIRST SSR frame via --stage-photo (no
+      // photo-FOUC; the inline custom property is present before hydration).
+      data-stage-photo={DEFAULT_STAGE_PHOTO}
+      style={
+        { ["--stage-photo"]: `url(${DEFAULT_STAGE_PHOTO})` } as React.CSSProperties
+      }
       className={`${GeistSans.variable} ${GeistMono.variable} ${poppins.variable} ${dmSans.variable} ${jakarta.variable} ${quicksand.variable} ${caveat.variable} h-full antialiased`}
     >
       <body
         suppressHydrationWarning
         className="cp-root flex min-h-full flex-col"
       >
-        {/* ThemeInit must be the FIRST child of <body>: its inline script
+        {/* The v2 background stage host: a fixed, full-viewport element at
+            z-index:-2 (app/themes.css `.stage`) whose ::before paints the photo
+            duotone (`var(--stage-photo)`) and ::after the tone scrim. NOTHING
+            rendered this before, so the whole background engine was inert (W2-4);
+            rendering it here as the FIRST child of <body> lights it up. It is a
+            plain server-rendered div (no client component needed) and sits behind
+            everything, so it cannot affect v1 surfaces. (The CSS-MODULE-scoped
+            `.stage` in notecards/Gallery is a different, unrelated class.) */}
+        <div className="stage" aria-hidden="true" />
+        {/* ThemeInit's inline script must run before first paint (it precedes
+            all app chrome here; the static .stage div above carries no script,
+            so it does not delay this one): it
             paints the persisted v2 axes (frame/glass/bg/theme/dim + a safe
             derived tone) onto <html> before the browser's first paint, so a
             Night/Paper/Wash (or any non-default) choice does not flash the

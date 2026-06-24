@@ -20,8 +20,10 @@
 Each axis is set as a data attribute on the app root (`<html>` / `.home`) by
 `lib/theme.tsx`. **Additive / back-compatible:** the v1 axes (`data-style`,
 `data-palette`) are NOT deleted — they are kept as **deprecated compat** so a
-flag-OFF rollback to v1 still works. The v2 path simply stops emitting
-`data-style` to the DOM.
+**git-level rollback** to v1 still compiles. This is a CLEAN CUTOVER: there is
+NO `NEXT_PUBLIC_V2` runtime flag and no runtime "v1 mode"; v2 is the only path.
+v1 compatibility is STRUCTURAL only (preserved tokens + the deprecated
+style/palette API). The v2 path simply stops emitting `data-style` to the DOM.
 
 | Axis | Attribute | Values | Default | Persisted? | Notes |
 |---|---|---|---|---|---|
@@ -93,8 +95,10 @@ ignored, never painted).
 > not persisted as teacher preferences in this stage.
 >
 > **Migration is one-way and lossless for rollback:** the v1 keys are never
-> deleted, so flipping the flag OFF returns the teacher to their original v1
-> look. The theme remap is idempotent (reading `clear` again yields `clear`).
+> deleted, so a **git-level rollback** to the v1 build still finds the
+> teacher's original v1 values intact (the cutover is structural — there is no
+> runtime flag to flip). The theme remap is idempotent (reading `clear` again
+> yields `clear`).
 
 ---
 
