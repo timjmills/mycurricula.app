@@ -9,6 +9,14 @@
 
 ## 0. The product shape (locked with the owner)
 
+**Market (owner decision):** sell **direct to individual teachers and homeschool parents** — B2C,
+self-serve, individual card subscriptions. **Not** schools/districts (no per-seat sales, POs, or
+invoicing). The $4.99/$8.99/mo individual pricing is built for this. Note: a **homeschool parent is a
+"teacher" persona** (they teach their own children with the teacher-facing planner) — this does NOT
+mean a parent *portal* (parents viewing a school's dashboards), which stays out of scope. A homeschooler
+with multiple children = **one Workspace, multiple Workbooks** (one per child/grade) on the adaptive
+spine.
+
 Three things to sell, on a shared AI core:
 
 | Plan | Price | What it is |
@@ -60,6 +68,56 @@ it for genuinely chaotic scans or a paid "high-fidelity" toggle, not the default
 - **Resource files count toward the page quota** when parsed for auto-tagging (see Pillar ④); pure
   storage/attach is ~free.
 - Re-imports **dedupe by content hash** so unchanged pages aren't re-billed.
+
+---
+
+## 1.5 Infrastructure, storage & account limits
+
+### The infra cost stack (verified June 2026; confirm at build)
+**Fixed (don't scale per user — amortize to ~$0 at volume; ~$30/mo total covers it until you outgrow it):**
+- **GitHub** — ~free (or ~$4/dev Team). A dev cost, not per-customer.
+- **Cloudflare Workers paid** — ~$5/mo flat + tiny usage.
+- **Supabase Pro** (Postgres + auth) — ~$25/mo flat (8GB DB, 100GB storage, 250GB egress included).
+
+**Per-user variable:**
+- **Cloudflare R2** (resource files) — **$0.015/GB-month, $0 egress** (no bandwidth bill on downloads —
+  the key reason storage is cheap). Class A/B ops are negligible at this scale.
+- Compute/requests — cents/user inside included tiers.
+- **AI** — the capped Assist / paid-pack costs from §1.
+
+### Why storage barely moves the margin (the 25MB × 10/lesson question)
+- **Max per lesson:** 10 × 25MB = **250MB.**
+- A **fully-maxed 150-lesson subject** ≈ 37.5GB → **$0.56/mo** (and no teacher maxes every lesson).
+- **Realistic** (a few small files + mostly links/lesson): ~2–5GB/subject → **$0.03–0.08/mo.**
+- Even a **100GB** packrat ≈ **$1.50/mo.**
+> R2's free egress makes stored curriculum nearly free. The real storage risk is **video uploads**
+> (100MB–1GB+ each) — which the 25MB/file cap defuses by forcing video to be **linked** (YouTube/Vimeo
+> = $0), not uploaded.
+
+### Probable margins — net of GitHub + Cloudflare + Supabase + R2 + AI + ~3% fees
+| Stream | Net rev | All-in COGS (incl. storage) | **Margin** |
+|---|---|---|---|
+| **$4.99 Base** | ~$4.55 | ~$0.55 | **~80%** |
+| **$8.99 AI** (typical, capped) | ~$8.43 | ~$2.30 (+~$1.50 AI) | **~73%** |
+| **$8.99 AI** (capped power user) | ~$8.43 | ~$3.50 | **~58%** |
+| **Upload pack** $7/$10/$15 | ~$6.5/$9.4/$14.4 | ~$2.50/$5/$7.50 | **~50–64%** |
+
+Storage shifts margin by <1%. The only real margin levers remain **AI usage (cap + cheap models)** and
+**video (the 25MB cap)**. Fixed infra (~$30/mo) is covered by ~8–10 paying subscribers; everything above
+is ~75–80% margin.
+
+### Recommended limits (abuse-guards + packaging — NOT cost-driven)
+- **Per-file: 25MB** ✓ (50MB on AI tier as a perk, optional). Steer video to **links**, not uploads.
+- **10 resources/lesson** ✓ — soft cap; prevents wall bloat, rarely hit.
+- **Master guard — total storage cap/account:** **~10GB (Base) / ~25GB (AI)** — one number that stops
+  TB-scale abuse (cost even when maxed: $0.15–0.38/mo) without micromanaging.
+- **Workspaces/curricula = packaging, generous:** **Base** = 1 workspace, ~5–8 subjects; **AI** = 2–3
+  workspaces, ~unlimited subjects within the storage cap. Extra workspaces = small add-on / upgrade
+  reason. (Homeschool: 1 workspace + a workbook per child fits Base.)
+- **B2C note:** seat-sharing matters less without schools, but the storage cap + workspace count still
+  enforce fair use. If a **free trial / freemium** is used for B2C acquisition, these limits matter MORE
+  (free users still consume storage/AI) — keep the free tier no-AI + small storage, and favor **annual
+  plans** to offset the higher churn + summer seasonality of individual teachers/homeschoolers.
 
 ---
 
