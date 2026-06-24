@@ -5,7 +5,8 @@ rules every contributor (human or agent) must follow**. Read it before touching 
 
 > **Companion file — read this too:** `BUILD_STANDARD.md` at the repo root is the
 > visual, structural, and responsive contract — what every page must look and behave
-> like. The Weekly view (`/weekly`) is the canonical reference. CLAUDE.md is the
+> like. The v2 mockup + `V2 Framework.md` (the 6.24.26 design handoff) are the canonical
+> visual reference — the handoff wins for look/behavior. CLAUDE.md is the
 > _policy_ (rules, phasing, what not to do); BUILD*STANDARD.md is the \_content*
 > (color recipe, type hierarchy, spacing scale, canonical primitives, new-page
 > prompt template). Read both at the start of every build session.
@@ -29,18 +30,32 @@ Supabase backend is the Phase 1B wave. The honest map:
 
 | Route / feature | Status |
 | --- | --- |
-| `/weekly` (Grid + List) | Shipped Phase 1A |
-| `/daily` (Day pane + lesson detail + IconRail) | Shipped Phase 1A |
-| `/year` (Roadmap + Progression + Print) | Shipped Phase 1A |
-| `/subject` (Curriculum view, per-subject unit pages) | Shipped Phase 1A |
+| Day (`/daily`) — "what now?" day pane + lesson detail | Shipped Phase 1A |
+| Week (`/weekly`) — Grid + List | Shipped Phase 1A |
+| Year (`/year`) — Roadmap + Progression + Print (the v2 "Curricular plan") | Shipped Phase 1A |
+| Lesson Plan — the unit/lesson planner (manila tabs, lesson flow) | Shipped Phase 1A |
+| Teach — the projection board (fullscreen, slides, annotation) | Shipped Phase 1A |
+| Planner Hub (`/planner`) — the v2 planning home / hub surface | v2 surface |
+| Resource Wall (`/post`) — the v2 resource board (per-card colors, per-section photos) | v2 surface |
+| Catch-Up (`/catch-up`) — lessons-not-covered triage | Shipped Phase 1A |
 | `/schedule` (timetable) | Shipped as deep-link + side-panel via GlobalRail (Phase 1A complete; rotation cycles deferred to Phase 1B) |
-| `/catch-up` (lessons-not-covered triage) | Shipped Phase 1A |
 | `/settings/*` (unified hub: curriculum, school week, school months, academic year, holidays, appearance, lesson templates, catch-up rules) | Shipped Phase 1A |
-| Master/Personal forking model | Visual + state shipped; persistence to Supabase is Phase 1B |
+| Personal/Team forking model | Visual + state shipped; persistence to Supabase is Phase 1B |
 | Onboarding wizard | Shipped Phase 1A (`Documents/Claude Design/.../onboarding_wizard` is the spec) |
 | Cloudflare deploy (custom domain `mycurricula.app`) | Live |
 | Claude auth bypass (Bearer + URL + cookie) | Live — all three flows working |
 | Supabase backend (auth + DB rows + realtime) | **Not yet wired** — Phase 1B gate. Mock data in `lib/mock/` drives every view today. |
+
+> `/subject` is a legacy redirect to `/year` (already retired on master). The
+> v2 console spine is **Day · Week · Year · Lesson Plan · Teach**, plus the
+> Planner Hub (`/planner`) and the Resource Wall (`/post`); the older
+> per-subject curriculum view folded into Year.
+>
+> **v2 redesign in progress behind `NEXT_PUBLIC_V2`** (per-wave reveal,
+> rollback is redeploy-gated).
+>
+> **Default appearance:** Frame A (Calm Glass) · Photo background · Theme Clear ·
+> auto tone (luminance-sampled from the active photo).
 
 Phase 1B is the **Supabase + multi-school config wave**: wiring the backend so the
 forking model persists, holidays render on weekly/daily, schedule rotation cycles work
@@ -72,19 +87,24 @@ marketplace. See §6 for the full out-of-scope list.
 
 ## 2. The approach — the one idea that defines the product
 
-**Git-style forking applied to curriculum.** There is one **Master** plan (also called
-"Core Curriculum" in newer design copy). Each teacher sees their **Personal** copy of a
-lesson where one exists, and the Master as fallback where it doesn't.
+**Git-style forking applied to curriculum.** There is one shared **Master** plan,
+surfaced to teachers under the UI label **"Team Curriculum."** The label is the only
+thing that changed: the internal value space is unchanged — `editMode ∈ personal | master`,
+`SaveTarget ∈ personal | core`. Each teacher sees their **Personal** copy of a lesson
+where one exists, and the Team plan as fallback where it doesn't.
 
 - **Lazy forking:** a personal copy is created automatically the first time a teacher
   edits a lesson in Personal mode. There is no manual "make a copy" step.
 - **Friction where it matters:** editing Personal is invisible and automatic. Editing
-  Master is intentional and explicit — gated by a top-bar **Personal | Master** toggle
-  and a flashing-then-persistent red banner ("Heads up — changes here affect the whole
-  team"). No confirm dialogs.
+  the Team plan is intentional and explicit — gated by a top-bar
+  **Personal | Team Curriculum** toggle and a **pink caution glow** (`#E8179B`) that
+  fires on `[data-mode="team"]`: a frame edge-glow, the toggle, and the planning header
+  light pink as a persistent "changes here affect the whole team." It animates a brief
+  **two-pulse then persists**; under `prefers-reduced-motion` it appears **solid** (no
+  pulse). The glow **is** the safety mechanism — **never a confirm dialog**.
 - **Completion is independent of forking.** Marking a lesson done never forks it.
-- **Three-tier visual differentiation** tells a teacher at a glance whose version a
-  card is:
+- **Three-tier visual differentiation** (PRESERVED unchanged) tells a teacher at a
+  glance whose version a card is:
   - _Unedited from Master_ → solid 4px subject-color left stripe.
   - _Personally modified (content changed)_ → **dashed** stripe + "Modified" pill.
   - _Personally moved (day/order changed)_ → solid stripe + move-arrow icon (↔ / ⤴).
@@ -113,11 +133,12 @@ nearly every feature — respect it everywhere.
 | ------------- | ------------------------------------------------------------------ |
 | Framework     | Next.js (App Router) + React 19 + TypeScript                       |
 | Styling       | Tailwind (layout/spacing only) + CSS custom-property design tokens |
+| Fonts         | Poppins (display/H1) · DM Sans (headings/wordmark) · Plus Jakarta Sans (UI/body/data), delivered via `next/font` |
 | Data (later)  | Supabase (Postgres + Auth + Realtime), row-level security          |
 | Auth (later)  | Supabase Auth — Google SSO, restricted to the school domain        |
 | Files (later) | Cloudflare R2 for resources; Supabase Storage for exports          |
 | PDF / Excel   | `@react-pdf/renderer` / SheetJS, client-side                       |
-| Hosting       | Cloudflare Pages                                                   |
+| Hosting       | Cloudflare Workers via OpenNext                                    |
 
 **Current state of the repo:** a **frontend-complete Phase 1A prototype** deployed to
 Cloudflare at `mycurricula.app`. See §1's status table for what is shipped vs.
@@ -147,37 +168,115 @@ Documents/      Planning docs + design handoff — NOT part of the app, never im
 
 ## 4. Design system rules
 
-The visual system has three independent axes, all set as `<html>` data attributes by
-`lib/theme.tsx`:
+> The canonical visual reference for v2 is the **v2 mockup + `V2 Framework.md`**
+> (under `Documents/Claude Design/.../design-system/`), not `/weekly`. The handoff
+> **wins for look and behavior** — when code and the handoff disagree, fix the code.
+> Recreate it faithfully in idiomatic React; cite the handoff as the origin.
 
-- `data-style` ∈ `quiet | calm | vivid` — card treatment. **The app defaults to
-  `vivid`**; `quiet` and `calm` remain available as teacher preferences.
-- `data-palette` ∈ `normal | highlight` — subject-color saturation. **Defaults to
-  `highlight`.**
-- `data-theme` ∈ `paper | cloud | night | mint | sky | blossom` — the app-wide color
-  theme (foundation neutrals, scrims, shadows, mesh, logo lockup). **Defaults to
-  `paper`** (the original warm-cream look; the plain `:root` block in `tokens.css`
-  IS the Paper theme). `night` is the dark mode. A teacher can also store
-  `"system"` (the "Follow system" picker option) — it resolves to `paper`/`night`
-  via `prefers-color-scheme` before reaching the DOM, so `data-theme` only ever
-  carries a concrete theme. Theme overrides live in `:root[data-theme="…"]` blocks
-  at the end of `tokens.css`, wrapped in `@media screen` so **print always renders
-  Paper**. Subject hues are deliberately NOT themed (color carries team-wide
-  meaning); Night re-tints only the subject `-tint`/`-ink` companions. The logo
-  re-colors per theme through the `--logo-*` tokens. All three axes persist to
-  localStorage (`mycurricula:user:theme*`) and paint pre-hydration via the
-  no-FOUC boot script in `lib/theme-init.tsx`. Theme changes pulse a
-  `data-theme-transition` attribute on `<html>` for ~220ms so tokens.css can
-  cross-fade the swap (suppressed under reduced motion). Optional cross-device
-  sync (`lib/theme-sync.ts`, OFF unless `NEXT_PUBLIC_THEME_SYNC=1`) mirrors the
-  three axes to the `teacher_preferences` table. ALLOWLIST LOCKSTEP: the value
-  lists live canonically in `lib/theme.tsx` (exported guards); the boot
-  script's inline arrays and the migration's SQL CHECK constraints must mirror
-  them exactly. CHROME TIER: active/selected chrome (nav items, tabs, rail
-  icons, filter chips) and chrome surfaces consume the `--chrome-accent-*` /
-  `--rail-bg` / `--panel-bg` tokens — never raw `--brand-*` — so every theme
-  re-hues its own chrome; Paper's chrome tokens default to the original
-  brand/paper values (see BUILD_STANDARD.md §Themes).
+### The v2 appearance engine — attribute vocabulary
+
+The visual system is a set of independent axes, all set as `<html>` / app-root data
+attributes by `lib/theme.tsx`. **This replaces the v1 3-axis model**
+(`data-style ∈ quiet|calm|vivid`, `data-palette ∈ normal|highlight`,
+`data-theme ∈ paper|cloud|night|mint|sky|blossom`). `data-style` and `data-palette`
+are **dropped**; `paper` + `cloud` **fold to `clear`**; `night` is now the dark **tone**,
+not a peer theme.
+
+- `data-frame` ∈ `glass | paper | color` — layout character + material + emphasis.
+  Defaults to **`glass`** (Frame A · Calm Glass). The working build also carries the
+  equivalent `data-version ∈ A|B|C` on the app root (A=Glass, B=Bright/paper,
+  C=Color-forward) — **treat them as the same axis.** A frame changes layout/material,
+  never the global tone.
+- `data-glass` ∈ `dark | light` — the two frosted **registers** of Frame A (dark
+  frosted = translucent dark panels + white text; white frosted = translucent white
+  panels + dark ink). Surface-only — it flips a panel's fill **and** its text together;
+  it must never wash the background.
+- `data-bg` ∈ `photo | wash` — what lives behind the glass. **Frosted glass over Photo,
+  Liquid glass ("Liquid v5") over Wash.** Defaults to **`photo`**.
+- `data-theme` ∈ `clear | night | honey | blossom | mint | sky | off` — the seven
+  themes (see below). Defaults to **`clear`**. (`off` = Photo, the true ungraded photo.)
+- `data-dim` ∈ `dim | normal | bright` — Photo prominence + text treatment (Photo only).
+  `normal` is an **auto** mode (samples the photo's average luminance to derive tone).
+- `data-tone` ∈ `light | dark` — **DERIVED**, not chosen: Night forces dark; Photo
+  Dim/Normal → dark; Wash / Photo-Bright / any light theme → light. **Every surface
+  branches on `data-tone`, never on the theme.**
+- Plus the supporting axes `data-canvas` (the home center panel), `data-veil`
+  (readability layer), and `data-zoom` (ambient drift on/off).
+
+**The 7 themes** (a theme washes the whole app — ambient palette, soft-light tint, and
+the `--accent`/glow; subject + status colors never move):
+
+| Theme | Role |
+|---|---|
+| **Clear** | the resting theme (formerly Normal/paper); balanced brand mesh, white/clear swatch |
+| **Night** | the dark theme — the dark **tone** |
+| **Honey** | warm gold/amber/coral |
+| **Blossom** | pink/violet/periwinkle multi-hue |
+| **Mint** | blue-green |
+| **Sky** | cool blues |
+| **Off (Photo)** | no wash/grade — the true original photo |
+
+Theme washes are smoothed multi-stop gradients (no hard band); the accent glow lives in
+the **background wash**, not as a per-card halo. Themes (and washes) drift slowly by
+default; Motion = Still / reduced-motion stops them. **Glass is the signature material**
+— frosted over photo, Liquid v5 over wash, in a dark or white register; see §6 of
+`V2 Framework.md`.
+
+**Glass rules.** Glass always carries an inner top highlight (`inset 0 1px 0` white
+line) — the lit-edge read. Over dark it tints darker; over light it stays bright. Never
+replace floating-chrome glass with a flat opaque card. **RULE #1 — NO SHARP CORNERS,
+EVER**: every panel, card, tab, chip, button, image, preview tile, and input is rounded.
+Color is **information, never decoration**; gradients are **atmosphere, not surfaces**.
+
+**Subject scale + the §4 subject map.** The subject token scale is **wider than the
+named subjects**: `--subj-1 … --subj-15` (15 hues + brand indigo), each with `-tint`
+(fills), `-ink` (text-on-tint), and `-bright` (dots/outlines) companions — so the system
+supports more subjects and a 16-swatch palette (e.g. Resource Wall per-card colors)
+without reuse. The locked, **team-wide** subject→slot map (v2 §4):
+
+| Subject | Slot | | Subject | Slot |
+|---|---|---|---|---|
+| math | `--subj-1` (gold) | | reading | `--subj-10` (blue) |
+| ufli | `--subj-2` (apricot) | | sel | `--subj-12` (teal) |
+| writing | `--subj-5` (pink) | | explorers | `--subj-13` (green) |
+| grammar | `--subj-7` (purple) | | | |
+| spelling | `--subj-9` (periwinkle) | | | |
+
+Color carries **team-wide meaning**; the subject→slot map is **not** a teacher
+preference. (The pink Team caution glow `#E8179B` is `--subj-5-bright`.)
+
+**The legibility contract** (non-negotiable): **branch on `data-tone`, never the theme.**
+Dark tone → white text on translucent-dark glass; light tone → ink text on
+white/translucent-white. Never ink-on-dark or white-on-white. When a surface flips tone,
+its text flips with it. Accent colors only interactive/emphasis elements (primary
+buttons, active tab, focus, now-ring) — never plain reading text or nav labels. Subject
+color always wins for subject identity, on any background.
+
+**Surface-theming + forward rules.** Overlays (modals, drawers, popovers, menus) render
+above the app-wide wash layer, so they get their own faint **accent wash** from the
+central "SURFACE THEMING CONTRACT" rule (`themes.css`) — Clear and Off get no wash. A new
+overlay must reuse one of the registered surface container classes (`.hub-modal`,
+`.cfg-modal`, `.cu-modal`, `.ue-modal`, `.set-panel`, `.ll-dlg`, `.td-dock`, the
+popover/menu classes, …) **or** add its own root + scrim to that rule. **Forward rule for
+any new menu/view/modal:** read tone not theme; build from `.glass`/card + `var(--accent)`
++ subject tokens (never hard-code a color); respect the legibility contract; default to
+neutral and earn color; survive Wash / Photo-Dim / Photo-Bright / Night before shipping;
+round + float + single-job; carry the theme on overlays.
+
+**Token migration is ADDITIVE.** Tokens live in `app/tokens.css` as CSS custom
+properties (Tailwind = layout/spacing only). The v2 names are **added** and ~6 shared
+collisions re-pointed, but **all v1-only tiers are preserved**: `--chrome-accent-*`,
+`--rail-bg` / `--panel-bg`, `--logo-*`, `--wf-*` / `--teach-*`, `--tag-*`, `--hl-*`,
+scrims, and the z-scale. Do not delete a v1 tier just because v2 doesn't reference it.
+
+**ALLOWLIST LOCKSTEP.** The appearance axes' value lists live canonically in
+`lib/theme.tsx` (exported guards). Five surfaces must stay in sync — change one, change
+all:
+1. `lib/theme.tsx` — the exported guard arrays.
+2. `lib/theme-init.tsx` — the no-FOUC boot script's inline arrays.
+3. The `teacher_preferences` SQL `CHECK` constraints (the migration).
+4. `app/layout.tsx` — the SSR root attributes.
+5. `scripts/probe-theme-wave.mjs` — the per-wave probe.
 
 **Hard rules:**
 
@@ -188,12 +287,13 @@ The visual system has three independent axes, all set as `<html>` data attribute
   font size in a component.
 - Subject colors come through the `.cp-subj.<subject>` classes (driven by the palette
   bridge in `lib/palette.tsx`) or the `useSubjectColor(subjectId)` hook. Never invent a
-  subject color.
+  subject color; pull from the `--subj-*` scale or the hook.
 - **Buttons:** use the `components/ui/Button` primitive only — never hand-roll a pill CTA, never give a button a colored-glow resting shadow, and qualify variant/size CSS with `.btn` so the `.cp-root` reset can't strip it. See BUILD_STANDARD.md §7a (Buttons & pills).
-- The 8 subjects (`math, reading, writing, grammar, spelling, ufli, explorers, sel`)
-  and their swatch mapping are **locked team-wide**. Style, palette, and theme are
-  per-teacher preference; the subject→color mapping is not.
-- Respect `prefers-reduced-motion`: the master-mode banner appears solid (no flash) and
+- The subjects (`math, reading, writing, grammar, spelling, ufli, explorers, sel`)
+  and their swatch mapping (the §4 subject map above) are **locked team-wide**. Frame,
+  glass register, background, theme, and brightness are per-teacher preference; the
+  subject→slot mapping is not.
+- Respect `prefers-reduced-motion`: the Team caution glow appears solid (no pulse) and
   urgent notes never pulse under reduced motion.
 - Accessibility: WCAG AA contrast minimum, full keyboard navigation, ≥44px touch
   targets on primary actions.
@@ -714,13 +814,17 @@ historical.
 ### Route aliases (planning-doc names vs. current routes)
 
 The planning doc and some older artifacts name routes that have since been
-renamed in the codebase. These have not changed in 2 months; older docs that
-say `/curriculum` or `/yearly` refer to the same surfaces.
+renamed in the codebase. Older docs that say `/curriculum`, `/yearly`, or
+`/subject` refer to the same surfaces; v2 added the Planner Hub and Resource Wall.
 
-| Planning-doc name | Current route | Top-bar tab label |
+| Planning-doc / older name | Current route | v2 console / tab label |
 | --- | --- | --- |
-| `/curriculum` | `/subject` (→ `/subject/<id>`) | "Curriculum" |
-| `/yearly` | `/year` | "Yearly" |
+| `/curriculum`, `/subject` (→ `/subject/<id>`) | `/year` (`/subject` is a legacy redirect to `/year`) | "Year" (the v2 "Curricular plan") |
+| `/yearly` | `/year` | "Year" |
+| (the unit/lesson planner) | Lesson Plan | "Lesson Plan" |
+| (the projection board) | Teach | "Teach" |
+| (new in v2) | `/planner` | "Planner Hub" |
+| (new in v2 — resource board) | `/post` | "Resource Wall" |
 
 ### Audit-doc disclaimer
 
