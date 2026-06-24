@@ -14,11 +14,16 @@
 //
 // DERIVED data-tone: tone is computed from theme + bg + dim at paint time (see
 // deriveTone). Every surface branches on data-tone, never on the theme — this is
-// the legibility contract. In THIS stage tone is derived from the persisted axes
-// only; the photo-luminance "normal → auto" sample is wired in a LATER stage, so
-// here `normal` resolves to its safe default (dark — white text on a scrim). The
-// boot script paints a deterministic light default and the post-mount effect
-// reconciles to the persisted-axes derivation.
+// the legibility contract. For dim ∈ {dim, bright} and bg === "wash" / theme ===
+// "night" the tone is fixed by the persisted axes. For bg === "photo" + dim ===
+// "normal" the matrix calls for AUTO: sample the active photo's average luminance
+// (lib/photo-luminance.ts) and resolve light (light photo → dark text) / dark.
+// Until a sample is available — which is ALWAYS the case in this wave, because no
+// active-photo URL source is wired yet (the photo library is a later wave) — the
+// `normal` branch resolves to its safe default (dark — white text on a scrim).
+// The auto path is therefore DORMANT today: autoTone stays null and `normal`
+// behaves exactly as before. The boot script paints a deterministic light default
+// and the post-mount effect reconciles to the derivation.
 //
 // DEPRECATED v1 COMPAT (kept, NOT emitted on the v2 DOM path): `style`/`palette`
 // + their setters and STYLE_VALUES/PALETTE_VALUES. ~17 components and the command
@@ -55,6 +60,11 @@ import {
 import type { ReactNode } from "react";
 import { PaletteProvider } from "./palette";
 import type { PaletteType, SubjectMapping } from "./palette";
+import {
+  getCachedLuminance,
+  luminanceToTone,
+  samplePhotoLuminance,
+} from "./photo-luminance";
 import { loadRemotePrefs, saveRemotePrefs } from "./theme-sync";
 
 // ── v2 axis types ─────────────────────────────────────────────────────────
@@ -203,6 +213,16 @@ const DIM_KEY = "mycurricula:user:theme-dim";
 const STYLE_KEY = "mycurricula:user:theme-style";
 const PALETTE_KEY = "mycurricula:user:theme-palette";
 
+// Per-photo auto-tone cache key prefix (NOT a lockstep axis key). The `normal`
+// AUTO path samples a photo's luminance once; we cache the derived tone keyed by
+// the photo URL so a revisit can seed `autoTone` synchronously and skip the
+// post-hydration flash while the async re-sample confirms it. This is a SEPARATE
+// presentation cache — it is NEVER one of the lockstep theme axes, never sent to
+// teacher_preferences / theme-sync, and never validated against an axis guard.
+// Shape: `mycurricula:photo-tone:<url>` → "light" | "dark".
+const PHOTO_TONE_KEY_PREFIX = "mycurricula:photo-tone:";
+const photoToneKey = (url: string): string => `${PHOTO_TONE_KEY_PREFIX}${url}`;
+
 // ── Allowlist guards ───────────────────────────────────────────────────────
 //
 // Exported so lib/theme-sync.ts (and any future consumer) validates against
@@ -224,6 +244,12 @@ export function isThemeDim(v: unknown): v is ThemeDim {
 }
 export function isThemeCanvas(v: unknown): v is ThemeCanvas {
   return CANVAS_VALUES.includes(v as ThemeCanvas);
+}
+// NOTE: NOT a lockstep axis guard. Tone is DERIVED, never persisted as an axis;
+// this only validates the separate per-URL `photo-tone:<url>` presentation cache
+// (the AUTO seed) so a stale/hand-edited value can never seed an invalid tone.
+function isThemeTone(v: unknown): v is ThemeTone {
+  return TONE_VALUES.includes(v as ThemeTone);
 }
 /** Accepts the v2 theme set AND the "system" sentinel. */
 export function isThemeSetting(v: unknown): v is ThemeSetting {
@@ -305,6 +331,23 @@ function resolveTheme(setting: ThemeSetting, systemDark: boolean): AppTheme {
 }
 
 /**
+ * The ACTIVE-PHOTO-URL SEAM for the `dim === "normal"` AUTO tone.
+ *
+ * Today this yields null: NO code populates an active-photo URL anywhere (the
+ * photo library / upload is a LATER wave). The CSS stage already references an
+ * empty `var(--stage-photo, none)` slot (app/themes.css); when the photo wave
+ * lands it will set `<html data-stage-photo="<url>">` (or repoint this getter at
+ * whatever photo context it introduces), and the AUTO path lights up with no
+ * further change here. Until then `autoTone` stays null → `normal` resolves to
+ * dark exactly as before, so the mechanism is dormant + safe this wave.
+ */
+function getActivePhotoUrl(): string | null {
+  if (typeof document === "undefined") return null;
+  const url = document.documentElement.dataset.stagePhoto;
+  return url && url.length > 0 ? url : null;
+}
+
+/**
  * DERIVE the tone from the persisted axes (see WAVE-2-VALUE-MATRIX.md §4).
  * Evaluated top-to-bottom; first match wins:
  *   1. theme === "night"  → dark   (the only dark theme, app-wide)
@@ -312,22 +355,27 @@ function resolveTheme(setting: ThemeSetting, systemDark: boolean): AppTheme {
  *   3. bg === "photo":
  *        dim === "dim"     → dark   (manual override — scrim, white text)
  *        dim === "bright"  → light  (manual override — ink on white frosted)
- *        dim === "normal"  → AUTO. The photo-luminance sample lands in a LATER
- *                            stage; until then default to dark (the safe
- *                            white-text-on-scrim state).
+ *        dim === "normal"  → AUTO. Resolve the photo-luminance-derived `autoTone`
+ *                            when one is available; until then (the common case,
+ *                            and ALWAYS this wave — no active-photo URL is wired)
+ *                            default to dark (the safe white-text-on-scrim state).
+ *
+ * Pure: the auto result is passed IN as `autoTone` (computed by the effect from
+ * the luminance sample), so this stays a plain function of its arguments.
  */
 function deriveTone(
   resolved: AppTheme,
   bg: ThemeBg,
   dim: ThemeDim,
+  autoTone: ThemeTone | null,
 ): ThemeTone {
   if (resolved === "night") return "dark";
   if (bg === "wash") return "light";
   // bg === "photo"
   if (dim === "dim") return "dark";
   if (dim === "bright") return "light";
-  // dim === "normal" — auto (photo-luminance sample is a later stage)
-  return "dark";
+  // dim === "normal" — AUTO: the luminance-derived tone when sampled, else dark.
+  return autoTone ?? "dark";
 }
 
 interface ThemeProviderProps {
@@ -398,6 +446,14 @@ export function ThemeProvider({
   const [palette, setPalette] = useState<ThemePalette>(initialPalette);
   // Tracks the OS dark-mode preference, used only when theme === "system".
   const [systemDark, setSystemDark] = useState(false);
+  // The photo-luminance-derived tone for the `dim === "normal"` AUTO path. NULL
+  // until an active photo is sampled — which is ALWAYS the case this wave (no
+  // active-photo URL is wired yet), so `normal` falls back to dark. Initialized
+  // to null (never read storage in the initializer — preserves the SSR no-FOUC
+  // contract: server HTML + first client render must match). It is NOT persisted
+  // as tone (tone is derived, never persisted); the per-URL `photo-tone:<url>`
+  // cache that seeds it is a separate, non-axis presentation cache.
+  const [autoTone, setAutoTone] = useState<ThemeTone | null>(null);
 
   // Load effect — declared FIRST so it runs before the mirror effect on mount.
   // Reads + validates the persisted axes (NEW v2 keys), runs the one-time v1
@@ -566,12 +622,66 @@ export function ThemeProvider({
     [theme, systemDark],
   );
 
-  // DERIVED tone — recomputed from the persisted axes whenever they change.
-  // Never persisted; never a setter.
+  // DERIVED tone — recomputed from the persisted axes (+ the AUTO `autoTone`)
+  // whenever they change. Never persisted; never a setter. `autoTone` only ever
+  // affects the bg === "photo" + dim === "normal" branch (deriveTone); for every
+  // other combination it is ignored, so its null default this wave is inert.
   const tone = useMemo<ThemeTone>(
-    () => deriveTone(resolvedTheme, bg, dim),
-    [resolvedTheme, bg, dim],
+    () => deriveTone(resolvedTheme, bg, dim, autoTone),
+    [resolvedTheme, bg, dim, autoTone],
   );
+
+  // AUTO photo-luminance effect (matrix §4, rule 3, `dim === "normal"`). Runs
+  // only when bg === "photo" AND dim === "normal" AND an active photo URL exists.
+  // Today getActivePhotoUrl() always returns null (no photo source wired this
+  // wave), so this effect resets autoTone to null on every run and never samples
+  // — the dormant, zero-behavior-change state. When the later photo wave feeds a
+  // URL through the seam, this (a) seeds autoTone synchronously from the in-memory
+  // / per-URL localStorage cache to avoid a flash, then (b) samples the photo and
+  // sets autoTone via luminanceToTone, writing both caches. NEVER runs on the
+  // server; resilient to a missing URL; guards async sets against unmount.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const url =
+      bg === "photo" && dim === "normal" ? getActivePhotoUrl() : null;
+
+    // Conditions unmet (wash / night-via-theme handled upstream, dim/bright
+    // overrides, or no active photo — the common case): no auto tone applies, so
+    // `normal` falls back to dark. Resetting to null keeps deriveTone pure.
+    if (url === null) {
+      setAutoTone(null);
+      return;
+    }
+
+    let active = true;
+
+    // (a) Synchronous seed — avoid a post-hydration flash on revisit. Prefer the
+    // in-memory luminance cache; else the per-URL localStorage tone cache. Either
+    // is a hint that the async sample below confirms/overrides.
+    const cachedLum = getCachedLuminance(url);
+    if (typeof cachedLum === "number") {
+      setAutoTone(luminanceToTone(cachedLum));
+    } else {
+      const storedTone = readValidated(photoToneKey(url), isThemeTone);
+      if (storedTone !== null) setAutoTone(storedTone);
+    }
+
+    // (b) Sample (de-duped + memoized in photo-luminance.ts). On a readable photo
+    // set the derived tone + persist the per-URL cache; on failure (load error /
+    // CORS taint / no canvas) keep whatever seed we had (or the dark fallback) —
+    // never force a wrong tone.
+    void samplePhotoLuminance(url).then((lum) => {
+      if (!active || lum === null) return;
+      const derived = luminanceToTone(lum);
+      setAutoTone(derived);
+      writeKey(photoToneKey(url), derived);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [bg, dim]);
 
   // Mirror effect — declared SECOND. Writes the axes onto <html> and persists
   // them. It SKIPS its first invocation: the boot script already painted the
