@@ -177,6 +177,18 @@ run an adversarial review before declaring the task complete or asking for user
 review. Trivial comments, formatting, and copy-only edits do not require this
 gate.
 
+**MANDATORY — design-fidelity verification (every wave, every visual surface).**
+Any change touching a design/visual surface (tokens, the appearance engine,
+chrome, a screen, a component's look/behavior) MUST be verified against the
+**FULL v2 design handoff, not just the markdown** — open the actual files under
+`Documents/Claude Design/.../6.24.26 design_handoff_v2_site/` and check every
+value/recipe/axis/label the change touches. **Authority chain (handoff
+README):** the runnable **bundled mockup** (`mockup/New v2 Site
+Design.bundled.html`) wins for look + behavior > **`design-system/V2
+Framework.md`** for rules > the **design-system CSS** for tokens > the plan for
+sequencing. This runs in the code-review gate (against the diff) and again in
+the Live QA gate (against the rendered result, at every device width).
+
 **Precondition — stage every in-scope file first.** The review prompt reads
 `git diff` (working tree vs index) and `git diff --cached` (index vs HEAD),
 which together cover staged and unstaged tracked-file changes but NOT
@@ -255,6 +267,13 @@ not performed through the headless review command: whichever agent has
 browser tooling runs it (in Claude Code, the user-scope `playwright` /
 `chrome-devtools` MCP servers; otherwise a local Playwright script with
 `channel: "chrome"`).
+
+**MANDATORY — compare the rendered result to the design handoff,** not just to
+a mental model: open the runnable **bundled mockup** + the
+**`design-system/*.html`** galleries in the browser alongside the running app
+and compare behavior + exact values at **every device width (phone 375–414 ·
+tablet 768–834 · desktop 1280–1440)**. Same authority chain as the code-review
+gate. A surface that works but diverges from the handoff is a finding.
 
 Breadth scales with the build — an app-wide wave gets the full template
 below; a focused change gets every surface it touches plus a browser-console

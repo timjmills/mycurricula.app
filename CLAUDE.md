@@ -402,6 +402,22 @@ run an adversarial review via Codex before declaring the task complete or
 asking for user review. Trivial comments, formatting, and copy-only edits do
 not require this gate.
 
+**MANDATORY — design-fidelity verification (every wave, every visual surface).**
+Any change that touches a design/visual surface — tokens, the appearance
+engine, chrome, a screen, a component's look or behavior — MUST be reviewed
+against the **FULL v2 design handoff, not just the markdown.** The reviewer
+opens the actual handoff files under
+`Documents/Claude Design/.../6.24.26 design_handoff_v2_site/` and verifies every
+value / recipe / axis / label the change touches against them — never trusting
+the diff or the plan's restatements. **Authority chain (handoff README):** the
+runnable **bundled mockup** (`mockup/New v2 Site Design.bundled.html`) wins for
+look + behavior > **`design-system/V2 Framework.md`** for rules > the
+**design-system CSS** (`colors_and_type.css` / `themes.css` / `modes.css`) for
+tokens > the plan for sequencing. Open the `design-system/*.html` galleries +
+the per-surface `source/*.jsx` + `source/*.css` references for exact values.
+This applies in §4a (against the diff) and again in §4b (against the rendered
+result, at every device width) — neither substitutes for the other.
+
 **Invocation.** Run Codex non-interactively with the read-only sandbox so it
 cannot write to the tree and cannot stall on approval prompts:
 
@@ -571,6 +587,16 @@ Playwright script (`chromium.launch({ channel: "chrome" })`, like the
 audit template below; a focused change gets every surface it touches plus a
 browser-console error check. What never scales away: real clicks in a real
 browser before "done".
+
+**MANDATORY — compare the rendered result to the design handoff.** This live
+pass does not just check that the app *works*; it checks that it *matches the
+v2 design.* Open the runnable **bundled mockup**
+(`mockup/New v2 Site Design.bundled.html`) + the **`design-system/*.html`**
+galleries in the browser alongside the running app, and compare behavior +
+exact values at **every device width (phone 375–414 · tablet 768–834 · desktop
+1280–1440)** — not against a mental model. Same authority chain as §4a (bundled
+mockup > V2 Framework.md > design-system CSS > plan). A surface that works but
+diverges from the handoff is a finding.
 
 **Operational notes.**
 
