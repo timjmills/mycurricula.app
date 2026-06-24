@@ -7,6 +7,26 @@
 
 ---
 
+## ⛔ Prerequisites & build sequencing (owner decision — do NOT start before these)
+
+**None of the AI platform is built until the foundation is in place.** Order is fixed:
+
+1. **The new website is up** — the v2 appearance/site rebuild (the `claude/v2-wave*` waves) ships to
+   production. The AI surfaces (import wizard, in-lesson Assist, resource walls) render on the v2 shell,
+   so the shell comes first.
+2. **The normal data streams are working** — the Supabase backend is wired end-to-end (real auth rows,
+   the forking model persisting, lessons/units/resources reading+writing real data, not `lib/mock/`
+   fixtures). The AI features WRITE into this data layer (staging → commit, suggest → lazy-fork), so
+   there must be a real data layer to write to. The adaptive-spine schema changes (Workspace/Workbook/
+   open-Subject/Phase, nullable placement) land as part of / right after this step.
+3. **Then build the AI platform** — in the pillar order in §4 (Ingestion + Resources → AI Assist →
+   Authoring), on the now-solid foundation.
+
+This doc is the **recorded design to build in step 3** — researched and costed now, implemented later.
+Treat everything below as the spec to return to once (1) and (2) are done.
+
+---
+
 ## 0. The product shape (locked with the owner)
 
 **Market (owner decision):** sell **direct to individual teachers and homeschool parents** — B2C,
@@ -121,6 +141,34 @@ is ~75–80% margin.
 
 ---
 
+## 1.6 Retention & billing (B2C / seasonal)
+
+Selling to **individual teachers + homeschool parents** means consumer billing dynamics — higher churn
+than B2B, and a hard **summer-dormancy** pattern (use Sep–May, drop over Jun–Aug). The plan:
+
+- **Annual discount — yes: "2 months free" (~17% off).** Base **~$49.90/yr** (~$4.16/mo); AI
+  **~$89.90/yr** (~$7.49/mo). It **pre-solves summer churn** (the dormant months are already paid, and
+  COGS over summer is ~$0 → pure margin), improves cash flow + CAC payback, and aligns to the school
+  year. Make annual the **visible default** (anchored vs monthly); push hardest at back-to-school.
+- **"Pause for summer," not cancel.** Offer a one-click **hold (up to ~3 months, data preserved)** as
+  the first option on the cancel path. Re-activation = one click, not a re-signup. Make it **free**
+  (storage is pennies) — goodwill that converts to retention.
+- **Retain data ~12 months after any cancel** (don't delete on day one — storage is near-free). A
+  returning teacher finds their curriculum + imported resources intact → frictionless return. The
+  **paid upload packs are a switching-cost moat**: re-importing is real effort, so retained data ≫
+  "start over."
+- **August win-back** automation to dormant/retained users ("your room's ready for the new year") —
+  high ROI because the data's still there.
+- **Optional summer tier** (~$2.99 read-only / planning mode) to capture revenue from those who'd
+  otherwise fully pause.
+- **Free trial / freemium caution:** if used for acquisition, keep the free tier **no-AI + small
+  storage** (free users still consume storage/AI), and time conversion prompts to back-to-school.
+
+> Net: lead with **annual**, turn **cancel into pause**, and **never delete data fast**. Those three
+> convert the seasonal churner into either continued revenue or a frictionless return.
+
+---
+
 ## 2. Shared AI core (built once, used by every pillar)
 
 - **LLM client + structured outputs** — Claude Structured Outputs (schema-guaranteed JSON via
@@ -165,8 +213,20 @@ real resources. Two input modes: **around a known book** (title/ISBN) or **from 
   grade/safety) → rank.** Discovery options: **Perplexity Sonar** (grounded + citations), Gemini
   Google-grounding, Claude web-search, or Exa/Tavily; **YouTube Data API** for verifiable videos.
 - **K-12 content-safety + standards-alignment** gates before anything is suggested.
-- **Strong models** (paid generation); output-token-heavy → its own credit/cost model (cost a full pass
-  separately at build — rough order: a few $ of LLM output + search per subject-year).
+- **Strong models** (paid generation); output-token-heavy → its own credit/cost model.
+- **Discovery-layer costs (verified June 2026; re-check at build):**
+  - **Perplexity Sonar** — base **$1/$1 per M tokens + $5–12 per 1k requests**; Sonar Pro $3/$15 + $6–14
+    per 1k. Turnkey grounded search with citations.
+  - **Exa** — ~**$5/1k** (instant) / **$7/1k** (with contents); 1k free/mo. Semantic search.
+  - **Tavily** — ~**$8/1k** basic / **$16/1k** advanced; 1k free/mo. RAG-optimized.
+  - **YouTube Data API** — **free, but 10k units/day** and **search = 100 units/call → only ~100 video
+    searches/day free**; no self-serve top-up (must apply for a quota extension). **Build constraint:**
+    cache/dedupe video lookups, spread over days, or apply for higher quota; don't assume unlimited.
+  - **Gemini Google-grounding / Claude web-search** — viable alternatives if staying in one LLM vendor.
+- **Rough all-in per subject-year:** generation (output-heavy: ~80–150k output tokens → ~$1.2–2.3 Sonnet
+  / ~$2–3.8 Opus) + discovery (~2–5 searches/lesson → ~$2–4) ≈ **~$4–8/subject** — *more than ingestion*,
+  so price it higher (~$15–25/subject) or fund it from AI-tier credits. Firm this up in a dedicated
+  costing pass when this pillar is designed.
 - **Sequence after ① and ②** (higher risk: hallucination/safety/pedagogy), but design the spine now to
   serve it (already done).
 
@@ -188,6 +248,9 @@ Walls (kanban), R2 + `app/api/resources`, link-preview `app/api/og-preview`.
 ---
 
 ## 4. Sequencing
+
+**Gated behind the two prerequisites at the top** (v2 website live → data streams working). Then, in
+pillar order:
 
 1. **Pillar ① Ingestion + ④ Resources** — onboarding value; builds the schema + staging + HITL the rest
    reuse. Strong-model, paid per pack.
@@ -221,3 +284,7 @@ extended each step.
   https://www.llamaindex.ai/pricing · https://developers.llamaindex.ai/llamaparse/general/pricing/
 - Document-AI cost comparison 2026 (Mistral OCR ~$1–2/1k, Azure DI ~$10/1k, Textract ~$65/1k) —
   https://aiproductivity.ai/blog/document-ai-cost-comparison/
+- Cloudflare R2 ($0.015/GB-mo, $0 egress) · Workers / Supabase Pro ($25/mo) — vendor pricing pages.
+- Perplexity Sonar ($1/$1 + $5–12/1k req; Pro $3/$15) — https://docs.perplexity.ai/docs/getting-started/pricing
+- YouTube Data API (free, 10k units/day; search = 100 units) — https://developers.google.com/youtube/v3/determine_quota_cost
+- Exa (~$5–7/1k) · Tavily (~$8–16/1k) — https://exa.ai/pricing · https://www.buildmvpfast.com/api-costs/ai-search

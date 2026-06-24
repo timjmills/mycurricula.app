@@ -8,6 +8,11 @@
 > mixed formats (PDF / DOCX / XLSX / scans / zips) and have the app ingest it into an interactive plan
 > **while preserving their own structure, formatting, and links as much as possible** — with a
 > human-in-the-loop review so nothing wrong lands silently.
+>
+> **Umbrella + sequencing:** this is **Pillar ① of `docs/AI-PLATFORM-PLAN.md`** (tiers, pricing,
+> shared AI core, the four pillars, retention). Per the owner, build is **gated**: (1) the new v2
+> website ships → (2) the Supabase data streams work → (3) then build this. Researched now, implemented
+> in step 3.
 
 ---
 
