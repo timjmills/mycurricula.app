@@ -17,6 +17,28 @@
 
 ---
 
+## PART 0 — DESIGN-FIDELITY VERIFICATION (MANDATORY every wave; feeds both §4a and §4b)
+Every audit verifies the wave against the **FULL v2 design handoff — not just the markdown.** Fetch
+read-only (`git fetch origin claude/design-handoff-v2-site`), dir
+`Documents/Claude Design/6.24.26 design_handoff_v2_site/`:
+- **design-system/** — `V2 Framework.md` (written rules); `V2 Design System.html` + `Design Language.html`
+  (visual gallery + narrative — **open in a browser**); `colors_and_type.css` + `themes.css` + `modes.css`
+  + `styles.css` (tokens/engine).
+- **mockup/** — `New v2 Site Design.bundled.html` — the **CANONICAL runnable reference**; open it in the
+  browser and compare behavior + exact values against the build.
+- **specs/** — `three-frames-spec.md`, `design-system-brief.md`, `wall-library-spec.md`, `v2-three-frames-audit.md`.
+- **source/** — the per-surface `*.jsx` + `*.css` reference implementations (exact values + component logic).
+- **assets/** — every image used.
+
+**Authority chain (handoff README):** the **runnable bundled mockup wins for look/behavior** > **V2
+Framework.md** for rules > **design-system CSS** for tokens > the plan for sequencing.
+- In **§4a** (code): open the relevant HTML/CSS/jsx/mockup and verify every value/recipe/axis the wave
+  touches matches the handoff — do NOT trust the diff or the plan's restatements.
+- In **§4b** (live): compare the **rendered** result to the **bundled mockup + the design HTMLs** at each
+  device width, not just to a mental model.
+
+---
+
 ## PART A — §4a Code Review Gate (two independent reviewers)
 
 ```text

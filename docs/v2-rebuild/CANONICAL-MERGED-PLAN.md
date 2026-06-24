@@ -217,6 +217,14 @@ otherwise validate the mock).
 ---
 
 ## 6. Verification, gates & orchestration
+- **DESIGN-FIDELITY — MANDATORY, EVERY WAVE (§4a + §4b).** Every audit verifies the wave against the
+  **FULL v2 design handoff**, not just the markdown: `V2 Framework.md` + the design HTMLs
+  (`V2 Design System.html`, `Design Language.html`) + the **runnable bundled mockup**
+  (`New v2 Site Design.bundled.html`) + `specs/*` + the `source/*.jsx`/`*.css` reference impls + the
+  design-system CSS (`colors_and_type/themes/modes`). Authority chain: **bundled mockup wins for
+  look/behavior** > Framework for rules > design-system CSS for tokens. §4a checks code-vs-handoff
+  (open the HTML/CSS/jsx/mockup, don't trust the diff); §4b compares **rendered-vs-mockup** at every
+  device width. (Baked into the §4a/§4b gate docs in CLAUDE.md/AGENTS.md too.)
 - **Both gates (§4a code-review + §4b live QA) on every data/security wave — including Waves 8 and 12**
   (both plans' enumerated lists dropped them).
 - **Token-migration-first is a HARD barrier**: serialize edits to `tokens.css` + `components/ui/*` (143
