@@ -181,6 +181,81 @@ other:
 2. **Local verification stack**, on top of the self-review — the project's lint,
    typecheck, build, and the relevant test suite.
 
+## Live QA Audit Gate
+
+The Code Review Gate above checks the diff. A second, separate gate checks
+the running app: a live QA audit — visual + interaction testing in a real
+browser. **Both gates run before a build is said to be done.** This gate is
+not performed through the headless review command: whichever agent has
+browser tooling runs it (in Claude Code, the user-scope `playwright` /
+`chrome-devtools` MCP servers; otherwise a local Playwright script with
+`channel: "chrome"`).
+
+Breadth scales with the build — an app-wide wave gets the full template
+below; a focused change gets every surface it touches plus a browser-console
+error check. The audit is report-only; triage findings afterwards. An
+unresolved critical finding on a touched surface means the build is not
+done. Full contract: `CLAUDE.md` §4b.
+
+Use this audit prompt (canonical template):
+
+```text
+Goal: QA audit — code inspection + live visual testing.
+Inspect this codebase and visually test the running website, then produce a
+prioritized report of bugs and improvements.
+
+1. Code inspection. Review the project structure, components, routing, and
+   state management. Flag dead code, error-handling gaps, accessibility
+   issues (missing alt text, labels, focus states), hardcoded values, and
+   obvious performance problems.
+2. Run and visually inspect the site. Start the dev server. Open the site
+   and take screenshots of every page/route. Compare what renders against
+   what the code intends.
+3. Interact like a user. Click every button, link, and menu item. Fill out
+   and submit every form — including with invalid/empty input. Test all
+   interactive features (modals, dropdowns, search, filters, auth flows).
+   Note anything that errors, dead-ends, or behaves unexpectedly. Check the
+   browser console for errors/warnings during all interactions.
+4. Responsive testing. Resize the window to mobile (375px), tablet (768px),
+   and desktop (1440px) widths. Screenshot each. Flag layout breaks,
+   overflow, overlapping elements, unusable touch targets, and hidden
+   content.
+5. Report. Write findings to QA-REPORT.md with: severity
+   (critical/major/minor), description, steps to reproduce, screenshot
+   reference, suspected file/line where applicable, and suggested fix.
+   Separate "bugs" from "improvement ideas." Do not fix anything yet —
+   report only.
+```
+
+**Visual verification method — never sign off on UI from code review
+alone.** Pick by the change (full rationale in `CLAUDE.md` §4b):
+
+- **Method A — video + frame-by-frame.** Record the whole session, then
+  extract frames and review them as images. Use for motion / time-based
+  behavior (animations, transitions, loading states, scroll,
+  drag-and-drop), layout shift / flicker / jank between states, long
+  multi-step flows, post-major-change audits (replayable evidence), or
+  vague "something looks off" reports. Capture with Playwright video
+  (`recordVideo` / `--save-video`), then:
+
+  ```bash
+  ffmpeg -i session.webm -vf fps=1 frames/frame_%03d.png
+  ```
+
+  `fps=2`+ for fast animations. Note frame number + preceding action per
+  anomaly; keep the `.webm` for replay.
+- **Method B — screenshot key moments.** Screenshot after each meaningful
+  action and assess before the next (what the `scripts/probe-*.mjs`
+  probes do). Use for static/discrete states, responsive checks
+  (375/768/1440), targeted one-change verification, and console/network
+  debugging. Screenshot before AND after destructive actions; name files
+  descriptively.
+
+Default to **B** for routine/targeted checks; escalate to **A** when
+behavior over time matters or for full post-major-change audits.
+Combining is fine. Cite the frame number + `.webm` path (A) or
+screenshot filename (B) as evidence in `QA-REPORT.md`.
+
 ## Sandbox Discipline
 
 Run commands inside the normal sandbox. Do not request escalation or execute

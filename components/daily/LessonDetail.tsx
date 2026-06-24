@@ -76,11 +76,13 @@
 import { useState, useEffect, useRef } from "react";
 import type { ReactNode, SyntheticEvent } from "react";
 import type { Lesson } from "@/lib/types";
-import { lessonTime } from "@/lib/mock";
+import { lessonTime, dateForWeekDay } from "@/lib/mock";
+import { useOrderedWeekdays } from "@/lib/week-order";
 import { LessonFlow } from "@/components/lesson-flow";
 import { RichTextEditor } from "@/components/rich-text";
 import { usePlanner } from "@/lib/planner-store";
 import { Button, Tooltip } from "@/components/ui";
+import { StandardsTagSection } from "@/components/standards/StandardsTagSection";
 import detailStyles from "./lesson-detail.module.css";
 
 // ── Completion checkbox (status-aware) ───────────────────────────────────
@@ -197,7 +199,22 @@ function PencilIcon(): ReactNode {
 
 interface LessonDetailProps {
   lesson: Lesson;
-  onToggleComplete: (id: string, next: Lesson["status"]) => void;
+  /**
+   * Completion handler. OPTIONAL — when omitted (e.g. the shell right-panel
+   * mounts this standalone, keyed by selectedLessonId) the component falls
+   * back to `setLessonStatus` from usePlanner() so cycling status still
+   * routes through the one store dispatch path. Daily passes its own handler
+   * (which also calls setLessonStatus) so its completion → scroll-into-view
+   * effect keeps firing exactly as before.
+   */
+  onToggleComplete?: (id: string, next: Lesson["status"]) => void;
+  /**
+   * Narrow-width variant for the shell right-panel (~320px). Trims the
+   * Daily-tuned `zoom`/gutters via a `.compact` class on the root so the
+   * shared surface reads correctly in the slim docked panel. Daily omits
+   * it and keeps the full-width treatment unchanged.
+   */
+  compact?: boolean;
 }
 
 // ── Component ────────────────────────────────────────────────────────────
@@ -205,17 +222,31 @@ interface LessonDetailProps {
 export function LessonDetail({
   lesson,
   onToggleComplete,
+  compact = false,
 }: LessonDetailProps): ReactNode {
-  // ── Store — notes editing + subject catalog ──────────────────────────
+  // ── Store — notes editing + subject/unit catalog + completion fallback ─
   // Notes are written through editLesson with coalescing so a typing burst
   // produces one history step. Sections are managed by LessonFlow directly.
-  // Completion is routed through onToggleComplete → DailyView, which calls
-  // setLessonStatus — keeping a single dispatch path per UI action.
-  // Subject metadata comes from the planner store's catalog (frozen API),
-  // not lib/mock — safe here, LessonDetail only renders under the (planner)
-  // /daily route (PlannerProvider present).
-  const { editLesson, subjectById } = usePlanner();
+  // Completion routes through the `toggleComplete` resolved below: Daily
+  // passes its own onToggleComplete; standalone callers fall back to the
+  // store's setLessonStatus — either way it's one dispatch path and
+  // completion never forks the lesson.
+  // Subject/unit metadata + the section count come from the planner store's
+  // catalog (frozen API), available app-wide under PlannerProvider — safe
+  // here whether mounted under /daily or the shell right-panel.
+  const { editLesson, subjectById, unitById, getSections, setLessonStatus } =
+    usePlanner();
   const subj = subjectById[lesson.subject];
+
+  // Resolve the completion handler once: the explicit prop wins, else the
+  // store's setLessonStatus. Marking done never forks the lesson (product
+  // rule) regardless of which path is used.
+  const toggleComplete = onToggleComplete ?? setLessonStatus;
+
+  // Configured school week — the stats header's weekday label derives from
+  // the team's configured week (never a hard-coded Sun-first set). See
+  // lib/week-order.ts.
+  const weekdays = useOrderedWeekdays();
 
   // ── Docked-toolbar target ref ────────────────────────────────────────
   // cellRef is attached to the scrollable detail body region — the "cell"
@@ -365,8 +396,9 @@ export function LessonDetail({
   }
 
   // Cycle: not_done → done → partial → not_done.
-  // Routes through onToggleComplete → DailyView.handleToggleComplete →
-  // store.setLessonStatus (one dispatch, completion never forks a lesson).
+  // Routes through the resolved `toggleComplete` (Daily's handler →
+  // setLessonStatus, or the store's setLessonStatus directly when standalone)
+  // — one dispatch, completion never forks a lesson.
   function cycleStatus(): void {
     const next: Lesson["status"] =
       lesson.status === "not_done"
@@ -374,15 +406,64 @@ export function LessonDetail({
         : lesson.status === "done"
           ? "partial"
           : "not_done";
-    onToggleComplete(lesson.id, next);
+    toggleComplete(lesson.id, next);
   }
+
+  // ── Stats header data (#8) ───────────────────────────────────────────
+  // A compact strip of at-a-glance lesson facts beneath the title/objective.
+  // Each value is derived, never hard-coded, and guards gracefully when the
+  // mock/calendar can't resolve a field:
+  //   • Unit       — unitById[lesson.unit]?.name
+  //   • Date       — dateForWeekDay(week, day) formatted + the configured
+  //                  weekday long-label (try/catch around the Date so a
+  //                  bad week/day never throws in the panel)
+  //   • Phases     — getSections(lesson.id).length
+  //   • Resources  — lesson.resources.length
+  // Time + Week live in the band already; we still surface Week here as a
+  // quiet chip because the stats strip can render standalone in the panel
+  // body below the band. Fork state has its own chip (see below).
+  const unitName = unitById[lesson.unit]?.name ?? null;
+  const phaseCount = getSections(lesson.id).length;
+  const resourceCount = lesson.resources.length;
+  const standardCount = lesson.standards.length;
+
+  // Date label — guard the Date construction + formatting so an out-of-range
+  // week/day (or a locale that rejects the options) degrades to no chip
+  // rather than throwing inside the shared panel.
+  let dateLabel: string | null = null;
+  try {
+    const d = dateForWeekDay(lesson.week, lesson.day);
+    if (!Number.isNaN(d.getTime())) {
+      dateLabel = d.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      });
+    }
+  } catch {
+    dateLabel = null;
+  }
+  // Weekday long-label from the configured school week (e.g. "Sunday").
+  // `day` is a 0-based index INTO the configured week, so guard the lookup.
+  const weekdayLabel = weekdays[lesson.day]?.longLabel ?? null;
+
+  // Fork-state chip text (mirrors the three-tier model in CLAUDE.md §2):
+  // a personally-moved lesson reads "Moved"; a content-modified one reads
+  // "Modified"; an untouched personal copy reads "Personal". Null → no chip
+  // (an unedited Master lesson).
+  const forkLabel: string | null = lesson.moved
+    ? "Moved"
+    : lesson.modified
+      ? "Modified"
+      : lesson.isPersonal
+        ? "Personal"
+        : null;
 
   // Time label from the mock schedule (uses lesson.time override if set).
   const timeLabel = lessonTime(lesson);
 
   return (
     <div
-      className={`${detailStyles.root} cp-subj ${subj.cls}`}
+      className={`${detailStyles.root} ${compact ? detailStyles.compact : ""} cp-subj ${subj.cls}`}
       role="region"
       aria-label={`Lesson detail: ${lesson.title}`}
     >
@@ -633,6 +714,65 @@ export function LessonDetail({
             )}
           </div>
 
+          {/* ── Stats strip (#8) ──────────────────────────────────────────
+              An at-a-glance row of lesson facts beneath the objective:
+              unit, date + weekday, time, week #, phases count, resources
+              count, standards count, and the fork-state chip. Every value
+              is derived above and self-hides when it can't resolve, so an
+              unedited Master lesson with no resources simply shows fewer
+              chips. The strip reads top-to-bottom as a quiet meta band — it
+              never duplicates the title/objective hero above it and benefits
+              the Daily view as much as the shell right-panel.
+
+              The fork chip uses the subject-deep ink chip language (same as
+              the band's "Personal" pill); the rest are neutral so color
+              stays meaningful (subject color = the stripe + band only). */}
+          <dl className={detailStyles.stats} aria-label="Lesson details">
+            {unitName && (
+              <div className={detailStyles.statItem}>
+                <dt className={detailStyles.statLabel}>Unit</dt>
+                <dd className={detailStyles.statValue}>{unitName}</dd>
+              </div>
+            )}
+            {dateLabel && (
+              <div className={detailStyles.statItem}>
+                <dt className={detailStyles.statLabel}>Date</dt>
+                <dd className={detailStyles.statValue}>
+                  {weekdayLabel ? `${weekdayLabel}, ${dateLabel}` : dateLabel}
+                </dd>
+              </div>
+            )}
+            {/* Time is the band's right-region hero already, so it's omitted
+                here to avoid duplicating what's shown above (#8 "don't
+                duplicate"). Week is surfaced because the band never shows it. */}
+            <div className={detailStyles.statItem}>
+              <dt className={detailStyles.statLabel}>Week</dt>
+              <dd className={detailStyles.statValue}>{lesson.week}</dd>
+            </div>
+            <div className={detailStyles.statItem}>
+              <dt className={detailStyles.statLabel}>Phases</dt>
+              <dd className={detailStyles.statValue}>{phaseCount}</dd>
+            </div>
+            <div className={detailStyles.statItem}>
+              <dt className={detailStyles.statLabel}>Resources</dt>
+              <dd className={detailStyles.statValue}>{resourceCount}</dd>
+            </div>
+            {standardCount > 0 && (
+              <div className={detailStyles.statItem}>
+                <dt className={detailStyles.statLabel}>Standards</dt>
+                <dd className={detailStyles.statValue}>{standardCount}</dd>
+              </div>
+            )}
+            {forkLabel && (
+              <div className={detailStyles.statItem}>
+                <dt className={detailStyles.srOnly}>Version</dt>
+                <dd>
+                  <span className={detailStyles.statForkChip}>{forkLabel}</span>
+                </dd>
+              </div>
+            )}
+          </dl>
+
           {/* ── Action row ────────────────────────────────────────────
               Compact icon+label buttons (spec §5). Left cluster groups
               completion affordances ([Mark done] cycle + [Add status]
@@ -754,12 +894,16 @@ export function LessonDetail({
             />
           </div>
 
-          {/* Standards row deliberately omitted here — <LessonFlow> already
-              renders a "Standards" canonical row (index 1) via
-              `helperOverride`, so a duplicate section in this body would (a)
-              show the same data twice and (b) produce a "Standards{count}"
-              screen-reader concatenation when the count chip lived inside
-              the heading. The LessonFlow row is the canonical surface. */}
+          {/* Standards — the EDITABLE tagging surface. The LessonFlow virtual
+              "Standards" row (index 1) only shows a read-only one-line glance
+              of the codes in its helper; this section is where a teacher
+              actually adds/removes them via the scoped picker (search confined
+              to their effective frameworks). Shares <StandardsTagSection> with
+              the right-rail lesson panel so tagging behaves identically. */}
+          <section className={detailStyles.section}>
+            <StandardsTagSection lessonId={lesson.id} />
+          </section>
+
 
           {/* ── My notes — always-visible editable rich text ────────────
               Always rendered (not gated on lesson.notes) so teachers can

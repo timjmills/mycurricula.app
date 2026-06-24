@@ -448,6 +448,63 @@ function isEditorEmpty(el: HTMLElement): boolean {
   return inner === "" || /^(<br\s*\/?>|<div><br\s*\/?><\/div>)$/i.test(inner);
 }
 
+/**
+ * Resolve the block format wrapping the current caret to one of the values the
+ * heading/quote toggles care about ("h1" | "h2" | "blockquote" | ""). Walks up
+ * from the selection's anchor to the nearest H1/H2/BLOCKQUOTE that lives inside
+ * the editor; returns "" for a plain paragraph/div or when there is no usable
+ * selection. Browser-only — callers run in event handlers / client effects.
+ */
+function getBlockTagAtCaret(
+  editor: HTMLElement,
+): "" | "h1" | "h2" | "blockquote" {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return "";
+  const anchor = sel.anchorNode;
+  if (!anchor) return "";
+  let node: Node | null =
+    anchor.nodeType === Node.ELEMENT_NODE ? anchor : anchor.parentNode;
+  while (node && node !== editor) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const tag = (node as Element).tagName.toLowerCase();
+      if (tag === "h1" || tag === "h2" || tag === "blockquote") {
+        // The comparison narrows `tag` to the literal union the signature wants.
+        return tag as "h1" | "h2" | "blockquote";
+      }
+    }
+    node = node.parentNode;
+  }
+  return "";
+}
+
+/**
+ * Find the checklist <li> a node lives inside, if any. A checklist item is an
+ * <li> whose parent <ul> carries data-checklist. Returns null otherwise. Used
+ * by the click/keyboard toggle so only real checklist items respond. Stops at
+ * the editor boundary so a stray same-named attribute outside can't match.
+ */
+function closestChecklistItem(
+  node: Node | null,
+  editor: HTMLElement,
+): HTMLLIElement | null {
+  let cur: Node | null =
+    node && node.nodeType === Node.ELEMENT_NODE
+      ? node
+      : (node?.parentNode ?? null);
+  while (cur && cur !== editor) {
+    if (
+      cur.nodeType === Node.ELEMENT_NODE &&
+      (cur as Element).tagName === "LI"
+    ) {
+      const li = cur as HTMLLIElement;
+      const parent = li.parentElement;
+      if (parent && parent.matches("ul[data-checklist]")) return li;
+    }
+    cur = cur.parentNode;
+  }
+  return null;
+}
+
 // ── Inline-media insertion helpers ────────────────────────────────────────────
 //
 // We build a small HTML fragment and inject it with execCommand('insertHTML').
@@ -498,6 +555,83 @@ function buildEmbedHtml(embedUrl: string, title: string): string {
     `sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation" ` +
     `allowfullscreen></iframe>` +
     `</div><p><br></p>`
+  );
+}
+
+/**
+ * Build an interactive checklist from an array of line strings. Emits a
+ * `<ul data-checklist="true">` whose `<li data-checked="false">` items toggle
+ * on click (handler lives in the component). The data attributes are the
+ * persisted state — DOMPurify keeps `data-*` by default, so the checked state
+ * round-trips through sanitizeHtml(); `class` would NOT survive, so styling
+ * keys off the attribute selectors in the module CSS instead. Each line's text
+ * is escaped (defence-in-depth; the sanitizer re-validates on emit). An empty
+ * input yields a single blank item so the teacher has a row to type into.
+ * A trailing <p><br></p> gives a caret landing spot after the list.
+ */
+function buildChecklistHtml(lines: string[]): string {
+  const rows = lines.length > 0 ? lines : [""];
+  const items = rows
+    .map(
+      (line) => `<li data-checked="false">${escapeAttr(line) || "<br>"}</li>`,
+    )
+    .join("");
+  return `<ul data-checklist="true">${items}</ul><p><br></p>`;
+}
+
+/**
+ * Build an inline resource "card": a <figure> grouping an image, embed, or
+ * link with an optional caption. `data-card` tags the variant for styling
+ * (figure/figcaption survive sanitizeHtml — they were added to the allowlist).
+ * The inner media is produced by the shared buildImageHtml/buildEmbedHtml so an
+ * unsafe src is still dropped on emit; the link variant emits a plain anchor
+ * the sanitizer hardens (target/rel). The caption is optional and escaped.
+ */
+function buildImageCardHtml(src: string, caption: string): string {
+  const cap = caption.trim()
+    ? `<figcaption>${escapeAttr(caption.trim())}</figcaption>`
+    : "";
+  return (
+    `<figure class="${styles.resourceCard}" data-card="image">` +
+    buildImageHtml(src, caption.trim()) +
+    cap +
+    `</figure><p><br></p>`
+  );
+}
+
+function buildEmbedCardHtml(
+  embedUrl: string,
+  title: string,
+  caption: string,
+): string {
+  const cap = caption.trim()
+    ? `<figcaption>${escapeAttr(caption.trim())}</figcaption>`
+    : "";
+  // buildEmbedHtml already appends its own trailing <p><br></p>; drop it here so
+  // the caption sits INSIDE the figure, then add one paragraph after the figure.
+  const embed = buildEmbedHtml(embedUrl, title).replace(/<p><br><\/p>$/, "");
+  return (
+    `<figure class="${styles.resourceCard}" data-card="embed">` +
+    embed +
+    cap +
+    `</figure><p><br></p>`
+  );
+}
+
+function buildLinkCardHtml(
+  url: string,
+  label: string,
+  caption: string,
+): string {
+  const text = (label.trim() || url).trim();
+  const cap = caption.trim()
+    ? `<figcaption>${escapeAttr(caption.trim())}</figcaption>`
+    : "";
+  return (
+    `<figure class="${styles.resourceCard}" data-card="link">` +
+    `<a href="${escapeAttr(url)}">${escapeAttr(text)}</a>` +
+    cap +
+    `</figure><p><br></p>`
   );
 }
 
@@ -645,6 +779,12 @@ export function RichTextEditor({
   const [strikethrough, setStrikethrough] = useState(false);
   const [subscript, setSubscript] = useState(false);
   const [superscript, setSuperscript] = useState(false);
+  // Which block format wraps the caret — "" (plain paragraph/div), "h1", "h2",
+  // or "blockquote". Drives the heading/quote toggle highlights so a teacher
+  // sees at a glance whether the current line is already a heading. Read from
+  // the caret's nearest block ancestor inside the editor (queryCommandValue is
+  // unreliable across browsers for formatBlock, so we resolve it ourselves).
+  const [blockTag, setBlockTag] = useState<"" | "h1" | "h2" | "blockquote">("");
 
   // Whether the editor content is empty (for placeholder).
   // Initial state: treat as empty when value is blank or a bare <br>.
@@ -711,6 +851,11 @@ export function RichTextEditor({
     setStrikethrough(document.queryCommandState("strikeThrough"));
     setSubscript(document.queryCommandState("subscript"));
     setSuperscript(document.queryCommandState("superscript"));
+    // Heading / blockquote toggle state. queryCommandValue('formatBlock') is
+    // inconsistent across browsers, so resolve the block from the caret's
+    // ancestor chain instead (getBlockTagAtCaret).
+    const el = editorRef.current;
+    setBlockTag(el ? getBlockTagAtCaret(el) : "");
   }, []);
 
   // ── Docked positioning ──────────────────────────────────────────────────
@@ -863,9 +1008,52 @@ export function RichTextEditor({
     [onChange],
   );
 
+  // Toggle a checklist item's checked state. Declared BEFORE the click /
+  // keydown handlers that list it in their useCallback dependency arrays —
+  // those arrays are evaluated at render time, so a later `const` would hit a
+  // temporal-dead-zone ("Cannot access 'toggleChecklistItem' before
+  // initialization") and crash every editor mount. Flips data-checked in the
+  // live DOM then emits so the state persists through sanitizeHtml().
+  const toggleChecklistItem = useCallback(
+    (li: HTMLLIElement) => {
+      const el = editorRef.current;
+      if (!el) return;
+      const checked = li.getAttribute("data-checked") === "true";
+      li.setAttribute("data-checked", checked ? "false" : "true");
+      li.setAttribute("aria-checked", checked ? "false" : "true");
+      const html = el.innerHTML;
+      lastWrittenRef.current = html;
+      emitChange(html);
+    },
+    [emitChange],
+  );
+
   // ── Keyboard handler ────────────────────────────────────────────────
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const el = editorRef.current;
+
+      // Keyboard toggle for the checklist: Ctrl/Cmd+Enter flips the checked
+      // state of the item the caret is in. Plain Enter is left to the browser
+      // so it still creates the next checklist item — overriding it would break
+      // list continuation. This keeps the checklist fully keyboard-operable
+      // (the marker click is the pointer path) without stealing normal keys.
+      if (
+        el &&
+        e.key === "Enter" &&
+        (e.ctrlKey || e.metaKey) &&
+        !e.altKey &&
+        !e.shiftKey
+      ) {
+        const sel = window.getSelection();
+        const li = closestChecklistItem(sel?.anchorNode ?? null, el);
+        if (li) {
+          e.preventDefault();
+          toggleChecklistItem(li);
+          return;
+        }
+      }
+
       if (singleLine && e.key === "Enter") {
         e.preventDefault();
         return;
@@ -874,7 +1062,6 @@ export function RichTextEditor({
       // Markdown-style auto-list: convert "- ", "* ", "1. " etc. at line
       // start into proper list items. tryAutoList returns true when it
       // consumed the keypress, at which point we report the updated HTML.
-      const el = editorRef.current;
       if (el && tryAutoList(e, el, singleLine)) {
         const html = el.innerHTML;
         lastWrittenRef.current = html;
@@ -882,7 +1069,7 @@ export function RichTextEditor({
         setEmpty(isEditorEmpty(el));
       }
     },
-    [singleLine, emitChange],
+    [singleLine, emitChange, toggleChecklistItem],
   );
 
   // ── Input handler — report changes, check empty state ──────────────
@@ -894,6 +1081,31 @@ export function RichTextEditor({
     emitChange(html);
     setEmpty(isEditorEmpty(el));
   }, [emitChange]);
+
+  // ── Checklist click toggle ──────────────────────────────────────────
+  // A click whose target falls in the marker zone of a checklist item flips
+  // its checked state. The checkbox is drawn as an ::before pseudo-element on
+  // the <li>, so it isn't itself a click target — we detect a hit by comparing
+  // the click's X against the item's content-box left edge (the marker sits in
+  // the list's left padding). Clicks on the item's TEXT pass through so the
+  // caret can be placed for editing. No-op outside a checklist item.
+  const handleEditorClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const el = editorRef.current;
+      if (!el) return;
+      const li = closestChecklistItem(e.target as Node, el);
+      if (!li) return;
+      // The marker lives in the <li>'s left padding. Treat a click at or left
+      // of the padding-box's content start as a marker toggle.
+      const rect = li.getBoundingClientRect();
+      const padLeft = parseFloat(getComputedStyle(li).paddingLeft) || 0;
+      if (e.clientX <= rect.left + padLeft) {
+        e.preventDefault();
+        toggleChecklistItem(li);
+      }
+    },
+    [toggleChecklistItem],
+  );
 
   // ── Selection change → update toolbar ──────────────────────────────
   useEffect(() => {
@@ -1200,23 +1412,102 @@ export function RichTextEditor({
     [insertHtmlAtSavedRange, emitChange],
   );
 
-  // ── Checklist (best-effort) ─────────────────────────────────────────
-  // True interactive checklists in contentEditable require complex DOM
-  // bookkeeping beyond execCommand. This best-effort implementation inserts
-  // a "☐ " prefix on each selected line so teachers can visually track
-  // checkbox items. Items are plain text markers, not interactive inputs.
-  const applyChecklist = useCallback(
-    (e: React.MouseEvent) => {
+  // ── Block format (headings / blockquote) ────────────────────────────
+  // Toggle the caret's block between a heading/quote and a plain paragraph.
+  // execCommand('formatBlock') rewraps the current block; passing the same tag
+  // it already is would leave it unchanged, so we toggle back to <p> when the
+  // caret is already inside that block. Works at a collapsed caret and over a
+  // multi-block selection. The result is re-read so the toggle highlight tracks
+  // the new block, then emitted (headings/blockquote survive sanitizeHtml()).
+  const applyBlock = useCallback(
+    (e: React.MouseEvent, tag: "h1" | "h2" | "blockquote") => {
       e.preventDefault();
-      editorRef.current?.focus();
-      // Insert a checkbox character + non-breaking-space before the selection.
-      // execCommand('insertText') places it at the caret or replaces selection.
-      exec("insertText", "☐ ");
-      const html = editorRef.current?.innerHTML ?? "";
+      const el = editorRef.current;
+      if (!el) return;
+      el.focus();
+      const current = getBlockTagAtCaret(el);
+      // formatBlock wants the tag wrapped in <>, e.g. "<h1>". Toggling the
+      // active block off returns it to a normal paragraph.
+      const next = current === tag ? "p" : tag;
+      exec("formatBlock", `<${next}>`);
+      syncFormatState();
+      setBlockTag(getBlockTagAtCaret(el));
+      const html = el.innerHTML;
       lastWrittenRef.current = html;
       emitChange(html);
     },
-    [emitChange],
+    [emitChange, syncFormatState],
+  );
+
+  // ── Interactive checklist ───────────────────────────────────────────
+  // Upgrades the old cosmetic "☐ " marker to a REAL toggleable checklist.
+  // Inserts a <ul data-checklist> whose <li data-checked> items flip on click
+  // or keyboard (handlers below). When the selection spans text, each selected
+  // line becomes its own item; otherwise a single empty item is inserted ready
+  // to type. State rides on data-checked so it round-trips through
+  // sanitizeHtml() (DOMPurify keeps data-*; class would be stripped).
+  const applyChecklist = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const el = editorRef.current;
+      if (!el) return;
+      // Capture any selected text and split it into per-line items so a teacher
+      // can select a few lines and convert them in one shot.
+      const sel = window.getSelection();
+      const savedRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+      const selectedText = sel ? sel.toString() : "";
+      const lines = selectedText
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+      insertHtmlAtSavedRange(buildChecklistHtml(lines), savedRange);
+    },
+    [insertHtmlAtSavedRange],
+  );
+
+  // ── Insert resource card (image / embed / link) ──────────────────────────
+  // Complements the bare image/embed inserts with a <figure> "card": the media
+  // plus an optional caption. Reuses parseResourceUrl + buildImage/EmbedHtml so
+  // the same trusted-host + safe-scheme rules apply, and the markup stays
+  // sanitizer-safe (figure/figcaption are allow-listed; an unsafe src/host is
+  // still dropped on emit). A non-embeddable URL falls back to a link card.
+  const applyResourceCard = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const sel = window.getSelection();
+      const savedRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+
+      const raw = window.prompt(
+        "Resource card — paste an image, video or document link (YouTube, Vimeo, Google, or an image URL):",
+        "https://",
+      );
+      if (!raw || !raw.trim()) return;
+      const caption =
+        window.prompt("Optional caption (leave blank for none):", "") ?? "";
+
+      const parsed = parseResourceUrl(raw.trim());
+      if (parsed.kind === "embed" && parsed.embedUrl) {
+        insertHtmlAtSavedRange(
+          buildEmbedCardHtml(parsed.embedUrl, parsed.displayName, caption),
+          savedRange,
+        );
+        return;
+      }
+      if (parsed.kind === "image" && parsed.embedUrl) {
+        insertHtmlAtSavedRange(
+          buildImageCardHtml(parsed.embedUrl, caption),
+          savedRange,
+        );
+        return;
+      }
+      // Not embeddable / not a direct image — emit a link card so the teacher's
+      // intent survives (the sanitizer hardens the anchor on emit).
+      insertHtmlAtSavedRange(
+        buildLinkCardHtml(raw.trim(), parsed.displayName, caption),
+        savedRange,
+      );
+    },
+    [insertHtmlAtSavedRange],
   );
 
   // ── Paste handler ───────────────────────────────────────────────────
@@ -1360,6 +1651,36 @@ export function RichTextEditor({
               <span className={styles.iconScript}>
                 X<sup>²</sup>
               </span>
+            </ToolbarButton>
+
+            <span className={styles.divider} aria-hidden />
+
+            {/* ── Group 2b: Block format (headings / quote) ── */}
+            {/* formatBlock toggles — each highlights when the caret sits inside
+                that block, and pressing it again returns the line to a normal
+                paragraph. */}
+            <ToolbarButton
+              label="Heading 1"
+              active={blockTag === "h1"}
+              onMouseDown={(e) => applyBlock(e, "h1")}
+            >
+              <span className={styles.iconHeading}>H1</span>
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Heading 2"
+              active={blockTag === "h2"}
+              onMouseDown={(e) => applyBlock(e, "h2")}
+            >
+              <span className={styles.iconHeading}>H2</span>
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Quote"
+              active={blockTag === "blockquote"}
+              onMouseDown={(e) => applyBlock(e, "blockquote")}
+            >
+              <span className={styles.iconQuote}>&rdquo;</span>
             </ToolbarButton>
 
             <span className={styles.divider} aria-hidden />
@@ -1523,11 +1844,11 @@ export function RichTextEditor({
             </ToolbarButton>
 
             <ToolbarButton
-              label="Checklist (inserts ☐ marker)"
+              label="Checklist — insert tick-box items you can check off as you teach"
               active={false}
               onMouseDown={applyChecklist}
             >
-              <span className={styles.iconList}>☐</span>
+              <span className={styles.iconList}>☑</span>
             </ToolbarButton>
 
             <span className={styles.divider} aria-hidden />
@@ -1555,6 +1876,17 @@ export function RichTextEditor({
               onMouseDown={applyEmbed}
             >
               <span className={styles.iconEmbed}>▶</span>
+            </ToolbarButton>
+
+            <ToolbarButton
+              label="Insert resource card — an image, video or link wrapped in a captioned card"
+              active={false}
+              onMouseDown={applyResourceCard}
+            >
+              <span className={styles.iconCard} aria-hidden>
+                <span className={styles.iconCardTop} />
+                <span className={styles.iconCardLine} />
+              </span>
             </ToolbarButton>
 
             <span className={styles.divider} aria-hidden />
@@ -1669,6 +2001,7 @@ export function RichTextEditor({
           className={`${styles.editor} ${singleLine ? styles.editorSingleLine : ""}`}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
+          onClick={handleEditorClick}
           onPaste={handlePaste}
         />
       </div>

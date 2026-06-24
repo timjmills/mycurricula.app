@@ -76,16 +76,10 @@ import {
   TeachSubBar,
   TeachTopBar,
   TEACH_CENTER_PANEL_ID,
-  type TeachFooterModule,
 } from "./chrome";
 import { TeachLeftPanel, TeachLeftRail } from "./left";
 import { TeachRightPanel, TeachRightRail } from "./right";
-import {
-  TeachingBoard,
-  WidgetPicker,
-  BoardSettingsPopover,
-  WidgetSettingsPopover,
-} from "./board";
+import { BoardSettingsPopover } from "./board";
 import {
   BoardEditor,
   type BoardEditorIntent,
@@ -94,12 +88,12 @@ import {
 import { BoardFullscreen } from "./board/fullscreen";
 import { BoardLibraryModule, WidgetLibrary } from "./library";
 import { TeachIcon, widgetMeta } from "@/components/teach/widgets";
+import { Button } from "@/components/ui";
 import { BoardCanvasResource, ResourceViewerToolbar } from "./canvas";
 import {
   AnnotationLayer,
   ANNOTATION_SWATCHES,
   BoardToolbar,
-  ToolDock,
   type AnnotationSwatch,
 } from "./annotation";
 import styles from "./TeachWorkspace.module.css";
@@ -314,16 +308,9 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   // than in the frozen reducer state.
   const [pages, setPages] = useState<BoardPage[]>([]);
   const [activePageId, setActivePageId] = useState<string | null>(null);
-  // Local widget-picker target (the board calls onAddWidget; this file owns the
-  // picker mount because TeachingBoard renders only the cells, not the picker).
-  const [pickerTarget, setPickerTarget] = useState<BoardCellTarget | null>(
-    null,
-  );
   // Board-settings popover (audit G1) — open when truthy. Holds nothing; it
   // reads the live `activeBoard` at mount, so a board switch closes it.
   const [boardSettingsOpen, setBoardSettingsOpen] = useState(false);
-  // Per-widget settings popover (audit G2) — the widget being configured.
-  const [settingsWidget, setSettingsWidget] = useState<Widget | null>(null);
   // Help / shortcuts overlay (audit B2) — the top-bar Help button opens it.
   const [helpOpen, setHelpOpen] = useState(false);
   // Board / Widget Library overlay (5.31) — opened from the sub-bar. Null = none.
@@ -477,11 +464,10 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     }
   }, [boards, state.activeBoardId]);
 
-  // Close the settings popovers when the active board changes so they never
-  // operate on a board the teacher has navigated away from.
+  // Close the board-settings popover when the active board changes so it never
+  // operates on a board the teacher has navigated away from.
   useEffect(() => {
     setBoardSettingsOpen(false);
-    setSettingsWidget(null);
   }, [state.activeBoardId]);
 
   // ── Resource deep-link resolution (?resource=<id>) ─────────────────────────
@@ -721,6 +707,23 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     boardGradeId,
   ]);
 
+  // Whether "Start blank" can create a board right now — mirrors handleAddBoard's
+  // guards (a target lesson or the sandbox + a resolved owner/grade). When false
+  // the empty state hides the primary action rather than offering a dead button
+  // (e.g. the flag is ON and the auth/grade identity hasn't resolved yet).
+  const canCreateBoard =
+    (state.sandbox || activeLessonId != null) &&
+    ownerId != null &&
+    boardGradeId(activeBoard) != null;
+
+  // Open the left Boards module — the empty state's "pick from the Boards page"
+  // path (the dedicated /boards route lands in Wave 3; today Boards browsing is
+  // the left module + the Board Library overlay it opens).
+  const openBoardsPanel = useCallback((): void => {
+    setLeftActiveModule("boards");
+    openLeftPanel();
+  }, [openLeftPanel]);
+
   const togglePanels = useCallback((): void => {
     // On small screens the panels are overlay drawers, so "show panels" must
     // not open both at once (they'd overlap). If anything is open, collapse
@@ -747,32 +750,10 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     workspace.toggleRightCollapsed();
   }, [viewport.isSmall, state.leftCollapsed, state.rightCollapsed, workspace]);
 
-  // ── Board widget callbacks ─────────────────────────────────────────────────
-  const handleAddWidget = useCallback((target: BoardCellTarget): void => {
-    setPickerTarget(target);
-  }, []);
-
-  const handleRemoveWidget = useCallback(
-    async (widget: Widget): Promise<void> => {
-      await teach.deleteWidget(widget.id);
-      await reloadBoards();
-    },
-    [reloadBoards],
-  );
-
-  const handleTogglePin = useCallback(
-    async (widget: Widget): Promise<void> => {
-      await teach.updateWidget(widget.id, { pinned: !widget.pinned });
-      await reloadBoards();
-    },
-    [reloadBoards],
-  );
-
-  // Open the per-widget settings popover (audit G2). The cog on each WidgetShell
-  // routes here so it is honestly functional rather than a dead control.
-  const handleWidgetSettings = useCallback((widget: Widget): void => {
-    setSettingsWidget(widget);
-  }, []);
+  // Board widget mutations (add / pin / settings / remove) flow exclusively
+  // through the free-form `BoardEditor`'s typed intents (handleEditorIntent
+  // below). The old per-cell add/pin/settings/remove callbacks belonged to the
+  // deleted CSS-grid `TeachingBoard` and were removed with it (Wave 1 declutter).
 
   // ── Free-form editor intent → repo (5.31) ──────────────────────────────────
   // The BoardEditor emits a single typed intent per mutation; we map each to the
@@ -895,6 +876,13 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
             return;
           case "setBoardTheme":
             await teach.setBoardTheme(board.id, intent.theme);
+            await Promise.all([reloadBoards(), reloadPages()]);
+            return;
+          case "setBackground":
+            // Board paper/surface. Same field + repo method the ⚙ settings
+            // popover used; now reachable from the editor's appearance popover
+            // so paper lives in ONE place next to the board (#11).
+            await teach.updateBoard(board.id, { background: intent.background });
             await Promise.all([reloadBoards(), reloadPages()]);
             return;
           case "clearAllWidgetAppearance": {
@@ -1049,30 +1037,9 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     }
   }
 
-  // ── Module footer dots (open panels) ───────────────────────────────────────
-  const footerModules: TeachFooterModule[] = useMemo(() => {
-    const mods: TeachFooterModule[] = [];
-    if (!state.leftCollapsed) {
-      mods.push({
-        id: leftActiveModule,
-        label: leftActiveModule,
-        active: true,
-      });
-    }
-    if (!state.rightCollapsed) {
-      mods.push({
-        id: rightActiveModule,
-        label: rightActiveModule,
-        active: true,
-      });
-    }
-    return mods;
-  }, [
-    state.leftCollapsed,
-    state.rightCollapsed,
-    leftActiveModule,
-    rightActiveModule,
-  ]);
+  // (The footer's module-jump dots were removed in the Wave 1 declutter — the
+  // rails already provide module navigation, so the footer is now just the
+  // panels toggle + save status.)
 
   // The persisted layout types its rail orders as `string[]`; the hook
   // normalizes to known module ids on write, so narrow back to `TeachModuleId[]`
@@ -1111,6 +1078,18 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
   // The page to render — the selection, or the first page while the sync effect
   // catches up (avoids a one-frame fallback flash on board load/switch).
   const resolvedPageId = activePageId ?? pages[0]?.id ?? null;
+
+  // Safety net: present mode requires a board + page to project. Since the lazy
+  // auto-seed was removed (#10), "no active board" is a normal state — and ⌘P
+  // (use-teach-shortcuts) dispatches setPresent without that context. If present
+  // is ever on without something to show, exit immediately so we never render a
+  // boardless present shell (gate N1; complements the SubBar button guard, F2,
+  // and is sandbox-safe because `activeBoard` resolves the sandbox board too).
+  useEffect(() => {
+    if (state.present && !(activeBoard && resolvedPageId)) {
+      dispatch({ type: "setPresent", present: false });
+    }
+  }, [state.present, activeBoard, resolvedPageId, dispatch]);
 
   // ── Present mode → full-bleed Board Fullscreen takeover (5.31 §5) ───────────
   // When presenting, the whole shell is replaced by the projected board. Exit
@@ -1197,8 +1176,6 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                 dispatch={dispatch}
                 boards={boards}
                 subject={subject}
-                weekLabel={`Week ${week}`}
-                subjectLabel={subject ? subject : "Subject"}
                 onAddBoard={() => void handleAddBoard()}
                 onBoardSettings={
                   activeBoard ? () => setBoardSettingsOpen(true) : undefined
@@ -1231,7 +1208,6 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
             <TeachLeftPanel
               state={state}
               dispatch={dispatch}
-              workspace={workspace}
               activeModuleId={leftActiveModule}
               onActiveModuleChange={setLeftActiveModule}
               width={leftWidth}
@@ -1241,7 +1217,9 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
               boards={boards}
               boardsGradeLevelId={boardGradeId(activeBoard)}
               reloadBoards={reloadBoards}
-              onOpenWidgetLibrary={() => setLibraryOverlay("widgets")}
+              onOpenWidgetLibrary={
+                activeBoard ? () => setLibraryOverlay("widgets") : undefined
+              }
               // Finding 3 fix: thread the flag-aware owner id so BoardsModule
               // never uses the hard-coded `ME.id` slug under the live flag.
               ownerId={ownerId}
@@ -1281,11 +1259,10 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                       width={strokeWidth}
                     />
                   </div>
-                  <ToolDock
-                    state={state}
-                    dispatch={dispatch}
-                    dragConstraints={resourceContainerRef}
-                  />
+                  {/* Wave 1 declutter: the floating `ToolDock` (a strict subset
+                      of the BoardToolbar below — select/pen/text + dead "Soon"
+                      tiles) was removed. The single `BoardToolbar` is the one
+                      drawing toolbar for the resource surface. */}
                 </div>
                 <BoardToolbar
                   state={state}
@@ -1307,18 +1284,18 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
                 onChange={handleEditorIntent}
                 subjectId={subject}
                 resources={editorResources}
+                onBrowseAll={() => setLibraryOverlay("widgets")}
               />
             ) : (
-              <TeachingBoard
-                state={state}
-                dispatch={dispatch}
-                board={activeBoard}
-                widgets={widgets}
-                subjectId={subject}
-                onAddWidget={handleAddWidget}
-                onTogglePin={(w) => void handleTogglePin(w)}
-                onSettings={handleWidgetSettings}
-                onRemove={(w) => void handleRemoveWidget(w)}
+              // Clean empty state (Wave 1, #10) — no board open yet. The board
+              // surface opens CLEAR: no widgets, no grid, no auto-seeded set.
+              // A board exists only on an explicit action, so we offer the three
+              // explicit creation paths.
+              <TeachBoardEmptyState
+                onStartBlank={
+                  canCreateBoard ? () => void handleAddBoard() : undefined
+                }
+                onOpenBoards={openBoardsPanel}
               />
             )}
           </main>
@@ -1339,7 +1316,9 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
               onEmbedResource={handleEmbedResource}
               week={week}
               day={selectedDay}
-              onOpenWidgetLibrary={() => setLibraryOverlay("widgets")}
+              onOpenWidgetLibrary={
+                activeBoard ? () => setLibraryOverlay("widgets") : undefined
+              }
             />
           ) : null}
 
@@ -1383,47 +1362,20 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
         {!state.present ? (
           <footer className={styles.footerSlot}>
             <TeachFooter
-              boardIndex={boardIndex}
-              boardCount={boardCount}
-              modules={footerModules}
               panelsCollapsed={state.leftCollapsed && state.rightCollapsed}
               onTogglePanels={togglePanels}
-              onSelectModule={(id) => onFocusModule(id as never)}
             />
           </footer>
         ) : null}
 
-        {/* Widget picker — owned here because the board emits target cells. It
-            persists a widget keyed on the grade uuid, so only mount it once the
-            grade id resolves (flag-OFF this is the mock slug and is always set)
-            — never hand the picker a slug for a uuid column (audit finding #18). */}
-        {pickerTarget && boardGradeId(activeBoard) != null ? (
-          <WidgetPicker
-            target={pickerTarget}
-            gradeLevelId={boardGradeId(activeBoard) as string}
-            nextDisplayOrder={widgets.length}
-            onClose={() => setPickerTarget(null)}
-            onCreated={() => {
-              setPickerTarget(null);
-              void reloadBoards();
-            }}
-          />
-        ) : null}
-
-        {/* Board-settings popover (audit G1) — rename / reorder hint / reset. */}
+        {/* Board-settings popover (audit G1) — rename / reorder hint / reset.
+            (The CSS-grid `TeachingBoard`'s WidgetPicker + per-widget
+            WidgetSettingsPopover were removed in the Wave 1 declutter — widget
+            add/settings now flow through the BoardEditor's typed intents.) */}
         {boardSettingsOpen && activeBoard ? (
           <BoardSettingsPopover
             board={activeBoard}
             onClose={() => setBoardSettingsOpen(false)}
-            reloadBoards={reloadBoards}
-          />
-        ) : null}
-
-        {/* Per-widget settings popover (audit G2). */}
-        {settingsWidget ? (
-          <WidgetSettingsPopover
-            widget={settingsWidget}
-            onClose={() => setSettingsWidget(null)}
             reloadBoards={reloadBoards}
           />
         ) : null}
@@ -1571,5 +1523,60 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
         ) : null}
       </DragOverlay>
     </DndContext>
+  );
+}
+
+// ── Board empty state (Wave 1, #10) ──────────────────────────────────────────
+// Shown in the center when no board is open. The board surface opens CLEAN —
+// no widgets, no grid — and offers the explicit creation paths (a board exists
+// only on an explicit action). "Start blank" is hidden when a board can't be
+// created yet (no lesson/owner/grade) rather than rendering a dead button.
+
+interface TeachBoardEmptyStateProps {
+  /** Create a blank board for the active lesson / sandbox. Omitted → hidden. */
+  onStartBlank?: () => void;
+  /** Open the Boards panel (browse + reuse boards). */
+  onOpenBoards: () => void;
+}
+
+function TeachBoardEmptyState({
+  onStartBlank,
+  onOpenBoards,
+}: TeachBoardEmptyStateProps): ReactNode {
+  return (
+    <div
+      className={styles.emptyState}
+      role="region"
+      aria-label="No board open"
+    >
+      <div className={styles.emptyIcon} aria-hidden="true">
+        <TeachIcon name="grid" size={30} />
+      </div>
+      <h2 className={styles.emptyTitle}>No board open yet</h2>
+      <p className={styles.emptyBody}>
+        Start a blank board, open one from a resource, or pick from the Boards
+        page.
+      </p>
+      <div className={styles.emptyActions}>
+        {onStartBlank ? (
+          <Button
+            variant="primary"
+            leadingIcon={<TeachIcon name="plus" size={16} />}
+            onClick={onStartBlank}
+            tooltip="Create a fresh blank board for this lesson"
+          >
+            Start blank
+          </Button>
+        ) : null}
+        <Button
+          variant="secondary"
+          leadingIcon={<TeachIcon name="grid" size={16} />}
+          onClick={onOpenBoards}
+          tooltip="Browse your boards and the team's, and open one here"
+        >
+          Browse boards
+        </Button>
+      </div>
+    </div>
   );
 }

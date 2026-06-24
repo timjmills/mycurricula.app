@@ -18,7 +18,7 @@ import { useId, useState } from "react";
 import type { CSSProperties } from "react";
 import type { CatchupItem } from "@/lib/catchup-data";
 import { usePlanner } from "@/lib/planner-store";
-import { Tooltip } from "@/components/ui";
+import { StandardPill, Tooltip } from "@/components/ui";
 import { StatusPill } from "./StatusPill";
 import styles from "./CatchupRow.module.css";
 
@@ -259,9 +259,7 @@ export function CatchupRow({
           {item.standards.length > 0 && (
             <div className={styles.standards}>
               {item.standards.map((code) => (
-                <span key={code} className={`cp-mono ${styles.standard}`}>
-                  {code}
-                </span>
+                <StandardPill key={code} code={code} />
               ))}
             </div>
           )}

@@ -16,11 +16,13 @@
 import { useCallback, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  DEFAULT_LESSON_TEMPLATE_ID,
   LESSON_TEMPLATES,
   type LessonTemplate,
   type LessonTemplateSection,
 } from "@/lib/lesson-templates";
 import { useCustomTemplates, isCustomTemplateId } from "@/lib/custom-templates";
+import { useDefaultTemplate } from "@/lib/use-default-template";
 import { TemplateSectionEditor } from "./template-section-editor";
 import {
   Badge,
@@ -30,6 +32,7 @@ import {
   PageHeader,
   Tooltip,
 } from "@/components/ui";
+import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./lesson-templates-manager.module.css";
 
 // ── Built-in card ───────────────────────────────────────────────────────────
@@ -37,13 +40,26 @@ import styles from "./lesson-templates-manager.module.css";
 interface BuiltinCardProps {
   template: LessonTemplate;
   onDuplicate: (template: LessonTemplate) => void;
+  /** True when this template is the teacher's account-wide default. */
+  isDefault: boolean;
+  onSetDefault: () => void;
 }
 
-function BuiltinCard({ template, onDuplicate }: BuiltinCardProps): ReactNode {
+function BuiltinCard({
+  template,
+  onDuplicate,
+  isDefault,
+  onSetDefault,
+}: BuiltinCardProps): ReactNode {
   return (
     <article className={styles.builtinCard}>
       <div className={styles.builtinCardTop}>
         <span className={styles.builtinName}>{template.name}</span>
+        {isDefault && (
+          <Badge variant="success" aria-label="Your default template">
+            Default
+          </Badge>
+        )}
         {template.recommended && (
           <Badge variant="warn" aria-label="Recommended">
             Recommended
@@ -94,6 +110,17 @@ function BuiltinCard({ template, onDuplicate }: BuiltinCardProps): ReactNode {
         >
           Duplicate &amp; edit
         </Button>
+        {!isDefault && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onSetDefault}
+            aria-label={`Set ${template.name} as your default template`}
+            tooltip={`Make ${template.name} your default — every new lesson in an academic subject starts with this flow`}
+          >
+            Set as default
+          </Button>
+        )}
       </div>
     </article>
   );
@@ -106,6 +133,9 @@ interface CustomRowProps {
   isEditing: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  /** True when this template is the teacher's account-wide default. */
+  isDefault: boolean;
+  onSetDefault: () => void;
 }
 
 function CustomRow({
@@ -113,6 +143,8 @@ function CustomRow({
   isEditing,
   onEdit,
   onDelete,
+  isDefault,
+  onSetDefault,
 }: CustomRowProps): ReactNode {
   const sectionCount = template.sections.length;
   return (
@@ -126,7 +158,14 @@ function CustomRow({
       }
     >
       <div className={styles.customRowInfo}>
-        <div className={styles.customRowName}>{template.name}</div>
+        <div className={styles.customRowName}>
+          {template.name}
+          {isDefault && (
+            <Badge variant="success" aria-label="Your default template">
+              Default
+            </Badge>
+          )}
+        </div>
         <div className={styles.customRowMeta}>
           {sectionCount === 0
             ? "No sections yet"
@@ -134,6 +173,17 @@ function CustomRow({
         </div>
       </div>
       <div className={styles.customRowActions}>
+        {!isDefault && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onSetDefault}
+            aria-label={`Set ${template.name} as your default template`}
+            tooltip={`Make ${template.name} your default — every new lesson in an academic subject starts with this flow`}
+          >
+            Set as default
+          </Button>
+        )}
         <Button
           variant="icon"
           size="sm"
@@ -282,6 +332,10 @@ export function LessonTemplatesManager(): ReactNode {
   const { templates, create, update, remove, getById, hydrated } =
     useCustomTemplates();
 
+  // Account-wide default template (USER-scoped; seeded from the
+  // onboarding wizard's choice the first time this page loads).
+  const { defaultTemplateId, setDefaultTemplateId } = useDefaultTemplate();
+
   // Id of the custom template currently open in the editor, or null.
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -309,9 +363,15 @@ export function LessonTemplatesManager(): ReactNode {
   const handleDelete = useCallback(
     (id: string) => {
       if (editingId === id) setEditingId(null);
+      // Deleting the current default falls back to the built-in default
+      // so the preference never points at a template that no longer
+      // exists.
+      if (defaultTemplateId === id) {
+        setDefaultTemplateId(DEFAULT_LESSON_TEMPLATE_ID);
+      }
       remove(id);
     },
-    [remove, editingId],
+    [remove, editingId, defaultTemplateId, setDefaultTemplateId],
   );
 
   const handleDone = useCallback(() => {
@@ -343,7 +403,7 @@ export function LessonTemplatesManager(): ReactNode {
 
   return (
     <div className={styles.page}>
-      <div className={styles.inner}>
+      <div className={`${styles.inner} ${reveal.reveal}`}>
         {/* Page header — breadcrumb + title + subtitle via PageHeader primitive */}
         <PageHeader
           eyebrow="Settings"
@@ -382,6 +442,8 @@ export function LessonTemplatesManager(): ReactNode {
                 key={tpl.id}
                 template={tpl}
                 onDuplicate={handleDuplicateBuiltin}
+                isDefault={defaultTemplateId === tpl.id}
+                onSetDefault={() => setDefaultTemplateId(tpl.id)}
               />
             ))}
           </div>
@@ -458,6 +520,8 @@ export function LessonTemplatesManager(): ReactNode {
                     isEditing={editingId === tpl.id}
                     onEdit={() => handleEdit(tpl.id)}
                     onDelete={() => handleDelete(tpl.id)}
+                    isDefault={defaultTemplateId === tpl.id}
+                    onSetDefault={() => setDefaultTemplateId(tpl.id)}
                   />
                 ) : null,
               )}

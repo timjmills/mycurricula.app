@@ -21,6 +21,8 @@ import Link from "next/link";
 import { CatchupProvider, useCatchup } from "@/lib/catchup-state";
 import { Button, PageHeader, ToggleGroup, Tooltip } from "@/components/ui";
 import { SettingsCard } from "@/components/appearance/settings-card";
+import { SECTION_ICONS } from "@/components/settings/section-icons";
+import reveal from "@/components/settings/section-reveal.module.css";
 import styles from "./page.module.css";
 
 export default function CatchupSettingsPage(): ReactNode {
@@ -41,7 +43,7 @@ function CatchupSettingsInner(): ReactNode {
 
   return (
     <div className={styles.page}>
-      <div className={styles.inner}>
+      <div className={`${styles.inner} ${reveal.reveal}`}>
         <PageHeader
           eyebrow="Settings"
           title="Catch-up"
@@ -50,6 +52,7 @@ function CatchupSettingsInner(): ReactNode {
 
         {/* ── Toggle card ─────────────────────────────────────────── */}
         <SettingsCard
+          glyph={SECTION_ICONS["catch-up"]({ size: 14 })}
           eyebrow="Layer 1"
           title={
             <Tooltip
@@ -101,6 +104,7 @@ function CatchupSettingsInner(): ReactNode {
             Per the planning-doc §1262, the dedicated Catch-up screen stays
             reachable from Settings regardless of the feature flag. */}
         <SettingsCard
+          glyph={SECTION_ICONS["catch-up"]({ size: 14 })}
           eyebrow="Layer 3"
           title={
             <Tooltip

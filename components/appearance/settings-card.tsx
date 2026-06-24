@@ -7,7 +7,7 @@
 //   • RadioDot     — the filled-circle radio indicator shared by the
 //     style picker and palette toggle.
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui";
 import styles from "./settings-card.module.css";
 
@@ -26,8 +26,36 @@ interface SettingsCardProps {
    *  on the team) or "Personal" (this teacher only) next to the eyebrow.
    *  Vocabulary follows Unified Audit Decision #2. */
   scope?: "personal" | "team";
+  /** Instant-apply feedback: bump this counter after each successful
+   *  persist and the header flashes a small "Saved" chip for ~1.4s.
+   *  Settings have no Save buttons (changes apply immediately), so this
+   *  chip is the only confirmation a change landed. */
+  savedTick?: number;
+  /** Stable deep-link id for the settings search (lib/settings-search-
+   *  index.ts). When set, the card is wrapped in a <section id=…> the
+   *  search results can scroll to and highlight. */
+  anchorId?: string;
+  /** Eyebrow pill tone — varies by the settings sidebar group so the
+   *  domains read differently at a glance: Planning = honey (default,
+   *  the original look), Content = brand, People = teal, neutral = quiet
+   *  ink. Purely the pill chrome; titles/hints stay identical. */
+  tone?: "honey" | "brand" | "teal" | "neutral";
+  /** Small glyph rendered inside the eyebrow pill (16px slot) — the
+   *  section's icon from components/settings/section-icons.tsx. */
+  glyph?: ReactNode;
   children: ReactNode;
 }
+
+/** Eyebrow tone → module class. honey is the base .eyebrow look. */
+const TONE_CLASS: Record<
+  NonNullable<SettingsCardProps["tone"]>,
+  string | null
+> = {
+  honey: null,
+  brand: "eyebrowBrand",
+  teal: "eyebrowTeal",
+  neutral: "eyebrowNeutral",
+};
 
 /** White rounded panel with a consistent header — the A2 section frame.
  *  Delegates border / shadow / radius / background to <Card neutral>. */
@@ -37,13 +65,47 @@ export function SettingsCard({
   hint,
   action,
   scope,
+  savedTick,
+  anchorId,
+  tone = "honey",
+  glyph,
   children,
 }: SettingsCardProps): ReactNode {
+  // "Saved" pulse — visible while the timeout below is pending. The chip
+  // appears whenever savedTick increments past its previous value (the
+  // initial render never pulses, so cards mounting with savedTick=0 stay
+  // quiet). Reduced-motion users get the same chip without the fade —
+  // the module CSS guards the transition.
+  const [showSaved, setShowSaved] = useState(false);
+  const lastTickRef = useRef(savedTick ?? 0);
+  useEffect(() => {
+    const tick = savedTick ?? 0;
+    if (tick <= lastTickRef.current) return;
+    lastTickRef.current = tick;
+    setShowSaved(true);
+    const timer = window.setTimeout(() => setShowSaved(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, [savedTick]);
+
   const header = (
     <div className={styles.header}>
       <div className={styles.headerText}>
         <div className={styles.eyebrowRow}>
-          <span className={styles.eyebrow}>{eyebrow}</span>
+          <span
+            className={[
+              styles.eyebrow,
+              TONE_CLASS[tone] ? styles[TONE_CLASS[tone] as string] : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {glyph && (
+              <span className={styles.eyebrowGlyph} aria-hidden>
+                {glyph}
+              </span>
+            )}
+            {eyebrow}
+          </span>
           {scope && (
             <span
               className={[
@@ -68,11 +130,47 @@ export function SettingsCard({
         {title && <h2 className={styles.title}>{title}</h2>}
         {hint && <p className={styles.hint}>{hint}</p>}
       </div>
-      {action && <div className={styles.action}>{action}</div>}
+      {(action || showSaved) && (
+        <div className={styles.action}>
+          <span
+            className={[styles.saved, showSaved ? styles.savedVisible : ""]
+              .filter(Boolean)
+              .join(" ")}
+            role="status"
+            aria-live="polite"
+          >
+            {showSaved ? "Saved" : ""}
+          </span>
+          {action}
+        </div>
+      )}
     </div>
   );
 
-  return <Card header={header}>{children}</Card>;
+  // Scope stripe — team-scoped cards wear the core-mode (team red) left
+  // stripe, extending the lesson-card stripe language into settings so a
+  // teacher reads the blast radius before the copy. Personal cards keep
+  // Card's quiet neutral stripe.
+  const card = (
+    <Card
+      header={header}
+      className={scope === "team" ? styles.cardTeam : undefined}
+    >
+      {children}
+    </Card>
+  );
+
+  // Anchor wrapper — gives the settings search a scroll target. The
+  // [data-settings-anchor] hook lets the search highlight the section it
+  // just navigated to without per-page CSS.
+  if (anchorId) {
+    return (
+      <section id={anchorId} data-settings-anchor className={styles.anchor}>
+        {card}
+      </section>
+    );
+  }
+  return card;
 }
 
 /** Filled-circle radio indicator. */

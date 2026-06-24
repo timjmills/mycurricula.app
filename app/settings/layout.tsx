@@ -106,6 +106,12 @@ const SETTINGS_GROUPS: readonly SettingsGroup[] = [
         scope: "team",
       },
       {
+        slug: "standards",
+        label: "Standards",
+        href: "/settings/standards",
+        scope: "team",
+      },
+      {
         slug: "calendar",
         label: "Calendar",
         href: "/settings/calendar",

@@ -14,11 +14,26 @@
 // the SAME miniature planner windows the Appearance picker renders
 // (ThemeChip), so the preview language is identical everywhere.
 
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { useTheme } from "@/lib/theme";
 import type { ThemeSetting } from "@/lib/theme";
+import { Tooltip } from "@/components/ui";
 import { ThemeChip } from "./theme-picker";
+import { useRovingRadio } from "./use-roving-radio";
 import styles from "./theme-quick-switch.module.css";
+
+// Navigation keys the roving-radio hook consumes. Inside the top-bar More
+// menu (menuSemantics) we stop these from bubbling so they drive ONLY the
+// theme chips, never a future menu-level arrow handler — the correct
+// behavior for a radio group nested in a menu.
+const NAV_KEYS = new Set([
+  "ArrowRight",
+  "ArrowLeft",
+  "ArrowUp",
+  "ArrowDown",
+  "Home",
+  "End",
+]);
 
 // Labels only — the full picker carries the long descriptions + tooltips;
 // here each chip explains itself via aria-label/title.
@@ -43,12 +58,33 @@ export function ThemeQuickSwitch({
   menuSemantics = false,
 }: ThemeQuickSwitchProps): ReactNode {
   const { theme, setTheme } = useTheme();
+  const roving = useRovingRadio({
+    values: QUICK_OPTIONS.map((o) => o.id),
+    selected: theme,
+    onSelect: (v) => setTheme(v as ThemeSetting),
+  });
+
+  // In the More menu the chips are a radio group nested in a role="menu";
+  // keep their arrow/Home/End keys from bubbling to the menu so the two
+  // never fight over the same keystroke. The hook's handler runs first
+  // (it moves the selection + focus), then we halt propagation.
+  const groupProps = roving.getGroupProps();
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    groupProps.onKeyDown(e);
+    if (menuSemantics && NAV_KEYS.has(e.key)) {
+      e.stopPropagation();
+    }
+  };
 
   return (
     <div
       role={menuSemantics ? "group" : "radiogroup"}
-      aria-label="App color theme"
+      // Distinct from the full picker's "App color theme" group — on
+      // /settings/appearance BOTH render (sidebar strip + picker card), and
+      // two identically-named radiogroups confuse AT users and tests alike.
+      aria-label="Theme quick switch"
       className={styles.group}
+      onKeyDown={onKeyDown}
     >
       {QUICK_OPTIONS.map((opt) => {
         const selected = theme === opt.id;
@@ -57,18 +93,29 @@ export function ThemeQuickSwitch({
             ? "Follow system — Paper by day, Night in dark mode"
             : `${opt.label} theme`;
         return (
-          <button
+          // Icon-only control → real Tooltip per CLAUDE.md §4 (hover AND
+          // keyboard focus; native title alone never shows on focus). The
+          // dismissible tooltipId keeps the chips inside the onboarding
+          // system's global off-switch.
+          <Tooltip
             key={opt.id}
-            type="button"
-            role={menuSemantics ? "menuitemradio" : "radio"}
-            aria-checked={selected}
-            aria-label={label}
-            title={label}
-            className={`${styles.chipBtn} cp-focusable`}
-            onClick={() => setTheme(opt.id)}
+            content={label}
+            side="top"
+            tooltipId={`appearance-quick-theme-${opt.id}`}
           >
-            <ThemeChip id={opt.id} />
-          </button>
+            <button
+              type="button"
+              role={menuSemantics ? "menuitemradio" : "radio"}
+              aria-checked={selected}
+              aria-label={label}
+              title={label}
+              {...roving.getOptionProps(opt.id)}
+              className={`${styles.chipBtn} cp-focusable`}
+              onClick={() => setTheme(opt.id)}
+            >
+              <ThemeChip id={opt.id} />
+            </button>
+          </Tooltip>
         );
       })}
     </div>

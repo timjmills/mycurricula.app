@@ -81,7 +81,11 @@ export interface OnboardingData {
   subjects: OnboardingSubject[];
   /** The account-wide default lesson-flow template id. */
   defaultTemplateId: string;
-  /** Selected standards-framework ids (may be empty — the step is skippable). */
+  /** Selected standards-framework UUIDs (standards_frameworks.id) from the live
+   *  FrameworkBrowser (may be empty — the step is skippable). Persisted to
+   *  localStorage like the rest of onboarding; Phase 1B seeds these into the
+   *  teacher's framework set (teacher_frameworks). The live Supabase path today
+   *  is Settings → Standards. */
   standards: string[];
 }
 

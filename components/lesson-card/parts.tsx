@@ -13,7 +13,7 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { LessonResource, LessonStatus } from "@/lib/types";
 import { useCatalogOptional } from "@/lib/planner-store";
-import { Tooltip } from "@/components/ui";
+import { StandardPill, Tooltip } from "@/components/ui";
 import { Icon } from "./icon";
 import type { IconName } from "./icon";
 import { checkTitle } from "./status";
@@ -403,10 +403,13 @@ export function StandardsBadge({ codes }: { codes: string[] }) {
   );
 }
 
-/** Full standards list shown in the expanded card body. */
+/**
+ * Standards shown in the expanded card body — pill-only. Each code renders as
+ * a StandardPill; the full wording is revealed on hover/focus/long-press, never
+ * printed inline (design brief: lesson notes/detail show the pill reference
+ * only).
+ */
 export function StandardsList({ codes }: { codes: string[] }) {
-  // Provider-optional catalog (see StandardsBadge).
-  const { describeStandard } = useCatalogOptional();
   if (codes.length === 0) {
     return (
       <p style={{ fontSize: 12, color: "var(--ink-400)", margin: 0 }}>
@@ -415,44 +418,10 @@ export function StandardsList({ codes }: { codes: string[] }) {
     );
   }
   return (
-    <ul
-      style={{
-        listStyle: "none",
-        margin: 0,
-        padding: 0,
-        display: "flex",
-        flexDirection: "column",
-        gap: 5,
-      }}
-    >
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
       {codes.map((code) => (
-        <li key={code} style={{ display: "flex", gap: 8 }}>
-          <span
-            className="cp-mono"
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "var(--cd)",
-              background: "var(--cl)",
-              padding: "1px 5px",
-              borderRadius: 3,
-              flex: "0 0 auto",
-              height: "fit-content",
-            }}
-          >
-            {code}
-          </span>
-          <span
-            style={{
-              fontSize: 12,
-              color: "var(--ink-600, var(--ink-700))",
-              lineHeight: 1.45,
-            }}
-          >
-            {describeStandard(code)}
-          </span>
-        </li>
+        <StandardPill key={code} code={code} />
       ))}
-    </ul>
+    </div>
   );
 }

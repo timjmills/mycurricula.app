@@ -302,6 +302,16 @@
   outline-offset: 2px;
 }
 
+/* ── View-mode toggle (List ↔ Grid) ──────────────────────────────
+   Sits at the far right of the filter bar after the group-by select. A thin
+   wrapper so the segmented ToggleGroup primitive aligns vertically with the
+   chips + select on the same row; it wraps to its own line on phone with the
+   rest of the bar. */
+.viewToggle {
+  display: inline-flex;
+  align-items: center;
+}
+
 /* ── Body ───────────────────────────────────────────────────────── */
 
 .body {
@@ -358,6 +368,18 @@
   border-radius: var(--r-md);
   border: 1px solid var(--border);
   overflow: hidden;
+}
+
+/* ── Card grid (Grid view mode) ──────────────────────────────────
+   The Grid-mode counterpart to .rows: the same group items laid out as
+   <CatchupCard>s. auto-fill + minmax(240px, 1fr) lets the grid pack as many
+   columns as fit and wrap to new rows — never a horizontal scroll. Cards
+   stretch to equal row height (align-items: stretch is the grid default) so
+   the action footer (margin-top: auto inside the card) bottom-aligns. */
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
 }
 
 /* ── Touch-target floor on phone/tablet ─────────────────────────── */

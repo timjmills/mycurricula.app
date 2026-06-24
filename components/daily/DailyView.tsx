@@ -117,7 +117,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Lesson, LessonStatus } from "@/lib/types";
-import { useAppState } from "@/lib/app-state";
+import { useAppState, type ViewMode } from "@/lib/app-state";
 import { dateNumberForWeekDay, notesForDay } from "@/lib/mock";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useDayHoliday, useHolidaysByDay } from "@/lib/use-day-holiday";
@@ -132,7 +132,13 @@ import { RightRail } from "./RightRail";
 import { PaneSplitter } from "./PaneSplitter";
 import { AddLessonForm } from "./AddLessonForm";
 import { AddEventForm } from "./AddEventForm";
-import { Button, EmptyState, PageHeader, Tooltip } from "@/components/ui";
+import {
+  Button,
+  EmptyState,
+  PageHeader,
+  Tooltip,
+  ToggleGroup,
+} from "@/components/ui";
 import { DailyList } from "@/components/list/DailyList";
 import { ScheduleDayPane } from "@/components/schedule";
 import { DailySchedulePill } from "./daily-schedule-pill";
@@ -1230,9 +1236,13 @@ export interface DailyViewProps {
 export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
   const router = useRouter();
   // selectedDay is shared planner state — the top bar may also change it.
-  // viewMode drives the list vs. grid rendering choice.
-  const { viewMode, week, selectedDay, setSelectedDay, setWeek } =
+  // The Daily view's Grid/List preference is now per-view (app-state's
+  // per-view mode map) rather than the old single global flag: read it with
+  // getViewMode("daily") and flip it with setViewMode("daily", v). viewMode
+  // drives the list vs. grid rendering choice below + the header toggle.
+  const { getViewMode, setViewMode, week, selectedDay, setSelectedDay, setWeek } =
     useAppState();
+  const viewMode = getViewMode("daily");
 
   // Renameable hierarchy captions — a school may rename "Week" → "Module",
   // "Lesson" → "Activity", etc. Read once at the top of the component so the
@@ -1246,7 +1256,11 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
 
   // Lessons come from the planner store so completions, edits, and undo/redo
   // are immediately reflected in the left pane list and right pane detail.
-  const { lessons, setLessonStatus, lastChange, subjectById } = usePlanner();
+  // `hydration` gates the deep-link resolver below: under the Supabase flag
+  // the doc arrives async, and the resolver must know "still loading" from
+  // "loaded and the id genuinely isn't there".
+  const { lessons, setLessonStatus, lastChange, subjectById, hydration } =
+    usePlanner();
 
   // ── Per-teacher row order (local + localStorage, NOT the shared doc) ──
   // Keyed by week+day. Initialised EMPTY rather than from localStorage: the
@@ -1288,18 +1302,117 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
     return first?.id ?? null;
   });
 
-  // Once-only sync of week + selectedDay to the deep-linked lesson's
-  // location, then drop the query string so subsequent day changes don't
-  // re-seed. Runs only when initialLessonId is set on first mount.
+  // Deep-link resolver for a `?lesson=<id>` hand-off (the Weekly / Subject
+  // "Go to lesson" buttons, the command palette, a resource row). It selects
+  // THAT lesson and syncs the view to its week + day, then drops the query so
+  // a later manual day change can't re-trigger it.
+  //
+  // Why an effect that watches `lessons`/`hydration` rather than a once-on-
+  // mount run: under the Supabase flag the document hydrates AFTER mount, so
+  // at first render `lessons` is empty and neither the initializer above nor a
+  // mount-only effect can resolve the id — they silently no-op and the view
+  // falls back to "first not-done of today" (the reported bug). Re-running as
+  // the doc arrives lets the resolve land the moment the lesson exists. With
+  // the flag OFF the mock doc is present synchronously, so this resolves on the
+  // first run exactly as before.
+  //
+  // `seededForIdRef` makes the seed for a given id happen exactly once per query
+  // arrival: after the selection is placed we don't re-seed that id, so the
+  // teacher's later day/week navigation is never yanked back to the deep-linked
+  // lesson (see the ID-tracking note below for the multi-deep-link nuance).
+  //
+  // ── Why the URL strip is DEFERRED to a separate effect ────────────────────
+  // The cold/direct-load bug: calling router.replace("/daily") in the SAME tick
+  // as setSelectedId/setWeek/setSelectedDay discarded those writes. router.replace
+  // schedules an App-Router re-render that re-runs this component with a NEW
+  // `initialLessonId` (now undefined, the query is gone) BEFORE the seed's local
+  // state updates flush — so the selection never painted (the warm/client-nav
+  // path only survived because the useState initializer had already seeded
+  // selectedId independently of this effect). Fix: the seed effect now ONLY writes
+  // state + records the id in `seededForIdRef`, then sets `seedDoneForId`. A
+  // SECOND effect, keyed on `seedDoneForId`, performs the one-time router.replace
+  // on a LATER commit — after the selection has committed and painted, so the
+  // navigation re-render can't race it.
+  //
+  // ── Why we track the seeded ID, not a boolean ─────────────────────────────
+  // A teacher already on /daily can fire a SECOND deep-link (command palette,
+  // a lesson-card "Go to lesson", a search result) without DailyView remounting:
+  // App Router swaps the searchParams in place, so `initialLessonId` changes
+  // A → B while the same component instance stays mounted. A boolean "already
+  // seeded" latch would ignore B forever. Keying the guard on the id instead
+  // re-arms the resolver whenever a NEW non-null id arrives, while the deferred
+  // strip's `initialLessonId → undefined` transition still can't re-arm (only
+  // non-null ids resolve) — so manual day/week nav after a seed is never yanked.
+  //
+  // The latch CLEARS the moment `initialLessonId` returns to null (the post-strip
+  // / plain-load state). That makes the latch "this id, FOR THIS query arrival"
+  // rather than "this id, forever": re-deep-linking the SAME id later (after the
+  // strip cleared the query) re-arms and re-syncs, instead of being permanently
+  // ignored. Manual day/week nav is still safe — it never restores a non-null
+  // `initialLessonId`, so the resolver's `!initialLessonId` guard keeps it inert.
+  const seededForIdRef = useRef<string | null>(null);
+  const [seedDoneForId, setSeedDoneForId] = useState<string | null>(null);
   useEffect(() => {
-    if (!initialLessonId) return;
+    if (!initialLessonId) {
+      // No active deep-link (plain load, or the query was just stripped). Clear
+      // the latch so a future deep-link to ANY id — including one already seeded
+      // — resolves on its next arrival. `seedDoneForId` resets in lockstep so the
+      // NEXT resolution is a real null → id state transition (re-firing the
+      // deferred strip); without this reset a repeat of the same id would be a
+      // same-value setState that the strip effect would never observe.
+      seededForIdRef.current = null;
+      setSeedDoneForId(null);
+      return;
+    }
+    if (seededForIdRef.current === initialLessonId) return;
     const target = lessons.find((l) => l.id === initialLessonId);
-    if (!target) return;
-    if (target.week !== week) setWeek(target.week);
-    if (target.day !== selectedDay) setSelectedDay(target.day);
-    router.replace("/daily", { scroll: false });
+    if (target) {
+      // Set week/day unconditionally — React bails out of a same-value useState
+      // set, so this needs no `!==` guard and keeps `week`/`selectedDay` out of
+      // the effect (the deps below stay honest).
+      setWeek(target.week);
+      setSelectedDay(target.day);
+      setSelectedId(target.id);
+      seededForIdRef.current = initialLessonId;
+      setSeedDoneForId(initialLessonId); // trigger the deferred URL strip
+      return;
+    }
+    // Not found YET. The give-up must NOT latch while the lesson could still
+    // arrive. The doc legitimately changes owner mid-load under the Supabase
+    // flag: the session resolves from null → a real uid, so the first hydrate
+    // runs for the null owner and settles to "empty" BEFORE the real owner's
+    // hydrate brings the lessons. So we only abandon the deep-link when loading
+    // has reached a TERMINAL, populated-or-failed state where the id is
+    // genuinely unreachable:
+    //   • "error"                         — the load failed; no lessons are coming.
+    //   • "empty"/"ready" WITH lessons     — the doc populated and the id is absent
+    //                                        (a genuinely bad/stale id).
+    // A non-"loading" status while `lessons` is still empty is treated as a
+    // transient (e.g. the null-owner "empty" that precedes the real owner's
+    // hydrate): stay armed so the next lessons/hydration change retries.
+    const settledUnreachable =
+      hydration === "error" ||
+      ((hydration === "empty" || hydration === "ready") && lessons.length > 0);
+    if (settledUnreachable) {
+      seededForIdRef.current = initialLessonId;
+      setSeedDoneForId(initialLessonId); // strip the now-useless query (deferred)
+    }
+    // setWeek / setSelectedDay / setSelectedId are stable useState setters and
+    // router is stable, so they are intentionally omitted from the deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialLessonId]);
+  }, [initialLessonId, lessons, hydration]);
+
+  // Deferred, one-time URL strip. Runs AFTER the seed effect's state writes have
+  // committed (its own commit, triggered by `seedDoneForId`), so router.replace's
+  // navigation re-render can no longer discard the selection/week/day writes. The
+  // `=== initialLessonId` guard fires the strip exactly once for the id that was
+  // just resolved and stays inert on plain /daily loads (initialLessonId null).
+  useEffect(() => {
+    if (!initialLessonId || seedDoneForId !== initialLessonId) return;
+    router.replace("/daily", { scroll: false });
+    // router is stable; seedDoneForId/initialLessonId fully describe the intent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedDoneForId, initialLessonId]);
 
   // Collapse-all toggle — default expanded. UI-only, never persisted.
   const [collapsedAll, setCollapsedAll] = useState(false);
@@ -2103,6 +2216,36 @@ export function DailyView({ initialLessonId }: DailyViewProps = {}): ReactNode {
         className={styles.dailyPageHeader}
         actions={
           <div className={styles.headerActions}>
+            {/* Grid ↔ List view-mode toggle — flips the Daily body between the
+                full lesson-detail layout (Grid) and the compact <DailyList>
+                (List). It writes the PER-VIEW preference via setViewMode("daily",
+                …) so the choice is remembered for the Daily view alone (not
+                Weekly/Year/etc). It sits BESIDE the Subject↔Schedule pill +
+                Present button — both coexist; this toggle owns the lesson-card
+                layout, the pill owns the schedule overlay. Onboarding tips
+                (CLAUDE.md §4) carry a tooltipId so a first-time teacher learns
+                each mode once, then can dismiss. */}
+            <ToggleGroup<ViewMode>
+              ariaLabel="Daily view mode"
+              variant="prominent"
+              size="sm"
+              value={viewMode}
+              onChange={(v) => setViewMode("daily", v)}
+              options={[
+                {
+                  value: "grid",
+                  label: "Grid",
+                  title: "See the day as the full lesson detail layout",
+                  tooltipId: "daily-view-grid",
+                },
+                {
+                  value: "list",
+                  label: "List",
+                  title: "See the day as a compact list of lessons",
+                  tooltipId: "daily-view-list",
+                },
+              ]}
+            />
             <DailySchedulePill />
             <Tooltip
               content="Open this day in the full-screen Teaching View for live class delivery"

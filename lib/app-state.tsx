@@ -25,6 +25,12 @@ import type { User } from "@supabase/supabase-js";
 import type { LessonStatus, SubjectId } from "@/lib/types";
 import { CURRENT_WEEK, ME } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/client";
+import {
+  PROFILE_EVENT,
+  PROFILE_STORAGE_KEY,
+  deriveInitials,
+  readStoredDisplayName,
+} from "@/lib/use-account-settings";
 
 /**
  * Grid (matrix/canvas view of lessons in a subject × day grid) vs
@@ -60,6 +66,60 @@ const EMPTY_FILTERS: PlannerFilters = {
   standards: [],
   showHolidays: true,
 };
+
+/**
+ * Per-view Grid/List preference.
+ *
+ * Each primary view (Weekly, Daily, Yearly, Subject/Curriculum, Catch-up)
+ * remembers its OWN Grid↔List choice — flipping Weekly to List does not change
+ * Yearly. USER-scoped (a per-teacher preference), persisted to localStorage and
+ * synced across tabs. SSR-safe: the server and the first client paint both use
+ * DEFAULT_VIEW_MODES; the stored values arrive in a post-mount effect, so there
+ * is no hydration mismatch on the rendered layout.
+ */
+export type ViewKey = "weekly" | "daily" | "year" | "subject" | "catchup";
+
+const VIEW_KEYS: readonly ViewKey[] = [
+  "weekly",
+  "daily",
+  "year",
+  "subject",
+  "catchup",
+];
+
+const VIEW_MODE_KEY = "mycurricula:user:view-mode-by-view";
+
+const DEFAULT_VIEW_MODES: Record<ViewKey, ViewMode> = {
+  weekly: "grid",
+  daily: "grid",
+  year: "grid",
+  subject: "grid",
+  // Catch-up's original/primary surface is the grouped row list (where note
+  // editing lives); Grid is the alternate. Default to "list" so first-load
+  // matches the established Catch-up experience.
+  catchup: "list",
+};
+
+/**
+ * Read the per-view mode map from localStorage, falling back to the default
+ * for any missing or invalid entry. SSR-safe (returns defaults with no window).
+ */
+function readViewModes(): Record<ViewKey, ViewMode> {
+  if (typeof window === "undefined") return { ...DEFAULT_VIEW_MODES };
+  try {
+    const raw = window.localStorage.getItem(VIEW_MODE_KEY);
+    if (!raw) return { ...DEFAULT_VIEW_MODES };
+    const parsed = JSON.parse(raw) as Partial<Record<ViewKey, unknown>>;
+    const result = { ...DEFAULT_VIEW_MODES };
+    for (const key of VIEW_KEYS) {
+      const v = parsed[key];
+      if (v === "grid" || v === "list") result[key] = v;
+    }
+    return result;
+  } catch {
+    return { ...DEFAULT_VIEW_MODES };
+  }
+}
 
 /**
  * localStorage key for the team's curriculum label.
@@ -187,9 +247,13 @@ function toCurrentUser(user: User): CurrentUser {
 }
 
 export interface AppStateValue {
-  /** Grid (matrix/canvas) vs List (flat list of lessons) — persists per teacher. */
-  viewMode: ViewMode;
-  setViewMode: (m: ViewMode) => void;
+  /**
+   * Per-view Grid (matrix/canvas) vs List (flat list) preference. Each primary
+   * view remembers its own choice independently, persisted per teacher. Read a
+   * view's mode with `getViewMode(view)`; change it with `setViewMode(view, m)`.
+   */
+  getViewMode: (view: ViewKey) => ViewMode;
+  setViewMode: (view: ViewKey, mode: ViewMode) => void;
 
   /** Personal vs. Master. Master triggers the heads-up banner sequence. */
   editMode: EditMode;
@@ -285,7 +349,8 @@ interface AppStateProviderProps {
 export function AppStateProvider({
   children,
 }: AppStateProviderProps): ReactNode {
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewModes, setViewModes] =
+    useState<Record<ViewKey, ViewMode>>(DEFAULT_VIEW_MODES);
   const [editMode, setEditMode] = useState<EditMode>("personal");
   const [week, setWeek] = useState<number>(CURRENT_WEEK);
   const [selectedDay, setSelectedDay] = useState<number>(0);
@@ -315,6 +380,21 @@ export function AppStateProvider({
     setCurrentUser((prev) => ({ ...prev, curriculumLabel: stored }));
   }, []);
 
+  // Post-mount: overlay the teacher-chosen display name (Settings →
+  // Account, persisted under `mycurricula:user:profile`) over the mock
+  // fallback so the top-bar / SideNav avatar reflects the chosen name.
+  // Same SSR-safety rationale as the curriculum-label overlay above —
+  // the initial render must use ME so server HTML matches first paint.
+  useEffect(() => {
+    const stored = readStoredDisplayName();
+    if (stored == null) return;
+    setCurrentUser((prev) => ({
+      ...prev,
+      name: stored,
+      initials: deriveInitials(stored),
+    }));
+  }, []);
+
   useEffect(() => {
     const supabase = createClient();
     let active = true;
@@ -329,6 +409,16 @@ export function AppStateProvider({
         // auth event (initial read, refresh, sign-in).
         const stored = readCurriculumLabel();
         if (stored != null) next.curriculumLabel = stored;
+        // Same overlay for the Settings → Account display name: the
+        // locally-chosen name (and its derived initials) wins over the
+        // auth-profile name until Supabase profile rows land (Phase 1B).
+        // Without this, any auth event (initial read, token refresh,
+        // sign-in) would clobber the teacher's rename.
+        const storedName = readStoredDisplayName();
+        if (storedName != null) {
+          next.name = storedName;
+          next.initials = deriveInitials(storedName);
+        }
         setCurrentUser(next);
       }
     };
@@ -356,6 +446,37 @@ export function AppStateProvider({
     };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  // Display-name sync — two channels for the same key:
+  //   • `storage` event  — a rename in ANOTHER tab (Settings → Account
+  //     open in tab B while /weekly sits in tab A).
+  //   • PROFILE_EVENT    — a rename in THIS tab (the `storage` event never
+  //     fires on the writing tab; lib/use-account-settings dispatches the
+  //     custom event after each write so the avatar updates live).
+  // Both re-read storage so there is a single source of truth. Clearing
+  // falls back to the mock ME name — when real Supabase profiles land
+  // (Phase 1B) the fallback becomes the auth-profile name instead.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const applyStoredName = (): void => {
+      const stored = readStoredDisplayName();
+      setCurrentUser((prev) => ({
+        ...prev,
+        name: stored ?? ME.name,
+        initials: stored != null ? deriveInitials(stored) : ME.initials,
+      }));
+    };
+    const onStorage = (e: StorageEvent): void => {
+      if (e.key !== PROFILE_STORAGE_KEY) return;
+      applyStoredName();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(PROFILE_EVENT, applyStoredName);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(PROFILE_EVENT, applyStoredName);
+    };
   }, []);
 
   // Setter exposed via the context. Writes through to localStorage and
@@ -405,9 +526,40 @@ export function AppStateProvider({
     setScheduleOpen(false);
   }, []);
 
+  // Per-view Grid/List preference — hydrate from localStorage post-mount so the
+  // server + first client paint match (DEFAULT_VIEW_MODES), then overlay the
+  // stored choices. Also sync across tabs (a flip in Settings/another tab).
+  useEffect(() => {
+    setViewModes(readViewModes());
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== VIEW_MODE_KEY) return;
+      setViewModes(readViewModes());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const getViewMode = useCallback(
+    (view: ViewKey): ViewMode => viewModes[view] ?? "grid",
+    [viewModes],
+  );
+
+  const setViewMode = useCallback((view: ViewKey, mode: ViewMode): void => {
+    setViewModes((prev) => {
+      if (prev[view] === mode) return prev;
+      const next = { ...prev, [view]: mode };
+      try {
+        window.localStorage.setItem(VIEW_MODE_KEY, JSON.stringify(next));
+      } catch {
+        // Storage disabled / quota exceeded — in-memory state still updates.
+      }
+      return next;
+    });
+  }, []);
+
   const value = useMemo<AppStateValue>(
     () => ({
-      viewMode,
+      getViewMode,
       setViewMode,
       editMode,
       setEditMode,
@@ -437,7 +589,8 @@ export function AppStateProvider({
       updateCurriculumLabel,
     }),
     [
-      viewMode,
+      getViewMode,
+      setViewMode,
       editMode,
       week,
       selectedDay,

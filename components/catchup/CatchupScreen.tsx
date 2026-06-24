@@ -37,9 +37,11 @@ import type {
 } from "@/lib/catchup-data";
 import { usePlanner } from "@/lib/planner-store";
 import { useLabels } from "@/lib/labels";
-import { Tooltip } from "@/components/ui";
+import { Tooltip, ToggleGroup } from "@/components/ui";
+import type { ViewMode } from "@/lib/app-state";
 import { BulkActionBar } from "./BulkActionBar";
 import { CatchupRow } from "./CatchupRow";
+import { CatchupCard } from "./CatchupCard";
 import { EmptyState } from "./EmptyState";
 import styles from "./CatchupScreen.module.css";
 
@@ -112,7 +114,13 @@ export function CatchupScreen() {
   // OFF `subjectById` mirrors the mock SUBJECT_BY_ID byte-identically; flag ON
   // it resolves the hydrated grade's subjects.
   const { lessons, subjectById } = usePlanner();
-  const { week, currentUser } = useAppState();
+  // The Catch-up screen's List ↔ Grid choice is a per-view preference held in
+  // app-state's per-view mode map (persisted per teacher). "list" is the
+  // grouped CatchupRow stack (the default + original layout); "grid" lays the
+  // same items out as compact cards. The filters/grouping are shared — only
+  // the per-item presentation differs between modes.
+  const { week, currentUser, getViewMode, setViewMode } = useAppState();
+  const viewMode = getViewMode("catchup");
   const { enabled, actions, setAction, setNote, getNote } = useCatchup();
   const labels = useLabels();
 
@@ -431,6 +439,37 @@ export function CatchupScreen() {
             </select>
           </Tooltip>
         </label>
+
+        {/* List ↔ Grid view-mode toggle — flips the body between the grouped
+            CatchupRow stack (List, the default) and a compact card grid
+            (Grid). Per-view preference via setViewMode("catchup", …) so the
+            choice is remembered for Catch-up alone. The grouping + scope +
+            status filters above stay live in both modes; only the per-item
+            presentation changes. Onboarding tips (CLAUDE.md §4) carry a
+            tooltipId so a first-time teacher learns each mode once. */}
+        <div className={styles.viewToggle}>
+          <ToggleGroup<ViewMode>
+            ariaLabel="Catch-up view mode"
+            variant="prominent"
+            size="sm"
+            value={viewMode}
+            onChange={(v) => setViewMode("catchup", v)}
+            options={[
+              {
+                value: "grid",
+                label: "Grid",
+                title: "See uncovered lessons as compact cards in a grid",
+                tooltipId: "catchup-view-grid",
+              },
+              {
+                value: "list",
+                label: "List",
+                title: "See uncovered lessons as a grouped vertical list",
+                tooltipId: "catchup-view-list",
+              },
+            ]}
+          />
+        </div>
       </div>
 
       {/* ── Body ──────────────────────────────────────────────────── */}
@@ -462,22 +501,45 @@ export function CatchupScreen() {
                     &middot; {group.items.length} uncovered
                   </span>
                 </header>
-                <div className={styles.rows}>
-                  {group.items.map((item) => (
-                    <CatchupRow
-                      key={item.lessonId}
-                      item={item}
-                      selected={selected.has(item.lessonId)}
-                      note={getNote(item.lessonId)}
-                      onToggleSelect={() => toggleSelect(item.lessonId)}
-                      onMarkDone={() => handleMarkDone(item.lessonId)}
-                      onSkip={() => handleSkip(item.lessonId)}
-                      onCarryOver={() => handleCarryOver(item.lessonId)}
-                      onJumpToLesson={() => handleJumpToLesson()}
-                      onSaveNote={(value) => setNote(item.lessonId, value)}
-                    />
-                  ))}
-                </div>
+                {/* List mode → the grouped CatchupRow stack (the original
+                    layout). Grid mode → a wrapping card grid of the SAME items
+                    rendered as compact <CatchupCard>s. Both share the group's
+                    filtered + grouped item set, so scope / status / group-by
+                    behave identically; only the per-item presentation differs. */}
+                {viewMode === "grid" ? (
+                  <div className={styles.cardGrid}>
+                    {group.items.map((item) => (
+                      <CatchupCard
+                        key={item.lessonId}
+                        item={item}
+                        selected={selected.has(item.lessonId)}
+                        note={getNote(item.lessonId)}
+                        onToggleSelect={() => toggleSelect(item.lessonId)}
+                        onMarkDone={() => handleMarkDone(item.lessonId)}
+                        onSkip={() => handleSkip(item.lessonId)}
+                        onCarryOver={() => handleCarryOver(item.lessonId)}
+                        onJumpToLesson={() => handleJumpToLesson()}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className={styles.rows}>
+                    {group.items.map((item) => (
+                      <CatchupRow
+                        key={item.lessonId}
+                        item={item}
+                        selected={selected.has(item.lessonId)}
+                        note={getNote(item.lessonId)}
+                        onToggleSelect={() => toggleSelect(item.lessonId)}
+                        onMarkDone={() => handleMarkDone(item.lessonId)}
+                        onSkip={() => handleSkip(item.lessonId)}
+                        onCarryOver={() => handleCarryOver(item.lessonId)}
+                        onJumpToLesson={() => handleJumpToLesson()}
+                        onSaveNote={(value) => setNote(item.lessonId, value)}
+                      />
+                    ))}
+                  </div>
+                )}
               </section>
             );
           })

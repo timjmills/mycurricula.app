@@ -67,8 +67,9 @@ type DOMPurifyInstance = {
 
 // Allowed tags — the formatting vocabulary the rich-text editor can emit
 // (bold/italic/underline/strike, sub/sup, headings, lists, links, code,
-// blockquote, and the <font>/<span> wrappers execCommand produces for color,
-// highlight, and font-family/size). Everything not listed is stripped.
+// blockquote, figure/figcaption resource cards, and the <font>/<span> wrappers
+// execCommand produces for color, highlight, and font-family/size). Everything
+// not listed is stripped.
 const ALLOWED_TAGS = [
   "p",
   "br",
@@ -98,6 +99,16 @@ const ALLOWED_TAGS = [
   "blockquote",
   "code",
   "pre",
+  // <figure>/<figcaption> wrap the editor's inline resource "cards" (an image
+  // or embed with an optional caption). They carry no script surface — figure
+  // is a plain grouping element and figcaption holds plain text — so allowing
+  // them only widens the structural vocabulary, never the attack surface. The
+  // media INSIDE a figure (<img>/<iframe>) is still individually vetted by the
+  // hooks below. The interactive checklist the editor emits reuses <ul>/<li>
+  // (already allowed) and carries its state on `data-checklist`/`data-checked`,
+  // which DOMPurify keeps by default (ALLOW_DATA_ATTR) — no new attr needed.
+  "figure",
+  "figcaption",
   // execCommand('foreColor'/'hiliteColor'/'fontName'/'fontSize') wraps
   // selections in <font color|face|size>. Allowed, but its attributes are
   // constrained to the safe set below.

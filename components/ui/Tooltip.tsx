@@ -353,13 +353,36 @@ export function Tooltip({
   // Clone the trigger to inject ref + aria-describedby (always) and the
   // hover/focus listeners (only on the enabled path). When the child is
   // disabled, the listeners move to the wrapper span below.
+  //
+  // COMPOSE, never clobber: cloneElement props REPLACE the child's own,
+  // so naively injecting onBlur here used to silently swallow a child's
+  // commit-on-blur handler (e.g. the settings text inputs that save when
+  // you click out). Each injected listener now calls the child's own
+  // handler first, then the tooltip's.
+  const composeHandler = <E,>(
+    theirs: unknown,
+    ours: (e: E) => void,
+  ): ((e: E) => void) => {
+    return (e: E): void => {
+      if (typeof theirs === "function") {
+        (theirs as (e: E) => void)(e);
+      }
+      ours(e);
+    };
+  };
   const triggerHandlers = childDisabled
     ? {}
     : {
-        onMouseEnter: handleMouseEnter,
-        onMouseLeave: handleMouseLeave,
-        onFocus: handleFocus,
-        onBlur: handleBlur,
+        onMouseEnter: composeHandler(
+          childProps?.onMouseEnter,
+          handleMouseEnter,
+        ),
+        onMouseLeave: composeHandler(
+          childProps?.onMouseLeave,
+          handleMouseLeave,
+        ),
+        onFocus: composeHandler(childProps?.onFocus, handleFocus),
+        onBlur: composeHandler(childProps?.onBlur, handleBlur),
       };
 
   // For the enabled path the ref lives on the trigger itself; for the

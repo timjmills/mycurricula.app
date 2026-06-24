@@ -25,11 +25,7 @@ import { DRAG_MOTION } from "@/lib/collapse-on-drag";
 import type { TeachModuleId } from "@/lib/use-teach-workspace";
 import type { TeachResource } from "@/lib/types";
 import { Button, Tooltip } from "@/components/ui";
-import { useDockedTools } from "@/lib/teach/use-docked-tools";
-import type { WidgetType } from "@/lib/types";
 import { PanelAddMenu } from "@/components/teach/left/PanelAddMenu";
-import { ToolsModule } from "@/components/teach/left/modules";
-import { ToolsIcon } from "@/components/teach/left/icons";
 import { ResourcesIcon, ChatIcon, TodoIcon, ChevronIcon } from "./icons";
 import { ResourcesModule } from "./modules/ResourcesModule";
 import { ChatModule } from "./modules/ChatModule";
@@ -60,11 +56,9 @@ const MODULE_META: Partial<Record<TeachModuleId, PanelModuleMeta>> = {
     icon: <TodoIcon size={14} />,
     tip: "Your to-do list for today.",
   },
-  tools: {
-    label: "Tools",
-    icon: <ToolsIcon size={14} />,
-    tip: "Docked teaching tools — timer, dice, poll, traffic light, and more.",
-  },
+  // Wave 1 declutter: "Tools" is a LEFT module with a single canonical home (the
+  // left rail + its module body). The right panel no longer renders a duplicate
+  // Tools tab/body — that was one of the 5–6 duplicate Tools entry points.
 };
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -118,28 +112,14 @@ export function TeachRightPanel({
 }: TeachRightPanelProps): ReactNode {
   const reducedMotion = useReducedMotion() ?? false;
 
-  // The docked tool-widget stack — the panel-bar "+" docks tools into it.
-  const dockedTools = useDockedTools();
-
-  // Panel-bar "+": dock the chosen tool-widget into the Tools stack. The right
-  // panel does NOT own the right tab order or render a "tools" body (those live
-  // in TeachWorkspace — see the cross-boundary note in the build report), so we
-  // dock the tool and only focus the Tools tab when it already exists in
-  // `order`. We never break existing right-tab behaviour.
-  const handleAddTool = useCallback(
-    (type: WidgetType): void => {
-      dockedTools.add(type);
-      if (order.includes("tools")) onActivateModule("tools");
-    },
-    [dockedTools, order, onActivateModule],
-  );
-
   // Resolve the effective focused module: the explicit active id when it is in
-  // `order`, else the first module. Guards against a stale active id.
+  // `order` AND right-supported (has MODULE_META), else the first supported
+  // module. Requiring MODULE_META guards against a stale/cross-side-dropped id
+  // like the left-only `tools` resolving to a blank body (gate F4).
   const effectiveActive: TeachModuleId | null =
-    activeModuleId && order.includes(activeModuleId)
+    activeModuleId && order.includes(activeModuleId) && MODULE_META[activeModuleId]
       ? activeModuleId
-      : (order[0] ?? null);
+      : (order.find((id) => MODULE_META[id]) ?? null);
 
   const renderBody = useCallback(
     (moduleId: TeachModuleId): ReactNode => {
@@ -156,8 +136,6 @@ export function TeachRightPanel({
           return <ChatModule week={week} day={day} />;
         case "todo":
           return <TodoModule />;
-        case "tools":
-          return <ToolsModule />;
         default:
           return null;
       }
@@ -251,11 +229,10 @@ export function TeachRightPanel({
             );
           })}
         </div>
-        {/* Panel-bar "+": dock a tool or open the widget library. Hidden until
-            hover/focus on desktop; always visible on touch. */}
+        {/* Panel-bar "+": open the widget library. Hidden until hover/focus on
+            desktop; always visible on touch. */}
         <PanelAddMenu
           side="right"
-          onAddTool={handleAddTool}
           onOpenWidgetLibrary={onOpenWidgetLibrary}
           triggerClassName={styles.addTrigger}
         />

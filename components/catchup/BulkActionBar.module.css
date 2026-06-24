@@ -54,9 +54,10 @@
   flex: 1;
 }
 
-.btn,
-.btnPrimary,
-.btnGhost {
+/* .btn.btn … — (0,2,0) survives the .cp-root button reset (tokens.css). */
+.btn.btn,
+.btnPrimary.btnPrimary,
+.btnGhost.btnGhost {
   font: inherit;
   font-size: var(--t-12);
   font-weight: 700;
@@ -69,7 +70,10 @@
   min-height: 44px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 120ms ease;
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
 }
 
 .btn:hover,
@@ -78,16 +82,31 @@
   background: color-mix(in srgb, #fff 18%, transparent);
 }
 
-.btnPrimary {
-  background: var(--brand-500);
+/* Primary "Mark all as needs carry-over" — filled THEME accent, on-solid
+   ink, crisp neutral shadow (no colored glow). Recolours per theme via
+   --chrome-accent; hover deepens one shade and lifts, mirroring
+   .btn.primary in the canonical primitive. */
+/* .btnPrimary.btnPrimary — (0,2,0) survives the .cp-root button reset (tokens.css). */
+.btnPrimary.btnPrimary {
+  background: var(--chrome-accent);
+  color: var(--on-solid);
   font-weight: 700;
+  box-shadow: var(--sh-sm);
 }
 
 .btnPrimary:hover {
-  background: var(--brand-600);
+  background: var(--chrome-accent-strong);
+  box-shadow: var(--sh-md);
+  transform: translateY(-1px);
 }
 
-.btnGhost {
+.btnPrimary:active {
+  transform: translateY(0);
+  box-shadow: var(--sh-xs);
+}
+
+/* .btnGhost.btnGhost — (0,2,0) survives the .cp-root button reset (tokens.css). */
+.btnGhost.btnGhost {
   background: transparent;
   color: color-mix(in srgb, #fff 75%, transparent);
 }
@@ -109,6 +128,11 @@
   .btnPrimary,
   .btnGhost {
     transition: none;
+  }
+  /* Suppress the crisp primary lift under reduced motion. */
+  .btnPrimary:hover,
+  .btnPrimary:active {
+    transform: none;
   }
 }
 

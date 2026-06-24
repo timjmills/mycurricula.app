@@ -116,12 +116,47 @@ Non-subject status colors are NOT subject colors. Use:
 | `var(--important)`                     | Modified, attention     |
 | `var(--catchup)` / `var(--catchup-bg)` | Behind, needs catch-up  |
 | `var(--ink-50…900)`                    | Neutral ink ramp        |
-| `var(--paper)`                         | The card body white     |
+| `var(--paper)`                         | The card body surface   |
 | `var(--tag-*)`                         | 10 tag colors for chips |
 
 A blue ring on a Reading card means "this is math" — never use a
 subject color for a non-subject signal. Selection states, focus rings,
 and informational accents use `--fyi`, `--ink-900`, or a tag color.
+
+### Themes — neutrals are theme-RELATIVE, not colors
+
+The app ships six selectable themes (`data-theme` on `<html>`: `paper`
+default, `cloud`, `night` dark mode, `mint`, `sky`, `blossom` — see
+CLAUDE.md §4). Every neutral above is re-mapped per theme, which changes
+what some tokens MEAN on a dark surface:
+
+- **`--paper` and the `--ink-*` ramp are theme-relative.** On Night,
+  `--paper` is a DARK surface and `--ink-900` is near-white. Never use
+  `color: var(--paper)` to mean "white ink on a saturated solid" — that
+  flips dark-on-dark under Night. Use **`var(--on-solid)`** (always
+  white) for text/icons over `--brand-500/600`, status solids, subject
+  solids, and other saturated theme-stable fills.
+- **Tint/deep pairs adapt; mid-solids don't.** `--brand-50/100/700` and
+  `--honey-50/100/600` re-mix on Night (tint surfaces darken, their text
+  members lighten); `--brand-500/600` and `--honey-300..500` stay
+  saturated. Pair text-on-tint with the ramp's TEXT member (`--brand-700`,
+  `--honey-600`), never the solid members.
+- **Subject tints flow through `--tint-base`.** Recipes that mix toward
+  white must mix toward `var(--tint-base)` so dark themes re-tint them.
+- **Chrome states use the `--chrome-accent-*` tier, never raw `--brand-*`.**
+  Active/selected chrome (nav items, tabs, rail icons, filter chips) and
+  chrome surfaces (`--rail-bg`, `--panel-bg`, `--panel-header-bg`) re-hue
+  per theme; Paper's defaults resolve to the original indigo, so using the
+  tier costs nothing and keeps every theme's chrome in its own accent.
+- **Verify every new surface across all six themes** — `paper`, `cloud`,
+  `night`, `mint`, `sky`, `blossom` — before calling it done, the same way
+  the responsive contract requires three viewport tiers. Night (the dark
+  mode) and at least one wash are the non-negotiable floor; an app-wide
+  change covers all six. On each, confirm chrome re-hues through the
+  `--chrome-accent-*` tier, no surface goes dark-on-dark or light-on-light,
+  and text holds WCAG AA contrast. Settings → Appearance switches instantly;
+  persisted per device. This is the §Themes half of the CLAUDE.md §4b
+  Live QA Audit gate's cross-theme verification — both run before "done".
 
 ---
 
@@ -209,6 +244,96 @@ primitive instead of inventing one locally.
 
 When you need a new primitive variant: add to the existing component
 with a new prop. Do not duplicate.
+
+---
+
+## 7a. Buttons & pills
+
+Every button in the app is the **`components/ui/Button`** primitive
+(`Button.tsx` + `Button.module.css`). There is no other button. The
+variants are `primary` · `honey` · `secondary` · `ghost` · `icon` ·
+`destructive`; the sizes are `sm` / `md` / `lg`. **Never hand-roll a pill
+CTA** — a `<button>` with its own background, border, and radius — outside
+this primitive. If you need a new look, add a variant to `Button.module.css`,
+do not invent one at the callsite.
+
+### The DON'T (the bug this section codifies)
+
+1. **No oversized colored glow as the resting shadow.** Do not set
+   `box-shadow: var(--sh-brand)` / `var(--sh-honey)` (or any other
+   color-glow token) on a button at rest. At rest a colored bloom reads as
+   a blurry halo — a "glitch", not a crisp control. Those color-glow tokens
+   are rationed to non-button accents (hero lockups, focus emphasis); a
+   button's resting shadow is a tight neutral elevation, never a color
+   wash.
+2. **No bare single-class variant/size rule for fill, border, or padding.**
+   A rule like `.primary { background … }` or `.md { padding … }` is
+   specificity **(0,1,0)**. The Settings UI and several slide-out panels
+   render inside `.cp-root`, whose base reset
+   `.cp-root button { background: none; border: none; padding: 0 }` is
+   **(0,1,1)** — so inside those contexts the reset WINS and silently
+   strips the fill, border, and padding. The visible failure: floating
+   label text with a leftover shadow halo at rest, and a zero-padding,
+   cramped pill on hover (the fill returns, the padding doesn't).
+   **Fix:** qualify every variant and size rule with the base class —
+   `.btn.primary`, `.btn.md` → **(0,2,0)** — so it outranks the reset and
+   the primitive renders identically in every context. (The double-class
+   trick — `.foo.foo` — is the same fix where there is no base class to
+   lean on; see CLAUDE.md "cp-root button reset trap" lesson.) Do not
+   de-qualify these rules.
+3. **No raw `--brand-*` for a button's hover/active color.** Raw brand
+   ignores the active theme. Active/hover button color routes through the
+   `--chrome-accent-*` tier (§4 "Chrome states"), so every theme re-hues
+   its own buttons.
+
+### The DO (the crisp, theme-recoloured design)
+
+- **Crisp solid pill.** The resting shadow is a tight neutral elevation —
+  `var(--sh-sm)` (filled variants) / `var(--sh-xs)` (secondary) — never a
+  color glow. Pill radius `var(--r-pill)`; label weight 700.
+- **Recolour per theme.** Filled `primary` uses `var(--chrome-accent)` at
+  rest and `var(--chrome-accent-strong)` on hover; the token contract
+  guarantees both clear **≥4.5:1** against `var(--on-solid)` (always-white
+  ink) on all six themes. `secondary` hover routes its border through
+  `var(--chrome-accent-mid)` and its text through `var(--chrome-accent-deep)`.
+  The `honey` marketing CTA stays warm (`var(--grad-honey)` + `var(--on-honey)`)
+  — deliberately NOT theme-recoloured — but uses the same neutral shadow
+  scale. `destructive` stays semantic catch-up red, also NOT theme-recoloured.
+- **Distinct rest vs hover.** Hover deepens the fill one shade, steps the
+  shadow up to `var(--sh-md)`, and lifts with `transform: translateY(-1px)`;
+  `:active` returns to `translateY(0)` with `var(--sh-xs)`. Both the
+  transition and the lift are dropped under
+  `@media (prefers-reduced-motion: reduce)`.
+- **Generous pill padding** so the label never crowds the edge:
+  `sm` ~14px / `md` ~20px / `lg` ~26px horizontal. On phone/tablet (≤900px),
+  `sm` and `md` inflate to a ≥44px hit area via a transparent `::before`
+  overlay (§8) — the visual stays compact, the touch target meets WCAG 2.5.5.
+- **Tokens only, zero raw hex** — color, type, radius, and shadow all come
+  from `var(--…)`.
+
+### Before / after (so the anti-pattern is recognisable)
+
+```
+/* ✗ BEFORE — the bug: (0,1,0) loses to .cp-root's reset; colored glow blooms */
+.primary {
+  background: var(--brand-500);          /* raw brand — ignores theme */
+  box-shadow: var(--sh-brand);           /* oversized colored halo at rest */
+}
+/* Inside .cp-root: background + padding stripped → floating text + halo;
+   on hover the fill returns with zero padding → cramped pill. */
+
+/* ✓ AFTER — crisp, theme-recoloured, survives the reset */
+.btn.primary {                            /* (0,2,0) outranks the reset */
+  background: var(--chrome-accent);       /* re-hues per theme */
+  color: var(--on-solid);
+  box-shadow: var(--sh-sm);               /* tight neutral elevation */
+}
+.btn.primary:hover:not(:disabled) {
+  background: var(--chrome-accent-strong);
+  box-shadow: var(--sh-md);
+  transform: translateY(-1px);            /* deepen one shade + lift */
+}
+```
 
 ---
 
@@ -326,6 +451,11 @@ Responsive contract:
 Verify at 360px, 768px, and 1280px in DevTools device emulation.
 Report the verification with one line per tier in the commit message:
   Verified: 360 OK / 768 OK / 1280 OK
+
+Theme contract:
+  - Verify across all six themes (paper, cloud, night, mint, sky, blossom)
+    via Settings → Appearance. Chrome must re-hue through --chrome-accent-*;
+    no dark-on-dark / light-on-light; text holds WCAG AA — especially Night.
 
 The page is: [one sentence describing what the page does and who uses it]
 The data source is: [path to mock data or store]

@@ -2,16 +2,22 @@
 
 // YearView — the full Year tab composition (desktop / tablet).
 //
+// NOTE (2026-06-13): this composition is RETIRED — the live Year surface is
+// <TimelineYear>; YearPage mounts that, not this. YearView is kept only so it
+// (and RoadmapView/ProgressionView) still compile. The doc below describes its
+// historical behavior.
+//
 // Layout: [main column] (the YearSidebar rail was unmounted — every
 // item was an inert "coming soon" affordance; see import block below).
 // The main column contains a page header, an in-page Roadmap | Progression
-// toggle wired to viewMode, a status filter pill bar, and a single shared
-// horizontally scrolling container holding the sticky QuarterMonthWeekHeader
-// + the active view's lane stack. A bottom stat strip shows live totals.
+// toggle wired to the "year" Grid/List slot, a status filter pill bar, and a
+// single shared horizontally scrolling container holding the sticky
+// QuarterMonthWeekHeader + the active view's lane stack. A bottom stat strip
+// shows live totals.
 //
-// The global Grid|List pill in the top bar and the in-page toggle both
-// control the same viewMode — they stay in sync automatically since they
-// both read/write useAppState().viewMode.
+// The Roadmap/Progression toggle reads/writes the shared per-view Grid/List
+// preference via getViewMode("year") / setViewMode("year", m) (the old
+// useAppState().viewMode pair was removed).
 //
 // Active subject for the chameleon header is lifted here: the inner view
 // observes its lanes via IntersectionObserver and calls
@@ -232,7 +238,13 @@ const LEFT_RAIL_WIDTH_PX = 200;
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function YearView() {
-  const { viewMode, setViewMode } = useAppState();
+  // Per-view Grid/List preference now lives behind getViewMode/setViewMode
+  // keyed on the ViewKey (the old `viewMode`/`setViewMode(m)` pair was
+  // removed from useAppState). This view is RETIRED dead code (the live Year
+  // surface is <TimelineYear>), but it must still compile, so it reads/writes
+  // the "year" slot through the current API.
+  const { getViewMode, setViewMode } = useAppState();
+  const viewMode = getViewMode("year");
   const { lessons, subjects } = usePlanner();
 
   // CURRENT_WEEK is 1-based; convert to 0-based for index math.
@@ -500,7 +512,7 @@ export function YearView() {
                 },
               ]}
               value={viewMode}
-              onChange={setViewMode}
+              onChange={(v) => setViewMode("year", v)}
               ariaLabel="Year view mode"
             />
 

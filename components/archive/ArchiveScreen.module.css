@@ -213,7 +213,9 @@
   flex-wrap: wrap;
   gap: 8px 18px;
 }
-/* Primary CTA into the live plan. */
+/* Primary CTA into the live plan. Filled THEME accent, crisp neutral shadow
+   (NOT a colored glow); recolours per theme via --chrome-accent. Hover deepens
+   one shade and lifts 1px, matching the canonical Button primitive. */
 .openPlanBtn {
   display: inline-flex;
   align-items: center;
@@ -221,11 +223,12 @@
   min-height: 44px;
   padding: 0 20px;
   border-radius: var(--r-pill);
-  background: var(--brand-500);
+  background: var(--chrome-accent);
   color: var(--on-solid);
   font-weight: 700;
   font-size: var(--t-14);
   text-decoration: none;
+  border: 1px solid transparent;
   box-shadow: var(--sh-sm);
   transition:
     background 0.16s ease,
@@ -233,8 +236,13 @@
     transform 0.16s ease;
 }
 .openPlanBtn:hover {
-  background: var(--brand-600);
-  box-shadow: var(--sh-brand);
+  background: var(--chrome-accent-strong);
+  box-shadow: var(--sh-md);
+  transform: translateY(-1px);
+}
+.openPlanBtn:active {
+  transform: translateY(0);
+  box-shadow: var(--sh-xs);
 }
 .openPlanBtn:hover span[aria-hidden] {
   transform: translateX(2px);
@@ -246,10 +254,12 @@
   outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
+/* Inline text link (not a pill CTA) — its accent color tracks the active
+   theme via --chrome-accent-deep (was raw --brand-600). */
 .secondaryLink {
   font-weight: 700;
   font-size: var(--t-13);
-  color: var(--brand-600);
+  color: var(--chrome-accent-deep);
   text-decoration: none;
   padding: 6px 4px;
   border-radius: var(--r-sm);
@@ -681,5 +691,21 @@
   .statRow,
   .insideStats {
     gap: 18px;
+  }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────────
+   tokens.css already collapses transition/animation DURATIONS under
+   .cp-root, but it does not neutralize the transform VALUE itself. Suppress
+   the open-plan CTA's 1px hover/active lift so it stays put when the OS
+   setting is on (matches the canonical Button primitive). */
+@media (prefers-reduced-motion: reduce) {
+  .openPlanBtn:hover,
+  .openPlanBtn:active {
+    transform: none;
+  }
+  /* Also still the arrow-nudge child so reduced motion has no hover shift. */
+  .openPlanBtn:hover span[aria-hidden] {
+    transform: none;
   }
 }

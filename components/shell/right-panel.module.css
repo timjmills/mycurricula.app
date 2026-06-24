@@ -11,7 +11,7 @@
   display: flex;
   flex-direction: column;
   width: 320px;
-  background: var(--paper);
+  background: var(--panel-bg); /* per-theme whisper wash */
   border-left: var(--line);
   flex: 0 0 auto;
   overflow: hidden;
@@ -163,7 +163,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--ink-500);
-  background: var(--paper);
+  background: var(--panel-bg); /* match the panel so the sticky header blends */
   position: sticky;
   top: 0;
   z-index: 1;
@@ -362,6 +362,13 @@
 
 /* ─────────────────────────────────────────────────────────────────────────
    LESSON DETAIL PANEL
+   The body now hosts the SHARED, fully-editable <LessonDetail compact> (the
+   same surface /daily uses) — so the read-only summary's styles
+   (.detailSection / .detailObjective / .detailLabel / .detailBody /
+   .detailNoteBody / .detailResource* / .detailStd* / .statusRow /
+   .statusBadge / .detailTitle / .detailSubjectLabel) are gone. Only the
+   panel-level stripe + header action + host wrapper remain here; everything
+   inside the card is styled by components/daily/lesson-detail.module.css.
    ──────────────────────────────────────────────────────────────────────── */
 
 .detailSubjectStripe {
@@ -369,120 +376,40 @@
   flex: 0 0 auto;
 }
 
-.detailSection {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--ink-100);
-}
-
-.detailSubjectLabel {
-  font-size: var(--t-11);
-  font-weight: 500;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-.detailTitle {
-  font-size: var(--t-16);
-  font-weight: 600;
-  letter-spacing: -0.2px;
-  color: var(--ink-900);
-  line-height: 1.25;
-  margin-bottom: 4px;
-}
-
-.detailObjective {
-  font-size: var(--t-12);
-  color: var(--ink-500);
-  line-height: 1.4;
-  font-style: italic;
-}
-
-.detailLabel {
-  font-size: var(--t-11);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--ink-400);
-  margin-bottom: 6px;
-}
-
-.detailBody {
-  font-size: var(--t-13);
-  color: var(--ink-700);
-  line-height: 1.55;
-}
-
-.detailNoteBody {
-  font-size: var(--t-12);
-  color: var(--ink-500);
-  line-height: 1.5;
-  background: var(--ink-50);
-  border-left: 3px solid var(--ink-200);
-  padding: 8px 10px;
-  border-radius: 0 var(--r-4) var(--r-4) 0;
-}
-
-/* Resource row in lesson detail */
-.detailResource {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 7px;
-  border-radius: var(--r-4);
-  font-size: var(--t-12);
-  color: var(--ink-700);
-  transition: background 0.1s ease;
-}
-
-.detailResource:hover {
-  background: var(--ink-50);
-}
-
-.detailResourceLabel {
-  flex: 1;
-  min-width: 0;
-}
-
-/* Standard row in lesson detail */
-.detailStdRow {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.detailStdCode {
-  font-family: var(--font-mono);
-  font-size: var(--t-11);
-  font-weight: 600;
-  padding: 2px 5px;
-  border-radius: var(--r-2);
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.detailStdDesc {
-  font-size: var(--t-12);
-  color: var(--ink-500);
-  line-height: 1.4;
-  flex: 1;
-}
-
-/* Status badge at the bottom of the detail panel */
-.statusRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-}
-
-.statusBadge {
+/* Header action — "Open in Daily view". Mirrors .closeBtn's quiet square
+   icon-button treatment so the two header controls read as a matched pair. */
+.detailOpenDaily {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: var(--t-12);
-  font-weight: 600;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-6);
+  color: var(--ink-500);
+  flex: 0 0 auto;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.detailOpenDaily:hover {
+  background: var(--ink-100);
+  color: var(--ink-900);
+}
+
+.detailOpenDaily:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: 2px;
+}
+
+/* Host wrapper for the shared LessonDetail. Fills the panel below the header
+   and lets the card's own `.body` scroll internally (the compact `.root` is
+   `flex: 1; min-height: 0`). `min-height: 0` is essential so the flex child
+   can shrink and its inner overflow:auto region actually scrolls instead of
+   pushing the panel taller. */
+.detailHost {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }

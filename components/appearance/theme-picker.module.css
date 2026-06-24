@@ -6,36 +6,15 @@
  * accessibility attribute IS the styling hook.
  */
 
+/* Layout only — surface/border/hover/selected chrome comes from the SHARED
+   .pickOption class in settings-card.module.css, so the theme, card-style,
+   and palette pickers stay byte-identical in feel. */
 .option {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
   min-height: 44px;
-  border-radius: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    box-shadow 140ms ease,
-    transform 140ms ease,
-    border-color 140ms ease;
-}
-
-.option:hover {
-  border-color: var(--ink-200);
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-1px);
-}
-
-.option:active {
-  transform: translateY(0);
-}
-
-.option[aria-checked="true"] {
-  border: 1.5px solid var(--theme-accent);
-  background: var(--theme-accent-soft);
 }
 
 /* ── Miniature planner preview ─────────────────────────────────────────────

@@ -18,6 +18,67 @@
   padding: 24px 24px 40px;
   /* Allow natural scroll on screen so a multi-month stack doesn't clip. */
   overflow: auto;
+
+  /* ── Print preview is a PAPER preview — theme-independent by design ──────
+     Actual printing is already pinned to Paper (the theme overrides in
+     tokens.css live inside an @media screen wrapper, so print falls back to
+     the :root values). But VIEWING this route on a dark theme (Night) paints
+     the on-screen preview dark — wrong for a surface whose whole job is to
+     show what the paper will look like. We re-declare the exact Paper literals
+     for every foundation token this subtree consumes, on the page root, so the
+     local cascade overrides the active theme for this subtree only — without
+     touching :root. Values are copied verbatim from the :root (Paper) block in
+     app/tokens.css; keep them in sync if those Paper values ever change.
+
+     Neutral ramp + surfaces (page bg, sheet, borders, hairlines, ink). */
+  --ink-50: #fcfaf6;
+  --ink-100: #f4f2ec;
+  --ink-150: #eceae3;
+  --ink-200: #d9d6cc;
+  --ink-300: #bfbed0;
+  --ink-400: #908fa3;
+  --ink-500: #57566b;
+  --ink-900: #1c1b2e;
+  --paper: #ffffff;
+
+  /* Subject color slots. resolveSubjectColor() emits var(--subj-N-ink) for the
+     subject stub text (color.cd) and var(--subj-N) for the stripe (color.stripe,
+     a solid — NOT themed). Night re-mixes --subj-N-ink toward WHITE (for AA on a
+     dark tile), which would be near-invisible on this white sheet; re-pinning the
+     15 -ink slots to their Paper literals keeps the stub labels dark. --tint-base
+     (mix target inside the gradient recipe) and the -tint fills are re-pinned too
+     so any tint this subtree touches mixes toward white, not the dark surface. */
+  --tint-base: #ffffff;
+  --subj-1-ink: #7a671f;
+  --subj-2-ink: #7a491f;
+  --subj-3-ink: #7a2b1f;
+  --subj-4-ink: #7a1f36;
+  --subj-5-ink: #7a1f59;
+  --subj-6-ink: #752475;
+  --subj-7-ink: #572475;
+  --subj-8-ink: #3c2475;
+  --subj-9-ink: #242975;
+  --subj-10-ink: #244a75;
+  --subj-11-ink: #246575;
+  --subj-12-ink: #247565;
+  --subj-13-ink: #247547;
+  --subj-14-ink: #257425;
+  --subj-15-ink: #467524;
+  --subj-1-tint: #f4efdf;
+  --subj-2-tint: #f4e9df;
+  --subj-3-tint: #f4e2df;
+  --subj-4-tint: #f2e1e5;
+  --subj-5-tint: #f2e1ec;
+  --subj-6-tint: #f0e2f0;
+  --subj-7-tint: #ebe2f0;
+  --subj-8-tint: #e6e2f0;
+  --subj-9-tint: #e2e3f0;
+  --subj-10-tint: #e2e9f0;
+  --subj-11-tint: #e2eef0;
+  --subj-12-tint: #e2f0ee;
+  --subj-13-tint: #e2f0e8;
+  --subj-14-tint: #e2f0e2;
+  --subj-15-tint: #e8f0e2;
 }
 
 /* ── Screen-only action bar ─────────────────────────────────────────────── */

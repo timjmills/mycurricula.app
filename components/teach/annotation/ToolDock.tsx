@@ -3,17 +3,19 @@
 // components/teach/annotation/ToolDock.tsx — the floating bottom dock (plan
 // §5.3, artboard T1).
 //
-// A compact, draggable cluster of the most-used tools (select / text / pen)
-// plus "Soon" tiles for the deferred interactive-widget library (sticky note /
-// timer / dice / poll — Phase 3). The live tools dispatch setTool; the deferred
-// ones render as disabled FutureControls so they never read as broken.
+// A compact, draggable cluster of the most-used drawing tools (select / pen /
+// text), each dispatching setTool. Wave 1 declutter removed the four disabled
+// "Soon" tiles (sticky / timer / dice / poll) that advertised unbuilt features
+// over the live board. (The dock is also no longer mounted alongside the full
+// BoardToolbar — see TeachWorkspace's resource stage — so this stays a lean,
+// reusable quick-tool cluster.)
 //
 // Draggable via framer-motion `drag`, honouring useReducedMotion() — under
 // reduced motion the dock is fixed in place (no drag, no spring).
 
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Button, FutureControl, Tooltip } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import type { TeachWorkspaceAction } from "@/components/teach";
 import type { BoardTool, TeachWorkspaceState } from "@/lib/teach/types";
 import styles from "./ToolDock.module.css";
@@ -52,22 +54,6 @@ const LIVE_TOOLS: readonly LiveTool[] = [
     glyph: "T",
     label: "Text",
     tip: "Click to place a text label on the board",
-  },
-];
-
-const SOON_TILES: ReadonlyArray<{ glyph: string; tip: string }> = [
-  {
-    glyph: "▥",
-    tip: "Sticky note — drop quick reminders on the board (coming after beta)",
-  },
-  {
-    glyph: "⏱",
-    tip: "Timer — a live countdown for the class (coming after beta)",
-  },
-  { glyph: "⚄", tip: "Dice — roll for random picks (coming after beta)" },
-  {
-    glyph: "📊",
-    tip: "Poll — gather quick class responses (coming after beta)",
   },
 ];
 
@@ -123,18 +109,6 @@ export function ToolDock({
           </Tooltip>
         );
       })}
-
-      <span className={styles.divider} aria-hidden="true" />
-
-      {SOON_TILES.map((tile, i) => (
-        <FutureControl
-          key={i}
-          variant="icon-only"
-          leadingIcon={<span aria-hidden="true">{tile.glyph}</span>}
-          tooltip={tile.tip}
-          tooltipSide="top"
-        />
-      ))}
     </motion.div>
   );
 }

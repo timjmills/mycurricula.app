@@ -33,13 +33,15 @@ import {
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
+import { useTheme } from "@/lib/theme";
+import type { ThemeSetting, ThemeStyle, ThemePalette } from "@/lib/theme";
 import { SUBJECTS } from "@/lib/mock";
 import type { SubjectId } from "@/lib/types";
 import styles from "./command-palette.module.css";
 
 // ── Result shape ───────────────────────────────────────────────────────────────
 
-type ResultKind = "view" | "subject" | "lesson";
+type ResultKind = "view" | "subject" | "lesson" | "appearance";
 
 interface PaletteResult {
   id: string;
@@ -47,6 +49,19 @@ interface PaletteResult {
   label: string;
   /** Secondary label shown beside the primary label. */
   meta?: string;
+  /**
+   * Extra search terms beyond the label — e.g. "dark mode" for Night,
+   * "vibrant" for Mid-Vivid — so a teacher who searches by intent rather
+   * than the exact name still finds the action.
+   */
+  keywords?: string[];
+  /**
+   * True when this result reflects the setting that is currently live (the
+   * active theme / card style). Rendered as a leading check so the palette
+   * shows the current choice without changing it. Navigation results
+   * (views/subjects/lessons) never set this.
+   */
+  selected?: boolean;
   action: () => void;
 }
 
@@ -69,6 +84,84 @@ const SUBJECT_VIEW_RESULTS: Omit<PaletteResult, "action">[] = SUBJECTS.map(
   }),
 );
 
+// ── Appearance options (theme + card style) ─────────────────────────────────
+//
+// Every app-wide theme and card style is reachable from the palette, so a
+// teacher can re-skin the app without leaving the keyboard. Labels mirror
+// Settings → Appearance; keywords let intent-based searches ("dark", "vibrant")
+// land on the right option. The id maps 1:1 to a ThemeSetting / ThemeStyle the
+// action passes to setTheme / setStyle. `selected` is computed at render time
+// from live useTheme() state — these static rows only carry the keywords.
+
+interface ThemeActionDef {
+  theme: ThemeSetting;
+  label: string;
+  keywords: string[];
+}
+
+const THEME_ACTIONS: readonly ThemeActionDef[] = [
+  { theme: "paper", label: "Theme: Paper", keywords: ["cream", "light"] },
+  { theme: "cloud", label: "Theme: Cloud", keywords: ["white", "light"] },
+  {
+    theme: "night",
+    label: "Theme: Night",
+    keywords: ["dark", "dark mode", "low light"],
+  },
+  { theme: "mint", label: "Theme: Mint", keywords: ["green"] },
+  { theme: "sky", label: "Theme: Sky", keywords: ["blue"] },
+  { theme: "blossom", label: "Theme: Blossom", keywords: ["pink"] },
+  {
+    theme: "system",
+    label: "Theme: Follow system",
+    keywords: ["auto", "device", "os", "automatic"],
+  },
+];
+
+interface StyleActionDef {
+  cardStyle: ThemeStyle;
+  label: string;
+  keywords: string[];
+}
+
+const STYLE_ACTIONS: readonly StyleActionDef[] = [
+  {
+    cardStyle: "quiet",
+    label: "Card style: Quiet",
+    keywords: ["minimal", "white", "stripe"],
+  },
+  {
+    cardStyle: "calm",
+    label: "Card style: Mid-Calm",
+    keywords: ["monogram", "medium"],
+  },
+  {
+    cardStyle: "vivid",
+    label: "Card style: Mid-Vivid",
+    keywords: ["vibrant", "tint", "color", "colour"],
+  },
+];
+
+interface PaletteAxisActionDef {
+  palette: ThemePalette;
+  label: string;
+  keywords: string[];
+}
+
+// The third appearance axis — without these, "highlight"/"saturation"
+// searches dead-ended even though theme + card style were reachable.
+const PALETTE_AXIS_ACTIONS: readonly PaletteAxisActionDef[] = [
+  {
+    palette: "normal",
+    label: "Color intensity: Normal",
+    keywords: ["saturation", "muted", "workbook"],
+  },
+  {
+    palette: "highlight",
+    label: "Color intensity: Highlight",
+    keywords: ["saturation", "bright", "highlighter", "electric"],
+  },
+];
+
 // ── Text helpers ───────────────────────────────────────────────────────────────
 
 /** Strip HTML tags to extract plain text for matching. */
@@ -79,6 +172,11 @@ function stripHtml(html: string): string {
 /** Case-insensitive substring match. */
 function matches(text: string, query: string): boolean {
   return text.toLowerCase().includes(query.toLowerCase());
+}
+
+/** Match a label OR any of its keyword aliases against the query. */
+function matchesAny(label: string, keywords: string[], query: string): boolean {
+  return matches(label, query) || keywords.some((k) => matches(k, query));
 }
 
 // ── Focus trap helper ─────────────────────────────────────────────────────────
@@ -111,6 +209,7 @@ export function CommandPalette({
   const router = useRouter();
   const { setSubjectView, setSearch } = useAppState();
   const { lessons } = usePlanner();
+  const { theme, style, palette, setTheme, setStyle, setPalette } = useTheme();
 
   // ── Build the full results list from the current query ───────────────────
 
@@ -143,6 +242,54 @@ export function CommandPalette({
       };
     });
 
+    // Appearance results — apply an app-wide theme or card style without
+    // leaving the keyboard. Each closes the palette on select (like every
+    // other action) and marks the currently-live option with a check.
+    const themeResults: PaletteResult[] = THEME_ACTIONS.filter(
+      (t) => !q || matchesAny(t.label, t.keywords, q),
+    ).map((t) => ({
+      id: `theme-${t.theme}`,
+      kind: "appearance" as const,
+      label: t.label,
+      meta: "Theme",
+      keywords: t.keywords,
+      selected: theme === t.theme,
+      action: () => {
+        setTheme(t.theme);
+        onClose();
+      },
+    }));
+
+    const styleResults: PaletteResult[] = STYLE_ACTIONS.filter(
+      (s) => !q || matchesAny(s.label, s.keywords, q),
+    ).map((s) => ({
+      id: `style-${s.cardStyle}`,
+      kind: "appearance" as const,
+      label: s.label,
+      meta: "Card style",
+      keywords: s.keywords,
+      selected: style === s.cardStyle,
+      action: () => {
+        setStyle(s.cardStyle);
+        onClose();
+      },
+    }));
+
+    const paletteAxisResults: PaletteResult[] = PALETTE_AXIS_ACTIONS.filter(
+      (p) => !q || matchesAny(p.label, p.keywords, q),
+    ).map((p) => ({
+      id: `palette-${p.palette}`,
+      kind: "appearance" as const,
+      label: p.label,
+      meta: "Palette",
+      keywords: p.keywords,
+      selected: palette === p.palette,
+      action: () => {
+        setPalette(p.palette);
+        onClose();
+      },
+    }));
+
     // Lesson results — match by plain-text title; cap at 12 so the list
     // stays digestible (most useful when the query is specific).
     const lessonResults: PaletteResult[] = lessons
@@ -164,8 +311,28 @@ export function CommandPalette({
         },
       }));
 
-    return [...views, ...subjectViews, ...lessonResults];
-  }, [query, lessons, router, setSubjectView, setSearch, onClose]);
+    return [
+      ...views,
+      ...subjectViews,
+      ...themeResults,
+      ...styleResults,
+      ...paletteAxisResults,
+      ...lessonResults,
+    ];
+  }, [
+    query,
+    lessons,
+    router,
+    setSubjectView,
+    setSearch,
+    onClose,
+    theme,
+    style,
+    palette,
+    setTheme,
+    setStyle,
+    setPalette,
+  ]);
 
   // Reset selection whenever the results list changes.
   useEffect(() => {
@@ -323,6 +490,15 @@ export function CommandPalette({
               >
                 <ResultIcon kind={result.kind} />
                 <span className={styles.resultLabel}>{result.label}</span>
+                {result.selected && (
+                  // Visible "Current" text IS the accessible name — no
+                  // aria-label (prohibited on generic spans, inconsistently
+                  // honored). The check icon is decorative.
+                  <span className={styles.resultCurrent}>
+                    <CheckIcon />
+                    Current
+                  </span>
+                )}
                 {result.meta && (
                   <span className={styles.resultMeta}>{result.meta}</span>
                 )}
@@ -447,6 +623,29 @@ function ResultIcon({ kind }: { kind: ResultKind }) {
       </svg>
     );
   }
+  if (kind === "appearance") {
+    // A painter's palette — signals "appearance / theme" without leaning on
+    // any one theme's color (stroke inherits currentColor like its siblings).
+    return (
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        aria-hidden="true"
+        className={styles.resultIcon}
+      >
+        <path
+          d="M7 1.25c3.17 0 5.75 2.35 5.75 5.25 0 1.66-1.42 2.75-3 2.75h-1.1c-.66 0-1.15.55-1.15 1.18 0 .3.13.55.27.79.14.24.28.5.28.79 0 .67-.55 1.05-1.2 1.05C3.83 14.75 1.25 12.15 1.25 7S3.83 1.25 7 1.25Z"
+          stroke="currentColor"
+          strokeWidth="1.3"
+        />
+        <circle cx="4.4" cy="6.4" r="0.95" fill="currentColor" />
+        <circle cx="7" cy="4.6" r="0.95" fill="currentColor" />
+        <circle cx="9.6" cy="6.4" r="0.95" fill="currentColor" />
+      </svg>
+    );
+  }
   // lesson
   return (
     <svg
@@ -492,6 +691,29 @@ function ResultIcon({ kind }: { kind: ResultKind }) {
         stroke="currentColor"
         strokeWidth="1.3"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+// Small check used on the appearance rows to flag the currently-live theme /
+// card style. Decorative — the "Current setting" text carries the meaning for
+// screen readers.
+function CheckIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M2.5 6.2 4.8 8.5 9.5 3.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );

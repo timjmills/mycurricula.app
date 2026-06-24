@@ -64,12 +64,11 @@ import type {
   WidgetPersistence,
   WidgetType,
 } from "../types";
-import { buildDefaultBoardSet } from "../mock/boards";
 import { boardMatchesContext, type BoardContext } from "./board-tags";
 import { ensureCanvas } from "./board-migrate";
 import { BoardCapError, MAX_BOARDS_PER_TEACHER } from "./limits";
 import type { TeachDataSource } from "./queries";
-import { SANDBOX_LESSON_ID } from "./queries";
+import { SANDBOX_LESSON_ID } from "./constants";
 import { makeUnwrap, sb, type ServerClient } from "../supabase/helpers";
 import { slugToUuid } from "../planner/id-bridge";
 
@@ -830,24 +829,14 @@ export const supabaseTeachSource: TeachDataSource = {
       .eq("master_core_lesson_event_id", lesson);
     const rows = unwrap(all, "list boards for lesson") as BoardRow[];
 
+    // CREATION RULE (Wave 1, #10): a board exists ONLY on an explicit action.
+    // Opening Teach on a lesson with no boards returns an EMPTY list (no lazy
+    // `seedDefaultTeamSet`) so the workspace lands on the clean empty state.
+    // The old auto-seed (and its check-then-act duplicate-set race) is gone;
+    // boards are now created only via createBoard / createBlankBoard / the
+    // Boards page. Mirrors the mock source's `setForLesson`.
     if (rows.length === 0) {
-      // Lazily seed the default team set so opening Teach on any lesson works
-      // (mirrors the mock's setForLesson fallback). The default builder yields
-      // domain boards; insert them as the team set, then return the persisted
-      // rows so caller-visible ids are the real db uuids.
-      //
-      // KNOWN LOW RISK (audit Finding 5): this is a check-then-act race — two
-      // teachers opening the SAME lesson for the very first time at the same
-      // instant could both observe an empty set and both run `seedDefaultTeamSet`,
-      // producing a duplicated team set. It is not a unique-index violation
-      // (seeded team titles are distinct per set, but a 2nd full set re-uses the
-      // same titles and WOULD hit `uniq_boards_team_lesson_title` — so the loser
-      // of the race fails its insert and surfaces an error rather than silently
-      // duplicating). Accepted for the single-beta-teacher launch (one provisioned
-      // teacher → the concurrent-first-open window effectively cannot occur). The
-      // durable fix is an atomic seed (stored procedure / `on conflict do nothing`
-      // upsert), deferred with the push-to-team atomicity finding.
-      return seedDefaultTeamSet(client, lesson);
+      return [];
     }
 
     const personal = rows.filter(
@@ -2370,47 +2359,6 @@ async function copyBoardContentOrRollback(
     await client.from("boards").delete().eq("id", targetBoardId);
     throw err;
   }
-}
-
-/** Seed + return the default team board set for a lesson with no boards yet. */
-async function seedDefaultTeamSet(
-  client: ServerClient,
-  lessonId: string,
-): Promise<Board[]> {
-  const defaults = buildDefaultBoardSet(lessonId);
-  // The default board fixtures carry the mock grade slug ("g5"); never write
-  // that into the uuid `grade_level_id` column. Resolve the lesson's REAL grade
-  // uuid from the master event row (the FK target) once for the whole set.
-  const gradeLevelId = await gradeIdForLesson(client, lessonId);
-  const out: Board[] = [];
-  for (let i = 0; i < defaults.length; i += 1) {
-    const b = defaults[i];
-    const ins = await client
-      .from("boards")
-      .insert({
-        master_core_lesson_event_id: lessonId,
-        owner_id: null,
-        scope: "team",
-        title: b.title,
-        display_order_within_lesson: b.displayOrderWithinLesson ?? i,
-        template_id: b.templateId ?? null,
-        grade_level_id: gradeLevelId,
-        // Carry any 5.31 fields the default builder set on the seed board.
-        background: b.background ?? null,
-        tags: b.tags ?? null,
-        board_theme: b.boardTheme ?? null,
-        repeat: b.repeat ?? null,
-        whiteboard: b.whiteboard ?? false,
-        ephemeral: false,
-        library_visibility: "private",
-      })
-      .select(BOARD_COLS)
-      .single();
-    const row = unwrap(ins, "seed default team set (board)") as BoardRow;
-    await copyBoardContent(client, b, row.id);
-    out.push(await loadBoard(client, row.id));
-  }
-  return out;
 }
 
 // ── Patch → row mappers (the columns the schema actually has) ──────────────────

@@ -18,6 +18,8 @@ import { useTheme } from "@/lib/theme";
 import type { ThemeSetting, AppTheme } from "@/lib/theme";
 import { Tooltip } from "@/components/ui";
 import { SettingsCard, RadioDot } from "./settings-card";
+import { useRovingRadio } from "./use-roving-radio";
+import cardStyles from "./settings-card.module.css";
 import styles from "./theme-picker.module.css";
 
 interface ThemeOption {
@@ -95,6 +97,11 @@ const RESOLVED_LABEL: Record<AppTheme, string> = {
 
 export function ThemePicker(): ReactNode {
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const roving = useRovingRadio({
+    values: THEME_OPTIONS.map((o) => o.id),
+    selected: theme,
+    onSelect: (v) => setTheme(v as ThemeSetting),
+  });
 
   return (
     <SettingsCard
@@ -112,6 +119,7 @@ export function ThemePicker(): ReactNode {
       <div
         role="radiogroup"
         aria-label="App color theme"
+        {...roving.getGroupProps()}
         style={{
           marginTop: 12,
           display: "grid",
@@ -135,9 +143,10 @@ export function ThemePicker(): ReactNode {
                 type="button"
                 role="radio"
                 aria-checked={selected}
+                {...roving.getOptionProps(opt.id)}
                 onClick={() => setTheme(opt.id)}
                 title={opt.tooltip}
-                className={`${styles.option} cp-focusable`}
+                className={`${styles.option} ${cardStyles.pickOption} cp-focusable`}
               >
                 <RadioDot selected={selected} />
                 <ThemeChip id={opt.id} />

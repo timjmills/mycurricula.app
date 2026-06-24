@@ -48,15 +48,16 @@
   flex-shrink: 0;
 }
 
-.actionBtn {
+/* .actionBtn.actionBtn — (0,2,0) survives the .cp-root button reset (tokens.css). */
+.actionBtn.actionBtn {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   padding: 8px 14px;
   border-radius: var(--r-pill);
-  background: var(--surface);
-  color: var(--ink-soft);
-  border: 1px solid var(--border);
+  background: var(--ink-150);
+  color: var(--ink);
+  border: 1px solid var(--ink-300);
   font-size: var(--t-13);
   font-weight: 700;
   letter-spacing: -0.1px;
@@ -70,28 +71,46 @@
     box-shadow 120ms ease;
 }
 
+/* Bordered/secondary recipe — routes hover through the chrome-accent tier so
+   the outline + text track the active theme (was raw --brand-*). Matches the
+   canonical Button primitive's .secondary variant. */
 .actionBtn:hover {
-  border-color: var(--brand-300);
-  color: var(--brand-600);
+  background: var(--ink-200);
+  border-color: var(--chrome-accent-mid);
+  color: var(--chrome-accent-deep);
+  box-shadow: var(--sh-sm);
+  transform: translateY(-1px);
+}
+
+.actionBtn:active {
+  transform: translateY(0);
+  box-shadow: var(--sh-xs);
+}
+
+/* Primary variant — used for "+ Add unit". Filled THEME accent so it reads as
+   the dominant action in the header cluster; recolours per theme via
+   --chrome-accent. Crisp: a tight neutral shadow (--sh-sm), NOT a colored
+   glow; hover deepens one shade (--chrome-accent-strong) and lifts 1px to
+   match the canonical Button primitive. */
+/* .actionBtnPrimary.actionBtnPrimary — (0,2,0) survives the .cp-root button reset (tokens.css). */
+.actionBtnPrimary.actionBtnPrimary {
+  background: var(--chrome-accent);
+  color: var(--on-solid);
+  border-color: transparent;
   box-shadow: var(--sh-sm);
 }
 
-/* Primary variant — used for "+ Add unit". Filled indigo brand so it reads
-   as the dominant action in the header cluster, lifted by the brand glow.
-   Hover deepens to brand-600 without changing height (keeps the row
-   alignment stable). */
-.actionBtnPrimary {
-  background: var(--brand-500);
-  color: #fff;
+.actionBtnPrimary:hover {
+  background: var(--chrome-accent-strong);
+  color: var(--on-solid);
   border-color: transparent;
-  box-shadow: var(--sh-brand);
+  box-shadow: var(--sh-md);
+  transform: translateY(-1px);
 }
 
-.actionBtnPrimary:hover {
-  background: var(--brand-600);
-  color: #fff;
-  border-color: transparent;
-  box-shadow: var(--sh-brand);
+.actionBtnPrimary:active {
+  transform: translateY(0);
+  box-shadow: var(--sh-xs);
 }
 
 .actionBtn:focus-visible {
@@ -256,5 +275,11 @@
 @media (prefers-reduced-motion: reduce) {
   .actionBtn {
     transition: none;
+  }
+  /* Suppress the crisp 1px lift under reduced motion (matches the Button
+     primitive). */
+  .actionBtn:hover,
+  .actionBtnPrimary:hover {
+    transform: none;
   }
 }

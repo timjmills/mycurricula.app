@@ -50,8 +50,22 @@ import {
   type EffectiveTheme,
 } from "@/lib/teach/widget-theme";
 import { widgetDefaultTheme } from "@/lib/teach/widget-defaults";
-import { WidgetBody, widgetMeta, TeachIcon } from "@/components/teach/widgets";
+import {
+  BOARD_BACKGROUNDS,
+  BOARD_BACKGROUND_CATEGORIES,
+  type BoardBackgroundCategory,
+  boardBackgroundCss,
+  findBackground,
+  isDarkBackground,
+} from "@/lib/teach/backgrounds";
+import {
+  WidgetBody,
+  widgetMeta,
+  TeachIcon,
+  CORE_WIDGET_TYPES,
+} from "@/components/teach/widgets";
 import { AppearancePanel, type ThemeProp } from "./AppearancePanel";
+import { useFocusTrap } from "../useFocusTrap";
 import styles from "./editor.module.css";
 
 // ── Geometry constants (raw px — geometry numbers are allowed) ──────────────
@@ -60,16 +74,12 @@ const MAX_W = 640;
 const DEFAULT_W = 320;
 const LS_KEY = "be-board-v1";
 
-/** Widget types offered in the toolbar "+ Widget" popover. A curated subset of
- *  the catalogue; the lead can extend by passing `addableTypes`. */
-const DEFAULT_ADDABLE: readonly WidgetType[] = [
-  "objective",
-  "timer",
-  "directions",
-  "exit-ticket",
-  "namepick",
-  "notes",
-];
+/** Widget types offered in the toolbar "+ Widget" popover. The six CORE
+ *  teaching widgets (single source of truth in the catalogue, #18) — every one
+ *  an addable survivor, never a retired generic. A "More widgets…" row opens the
+ *  full library for everything else; the lead can still override via
+ *  `addableTypes`. */
+const DEFAULT_ADDABLE: readonly WidgetType[] = CORE_WIDGET_TYPES;
 
 /** A resource entry shown in the picker modal. The lead supplies real ones via
  *  `resources`; these sample items keep the editor usable pre-wiring. */
@@ -125,6 +135,8 @@ export type BoardEditorIntent =
     }
   | { type: "resetWidgetAppearance"; pageId: string; widgetId: string }
   | { type: "setBoardTheme"; theme: ThemeOverride }
+  /** Set the board's paper/background id (null → default white paper). */
+  | { type: "setBackground"; background: string | null }
   | { type: "clearAllWidgetAppearance" }
   | { type: "present" }
   | { type: "share" }
@@ -142,6 +154,9 @@ export interface BoardEditorProps {
   addableTypes?: readonly WidgetType[];
   /** Override the resource picker's items. */
   resources?: readonly ResourceItem[];
+  /** Open the full widget library ("More widgets…" in the add-widget popover).
+   *  Omitted → the row is hidden and only the core six are offered. */
+  onBrowseAll?: () => void;
 }
 
 // ── Local optimistic geometry overlay ───────────────────────────────────────
@@ -324,10 +339,13 @@ function Placed({
 function AddWidgetPopover({
   types,
   onAdd,
+  onMore,
   onClose,
 }: {
   types: readonly WidgetType[];
   onAdd: (t: WidgetType) => void;
+  /** Open the full widget library. Omitted → the "More widgets…" row hides. */
+  onMore?: () => void;
   onClose: () => void;
 }): ReactNode {
   return (
@@ -355,6 +373,90 @@ function AddWidgetPopover({
           </button>
         );
       })}
+      {onMore ? (
+        <button
+          type="button"
+          role="menuitem"
+          className={`${styles.popItem} ${styles.popMore}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => {
+            onClose();
+            onMore();
+          }}
+        >
+          <span className={styles.popIcon}>
+            <TeachIcon name="grid" size={18} />
+          </span>
+          <span className={styles.popLabel}>More widgets…</span>
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+// ── Board paper / background picker (board-mode appearance) ─────────────────
+// The ONE place a teacher chooses the board's paper. Two distinct axes, each a
+// group of toggle buttons (aria-pressed) — NOT a tablist: the category row only
+// FILTERS which swatch family shows, while the value group is the actual paper
+// choice. "White" is the first value (clears the id → default white paper, C8);
+// the swatches are the catalogue. Emits the chosen id up so the parent persists
+// `board.background`. (Mixing a value + filters under one role="tablist" gave
+// invalid tab semantics — gate G4-1.)
+function PaperPicker({
+  current,
+  onPick,
+}: {
+  current: string | null;
+  onPick: (id: string | null) => void;
+}): ReactNode {
+  const [tab, setTab] = useState<BoardBackgroundCategory>(
+    findBackground(current)?.category ?? "solid",
+  );
+  const swatches = BOARD_BACKGROUNDS.filter((b) => b.category === tab);
+  return (
+    <div className={styles.paper}>
+      {/* Family filter — which swatch set is shown (a toggle group, not tabs). */}
+      <div className={styles.paperTabs} role="group" aria-label="Paper type">
+        {BOARD_BACKGROUND_CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            aria-pressed={tab === c.id}
+            className={`${styles.paperTab} ${tab === c.id ? styles.paperTabOn : ""}`}
+            onClick={() => setTab(c.id)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+      {/* The paper VALUE — White (none) + the selected family's swatches. */}
+      <div className={styles.paperGrid} role="group" aria-label="Board paper">
+        <button
+          type="button"
+          title="White (no background)"
+          aria-label="White (no background)"
+          aria-pressed={current === null}
+          className={`${styles.paperSw} ${styles.paperNone} ${
+            current === null ? styles.paperSwOn : ""
+          }`}
+          onClick={() => onPick(null)}
+        />
+        {swatches.map((bg) => {
+          const on = current === bg.id;
+          return (
+            <button
+              key={bg.id}
+              type="button"
+              title={bg.label}
+              aria-label={bg.label}
+              aria-pressed={on}
+              className={`${styles.paperSw} ${on ? styles.paperSwOn : ""}`}
+              style={{ ["--swatch-bg" as string]: boardBackgroundCss(bg.id) }}
+              onClick={() => onPick(bg.id)}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -468,12 +570,15 @@ export function BoardEditor({
   subjectId,
   addableTypes = DEFAULT_ADDABLE,
   resources = SAMPLE_RESOURCES,
+  onBrowseAll,
 }: BoardEditorProps): ReactNode {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [resOpen, setResOpen] = useState(false);
   const [present, setPresent] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  // The appearance editor opens ON DEMAND only (one popover, never docked) — a
+  // clean board is the default; the toolbar "Appearance" button toggles it.
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [geomDraft, setGeomDraft] = useState<GeomDraft>({});
   // Mirror the latest draft into a ref so gesture handlers can read the live
   // position at gesture-start without re-subscribing on every draft update
@@ -482,6 +587,10 @@ export function BoardEditor({
   geomDraftRef.current = geomDraft;
   const canvasRef = useRef<HTMLDivElement>(null);
   const headingId = useId();
+  // Focus trap for the appearance popover — it declares `aria-modal`, so the
+  // contract is that focus is contained + restored while it's open (gate F5).
+  const appearanceRef = useRef<HTMLDivElement>(null);
+  const appearanceCloseRef = useRef<HTMLButtonElement>(null);
 
   // The active page (fallback to the first, then an empty implicit page).
   const activePage = useMemo<BoardPage>(() => {
@@ -539,12 +648,21 @@ export function BoardEditor({
       if (e.key === "Escape") {
         setSelectedId(null);
         setAddOpen(false);
-        setSheetOpen(false);
+        setAppearanceOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Trap + restore focus while the appearance popover is open (matches its
+  // `aria-modal` semantics). Inert when closed; the hook no-ops if the
+  // container isn't mounted yet.
+  useFocusTrap({
+    containerRef: appearanceRef,
+    initialFocusRef: appearanceCloseRef,
+    active: !present && appearanceOpen,
+  });
 
   const emit = onChange;
 
@@ -685,6 +803,15 @@ export function BoardEditor({
   };
   const clearAllOverrides = () => emit({ type: "clearAllWidgetAppearance" });
 
+  // Board paper / background (board-mode only). null → default white paper.
+  const setBackground = (background: string | null) =>
+    emit({ type: "setBackground", background });
+
+  // The board's paper surface. Undefined id → the canvas CSS default (white,
+  // C8). Dark fills flag the stage so chrome/empty-hint text can read light.
+  const surfaceBg = boardBackgroundCss(board.background);
+  const surfaceDark = isDarkBackground(board.background);
+
   // The effective theme reflected in the panel.
   const panelEff: EffectiveTheme = selectedWidget
     ? effective(
@@ -749,6 +876,7 @@ export function BoardEditor({
               <AddWidgetPopover
                 types={addableTypes}
                 onAdd={addWidget}
+                onMore={onBrowseAll}
                 onClose={() => setAddOpen(false)}
               />
             )}
@@ -760,12 +888,10 @@ export function BoardEditor({
           />
           <TBtn
             icon={<TeachIcon name="palette" size={17} />}
-            label="Board theme"
-            active={!selectedWidget}
-            onClick={() => {
-              setSelectedId(null);
-              setSheetOpen(true);
-            }}
+            label={selectedWidget ? "Style widget" : "Appearance"}
+            active={appearanceOpen}
+            ariaExpanded={appearanceOpen}
+            onClick={() => setAppearanceOpen((o) => !o)}
           />
           <TBtn
             icon={<TeachIcon name="play" size={15} />}
@@ -832,6 +958,8 @@ export function BoardEditor({
         >
           <div
             className={styles.canvasInner}
+            data-dark={surfaceDark || undefined}
+            style={surfaceBg ? { background: surfaceBg } : undefined}
             onPointerDown={(e) => {
               if (e.target === e.currentTarget) setSelectedId(null);
             }}
@@ -898,49 +1026,55 @@ export function BoardEditor({
           </div>
         </div>
 
-        {/* Desktop: docked panel. Hidden in present mode. */}
-        {!present && (
-          <div className={styles.panel} aria-labelledby={headingId}>
-            <AppearancePanel {...panelProps} headingId={headingId} />
-          </div>
-        )}
+        {/* No docked panel — the board canvas owns the full body width. The
+            appearance editor is an on-demand popover (below), never docked, so a
+            board opens clean and content-first (#11, "no crowding"). */}
       </div>
 
-      {/* Tablet/phone: a FAB opens the appearance panel as a bottom sheet so it
-          never squeezes the canvas. The docked panel above is hidden by CSS at
-          those tiers via the wrapping responsive styles on the page; the FAB +
-          sheet are always rendered but visually surface only on small screens
-          (the sheet is gated on `sheetOpen`). */}
-      {!present && (
+      {/* ── Appearance: ONE on-demand popover (never docked) ─────────────────
+          Toggled by the toolbar "Appearance"/"Style widget" button. A floating
+          right-side card on desktop, a bottom sheet on phone/tablet (CSS) — both
+          gated on the single `appearanceOpen` state. Board mode (nothing
+          selected) shows the Paper picker on top + the board-wide theme; widget
+          mode styles just the selected widget. */}
+      {!present && appearanceOpen && (
         <>
-          <button
-            type="button"
-            className={styles.panelFab}
-            aria-label="Open appearance editor"
-            aria-expanded={sheetOpen}
-            data-editor-fab
-            onClick={() => setSheetOpen(true)}
+          <div
+            className={styles.sheetBackdrop}
+            onClick={() => setAppearanceOpen(false)}
+          />
+          <div
+            ref={appearanceRef}
+            className={`${styles.panel} ${styles.panelFloat}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={headingId}
           >
-            <TeachIcon name="palette" size={16} />
-            {selectedWidget ? "Appearance" : "Board theme"}
-          </button>
-          {sheetOpen && (
-            <>
-              <div
-                className={styles.sheetBackdrop}
-                onClick={() => setSheetOpen(false)}
-              />
-              <div
-                className={`${styles.panel} ${styles.panelSheet}`}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={headingId}
+            <div className={styles.panelTopBar}>
+              <div className={styles.sheetGrip} aria-hidden="true" />
+              <button
+                ref={appearanceCloseRef}
+                type="button"
+                className={styles.panelClose}
+                aria-label="Close appearance"
+                onClick={() => setAppearanceOpen(false)}
               >
-                <div className={styles.sheetGrip} aria-hidden="true" />
-                <AppearancePanel {...panelProps} headingId={headingId} />
-              </div>
-            </>
-          )}
+                <TeachIcon name="x" size={18} />
+              </button>
+            </div>
+            <div className={styles.panelScroll}>
+              {!selectedWidget && (
+                <div className={styles.paperSection}>
+                  <div className={styles.paperHead}>Paper</div>
+                  <PaperPicker
+                    current={board.background ?? null}
+                    onPick={setBackground}
+                  />
+                </div>
+              )}
+              <AppearancePanel {...panelProps} headingId={headingId} />
+            </div>
+          </div>
         </>
       )}
 

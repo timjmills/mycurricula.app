@@ -15,7 +15,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
+import { useSidenavCollapsed } from "@/lib/use-sidenav-collapsed";
 import { NotebookSwitcher } from "@/components/nav";
+import { Tooltip } from "@/components/ui";
 import styles from "./SideNav.module.css";
 
 interface NavItem {
@@ -35,6 +37,7 @@ const SECTIONS: NavSection[] = [
   {
     label: "Plan",
     items: [
+      { label: "Home", href: "/home", icon: <HomeIcon /> },
       { label: "Daily", href: "/daily", icon: <CalendarIcon /> },
       { label: "Weekly", href: "/weekly", icon: <GridIcon /> },
       { label: "Year", href: "/year", icon: <LayersIcon /> },
@@ -55,6 +58,10 @@ const SECTIONS: NavSection[] = [
 export function SideNav(): ReactNode {
   const pathname = usePathname();
   const { currentUser } = useAppState();
+  // User-controlled icons-only collapse (persists per device; see the hook).
+  // Below 900px the CSS auto-collapses regardless of this flag — the pin only
+  // governs the ≥900px range.
+  const { collapsed, toggle } = useSidenavCollapsed();
 
   const isActive = (item: NavItem) => {
     const base = item.match ?? item.href;
@@ -62,10 +69,14 @@ export function SideNav(): ReactNode {
   };
 
   return (
-    <nav className={styles.sidenav} aria-label="Primary">
-      {/* Brand → home (Weekly) */}
+    <nav
+      className={styles.sidenav}
+      aria-label="Primary"
+      data-collapsed={collapsed}
+    >
+      {/* Brand → Home */}
       <Link
-        href="/weekly"
+        href="/home"
         className={styles.brand}
         aria-label="mycurricula.app home"
       >
@@ -114,6 +125,35 @@ export function SideNav(): ReactNode {
       ))}
 
       <span className={styles.spacer} />
+
+      {/* Collapse pin — minimizes the rail to icons-only (or expands it).
+          aria-pressed reflects the collapsed state; the label flips so AT
+          users hear the action the click will perform. Dismissible onboarding
+          tooltip (not high-consequence, so NOT required — a teacher can turn
+          it off once they know the control). When collapsed the label is
+          hidden by CSS, so the icon's tooltip + the native title= carry it. */}
+      <Tooltip
+        content={
+          collapsed
+            ? "Expand the sidebar to show labels"
+            : "Minimize the sidebar to icons only"
+        }
+        tooltipId="sidenav-collapse"
+        side="right"
+      >
+        <button
+          type="button"
+          className={styles.pinBtn}
+          onClick={toggle}
+          aria-pressed={collapsed}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <ChevronsIcon collapsed={collapsed} />
+          <span className={styles.label}>
+            {collapsed ? "Expand" : "Collapse"}
+          </span>
+        </button>
+      </Tooltip>
 
       {/* Settings */}
       <Link
@@ -171,6 +211,15 @@ function svgProps() {
     strokeLinejoin: "round" as const,
     "aria-hidden": true,
   };
+}
+function HomeIcon(): ReactNode {
+  return (
+    <svg {...svgProps()}>
+      <path d="M3 11.5 12 4l9 7.5" />
+      <path d="M5 10v10h14V10" />
+      <path d="M10 20v-6h4v6" />
+    </svg>
+  );
 }
 function GridIcon(): ReactNode {
   return (
@@ -242,6 +291,20 @@ function GearIcon(): ReactNode {
     <svg {...svgProps()}>
       <circle cx="12" cy="12" r="3" />
       <path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8 6 18M18 6l1.8-1.8" />
+    </svg>
+  );
+}
+// Collapse-pin glyph: double chevrons that point LEFT when the rail is
+// expanded (the click will collapse it) and RIGHT when it is collapsed (the
+// click will expand it) — the universal sidebar-toggle affordance.
+function ChevronsIcon({ collapsed }: { collapsed: boolean }): ReactNode {
+  return (
+    <svg {...svgProps()}>
+      {collapsed ? (
+        <path d="m6 17 5-5-5-5M13 17l5-5-5-5" />
+      ) : (
+        <path d="m11 17-5-5 5-5M18 17l-5-5 5-5" />
+      )}
     </svg>
   );
 }

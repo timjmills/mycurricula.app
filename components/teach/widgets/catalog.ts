@@ -1,7 +1,7 @@
 // catalog.ts — the static metadata for every widget type: display label, icon,
 // board tint, picker category, and the short kicker shown in the widget header.
-// The WidgetPicker, WidgetLibrary, BoardEmptyState, and WidgetShell all read
-// from this one source so labels/tints/categories never drift.
+// The WidgetLibrary + BoardEditor (and the BoardFullscreen favorites/library)
+// all read from this one source so labels/tints/categories never drift.
 //
 // 5.31 rebin: categories are now the six handoff families
 // (lesson · management · assessment · language · wellbeing · utilities). The
@@ -485,6 +485,37 @@ const ALL_WIDGETS: readonly WidgetMeta[] = [
 export const WIDGET_CATALOG: readonly WidgetMeta[] = ALL_WIDGETS.filter(
   (m) => m.addable !== false,
 );
+
+/** The CORE teaching widgets surfaced first — the board's "+ Widget" popover
+ *  offers exactly these, with a "More widgets…" row for the full library
+ *  (Wave 1, #18: tier the catalogue so a board opens uncluttered and the six
+ *  everyday widgets are one tap away). Single source of truth: BoardEditor's
+ *  default add-list reads this, so the curated set never drifts and can never
+ *  list a retired generic. Every entry MUST be an addable survivor — guarded by
+ *  the dev-time assertion below. */
+export const CORE_WIDGET_TYPES: readonly WidgetType[] = [
+  "learning-target",
+  "directions",
+  "timer",
+  "groups",
+  "namepick",
+  "poll",
+];
+
+if (process.env.NODE_ENV !== "production") {
+  // Use ALL_WIDGETS (declared above) — BY_TYPE is defined later in the module,
+  // so referencing it here would throw a temporal-dead-zone ReferenceError at
+  // import time.
+  const retired = CORE_WIDGET_TYPES.filter(
+    (t) => ALL_WIDGETS.find((m) => m.type === t)?.addable === false,
+  );
+  if (retired.length > 0) {
+    // A retired generic in the core list would offer an un-addable widget.
+    console.error(
+      `[catalog] CORE_WIDGET_TYPES contains retired (addable:false) types: ${retired.join(", ")}`,
+    );
+  }
+}
 
 const BY_TYPE: Record<WidgetType, WidgetMeta> = ALL_WIDGETS.reduce(
   (acc, meta) => {

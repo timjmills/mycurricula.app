@@ -13,11 +13,28 @@
 // and passes the result into NotebookProvider as a prop). The context's shape and
 // the localStorage persistence key are stable across that migration.
 //
+// Settings overrides (Workspace & Team settings — lib/use-workspace-settings.ts):
+//   The provider LAYERS three localStorage-backed overrides over the injected
+//   base data, read-only from this side (mutations live in the settings hooks):
+//     • `mycurricula:team:workspace-name` — overrides the workspace label.
+//     • `mycurricula:team:notebooks`      — notebook OVERLAY list, merged over
+//       the base list by `mergeNotebookOverlay()` (matching id replaces the
+//       base entry — rename/archive/restore; new id appends — added notebook).
+//     • `mycurricula:user:default-notebook-id` — selection fallback (below).
+//   SSR-safe: the initial render uses the base list + provider default name;
+//   the overrides arrive in a post-mount effect and stay live through
+//   `subscribeToWorkspaceSettings()` (cross-tab `storage` + same-tab event).
+//   The Phase 1B props-injection seam above is unchanged — when the base list
+//   becomes server-driven the overlay simply layers over server data until
+//   its writes migrate to real `grade_levels` rows.
+//
 // Active notebook selection:
 //   Persisted to `mycurricula:user:active-notebook-id` under the USER-scoped
 //   namespace (active notebook is a per-teacher choice, not team-shared — two
 //   teachers on the same workspace may be looking at different notebooks).
-//   Falls back to the first active notebook when the stored id is not found.
+//   When the stored id is unset or no longer active, falls back to the
+//   teacher's default notebook (`mycurricula:user:default-notebook-id`),
+//   then to the first active notebook.
 //
 // Workspace admin detection:
 //   In Phase 1A the founding teacher (first in the TEACHERS mock list) is treated
@@ -34,6 +51,14 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { ME } from "@/lib/mock";
+import {
+  mergeNotebookOverlay,
+  readDefaultNotebookId,
+  readNotebookOverlay,
+  readWorkspaceNameOverride,
+  subscribeToWorkspaceSettings,
+  type WorkspaceNotebookOverride,
+} from "@/lib/use-workspace-settings";
 
 // ── Mock notebook definitions ────────────────────────────────────────────────
 // Beta school has a single active notebook ("Grade 5 — My Class").
@@ -81,9 +106,10 @@ function writeStoredId(id: string): void {
 // ── Context shape ────────────────────────────────────────────────────────────
 
 export interface NotebookStateValue {
-  /** The workspace name (quiet label; not a management surface). */
+  /** The workspace name (settings override applied; managed on
+   *  Settings → Workspace, quiet label everywhere else). */
   workspaceName: string;
-  /** All notebooks (active and archived) in this workspace. */
+  /** All notebooks (active and archived), settings overlay merged in. */
   allNotebooks: readonly NotebookEntry[];
   /** Active notebooks only — the switcher list. */
   activeNotebooks: readonly NotebookEntry[];
@@ -127,9 +153,43 @@ export function NotebookProvider({
   workspaceName = MOCK_WORKSPACE_NAME,
   children,
 }: NotebookProviderProps): ReactNode {
+  // ── Settings overrides ─────────────────────────────────────────────────
+  // Read-only layering of the Workspace & Team settings state (mutations
+  // live in lib/use-workspace-settings.ts). SSR-safe: the initial render
+  // carries no overrides (base list + provider-default name), so server
+  // HTML matches the first client frame; the stored values arrive in the
+  // post-mount sync below and stay live through the subscription
+  // (cross-tab `storage` + same-tab settings event).
+  const [overrides, setOverrides] = useState<{
+    name: string | null;
+    overlay: WorkspaceNotebookOverride[];
+  }>({ name: null, overlay: [] });
+
+  useEffect(() => {
+    const sync = (): void =>
+      setOverrides({
+        name: readWorkspaceNameOverride(),
+        overlay: readNotebookOverlay(),
+      });
+    sync(); // post-mount read
+    return subscribeToWorkspaceSettings(sync); // stays live; returns cleanup
+  }, []);
+
+  // Merge the overlay over the injected base list (matching id replaces the
+  // base entry; new ids append). WorkspaceNotebookOverride is structurally
+  // identical to NotebookEntry, so the merged array satisfies the existing
+  // NotebookEntry-typed context API unchanged.
+  const mergedNotebooks = useMemo<NotebookEntry[]>(
+    () => mergeNotebookOverlay(notebooks, overrides.overlay),
+    [notebooks, overrides.overlay],
+  );
+
+  // Workspace name: the settings override wins; the prop stays the default.
+  const effectiveWorkspaceName = overrides.name ?? workspaceName;
+
   const activeNotebooks = useMemo(
-    () => notebooks.filter((nb) => nb.isActive),
-    [notebooks],
+    () => mergedNotebooks.filter((nb) => nb.isActive),
+    [mergedNotebooks],
   );
 
   // Resolve the initial active id. SSR-safe: starts with the first active
@@ -139,15 +199,24 @@ export function NotebookProvider({
     activeNotebooks[0]?.gradeLevelId ?? "",
   );
 
-  // Post-mount: restore the stored id if it's still an active notebook.
+  // Re-resolve the selection post-mount and whenever the active list
+  // changes (overlay arrival, archive/restore from Settings → Workspace).
+  // Precedence:
+  //   1. the stored active id        (the teacher's last explicit switch),
+  //   2. the teacher's default notebook (Settings → "Default notebook"),
+  //   3. the current selection, if still active (avoid churn),
+  //   4. the first active notebook.
   useEffect(() => {
-    const stored = readStoredId();
-    if (
-      stored &&
-      activeNotebooks.some((nb) => nb.gradeLevelId === stored)
-    ) {
-      setActiveNotebookIdState(stored);
-    }
+    setActiveNotebookIdState((current) => {
+      const isActiveId = (id: string | null): id is string =>
+        id != null && activeNotebooks.some((nb) => nb.gradeLevelId === id);
+      const stored = readStoredId();
+      if (isActiveId(stored)) return stored;
+      const preferred = readDefaultNotebookId();
+      if (isActiveId(preferred)) return preferred;
+      if (isActiveId(current)) return current;
+      return activeNotebooks[0]?.gradeLevelId ?? "";
+    });
   }, [activeNotebooks]);
 
   const setActiveNotebookId = useCallback(
@@ -165,16 +234,16 @@ export function NotebookProvider({
 
   const value = useMemo<NotebookStateValue>(
     () => ({
-      workspaceName,
-      allNotebooks: notebooks,
+      workspaceName: effectiveWorkspaceName,
+      allNotebooks: mergedNotebooks,
       activeNotebooks,
       activeNotebookId,
       setActiveNotebookId,
       isWorkspaceAdmin,
     }),
     [
-      workspaceName,
-      notebooks,
+      effectiveWorkspaceName,
+      mergedNotebooks,
       activeNotebooks,
       activeNotebookId,
       setActiveNotebookId,

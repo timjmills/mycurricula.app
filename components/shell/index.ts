@@ -13,3 +13,8 @@ export { RailsDndProvider } from "./RailsDndProvider";
 export { RailAddButton } from "./RailAddButton";
 export { GlobalShortcuts } from "./global-shortcuts";
 export { Clock } from "./Clock";
+export {
+  LastRouteRecorder,
+  readSettingsReturnRoute,
+  SETTINGS_RETURN_KEY,
+} from "./last-route-recorder";

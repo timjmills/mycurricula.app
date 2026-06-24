@@ -1,29 +1,26 @@
 "use client";
 
-// TeachSubBar.tsx — the Teach workspace's secondary toolbar
-// (docs/teach-view-plan.md §3, §4.1, §4.2, §7; Agent A). Left-to-right
-// (prototype `SubBar`):
-//   Week ▾ · Subject ▾ · board tab strip (numbered pills + Add Board) ·
-//   spacer · layout toolbar (1up…3×3) · ⚙ board settings · action cluster
-//   (Present · Full Screen · Pop-Out[soon] · Duplicate[soon]).
+// TeachSubBar.tsx — the Teach workspace's single board toolbar
+// (docs/teach-view-plan.md §3, §4.1, §4.2). Wave 1 declutter: this used to be a
+// second stacked command strip carrying four dead "Soon" stubs (Week ▾,
+// Subject ▾, Pop-Out, Duplicate) alongside its real controls. Those are gone;
+// what remains reads as ONE coherent board toolbar — left-to-right:
+//   board tab strip (numbered pills + Add Board) · spacer · board-action cluster
+//   (Widgets · Library · ⚙ settings · Present · Full Screen).
 //
 // A PURE presentational component. Board data + the active subject arrive via
 // props (the integrating component reads the teach repository / usePlanner()).
 // It dispatches against the frozen `TeachWorkspaceAction` union:
 //   • board pill          → { type: "selectBoard", boardId }
-//   • layout toolbar      → { type: "setLayout", layout }
 //   • Present             → { type: "setPresent", present: true }
 //   • Full Screen         → { type: "setFullscreen", fullscreen } + Fullscreen API
-//
-// Pop-Out + Duplicate are Phase 2 (plan §7) — rendered as `FutureControl`
-// "Soon" tiles, never live.
 
 import type { Dispatch, KeyboardEvent, ReactNode } from "react";
 import { useCallback } from "react";
 import type { TeachWorkspaceAction } from "../TeachWorkspace";
 import type { TeachWorkspaceState } from "@/lib/teach/types";
 import type { Board, SubjectId } from "@/lib/types";
-import { FutureControl, Tooltip } from "@/components/ui";
+import { Tooltip } from "@/components/ui";
 import styles from "./TeachChrome.module.css";
 
 // The fixed-grid layout toolbar (1up / 2×2 / …) was retired with the move to the
@@ -51,10 +48,6 @@ export interface TeachSubBarProps {
   /** Subject of the active lesson — drives the subject-tinted active pill via
    *  `.cp-subj.<id>` on the strip root. Falls back to math when absent. */
   subject?: SubjectId;
-  /** Week label for the Week ▾ chip (e.g. "Week 12"). */
-  weekLabel?: string;
-  /** Subject label for the Subject ▾ chip (e.g. "Math"). */
-  subjectLabel?: string;
   /** Add a new board to the active lesson. Optional. */
   onAddBoard?: () => void;
   /** Open board settings (⚙). Optional. */
@@ -76,18 +69,26 @@ export function TeachSubBar({
   dispatch,
   boards,
   subject = "math",
-  weekLabel = "This week",
-  subjectLabel = "Subject",
   onAddBoard,
   onBoardSettings,
   onToggleFullscreen,
   onOpenBoardLibrary,
   onOpenWidgetLibrary,
 }: TeachSubBarProps): ReactNode {
-  const handlePresent = useCallback(
-    () => dispatch({ type: "setPresent", present: true }),
-    [dispatch],
-  );
+  // Board-scoped actions (Present, ⚙ settings) only make sense when a board is
+  // open. Since the lazy auto-seed was removed (#10), "no board" is a normal
+  // state. A board is active whenever ANY board exists: TeachWorkspace resolves
+  // `activeBoard` as `boards.find(id) ?? boards[0]`, so the canvas always shows
+  // a board (and Present works) when boards is non-empty — even if activeBoardId
+  // is momentarily stale. Gate on that same reality so the canvas and its
+  // controls never disagree (gates F2 + G4-2); the workspace's self-correcting
+  // present effect (N1) is the final backstop.
+  const hasActiveBoard = boards.length > 0;
+
+  const handlePresent = useCallback(() => {
+    if (boards.length === 0) return;
+    dispatch({ type: "setPresent", present: true });
+  }, [dispatch, boards.length]);
 
   const handleFullscreen = useCallback(() => {
     const next = !state.fullscreen;
@@ -127,25 +128,8 @@ export function TeachSubBar({
 
   return (
     <div className={styles.subBar}>
-      {/* Week ▾ — the week/subject jumpers are not wired in v1 (audit B3).
-          Rendered as honest disabled "Soon" chips (the active week/subject are
-          still shown as live context) rather than dead dropdown buttons. */}
-      <FutureControl
-        variant="ghost"
-        label={weekLabel}
-        trailingIcon={<ChevronDownIcon />}
-        tooltip="Switch which week you're teaching from — coming after beta"
-      />
-
-      {/* Subject ▾ — Soon (audit B3). */}
-      <FutureControl
-        variant="ghost"
-        label={subjectLabel}
-        trailingIcon={<ChevronDownIcon />}
-        tooltip="Filter the board strip to one subject — coming after beta"
-      />
-
-      {/* Board tab strip — subject-tinted active pill via .cp-subj. */}
+      {/* Board tab strip — subject-tinted active pill via .cp-subj. The single
+          board switcher; opens the active board's widgets in the canvas. */}
       <div
         className={`${styles.boardStrip} cp-subj ${subject}`}
         role="tablist"
@@ -206,62 +190,73 @@ export function TeachSubBar({
 
       <div className={styles.spacer} aria-hidden="true" />
 
-      {/* Library entries — browse/add boards + widgets (5.31). */}
-      {onOpenWidgetLibrary ? (
-        <Tooltip
-          content="Browse the full widget library and add one to this board"
-          side="bottom"
-          tooltipId="teach-widget-library"
-        >
-          <button
-            type="button"
-            className={styles.contextChip}
-            onClick={onOpenWidgetLibrary}
-            aria-label="Open widget library"
-          >
-            <PlusIcon />
-            Widgets
-          </button>
-        </Tooltip>
-      ) : null}
-      {onOpenBoardLibrary ? (
-        <Tooltip
-          content="Open the board library — browse your boards and the team's, and reuse them"
-          side="bottom"
-          tooltipId="teach-board-library"
-        >
-          <button
-            type="button"
-            className={styles.contextChip}
-            onClick={onOpenBoardLibrary}
-            aria-label="Open board library"
-          >
-            Library
-          </button>
-        </Tooltip>
-      ) : null}
-
-      {/* ⚙ board settings. */}
-      <Tooltip
-        content="Board settings — rename, reorder, or reset this board"
-        side="bottom"
-        tooltipId="teach-board-settings"
-      >
-        <button
-          type="button"
-          className={styles.gearBtn}
-          onClick={onBoardSettings}
-          aria-label="Board settings"
-        >
-          <CogIcon />
-        </button>
-      </Tooltip>
-
-      {/* Action cluster. */}
+      {/* Board-action cluster — the board's verbs, grouped as one toolbar so the
+          bar reads as a single board toolbar (not a scattered strip). */}
       <div className={styles.actionCluster}>
+        {/* Widget library — browse/add widgets (5.31). */}
+        {onOpenWidgetLibrary ? (
+          <Tooltip
+            content="Browse the full widget library and add one to this board"
+            side="bottom"
+            tooltipId="teach-widget-library"
+          >
+            <button
+              type="button"
+              className={styles.contextChip}
+              onClick={onOpenWidgetLibrary}
+              aria-label="Open widget library"
+            >
+              <PlusIcon />
+              Widgets
+            </button>
+          </Tooltip>
+        ) : null}
+        {/* Board library — browse + reuse boards (5.31). */}
+        {onOpenBoardLibrary ? (
+          <Tooltip
+            content="Open the board library — browse your boards and the team's, and reuse them"
+            side="bottom"
+            tooltipId="teach-board-library"
+          >
+            <button
+              type="button"
+              className={styles.contextChip}
+              onClick={onOpenBoardLibrary}
+              aria-label="Open board library"
+            >
+              Library
+            </button>
+          </Tooltip>
+        ) : null}
+
+        {/* ⚙ board settings. */}
+        <Tooltip
+          content={
+            hasActiveBoard
+              ? "Board settings — rename, reorder, or reset this board"
+              : "Open or create a board first to change its settings"
+          }
+          side="bottom"
+          tooltipId="teach-board-settings"
+        >
+          <button
+            type="button"
+            className={styles.gearBtn}
+            onClick={onBoardSettings}
+            disabled={!hasActiveBoard}
+            aria-label="Board settings"
+          >
+            <CogIcon />
+          </button>
+        </Tooltip>
+
         {/* Present — Phase 1 functional. */}
         <Tooltip
-          content="Present this board full-screen for the class — all editing chrome hides"
+          content={
+            hasActiveBoard
+              ? "Present this board full-screen for the class — all editing chrome hides"
+              : "Open or create a board first to present it"
+          }
           side="bottom"
           tooltipId="teach-present"
         >
@@ -269,6 +264,7 @@ export function TeachSubBar({
             type="button"
             className={`${styles.boardTab} cp-subj ${subject} ${styles.boardTabActive}`}
             onClick={handlePresent}
+            disabled={!hasActiveBoard}
             aria-label="Present this board"
           >
             <PlayIcon />
@@ -297,42 +293,12 @@ export function TeachSubBar({
             Full Screen
           </button>
         </Tooltip>
-
-        {/* Pop-Out + Duplicate — Phase 2 (plan §7). */}
-        <FutureControl
-          label="Pop-Out"
-          leadingIcon={<PopOutIcon />}
-          tooltip="Pop the board into a second window for a second monitor — coming after beta"
-        />
-        <FutureControl
-          label="Duplicate"
-          leadingIcon={<DuplicateIcon />}
-          tooltip="Mirror this board to a second window — coming after beta"
-        />
       </div>
     </div>
   );
 }
 
 // ── Icons ────────────────────────────────────────────────────────────────────
-
-function ChevronDownIcon(): ReactNode {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
 
 function PlusIcon(): ReactNode {
   return (
@@ -400,45 +366,6 @@ function FullscreenIcon(): ReactNode {
       aria-hidden="true"
     >
       <path d="M4 4h6M4 4v6M20 4h-6M20 4v6M4 20h6M4 20v-6M20 20h-6M20 20v-6" />
-    </svg>
-  );
-}
-
-function PopOutIcon(): ReactNode {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M14 4h6v6" />
-      <path d="M10 14L20 4" />
-      <path d="M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6" />
-    </svg>
-  );
-}
-
-function DuplicateIcon(): ReactNode {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="8" y="8" width="12" height="12" rx="1" />
-      <path d="M4 16V4h12" />
     </svg>
   );
 }

@@ -48,7 +48,11 @@ interface WeeklyViewControlsProps {
 export function WeeklyViewControls({
   isNarrow = false,
 }: WeeklyViewControlsProps): ReactNode {
-  const { viewMode, setViewMode } = useAppState();
+  // app-state's view-mode API is now per-view: read this view's mode with
+  // getViewMode("weekly") and write it with setViewMode("weekly", m). The old
+  // single global viewMode/setViewMode(m) pair was removed.
+  const { getViewMode, setViewMode } = useAppState();
+  const viewMode = getViewMode("weekly");
   const { setMode, scheduleMode, events, setEvents } = useWeeklyScheduleMode();
 
   // Offering "Schedule" on the narrow tier would let the control claim a mode
@@ -80,7 +84,7 @@ export function WeeklyViewControls({
             return;
           }
           setMode("subject");
-          setViewMode(v);
+          setViewMode("weekly", v);
         }}
         options={[
           {

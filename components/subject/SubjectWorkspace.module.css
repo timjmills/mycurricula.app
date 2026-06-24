@@ -452,21 +452,29 @@
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
 }
-.wkcard {
+/* Doubled class beats the global `.cp-root button` reset (0,1,1), which would
+   otherwise strip the border/padding/background off these button cards. */
+.wkcard.wkcard {
   min-width: 0;
   border: 1.5px solid var(--border);
   border-radius: 13px;
   padding: 12px 13px;
   cursor: pointer;
-  transition: 0.12s;
+  transition:
+    box-shadow 0.14s ease,
+    border-color 0.14s ease,
+    transform 0.14s ease;
   background: var(--surface);
   text-align: left;
 }
-.wkcard:hover {
-  box-shadow: var(--sh-md);
-  transform: translateY(-2px);
+/* Clean, soft hover lift (was the heavier --sh-md): a short, neutral shadow +
+   a subtle accent border instead of a deep drop. */
+.wkcard.wkcard:hover {
+  border-color: color-mix(in srgb, var(--ac) 45%, var(--border));
+  box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--ink-900) 26%, transparent);
+  transform: translateY(-1px);
 }
-.wkcardOn {
+.wkcardOn.wkcardOn {
   border-color: var(--ac);
   background: var(--ac-t);
 }
@@ -499,24 +507,34 @@
   font-weight: 600;
 }
 
-.daycard {
+/* Doubled class beats the global `.cp-root button` reset (0,1,1) so each day
+   keeps its full outline + subject left-stripe (the reset was stripping the
+   border, so the days ran together with no separation). */
+.daycard.daycard {
   min-width: 0;
   border: 1.5px solid var(--border);
   border-radius: 13px;
   border-left: 4px solid var(--ac);
   padding: 12px 13px;
   cursor: pointer;
-  transition: 0.12s;
+  transition:
+    box-shadow 0.14s ease,
+    border-color 0.14s ease,
+    transform 0.14s ease;
   background: var(--surface);
   text-align: left;
 }
-.daycard:hover {
-  box-shadow: var(--sh-md);
-  transform: translateY(-2px);
+/* Clean, soft hover (was the heavier --sh-md drop). */
+.daycard.daycard:hover {
+  border-color: color-mix(in srgb, var(--ac) 50%, var(--border));
+  box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--ink-900) 26%, transparent);
+  transform: translateY(-1px);
 }
-.daycardOn {
+/* Selected day: accent ring + a soft accent-tinted lift (was a heavy solid
+   amber drop-shadow). */
+.daycardOn.daycardOn {
   border-color: var(--ac);
-  box-shadow: 0 10px 22px -10px var(--ac);
+  box-shadow: 0 8px 18px -12px color-mix(in srgb, var(--ac) 55%, transparent);
 }
 .daycard .dh {
   font-size: 12px;

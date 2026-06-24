@@ -8,7 +8,8 @@
 
 import type { ReactNode } from "react";
 import type { WidgetBodyProps } from "./types";
-import { WHead, KitIcon, Pill } from "./_WidgetKit";
+import { StandardPill } from "@/components/ui";
+import { WHead, KitIcon } from "./_WidgetKit";
 import styles from "./ObjectiveWidget.module.css";
 import kit from "./widgets530.module.css";
 
@@ -52,9 +53,7 @@ export function ObjectiveWidget({ widget }: WidgetBodyProps): ReactNode {
         <div className={styles.standards}>
           <span className={styles.standardsLabel}>Standard:</span>
           {standards.map((code) => (
-            <Pill key={code} tone="purple">
-              {code}
-            </Pill>
+            <StandardPill key={code} code={code} />
           ))}
         </div>
       ) : null}

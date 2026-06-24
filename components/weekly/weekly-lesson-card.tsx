@@ -76,6 +76,7 @@ import {
   ResourceTypeRow,
   StandardsBadge,
   StandardsList,
+  SubjectMonogram,
 } from "@/components/lesson-card/parts";
 import { cycleStatus } from "@/components/lesson-card/status";
 import { TaskRow } from "@/components/lesson-card/task-row";
@@ -384,6 +385,10 @@ export function WeeklyLessonCard({
   // reads as a strongly distinct zone regardless of the style axis. In vivid
   // mode the card border picks up a subject-tint; quiet/calm stay ink-150.
   const isVivid = style === "vivid";
+  // Mid-Calm's defining feature (per the Appearance picker copy) is the
+  // subject monogram tile. Calm-only on the weekly card: vivid's identity is
+  // already the full subject-tint fill, and quiet stays minimal.
+  const isCalm = style === "calm";
 
   // Bug 4 fix: floating shadow/ring/rotation applies ONLY to the DragOverlay
   // copy (overlay=true). The in-grid card — even while isDragging via
@@ -872,6 +877,21 @@ export function WeeklyLessonCard({
                     label={`Mark "${stripHtml(lesson.title)}" — current status ${lesson.status}`}
                   />
                 </div>
+
+                {/* Mid-Calm monogram tile — the style's signature. CALM-ONLY
+                    here by design (lesson-card.tsx shows it on vivid too): the
+                    weekly card's vivid identity is the full tint fill + band,
+                    so a tile would double-badge it. subject.icon is the same
+                    2-letter code the compact chip uses; tile/deep come from
+                    the resolved palette so it re-themes with the tokens. */}
+                {isCalm && (
+                  <SubjectMonogram
+                    glyph={subject.icon}
+                    fill={color.tile}
+                    ink={color.deep}
+                    size={22}
+                  />
+                )}
 
                 {/* Subject · time — single muted metadata line (Option 1).
               No uppercase, no pill. The card's color background already

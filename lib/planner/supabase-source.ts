@@ -80,6 +80,10 @@ import {
 } from "./source";
 import { buildReverseIndex, slugToUuid } from "./id-bridge";
 import {
+  resolveCodesToStandardIds,
+  resolveStandardsByIds,
+} from "@/lib/standards/code-lookup";
+import {
   makeUnwrap,
   makeUnwrapMaybe,
   sb,
@@ -538,12 +542,17 @@ function jsonToSectionResources(
   return out;
 }
 
-// ── Standards uuid[] ↔ slug code[] bridge ─────────────────────────────────────
-// Standard CODES are the slugs (`5.NF.A.1`); the DB stores `standards uuid[]`.
-// `slugToUuid("standard", code)` maps code → uuid; the reverse index maps the
-// uuids back. We build the reverse index from the grade's loaded standard codes
-// once per read so a lesson's `standards uuid[]` resolve to the code slugs the
-// domain expects.
+// ── Standards uuid[] ↔ code[] bridge ──────────────────────────────────────────
+// Lessons store `standards uuid[]`; the domain carries standard CODES. The reverse
+// index (uuid → code) is built per read from the grade's loaded standards, so a
+// lesson's `standards uuid[]` resolve to the code slugs the domain expects.
+//
+// The FORWARD direction (code → uuid, for persisting an edited tag set) is NOT a
+// deterministic mint — the live catalog's `standards.id` were not minted from the
+// code, so it MUST be a real DB lookup. That lives in lib/standards/code-lookup.ts
+// (`resolveCodesToStandardIds`, scoped to the caller's effective frameworks) and is
+// awaited once at the top of updateLesson — never `slugToUuid("standard", …)`,
+// which would persist uuids that match no row.
 
 function standardUuidsToCodes(
   uuids: string[],
@@ -552,10 +561,6 @@ function standardUuidsToCodes(
   return uuids
     .map((u) => uuidToCode.get(u))
     .filter((c): c is string => typeof c === "string");
-}
-
-function standardCodesToUuids(codes: string[]): string[] {
-  return codes.map((c) => slugToUuid("standard", c));
 }
 
 // ── Row → domain mappers ──────────────────────────────────────────────────────
@@ -725,6 +730,47 @@ async function loadStandardsIndex(
     uuidToCode.set(row.id, row.code);
   }
   return { map, uuidToCode };
+}
+
+/** Phase 7 — out-of-grade tag survival. `loadStandardsIndex` is seeded from the
+ *  grade's ASSIGNED frameworks (a fast, bounded baseline). But the tagging
+ *  picker lets a teacher tag a standard from ANY framework in their EFFECTIVE
+ *  set (school default ± personal overrides), which can be broader than the
+ *  grade's assignments. A lesson uuid pointing at such an out-of-baseline
+ *  standard isn't in `uuidToCode`, so `standardUuidsToCodes` would silently
+ *  DROP it — the tag would vanish on reload (data loss).
+ *
+ *  This patches the index IN PLACE: any referenced uuid missing from the
+ *  baseline is resolved by a direct id lookup (`resolveStandardsByIds`, RLS-
+ *  gated) and merged into BOTH `uuidToCode` (so the lesson maps back to its
+ *  code) and `map` (so describeStandard surfaces its wording). No-op when every
+ *  referenced uuid is already in the baseline (the common case for the beta,
+ *  whose effective set == the grade's frameworks). Bounded: only the handful of
+ *  uuids a lesson set actually references are looked up, never the catalog. */
+async function augmentStandardsIndex(
+  client: ServerClient,
+  standards: { map: StandardsMap; uuidToCode: Map<string, string> },
+  referencedUuids: readonly string[],
+): Promise<void> {
+  const missing = [
+    ...new Set(
+      referencedUuids.filter(
+        (u) =>
+          typeof u === "string" &&
+          u.length > 0 &&
+          !standards.uuidToCode.has(u),
+      ),
+    ),
+  ];
+  if (missing.length === 0) return;
+  const extra = await resolveStandardsByIds(client, missing);
+  for (const row of extra) {
+    standards.uuidToCode.set(row.id, row.code);
+    // Existing baseline wording wins; only add a code the baseline lacks.
+    if (!(row.code in standards.map)) {
+      standards.map[row.code] = row.description ?? row.code;
+    }
+  }
 }
 
 // ── Implementation ────────────────────────────────────────────────────────────
@@ -924,6 +970,18 @@ export const plannerSupabaseSource: PlannerDataSource = {
       copyByMaster.set(c.master_core_lesson_event_id, c);
     const complByMaster = new Map<string, CompletionRow>();
     for (const c of complRows) complByMaster.set(c.core_lesson_event_id, c);
+
+    // Phase 7: patch the standards index for any tag pointing at a framework
+    // OUTSIDE the grade's baseline (the picker tags from the broader effective
+    // set). Without this those uuids drop on read and the tag vanishes. Collect
+    // every referenced uuid from the EFFECTIVE source rows (copy over master)
+    // plus authored, then augment the shared index in place once.
+    await augmentStandardsIndex(client, standards, [
+      ...masterRows.flatMap((m) =>
+        (copyByMaster.get(m.id) ?? m).standards ?? [],
+      ),
+      ...authoredRows.flatMap((a) => a.standards ?? []),
+    ]);
 
     // 4. Resolve personal-over-master and map each to a FLAT Lesson, EXCLUDING
     //    masters the owner has archived for themselves (archived_at not null on
@@ -1128,6 +1186,14 @@ export const plannerSupabaseSource: PlannerDataSource = {
     // `personal_authored_lessons` row directly (no fork — it has no master);
     // a master-derived lesson lazily forks into `personal_core_lesson_event_copies`.
     const client = await sb();
+    // R1: resolve edited standard CODES → real `standards.id` via a DB lookup
+    // scoped to the caller's effective frameworks (NOT a deterministic mint).
+    // Resolved once here; every write branch below reuses it. Unresolved codes
+    // are dropped (never fabricated). Empty when patch.standards is absent.
+    const resolvedStandards =
+      patch.standards !== undefined
+        ? await resolveCodesToStandardIds(client, patch.standards)
+        : undefined;
     const authored = await loadAuthored(client, lessonId, ownerId);
 
     if (authored) {
@@ -1141,7 +1207,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
         next.resources =
           patch.resources as unknown as AuthoredLessonRow["resources"];
       if (patch.standards !== undefined)
-        next.standards = standardCodesToUuids(patch.standards);
+        next.standards = resolvedStandards ?? [];
       // Authored completion lives on its OWN `status`/`reason_not_done` columns
       // (NOT `completion_status`, which FKs to master events).
       if (patch.status !== undefined) next.status = statusToDb(patch.status);
@@ -1203,7 +1269,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
         next.resources =
           patch.resources as unknown as MasterEventRow["resources"];
       if (patch.standards !== undefined)
-        next.standards = standardCodesToUuids(patch.standards);
+        next.standards = resolvedStandards ?? [];
       // `preview`/`time`/`tasks` have no master column (derived/unmodelled) —
       // skipped, exactly as in the personal-copy patch below.
       if (Object.keys(next).length > 0) {
@@ -1234,7 +1300,7 @@ export const plannerSupabaseSource: PlannerDataSource = {
       if (patch.notes !== undefined) next.notes = patch.notes;
       if (patch.resources !== undefined) next.resources = patch.resources;
       if (patch.standards !== undefined)
-        next.standards = standardCodesToUuids(patch.standards);
+        next.standards = resolvedStandards ?? [];
       // `preview`/`time`/`tasks` have no column in the copies table — they are
       // derived (preview) or unmodelled (time/tasks). Skipped intentionally.
       void copy;
@@ -1854,6 +1920,9 @@ async function reloadLesson(
   const compl = complRes.data as CompletionRow | null;
 
   const src = copy ?? master;
+  // Phase 7: ensure an out-of-grade tag on this lesson still resolves to its
+  // code after an edit-reload (mirrors listLessons' augmentation).
+  await augmentStandardsIndex(client, standards, src.standards ?? []);
   return buildLesson({
     id: master.id,
     subject: uuidToSubjectId.get(src.subject_id) ?? "math",
@@ -1918,6 +1987,8 @@ async function reloadAuthoredLesson(
     ? (uuidToUnitSlug.get(authored.unit_id) ?? authored.unit_id)
     : "";
 
+  // Phase 7: out-of-grade tag survival (mirrors listLessons' augmentation).
+  await augmentStandardsIndex(client, standards, authored.standards ?? []);
   return buildLesson({
     id: authored.id,
     subject: subjectId,

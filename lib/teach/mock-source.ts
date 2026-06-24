@@ -25,7 +25,6 @@ import type {
 } from "../types";
 import {
   BOARDS,
-  buildDefaultBoardSet,
   MOCK_GRADE_LEVEL_ID,
   TEAM_LIBRARY_BOARDS,
 } from "../mock/boards";
@@ -33,7 +32,7 @@ import { boardMatchesContext, type BoardContext } from "./board-tags";
 import { ensureCanvas } from "./board-migrate";
 import { BoardCapError, MAX_BOARDS_PER_TEACHER } from "./limits";
 import type { TeachDataSource } from "./queries";
-import { SANDBOX_LESSON_ID } from "./queries";
+import { SANDBOX_LESSON_ID } from "./constants";
 
 // ── Mutable in-memory store ─────────────────────────────────────────────────
 // Cloned from the fixtures so editing the live store never mutates the exported
@@ -204,26 +203,18 @@ export function resolveOwnerId(ownerId: string): string {
 // ── Read ─────────────────────────────────────────────────────────────────────
 
 /** The board set a teacher sees for a lesson: their PERSONAL set where one
- *  exists, otherwise the TEAM set (plan §13.1). When a lesson has no seeded
- *  boards at all, lazily materialize the default five-phase team set. */
+ *  exists, otherwise the TEAM set (plan §13.1).
+ *
+ *  CREATION RULE (Wave 1, #10): a board exists ONLY on an explicit action
+ *  (opened, added as a resource, attached to a lesson/phase, or created from the
+ *  Boards page). Opening Teach on a lesson with no boards must NOT auto-seed a
+ *  default set — it returns an empty list so the workspace lands on the clean
+ *  empty state. (The old lazy `buildDefaultBoardSet` seed was removed here and
+ *  in supabase-source's `listBoardsForLesson` to honour that rule.) */
 function setForLesson(masterLessonId: string, ownerId: string): Board[] {
   const lesson = resolveLessonId(masterLessonId);
   const owner = resolveOwnerId(ownerId);
   const forLesson = boards.filter((b) => b.masterLessonId === lesson);
-  if (forLesson.length === 0) {
-    // Lazily seed a default team set so opening Teach on any lesson works.
-    const seeded = buildDefaultBoardSet(lesson).map((b) => ({
-      ...b,
-      id: nextId("b"),
-      widgets: b.widgets.map((w) => ({ ...w, id: nextId("w") })),
-    }));
-    // Re-link each widget's boardId to the freshly-issued board id.
-    for (const board of seeded) {
-      board.widgets = board.widgets.map((w) => ({ ...w, boardId: board.id }));
-    }
-    boards.push(...seeded);
-    return seeded;
-  }
   const personal = forLesson.filter(
     (b) => b.scope === "personal" && b.ownerId === owner,
   );

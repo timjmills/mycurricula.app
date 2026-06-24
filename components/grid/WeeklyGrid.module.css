@@ -166,7 +166,12 @@
 /* ── Scroll region + grid ───────────────────────────────────────────── */
 .scroll {
   flex: 1;
-  overflow: auto;
+  /* overflow: visible — the WeeklyShell now wraps the grid in <ZoomPanCanvas>,
+     which OWNS clipping + fit/zoom/pan. This region no longer scrolls itself;
+     it lets the canvas lay the board out at 100% width (columns shrink to fit)
+     and scale the whole board down to fit the height ("Fit" = everything
+     visible). A self-scroll here would fight the canvas transform. */
+  overflow: visible;
   padding: 16px 20px 28px;
 }
 
@@ -174,10 +179,14 @@
   display: grid;
   /* Leading subject-label column + one day column per configured school day.
      `--day-count` is set inline from the configured school week (defaults to 5
-     for the Sun–Thu beta) so the grid never assumes a fixed 5-day week. The min
-     day width keeps cards readable; below the natural width the region scrolls
-     rather than crushes. */
-  grid-template-columns: 132px repeat(var(--day-count, 5), minmax(190px, 1fr));
+     for the Sun–Thu beta) so the grid never assumes a fixed 5-day week.
+     `minmax(0, 1fr)` (not `minmax(190px, 1fr)`) lets the day columns SHRINK
+     below their natural width so the whole board fits the available width with
+     NO horizontal scrollbar — the ZoomPanCanvas wrapper then scales the board
+     down to also fit the height and lets the teacher zoom in to read a dense
+     week. The old 190px floor forced the board past the viewport (the clipped-
+     columns bug); zoom replaces the floor as the readability mechanism. */
+  grid-template-columns: 132px repeat(var(--day-count, 5), minmax(0, 1fr));
   /* Tight gap — cells should read as a continuous grid, not floating tiles.
      Column gap keeps horizontal breathing room; row gap is collapsed to 0
      so subject rows read as tightly stacked bands rather than floating tiles. */
@@ -187,10 +196,9 @@
      behaviour — no `align-items: start`). Combined with each cell's fixed
      `min-height` (see .cell), every cell in a row settles to the same height,
      so the grid reads as a clean matrix with no ragged voids. */
-  /* 132px subject column + 190px per configured day column. Matches the old
-     fixed 1082px (132 + 5×190) for the Sun–Thu default and scales with the
-     configured day count. */
-  min-width: calc(132px + var(--day-count, 5) * 190px);
+  /* No `min-width` floor: the board lays out at 100% of the canvas width and
+     the canvas's Fit/zoom owns readability. A min-width here would re-introduce
+     the horizontal overflow the canvas exists to eliminate. */
 }
 
 /* ── Day header row ─────────────────────────────────────────────────── */

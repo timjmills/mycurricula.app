@@ -98,7 +98,9 @@ button.neutral:focus-visible {
 }
 
 .neutral .header {
-  background: var(--ink-50);
+  /* --panel-header-bg defaults to --ink-50 (Paper-identical); Night gives
+     panels their own header step so cards read as composed furniture. */
+  background: var(--panel-header-bg);
   border-bottom: 1px solid var(--ink-150);
 }
 

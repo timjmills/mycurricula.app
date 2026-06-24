@@ -80,7 +80,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Button, Tooltip } from "@/components/ui";
+import { Button, Tooltip, ZoomPanCanvas } from "@/components/ui";
 import {
   DndContext,
   DragOverlay,
@@ -489,12 +489,17 @@ export function WeeklyShell(): ReactNode {
     selectedDay,
     selectedLessonId,
     setSelectedLessonId,
-    viewMode,
+    getViewMode,
     todoPanelOpen,
     commentsPanelOpen,
     toggleTodoPanel,
     toggleCommentsPanel,
   } = useAppState();
+  // app-state's view-mode API is per-view now: read THIS view's grid/list
+  // choice with getViewMode("weekly"). The old global `viewMode` field was
+  // removed. The isNarrow-forces-List behavior below is unchanged — it ORs the
+  // narrow flag with this preference (see `showList` in renderGridPanel).
+  const viewMode = getViewMode("weekly");
   const { lessons } = usePlanner();
 
   // Inline schedule-mode state (Subject↔Schedule + Lessons-only↔All). Lives
@@ -969,10 +974,20 @@ export function WeeklyShell(): ReactNode {
           // so the splitter and rail math are unaffected.
           <WeeklyList />
         ) : (
-          /* WeeklyGrid renders untouched in the center slot. The outer slot
-             wrapper already carries min-width: 0 so the grid can shrink
-             gracefully when the rail grows. */
-          <WeeklyGrid />
+          /* WeeklyGrid renders inside a ZoomPanCanvas so the dense week board
+             can lay out at 100% width (its columns now shrink to fit — see
+             WeeklyGrid.module.css `.grid`) AND be read at detail via Fit /
+             pinch / ⌘|Ctrl+wheel zoom. The canvas FILLS this slot, so the slot
+             must be height-bounded — `.columnWithGrip[data-pane="grid"]` is
+             flex:1 + min-height:0 inside the flex:1 .bodyRow, so Fit can
+             measure a real box. ONLY the grid branch is wrapped: WeeklyList and
+             ScheduleTimeline keep their own native scroll. The canvas excludes
+             cards / buttons / [data-dnd-draggable] from pan and turns panning
+             off at Fit, so dnd-kit lesson drag + collapse-on-drag are
+             untouched. */
+          <ZoomPanCanvas ariaLabel="Weekly grid" tooltipPrefix="weekly">
+            <WeeklyGrid />
+          </ZoomPanCanvas>
         )}
       </div>
     );

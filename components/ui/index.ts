@@ -28,6 +28,12 @@ export type { BadgeProps } from "./Badge";
 export { Chip } from "./Chip";
 export type { ChipProps } from "./Chip";
 
+export { StandardPill } from "./StandardPill";
+export type { StandardPillProps } from "./StandardPill";
+
+export { ZoomPanCanvas } from "./ZoomPanCanvas";
+export type { ZoomPanCanvasProps } from "./ZoomPanCanvas";
+
 export { Tooltip } from "./Tooltip";
 export type { TooltipProps } from "./Tooltip";
 
@@ -36,3 +42,5 @@ export type { FutureControlProps } from "./FutureControl";
 
 export { IntroSubtitle } from "./IntroSubtitle";
 export type { IntroSubtitleProps, IntroSubtitleViewKey } from "./IntroSubtitle";
+
+export { ThemeWash } from "./ThemeWash";

@@ -9,7 +9,7 @@
 import type { CSSProperties } from "react";
 import type { LessonTask, SubjectId } from "@/lib/types";
 import { resolveSubjectColor, usePalette } from "@/lib/palette";
-import { Tooltip } from "@/components/ui";
+import { StandardPill, Tooltip } from "@/components/ui";
 import { CompletionCheck, ResourceTypeRow } from "./parts";
 import { cycleStatus } from "./status";
 
@@ -105,11 +105,8 @@ export function TaskRow({ task, parentSubject, onCycle }: TaskRowProps) {
       )}
       <ResourceTypeRow resources={task.resources} dense />
       {task.standards.length > 0 && (
-        <span
-          className="cp-mono"
-          style={{ fontSize: 9, color: "var(--ink-500)", flex: "0 0 auto" }}
-        >
-          {task.standards[0]}
+        <span style={{ flex: "0 0 auto" }}>
+          <StandardPill code={task.standards[0]} />
         </span>
       )}
     </div>

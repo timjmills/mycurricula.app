@@ -119,7 +119,11 @@
 }
 
 .tbBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  /* currentColor (= the toolbar's --paper text) so the overlay tracks the
+     toolbar's contrast direction: a light wash on the dark Paper toolbar, a
+     dark wash on Night's inverted (light) toolbar. A literal white would
+     vanish on Night. */
+  background: color-mix(in srgb, currentColor 10%, transparent);
   color: var(--paper);
 }
 
@@ -129,7 +133,9 @@
 }
 
 .tbBtnActive {
-  background: rgba(255, 255, 255, 0.15);
+  /* currentColor overlay — see .tbBtn:hover. Tracks the toolbar's contrast on
+     both light and dark themes instead of assuming a dark toolbar. */
+  background: color-mix(in srgb, currentColor 15%, transparent);
   color: var(--paper);
 }
 
@@ -244,6 +250,52 @@
   color: inherit;
 }
 
+/* Heading glyphs ("H1" / "H2") — compact, bold, so they read as structure
+   controls next to the inline B/I/U buttons. */
+.iconHeading {
+  font-size: var(--t-11);
+  font-weight: 700;
+  font-family: var(--font-sans);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: inherit;
+}
+
+/* Quote glyph — an oversized closing quotation mark. Pulled up slightly so the
+   tall mark sits centered in the button. */
+.iconQuote {
+  font-size: var(--t-18);
+  font-weight: 700;
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 0.7;
+  color: inherit;
+}
+
+/* Resource-card glyph — a tiny "card": a filled top band over a baseline rule,
+   built from two spans so it reads as a media card rather than a letter. Uses
+   currentColor so it tracks the toolbar's text color on every theme. */
+.iconCard {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 2px;
+  width: var(--t-14);
+  height: var(--t-12);
+}
+
+.iconCardTop {
+  height: 5px;
+  border-radius: 1.5px;
+  background: currentColor;
+}
+
+.iconCardLine {
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, currentColor 60%, transparent);
+}
+
 .iconCaret {
   font-size: var(--t-10);
   color: var(--muted);
@@ -256,7 +308,9 @@
   display: block;
   width: 1px;
   height: var(--t-16);
-  background: rgba(255, 255, 255, 0.12);
+  /* currentColor so the group divider stays visible on the inverted Night
+     toolbar (a literal white would disappear). */
+  background: color-mix(in srgb, currentColor 12%, transparent);
   margin: 0 3px;
   flex-shrink: 0;
 }
@@ -344,7 +398,11 @@
   width: var(--t-28);
   height: var(--t-28);
   border-radius: var(--r-4);
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  /* currentColor (inherited --paper) so the swatch hairline + hover ring read
+     on both the dark Paper popover and Night's inverted (light) popover. The
+     swatch's own fill is the highlight color set inline; this is only its
+     chrome border. */
+  border: 1.5px solid color-mix(in srgb, currentColor 10%, transparent);
   cursor: pointer;
   transition:
     transform 0.1s ease,
@@ -355,7 +413,7 @@
 
 .swatch:hover {
   transform: scale(1.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: color-mix(in srgb, currentColor 50%, transparent);
 }
 
 .swatch:focus-visible {
@@ -365,7 +423,9 @@
 
 /* "No highlight" swatch — shows the classic remove/null symbol */
 .swatchNone {
-  background: rgba(255, 255, 255, 0.06) !important;
+  /* currentColor wash (not a literal white) so the empty-swatch fill reads on
+     the inverted Night popover too. */
+  background: color-mix(in srgb, currentColor 6%, transparent) !important;
   border-style: dashed;
 }
 
@@ -415,7 +475,9 @@
 }
 
 .fontOption:hover {
-  background: rgba(255, 255, 255, 0.1);
+  /* currentColor overlay — see .tbBtn:hover. Reads on both light and dark
+     popovers. */
+  background: color-mix(in srgb, currentColor 10%, transparent);
   color: var(--paper);
 }
 
@@ -542,6 +604,184 @@
   margin: var(--t-2, 2px) 0;
 }
 
+/* ── Headings & blockquote inside the editor ────────────────────────────────────
+   The block-format toolbar (H1 / H2 / Quote) emits real <h1>/<h2>/<blockquote>
+   elements. Tailwind's preflight strips heading sizing, so we re-assert sensible
+   token-based sizes here, scoped to the editor only. We deliberately keep these
+   MODEST relative to the surrounding lesson typography — a heading should read as
+   structure, not blow out the card — and use em-relative line spacing so they sit
+   in the same rhythm whatever font-size the host context sets. */
+.editor h1 {
+  font-size: var(--t-20);
+  font-weight: 700;
+  line-height: 1.25;
+  margin: var(--t-12) 0 var(--t-8, 8px);
+  color: inherit;
+}
+
+.editor h2 {
+  font-size: var(--t-16);
+  font-weight: 700;
+  line-height: 1.3;
+  margin: var(--t-10) 0 var(--t-4, 4px);
+  color: inherit;
+}
+
+/* First heading shouldn't push a big gap above the content's top edge. */
+.editor h1:first-child,
+.editor h2:first-child {
+  margin-top: 0;
+}
+
+/* Blockquote — a quiet left rule + inset, no background, so it reads as a quote
+   without fighting the host card surface. The rule uses the subject/ink hairline
+   token-mix so it tracks the active theme. */
+.editor blockquote {
+  margin: var(--t-10) 0;
+  padding: var(--t-2, 2px) 0 var(--t-2, 2px) var(--t-12);
+  border-left: 3px solid color-mix(in srgb, currentColor 28%, transparent);
+  color: var(--ink-700);
+  font-style: italic;
+}
+
+/* ── Interactive checklist inside the editor ────────────────────────────────────
+   The checklist toolbar emits <ul data-checklist="true"> with
+   <li data-checked="true|false"> items. State rides on data-checked (it survives
+   sanitizeHtml; a class would not), so every style here keys off the attribute.
+   The tick-box is an ::before marker drawn in the list's left padding; a click in
+   that zone toggles the item (handler in the component). Keyboard: an item can be
+   focused and toggled with Ctrl/Cmd+Enter. */
+.editor ul[data-checklist] {
+  list-style: none;
+  padding-left: var(--t-24);
+  margin: var(--t-10) 0;
+}
+
+.editor ul[data-checklist] > li {
+  position: relative;
+  margin: var(--t-4, 4px) 0;
+  /* Make the whole row feel clickable on its marker side. */
+  cursor: default;
+}
+
+/* The tick-box marker, seated in the left padding so list text stays aligned. */
+.editor ul[data-checklist] > li::before {
+  content: "";
+  position: absolute;
+  /* Pull back into the list's left padding; centered on the first text line. */
+  left: calc(-1 * var(--t-20));
+  top: 0.15em;
+  width: var(--t-14);
+  height: var(--t-14);
+  box-sizing: border-box;
+  border: 1.5px solid color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: var(--r-4);
+  background: var(--surface);
+  /* The marker is the click target — invite the pointer. */
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor ul[data-checklist] > li::before {
+    transition: none;
+  }
+}
+
+/* Checked item: fill the box with the brand accent + draw a checkmark, and mute
+   the text so completed items recede. The checkmark is a rotated box-border tick
+   on the ::after marker, also sitting in the left padding. */
+.editor ul[data-checklist] > li[data-checked="true"]::before {
+  background: var(--brand-500);
+  border-color: var(--brand-500);
+}
+
+.editor ul[data-checklist] > li[data-checked="true"]::after {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--t-20) + 4px);
+  top: calc(0.15em + 1px);
+  width: 6px;
+  height: 10px;
+  box-sizing: border-box;
+  border: solid var(--paper);
+  border-width: 0 2px 2px 0;
+  transform: rotate(40deg);
+  pointer-events: none;
+}
+
+.editor ul[data-checklist] > li[data-checked="true"] {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
+}
+
+/* Keyboard focus ring on a focused checklist item. */
+.editor ul[data-checklist] > li:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: var(--r-2);
+}
+
+/* ── Inline resource cards inside the editor ────────────────────────────────────
+   The "Insert resource card" control emits a <figure data-card="…"> wrapping an
+   image, embed, or link, with an optional <figcaption>. The card gives the media
+   a framed, captioned container distinct from a bare inline image/embed. Scoped
+   to the editor; constrained to the content width so it never forces horizontal
+   scroll. (The figure carries a module class on first insert for live styling,
+   but that class is stripped on emit — these attribute-keyed rules are the
+   durable ones and also cover the post-sanitize round-trip.) */
+.editor figure[data-card],
+.resourceCard {
+  margin: var(--t-10) 0;
+  padding: var(--t-8, 8px);
+  max-width: 480px;
+  border: var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+/* Media inside a card fills the card width; reset the standalone image margins
+   so the figure padding owns the spacing. */
+.editor figure[data-card] > img {
+  margin: 0;
+  width: 100%;
+}
+
+.editor figure[data-card] .embedBlock {
+  margin: 0;
+  max-width: 100%;
+}
+
+/* A carded embed keeps a 16:9 frame even after a sanitize round-trip strips the
+   .embedBlock wrapper class — the figure owns the constraint via this fallback,
+   scoped to cards only so standalone-embed behavior is untouched. */
+.editor figure[data-card] iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--r-sm);
+}
+
+/* Caption — quiet, smaller than body, sits under the media. */
+.editor figure[data-card] > figcaption {
+  margin-top: var(--t-8, 8px);
+  font-size: var(--t-12);
+  line-height: 1.4;
+  color: var(--ink-500);
+}
+
+/* Link-card variant: the anchor reads as the card's title rather than a bare
+   inline link. */
+.editor figure[data-card="link"] > a {
+  display: inline-block;
+  font-weight: 600;
+  color: var(--brand-600);
+}
+
 /* ── Inline media inside the editor (images + embeds) ───────────────────────────
    Notecard bodies can carry inline images and safe embeds (YouTube / Vimeo /
    Google), inserted via the toolbar. Both must stay within the editor's content
@@ -625,7 +865,9 @@
 }
 
 .sizeOption:hover {
-  background: rgba(255, 255, 255, 0.1);
+  /* currentColor overlay — see .tbBtn:hover. Reads on both light and dark
+     popovers. */
+  background: color-mix(in srgb, currentColor 10%, transparent);
   color: var(--paper);
 }
 

@@ -32,23 +32,13 @@ import { mockTeachSource } from "./mock-source";
 // repository seam remains the single import site for consumers.
 export { BoardCapError, MAX_BOARDS_PER_TEACHER } from "./limits";
 
-/**
- * Sentinel master-lesson id for the EPHEMERAL sandbox set (plan §4a). The Teach
- * UI uses this opaque string as the repo key for "boards built without a lesson
- * attached" — `listBoardsForLesson(SANDBOX_LESSON_ID, owner)` /
- * `createBoard({ masterLessonId: SANDBOX_LESSON_ID, … })` return/insert the
- * teacher's lesson-LESS ephemeral personal boards. It is NOT a real lesson:
- *   - the MOCK source treats it as an ordinary (never-seeded) opaque key — its
- *     filter `b.masterLessonId === "sandbox"` simply never matches a real board,
- *     so the sandbox set is whatever the UI creates under this key;
- *   - the SUPABASE source maps it to lesson-less ephemeral personal boards
- *     (`master_core_lesson_event_id IS NULL`, `ephemeral = true`), because under
- *     Supabase a fake-uuid lesson id would resolve to no lesson and the
- *     grade-from-lesson lookup would throw.
- * Sharing the sentinel here (instead of a private const in each repo + the UI)
- * keeps the UI, the mock, and the Supabase adapter agreeing on the one key.
- */
-export const SANDBOX_LESSON_ID = "sandbox";
+// `SANDBOX_LESSON_ID` lives in the ./constants leaf for the SAME reason as the
+// cap above: mock-source.ts / supabase-source.ts need the sentinel, and they
+// must NOT import this seam for a value (that back-edge formed the runtime
+// circular import `queries → mock-source → queries`, which threw "Cannot access
+// 'mockTeachSource' before initialization"). Re-exported here so consumers keep
+// importing it from the single repository seam. See ./constants for the doc.
+export { SANDBOX_LESSON_ID } from "./constants";
 
 /**
  * The repository contract for Teach board data. Every method is async

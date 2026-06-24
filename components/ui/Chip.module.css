@@ -9,7 +9,9 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
+  /* 13px side padding — at 10px the label crowded the pill edge, most
+     visibly on the solid brand-filled active filter chips. */
+  padding: 5px 13px;
   border-radius: var(--r-pill);
   font-size: var(--t-12);
   font-weight: 600;
@@ -42,26 +44,28 @@
     border-color 120ms ease;
 }
 
+/* Chrome-accent tier (never raw --brand-*): filter chips carry each
+   theme's own accent — indigo on Paper, green on Mint, violet on Night. */
 .filter:hover {
-  border-color: var(--brand-300);
-  color: var(--brand-600);
+  border-color: var(--chrome-accent-mid);
+  color: var(--chrome-accent-strong);
 }
 
 /* Active state (aria-pressed="true") */
 .filter[aria-pressed="true"] {
-  background: var(--brand-500);
-  color: #fff;
+  background: var(--chrome-accent);
+  color: var(--on-solid);
   border-color: transparent;
 }
 
-/* Active hover — keep brand bg, deepen for interactivity feedback */
+/* Active hover — keep the accent bg, deepen for interactivity feedback */
 .filter[aria-pressed="true"]:hover {
-  background: var(--brand-600);
-  color: #fff;
+  background: var(--chrome-accent-strong);
+  color: var(--on-solid);
 }
 
 .filter:focus-visible {
-  outline: 2px solid var(--brand-500);
+  outline: 2px solid var(--chrome-accent);
   outline-offset: 2px;
 }
 

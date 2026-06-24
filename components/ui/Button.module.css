@@ -1,6 +1,26 @@
 /* Button.module.css — canonical button primitive.
-   All color / type / spacing from var(--…) only. Zero hex.
+   All color / type / spacing from var(--…) only. Zero raw hex.
    Tailwind supplies no styling here — this file owns the visual.
+
+   ── Specificity contract — why variant/size rules are qualified with .btn ──
+   The Settings UI and several slide-out panels render inside `.cp-root`,
+   whose base reset `.cp-root button { background:none; border:none;
+   padding:0 }` (tokens.css) has specificity (0,1,1). A bare single-class
+   rule like `.primary` or `.md` is only (0,1,0), so INSIDE `.cp-root` it
+   loses — the fill, border, and padding get stripped at rest, leaving
+   floating text + a leftover shadow halo (the old "glitch"), and the hover
+   fill returns with zero padding (the old cramped pill). Qualifying every
+   variant + size rule as `.btn.primary` / `.btn.md` lifts them to (0,2,0)
+   so the primitive renders IDENTICALLY in every context. Do not de-qualify
+   these. See BUILD_STANDARD.md §Buttons & pills.
+
+   ── Visual language (v1.4 — crisp, theme-recoloured) ────────────────────
+   Filled buttons are solid pills with a TIGHT neutral shadow — no colored
+   glow bloom. The primary fill recolours per theme via --chrome-accent
+   (Paper indigo · Cloud slate · Mint green · Sky blue · Blossom rose ·
+   Night violet); hover deepens one shade (--chrome-accent-strong, which the
+   token contract guarantees ≥4.5:1 with --on-solid white) and lifts 1px.
+   Rest and hover are deliberately distinct but both crisp.
 
    ── Hit-area inflation trick (§8 BUILD_STANDARD) ───────────────────────
    On phone/tablet (≤900px) sm and md buttons are visually smaller than
@@ -15,9 +35,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   position: relative;
-  border: none;
+  /* Border lives on the base so every variant shares one border-box
+     geometry — variants only swap border-color, so there is no 1px layout
+     jump when (e.g.) secondary's hairline appears. */
+  border: 1px solid transparent;
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
@@ -25,11 +48,11 @@
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
   transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease,
-    box-shadow 120ms ease,
-    transform 120ms ease;
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
   /* Prevent text selection on rapid clicks */
   user-select: none;
 }
@@ -49,48 +72,50 @@
 }
 
 /* ── Sizes ───────────────────────────────────────────────────────────── */
+/* Pill-shaped at every size, weight 700. Generous horizontal padding so the
+   label never crowds the pill edge. Qualified with .btn for the specificity
+   contract above. */
 
-/* v1.3: text buttons are pill-shaped at every size, weight 700. */
-
-/* sm: 32px visual, 13px h-padding, t-12 */
-.sm {
+/* sm: 32px visual, 14px h-padding, t-12 */
+.btn.sm {
   height: 32px;
-  padding: 0 13px;
+  padding: 0 14px;
   font-size: var(--t-12);
   font-weight: 700;
   border-radius: var(--r-pill);
 }
 
-/* md: 40px visual, 18px h-padding, t-13. Default. */
-.md {
+/* md: 40px visual, 20px h-padding, t-13. Default. */
+.btn.md {
   height: 40px;
-  padding: 0 18px;
+  padding: 0 20px;
   font-size: var(--t-13);
   font-weight: 700;
   border-radius: var(--r-pill);
 }
 
-/* lg: 48px visual, 24px h-padding, t-14. Primary CTAs. */
-.lg {
+/* lg: 48px visual, 26px h-padding, t-14. Primary CTAs. */
+.btn.lg {
   height: 48px;
-  padding: 0 24px;
+  padding: 0 26px;
   font-size: var(--t-14);
   font-weight: 700;
   border-radius: var(--r-pill);
 }
 
-/* icon overrides: square (rounded) proportions, not a pill, regardless of size */
-.icon.sm {
+/* icon overrides: square (rounded) proportions, not a pill, regardless of
+   size. .btn.icon.<size> is (0,3,0) so it wins over .btn.<size> (0,2,0). */
+.btn.icon.sm {
   width: 32px;
   padding: 0;
   border-radius: var(--r-sm);
 }
-.icon.md {
+.btn.icon.md {
   width: 40px;
   padding: 0;
   border-radius: var(--r-md);
 }
-.icon.lg {
+.btn.icon.lg {
   width: 48px;
   padding: 0;
   border-radius: var(--r-md);
@@ -120,115 +145,135 @@
 }
 
 /* ── Variants ────────────────────────────────────────────────────────── */
+/* All qualified with .btn (0,2,0) so the fill/border survive the .cp-root
+   reset. Hover/active are (0,4,0) and win cleanly. */
 
-/* primary — filled indigo brand, white text, brand glow. Dominant action. */
-.primary {
-  background: var(--brand-500);
-  color: #fff;
-  border: 1px solid transparent;
-  box-shadow: var(--sh-brand);
+/* primary — filled THEME accent, white text, crisp neutral shadow. The
+   dominant action. Recolours per theme via --chrome-accent; hover deepens
+   one shade (--chrome-accent-strong) and lifts. No colored glow. */
+.btn.primary {
+  background: var(--chrome-accent);
+  color: var(--on-solid);
+  border-color: transparent;
+  box-shadow: var(--sh-sm);
 }
 
-.primary:hover:not(:disabled) {
-  background: var(--brand-600);
-  box-shadow: 0 16px 30px -10px rgba(59, 108, 246, 0.55);
+.btn.primary:hover:not(:disabled) {
+  background: var(--chrome-accent-strong);
+  box-shadow: var(--sh-md);
   transform: translateY(-1px);
 }
 
-.primary:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: var(--sh-brand);
-}
-
-/* honey — gradient marketing CTA, dark text, honey glow. The warm "welcome". */
-.honey {
-  background: var(--grad-honey);
-  color: #3a2a05;
-  border: 1px solid transparent;
-  box-shadow: var(--sh-honey);
-}
-
-.honey:hover:not(:disabled) {
-  filter: brightness(1.03);
-  box-shadow: 0 16px 30px -10px rgba(233, 165, 38, 0.6);
-  transform: translateY(-1px);
-}
-
-.honey:active:not(:disabled) {
-  transform: translateY(1px);
-  filter: none;
-  box-shadow: var(--sh-honey);
-}
-
-/* secondary — white body, warm border, ink-soft text. Default. */
-.secondary {
-  background: var(--surface);
-  color: var(--ink-soft);
-  border: 1px solid var(--border);
+.btn.primary:active:not(:disabled) {
+  transform: translateY(0);
   box-shadow: var(--sh-xs);
 }
 
-.secondary:hover:not(:disabled) {
-  border-color: var(--brand-300);
-  color: var(--brand-600);
+/* honey — gradient marketing CTA, warm-dark ink. The warm "welcome" action
+   (Get started, Start planning). Kept warm (NOT theme-recoloured) but crisp:
+   the oversized honey glow is replaced by the same neutral shadow scale as
+   primary. */
+.btn.honey {
+  background: var(--grad-honey);
+  color: var(--on-honey);
+  border-color: transparent;
+  box-shadow: var(--sh-sm);
+}
+
+.btn.honey:hover:not(:disabled) {
+  filter: brightness(1.03);
+  box-shadow: var(--sh-md);
+  transform: translateY(-1px);
+}
+
+.btn.honey:active:not(:disabled) {
+  transform: translateY(0);
+  filter: none;
+  box-shadow: var(--sh-xs);
+}
+
+/* secondary — neutral FILLED pill, medium emphasis. The old --surface fill +
+   faint --border vanished on a --surface card (it read as floating text). A
+   real --ink-150 fill + a defined --ink-300 border + the darkest --ink label
+   make it unmistakably a button on any surface — a fill, not a hairline, is
+   what reads. Below primary, above ghost. Hover routes through the
+   chrome-accent tier so border + text pick up the active theme. */
+.btn.secondary {
+  background: var(--ink-150);
+  color: var(--ink);
+  border-color: var(--ink-300);
+  box-shadow: var(--sh-xs);
+}
+
+.btn.secondary:hover:not(:disabled) {
+  background: var(--ink-200);
+  border-color: var(--chrome-accent-mid);
+  color: var(--chrome-accent-deep);
   box-shadow: var(--sh-sm);
   transform: translateY(-1px);
 }
 
-.secondary:active:not(:disabled) {
-  transform: translateY(1px);
+.btn.secondary:active:not(:disabled) {
+  transform: translateY(0);
   box-shadow: var(--sh-xs);
 }
 
-/* ghost — transparent body, ink-soft text. Hover fills hairline. */
-.ghost {
-  background: transparent;
+/* ghost — soft low-emphasis FILLED button. A light --ink-100 fill + a hairline
+   --ink-200 border give it a clear pill shape at rest (it used to be bare,
+   shapeless text) while staying lighter than secondary. Hover deepens the
+   fill + edge and darkens the label. */
+.btn.ghost {
+  background: var(--ink-100);
   color: var(--ink-soft);
-  border: 1px solid transparent;
+  border-color: var(--ink-200);
 }
 
-.ghost:hover:not(:disabled) {
-  background: var(--hairline);
+.btn.ghost:hover:not(:disabled) {
+  background: var(--ink-150);
+  border-color: var(--ink-300);
   color: var(--ink);
 }
 
-.ghost:active:not(:disabled) {
-  background: var(--border);
+.btn.ghost:active:not(:disabled) {
+  background: var(--ink-200);
+  border-color: var(--ink-300);
 }
 
 /* icon — square ghost-style for icon-only triggers */
-.icon {
+.btn.icon {
   background: transparent;
   color: var(--ink-500);
-  border: 1px solid transparent;
+  border-color: transparent;
 }
 
-.icon:hover:not(:disabled) {
+.btn.icon:hover:not(:disabled) {
   background: var(--ink-100);
   color: var(--ink-900);
 }
 
-.icon:active:not(:disabled) {
+.btn.icon:active:not(:disabled) {
   background: var(--ink-150);
 }
 
-/* destructive — catchup-tinted fill, on-solid ink. Archive/Delete. */
-.destructive {
+/* destructive — catchup-tinted fill, on-solid ink. Archive/Delete. Danger is
+   semantic and NOT theme-recoloured; only the shadow follows the crisp
+   neutral scale. */
+.btn.destructive {
   background: color-mix(in srgb, var(--catchup) 85%, white);
   color: var(--on-solid);
-  border: 1px solid transparent;
-  box-shadow: var(--shadow-card);
+  border-color: transparent;
+  box-shadow: var(--sh-sm);
 }
 
-.destructive:hover:not(:disabled) {
+.btn.destructive:hover:not(:disabled) {
   background: var(--catchup);
-  box-shadow: var(--shadow-card-hover);
+  box-shadow: var(--sh-md);
   transform: translateY(-1px);
 }
 
-.destructive:active:not(:disabled) {
+.btn.destructive:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--sh-xs);
 }
 
 /* ── Icon slots ──────────────────────────────────────────────────────── */

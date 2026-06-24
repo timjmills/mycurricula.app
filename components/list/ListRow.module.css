@@ -53,6 +53,25 @@
   opacity: 0.65;
 }
 
+/* ── Vivid style — soft subject-tint row fill ────────────────────────────
+   The "Mid-Vivid" card style tints the whole card with the subject color.
+   A dense list can't take the opaque card fill without losing scanability,
+   so the list row's vivid treatment is a gentle wash of the subject's light
+   tint (--cl, from the .cp-subj cascade) mixed heavily back into --surface,
+   plus a subject-tinted border. Calm + quiet keep the plain --surface fill.
+   --cl falls back to --surface so a row with no resolved subject color is
+   simply un-tinted rather than transparent. */
+.row.rowVivid {
+  background: color-mix(in oklch, var(--cl, var(--surface)) 38%, var(--surface));
+  border-color: color-mix(in oklch, var(--c, var(--border)) 22%, var(--border));
+}
+
+/* Selection / hover still win over the resting vivid wash so the row's
+   interactive states stay legible on the tinted background. */
+.row.rowVivid:hover {
+  border-color: var(--c, var(--border));
+}
+
 /* ── Left-edge stripe (::before) ────────────────────────────────────── */
 /* Solid stripe: subject base color fills the full height */
 

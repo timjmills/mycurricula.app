@@ -38,45 +38,18 @@ import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { usePathname, useRouter } from "next/navigation";
 import { TODOS, TAG_BY_ID, LESSONS, LESSON_BY_ID } from "@/lib/mock";
-import type { LessonStatus, Subject, SubjectId, Unit } from "@/lib/types";
-import { Button, Tooltip } from "@/components/ui";
+import type { Subject, SubjectId, Unit } from "@/lib/types";
+import { Tooltip } from "@/components/ui";
+// The right-rail lesson panel mounts a PURPOSE-BUILT surface — a single-column,
+// table-like stack of the lesson's phases with a lightweight add-resource/note
+// composer — NOT the full Daily <LessonDetail> editor (which read as "the old
+// daily lesson view" when crammed into the slim rail). LessonPhasePanel is
+// shell-local so it stays out of the heavy DailyView tree (dnd-kit, schedule
+// pane, …). The full editor still lives on /daily; the header's
+// "Open in Daily view" action hands the lesson off to it.
+import { LessonPhasePanel } from "./LessonPhasePanel";
 import { DRAWER_MQ } from "@/components/weekly";
 import styles from "./right-panel.module.css";
-
-// ── Status display helpers ───────────────────────────────────────────────────
-
-const STATUS_LABELS: Record<LessonStatus, string> = {
-  not_done: "Not done",
-  done: "Done",
-  carried: "Carried over",
-  skipped: "Skipped",
-  partial: "Partial",
-};
-
-// Background / foreground for the status badge — matches semantic colors from
-// tokens.css without hard-coding hex values.
-const STATUS_COLORS: Record<LessonStatus, { bg: string; fg: string }> = {
-  not_done: {
-    bg: "var(--ink-100)",
-    fg: "var(--ink-500)",
-  },
-  done: {
-    bg: "color-mix(in oklch, var(--done) 16%, white)",
-    fg: "var(--done)",
-  },
-  partial: {
-    bg: "color-mix(in oklch, var(--fyi) 14%, white)",
-    fg: "var(--fyi)",
-  },
-  carried: {
-    bg: "var(--catchup-bg)",
-    fg: "var(--catchup)",
-  },
-  skipped: {
-    bg: "var(--ink-100)",
-    fg: "var(--ink-400)",
-  },
-};
 
 // ── Due date label helper ────────────────────────────────────────────────────
 
@@ -101,6 +74,32 @@ function CloseIcon() {
         stroke="currentColor"
         strokeWidth="1.6"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+// ── "Open in Daily view" SVG ──────────────────────────────────────────────────
+// An "open in larger surface" glyph — a panel with an outward arrow — for the
+// header action that hands the lesson off to the full-width Daily view.
+
+function OpenDailyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+      {/* Outward diagonal arrow — "expand / open elsewhere". */}
+      <path
+        d="M5.5 2.5H2.5V11.5H11.5V8.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 2.5H11.5V6M11.5 2.5L6.5 7.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
@@ -833,20 +832,27 @@ function AllCommentsTab({
 // LESSON DETAIL PANEL
 // ════════════════════════════════════════════════════════════════════════════
 
-// Shows the full detail for a single lesson: objective, directions, notes,
-// resources, standards, and completion status. The subject-color stripe at
-// the top anchors visual identity with the rest of the planner.
+// Hosts the PURPOSE-BUILT <LessonPhasePanel> body inside the shell right-panel
+// chrome. The earlier approach mounted the full Daily <LessonDetail> editor in
+// the slim rail; the user rejected that ("looks like the old daily lesson view
+// we got rid of"). The body is now a single-column, table-like stack of the
+// lesson's PHASES with a small composer to add a resource/note tagged to the
+// whole lesson or one phase.
+//
+// The panel chrome stays exactly as before: a sticky header (lesson title +
+// "Open in Daily view" + close button) and a thin subject-color stripe
+// anchoring the panel's visual identity. The full-width editor still lives on
+// /daily; the "Open in Daily view" action hands this lesson off to it.
 
 function LessonDetailPanel({ lessonId }: { lessonId: string }): ReactNode {
   const { setSelectedLessonId } = useAppState();
   const router = useRouter();
-  // Subject label + standard descriptions come from the planner catalog
-  // (catalog migration). Flag OFF these mirror the mock SUBJECT_BY_ID /
-  // describeStandard byte-identically; flag ON they track the hydrated grade.
-  // The lesson itself resolves from the store first (so backend-hydrated
-  // lessons whose ids aren't in the mock fixture still render) with the
-  // mock map as the flag-OFF fallback.
-  const { subjectById, describeStandard, lessons } = usePlanner();
+  // Subject label comes from the planner catalog (catalog migration). Flag
+  // OFF it mirrors the mock SUBJECT_BY_ID byte-identically; flag ON it tracks
+  // the hydrated grade. The lesson itself resolves from the store first (so
+  // backend-hydrated lessons whose ids aren't in the mock fixture still
+  // render) with the mock map as the flag-OFF fallback.
+  const { subjectById, lessons } = usePlanner();
   const lesson =
     lessons.find((l) => l.id === lessonId) ?? LESSON_BY_ID[lessonId];
 
@@ -879,26 +885,51 @@ function LessonDetailPanel({ lessonId }: { lessonId: string }): ReactNode {
   // Guard: subject not found in lookup (e.g. stale mock data).
   if (!subj) return null;
 
-  const statusColors = STATUS_COLORS[lesson.status];
-
   return (
     <div
       className={`cp-root ${styles.panel}`}
       role="complementary"
       aria-label={`Lesson detail: ${lesson.title}`}
     >
-      {/* Thin subject-color stripe at the very top */}
+      {/* Thin subject-color stripe at the very top — panel-level visual
+          anchor (kept; the shared card's own band sits below it). */}
       <div
         className={`cp-subj ${subj.cls} ${styles.detailSubjectStripe}`}
         style={{ background: "var(--c)" }}
         aria-hidden
       />
 
-      {/* Header — subject label + lesson title + close */}
+      {/* Header — lesson title + "Open in Daily view" + close.
+          The Daily-view action replaces the old read-only "Go to lesson"
+          hand-off (B6): editing now happens in place, so this is a quiet
+          convenience for teachers who prefer the full-width layout, not a
+          required round-trip. */}
       <div className={styles.header}>
         <h2 className={styles.headerTitle} title={lesson.title}>
           {lesson.title}
         </h2>
+        <Tooltip
+          content="Open this lesson in the full-width Daily view — same edits, more room"
+          side="bottom"
+        >
+          <button
+            type="button"
+            className={`cp-focusable ${styles.detailOpenDaily}`}
+            aria-label="Open in Daily view"
+            title="Open this lesson in the full-width Daily view"
+            onClick={() => {
+              // Hand off via the W1-V5 deep link — /daily resolves ?lesson=
+              // server-side, seeds its selection to THIS lesson (not "first
+              // not-done of the day"), and syncs week + day itself. Clearing
+              // the global selection first unmounts this panel so Daily
+              // doesn't render with a leftover second panel.
+              setSelectedLessonId(null);
+              router.push(`/daily?lesson=${encodeURIComponent(lesson.id)}`);
+            }}
+          >
+            <OpenDailyIcon />
+          </button>
+        </Tooltip>
         <button
           type="button"
           className={`cp-focusable ${styles.closeBtn}`}
@@ -909,140 +940,13 @@ function LessonDetailPanel({ lessonId }: { lessonId: string }): ReactNode {
         </button>
       </div>
 
-      {/* Go to lesson — this panel is a read-only summary; full editing
-          (lesson flow, status, resources, notes) lives in the Daily view.
-          Pinned under the header so it never scrolls out of reach. */}
-      <div style={{ padding: "10px 16px 0", flex: "0 0 auto" }}>
-        <Button
-          variant="secondary"
-          size="sm"
-          style={{ width: "100%" }}
-          tooltip="Open this lesson in the Daily view, where you can edit every part of it — directions, resources, notes, and status"
-          onClick={() => {
-            // Hand off via the W1-V5 deep link — /daily resolves ?lesson=
-            // server-side, seeds its selection to THIS lesson (not "first
-            // not-done of the day"), and syncs week + day itself. Clearing
-            // the global selection first unmounts this read-only panel so
-            // Daily doesn't render with a leftover second panel.
-            setSelectedLessonId(null);
-            router.push(`/daily?lesson=${encodeURIComponent(lesson.id)}`);
-          }}
-        >
-          Go to lesson
-        </Button>
-      </div>
-
-      {/* Scrollable body */}
-      <div className={styles.body}>
-        {/* Subject + objective */}
-        <section className={styles.detailSection}>
-          <p
-            className={`cp-subj ${subj.cls} ${styles.detailSubjectLabel}`}
-            style={{ color: "var(--c)" }}
-          >
-            {subj.name}
-          </p>
-          {lesson.objective && (
-            <p className={styles.detailObjective}>{lesson.objective}</p>
-          )}
-        </section>
-
-        {/* Directions */}
-        {lesson.directions && (
-          <section className={styles.detailSection}>
-            <p className={styles.detailLabel}>Directions</p>
-            <p className={styles.detailBody}>{lesson.directions}</p>
-          </section>
-        )}
-
-        {/* Notes */}
-        {lesson.notes && (
-          <section className={styles.detailSection}>
-            <p className={styles.detailLabel}>Notes</p>
-            <p className={styles.detailNoteBody}>{lesson.notes}</p>
-          </section>
-        )}
-
-        {/* Resources */}
-        {lesson.resources.length > 0 && (
-          <section className={styles.detailSection}>
-            <p className={styles.detailLabel}>Resources</p>
-            <ul
-              style={{
-                listStyle: "none",
-                margin: 0,
-                padding: 0,
-                display: "flex",
-                flexDirection: "column",
-                gap: 2,
-              }}
-            >
-              {lesson.resources.map((res, i) => (
-                <li key={`${res.type}-${i}`}>
-                  <span className={styles.detailResource}>
-                    <span
-                      style={{
-                        flex: "0 0 auto",
-                        fontSize: "var(--t-10)",
-                        color: "var(--ink-400)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.4px",
-                        fontWeight: 600,
-                        width: 42,
-                      }}
-                    >
-                      {res.type}
-                    </span>
-                    <span className={styles.detailResourceLabel}>
-                      {res.label}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {/* Standards */}
-        {lesson.standards.length > 0 && (
-          <section className={styles.detailSection}>
-            <p className={styles.detailLabel}>Standards</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {lesson.standards.map((code) => (
-                <div key={code} className={styles.detailStdRow}>
-                  <span
-                    className={`cp-mono cp-subj ${subj.cls} ${styles.detailStdCode}`}
-                    style={{
-                      background: "var(--cl)",
-                      color: "var(--cd)",
-                    }}
-                  >
-                    {code}
-                  </span>
-                  <span className={styles.detailStdDesc}>
-                    {describeStandard(code)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Status */}
-        <div className={styles.statusRow}>
-          <span className={styles.detailLabel} style={{ margin: 0 }}>
-            Status
-          </span>
-          <span
-            className={styles.statusBadge}
-            style={{
-              background: statusColors.bg,
-              color: statusColors.fg,
-            }}
-          >
-            {STATUS_LABELS[lesson.status]}
-          </span>
-        </div>
+      {/* Purpose-built phase panel — a single-column, table-like stack of the
+          lesson's phases with a lightweight add-resource/note composer. `key`
+          resets its local composer/draft state when the selected lesson
+          changes. The panel itself wraps in `.cp-subj <subjClass>` so the
+          subject cascade resolves for its row accents. */}
+      <div className={styles.detailHost}>
+        <LessonPhasePanel key={lesson.id} lessonId={lesson.id} />
       </div>
     </div>
   );
