@@ -10,16 +10,18 @@
 // data-tone.
 //
 // data-tone IS DERIVED (theme + bg + dim → light|dark; see theme.tsx
-// deriveTone + WAVE-2-VALUE-MATRIX.md §4) and the real value is reconciled
-// post-mount (the photo-luminance "normal → auto" sample is a LATER stage). The
-// boot script paints a deterministic default of "light": it is the resting tone
-// for the most common non-photo states (Wash, any light theme, Photo-Bright) and
-// — critically — light is the LEAST-FLASHING default, because the v2 Photo-Dark
-// register layers a scrim that keeps white text readable regardless, whereas a
-// premature "dark" tone on a light surface would flash unreadable ink. If a
-// previously-derived tone was stashed under the (non-persisted) `last-tone` key
-// we honor it as a closer first guess; otherwise light. Either way the provider
-// reconciles to the true derived tone within a frame.
+// deriveTone + WAVE-2-VALUE-MATRIX.md §4). The boot script paints the SAME
+// derivation deriveTone applies, MINUS the async photo-luminance sample (a
+// boot script cannot sample a canvas synchronously): night → dark; wash →
+// light; photo + bright → light; photo + dim|normal → dark (the matrix §4
+// pre-sample default — a scrim keeps white text readable, and the provider
+// upgrades normal → auto post-mount once luminance is sampled). This MUST equal
+// deriveTone(theme, bg, dim, null) and the SSR default in app/layout.tsx so the
+// server HTML, the boot paint, and the first client render all agree (no FOUC,
+// no hydration mismatch) — and so the scripts/probe-theme-wave.mjs assertion
+// (expectTone === "dark" at the Photo+normal defaults) passes. The provider
+// reconciles to the true derived tone (incl. the luminance upgrade) within a
+// frame.
 //
 // WHY A STATIC STRING: the script is a frozen string constant with ZERO
 // interpolation, so there is no path for user/runtime data to reach
@@ -84,15 +86,16 @@ const THEME_INIT_SCRIPT = `(function () {
     if (["dim","normal","bright"].indexOf(dim) < 0) dim = "normal";
     d.dataset.dim = dim;
 
-    // ── DERIVED tone (safe non-flashing default; provider reconciles post-mount) ──
-    // Night forces dark even pre-mount; otherwise honor a stashed last-tone, else
-    // light (the least-flashing default — see file header).
+    // ── DERIVED tone — replicate deriveTone(theme,bg,dim,null) (see header +
+    // WAVE-2-VALUE-MATRIX.md §4). MUST match theme.tsx deriveTone, the SSR
+    // default in app/layout.tsx, and the probe. The async photo-luminance
+    // "normal → auto" upgrade is reconciled by the provider post-mount.
+    //   night → dark · wash → light · photo+bright → light · photo+(dim|normal) → dark
     var tone;
     if (t === "night") tone = "dark";
-    else {
-      var lt = ls.getItem("mycurricula:user:theme-last-tone");
-      tone = (lt === "light" || lt === "dark") ? lt : "light";
-    }
+    else if (b === "wash") tone = "light";
+    else if (dim === "bright") tone = "light";
+    else tone = "dark";
     d.dataset.tone = tone;
   } catch (e) {}
 })();`;

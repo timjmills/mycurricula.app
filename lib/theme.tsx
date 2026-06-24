@@ -489,19 +489,27 @@ export function ThemeProvider({
     const savedDim = readValidated(DIM_KEY, isThemeDim);
     if (savedDim !== null) setDim(savedDim);
     // Theme with the one-time v1 paper/cloud → clear remap. We also capture the
-    // RAW stored string at mount (rawThemeAtMount) — distinct from the migrated
-    // value — so the remote-sync race guard below can compare the live stored
-    // value against what was there at mount (an in-flight user change differs).
-    const rawThemeAtMount =
+    // RAW stored string at mount — distinct from the migrated/validated value —
+    // so the remote-sync race guard below can compare the live stored value
+    // against what was there at mount (an in-flight user change differs). The
+    // RAW string (not the validated form) is what matters: comparing against a
+    // validated value would mis-fire the guard if the stored string ever
+    // differs from its validated form (an invalid value, or a future
+    // remappable one like theme's paper→clear). style/palette use the same raw
+    // capture so the guard stays correct if they ever become remappable too.
+    const readRaw = (key: string): string | null =>
       typeof window === "undefined"
         ? null
         : (() => {
             try {
-              return window.localStorage.getItem(THEME_KEY);
+              return window.localStorage.getItem(key);
             } catch {
               return null;
             }
           })();
+    const rawThemeAtMount = readRaw(THEME_KEY);
+    const rawStyleAtMount = readRaw(STYLE_KEY);
+    const rawPaletteAtMount = readRaw(PALETTE_KEY);
     const savedTheme = readThemeMigrated();
     if (savedTheme !== null) setTheme(savedTheme);
 
@@ -536,14 +544,14 @@ export function ThemeProvider({
         if (
           remote.prefs.style !== undefined &&
           remote.prefs.style !== savedStyle &&
-          untouched(STYLE_KEY, savedStyle)
+          untouched(STYLE_KEY, rawStyleAtMount)
         ) {
           setStyle(remote.prefs.style);
         }
         if (
           remote.prefs.palette !== undefined &&
           remote.prefs.palette !== savedPalette &&
-          untouched(PALETTE_KEY, savedPalette)
+          untouched(PALETTE_KEY, rawPaletteAtMount)
         ) {
           setPalette(remote.prefs.palette);
         }

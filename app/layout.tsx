@@ -88,9 +88,11 @@ export default function RootLayout({
   // subsequent changes. data-theme is always a RESOLVED value (never the "system"
   // sentinel) — DEFAULT_THEME is "clear" (concrete), so the attribute below stays
   // correct; the boot script resolves a stored "system" to night/clear before it
-  // ever paints. data-tone is DERIVED: its server value matches the boot script's
-  // safe non-flashing default ("light") so server HTML == first client paint; the
-  // provider reconciles the true derived tone post-mount. data-palette is the
+  // ever paints. data-tone is DERIVED: its server value equals
+  // deriveTone("clear", DEFAULT_BG, DEFAULT_DIM, null) === "dark" (matrix §4
+  // pre-sample default for Photo+normal) and matches the boot script, so server
+  // HTML == boot == first client paint; the provider reconciles the true derived
+  // tone (incl. the normal→auto luminance upgrade) post-mount. data-palette is the
   // deprecated v1 compat axis, kept for the PaletteProvider bridge + v1 surfaces;
   // data-style is intentionally NOT emitted on the v2 DOM path.
   return (
@@ -109,7 +111,7 @@ export default function RootLayout({
       data-bg={DEFAULT_BG}
       data-theme="clear"
       data-dim={DEFAULT_DIM}
-      data-tone="light"
+      data-tone="dark"
       data-palette={DEFAULT_PALETTE}
       className={`${GeistSans.variable} ${GeistMono.variable} ${poppins.variable} ${dmSans.variable} ${jakarta.variable} ${quicksand.variable} ${caveat.variable} h-full antialiased`}
     >

@@ -162,13 +162,16 @@ export const DEFAULT_SUBJECT_MAPPING: SubjectMapping = {
 //   sel      subj-9 → subj-12 (teal)
 // math / reading / grammar / explorers are unchanged.
 //
-// CRITICAL — this map applies ONLY on the v2 read path. v2 callsites resolve it
-// through the PURE `resolveSubjectColor(subjectId, type, V2_SUBJECT_SLOTS)` and
-// assign the result to inline `--sc/--sct/--sci` on each card/lane. It is NEVER
-// fed into PaletteContext or a second PaletteProvider — doing so would re-emit
-// global `.cp-subj` rules with the v2 hues and recolor flag-OFF v1. Color
-// remains a derived slug (subjects.color stores e.g. "writing"); no lesson-row
-// data is migrated by this map.
+// STAGING NOTE — this map is DEFINED here but not yet wired to any live
+// callsite. No surface in this wave reads it: every current resolveSubjectColor
+// call resolves the v1 DEFAULT_SUBJECT_MAPPING (see palette.tsx). The map is
+// applied when a v2 subject-color read path lands in a LATER stage; that path
+// MUST resolve it through the PURE `resolveSubjectColor(subjectId, type,
+// V2_SUBJECT_SLOTS)` and assign the result to inline `--sc/--sct/--sci` on each
+// card/lane. It must NEVER be fed into PaletteContext or a second
+// PaletteProvider — doing so would re-emit global `.cp-subj` rules with the v2
+// hues and recolor flag-OFF v1. Color remains a derived slug (subjects.color
+// stores e.g. "writing"); no lesson-row data is migrated by this map.
 export const V2_SUBJECT_SLOTS: SubjectMapping = {
   math: "subj-1",
   ufli: "subj-2",
@@ -190,11 +193,11 @@ const SLOT_ID = /^subj-\d+$/;
  * Pure — usable on the server or outside React, and it NEVER reads
  * PaletteContext: the mapping is always an explicit argument. The flag-OFF v1
  * path reaches it via the `useSubjectColor` hook in `palette.tsx`, which wraps
- * it with the active PaletteContext (the v1 `DEFAULT_SUBJECT_MAPPING`). The v2
- * read path calls it DIRECTLY with the v2 map —
- * `resolveSubjectColor(subjectId, type, V2_SUBJECT_SLOTS)` — and assigns the
+ * it with the active PaletteContext (the v1 `DEFAULT_SUBJECT_MAPPING`). A future
+ * v2 read path will call it DIRECTLY with the v2 map —
+ * `resolveSubjectColor(subjectId, type, V2_SUBJECT_SLOTS)` — and assign the
  * result to inline `--sc/--sct/--sci`, so the v2 remap never touches context
- * and cannot recolor v1.
+ * and cannot recolor v1. (No such callsite exists yet — see V2_SUBJECT_SLOTS.)
  *
  * The returned values are CSS color EXPRESSIONS — `var(--token)` references
  * (for v1.3 slot swatches, so the night theme's token overrides flow through)
