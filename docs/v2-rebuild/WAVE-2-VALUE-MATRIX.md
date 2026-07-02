@@ -94,6 +94,13 @@ ignored, never painted).
 > supporting `canvas`/`veil`/`zoom` axes are runtime presentation state and are
 > not persisted as teacher preferences in this stage.
 >
+> **Non-axis key (W3.1):** `mycurricula:user:theme-updated-at` — epoch-ms stamp
+> of the last local write that CHANGED the synced triple (a user edit, or an
+> applied remote value; plain reloads, fresh-store default writes, and v1
+> migration rewrites never stamp). The local half of the last-writer-wins gate
+> on the theme-sync remote pull. Never validated, not in the SQL/boot lockstep;
+> tests/probes that seed axis keys must seed it too.
+>
 > **Migration is one-way and lossless for rollback:** the v1 keys are never
 > deleted, so a **git-level rollback** to the v1 build still finds the
 > teacher's original v1 values intact (the cutover is structural — there is no

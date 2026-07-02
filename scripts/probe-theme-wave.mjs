@@ -106,6 +106,11 @@ for (const t of THEMES) {
   await ctx.addInitScript((seed) => {
     try {
       localStorage.setItem("mycurricula:user:theme", seed);
+      // Seed the LWW stamp too (see KEY.stamp) so a remote row can't override.
+      localStorage.setItem(
+        "mycurricula:user:theme-updated-at",
+        String(Date.now() + 300000),
+      );
     } catch {}
   }, t.seed);
 
@@ -349,6 +354,21 @@ const KEY = {
   glass: "mycurricula:user:theme-glass",
   bg: "mycurricula:user:theme-bg",
   dim: "mycurricula:user:theme-dim",
+  // Local write stamp for the synced triple (W3.1 last-writer-wins). EVERY
+  // seed block must set this alongside the axis keys, or an authenticated
+  // run's remote teacher_preferences row out-times the seed and the provider
+  // re-applies the remote look after hydration (the pre-W3.1 exit-1: boot
+  // paints the seeded theme, hydration flips it back). Seeded as
+  // Date.now() + 5min: each case's heal-push rewrites the row with a SERVER
+  // updated_at, so a plain now() in the next case could lose under clock
+  // skew; the margin out-times it. Contexts are ephemeral — no leakage.
+  //
+  // ⚠ SIDE EFFECT on authenticated + NEXT_PUBLIC_THEME_SYNC=1 runs: those
+  // heal-pushes WRITE each seeded triple into the signed-in account's
+  // teacher_preferences row — after the run, the account's saved look is the
+  // last case's seed. Run against the QA/bypass account (never a real
+  // teacher's) or with sync off.
+  stamp: "mycurricula:user:theme-updated-at",
 };
 
 // Matrix §4 rules (first match wins): night→dark; glass=light→light; wash→light;
@@ -383,6 +403,7 @@ for (const c of TONE_CASES) {
         if (seed.glass) localStorage.setItem(keys.glass, seed.glass);
         if (seed.bg) localStorage.setItem(keys.bg, seed.bg);
         if (seed.dim) localStorage.setItem(keys.dim, seed.dim);
+        localStorage.setItem(keys.stamp, String(Date.now() + 300000));
       } catch {}
     },
     { keys: KEY, seed: c.seed },
@@ -457,6 +478,7 @@ for (const c of CORNER_CASES) {
         localStorage.setItem(keys.frame, seed.frame);
         localStorage.setItem(keys.glass, seed.glass);
         localStorage.setItem(keys.bg, seed.bg);
+        localStorage.setItem(keys.stamp, String(Date.now() + 300000));
       } catch {}
     },
     { keys: KEY, seed: c },
@@ -509,6 +531,10 @@ for (const theme of ["clear", "honey", "mint", "sky", "blossom"]) {
   await ctx.addInitScript((t) => {
     try {
       localStorage.setItem("mycurricula:user:theme", t);
+      localStorage.setItem(
+        "mycurricula:user:theme-updated-at",
+        String(Date.now() + 300000),
+      );
     } catch {}
   }, theme);
   const page = await ctx.newPage();
@@ -771,6 +797,7 @@ function recordPaint(axis, width, route, bg, ok, detail) {
           try {
             localStorage.setItem(keys.theme, theme);
             localStorage.setItem(keys.bg, "wash");
+            localStorage.setItem(keys.stamp, String(Date.now() + 300000));
           } catch {}
         },
         { keys: KEY, theme: "clear" },
@@ -840,6 +867,7 @@ function recordPaint(axis, width, route, bg, ok, detail) {
           localStorage.setItem(keys.theme, "clear");
           localStorage.setItem(keys.bg, "photo");
           localStorage.setItem(keys.dim, "normal");
+          localStorage.setItem(keys.stamp, String(Date.now() + 300000));
         } catch {}
       },
       { keys: KEY },

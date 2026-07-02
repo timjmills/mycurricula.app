@@ -212,6 +212,14 @@ const DIM_KEY = "mycurricula:user:theme-dim";
 // v1 keys — kept for the one-time migration shim + deprecated compat persistence.
 const STYLE_KEY = "mycurricula:user:theme-style";
 const PALETTE_KEY = "mycurricula:user:theme-palette";
+// Last LOCAL write stamp for the SYNCED v1 triple (epoch ms as a string). NOT an
+// axis key — never validated, not part of the SQL/boot lockstep. It is the local
+// half of the last-writer-wins gate on the remote pull (W3.1): written whenever
+// a persist actually CHANGES one of theme/style/palette, compared against the
+// remote row's updated_at before remote values are applied. Any test/probe that
+// seeds the axis keys directly must seed this too, or the remote row will
+// out-time the seed exactly like the pre-fix clobber.
+const THEME_STAMP_KEY = "mycurricula:user:theme-updated-at";
 
 // Per-photo auto-tone cache key prefix (NOT a lockstep axis key). The `normal`
 // AUTO path samples a photo's luminance once; we cache the derived tone keyed by
@@ -311,6 +319,16 @@ function writeKey(key: string, value: string): void {
     window.localStorage.setItem(key, value);
   } catch {
     // Swallow — quota or disabled-storage errors are non-fatal.
+  }
+}
+
+/** Raw, unvalidated read of a single key — null on SSR or storage failure. */
+function readKeyRaw(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
   }
 }
 
@@ -536,6 +554,51 @@ export function ThemeProvider({
       if (!active) return;
 
       if (remote.kind === "loaded") {
+        // LAST-WRITER-WINS gate (W3.1). The untouched() guard below only
+        // protects a change made WHILE this load was in flight; a change
+        // written just BEFORE the page load — a reload inside the save
+        // debounce, or a probe/test seeding the keys — reads as "untouched"
+        // and was silently clobbered by the stale remote row. The stamp is
+        // written by the persist effect on every real local change of the
+        // synced triple; a stamp at-or-after the row's updated_at means THIS
+        // device holds the fresher look — skip the apply, and re-push local
+        // (only when the values actually diverge) so the lost debounced write
+        // heals and other devices converge.
+        // CLOCK-SKEW DECISION (documented, accepted): localAt is client time,
+        // remote.updatedAt is server time, compared raw with no margin. Same-
+        // device sequences end value-EQUAL (our own save echoes back), so skew
+        // only decides ties between near-simultaneous edits on DIFFERENT
+        // devices — where either winner is acceptable. A margin would trade
+        // that for masking genuine cross-device recency; not worth it.
+        // (`trim()` guard: an empty/whitespace stamp would Number() to 0 and
+        // beat a missing updated_at tie — treat it as no stamp instead.)
+        const rawStamp = readRaw(THEME_STAMP_KEY);
+        const localAt =
+          rawStamp !== null &&
+          rawStamp.trim() !== "" &&
+          Number.isFinite(Number(rawStamp))
+            ? Number(rawStamp)
+            : Number.NEGATIVE_INFINITY;
+        if (localAt >= remote.updatedAt) {
+          const localTheme = readThemeMigrated();
+          const localStyle = readValidated(STYLE_KEY, isThemeStyle);
+          const localPalette = readValidated(PALETTE_KEY, isThemePalette);
+          const diverges =
+            (remote.prefs.theme !== undefined &&
+              remote.prefs.theme !== (localTheme ?? DEFAULT_THEME)) ||
+            (remote.prefs.style !== undefined &&
+              remote.prefs.style !== (localStyle ?? DEFAULT_STYLE)) ||
+            (remote.prefs.palette !== undefined &&
+              remote.prefs.palette !== (localPalette ?? DEFAULT_PALETTE));
+          if (diverges) {
+            void saveRemotePrefs({
+              theme: localTheme ?? DEFAULT_THEME,
+              style: localStyle ?? DEFAULT_STYLE,
+              palette: localPalette ?? DEFAULT_PALETTE,
+            });
+          }
+          return;
+        }
         const untouched = (key: string, atMount: string | null): boolean => {
           try {
             return window.localStorage.getItem(key) === atMount;
@@ -755,6 +818,46 @@ export function ThemeProvider({
 
     // Persist. Theme persists the SETTING (may be "system"). canvas/tone are NOT
     // persisted (tone is derived; canvas is runtime presentation state).
+    // Stamp the last local write that CHANGES the SYNCED triple (the
+    // theme-sync last-writer-wins gate) — read-before-write, so the hydration
+    // re-write of identical values never re-stamps. Three loads must NOT read
+    // as fresh local edits, or the stamp would block — and via the heal-push,
+    // CLOBBER — the teacher's remote look: a plain page load (stored value ===
+    // state), a FRESH store's default write (nothing stored + state still the
+    // default — initialization, not an edit), and a MIGRATION/NORMALIZATION
+    // rewrite (a v1 remnant like theme="paper" loads as "clear"; comparing the
+    // raw string would mis-read that plain reload as an edit — §4a finding).
+    // So `prev` is NORMALIZED exactly the way the load path reads it: theme
+    // through the v1 remap + guard, style/palette through their guards; an
+    // unrecognized prev degrades to the fresh-store rule.
+    const normTheme = (v: string | null): string | null =>
+      v === null
+        ? null
+        : isThemeSetting(v)
+          ? v
+          : v in V1_THEME_REMAP
+            ? V1_THEME_REMAP[v]
+            : null;
+    const normStyle = (v: string | null): string | null =>
+      v !== null && isThemeStyle(v) ? v : null;
+    const normPalette = (v: string | null): string | null =>
+      v !== null && isThemePalette(v) ? v : null;
+    const syncedEdited = (
+      prev: string | null,
+      value: string,
+      dflt: string,
+    ): boolean => (prev === null ? value !== dflt : prev !== value);
+    if (
+      syncedEdited(normTheme(readKeyRaw(THEME_KEY)), theme, DEFAULT_THEME) ||
+      syncedEdited(normStyle(readKeyRaw(STYLE_KEY)), style, DEFAULT_STYLE) ||
+      syncedEdited(
+        normPalette(readKeyRaw(PALETTE_KEY)),
+        palette,
+        DEFAULT_PALETTE,
+      )
+    ) {
+      writeKey(THEME_STAMP_KEY, String(Date.now()));
+    }
     writeKey(FRAME_KEY, frame);
     writeKey(GLASS_KEY, glass);
     writeKey(BG_KEY, bg);

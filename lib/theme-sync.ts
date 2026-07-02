@@ -48,7 +48,11 @@ export interface RemoteThemePrefs {
 /**
  * Outcome of a remote-preferences read, DISCRIMINATED so the caller can tell
  * three states apart that a bare `null` would conflate:
- *   • `loaded`      — a row exists; apply its (validated) axes.
+ *   • `loaded`      — a row exists; apply its (validated) axes. Carries the
+ *                     row's `updated_at` as epoch ms (`0` if absent/unparsable)
+ *                     so the provider can LAST-WRITER-WINS against the local
+ *                     write stamp — a stale row must never clobber a fresher
+ *                     local change (the W3.1 ordering fix).
  *   • `empty`       — the query SUCCEEDED and the teacher has no row yet. Safe to
  *                     SEED the row from local values (their pre-sync look).
  *   • `unavailable` — sync is off, there is no session, or the read FAILED. The
@@ -59,7 +63,7 @@ export interface RemoteThemePrefs {
  * "empty" (not an "unavailable") may trigger a seeding write.
  */
 export type LoadRemoteResult =
-  | { kind: "loaded"; prefs: Partial<RemoteThemePrefs> }
+  | { kind: "loaded"; prefs: Partial<RemoteThemePrefs>; updatedAt: number }
   | { kind: "empty" }
   | { kind: "unavailable" };
 
@@ -100,7 +104,7 @@ export async function loadRemotePrefs(): Promise<LoadRemoteResult> {
 
     const { data, error } = await supabase
       .from("teacher_preferences")
-      .select("theme, theme_style, theme_palette")
+      .select("theme, theme_style, theme_palette, updated_at")
       .eq("teacher_id", user.id)
       .maybeSingle();
 
@@ -117,7 +121,16 @@ export async function loadRemotePrefs(): Promise<LoadRemoteResult> {
     if (isThemeSetting(data.theme)) prefs.theme = data.theme;
     if (isThemeStyle(data.theme_style)) prefs.style = data.theme_style;
     if (isThemePalette(data.theme_palette)) prefs.palette = data.theme_palette;
-    return { kind: "loaded", prefs };
+    // updated_at is trigger-maintained so it is always present in practice; an
+    // absent/unparsable value degrades to 0 (epoch) — still newer than a device
+    // that has never written locally, still older than any real local stamp.
+    const updatedAtMs =
+      typeof data.updated_at === "string" ? Date.parse(data.updated_at) : NaN;
+    return {
+      kind: "loaded",
+      prefs,
+      updatedAt: Number.isFinite(updatedAtMs) ? updatedAtMs : 0,
+    };
   } catch (err) {
     // Network / client-construction / unexpected shape — sync is best-effort.
     console.debug("theme-sync: load error", err);
