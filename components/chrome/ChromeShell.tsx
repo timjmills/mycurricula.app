@@ -37,6 +37,7 @@ import { ChromeContext } from "./ChromeContext";
 import { ChromeClock } from "./ChromeClock";
 import { ChromeQuote } from "./ChromeQuote";
 import { CompactConsole, COMPACT_CONSOLE_ROUTES } from "./Console";
+import { ViewTitle } from "./ViewTitle";
 
 // §9b immersive surfaces — exactly Plan · Post · Teach (WAVE-3-PLAN R1).
 // Prefix match so nested routes (/planner/units, /post/wall-x) stay immersive.
@@ -45,14 +46,7 @@ const IMMERSIVE_PREFIXES = ["/planner", "/post", "/teach"] as const;
 /** Personal/Team belongs in the immersbar on Plan ONLY (bundle-verified). */
 const IMMERSIVE_MODESW_PREFIXES = ["/planner"] as const;
 
-export function ChromeShell({
-  children,
-  title,
-}: {
-  children: ReactNode;
-  /** W3.5 seam: the in-bar ViewTitle + style gear host (`.topbar-left`). */
-  title?: ReactNode;
-}): ReactNode {
+export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
   const pathname = usePathname();
   const router = useRouter();
   const { editMode } = useAppState();
@@ -84,6 +78,11 @@ export function ChromeShell({
   // branch below returns before this ever reaches those surfaces.
   const compactConsoleRoute = COMPACT_CONSOLE_ROUTES.includes(pathname);
 
+  // W3.5: the per-view title + style gear. Self-derives its title from the
+  // route (renders null on home + the untitled surfaces), so it can be handed
+  // to whichever bar is active. Fills the title slot the W3.3 shell reserved.
+  const viewTitle = <ViewTitle />;
+
   if (immersive) {
     const showModeSwitch = IMMERSIVE_MODESW_PREFIXES.some(
       (p) => pathname === p || pathname.startsWith(p + "/"),
@@ -91,7 +90,7 @@ export function ChromeShell({
     return (
       <div className="overlay immersive">
         <ImmersiveBar
-          title={title}
+          title={viewTitle}
           showModeSwitch={showModeSwitch}
           onBack={() => {
             // Contract (WAVE-3-PLAN R1): settle any in-flight soft swap so
@@ -116,7 +115,7 @@ export function ChromeShell({
 
   return (
     <div className="overlay">
-      <ChromeTopBar title={title} />
+      <ChromeTopBar title={viewTitle} />
       {/* Middle 1fr row — hosts the routed view. minHeight:0 so the view's
           own scroll container works inside the grid track (layout-only
           inline style, per the Tailwind/tokens split). The compact console
