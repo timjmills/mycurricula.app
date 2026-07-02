@@ -1118,7 +1118,9 @@
       transparent 100%
     );
   }
-  .immersbar.hidden {
+  /* Bundle uses `.hidden`; renamed to dodge Tailwind's display:none utility
+     (§4a finding #10 — recorded parity deviation, see ImmersiveBar.tsx). */
+  .immersbar.immersbar-hidden {
     opacity: 0;
     transform: translateY(-100%);
   }
@@ -1189,6 +1191,123 @@
     );
   }
 
+  /* ── W3.3 additive follow-ups the W3.3a/b passes missed (bundle-exact):
+     the ctx avatar dot, the ctx gear buttons, and the clock's done/empty
+     states — flagged by the component build; pure recipe additions. ──────── */
+  .ctx .cdot-av {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    overflow: hidden;
+    flex: 0 0 auto;
+    background: linear-gradient(
+      135deg,
+      var(--accent, var(--brand-500)),
+      color-mix(in oklab, var(--accent, var(--brand-500)) 55%, #1c1b2e)
+    );
+    color: #fff;
+    font-family: var(--font-display-sm);
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .ctx-gear {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.7;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    margin-left: 4px;
+  }
+  .ctx-gear:hover {
+    opacity: 1;
+    background: rgba(127, 127, 150, 0.16);
+    transform: rotate(40deg);
+    transition: transform 0.25s;
+  }
+  .ctx-gear svg {
+    width: 18px;
+    height: 18px;
+  }
+  .clock-done {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.62;
+    margin: 0 0 9px;
+  }
+  .clock-empty {
+    font-size: 12.5px;
+    opacity: 0.6;
+    padding: 4px 0;
+  }
+
+  /* ══ Team-mode caution glow (W3.3) — replaces the red MasterBanner ═══════
+     CLAUDE.md §2 + the bundle's own recipe (mockup CSS 268-282, ported
+     BYTE-FAITHFUL per the §4a design-fidelity rule; rgba(232,23,155,…) is
+     --subj-5-bright): a persistent pink edge-glow + a pulsing entry
+     (`teamflash` opacity dip ×2, motion-gated so reduced-motion renders it
+     SOLID), a pink ring on the mode-switch pill, and the Team segment
+     reading pink. ChromeShell mirrors editMode==="master" onto
+     <html data-mode="team">. MAPPING NOTE (recorded deviation): the bundle
+     draws the edge-glow on `.frame::after`; the app has no `.frame` element
+     — `.overlay` spans the same inset window, so the ::after lives there
+     (z-8, above the corner chips at z-7, pointer-events:none). Second
+     deviation for the §4b comparer: in the bundle the glow paints BENEATH
+     the overlay content (frame < overlay); here the 60px wash paints OVER
+     content — purely cosmetic (pointer-events:none), resolve if §4b flags
+     the read. */
+  .overlay::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--frame-radius, 30px);
+    pointer-events: none;
+    z-index: 8;
+    box-shadow:
+      inset 0 0 0 2px rgba(232, 23, 155, 0.62),
+      inset 0 0 60px rgba(232, 23, 155, 0.22);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  :root[data-mode="team"] .overlay::after {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :root[data-mode="team"] .overlay::after {
+      animation: teamflash 1s ease 2;
+    }
+  }
+  @keyframes teamflash {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
+  }
+  /* Mode switch glows pink + the Team segment reads pink when active. */
+  :root[data-mode="team"] .modesw {
+    box-shadow:
+      0 0 0 1.5px rgba(232, 23, 155, 0.5),
+      0 0 24px -6px rgba(232, 23, 155, 0.65),
+      0 10px 30px -16px rgba(12, 11, 20, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+  :root[data-mode="team"] .modesw-ib.team.active {
+    color: #e8179b;
+    text-shadow: 0 0 16px rgba(232, 23, 155, 0.55);
+  }
+
   /* ── Responsive (mockup breakpoints; §4 three-tier contract) ───────────── */
   @media (max-width: 760px) {
     .overlay {
@@ -1225,5 +1344,20 @@
     .views {
       flex-wrap: nowrap;
     }
+  }
+}
+
+/* ── Print (§4a finding #6) — outside the @media screen wrapper above, so it
+   actually applies on paper: the corner chrome is navigation/ambient UI and
+   must never reach print output (globals.css's print rules only suppress
+   header/aside; the botbar/quote/immersbar/glow would otherwise degrade to
+   stray in-flow text over the print templates). */
+@media print {
+  .topbar,
+  .botbar,
+  .hero-quote,
+  .immersbar,
+  .overlay::after {
+    display: none !important;
   }
 }

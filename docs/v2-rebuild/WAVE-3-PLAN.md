@@ -325,6 +325,24 @@ corrections are folded in — refuted claims dropped, adjusted wording used.
   headless inventory block. The Design System.html change is a stripped
   registration comment. WallBgControl ships 3 stock photos (p1–p3); the
   p1–p5 references elsewhere are page backgrounds.
+- **R11 — W3.3 gate record (§4a, 15 findings — 13 fixed, 2 dispositioned).**
+  Fixed in-wave: To-do/Shoutbox + search re-homed as interim `.iconbtn`s in
+  the tools cluster (they fold into the ToolsBar when it lands); undo/redo
+  keyboard moved to GlobalShortcuts (persistent buttons return with the W3.5+
+  chrome); TeamModeIntro remounted beside ModeSwitch; team glow re-ported
+  BYTE-FAITHFUL from the bundle's own recipe (268-282; `.frame::after` →
+  `.overlay::after` mapping recorded — the app has no `.frame` element);
+  botbar/quote route-gated to home/Day per the bundle; print suppression for
+  the corner chrome; Help gear wired to SHORTCUTS_TOGGLE_EVENT; `.hidden` →
+  `.immersbar-hidden` (Tailwind utility collision — parity deviation);
+  back() deep-link fallback; ResourcesPanel banner offset removed; qpop
+  aria-modal dropped (no trap = not modal); theme.tsx data-mode note updated.
+  DISPOSITIONED: (a) touch targets — modesw 42×34 / ib-exit 42×42 / ctx-gear
+  30×30 are bundle-faithful but under CLAUDE.md §4's ≥44px phone/tablet
+  minimum — bundle-vs-policy conflict FLAGGED UPSTREAM, §4b checklist item;
+  (b) the TopBar save-status indicator (audit MED-8) is deferred to W3.8's
+  autosave UX, recorded here so it isn't lost. INTERIM STATES documented in
+  code: SideNav stays until the W3.4 console; ToolsBar defers to its wave.
 - **R10 — Confirmed survivors.** W3.1 (no synced-key changes), W3.2 (the §9
   navigation contract is unchanged; FLIP/pane/modal animations are
   component-level; one wiring note — the immersbar Back settles pending

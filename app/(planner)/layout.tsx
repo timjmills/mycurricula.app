@@ -9,12 +9,11 @@ import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
   GlobalShortcuts,
   LastRouteRecorder,
-  MasterBanner,
   RightPanel,
   SideNav,
-  TopBar,
   UndoToastBridge,
 } from "@/components/shell";
+import { ChromeShell } from "@/components/chrome";
 import styles from "./layout.module.css";
 
 // Planner shell — the chrome shared by every primary view (Weekly, Daily,
@@ -85,11 +84,20 @@ export default function PlannerLayout({
                     completion / first fork / revert). Must sit inside BOTH
                     PlannerProvider and UndoToastProvider. */}
                     <UndoToastBridge />
-                    {/* v1.3 shell: an app-wide left SideNav (primary navigation,
-                    replacing the old top-bar tabs + icon rails) and a content
-                    column holding the Team-Curriculum banner, the slimmed top
-                    bar, and the body row (left filter panel + canvas + right
-                    panel). Teach is a separate route group with its own chrome. */}
+                    {/* W3.3 shell: the v2 corner-grammar chrome (ChromeShell —
+                    Framework §3 overlay grid: ChromeTopBar with brand +
+                    Personal/Team icon toggle + bell · routed content in the
+                    middle row · ctx BL + clock BR + quote bottom-center; with
+                    the §9b immersive branch for /planner /post /teach). It
+                    REPLACES the v1.3 TopBar and the red MasterBanner — team
+                    mode now signals via the pink [data-mode="team"] glow
+                    (CLAUDE.md §2), which ChromeShell mirrors onto <html>.
+                    The SideNav stays mounted INTERIM until the W3.4 console
+                    gives the corner grammar its own primary navigation (the
+                    corner grammar itself carries no nav). The content column
+                    is position:relative so the absolute .overlay grid fills
+                    exactly the area right of the SideNav. Teach remains a
+                    separate route group with its own chrome. */}
                     <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
                       <SideNav />
                       <div
@@ -97,29 +105,31 @@ export default function PlannerLayout({
                           flex: 1,
                           minWidth: 0,
                           minHeight: 0,
-                          display: "flex",
-                          flexDirection: "column",
+                          position: "relative",
                         }}
                       >
-                        {/* Team Curriculum mode heads-up → persistent banner. Renders
-                        only while the Team Curriculum edit mode (internal value:
-                        "master") is active; pins above the top bar. */}
-                        <MasterBanner />
-                        <TopBar />
-                        <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-                          <main
-                            id="main-content"
+                        <ChromeShell>
+                          <div
                             style={{
                               flex: 1,
-                              minWidth: 0,
                               minHeight: 0,
-                              overflow: "auto",
+                              display: "flex",
                             }}
                           >
-                            {children}
-                          </main>
-                          <RightPanel />
-                        </div>
+                            <main
+                              id="main-content"
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                minHeight: 0,
+                                overflow: "auto",
+                              }}
+                            >
+                              {children}
+                            </main>
+                            <RightPanel />
+                          </div>
+                        </ChromeShell>
                       </div>
                     </div>
                   </div>

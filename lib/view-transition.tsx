@@ -65,6 +65,17 @@ function settlePendingCommit(): void {
   }
 }
 
+/**
+ * Settle any in-flight soft-swap before a navigation this module did not
+ * initiate (history.back(), the immersive-bar Back, a hard location change).
+ * Without this, the pending update promise would ride until its timeout while
+ * the OTHER navigation commits under the held snapshot (W3.3 immersbar
+ * contract: "the Back button must settle any pending View Transition").
+ */
+export function settlePendingNavigation(): void {
+  settlePendingCommit();
+}
+
 /** True when the soft swap can run: API present AND motion is welcome. */
 function canViewTransition(): boolean {
   if (typeof document === "undefined") return false;

@@ -459,8 +459,10 @@ export function ThemeProvider({
   // <AppStateProvider> (which is mounted per route group), so the context is not
   // in scope at this level. Duplicating the forking state here would both
   // violate the single-source rule and crash at mount. The mode axis stays where
-  // app-state is available, exactly as the v2 reference sets data-mode on `.home`
-  // (a descendant), never on <html>.
+  // app-state is available. (Placement note: the v2 reference sets data-mode on
+  // `.home`; the W3.3 ChromeShell deliberately mirrors it onto <html> instead so
+  // the team glow reaches portals/overlays that render outside the shell — the
+  // OWNERSHIP split is what this note guarantees, not the node.)
 
   const [frame, setFrame] = useState<ThemeFrame>(initialFrame);
   const [glass, setGlass] = useState<ThemeGlass>(initialGlass);
