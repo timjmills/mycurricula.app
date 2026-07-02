@@ -849,15 +849,23 @@ export function ThemeProvider({
       value: string,
       dflt: string,
     ): boolean => (prev === null ? value !== dflt : prev !== value);
-    if (
+    // Did the SYNCED triple (theme/style/palette) actually change this run?
+    // The local stamp AND the remote push must key off the SAME condition.
+    // This mirror effect also fires for non-synced axes (frame/glass/bg/dim);
+    // a push triggered by one of those would write a fresh server updated_at
+    // WITHOUT bumping this device's stamp, so it would out-time (clobber) a
+    // genuine theme edit made on another device that this one hasn't pulled
+    // yet. Computed from the raw stored values BEFORE the writeKey calls below
+    // update them, so it reads "changed since last persisted". (Wave-3 audit.)
+    const tripleEdited =
       syncedEdited(normTheme(readKeyRaw(THEME_KEY)), theme, DEFAULT_THEME) ||
       syncedEdited(normStyle(readKeyRaw(STYLE_KEY)), style, DEFAULT_STYLE) ||
       syncedEdited(
         normPalette(readKeyRaw(PALETTE_KEY)),
         palette,
         DEFAULT_PALETTE,
-      )
-    ) {
+      );
+    if (tripleEdited) {
       writeKey(THEME_STAMP_KEY, String(Date.now()));
     }
     writeKey(FRAME_KEY, frame);
@@ -870,8 +878,10 @@ export function ThemeProvider({
     writeKey(PALETTE_KEY, palette);
 
     // Best-effort cross-device push (no-op unless NEXT_PUBLIC_THEME_SYNC=1).
+    // Gated on `tripleEdited` so every server write carries a matching local
+    // stamp (see the clobber note above) — never re-push an unchanged triple.
     // Still the v1 triple this stage (widening theme-sync is a later stage).
-    if (remoteSettledRef.current) {
+    if (remoteSettledRef.current && tripleEdited) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
         void saveRemotePrefs({ theme, style, palette });

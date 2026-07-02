@@ -1457,6 +1457,39 @@
       flex-wrap: nowrap;
     }
   }
+
+  /* ≥44px touch targets (CLAUDE.md §4 hard rule) on TOUCH pointers. The corner
+     controls render compact for a mouse (42×42 icon buttons, 42×34 mode
+     segments, 30×30 gears) but must meet the hit-area minimum on phone/tablet.
+     Scoped to `pointer: coarse` rather than a width cutoff so it (a) leaves the
+     desktop mouse look untouched and (b) also covers 768–900px tablets a
+     max-width:760px block would miss. min-width/height override the fixed
+     width/height (used size clamps up to the minimum) while place-items:center
+     keeps each glyph centered. The high-consequence Personal/Team toggle
+     (.modesw button, .modesw-ib) is included. (Wave-3 audit.) */
+  @media (pointer: coarse) {
+    .iconbtn,
+    .toolsbtn-circle,
+    .modesw-ib,
+    .ib-exit,
+    .backbtn,
+    .ctx-gear,
+    .homecog-btn,
+    .topbar-left .vt-cogbtn {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .modesw button {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      /* justify-content too: this rule (`.modesw button`, higher specificity
+         than the base `.modesw-ib`) also matches the icon-variant Personal/Team
+         buttons and flips them from grid to flex, so it must re-center on the
+         main axis or the icon shifts to the start edge. (Wave-3 re-audit.) */
+      justify-content: center;
+    }
+  }
 }
 
 /* ── Print (§4a finding #6) — outside the @media screen wrapper above, so it
