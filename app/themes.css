@@ -186,6 +186,19 @@
     }
   }
 
+  /* ── View Transitions (W3.2 / D4) — the soft route swap ──────────────────
+     lib/view-transition.tsx wraps App Router pushes in startViewTransition;
+     the UA's default ~250ms cross-fade IS the handoff's "content swaps on the
+     glass with a soft entrance" (Framework §9) — no custom keyframes needed.
+     The JS already skips the API under prefers-reduced-motion; this guard is
+     the CSS half so even an externally-started transition never animates. */
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation: none !important;
+    }
+  }
+
   /* ════════════════════════════════════════════════════════════════════════
      1 · STAGE — living background, swapped by [data-bg]
      ────────────────────────────────────────────────────────────────────────

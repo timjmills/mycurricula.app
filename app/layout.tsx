@@ -19,6 +19,7 @@ import {
   DEFAULT_PALETTE,
 } from "@/lib/theme";
 import { ThemeInit } from "@/lib/theme-init";
+import { RouteTransitionPulse } from "@/lib/view-transition";
 import { DEFAULT_STAGE_PHOTO } from "@/lib/stage-photo";
 import { LabelsProvider } from "@/lib/labels";
 import { InstanceLabelsProvider } from "@/lib/instance-labels";
@@ -160,6 +161,10 @@ export default function RootLayout({
             Night/Paper/Wash (or any non-default) choice does not flash the
             Glass · Photo · Clear default. See lib/theme-init.tsx. */}
         <ThemeInit />
+        {/* W3.2 (D4) — resolves the in-flight view-transition promise when a
+            route's DOM commits (pathname change). Render-null client leaf;
+            mounted ONCE here so soft swaps work across every route group. */}
+        <RouteTransitionPulse />
         <ThemeProvider initialTheme={DEFAULT_THEME}>
           {/* LabelsProvider hosts the renameable Subject/Unit/Lesson/Section
               captions. Mounted near the root so every surface — Settings,

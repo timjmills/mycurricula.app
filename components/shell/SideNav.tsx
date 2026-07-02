@@ -13,7 +13,11 @@
 // here now (removed from the top bar).
 
 import type { ReactNode } from "react";
-import Link from "next/link";
+// W3.2 (D4): every SideNav navigation is an in-app route swap, so all four
+// anchors upgrade to the soft view-transition swap via the drop-in alias —
+// plain-Link semantics (new tab, modified clicks) are preserved by
+// TransitionLink itself.
+import { TransitionLink as Link } from "@/lib/view-transition";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
