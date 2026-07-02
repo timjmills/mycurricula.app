@@ -1371,6 +1371,11 @@
       min-height: 44px;
       display: inline-flex;
       align-items: center;
+      /* justify-content too: this rule (`.modesw button`, higher specificity
+         than the base `.modesw-ib`) also matches the icon-variant Personal/Team
+         buttons and flips them from grid to flex, so it must re-center on the
+         main axis or the icon shifts to the start edge. (Wave-3 re-audit.) */
+      justify-content: center;
     }
   }
 }
