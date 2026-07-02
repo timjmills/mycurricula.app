@@ -746,9 +746,9 @@ planning_document.md` has a screen-by-screen section (§5) and the data model (�
 - **Do not import anything from `Documents/`.** It is reference material only.
 - **Do not break the forking model.** Don't make completion fork a lesson; don't let
   Personal edits silently write to Master; don't let Master be editable without the
-  explicit toggle + banner.
-- **Do not add confirm dialogs for entering Master mode** — the flashing/persistent
-  banner is the deliberate safety mechanism.
+  explicit toggle + Team caution glow.
+- **Do not add confirm dialogs for entering Master mode** — the pink Team caution
+  glow (`#E8179B`, see §2) is the deliberate safety mechanism.
 - **Do not assume a single grade level** anywhere in data or queries.
 - **Do not hard-code the school week** (the set of weekdays, or a 5-day assumption). It
   is chosen at setup; every calendar surface derives its day columns from it. Today's
