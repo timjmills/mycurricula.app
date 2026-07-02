@@ -1005,6 +1005,190 @@
     height: 1.25em;
   }
 
+  /* ══ 7.2.26 DELTA (W3.3b) — top-bar title host + immersive chrome ════════
+     Ported from the 7.2.26 BUNDLE's home.css section (the modular
+     source/home.css is STALE for the shell — WAVE-3-PLAN header caveat) +
+     the source/resource-wall.css immersbar override (one of the five
+     re-extracted files). Inert like the rest of this file: `.topbar-left`,
+     `.overlay.immersive`, `.immersbar*`, `.ib-exit`, and the `.viewwrap`/
+     `.view-titlebar`/`.vt-cogbtn` classes they reference have no markup
+     until W3.3/W3.5–W3.7 mount them. Dual-emit convention as above:
+     `[data-tone]` overrides carry both the app-root (`:root`) and the
+     mockup-host (`.home`) forms; structural `.home` rules port verbatim. */
+
+  /* View title parked next to the logo (the title + style gear no longer
+     live in the view body — Framework §3 update). */
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+  .topbar-left .view-titlebar {
+    margin: 0;
+    gap: 7px;
+    min-width: 0;
+  }
+  .topbar-left .view-title {
+    font-size: 23px !important;
+    line-height: 1;
+    padding-bottom: 0 !important;
+    border-bottom: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar-left .vt-cogbtn {
+    padding: 3px;
+  }
+  .topbar-left .vt-cogbtn svg {
+    width: 17px;
+    height: 17px;
+  }
+  /* VESTIGIAL in 7.2 (ported for bundle parity): the ViewTitle renders in
+     .topbar-left OUTSIDE .viewwrap, so this hides nothing — the real
+     edit-mode chrome change is bottom-row suppression (wired in W3.8b). */
+  .viewwrap.pb-editing .view-titlebar {
+    display: none;
+  }
+  /* Bundle-exact breakpoints for the in-bar title (720/480 — distinct from
+     the 760/420 blocks below; do not fold). Note `.brand .wm{display:none}`
+     is a 7.2 change to the EXISTING brand recipe: the wordmark yields to the
+     title on phone. */
+  @media (max-width: 720px) {
+    .topbar-left .view-title {
+      font-size: 18px !important;
+      max-width: 38vw;
+    }
+    .brand .wm {
+      display: none;
+    }
+  }
+  @media (max-width: 480px) {
+    .topbar-left {
+      gap: 8px;
+    }
+    .topbar-left .view-title {
+      max-width: 32vw;
+    }
+  }
+
+  /* ── Immersive chrome (Plan · Post · Teach) — content fills the whole
+     frame card; a single slim bar floats over the top (Framework §9b). ── */
+  .overlay.immersive {
+    padding: 0;
+    grid-template-rows: 1fr;
+    border-radius: var(--frame-radius, 30px);
+    overflow: hidden;
+  }
+  .home .frame.fullbleed ~ .overlay.immersive {
+    border-radius: 0;
+  }
+  .immersbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px clamp(16px, 2.2vw, 26px) 22px;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(8, 8, 16, 0.42) 0%,
+      rgba(8, 8, 16, 0.16) 52%,
+      transparent 100%
+    );
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
+  }
+  .immersbar > * {
+    pointer-events: auto;
+  }
+  :root[data-tone="light"] .immersbar,
+  .home[data-tone="light"] .immersbar {
+    background: linear-gradient(
+      to bottom,
+      rgba(248, 249, 252, 0.62) 0%,
+      rgba(248, 249, 252, 0.2) 52%,
+      transparent 100%
+    );
+  }
+  .immersbar.hidden {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  .immersbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .immersbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+  .ib-exit {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    background: rgba(255, 255, 255, 0.18);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    transition:
+      transform 0.15s,
+      background 0.15s;
+  }
+  :root[data-tone="light"] .ib-exit,
+  .home[data-tone="light"] .ib-exit {
+    color: var(--ink);
+    border-color: var(--border);
+    background: rgba(255, 255, 255, 0.66);
+  }
+  .ib-exit svg {
+    width: 21px;
+    height: 21px;
+  }
+  .ib-exit:hover {
+    transform: translateX(-2px);
+    background: rgba(255, 255, 255, 0.3);
+  }
+  /* Resource-wall immersbar scrim override (source/resource-wall.css:296) —
+     ported LAST to mirror the bundle's cascade, where this bare, equal-
+     specificity rule loads after the base above and therefore wins
+     EVERYWHERE the bundle shows an immersbar. Possible design accident
+     (wall-only intent?) — flagged in the plan; if design confirms wall-only,
+     W3.3's component pass scopes it to the wall surface. */
+  .immersbar {
+    background: linear-gradient(
+      to bottom,
+      rgba(12, 11, 20, 0.5) 0%,
+      rgba(12, 11, 20, 0.16) 54%,
+      transparent 100%
+    );
+  }
+  :root[data-tone="light"] .immersbar,
+  .home[data-tone="light"] .immersbar {
+    background: linear-gradient(
+      to bottom,
+      rgba(248, 249, 252, 0.8) 0%,
+      rgba(248, 249, 252, 0.34) 54%,
+      transparent 100%
+    );
+  }
+
   /* ── Responsive (mockup breakpoints; §4 three-tier contract) ───────────── */
   @media (max-width: 760px) {
     .overlay {
