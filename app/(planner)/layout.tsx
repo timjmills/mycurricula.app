@@ -92,9 +92,12 @@ export default function PlannerLayout({
                     REPLACES the v1.3 TopBar and the red MasterBanner — team
                     mode now signals via the pink [data-mode="team"] glow
                     (CLAUDE.md §2), which ChromeShell mirrors onto <html>.
-                    The SideNav stays mounted INTERIM until the W3.4 console
-                    gives the corner grammar its own primary navigation (the
-                    corner grammar itself carries no nav). The content column
+                    W3.4 landed the console (the /home landing + the compact
+                    view-nav atop Day/Week/Year); the SideNav stays mounted
+                    INTERIM as nav for the surfaces the console doesn't yet
+                    cover (Subject, Schedule, Catch-up, Archive, Boards,
+                    Settings) — it retires once those get their own homes. The
+                    corner grammar itself carries no nav. The content column
                     is position:relative so the absolute .overlay grid fills
                     exactly the area right of the SideNav. Teach remains a
                     separate route group with its own chrome. */}

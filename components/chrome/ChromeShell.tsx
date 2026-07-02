@@ -2,8 +2,11 @@
 
 // ChromeShell — W3.3: the v2 corner-grammar chrome host (Framework §3), with
 // the §9b immersive branch. Replaces the v1.3 TopBar + red MasterBanner in the
-// (planner) layout; the SideNav stays mounted OUTSIDE this shell until the
-// W3.4 console gives the corner grammar its own primary navigation.
+// (planner) layout. W3.4 adds the console (the /home landing + the compact
+// view-nav atop Day/Week/Year); the SideNav stays mounted OUTSIDE this shell
+// as INTERIM nav for the surfaces the console doesn't yet cover (Subject,
+// Schedule, Catch-up, Archive, Boards, Settings). Retiring it waits until
+// those surfaces get console/contextual homes (a later sub-wave).
 //
 // Two render modes, keyed by route (WAVE-3-PLAN W3.3):
 //   • CORNER (Day/Week/Year/Home …): the mockup's `.overlay` grid —
@@ -33,6 +36,7 @@ import { ImmersiveBar } from "./ImmersiveBar";
 import { ChromeContext } from "./ChromeContext";
 import { ChromeClock } from "./ChromeClock";
 import { ChromeQuote } from "./ChromeQuote";
+import { CompactConsole, COMPACT_CONSOLE_ROUTES } from "./Console";
 
 // §9b immersive surfaces — exactly Plan · Post · Teach (WAVE-3-PLAN R1).
 // Prefix match so nested routes (/planner/units, /post/wall-x) stay immersive.
@@ -75,6 +79,10 @@ export function ChromeShell({
   // Bundle scoping for the bottom chrome (see the render comment below).
   const botbarRoute = pathname === "/home" || pathname === "/daily";
   const quoteRoute = pathname === "/home";
+  // W3.4: the compact console (the slim view-nav variant) rides atop
+  // Day/Week/Year. Home renders the FULL console as its page; the immersive
+  // branch below returns before this ever reaches those surfaces.
+  const compactConsoleRoute = COMPACT_CONSOLE_ROUTES.includes(pathname);
 
   if (immersive) {
     const showModeSwitch = IMMERSIVE_MODESW_PREFIXES.some(
@@ -111,8 +119,11 @@ export function ChromeShell({
       <ChromeTopBar title={title} />
       {/* Middle 1fr row — hosts the routed view. minHeight:0 so the view's
           own scroll container works inside the grid track (layout-only
-          inline style, per the Tailwind/tokens split). */}
+          inline style, per the Tailwind/tokens split). The compact console
+          (W3.4) sits above the view on Day/Week/Year as their in-view
+          primary nav. */}
       <div style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
+        {compactConsoleRoute && <CompactConsole />}
         {children}
       </div>
       {/* Bottom chrome is ROUTE-SCOPED per the bundle (showBot fires on

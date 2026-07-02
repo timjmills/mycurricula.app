@@ -660,6 +660,118 @@
     margin-bottom: 8px;
   }
 
+  /* ── W3.4: console mounts + variants (additive; no appearance axis) ─────── */
+  /* The app mounts the console inside the .overlay grid's MIDDLE row (via the
+     routed <main>), not as a direct grid child, so `.center`'s grid
+     self-alignment can't reach it. This wrapper re-centers the home console
+     over the stage; the <main> above it owns the scroll. */
+  .cp-home-console {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(16px, 4vh, 48px) clamp(12px, 4vw, 40px);
+  }
+
+  /* The compact console — the slim view-nav variant riding atop Day/Week/Year
+     (same `.views.console` vocabulary, tightened). */
+  .cp-compact-console {
+    display: flex;
+    justify-content: center;
+    padding: clamp(10px, 1.6vw, 18px) 12px clamp(4px, 1vw, 10px);
+  }
+  .views.console.compact .view {
+    padding: clamp(9px, 1vw, 12px) clamp(16px, 2.2vw, 28px);
+    flex: 0 1 auto;
+  }
+  .views.console.compact .view .vw-word {
+    font-size: clamp(14px, 1.3vw, 16px);
+  }
+
+  /* Console entries are anchors (TransitionLink) — drop the UA underline. */
+  .views .view {
+    text-decoration: none;
+  }
+
+  /* Active-view cue — carried by the compact console (home never marks one;
+     home isn't a NAV destination). Reads clearly against the dark stage AND
+     stays distinct from the :hover wash (rgba .22) via a stronger fill + an
+     inset ring, not a 0.04-alpha nudge (§4a W3.4 finding #3). */
+  .views.console .view.active {
+    background: rgba(255, 255, 255, 0.34);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  }
+  :root[data-tone="light"] .views.console .view.active,
+  .home[data-tone="light"] .views.console .view.active {
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: inset 0 0 0 1px rgba(28, 27, 46, 0.12);
+  }
+
+  /* ── W3.4: /planner immersive Planning-Hub seam stub ───────────────────── */
+  .cp-planner-stub {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Top padding clears the absolutely-positioned .immersbar (z-40). */
+    padding: clamp(72px, 12vh, 120px) clamp(20px, 6vw, 64px)
+      clamp(24px, 6vh, 64px);
+    text-align: center;
+  }
+  .cp-planner-seam {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    max-width: 520px;
+  }
+  .cp-planner-glyph {
+    display: inline-grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: var(--r-xl);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+  }
+  .cp-planner-glyph svg {
+    width: 34px;
+    height: 34px;
+  }
+  .cp-planner-title {
+    font-family: var(--head-font, var(--font-display));
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-size: clamp(26px, 3.4vw, 40px);
+    line-height: 1.05;
+    margin: 0;
+  }
+  .cp-planner-lede {
+    font-size: clamp(15px, 1.5vw, 18px);
+    line-height: 1.5;
+    margin: 0;
+    opacity: 0.86;
+  }
+  .cp-planner-note {
+    font-size: clamp(13px, 1.2vw, 14px);
+    line-height: 1.5;
+    margin: 0;
+    opacity: 0.62;
+  }
+  :root[data-tone="dark"] .cp-planner-stub {
+    color: #fff;
+  }
+  :root[data-tone="dark"] .cp-planner-title {
+    text-shadow: 0 2px 24px rgba(12, 11, 20, 0.4);
+  }
+  :root[data-tone="light"] .cp-planner-stub {
+    color: var(--ink);
+  }
+  :root[data-tone="light"] .cp-planner-glyph {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.8);
+  }
+
   /* ── Inspirational quote (bottom-center) + context popup ───────────────── */
   .hero-quote {
     position: absolute;
@@ -1357,6 +1469,12 @@
   .botbar,
   .hero-quote,
   .immersbar,
+  /* The console (home landing + compact view-nav) is screen navigation —
+     its `.views`/`.view` styling lives in @media screen, so without this it
+     would degrade to bare "Day Week Year Plan" link text on paper (§4a
+     W3.4 finding #2). */
+  .cp-home-console,
+  .cp-compact-console,
   .overlay::after {
     display: none !important;
   }

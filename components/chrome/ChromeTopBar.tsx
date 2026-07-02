@@ -29,9 +29,8 @@
 //     concern — those waves compose it into `.tools` from their own hosts.
 //
 // Navigation: the brand links home via TransitionLink so the photo holds
-// while the content soft-swaps (the W3.2 View-Transitions contract).
-// TODO(W3.4): retarget href to "/home" once the landing console lands —
-// until then the default landing route is /weekly (CLAUDE.md §1).
+// while the content soft-swaps (the W3.2 View-Transitions contract). W3.4
+// retargets it to "/home" — the landing console now lives there.
 //
 // The glyph: the bundle's LOGO_SVG artwork, inlined. SideNav's BookGlyph
 // is module-private (not exported), so we carry our own copy following the
@@ -91,7 +90,7 @@ export function ChromeTopBar({ title }: ChromeTopBarProps): ReactNode {
             learn-once chrome, not a high-consequence control). */}
         <Tooltip content="Home" side="bottom" tooltipId="chrome-brand-home">
           <TransitionLink
-            href="/weekly"
+            href="/home"
             className="brand glass"
             aria-label="mycurricula.app home"
           >

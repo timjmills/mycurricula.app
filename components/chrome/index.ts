@@ -8,3 +8,5 @@ export { ModeSwitch } from "./ModeSwitch";
 export { ChromeContext } from "./ChromeContext";
 export { ChromeClock } from "./ChromeClock";
 export { ChromeQuote } from "./ChromeQuote";
+// W3.4 — the segmented view console (home landing + compact view-nav variant).
+export { HomeConsole, CompactConsole, COMPACT_CONSOLE_ROUTES } from "./Console";
