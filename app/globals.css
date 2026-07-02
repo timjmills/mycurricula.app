@@ -18,6 +18,12 @@
    token defaults. All of themes.css lives inside @media screen → print stays
    light (no stage/photo/glass float/glow on paper). */
 @import "./themes.css";
+/* v2 corner-grammar chrome (Wave 3) — the mockup's foreground-overlay recipes
+   (brand/tools/console/clock/ctx/quote/cog). New class vocabulary only: no
+   existing markup matches these selectors, so the layer is live-but-inert
+   until the W3.3/W3.4 chrome components mount (same landing pattern as
+   themes.css in Wave 2). Inside @media screen → print unaffected. */
+@import "./chrome.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
