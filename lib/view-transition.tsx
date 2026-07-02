@@ -136,7 +136,7 @@ export function useTransitionRouter(): { push: (href: string) => void } {
       // navigation's update promise resolves (the UA auto-skips its visual
       // transition when a new one starts).
       settlePendingCommit();
-      document.startViewTransition(() => {
+      const transition = document.startViewTransition(() => {
         let myResolve!: () => void;
         const committed = new Promise<void>((resolve) => {
           myResolve = resolve;
@@ -155,6 +155,15 @@ export function useTransitionRouter(): { push: (href: string) => void } {
         router.push(href);
         return Promise.race([committed, timeout]);
       });
+      // The UA REJECTS `.ready` (AbortError) whenever it skips a transition —
+      // which is exactly the expected case here: a second navigation started
+      // while one was in flight (settlePendingCommit above), or a duplicate
+      // view-transition-name. `.finished` can reject on the same skip. Neither
+      // is an error for us (the router.push inside the callback already ran),
+      // so swallow them explicitly; an unhandled rejection would otherwise
+      // spam the console on every rapid/interrupted nav and trip the QA gate.
+      transition.ready.catch(() => {});
+      transition.finished.catch(() => {});
     },
     [router],
   );
