@@ -236,7 +236,7 @@ export function WeeklyLessonCard({
   onSaveTarget,
   deck,
 }: WeeklyLessonCardProps) {
-  const { style } = useTheme();
+  const { style, frame } = useTheme();
   const color = useSubjectColor(lesson.subject);
 
   // BUG-006 — canonical resource source: derive resources from the planner
@@ -398,25 +398,60 @@ export function WeeklyLessonCard({
   // but only when combined with `overlay`.
   const isFloating = overlay;
 
+  // ── Frame material register (W3.6 · interpretation i) ──────────────────────
+  // The card SHELL adopts the active v2 frame's material; the forking cue,
+  // header/body structure, density modes, and every interaction stay identical
+  // (non-destructive re-skin — "scope unchanged + additions"). Tone-awareness is
+  // FREE: --paper/--surface/--ink* and the subject tokens already redefine under
+  // data-tone="dark" (tokens.css:1623), so the same color-mix expressions yield a
+  // frosted-WHITE card in light tone and a frosted-DARK card in dark tone, with
+  // the card's token-driven text flipping to stay legible — no per-element flip.
+  //   • paper  (Frame B, baseline) — today's look: opaque --paper root.
+  //   • glass  (Frame A, default)  — frosted translucent --paper + backdrop blur
+  //     + the signature inner top highlight (CLAUDE.md glass rule).
+  //   • color  (Frame C)           — a light subject-tint wash over --paper.
+  // The DragOverlay copy (isFloating) AND every compact chip (isCompact — the
+  // drag-collapsed state; during a drag ALL peers become chips) render opaque
+  // paper with NO backdrop blur: clearer while dragging, and it removes the
+  // backdrop-filter multiplication at the jank-critical moment (§4a perf review).
+  const frameSurface: CSSProperties =
+    isFloating || isCompact
+      ? { background: "var(--paper)" }
+      : frame === "glass"
+        ? {
+            // Frosted only on RESTING full cards (drag-time chips gated opaque
+            // above). §4b: measure resting-scroll FPS on a populated glass grid;
+            // if it janks, drop the blur radius or cap by visible-card count.
+            background: "color-mix(in oklab, var(--paper) 72%, transparent)",
+            backdropFilter: "blur(14px) saturate(1.2)",
+            WebkitBackdropFilter: "blur(14px) saturate(1.2)",
+          }
+        : frame === "color"
+          ? { background: `color-mix(in oklch, ${color.cl} 42%, var(--paper))` }
+          : { background: "var(--paper)" };
+
   const cardSurface: CSSProperties = {
     position: "relative",
-    // Both collapsed AND expanded cards keep a neutral (paper) root: the
-    // redesigned collapsed card is a "mini" of the expanded one, so it carries
-    // the SAME subtle subject-tinted header band over an off-white body rather
-    // than the old full-bleed sticky-note tint. The band (bandTint) and the
-    // body (`--surface`) supply the only color; the root stays paper in every
-    // style so the header/body zones read cleanly. Quiet/Calm unchanged.
-    background: "var(--paper)",
+    // The band (bandTint) and body supply the subject color; the root's fill is
+    // now the frame material above (was a flat `--paper` before W3.6). Frame B
+    // (paper) reproduces the prior neutral-root look exactly.
+    ...frameSurface,
     border: selected
       ? `1.5px solid ${color.stripe}`
-      : isVivid
-        ? `1px solid color-mix(in oklch, ${color.deep} 14%, transparent)`
-        : "1px solid var(--ink-150)",
+      : frame === "glass"
+        ? "1px solid color-mix(in oklab, var(--ink-900) 12%, transparent)"
+        : frame === "color"
+          ? `1px solid color-mix(in oklch, ${color.deep} 18%, transparent)`
+          : isVivid
+            ? `1px solid color-mix(in oklch, ${color.deep} 14%, transparent)`
+            : "1px solid var(--ink-150)",
     boxShadow: isFloating
       ? `var(--shadow-drag), 0 0 0 1.5px ${color.stripe}`
-      : hovered
-        ? "var(--shadow-drag-soft)"
-        : "var(--shadow-card)",
+      : frame === "glass"
+        ? `inset 0 1px 0 rgba(255, 255, 255, 0.5), ${hovered ? "var(--shadow-drag-soft)" : "var(--shadow-card)"}`
+        : hovered
+          ? "var(--shadow-drag-soft)"
+          : "var(--shadow-card)",
     transform: isFloating ? "rotate(-1.2deg)" : "none",
     cursor: "pointer",
     // Done cards recede but stay readable — a gentle fade with only a light
@@ -436,7 +471,15 @@ export function WeeklyLessonCard({
   // "subject-tinted header over off-white body" the same way collapsed and
   // expanded, which is the design contract for the redesigned card.
   const bandSeparatorColor = `color-mix(in oklch, ${color.stripe} 45%, transparent)`;
-  const bandTint = `color-mix(in oklch, ${color.cl} 72%, var(--surface))`;
+  // Header band tint — frame-aware (W3.6): color-forward gets a bolder subject
+  // fill; glass lets the frost show through a lighter translucent tint; paper
+  // keeps the subtle baseline. Tokens are tone-aware so all three adapt to dark.
+  const bandTint =
+    frame === "color"
+      ? `color-mix(in oklch, ${color.cl} 88%, var(--surface))`
+      : frame === "glass"
+        ? `color-mix(in oklch, ${color.cl} 40%, transparent)`
+        : `color-mix(in oklch, ${color.cl} 72%, var(--surface))`;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
