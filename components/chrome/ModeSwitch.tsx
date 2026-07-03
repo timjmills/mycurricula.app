@@ -102,7 +102,11 @@ export function ModeSwitch(): ReactNode {
 
   return (
     <div
-      className="modesw modesw-icon glass"
+      // `modesw-fork` marks THIS as the Personal/Team fork toggle — the ONLY
+      // `.modesw` the pink Team-caution glow may attach to. Other `.modesw`
+      // pills (the W3.6 View↔Edit toggle) share the base recipe but must never
+      // glow, or the app's single safety signal (CLAUDE.md §2/§6) is diluted.
+      className="modesw modesw-fork modesw-icon glass"
       role="group"
       aria-label="Editing mode — Personal or Team Curriculum"
     >

@@ -1575,8 +1575,12 @@
       opacity: 0.3;
     }
   }
-  /* Mode switch glows pink + the Team segment reads pink when active. */
-  :root[data-mode="team"] .modesw {
+  /* Mode switch glows pink + the Team segment reads pink when active.
+     SCOPED to `.modesw-fork` (the Personal/Team toggle) on purpose: the W3.6
+     View↔Edit toggle reuses the base `.modesw` recipe but must NOT glow — the
+     pink caution glow is the team-edit safety signal, not decoration (CLAUDE.md
+     §2/§6). Do not relax this back to a bare `.modesw` selector. */
+  :root[data-mode="team"] .modesw.modesw-fork {
     box-shadow:
       0 0 0 1.5px rgba(232, 23, 155, 0.5),
       0 0 24px -6px rgba(232, 23, 155, 0.65),
@@ -1658,6 +1662,49 @@
          main axis or the icon shifts to the start edge. (Wave-3 re-audit.) */
       justify-content: center;
     }
+  }
+
+  /* ── W3.6 · `.va-ph` period-rail legibility (inert-ready) ───────────────────
+     The period/time rail (leftmost gutter of the Frame-A period×day grid) that
+     CONSUMES these rules lands in W3.8c (the "period-aligned column board" the
+     plan already scopes for Week EDIT). Per W3.6's "ADD `.va-ph` legibility"
+     directive, the recipe is staged now and stays a set of dead selectors until
+     that grid renders — the same inert-CSS pattern used elsewhere this wave
+     (plan §W3.3b / line 94). Ported from the 7.2.26 bundle (base :880, overrides
+     :4285-4290), DUAL-SCOPED `:root` (app-wide chrome host) + `.home` (mockup
+     home scope) per this file's header convention, and branching only on the
+     existing derived/appearance axes (`data-tone` / `data-bg` / `data-dim`) — so
+     it touches nothing on the 5-surface appearance allowlist (lockstep-safe). */
+  .va-ph {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    opacity: 0.6;
+    font-variant-numeric: tabular-nums;
+    padding-right: 6px;
+    text-align: right;
+  }
+  /* Dark tone → near-white (legibility contract: branch on tone, never theme). */
+  :root[data-tone="dark"] .va-ph,
+  .home[data-tone="dark"] .va-ph {
+    color: rgba(255, 255, 255, 0.86);
+    opacity: 0.96;
+  }
+  /* Over a photo that is NOT brightened → pure white + dark glow for contrast. */
+  :root[data-bg="photo"]:not([data-dim="bright"]) .va-ph,
+  .home[data-bg="photo"]:not([data-dim="bright"]) .va-ph {
+    color: #fff;
+    opacity: 1;
+    text-shadow: 0 1px 9px rgba(0, 0, 0, 0.7);
+  }
+  /* Brightened photo → soft ink + light glow (overrides the pure-white above). */
+  :root[data-bg="photo"][data-dim="bright"] .va-ph,
+  .home[data-bg="photo"][data-dim="bright"] .va-ph {
+    color: var(--ink-soft);
+    opacity: 0.92;
+    text-shadow: 0 1px 8px rgba(255, 255, 255, 0.7);
   }
 }
 

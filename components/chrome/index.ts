@@ -10,5 +10,7 @@ export { ChromeClock } from "./ChromeClock";
 export { ChromeQuote } from "./ChromeQuote";
 // W3.5 — the per-view title + style gear (mounted by ChromeShell's title slot).
 export { ViewTitle } from "./ViewTitle";
+// W3.6 — the Day/Week View↔Edit toggle (mounted in the top bar's `.tools` slot).
+export { ViewEditToggle } from "./ViewEditToggle";
 // W3.4 — the segmented view console (home landing + compact view-nav variant).
 export { HomeConsole, CompactConsole, COMPACT_CONSOLE_ROUTES } from "./Console";

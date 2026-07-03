@@ -38,6 +38,7 @@ import { ChromeClock } from "./ChromeClock";
 import { ChromeQuote } from "./ChromeQuote";
 import { CompactConsole, COMPACT_CONSOLE_ROUTES } from "./Console";
 import { ViewTitle } from "./ViewTitle";
+import { ViewEditToggle } from "./ViewEditToggle";
 
 // §9b immersive surfaces — exactly Plan · Post · Teach (WAVE-3-PLAN R1).
 // Prefix match so nested routes (/planner/units, /post/wall-x) stay immersive.
@@ -83,6 +84,12 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
   // to whichever bar is active. Fills the title slot the W3.3 shell reserved.
   const viewTitle = <ViewTitle />;
 
+  // W3.6: the View↔Edit toggle mounts in the top bar's `.tools` cluster on
+  // Day + Week ONLY (bundle-verified — the immersive bar never hosts it). Its
+  // `cc_editmode` map is keyed by view name; INERT until W3.8c wires the
+  // rendering split.
+  const showViewEdit = pathname === "/daily" || pathname === "/weekly";
+
   if (immersive) {
     const showModeSwitch = IMMERSIVE_MODESW_PREFIXES.some(
       (p) => pathname === p || pathname.startsWith(p + "/"),
@@ -115,7 +122,14 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
 
   return (
     <div className="overlay">
-      <ChromeTopBar title={viewTitle} />
+      <ChromeTopBar
+        title={viewTitle}
+        tools={
+          showViewEdit ? (
+            <ViewEditToggle view={pathname === "/daily" ? "Day" : "Week"} />
+          ) : undefined
+        }
+      />
       {/* Middle 1fr row — hosts the routed view. minHeight:0 so the view's
           own scroll container works inside the grid track (layout-only
           inline style, per the Tailwind/tokens split). The compact console

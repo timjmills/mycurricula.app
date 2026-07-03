@@ -25,8 +25,12 @@
 //   • `title` — the W3.5 ViewTitle + per-view style-gear host. Rendered
 //     verbatim inside `.topbar-left` after the brand; nothing else is
 //     mounted there yet (W3.5 wires the actual ViewTitle component).
-//   • The View↔Edit toggle mount point (Day/Week only) is a W3.6/W3.7
-//     concern — those waves compose it into `.tools` from their own hosts.
+//   • `tools` — the W3.6 View↔Edit toggle mount point (Day/Week only).
+//     Rendered as the FIRST child of `.tools`, ahead of the Personal/Team
+//     ModeSwitch (bundle `.tools` order: [View/Edit] → [Personal/Team] →
+//     [ToolsBar] → [NotifBell]). ChromeShell decides whether to pass it; a
+//     non-Day/Week route passes nothing and the cluster is byte-identical to
+//     its pre-W3.6 shape.
 //
 // Navigation: the brand links home via TransitionLink so the photo holds
 // while the content soft-swaps (the W3.2 View-Transitions contract). W3.4
@@ -77,11 +81,21 @@ export interface ChromeTopBarProps {
    * bundle renders the title only when a view is open).
    */
   title?: ReactNode;
+  /**
+   * The leading `.tools` slot — the W3.6 View↔Edit toggle (Day/Week only).
+   * Rendered as the FIRST child of `.tools`, immediately before the
+   * Personal/Team ModeSwitch (bundle order). Omit on every other route.
+   */
+  tools?: ReactNode;
 }
 
-export function ChromeTopBar({ title }: ChromeTopBarProps): ReactNode {
-  const { todoPanelOpen, commentsPanelOpen, toggleTodoPanel, toggleCommentsPanel } =
-    useAppState();
+export function ChromeTopBar({ title, tools }: ChromeTopBarProps): ReactNode {
+  const {
+    todoPanelOpen,
+    commentsPanelOpen,
+    toggleTodoPanel,
+    toggleCommentsPanel,
+  } = useAppState();
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -117,6 +131,10 @@ export function ChromeTopBar({ title }: ChromeTopBarProps): ReactNode {
             keyboard-only and the To-do/Shoutbox right-panel views are
             unreachable. They use the bundle's .iconbtn recipe and yield to
             the ToolsBar when it lands (the bundle folds these into it). */}
+        {/* W3.6 View↔Edit toggle mount point — first in `.tools` (bundle
+            order), ahead of the Personal/Team ModeSwitch. Present only on
+            Day/Week; ChromeShell passes undefined elsewhere. */}
+        {tools}
         <ModeSwitch />
         {/* First-switch Team-mode explainer (W2-B1 safety layer 1) — fires
             once, anchored under the toggle; reads editMode itself. Kept
