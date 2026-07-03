@@ -1167,13 +1167,22 @@
      the 760/420 blocks below; do not fold). Note `.brand .wm{display:none}`
      is a 7.2 change to the EXISTING brand recipe: the wordmark yields to the
      title on phone. */
+  /* Wordmark yields to the title so the top bar fits. Raised from the bundle's
+     ≤720 to ≤900: the app's right-side tools cluster (Personal/Team + search +
+     to-do + shoutbox + bell) is wider than the bundle's, so brand-wordmark +
+     ViewTitle + tools overflow the bar across the whole tablet range — this was
+     a 21px document horizontal-scroll at 768 (W3.5 audit BUG-1, §4 hard rule).
+     Hiding the wordmark reclaims ~140px; the glyph + title still identify the
+     bar. Above 900 there is ample room and the wordmark returns. */
+  @media (max-width: 900px) {
+    .brand .wm {
+      display: none;
+    }
+  }
   @media (max-width: 720px) {
     .topbar-left .view-title {
       font-size: 18px !important;
       max-width: 38vw;
-    }
-    .brand .wm {
-      display: none;
     }
   }
   @media (max-width: 480px) {
