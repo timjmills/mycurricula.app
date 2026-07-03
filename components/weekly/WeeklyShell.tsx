@@ -121,6 +121,7 @@ import { WeeklyList } from "@/components/list";
 import { ScheduleTimeline } from "@/components/schedule";
 import { WeeklyViewControls } from "./WeeklyViewControls";
 import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
+import { WeekColumns } from "./WeekColumns";
 import { useAppState } from "@/lib/app-state";
 import {
   WeeklyScheduleProvider,
@@ -128,6 +129,7 @@ import {
 } from "@/lib/weekly-schedule-state";
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
+import { useTheme } from "@/lib/theme";
 import { buildWeeklyLink, type WeeklyLink } from "@/lib/deep-links";
 import { CURRENT_WEEK } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
@@ -556,6 +558,11 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   } = useAppState();
   const { lessons, activeGradeId } = usePlanner();
   const router = useRouter();
+  // W3.6 — the v2 frame axis picks the Week GRID traversal (see
+  // renderGridPanel): Frame B (paper) reads the week as day columns
+  // (WeekColumns, the bundle's "WeekB"); glass/color keep the subject×day
+  // matrix (WeeklyGrid), whose card shell already re-skins per frame.
+  const { frame } = useTheme();
 
   // Inline schedule-mode state (Subject↔Schedule + Lessons-only↔All). Lives
   // in localStorage so a teacher's choice survives across sessions. The
@@ -1123,10 +1130,19 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           // WeeklyList replaces the grid but occupies the same 1fr slot
           // so the splitter and rail math are unaffected.
           <WeeklyList />
+        ) : frame === "paper" ? (
+          /* W3.6 — Frame B (paper) reads the week as DAY COLUMNS (the
+             bundle's "WeekB"). Same planner data, same rich card (so the
+             material register + forking cue carry over), different
+             traversal. Narrow/schedule/list precedence above is untouched:
+             ≤900px still falls to WeeklyList regardless of frame. */
+          <WeekColumns />
         ) : (
-          /* WeeklyGrid renders untouched in the center slot. The outer slot
-             wrapper already carries min-width: 0 so the grid can shrink
-             gracefully when the rail grows. */
+          /* Frames A (glass) + C (color): the subject×day matrix. WeeklyGrid
+             renders untouched in the center slot; its card shell already
+             re-skins per frame (commit 2). The outer slot wrapper already
+             carries min-width: 0 so the grid can shrink gracefully when the
+             rail grows. */
           <WeeklyGrid />
         )}
       </div>

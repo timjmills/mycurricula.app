@@ -10,3 +10,6 @@ export type { SaveTargetDialogProps } from "./save-target-dialog";
 // the existing <WeeklyGrid> unchanged in the center slot and reuses the
 // Daily-view IconRail + RightRail + PaneSplitter.
 export { WeeklyShell, DRAWER_MQ } from "./WeeklyShell";
+// The Frame-B day-column traversal of the Week view — one column per school
+// day, each a vertical stack of that day's lessons across all subjects.
+export { WeekColumns } from "./WeekColumns";
