@@ -27,6 +27,15 @@
 .navbar {
   display: flex;
   align-items: center;
+  /* RESPONSIVE-AUDIT F3: wrap the header row on narrow tiers. The title +
+     Grid/List/Schedule toggle + prev/next/today nav are a single flex row; when
+     the weekly canvas is only ~227px wide (phone, beside the rails) a nowrap row
+     pushed the toggle and week-nav off into the grid's internal horizontal
+     scroll, so they were reachable only by sideways-scrolling. Wrapping stacks
+     them onto extra lines so every control stays on-screen. Only wraps when the
+     row can't fit; no effect at desktop width. Mirrors `.controls` (the
+     view-controls toggle) which already wraps. */
+  flex-wrap: wrap;
   gap: 14px;
   padding: 14px 22px;
   background: var(--paper);
