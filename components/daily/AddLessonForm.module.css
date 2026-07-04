@@ -164,6 +164,15 @@
   color: var(--faint);
 }
 
+/* Create-failure line (W3.7 audit #3) — mirrors AddEventForm's .errorMsg:
+   the catch-up red (--catchup) is the nearest semantic "error" color in
+   tokens.css. */
+.errorMsg {
+  font-size: var(--t-11);
+  color: var(--catchup);
+  margin: 0;
+}
+
 /* ── Action row ───────────────────────────────────────────────────────── */
 
 .actions {

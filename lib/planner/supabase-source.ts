@@ -1513,7 +1513,12 @@ export const plannerSupabaseSource: PlannerDataSource = {
       day_of_week: dayIndexToWeekday(input.day, week),
       title: input.title,
       directions: null,
-      learning_objectives: [] as string[],
+      // W3.7 audit #5 — objective rides in the INSERT so the row lands
+      // atomically (the prior post-create editLesson tee could fail silently
+      // and strand the lesson without its objective). Same column + coercion
+      // as updateLesson's authored branch: `learning_objectives` via
+      // objectiveToObjectives (empty/omitted → []).
+      learning_objectives: objectiveToObjectives(input.objective ?? ""),
       notes: null,
       resources: [] as LessonResource[],
       standards: [] as string[],

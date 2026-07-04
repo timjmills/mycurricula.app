@@ -1760,3 +1760,109 @@
     animation: none;
   }
 }
+
+/* ── W3.7 — dashed add-lesson row (bundle .vb-railadd / .vc-aadd) ─────── */
+/* Rendered as the LAST child of the day panel's lesson-list region on the
+   paper + color frames (DailyView.renderDayPanel); one-click create, no
+   form. Recipe values are byte-faithful to the bundle (~6121/6256).
+   Class DOUBLED (.addLessonRow.addLessonRow) so the `.cp-root button`
+   (0,1,1) reset can't strip padding/border/background from a single-class
+   module rule (the tokens.css button-reset trap).
+   ACCENT = the chrome tier's --chrome-accent — never raw --brand-*
+   (CLAUDE.md §4) — so every theme re-hues the hover itself. */
+.addLessonRow.addLessonRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: 1.5px dashed var(--border);
+  background: none;
+  border-radius: var(--r-md);
+  padding: 10px 13px;
+  margin-top: 3px;
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 12.5px;
+  transition:
+    background 0.16s,
+    border-color 0.16s,
+    color 0.16s;
+}
+
+.addLessonRow.addLessonRow:hover {
+  background: color-mix(in oklab, var(--chrome-accent) 9%, transparent);
+  border-style: solid;
+  border-color: var(--chrome-accent);
+  color: var(--chrome-accent);
+}
+
+/* In-flight (disabled + aria-busy) — the beat between the click and the
+   data source resolving. Quiet the affordance; drop the pointer cue. */
+.addLessonRow.addLessonRow:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Transient create-failure line (W3.7 audit #3) — rendered adjacent to the
+   dashed row when the one-click create resolves null; auto-clears after
+   ~6s. Same recipe as the daily forms' .errorMsg: the catch-up red
+   (--catchup) is the nearest semantic "error" color in tokens.css. */
+.addLessonRowError {
+  font-size: var(--t-11);
+  color: var(--catchup);
+  margin: 4px 2px 0;
+}
+
+/* "+" badge (bundle .rplus). */
+.addLessonRowPlus {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--chrome-accent) 14%, transparent);
+  color: var(--chrome-accent);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Dark-tone override — dual-scope, the YearConstellation.module.css idiom:
+   the app-wide chrome host keys tone on :root[data-tone], the /home mock
+   host on .home[data-tone]. Literal white-alpha values are byte-faithful
+   to the bundle's dark recipe (they intentionally sit outside the token
+   set, like the bundle's own dark chrome). */
+:global(:root[data-tone="dark"]) .addLessonRow.addLessonRow,
+:global(.home[data-tone="dark"]) .addLessonRow.addLessonRow {
+  border-color: rgba(255, 255, 255, 0.26);
+  color: rgba(255, 255, 255, 0.82);
+}
+:global(:root[data-tone="dark"]) .addLessonRow.addLessonRow:hover,
+:global(.home[data-tone="dark"]) .addLessonRow.addLessonRow:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+}
+:global(:root[data-tone="dark"]) .addLessonRowPlus,
+:global(.home[data-tone="dark"]) .addLessonRowPlus {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+/* ≥44px hit area on coarse pointers (CLAUDE.md §4 touch-target floor) —
+   the 10px vertical padding lands ~40px with a mouse, which is fine for
+   fine pointers but short of the touch floor. */
+@media (pointer: coarse) {
+  .addLessonRow.addLessonRow {
+    min-height: 44px;
+  }
+}
+
+/* Reduced motion — the hover recolor transition is decorative; snap it. */
+@media (prefers-reduced-motion: reduce) {
+  .addLessonRow.addLessonRow {
+    transition: none;
+  }
+}

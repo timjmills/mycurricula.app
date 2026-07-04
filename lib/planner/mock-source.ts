@@ -316,6 +316,7 @@ export const plannerMockSource: PlannerDataSource = {
       week: number;
       day: number;
       title: string;
+      objective?: string;
     },
     _ownerId: string,
     _gradeLevelId?: string,
@@ -332,7 +333,9 @@ export const plannerMockSource: PlannerDataSource = {
       subject: input.subject,
       unit: input.unit,
       title: input.title,
-      objective: "",
+      // W3.7 audit #5 — objective rides in the create (no post-create edit
+      // tee); the one-click flow passes none → "".
+      objective: input.objective ?? "",
       preview: "",
       directions: "",
       notes: "",

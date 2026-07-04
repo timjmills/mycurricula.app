@@ -121,6 +121,10 @@ import {
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { useDayHoliday, useHolidaysByDay } from "@/lib/use-day-holiday";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
+// W3.7 — the v2 frame axis gates the dashed add-lesson row below (paper +
+// color frames only); the WeeklyShell grid-traversal branch (:565) is the
+// precedent for reading it here.
+import { useTheme } from "@/lib/theme";
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -366,6 +370,9 @@ interface LessonRowProps {
   collapsed: boolean;
   onSelect: (id: string) => void;
   onToggleComplete: (id: string, next: LessonStatus) => void;
+  /** W3.7 — force-open the daily planner for this lesson (double-click /
+   *  Shift+Enter). Routed to DailyView's openLessonPlanner seam. */
+  onOpenPlanner: (id: string) => void;
 }
 
 function LessonRow({
@@ -374,6 +381,7 @@ function LessonRow({
   collapsed,
   onSelect,
   onToggleComplete,
+  onOpenPlanner,
 }: LessonRowProps): ReactNode {
   // Catalog-migrated: subject metadata now comes from the planner store's
   // catalog (frozen API), not the lib/mock SUBJECT_BY_ID map. Safe here —
@@ -412,6 +420,11 @@ function LessonRow({
   }
 
   function handleCheckKey(e: React.KeyboardEvent): void {
+    // W3.7 audit #6 — Shift+Enter is the row's planner-open chord (see
+    // handleRowKeyDown below); return WITHOUT preventDefault/stopPropagation
+    // so it bubbles to the row handler. Consuming it here broke the chord
+    // whenever the checkbox held focus.
+    if (e.shiftKey && e.key === "Enter") return;
     if (e.key === " " || e.key === "Enter") {
       e.preventDefault();
       e.stopPropagation();
@@ -419,11 +432,51 @@ function LessonRow({
     }
   }
 
+  // W3.7 — double-click force-opens the daily planner (WeekColumns'
+  // handleWrapperDoubleClick ~855-858 is the precedent). Guard: the row's
+  // MAIN select button is the canonical dblclick surface (a teacher
+  // double-clicks the title/subject area), so it passes; every OTHER
+  // interactive child (drag handle, checkbox, future inputs) keeps its own
+  // single-click semantics and never force-opens.
+  function handleRowDoubleClick(e: React.MouseEvent<HTMLDivElement>): void {
+    const target = e.target as HTMLElement | null;
+    const interactive = target?.closest(
+      "button, a, input, textarea, select, [contenteditable]",
+    );
+    if (
+      interactive instanceof HTMLElement &&
+      !interactive.classList.contains(styles.lessonRowSelectBtn)
+    ) {
+      return;
+    }
+    e.stopPropagation();
+    onOpenPlanner(lesson.id);
+  }
+
+  // Keyboard parity (WeekColumns ~863-869): plain Enter keeps each child's
+  // own behavior (select / check / drag-lift), Shift+Enter is reserved for
+  // the planner open. Skip the drag handle — dnd-kit's keyboard sensor also
+  // lifts on Enter there, and one keystroke must never both lift and open.
+  function handleRowKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    if (e.key !== "Enter" || !e.shiftKey) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest(`.${styles.lessonDragHandle}`)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onOpenPlanner(lesson.id);
+  }
+
   return (
     <div
       ref={setNodeRef}
       style={sortableStyle}
       role="listitem"
+      // W3.7 — dblclick/Shift+Enter open the planner; the row root carried
+      // no title before this (the drag handle + fork dot own theirs), so
+      // the hint attaches cleanly without clobbering anything.
+      onDoubleClick={handleRowDoubleClick}
+      onKeyDown={handleRowKeyDown}
+      title="Double-click to open the daily planner"
       // data-planner-item enables scrollPlannerItemIntoView to locate this
       // row after a store mutation (edit, completion, undo, redo).
       data-planner-item={`lesson:${lesson.id}`}
@@ -871,9 +924,22 @@ export function DailyView({
   // are immediately reflected in the left pane list and right pane detail.
   // `hydration` gates the deep-link resolver below: under the Supabase flag the
   // doc arrives async, so the resolver must tell "still settling" from "loaded
-  // and the id genuinely isn't there".
-  const { lessons, setLessonStatus, lastChange, subjectById, hydration } =
-    usePlanner();
+  // and the id genuinely isn't there". `subjects` + `addLesson` feed the W3.7
+  // one-click dashed add row (subject fallback + the real create mutator).
+  const {
+    lessons,
+    setLessonStatus,
+    lastChange,
+    subjectById,
+    subjects,
+    hydration,
+    addLesson,
+  } = usePlanner();
+
+  // W3.7 — the v2 frame axis. Paper + color frames render the dashed
+  // add-lesson row at the end of the day panel's list; the glass frame keeps
+  // the header "+" button as its sole add affordance (unchanged visuals).
+  const { frame } = useTheme();
 
   // ── Per-teacher row order (local + localStorage, NOT the shared doc) ──
   // Keyed by week+day. Initialised EMPTY rather than from localStorage: the
@@ -1048,6 +1114,29 @@ export function DailyView({
   const [addLessonOpen, setAddLessonOpen] = useState(false);
   const [addEventOpen, setAddEventOpen] = useState(false);
 
+  // W3.7 — in-flight flag for the ONE-CLICK dashed add row. True from click
+  // until the store's addLesson resolves; the row disables (aria-busy) so a
+  // double-click can never create two lessons.
+  const [addingLesson, setAddingLesson] = useState(false);
+
+  // W3.7 audit #3 — transient create-failure message for the dashed row
+  // (addLesson → null). The dashed row has no form to hold an inline error,
+  // so the message renders adjacent to it and auto-clears after ~6s. The
+  // timeout lives in a ref so a second failure replaces (not stacks) the
+  // timer, and unmount cleanup can cancel it.
+  const [quickAddError, setQuickAddError] = useState<string | null>(null);
+  const quickAddErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  useEffect(() => {
+    // Unmount-only cleanup — never let the auto-clear fire on a dead tree.
+    return () => {
+      if (quickAddErrorTimerRef.current !== null) {
+        clearTimeout(quickAddErrorTimerRef.current);
+      }
+    };
+  }, []);
+
   // Narrow-mode pane choice — CSS decides whether this matters (it is inert
   // on wide viewports). "list" shows the lesson list; "detail" the right
   // pane. Selecting a lesson swaps to "detail"; "← Back" returns to "list".
@@ -1153,6 +1242,74 @@ export function DailyView({
     },
     [setLessonStatus],
   );
+
+  // ── Planner-open seam (W3.7) ──────────────────────────────────────────
+  // The ONE named entry point for "open this lesson in the daily planner":
+  // dblclick / Shift+Enter on a lesson row, and both add-lesson flows after
+  // a successful create. Today "open" means the existing selection path
+  // (select + swap the narrow pane to detail) — that IS the current Day
+  // layout's planner surface.
+  // TODO(W3.8b): point at the Day-edit split pane / fill-in template when it
+  // lands (WAVE-3-PLAN W3.8b openPlan).
+  const openLessonPlanner = useCallback(
+    (lessonId: string): void => {
+      handleSelectLesson(lessonId);
+    },
+    [handleSelectLesson],
+  );
+
+  // ── One-click add lesson (W3.7, bundle .vb-railadd/.vc-aadd) ─────────
+  // The dashed row at the end of the day panel creates a blank lesson in ONE
+  // click — no form. Subject defaults to the day's first lesson's subject
+  // (the likeliest continuation), else the catalog's first subject in the
+  // app's canonical order. Await-then-select: the store resolves the REAL
+  // source-minted id before anything is selected, so the planner never opens
+  // on a phantom row (see planner-store's addLesson for why no optimism).
+  const handleQuickAddLesson = useCallback(async (): Promise<void> => {
+    if (addingLesson) return; // in-flight guard — never double-create
+    const subject = dayLessons[0]?.subject ?? subjects[0]?.id;
+    if (!subject) return; // catalog not settled yet (backend hydrate)
+    setAddingLesson(true);
+    // A fresh attempt clears the previous failure message (audit #3).
+    if (quickAddErrorTimerRef.current !== null) {
+      clearTimeout(quickAddErrorTimerRef.current);
+      quickAddErrorTimerRef.current = null;
+    }
+    setQuickAddError(null);
+    try {
+      const created = await addLesson({
+        subject,
+        week,
+        day: selectedDay,
+        title: "New lesson",
+      });
+      // null → the source rejected/failed; the store already console.debug'd.
+      // W3.7 audit #3 — surface it: with no form to hold the draft, a silent
+      // null read as "the click did nothing". Show the transient error line
+      // next to the dashed row; auto-clear after ~6s.
+      if (created) {
+        openLessonPlanner(created.id);
+      } else {
+        setQuickAddError(
+          "Couldn’t add the lesson — check your connection and try again.",
+        );
+        quickAddErrorTimerRef.current = setTimeout(() => {
+          quickAddErrorTimerRef.current = null;
+          setQuickAddError(null);
+        }, 6000);
+      }
+    } finally {
+      setAddingLesson(false);
+    }
+  }, [
+    addingLesson,
+    dayLessons,
+    subjects,
+    addLesson,
+    week,
+    selectedDay,
+    openLessonPlanner,
+  ]);
 
   // ── Reorder helpers ───────────────────────────────────────────────────
   // Reordering writes the new id sequence to local state + localStorage
@@ -1355,6 +1512,7 @@ export function DailyView({
                   collapsed={collapsedAll}
                   onSelect={handleSelectLesson}
                   onToggleComplete={handleToggleComplete}
+                  onOpenPlanner={openLessonPlanner}
                 />
               ))}
             </SortableContext>
@@ -1397,6 +1555,48 @@ export function DailyView({
                 body="Add a lesson with the + button above, or check a different day on the week strip."
               />
             </div>
+          )}
+
+          {/* ── W3.7 dashed add-lesson row (bundle .vb-railadd/.vc-aadd,
+                ~6121/6256) ─────────────────────────────────────────────
+                Paper + color frames only — glass keeps the header "+"
+                button as its sole add affordance, byte-identical. Last
+                child of the lesson-list region (after the sortable rows /
+                empty state, above Today's Events). ONE-CLICK create →
+                select via the openLessonPlanner seam; disabled while the
+                source round-trip is in flight so a double-click can never
+                mint two lessons. */}
+          {(frame === "paper" || frame === "color") && (
+            <>
+              <Tooltip
+                content="Add a lesson to this day — creates a blank lesson you can fill in"
+                tooltipId="daily-add-lesson-row"
+                side="top"
+              >
+                <button
+                  type="button"
+                  className={styles.addLessonRow}
+                  onClick={() => void handleQuickAddLesson()}
+                  disabled={addingLesson}
+                  aria-busy={addingLesson}
+                  title="Add a lesson to this day — creates a blank lesson you can fill in"
+                >
+                  <span className={styles.addLessonRowPlus} aria-hidden="true">
+                    +
+                  </span>
+                  Add lesson
+                </button>
+              </Tooltip>
+              {/* W3.7 audit #3 — transient create-failure line. The one-click
+                    row has no form to hold an inline error, so a failed
+                    create (addLesson → null) surfaces here and auto-clears
+                    after ~6s. role="alert" so screen readers announce it. */}
+              {quickAddError && (
+                <p className={styles.addLessonRowError} role="alert">
+                  {quickAddError}
+                </p>
+              )}
+            </>
           )}
 
           {/* Today's Events section — stub add affordance (Phase 1A). */}
@@ -1722,6 +1922,9 @@ export function DailyView({
         onClose={() => setAddLessonOpen(false)}
         week={week}
         day={selectedDay}
+        // W3.7 — a successful create opens the new lesson through the same
+        // seam the dashed row and dblclick use.
+        onCreated={openLessonPlanner}
       />
       <AddEventForm
         open={addEventOpen}
