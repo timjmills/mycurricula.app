@@ -276,7 +276,15 @@ export function WeekColumns(): ReactNode {
   // pointerWithin returns nothing for keyboard drags (no pointer).
   const collisionDetection = useCallback<CollisionDetection>((args) => {
     const hits = pointerWithin(args);
-    return hits.length > 0 ? hits : closestCenter(args);
+    if (hits.length > 0) return hits;
+    // No pointer hit. closestCenter (rect-center comparison) is only a correct
+    // fallback for KEYBOARD drags, which have no pointer position — there it is
+    // the single collision signal available. For a POINTER drag a miss means the
+    // cursor is over an inter-column gap / blank canvas / outside a lane; falling
+    // back to closestCenter there would snap the drop to a NEIGHBORING day (a
+    // wrong-day move + spurious undo entry — audit High #1). Return [] so `over`
+    // is null and the drop cancels instead.
+    return args.pointerCoordinates ? [] : closestCenter(args);
   }, []);
 
   // ── Lifted archive-undo toast (terminal audit, archive High #2) ───────────
@@ -611,7 +619,13 @@ export function WeekColumns(): ReactNode {
           key={archiveToast.key}
           lessonTitle={archiveToast.title}
           onUndo={() => unarchiveLesson(archiveToast.id)}
-          onDismiss={() => setArchiveToast(null)}
+          // Generation-safe: a stale exit timer from a SUPERSEDED toast must not
+          // null out the current one. Only clear if the dismissing toast is still
+          // the one on screen (audit toast-race fix; belt-and-suspenders with the
+          // exit-timer cleanup inside ArchiveToast).
+          onDismiss={() =>
+            setArchiveToast((t) => (t?.key === archiveToast.key ? null : t))
+          }
         />
       )}
     </div>

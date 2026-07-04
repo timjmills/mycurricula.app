@@ -628,8 +628,12 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // Filter once per (lessons, week) change so the right rail's
   // ResourcesPanel sees a stable array identity until something actually
   // moves into / out of the week.
+  // Archived lessons are excluded: WeekColumns hides them from the lanes, so
+  // they must also vanish from every shell surface fed by this list (right
+  // rail, selected-lesson lookup, drawer, deep-link scroll) — otherwise a
+  // lesson archived while selected lingers in the rail/URL (audit Medium).
   const weekLessons = useMemo<Lesson[]>(
-    () => lessons.filter((l) => l.week === week),
+    () => lessons.filter((l) => l.week === week && l.archived !== true),
     [lessons, week],
   );
 
@@ -661,6 +665,41 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
         : null,
     [selectedLessonId, weekLessons],
   );
+
+  // A selection that BECOMES archived is cleared. weekLessons now excludes
+  // archived lessons, so selectedLesson resolves null — but the drawer opens
+  // on `selectedLessonId !== null` (below), which would hold it open on a
+  // lesson no visible weekly surface still shows (audit Medium). Two scopes:
+  //  • archived only (checked against the FULL store list) — a selection that
+  //    merely left the visible week (cross-week navigation) is untouched;
+  //  • TRANSITION only (false→true while selected) — WeeklyList deliberately
+  //    shows archived rows, and its row click sets the selection then pushes
+  //    /daily; clearing an already-archived selection in that same flush
+  //    would strand the /daily handoff without its focused lesson (review
+  //    Low #1). Mirrors WeekColumns' archived-transition watcher.
+  const prevSelectedArchivedRef = useRef<{
+    id: string;
+    archived: boolean;
+  } | null>(null);
+  useEffect(() => {
+    const prev = prevSelectedArchivedRef.current;
+    if (selectedLessonId === null) {
+      prevSelectedArchivedRef.current = null;
+      return;
+    }
+    const sel = lessons.find((l) => l.id === selectedLessonId);
+    const archived = sel?.archived === true;
+    prevSelectedArchivedRef.current = { id: selectedLessonId, archived };
+    if (
+      archived &&
+      prev !== null &&
+      prev.id === selectedLessonId &&
+      !prev.archived
+    ) {
+      setSelectedLessonId(null);
+      prevSelectedArchivedRef.current = null;
+    }
+  }, [selectedLessonId, lessons, setSelectedLessonId]);
 
   // ── Deep link READ — apply `initialLink` once on mount ────────────────
   // The lesson card to container-scroll once the target week's grid has
