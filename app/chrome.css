@@ -42,6 +42,17 @@
     grid-template-rows: auto 1fr auto;
     padding: clamp(18px, 2.4vw, 34px);
   }
+  /* Grid items default to min-width:auto, so a row whose content is
+     intrinsically wide (the Daily dock's rail/panel row measures ~1600px
+     min-content) refuses to shrink to the track and — because .overlay is
+     absolutely positioned — widens the DOCUMENT instead (457px of page
+     h-scroll at 1440 on /daily; W3.6 close-out audit). min-width:0 lets
+     every row shrink to the overlay's width so the view's own internal
+     scrollers do their job. Covers both the corner grid and
+     .overlay.immersive, whose routed children are direct grid items too. */
+  .overlay > * {
+    min-width: 0;
+  }
   .home .frame.fullbleed ~ .overlay {
     --frame-inset: 0px;
   }
