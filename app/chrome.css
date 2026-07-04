@@ -1206,6 +1206,39 @@
     .topbar-left .view-title {
       max-width: 32vw;
     }
+    /* Task #12 (RESPONSIVE-AUDIT F1): collapse the right `.tools` cluster to fit
+       the phone viewport. It measured 408px on Day/Week (with the View/Edit pill)
+       and 304px on Home against a ~320px budget, forcing a 147px / 43px document
+       horizontal-scroll (§4 hard rule) on /home, /weekly (all frames), and
+       /daily's shared chrome. Shed by VALUE — every essential and safety control
+       stays: Search (⌘K palette), the Personal/Team ModeSwitch (`.modesw-fork`,
+       the #E8179B caution control), and the NotificationBell. Dropped at ≤480:
+       the INERT View/Edit toggle (`.modesw-icon`, non-functional until W3.8b) and
+       the two secondary panel toggles (To-dos, Team Shoutbox). All three return
+       ≥481px; a future `.toolspop` overflow menu can restore the panels on phone
+       if wanted. NOTE: the Personal/Team ModeSwitch shares `.modesw-icon` (its
+       class is `modesw modesw-fork modesw-icon`), so the View/Edit toggle is
+       targeted as `.modesw-icon:not(.modesw-fork)` — the safety `.modesw-fork`
+       control is deliberately kept. The To-dos / Shoutbox buttons are matched by
+       a stable `data-tool` hook (NOT their `aria-label`) so a copy change to the
+       accessible name can't silently reintroduce the overflow. */
+    .tools .modesw-icon:not(.modesw-fork),
+    .tools .iconbtn[data-tool="todos"],
+    .tools .iconbtn[data-tool="team-shoutbox"] {
+      display: none;
+    }
+  }
+
+  /* Task #12 (cont.): the 481–540px band. Above the ≤480 phone rule the full
+     cluster is restored but still overflows by up to ~49px until it fits at
+     540 — the unnamed gap between the phone (≤480) and tablet (≥600) tiers
+     (real phone-landscape / small-tablet widths). Reclaim just the INERT
+     View/Edit pill (~104px) here — enough to clear the band — while To-dos and
+     Team Shoutbox stay reachable at these widths. */
+  @media (min-width: 481px) and (max-width: 540px) {
+    .tools .modesw-icon:not(.modesw-fork) {
+      display: none;
+    }
   }
 
   /* ══ W3.5 — the per-view title + style gear (ViewTitle) ═══════════════════

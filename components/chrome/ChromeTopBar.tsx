@@ -176,6 +176,7 @@ export function ChromeTopBar({ title, tools }: ChromeTopBarProps): ReactNode {
           <button
             type="button"
             className="iconbtn"
+            data-tool="todos"
             aria-label="To-dos"
             aria-pressed={todoPanelOpen}
             onClick={toggleTodoPanel}
@@ -206,6 +207,7 @@ export function ChromeTopBar({ title, tools }: ChromeTopBarProps): ReactNode {
           <button
             type="button"
             className="iconbtn"
+            data-tool="team-shoutbox"
             aria-label="Team Shoutbox"
             aria-pressed={commentsPanelOpen}
             onClick={toggleCommentsPanel}
