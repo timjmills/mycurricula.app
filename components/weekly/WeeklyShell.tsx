@@ -122,6 +122,11 @@ import { ScheduleTimeline } from "@/components/schedule";
 import { WeeklyViewControls } from "./WeeklyViewControls";
 import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
 import { WeekColumns } from "./WeekColumns";
+// W3.8 — the lesson-editor popup + the context that carries its opener down
+// to every WeeklyLessonCard (grid, columns, and board parents alike — see
+// the seam note in weekly-lesson-card.tsx).
+import { LessonModal } from "@/components/lesson-editor";
+import { OpenLessonEditorContext } from "./weekly-lesson-card";
 import { useAppState } from "@/lib/app-state";
 import {
   WeeklyScheduleProvider,
@@ -557,6 +562,21 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
     toggleCommentsPanel,
   } = useAppState();
   const { lessons, activeGradeId } = usePlanner();
+
+  // ── W3.8 — lesson-editor modal state ─────────────────────────────────
+  // The shell owns which lesson (if any) is open in the full-editor popup.
+  // The opener travels DOWN via <OpenLessonEditorContext> (provided around
+  // the whole body below) so every WeeklyLessonCard — under WeeklyGrid,
+  // WeekColumns, or the board — reaches it without per-parent prop
+  // threading. The modal renders ONCE, inside this shell root, so
+  // PlannerProvider / useAppState are in scope for its store calls.
+  const [modalLessonId, setModalLessonId] = useState<string | null>(null);
+  const openLessonEditor = useCallback((id: string): void => {
+    setModalLessonId(id);
+  }, []);
+  const closeLessonEditor = useCallback((): void => {
+    setModalLessonId(null);
+  }, []);
   const router = useRouter();
   // W3.6 — the v2 frame axis picks the Week GRID traversal (see
   // renderGridPanel): Frame B (paper) reads the week as day columns
@@ -907,15 +927,24 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // ── Esc key — clear the lesson selection so the Resources panel reverts
   //    to the week aggregate. Listens on the document so it fires even when
   //    focus is inside the grid or the rail.
+  //
+  //    W3.8 innermost-first guard: while the lesson-editor modal is open,
+  //    Esc belongs to the modal (its window-level listener closes it) —
+  //    this document listener runs FIRST (document before window) and used
+  //    to ALSO deselect on the same keypress, collapsing the expanded card
+  //    and unmounting the "Open in editor" opener before the modal's
+  //    focus-restore could target it (the gate's Esc-falls-to-body bug).
+  //    Skipping while the modal is open keeps one Esc = one close.
   useEffect(() => {
     const handleKeyDown = (e: globalThis.KeyboardEvent): void => {
+      if (modalLessonId !== null) return;
       if (e.key === "Escape" && selectedLessonId !== null) {
         setSelectedLessonId(null);
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [selectedLessonId, setSelectedLessonId]);
+  }, [modalLessonId, selectedLessonId, setSelectedLessonId]);
 
   // ── Column drag handlers ──────────────────────────────────────────────
   const handleColumnDragStart = useCallback((e: DragStartEvent): void => {
@@ -1249,23 +1278,26 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   };
 
   return (
-    <div className={styles.page}>
-      {/* ── aria-live region: column reorder announcements ───────────────
+    /* W3.8 — the provider sits at the very top of the shell tree so every
+       card parent (grid slot, columns, drawer) can reach the opener. */
+    <OpenLessonEditorContext.Provider value={openLessonEditor}>
+      <div className={styles.page}>
+        {/* ── aria-live region: column reorder announcements ───────────────
           A visually hidden polite live region — when a panel moves
           (mouse, touch, or keyboard) we write the new order into it so
           screen-readers hear the change. Always in DOM so the live
           attribute is observed from the start. */}
-      <div
-        id={columnAnnounceRegionId}
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className={styles.srOnly}
-      >
-        {columnAnnouncement}
-      </div>
+        <div
+          id={columnAnnounceRegionId}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className={styles.srOnly}
+        >
+          {columnAnnouncement}
+        </div>
 
-      {/* ── Single shared week row ──────────────────────────────────────
+        {/* ── Single shared week row ──────────────────────────────────────
           The Weekly view's only header chrome. The former "Weekly View"
           title band was removed; this <WeekNavigator> is lifted here (out
           of the per-canvas renders) so exactly ONE instance exists and it
@@ -1275,81 +1307,81 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           toggle stays reachable in every mode — the schedule timeline has
           no navigator of its own, so a per-canvas toggle would vanish in
           schedule mode and trap the teacher there. */}
-      <WeekNavigator
-        week={week}
-        currentWeek={CURRENT_WEEK}
-        minWeek={minWeek}
-        maxWeek={maxWeek}
-        onChange={setWeek}
-        headingLevel="h1"
-        actions={<WeeklyViewControls isNarrow={isNarrow} />}
-      />
+        <WeekNavigator
+          week={week}
+          currentWeek={CURRENT_WEEK}
+          minWeek={minWeek}
+          maxWeek={maxWeek}
+          onChange={setWeek}
+          headingLevel="h1"
+          actions={<WeeklyViewControls isNarrow={isNarrow} />}
+        />
 
-      {/* ── Body row: icon rail (fixed) + reorderable grid/rail body ───── */}
-      <div className={styles.bodyRow}>
-        {/* Far-left slim icon nav strip — shared with Daily. */}
-        <IconRail />
+        {/* ── Body row: icon rail (fixed) + reorderable grid/rail body ───── */}
+        <div className={styles.bodyRow}>
+          {/* Far-left slim icon nav strip — shared with Daily. */}
+          <IconRail />
 
-        {/* The reorderable + resizable body. The grid template is computed
+          {/* The reorderable + resizable body. The grid template is computed
             from columnOrder + effectiveRailWidth above so it re-evaluates
             when the teacher reorders or resizes a panel. */}
-        <div
-          ref={bodyRef}
-          className={styles.body}
-          style={{ gridTemplateColumns: gridTemplate }}
-        >
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleColumnDragStart}
-            onDragEnd={handleColumnDragEnd}
-            onDragCancel={handleColumnDragCancel}
+          <div
+            ref={bodyRef}
+            className={styles.body}
+            style={{ gridTemplateColumns: gridTemplate }}
           >
-            <SortableContext
-              items={columnOrder}
-              strategy={horizontalListSortingStrategy}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleColumnDragStart}
+              onDragEnd={handleColumnDragEnd}
+              onDragCancel={handleColumnDragCancel}
             >
-              {columnOrder.map((id, i) => {
-                const render = PANEL_RENDERERS[id];
-                // Build a unique CSS class per panel id so its inner
-                // chrome keeps its existing look regardless of position.
-                const slotClass =
-                  id === "rail" ? styles.railSlot : styles.gridSlot;
-                return (
-                  <Fragment key={id}>
-                    <SortablePanel id={id} className={slotClass}>
-                      {(grip) => render(grip)}
-                    </SortablePanel>
-                    {/* Splitter sits between this panel and the next; the
+              <SortableContext
+                items={columnOrder}
+                strategy={horizontalListSortingStrategy}
+              >
+                {columnOrder.map((id, i) => {
+                  const render = PANEL_RENDERERS[id];
+                  // Build a unique CSS class per panel id so its inner
+                  // chrome keeps its existing look regardless of position.
+                  const slotClass =
+                    id === "rail" ? styles.railSlot : styles.gridSlot;
+                  return (
+                    <Fragment key={id}>
+                      <SortablePanel id={id} className={slotClass}>
+                        {(grip) => render(grip)}
+                      </SortablePanel>
+                      {/* Splitter sits between this panel and the next; the
                         last panel has no trailing splitter. When the rail
                         is hidden we suppress the splitter so the teacher
                         uses the toggle button to re-expand. */}
-                    {i < columnOrder.length - 1 && !railHidden && (
-                      <PaneSplitter
-                        width={Math.round(rightWidth)}
-                        min={bounds.min}
-                        max={bounds.max}
-                        onDrag={handleSplitterDrag}
-                        onStep={handleSplitterStep}
-                        label="Resize resources rail"
-                      />
-                    )}
-                  </Fragment>
-                );
-              })}
-            </SortableContext>
+                      {i < columnOrder.length - 1 && !railHidden && (
+                        <PaneSplitter
+                          width={Math.round(rightWidth)}
+                          min={bounds.min}
+                          max={bounds.max}
+                          onDrag={handleSplitterDrag}
+                          onStep={handleSplitterStep}
+                          label="Resize resources rail"
+                        />
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </SortableContext>
 
-            {/* Floating ghost of the dragged panel — a small chip with
+              {/* Floating ghost of the dragged panel — a small chip with
                 the panel's label, reusing the right-rail panel-ghost
                 visual vocabulary (paper card + hairline + soft lift). */}
-            <DragOverlay>
-              {draggingColumnId && <ColumnDragGhost id={draggingColumnId} />}
-            </DragOverlay>
-          </DndContext>
+              <DragOverlay>
+                {draggingColumnId && <ColumnDragGhost id={draggingColumnId} />}
+              </DragOverlay>
+            </DndContext>
+          </div>
         </div>
-      </div>
 
-      {/* ── W3-C3 — narrow-viewport overlay drawer ──────────────────────
+        {/* ── W3-C3 — narrow-viewport overlay drawer ──────────────────────
           At ≤1280px the inline rail is `display: none` (see
           WeeklyShell.module.css RES-CRIT-001) so the WeeklyGrid has
           breathing room. The drawer brings the same <RightRail> content
@@ -1360,19 +1392,31 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           the icons' aria-pressed stays accurate). The inline rail
           render above is untouched; the drawer is a parallel surface
           that only mounts when `drawerMode` is true. */}
-      <WeeklyRailDrawer
-        open={drawerOpen}
-        onClose={handleDrawerClose}
-        selectedLesson={selectedLesson}
-        week={week}
-        selectedDay={selectedDay}
-        railMode={railMode}
-        weekLessons={weekLessons}
-        onClearLesson={
-          selectedLesson !== null ? () => setSelectedLessonId(null) : undefined
-        }
-      />
-    </div>
+        <WeeklyRailDrawer
+          open={drawerOpen}
+          onClose={handleDrawerClose}
+          selectedLesson={selectedLesson}
+          week={week}
+          selectedDay={selectedDay}
+          railMode={railMode}
+          weekLessons={weekLessons}
+          onClearLesson={
+            selectedLesson !== null
+              ? () => setSelectedLessonId(null)
+              : undefined
+          }
+        />
+
+        {/* ── W3.8 — lesson-editor popup ──────────────────────────────────
+          Rendered once, host-owned. Closes ONLY via its Exit button or
+          Esc (the scrim deliberately has no click-to-close — locked
+          scope). Conditional mount keeps its focus-capture/restore
+          lifecycle tied to open/close. */}
+        {modalLessonId !== null && (
+          <LessonModal lessonId={modalLessonId} onClose={closeLessonEditor} />
+        )}
+      </div>
+    </OpenLessonEditorContext.Provider>
   );
 }
 

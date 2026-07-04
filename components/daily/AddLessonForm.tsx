@@ -31,13 +31,7 @@
 // • No new dependencies — styled entirely through the CSS module.
 // • Reduced motion respected (no transitions under prefers-reduced-motion).
 
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useCallback,
-  useState,
-} from "react";
+import { useLayoutEffect, useRef, useCallback, useState } from "react";
 import type { ReactNode, KeyboardEvent, FormEvent } from "react";
 import type { SubjectId } from "@/lib/types";
 import { WEEK_DAYS } from "@/lib/mock";

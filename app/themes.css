@@ -1566,7 +1566,8 @@
       .rw-respop,
       .hub-detailpane,
       .qpop,
-      .ue-rowmenu
+      .ue-rowmenu,
+      .lm-modal
     ),
   .home[data-theme]:not([data-theme="clear"]):not([data-theme="off"])
     :is(
@@ -1587,7 +1588,8 @@
       .rw-respop,
       .hub-detailpane,
       .qpop,
-      .ue-rowmenu
+      .ue-rowmenu,
+      .lm-modal
     ) {
     background-image: radial-gradient(
       135% 130% at 100% 0%,
@@ -1604,7 +1606,8 @@
       .ue-scrim,
       .set-scrim,
       .ll-dlgscrim,
-      .qpop-scrim
+      .qpop-scrim,
+      .lm-scrim
     ),
   .home[data-theme]:not([data-theme="clear"]):not([data-theme="off"])
     :is(
@@ -1614,7 +1617,8 @@
       .ue-scrim,
       .set-scrim,
       .ll-dlgscrim,
-      .qpop-scrim
+      .qpop-scrim,
+      .lm-scrim
     ) {
     background-image: radial-gradient(
       120% 100% at 50% 0%,

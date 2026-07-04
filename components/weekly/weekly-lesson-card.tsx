@@ -47,7 +47,15 @@
 // Types re-exported so the sibling board agent can import without a deep path:
 //   export type { ContextAction, ContextActionPayload }
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CSSProperties, MouseEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Density } from "@/lib/collapse-on-drag";
@@ -92,6 +100,23 @@ export type {
   ContextAction,
   ContextActionPayload,
 } from "@/components/lesson-card/context-menu";
+
+// ── Open-in-editor seam (W3.8) ───────────────────────────────────────────────
+// The expanded card body carries a minimal "Open in editor ⤢" affordance that
+// hands the lesson to the full <LessonModal> (components/lesson-editor). The
+// opener callback travels by CONTEXT rather than a prop because this card has
+// FOUR render parents on the Weekly canvas (grid/GridCell, grid/WeeklyGrid,
+// weekly/WeekColumns — the frame-B branch — and weekly/weekly-board) and
+// threading a new prop through all of them is exactly the churn a seam should
+// avoid. <WeeklyShell> provides the value (it owns the modal-open state); any
+// card rendered outside the provider sees `null` and simply hides the
+// affordance. Declared HERE (not in LessonModal.tsx) so the card never
+// imports from components/lesson-editor — keeping the card ↔ editor module
+// graph acyclic (the editor's own files may legitimately import weekly
+// primitives like SaveTargetDialog).
+export const OpenLessonEditorContext = createContext<
+  ((lessonId: string) => void) | null
+>(null);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 // The fields a teacher can edit inline; matches the Lesson keys we allow
@@ -238,6 +263,10 @@ export function WeeklyLessonCard({
 }: WeeklyLessonCardProps) {
   const { style, frame } = useTheme();
   const color = useSubjectColor(lesson.subject);
+
+  // W3.8 seam — opens this lesson in the full editor modal. Null outside
+  // the <WeeklyShell> provider (the affordance hides itself).
+  const openLessonEditor = useContext(OpenLessonEditorContext);
 
   // BUG-006 — canonical resource source: derive resources from the planner
   // sections store (the same source the right-rail and daily detail use) so
@@ -1517,6 +1546,26 @@ export function WeeklyLessonCard({
                     >
                       Edit Template
                     </Button>
+                    {/* W3.8 — week-expand host seam: hand off to the full
+                        lesson-editor modal. Deliberately MINIMAL — the card's
+                        existing expanded rows stay untouched this wave (their
+                        dirty-tracking + SaveTargetDialog interplay is subtle;
+                        full template-in-expand is a follow-up). Hidden when no
+                        <OpenLessonEditorContext> provider is above. */}
+                    {openLessonEditor && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={styles.footerBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openLessonEditor(lesson.id);
+                        }}
+                        tooltip="Open this lesson in the full editor window"
+                      >
+                        Open in editor <span aria-hidden="true">⤢</span>
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}

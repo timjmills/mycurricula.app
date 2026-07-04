@@ -1,0 +1,261 @@
+/* FloatingBar.module.css — the W3.8 selection-driven floating rich-text bar.
+   Recipe from the v2 bundle's `.pb-fbar` (~line 5069):
+
+     position:fixed; z-index:4200; transform:translate(-50%,calc(-100% - 10px));
+     display:flex; align-items:center; gap:1px; padding:4px 6px;
+     border-radius:11px; background:#fff; border:1px solid var(--border);
+     box-shadow:0 16px 40px -14px rgba(22,26,42,.55)
+
+   Adapted to the house system:
+   • Colors via tokens (--surface/--border/--ink/…) so the bar re-themes
+     under all six data-theme values; the mock's literal #fff is only right
+     on Paper.
+   • z-index 9999 instead of the mock's 4200 — the house layer the editor's
+     own floating toolbar already uses (rich-text-editor.module.css), above
+     the LessonModal scrim (chrome.css z:170) and the appearance menus (150).
+   • A dark-TONE variant (mock defect #5): the v2 chrome tone axis, dual-
+     scoped exactly like app/chrome.css (`:root[data-tone="dark"]` for the
+     app-wide host + `.home[data-tone="dark"]` for the home surface).
+
+   Buttons are the canonical <Button variant="icon" size="sm"> primitive,
+   re-skinned to the mock's 26×28 density. The doubled class selectors
+   (.fbtn.fbtn) are deliberate: they out-specify Button.module.css's
+   `.icon.sm` / hover rules AND survive the `.cp-root button` reset cascade
+   (tokens.css, specificity 0,1,1 — see the cp-root button-reset trap).
+   Button's base keeps supplying the focus-visible ring, disabled fade, and
+   reduced-motion transition removal.
+
+   No animation is introduced (the bar snaps to its anchor; hover washes are
+   instant), so there is nothing extra to gate behind prefers-reduced-motion
+   — Button's own reduced-motion rule already drops its transitions. */
+
+/* ── Bar ─────────────────────────────────────────────────────────────── */
+
+.fbar {
+  position: fixed;
+  z-index: 9999;
+  /* Centered above the anchor with a 10px gap (bundle recipe). The
+     translate(-50%) means the -100% Y offset always reflects the bar's
+     LIVE height — a wrapped two-row bar still clears the anchor. */
+  transform: translate(-50%, calc(-100% - 10px));
+  display: flex;
+  /* W3.8 gate fix: on viewports that can't fit the 14 controls in one row
+     (phones — especially with the coarse-pointer 44px targets below), the
+     bar wraps to a second row instead of overflowing the viewport. Same
+     narrow-width strategy as RtToolbar. The 16px cap (8px per side) is
+     mirrored by BAR_EDGE_MARGIN in FloatingBar.tsx's clamp math. */
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100vw - 16px);
+  align-items: center;
+  gap: 1px;
+  padding: 4px 6px;
+  border-radius: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 16px 40px -14px rgba(22, 26, 42, 0.55);
+}
+
+/* Anchor too close to the viewport top → the bar flips below the selection
+   (the mock would clip it off-screen). `top` is the anchor rect's BOTTOM in
+   this mode; the transform supplies the mirrored 10px gap. */
+.fbar[data-side="below"] {
+  transform: translate(-50%, 10px);
+}
+
+/* ── Buttons (mock .pb-tb, on the Button primitive) ──────────────────── */
+
+.fbar .fbtn.fbtn {
+  min-width: 26px;
+  width: auto;
+  height: 28px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--ink);
+  font-size: var(--t-13);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.fbar .fbtn.fbtn:hover {
+  background: var(--hairline);
+  color: var(--ink);
+}
+
+/* Press feedback + lit toggle state share the brand tint (declared after
+   :hover so a lit toggle stays lit while hovered). */
+.fbar .fbtn.fbtn:active,
+.fbar .fbtnActive.fbtnActive {
+  background: var(--brand-50);
+  color: var(--brand-600);
+}
+
+/* Letter-glyph semantics (<b>/<i>/<u> children). */
+.fbtn i {
+  font-style: italic;
+}
+.fbtn u {
+  text-decoration: underline;
+}
+
+/* Size-button glyphs — A at the mock's 11/13/16px, via the type tokens. */
+.szS {
+  font-size: var(--t-11);
+}
+.szM {
+  font-size: var(--t-13);
+}
+.szL {
+  font-size: var(--t-16);
+}
+
+/* Text-color glyph (mock colors the A) + the little pop caret. */
+.colorGlyph {
+  color: var(--brand-500);
+}
+.caret {
+  font-size: var(--t-10);
+  margin-left: 1px;
+}
+
+/* ── Separators (mock .pb-tbsep) ─────────────────────────────────────── */
+
+.fsep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 3px;
+}
+
+/* ── Inline swatch pops (mock .pb-fpop / .pb-sw — the bar widens) ────── */
+
+.fpop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.fbar .sw {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+}
+.fbar .sw:hover {
+  border-color: var(--ink-500);
+}
+
+/* "Remove highlight" chip — transparent, shown as a checkerboard. */
+.fbar .swClear {
+  background: linear-gradient(
+      45deg,
+      var(--border) 25%,
+      transparent 25%,
+      transparent 75%,
+      var(--border) 75%
+    ),
+    var(--surface);
+  background-size: 8px 8px;
+}
+
+/* ── Inline link editor (replaces the mock's window.prompt) ──────────── */
+
+.linkPop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.fbar .linkInput {
+  width: 190px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface-warm);
+  color: var(--ink);
+  font-size: var(--t-12);
+  font-family: inherit;
+  padding: 0 8px;
+}
+.fbar .linkInput:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+/* ── Dark-tone variant (mock defect #5) ──────────────────────────────────
+   The v2 chrome tone axis. Dual-scoped like app/chrome.css; literal rgba
+   values follow that file's theme-layer convention (the tone axis has no
+   token set of its own). Dark surface + light ink; the lit-toggle chip
+   keeps its light brand tint, which reads as "on" against the dark bar. */
+
+:global(:root[data-tone="dark"]) .fbar,
+:global(.home[data-tone="dark"]) .fbar {
+  background: rgba(34, 34, 52, 0.94);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.75);
+}
+
+:global(:root[data-tone="dark"]) .fbar .fbtn.fbtn,
+:global(.home[data-tone="dark"]) .fbar .fbtn.fbtn {
+  color: rgba(255, 255, 255, 0.92);
+}
+:global(:root[data-tone="dark"]) .fbar .fbtn.fbtn:hover,
+:global(.home[data-tone="dark"]) .fbar .fbtn.fbtn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+:global(:root[data-tone="dark"]) .fbar .fbtn.fbtn:active,
+:global(:root[data-tone="dark"]) .fbar .fbtnActive.fbtnActive,
+:global(.home[data-tone="dark"]) .fbar .fbtn.fbtn:active,
+:global(.home[data-tone="dark"]) .fbar .fbtnActive.fbtnActive {
+  background: var(--brand-50);
+  color: var(--brand-600);
+}
+:global(:root[data-tone="dark"]) .fbar .colorGlyph,
+:global(.home[data-tone="dark"]) .fbar .colorGlyph {
+  color: #9db8ff;
+}
+:global(:root[data-tone="dark"]) .fsep,
+:global(.home[data-tone="dark"]) .fsep {
+  background: rgba(255, 255, 255, 0.18);
+}
+:global(:root[data-tone="dark"]) .fbar .sw,
+:global(.home[data-tone="dark"]) .fbar .sw {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+:global(:root[data-tone="dark"]) .fbar .linkInput,
+:global(.home[data-tone="dark"]) .fbar .linkInput {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+/* ── Coarse-pointer targets (§4: ≥44px on touch) ─────────────────────── */
+
+@media (pointer: coarse) {
+  .fbar {
+    gap: 2px;
+    padding: 6px 8px;
+  }
+  .fbar .fbtn.fbtn {
+    min-width: 40px;
+    height: 44px;
+  }
+  .fbar .sw {
+    width: 28px;
+    height: 28px;
+  }
+  .fbar .linkInput {
+    height: 40px;
+    font-size: var(--t-14);
+  }
+}

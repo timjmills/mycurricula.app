@@ -473,6 +473,10 @@ interface SectionRow {
   display_order: number;
   minutes: number | null;
   status: string | null;
+  // W3.8 appearance (20260704120000): wash-token name + tint scope. NULL =
+  // no stored appearance (the client falls back to its round-robin wash).
+  color: string | null;
+  tint_scope: string | null;
 }
 
 // Column lists kept in one place so reads stay consistent.
@@ -488,8 +492,10 @@ const UNIT_COLS =
 const SUBJECT_COLS =
   "id, grade_level_id, name, color, parent_id, display_order";
 const STANDARD_COLS = "id, code, description";
+// NOTE (launch coupling): `color` + `tint_scope` exist only once the
+// 20260704120000 migration is applied — apply it BEFORE deploying this code.
 const SECTION_COLS =
-  "id, owner_kind, owner_lesson_id, owner_id, grade_level_id, template_section_id, heading, prompt, body, resources, display_order, minutes, status";
+  "id, owner_kind, owner_lesson_id, owner_id, grade_level_id, template_section_id, heading, prompt, body, resources, display_order, minutes, status, color, tint_scope";
 
 // ── jsonb helpers ─────────────────────────────────────────────────────────────
 
@@ -545,6 +551,26 @@ function jsonToDifferentiation(
  *  flow renders; anything unknown falls back to "idle". */
 function sectionStatusFromDb(raw: string | null): "idle" | "progress" | "done" {
   return raw === "progress" || raw === "done" ? raw : "idle";
+}
+
+/** Coerce a persisted section `color` to a token-name string, or undefined.
+ *  Lenient FORMAT check only (`--token-name` shape, mirroring the column
+ *  CHECK) — the exact-ramp allowlist lives at the render sink
+ *  (lib/lesson-flow.ts isSectionAppearanceToken), so a future ramp token
+ *  survives the round-trip while a hex / injection payload never reaches an
+ *  inline style. */
+function sectionColorFromDb(raw: string | null): string | undefined {
+  return typeof raw === "string" && /^--[a-z0-9-]{1,64}$/.test(raw)
+    ? raw
+    : undefined;
+}
+
+/** Coerce a persisted section `tint_scope` to the union, or undefined
+ *  (undefined → the client's "field" default, mock tintText:true). */
+function sectionTintScopeFromDb(
+  raw: string | null,
+): "header" | "field" | undefined {
+  return raw === "header" || raw === "field" ? raw : undefined;
 }
 
 /** Coerce a jsonb section `resources` value to typed `SectionResource[]`,
@@ -1672,6 +1698,11 @@ export const plannerSupabaseSource: PlannerDataSource = {
       // the section (null minutes = no time line; status defaults idle).
       minutes: s.minutes ?? null,
       status: s.status ?? "idle",
+      // W3.8 appearance: wash-token name + tint scope (null = no stored
+      // appearance → client round-robin default). A pre-20260704120000 RPC
+      // simply ignores these keys, so sending them is deploy-order safe.
+      color: s.color ?? null,
+      tint_scope: s.tintScope ?? null,
     }));
 
     const rpc = await client.rpc("replace_lesson_sections", {
@@ -2151,6 +2182,8 @@ function mapSectionRows(rows: SectionRow[]): LessonSectionContent[] {
     resources: jsonToSectionResources(row.resources, row.id),
     minutes: row.minutes ?? null,
     status: sectionStatusFromDb(row.status),
+    color: sectionColorFromDb(row.color),
+    tintScope: sectionTintScopeFromDb(row.tint_scope),
   }));
 }
 

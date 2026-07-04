@@ -104,7 +104,10 @@ function cloneLesson(l: Lesson): Lesson {
 }
 
 /** Deep-clone a section list (and its resources) so callers can't mutate the
- *  store through a returned array. */
+ *  store through a returned array. The object spread carries EVERY section
+ *  field verbatim — including the W3.8 appearance pair (`color` /
+ *  `tintScope`), so the mock round-trips them exactly like the Supabase
+ *  source's lesson_sections columns. */
 function cloneSections(
   sections: LessonSectionContent[],
 ): LessonSectionContent[] {

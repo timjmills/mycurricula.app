@@ -23,6 +23,14 @@ export interface LessonTemplateSection {
    *  as "· N min" after the phase heading (6.11.26 daily handoff §7).
    *  Null/absent → the phase shows no time. */
   minutes?: number | null;
+  /** Optional wash-color override (W3.8 lesson editor, D2) — a token name
+   *  from lib/lesson-flow's SECTION_SWATCH_TOKENS ramp. Absent (every
+   *  built-in today) → instantiation assigns the round-robin default wash
+   *  for the section's index. Template defaults may pin one here. */
+  color?: string;
+  /** Optional tint-scope override ("header" | "field"). Absent → "field"
+   *  (the mock's tintText:true default). */
+  tintScope?: import("./lesson-flow").SectionTintScope;
 }
 
 /** An ordered, named lesson structure a teacher can adopt as their default. */

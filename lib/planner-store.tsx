@@ -86,8 +86,9 @@ import { detectFirstFork } from "@/lib/undo-toast-messages";
 /** Maximum number of undo steps retained. */
 export const HISTORY_LIMIT = 50;
 
-/** Milliseconds within which same-key text edits are coalesced into one step. */
-const COALESCE_WINDOW_MS = 700;
+/** Milliseconds within which same-key text edits are coalesced into one step.
+ *  Exported for the unit tests (tests/planner-store.test.ts). */
+export const COALESCE_WINDOW_MS = 700;
 
 // ── Document model ─────────────────────────────────────────────────────────
 
@@ -402,7 +403,11 @@ type PersistableSectionAction =
   | EditSectionAction
   | MoveSectionResourceAction
   | AddSectionResourceAction
-  | RemoveSectionResourceAction;
+  | RemoveSectionResourceAction
+  // Edits to an EXISTING section resource persist too (audit: this one was
+  // missed when the tee was introduced — the UI updated but the change was
+  // lost on reload).
+  | EditSectionResourceAction;
 
 // ── History control actions ──────────────────────────────────────────────
 
@@ -449,7 +454,9 @@ type MergeStandardsAction = { type: "mergeStandards"; map: StandardsMap };
  *  removed it from the doc would silently desync from the backend. */
 type AddLessonAction = { type: "addLesson"; lesson: Lesson };
 
-type PlannerAction =
+/** Exported for the unit tests (tests/planner-store.test.ts) — runtime
+ *  dispatch still flows only through the provider's mutator callbacks. */
+export type PlannerAction =
   | MoveLessonAction
   | SetLessonStatusAction
   | EditLessonAction
@@ -1183,6 +1190,11 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
       const copy: LessonSectionContent = {
         ...source,
         id: uid("lsec"),
+        // " copy" suffix (W3.8 gate fix, mock parity): an identical heading
+        // would give two sections the same accessible name — ambiguous for
+        // AT users on both this editor's banners and /daily's phase rows.
+        // Appended as a trailing TEXT node, safe after any rich-HTML heading.
+        heading: `${source.heading} copy`,
         resources: source.resources.map((r) => {
           counter += 1;
           return { ...r, id: `res-${ts}-${counter}` };
@@ -1299,7 +1311,9 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
 // ── History reducer ────────────────────────────────────────────────────────
 // Wraps applyDocAction with undo/redo and coalescing logic.
 
-interface HistoryReducerState {
+/** Exported (with `historyReducer`) for the unit tests — the reducer is a
+ *  pure function, so tests drive it directly without mounting the provider. */
+export interface HistoryReducerState {
   history: HistoryState;
   /** The coalesceKey of the last dispatched action (for burst detection). */
   lastCoalesceKey: string | null;
@@ -1334,7 +1348,10 @@ const INITIAL_REDUCER_STATE: HistoryReducerState = {
   catalog: pickInitialCatalog(),
 };
 
-function historyReducer(
+// Exported for the unit tests (tests/planner-store.test.ts): the reducer is
+// pure (no mutation, no side effects), so coalescing / history-limit /
+// section-guard behavior is testable without mounting the provider.
+export function historyReducer(
   state: HistoryReducerState,
   action: PlannerAction,
 ): HistoryReducerState {
@@ -2305,22 +2322,111 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [],
   );
 
+  // ── Serialized (latest-wins) section persistence ────────────────────────
+  // W3.8 gate fix (Codex HIGH — persistence ordering race): the lesson editor
+  // autosaves per keystroke, and EVERY section persist is a FULL
+  // `replace_lesson_sections` swap. Firing those through the fire-and-forget
+  // `persist()` tee makes them UNORDERED on the wire — a slow early request
+  // ("a") can commit AFTER a later one ("abc"), leaving the DB stale relative
+  // to the UI with no error surfaced.
+  //
+  // Fix: per-lesson LATEST-WINS serialization. Each lessonId keeps at most
+  //   • ONE in-flight RPC, and
+  //   • ONE pending "latest snapshot" slot.
+  // While a write is in flight, newer snapshots simply OVERWRITE the pending
+  // slot (each payload is the complete resolved section list, so intermediate
+  // states are safely skippable); when the in-flight settles — success OR
+  // failure — the pending snapshot (if any) is sent next. At most one RPC per
+  // lesson is ever outstanding, so commits land in send order and the final
+  // DB state always equals the last UI state. No timers: a trailing debounce
+  // would merely reduce write volume; the serialization IS the correctness
+  // fix (and a debounce alone would NOT fix ordering).
+  //
+  // Identity (ownerId / saveTarget) is captured INTO the snapshot at enqueue
+  // time, so a mid-flight sign-out or a Personal↔Team toggle flip never
+  // retargets an already-authored snapshot.
+  const sectionWriteQueueRef = useRef(
+    new Map<
+      string,
+      {
+        inFlight: boolean;
+        pending: {
+          sections: LessonSectionContent[];
+          ownerId: string;
+          saveTarget: "personal" | "core";
+        } | null;
+      }
+    >(),
+  );
+
+  const persistSectionsSerialized = useCallback(
+    (lessonId: string, sections: LessonSectionContent[]): void => {
+      // Same gating as persist(): flag OFF / no session → no-op (prototype
+      // mode is reducer-local, byte-identical to the pre-seam behavior).
+      if (!isPlannerSupabaseConfigured()) return;
+      if (!ownerIdRef.current) return;
+
+      let entry = sectionWriteQueueRef.current.get(lessonId);
+      if (!entry) {
+        entry = { inFlight: false, pending: null };
+        sectionWriteQueueRef.current.set(lessonId, entry);
+      }
+      const queued = entry;
+      // Latest wins: overwrite (never queue behind) the pending snapshot.
+      queued.pending = {
+        sections,
+        ownerId: ownerIdRef.current,
+        saveTarget: saveTargetRef.current,
+      };
+      if (queued.inFlight) return; // the settle handler drains the slot
+
+      const sendNext = (): void => {
+        const next = queued.pending;
+        if (!next) {
+          queued.inFlight = false;
+          // Settled with nothing pending — drop the map entry so a long
+          // editing session doesn't retain one slot per touched lesson
+          // (audit re-pass Low); a later write simply re-creates it.
+          sectionWriteQueueRef.current.delete(lessonId);
+          return;
+        }
+        queued.pending = null;
+        queued.inFlight = true;
+        void plannerClient
+          .setSections(lessonId, next.sections, next.ownerId, next.saveTarget)
+          .catch((err: unknown) => {
+            // Mirror persist()'s error contract: reducer state stands and the
+            // dropped write is surfaced without blocking the UI. A newer
+            // pending snapshot (drained below) supersedes the failed payload.
+            console.error("[planner] persist 'setSections' failed", err);
+          })
+          .then(() => {
+            queued.inFlight = false;
+            sendNext();
+          });
+      };
+      sendNext();
+    },
+    [],
+  );
+
   // ── Granular section-mutator persistence ───────────────────────────────
   // Several section reducer actions (reorder / add / remove / duplicate section,
   // move resource) mutate `present.sections[lessonId]` but had NO dedicated
   // persist verb — so the edit was lost on reload. This helper re-applies the
   // SAME pure transform the reducer runs (applyDocAction) to the CURRENT
-  // document, then tees the RESULTING section list through `setSections` so the
-  // whole new arrangement is durable. The payload is exactly the reducer's
-  // resulting `present.sections[lessonId]` (via ensureSections on the next doc),
-  // so the persisted set matches what the UI shows.
+  // document, then tees the RESULTING section list through the serialized
+  // setSections queue above so the whole new arrangement is durable AND
+  // ordered. The payload is exactly the reducer's resulting
+  // `present.sections[lessonId]` (via ensureSections on the next doc), so the
+  // persisted set matches what the UI shows.
   //
-  // FORKING (#14): the persist passes `saveTargetRef.current` — the live
-  // Personal | Team-Curriculum toggle — so a Team/Master-mode section edit
+  // FORKING (#14): the serialized queue captures `saveTargetRef.current` — the
+  // live Personal | Team-Curriculum toggle — so a Team/Master-mode section edit
   // writes the SHARED team section rows (RLS-gated, throws on denial) instead of
   // being forced into a personal fork. This mirrors updateLesson/moveLesson and
   // is the regression the stale Codex branch introduced by dropping saveTarget.
-  // With the Supabase flag OFF `persist` is a no-op, so this is reducer-local.
+  // With the Supabase flag OFF the queue is a no-op, so this is reducer-local.
   const persistSectionAction = useCallback(
     (action: PersistableSectionAction): void => {
       const nextDoc = applyDocAction(presentRef.current, action);
@@ -2332,15 +2438,12 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       // than re-reading the stale pre-render doc and clobbering this change. The
       // next render resets presentRef to the committed reducer state.
       presentRef.current = nextDoc;
-      persist(
-        "setSections",
+      persistSectionsSerialized(
         action.lessonId,
         ensureSections(nextDoc.sections, action.lessonId),
-        ownerIdRef.current ?? "",
-        saveTargetRef.current,
       );
     },
-    [persist],
+    [persistSectionsSerialized],
   );
 
   // ── Mutation callbacks ────────────────────────────────────────────────
@@ -2604,17 +2707,14 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const setSections = useCallback(
     (lessonId: string, next: LessonSectionContent[]) => {
       dispatchRef.current({ type: "setSections", lessonId, next });
-      // saveTarget threads the Personal | Team-Curriculum mode: "core" writes
-      // the shared team section rows (#14, RLS-gated), else a personal fork.
-      persist(
-        "setSections",
-        lessonId,
-        next,
-        ownerIdRef.current ?? "",
-        saveTargetRef.current,
-      );
+      // Routed through the SAME serialized per-lesson queue as the granular
+      // section mutators (a direct persist() here could interleave with the
+      // queued keystroke writes and re-introduce the ordering race). The
+      // queue captures the live saveTarget: "core" writes the shared team
+      // section rows (#14, RLS-gated), else a personal fork.
+      persistSectionsSerialized(lessonId, next);
     },
-    [persist],
+    [persistSectionsSerialized],
   );
 
   const reorderSections = useCallback(
@@ -2729,7 +2829,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       resourceId: string,
       patch: Partial<SectionResource>,
     ) => {
-      dispatchRef.current({
+      const action = {
         type: "editSectionResource",
         lessonId,
         sectionId,
@@ -2737,9 +2837,11 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         patch,
         coalesceKey: `editResource:${lessonId}:${sectionId}:${resourceId}`,
         coalesceTs: Date.now(),
-      });
+      } as const;
+      dispatchRef.current(action);
+      persistSectionAction(action);
     },
-    [],
+    [persistSectionAction],
   );
 
   const removeSectionResource = useCallback(
