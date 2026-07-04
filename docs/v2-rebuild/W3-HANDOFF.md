@@ -125,8 +125,8 @@ Still pending live confirmation at 1024 on /weekly AND /daily.
 - **W3.6 — near-done.** Live-verified at the terminal: archive/undo
   end-to-end ✅, cross-day move via keyboard ✅ (no snap-back, undo entry),
   full-height lanes ✅, console clean ✅. Remaining: the three §2 findings
-  - a 1024 re-measure of `70e9f8a` (/weekly and /daily). Fix, re-gate
-    (§4a Codex + live §4b), and W3.6 closes; task #11 completes with it.
+  plus a 1024 re-measure of `70e9f8a` (/weekly and /daily). Fix, re-gate
+  (§4a Codex + live §4b), and W3.6 closes; task #11 completes with it.
 - **W3.7 — Day + Year VIEW frame-aware rebuilds (+ additions)** — plan
   lines ~153-159. Frame-C Year constellation keyed off the subject scale;
   Day adds the frames-B/C "Add lesson" affordances (`.vb-railadd` /
