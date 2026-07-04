@@ -1173,8 +1173,11 @@
      ViewTitle + tools overflow the bar across the whole tablet range — this was
      a 21px document horizontal-scroll at 768 (W3.5 audit BUG-1, §4 hard rule).
      Hiding the wordmark reclaims ~140px; the glyph + title still identify the
-     bar. Above 900 there is ample room and the wordmark returns. */
-  @media (max-width: 900px) {
+     bar. Raised again ≤900 → ≤1100 in W3.6: the View/Edit pill widened the
+     tools cluster on Day/Week, pushing the wordmark-in bar to ~1058px — a 34px
+     document horizontal-scroll at the 1024 tier boundary (W3.6 terminal audit,
+     §4 hard rule). Above 1100 there is ample room and the wordmark returns. */
+  @media (max-width: 1100px) {
     .brand .wm {
       display: none;
     }
