@@ -19,7 +19,11 @@
 .page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  /* The PANE owns the viewport, not this module: 100% (not 100vh) so the
+     canvas fills its shell slot without forcing document-level overflow
+     (terminal audit: the 100vh shell leaked scroll past the pane). */
+  height: 100%;
+  min-height: 0;
   /* Lets the root shrink inside the planner shell's flex/grid content column
      (min-width:auto would refuse to shrink and break the right-rail layout). */
   min-width: 0;
@@ -30,18 +34,28 @@
 /* ── Scroll region + day grid ───────────────────────────────────────── */
 .scroll {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 16px 20px 28px;
 }
 
 .week {
   display: grid;
-  /* One column per configured school day. minmax keeps columns readable;
-     below the natural width the region scrolls rather than crushing cards. */
-  grid-template-columns: repeat(var(--day-count, 5), minmax(200px, 1fr));
-  min-width: calc(var(--day-count, 5) * 200px);
-  gap: 12px;
-  align-items: start;
+  /* One column per configured school day. 176px min × a 5-day week (+ gaps
+     + pane chrome) fits a 1024 viewport with NO document-level horizontal
+     scroll (§4 tier boundary; terminal audit measured 34px overflow at the
+     old 200px/12px recipe). Wider weeks (6+ days) overflow INSIDE .scroll —
+     internal scroll is the sanctioned §4 fallback. No explicit min-width:
+     the minmax() minimums already set the grid's intrinsic width. */
+  grid-template-columns: repeat(var(--day-count, 5), minmax(176px, 1fr));
+  gap: 10px;
+  /* Full-height lanes (terminal audit, drag High #1): stretch each column to
+     the row track and fill the scroll height, so a column's droppable rect —
+     and its holiday wash / drop glow — spans the whole lane, not just its
+     content. Without this, drops into the blank area below a short stack hit
+     NO droppable and closestCenter picked a neighboring column's card. */
+  align-items: stretch;
+  min-height: 100%;
 }
 
 /* ── Day column ─────────────────────────────────────────────────────── */
@@ -193,7 +207,11 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px 6px 6px;
-  /* A comfortable minimum so an empty column is still a clear drop target. */
+  /* Fill the stretched column below the sticky header (full-height-lane
+     contract above) so the whole lane is the drop target. */
+  flex: 1;
+  /* A comfortable minimum so an empty column is still a clear drop target
+     even if the height chain ever fails to resolve. */
   min-height: 120px;
 }
 

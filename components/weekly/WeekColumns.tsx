@@ -37,7 +37,9 @@ import {
   DndContext,
   DragOverlay,
   closestCenter,
+  pointerWithin,
   useDroppable,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -69,6 +71,7 @@ import {
 // its ./WeeklyViewControls etc.): importing the folder's OWN barrel from a
 // module the barrel re-exports is a circular dependency.
 import { WeeklyLessonCard } from "./weekly-lesson-card";
+import { ArchiveToast } from "@/components/lesson-card/archive-toast";
 import type { ContextAction, ContextActionPayload } from "./weekly-lesson-card";
 import styles from "./WeekColumns.module.css";
 
@@ -114,6 +117,7 @@ export function WeekColumns(): ReactNode {
     editLesson,
     duplicateLesson,
     setSaveTarget,
+    unarchiveLesson,
     lastChange,
     subjects,
     subjectById,
@@ -212,20 +216,17 @@ export function WeekColumns(): ReactNode {
   }, [subjects]);
 
   // ── byDay — visible lessons bucketed by day, subject-ordered within ───────
-  // Applies the week-match + search/filter gates before bucketing, mirroring
-  // WeeklyGrid's bySubjectDay (340-352) EXACTLY — including its deliberate
-  // absence of an `archived` filter. The 5s ArchiveToast (the undo affordance
-  // for the destructive Archive action) renders INSIDE WeeklyLessonCard, so
-  // filtering archived here would unmount the card in the same render the
-  // teacher archives it and the toast would never paint (§4a W3.6-c3 finding
-  // #2). It would also make Paper hide lessons that Glass/Color still show —
-  // an appearance axis must never change which data exists. The app-wide
-  // "views must filter archived" contract (lib/types.ts) is implemented only
-  // by Year today; adopting it on the weekly surfaces is deferred until the
-  // archive toast is lifted out of the card.
+  // Week-match + search/filter gates mirror WeeklyGrid's bySubjectDay
+  // (340-352). UNLIKE WeeklyGrid, archived lessons ARE filtered out here —
+  // this surface implements the lib/types.ts "views must filter archived"
+  // contract (terminal audit decision, W3.6-c3 re-fix). The undo affordance
+  // survives the card unmounting because the ArchiveToast is LIFTED to this
+  // component (see the archive-transition effect below); the card's own
+  // in-card toast never gets a chance to paint here, by design.
   const byDay = useMemo(() => {
     const buckets: Lesson[][] = Array.from({ length: DAY_COUNT }, () => []);
     for (const lesson of lessons) {
+      if (lesson.archived === true) continue;
       if (lesson.week !== week) continue;
       if (lesson.day < 0 || lesson.day >= DAY_COUNT) continue;
       if (!lessonMatchesQuery(lesson)) continue;
@@ -265,6 +266,56 @@ export function WeekColumns(): ReactNode {
     },
     [lessons, week, DAY_COUNT],
   );
+
+  // ── Collision detection — pointer-first (terminal audit, drag High #1) ────
+  // pointerWithin hit-tests what is actually UNDER the cursor (a card → its
+  // day via resolveOverDay; the lane's blank space → the full-height column
+  // droppable), which matches what a teacher sees. Bare closestCenter compared
+  // rect centers instead and, with short content-height lanes, routed blank-
+  // area drops to a NEIGHBORING column's card. Kept as the fallback because
+  // pointerWithin returns nothing for keyboard drags (no pointer).
+  const collisionDetection = useCallback<CollisionDetection>((args) => {
+    const hits = pointerWithin(args);
+    return hits.length > 0 ? hits : closestCenter(args);
+  }, []);
+
+  // ── Lifted archive-undo toast (terminal audit, archive High #2) ───────────
+  // byDay filters archived lessons, so the card — and the in-card toast the
+  // OTHER weekly surfaces rely on — unmounts in the same render the teacher
+  // archives. The undo affordance therefore lives HERE: watch the store for an
+  // archived:false→true transition and raise this surface's own ArchiveToast
+  // wired to unarchiveLesson. Store-wide (not per-week) so week navigation
+  // can never mistake an already-archived lesson for a fresh archive; the
+  // mount snapshot (prev === null) never toasts pre-existing archives.
+  const [archiveToast, setArchiveToast] = useState<{
+    id: string;
+    title: string;
+    key: number;
+  } | null>(null);
+  const archiveKeyRef = useRef(0);
+  const prevArchivedRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const now = new Set<string>();
+    for (const l of lessons) {
+      if (l.archived === true) now.add(l.id);
+    }
+    const prev = prevArchivedRef.current;
+    prevArchivedRef.current = now;
+    if (prev === null) return; // mount snapshot — no toast for old archives
+    for (const id of now) {
+      if (prev.has(id)) continue;
+      const lesson = lessons.find((l) => l.id === id);
+      if (!lesson) continue;
+      archiveKeyRef.current += 1;
+      setArchiveToast({
+        id,
+        // Plain text for the toast copy (same strip the card uses).
+        title: (lesson.title ?? "").slice(0, 2000).replace(/<[^>]*>/g, ""),
+        key: archiveKeyRef.current,
+      });
+      break; // one toast; a newer archive supersedes via the key remount
+    }
+  }, [lessons]);
 
   // ── Sync: collapse a card when its detail panel is dismissed externally ───
   // When app-state `selectedLessonId` transitions from a concrete id → null
@@ -486,7 +537,7 @@ export function WeekColumns(): ReactNode {
         // (WeeklyGrid 761-762) — avoids a hydration mismatch on the drag handle.
         id="weekly-columns-dnd"
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={collisionDetection}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
@@ -551,6 +602,18 @@ export function WeekColumns(): ReactNode {
           )}
         </DragOverlay>
       </DndContext>
+
+      {/* Lifted archive-undo toast — this surface hides archived lessons, so
+          the in-card toast can never paint here; this one survives the card
+          unmounting. key remount supersedes on a rapid second archive. */}
+      {archiveToast && (
+        <ArchiveToast
+          key={archiveToast.key}
+          lessonTitle={archiveToast.title}
+          onUndo={() => unarchiveLesson(archiveToast.id)}
+          onDismiss={() => setArchiveToast(null)}
+        />
+      )}
     </div>
   );
 }
