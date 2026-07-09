@@ -233,6 +233,13 @@
   .toolswrap {
     position: relative;
   }
+  /* The top-bar's "More tools" overflow instance is PHONE-ONLY: above 480px
+     the To-dos / Shoutbox iconbtns render inline, so the trigger would be a
+     duplicate. The ≤480 task-#12 block (below, later in the cascade — same
+     0,2,0 specificity, order wins) flips it to display:block. */
+  .tools .toolswrap {
+    display: none;
+  }
   .toolsbtn {
     display: inline-flex;
     align-items: center;
@@ -1235,6 +1242,23 @@
     .tools .iconbtn[data-tool="todos"],
     .tools .iconbtn[data-tool="team-shoutbox"] {
       display: none;
+    }
+    /* …and the "More tools" overflow menu (the bundle's .toolswrap popover
+       vocabulary, first consumer) restores those two panels behind a single
+       trigger — so phones lose nothing (closes the option-A tradeoff). The
+       trigger meets the 44px touch floor (base .toolsbtn-circle is 42). */
+    .tools .toolswrap {
+      display: block;
+    }
+    .tools .toolswrap .toolsbtn-circle {
+      width: 44px;
+      height: 44px;
+    }
+    /* With the 44px trigger the cluster (fork 94 + search 44 + more 44 +
+       bell 44) ran 378px at gap:10 — 3px past a 375 viewport. gap:8 lands it
+       at 372; controls themselves stay ≥44. */
+    .tools {
+      gap: 8px;
     }
   }
 

@@ -44,7 +44,7 @@
 // (#fff / #3A2A05), so this is bundle-faithful AND theme-aware, with no
 // hard-coded colors in the component.
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { TransitionLink } from "@/lib/view-transition";
 import { Tooltip } from "@/components/ui";
 import {
@@ -96,6 +96,41 @@ export function ChromeTopBar({ title, tools }: ChromeTopBarProps): ReactNode {
     toggleTodoPanel,
     toggleCommentsPanel,
   } = useAppState();
+
+  // ── Phone overflow menu (≤480) ────────────────────────────────────────
+  // The task-#12 collapse hides the To-dos + Team Shoutbox iconbtns at ≤480
+  // so the cluster fits the viewport; this `.toolswrap` menu (the bundle's
+  // inert popover vocabulary, first consumer) restores both behind a single
+  // "More tools" trigger so phones lose nothing. The wrapper itself is
+  // display:none above 480px (chrome.css), so this renders inert on
+  // tablet/desktop where the inline buttons are back.
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement | null>(null);
+  const moreTriggerRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onPointerDown = (e: PointerEvent): void => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") {
+        setMoreOpen(false);
+        // A keyboard user may be focused on a menu item that is about to
+        // unmount — without this, focus falls to <body> and they are
+        // stranded in the tab order (§4a finding).
+        moreTriggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [moreOpen]);
+
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -225,6 +260,102 @@ export function ChromeTopBar({ title, tools }: ChromeTopBarProps): ReactNode {
             </svg>
           </button>
         </Tooltip>
+        {/* Phone-only (≤480) overflow for the two iconbtns the task-#12
+            collapse hides. Uses the bundle's .toolswrap/.toolsbtn/.toolspop
+            glass-popover recipe; chrome.css keeps the wrapper display:none
+            above 480px. */}
+        <div className="toolswrap" ref={moreRef}>
+          <Tooltip
+            content="More tools — your to-dos and the Team Shoutbox"
+            side="bottom"
+            tooltipId="chrome-more-tools"
+          >
+            <button
+              type="button"
+              ref={moreTriggerRef}
+              className={"toolsbtn toolsbtn-circle" + (moreOpen ? " open" : "")}
+              aria-label="More tools"
+              aria-expanded={moreOpen}
+              aria-controls="chrome-more-tools-pop"
+              onClick={() => setMoreOpen((v) => !v)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <circle cx="5" cy="12" r="1.6" />
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="19" cy="12" r="1.6" />
+              </svg>
+            </button>
+          </Tooltip>
+          {moreOpen && (
+            // Disclosure pattern (aria-expanded + aria-controls on the
+            // trigger): plain buttons inside a labelled group — NOT
+            // role="menu", which would promise arrow-key semantics these
+            // two actions don't need (§4a finding).
+            <div
+              id="chrome-more-tools-pop"
+              className="toolspop"
+              role="group"
+              aria-label="More tools"
+            >
+              <button
+                type="button"
+                className="tool"
+                aria-pressed={todoPanelOpen}
+                onClick={() => {
+                  toggleTodoPanel();
+                  setMoreOpen(false);
+                }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 6h11" />
+                  <path d="M9 12h11" />
+                  <path d="M9 18h11" />
+                  <path d="m4 5 1 1 2-2" />
+                  <path d="m4 11 1 1 2-2" />
+                  <path d="m4 17 1 1 2-2" />
+                </svg>
+                <span>To-dos</span>
+              </button>
+              <button
+                type="button"
+                className="tool"
+                aria-pressed={commentsPanelOpen}
+                onClick={() => {
+                  toggleCommentsPanel();
+                  setMoreOpen(false);
+                }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.9-.9L3 20l1-4.9a8.3 8.3 0 0 1-1-4A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5Z" />
+                </svg>
+                <span>Shoutbox</span>
+              </button>
+            </div>
+          )}
+        </div>
         <NotificationBell />
       </div>
     </header>
