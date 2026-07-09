@@ -122,6 +122,7 @@ import { ScheduleTimeline } from "@/components/schedule";
 import { WeeklyViewControls } from "./WeeklyViewControls";
 import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
 import { WeekColumns } from "./WeekColumns";
+import { WeekEditBoard } from "./WeekEditBoard";
 // W3.8 — the lesson-editor popup + the context that carries its opener down
 // to every WeeklyLessonCard (grid, columns, and board parents alike — see
 // the seam note in weekly-lesson-card.tsx).
@@ -135,6 +136,7 @@ import {
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { useTheme } from "@/lib/theme";
+import { useViewEditMode } from "@/lib/edit-mode-state";
 import { buildWeeklyLink, type WeeklyLink } from "@/lib/deep-links";
 import { CURRENT_WEEK } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
@@ -583,6 +585,11 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // (WeekColumns, the bundle's "WeekB"); glass/color keep the subject×day
   // matrix (WeeklyGrid), whose card shell already re-skins per frame.
   const { frame } = useTheme();
+  // W3.8c — Week EDIT mode. Shared across nav by design (edit-mode-state's
+  // force-reset rule resets Day, never Week), so the board persists as the
+  // teacher moves between views. Drives the highest-precedence branch in
+  // renderGridPanel below.
+  const { isEdit } = useViewEditMode("Week");
 
   // Inline schedule-mode state (Subject↔Schedule + Lessons-only↔All). Lives
   // in localStorage so a teacher's choice survives across sessions. The
@@ -1168,6 +1175,13 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
 
   function renderGridPanel(grip: ReactNode): ReactNode {
     // Render selection, in precedence order:
+    //   0. isEdit (Week EDIT mode) → WeekEditBoard. Edit WINS over every other
+    //      branch, INCLUDING the ≤900px narrow-forced-List gate below: the
+    //      board scrolls internally and stays usable at phone widths, so the
+    //      teacher keeps a single editing surface at every tier (decision
+    //      locked by the orchestrator, W3.8c). The board owns its own
+    //      grip placement + `data-pane="grid"` wrapper, so it is returned
+    //      directly (grip is threaded in, not rendered as a sibling here).
     //   1. isNarrow (≤900px) → WeeklyList. The narrow-viewport gate WINS
     //      over schedule mode because a 5-column timeline at 360–900px is
     //      unusable; the dedicated /schedule route is the phone/tablet
@@ -1182,6 +1196,9 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
     //
     // The drag grip stays so the teacher can still reorder the panel at
     // any width or mode. The pills bar sits above whatever renders below.
+    if (isEdit) {
+      return <WeekEditBoard grip={grip} />;
+    }
     const showList = isNarrow || viewMode === "list";
     const showSchedule = !isNarrow && scheduleMode;
     return (

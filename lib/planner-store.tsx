@@ -204,7 +204,10 @@ interface CoalesceFields {
 type MoveLessonAction = {
   type: "moveLesson";
   id: string;
-  patch: { day?: number; subject?: SubjectId; week?: number };
+  // `time` (W3.8c) re-labels the lesson's time slot as part of a cross-period
+  // move on the Week edit board. It is a CONTENT relabel, not a placement
+  // change, so — unlike day/subject/week — it never sets the `moved` flag.
+  patch: { day?: number; subject?: SubjectId; week?: number; time?: string };
 };
 
 type SetLessonStatusAction = {
@@ -757,6 +760,11 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
         const nextDay = action.patch.day ?? l.day;
         const nextSubject = action.patch.subject ?? l.subject;
         const nextWeek = action.patch.week ?? l.week;
+        // `time` (W3.8c cross-period re-time) is a content relabel applied
+        // verbatim — mirroring editLesson's reducer, which spreads its patch
+        // WITHOUT touching any flag. So `sameSlot` (and thus `moved`) stays
+        // day/subject/week-based only: a time-only patch never sets `moved`.
+        const nextTime = action.patch.time ?? l.time;
         const sameSlot =
           nextDay === l.day && nextSubject === l.subject && nextWeek === l.week;
         return {
@@ -764,6 +772,7 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
           day: nextDay,
           subject: nextSubject,
           week: nextWeek,
+          time: nextTime,
           moved: sameSlot
             ? l.moved
             : nextWeek !== l.week
@@ -1706,10 +1715,14 @@ export interface PlannerValue {
    * Move a lesson to a new day, subject, or week.
    * Sets `moved` to "same-week" or "across-weeks" as appropriate.
    * Also prunes the source cell's CellLayout when the lesson leaves a cell.
+   * `time` (W3.8c) re-labels the lesson's time slot for a cross-period move on
+   * the Week edit board — a CONTENT relabel that never sets `moved`. It applies
+   * reducer-locally ONLY (no persist tee: `time` is unmodelled in the DB and a
+   * time-only updateLesson call would spuriously fork — see the mutator body).
    */
   moveLesson: (
     id: string,
-    patch: { day?: number; subject?: SubjectId; week?: number },
+    patch: { day?: number; subject?: SubjectId; week?: number; time?: string },
   ) => void;
   /**
    * Set a lesson's completion status (not_done / done / carried / skipped / partial).
@@ -2451,9 +2464,20 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const moveLesson = useCallback(
     (
       id: string,
-      patch: { day?: number; subject?: SubjectId; week?: number },
+      patch: { day?: number; subject?: SubjectId; week?: number; time?: string },
     ) => {
       dispatchRef.current({ type: "moveLesson", id, patch });
+      // W3.8c — a `time` relabel applies REDUCER-LOCALLY ONLY (the dispatch
+      // above; still one action = one undo step). It is deliberately NOT teed
+      // to persistence: `time` is unmodelled in the DB — every
+      // supabase-source updateLesson write branch skips it ("derived/
+      // unmodelled"), yet `time` sits in that source's contentKeys, so a
+      // time-only updateLesson call would take the fork path with an EMPTY
+      // patch — spuriously forking the lesson while persisting nothing
+      // (Codex gate, round 2). Until a lesson time/period column lands
+      // (Phase 1B, with the per-school timetable), a cross-period re-time is
+      // durable in mock mode and session-local when the Supabase planner
+      // flag is on; the day move below persists either way.
       if (patch.week != null || patch.day != null) {
         // Persist the lesson's RESOLVED final slot, not the bare patch. Call
         // sites (e.g. the weekly board) pass only { day }; sending that raw lets

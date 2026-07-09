@@ -13,3 +13,6 @@ export { WeeklyShell, DRAWER_MQ } from "./WeeklyShell";
 // The Frame-B day-column traversal of the Week view — one column per school
 // day, each a vertical stack of that day's lessons across all subjects.
 export { WeekColumns } from "./WeekColumns";
+// The W3.8c period × day EDIT board — replaces the weekly canvas while Week is
+// in Edit mode; period-aligned or stacked, cross-day/cross-period drag.
+export { WeekEditBoard } from "./WeekEditBoard";

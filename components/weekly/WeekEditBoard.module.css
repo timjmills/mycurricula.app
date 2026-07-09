@@ -1,0 +1,413 @@
+/* WeekEditBoard.module.css — the W3.8c period × day EDIT board.
+ *
+ * Layout is a single CSS grid: a 52px period/time rail (column 1) + one
+ * minmax(120px,1fr) column per configured school day (`--day-count`, set
+ * inline — never a fixed 5). The grid is wider than the viewport on a full
+ * week, so `.scroll` scrolls it HORIZONTALLY inside its own track; the
+ * DOCUMENT never scrolls sideways (CLAUDE.md §4 hard rule).
+ *
+ * All color/spacing come from app/tokens.css. Every token is tone-aware
+ * (redefines under data-tone="dark"), so surfaces stay legible in light and
+ * dark WITHOUT a per-element theme flip — we branch on tone via the tokens,
+ * never on the theme (the WeekColumns.module.css contract). Subject color
+ * arrives through the `.cp-subj.<id>` cascade (var(--c)/--cl/--cd) — never a
+ * hex.
+ *
+ * The period/time rail cells carry the GLOBAL `va-ph` class (app/chrome.css)
+ * for their font/tabular/right-align + dark-tone/photo legibility; this module
+ * only adds the sticky/positioning/background chrome around it (no duplicate
+ * font rules). RULE #1 — every panel, cell, tile, and pill is rounded.
+ */
+
+/* ── Page shell ─────────────────────────────────────────────────────── */
+.root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  background: var(--ink-50);
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 18px 24px;
+}
+
+/* ── The period × day grid ──────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: 52px repeat(var(--day-count, 5), minmax(120px, 1fr));
+  gap: 5px;
+  align-items: stretch;
+  min-height: 100%;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    gap: 4px;
+  }
+}
+
+/* ── Rail corner + sticky day headers ───────────────────────────────── */
+.corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 6;
+  background: var(--ink-50);
+  border-radius: var(--r-12);
+}
+
+.dayHead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px 8px;
+  background: var(--ink-50);
+  border-bottom: var(--line);
+  border-top-left-radius: var(--r-12);
+  border-top-right-radius: var(--r-12);
+}
+
+.dayHeadName {
+  font-size: var(--t-13);
+  font-weight: 700;
+  color: var(--ink-700);
+  letter-spacing: -0.1px;
+}
+
+.dayHeadDate {
+  font-size: var(--t-12);
+  font-weight: 400;
+  color: var(--ink-400);
+}
+
+/* ── Rail cells (the 52px period/time gutter) ───────────────────────── */
+/* `va-ph` (global) supplies font-size/weight/tabular/right-align + tone/photo
+   color; here we only pin it left, give it an opaque background so day cells
+   don't bleed through on horizontal scroll, and set the light-tone color +
+   sizing. */
+.railCell {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  min-height: 62px;
+  padding: 6px 6px 6px 2px;
+  color: var(--ink-500);
+  background: var(--ink-50);
+  border-radius: var(--r-12);
+}
+
+.railTime {
+  font-size: var(--t-12);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.railEnd {
+  font-size: var(--t-10);
+  font-weight: 500;
+  color: var(--ink-400);
+  line-height: 1.1;
+}
+
+.railEmpty {
+  min-height: 62px;
+  background: transparent;
+}
+
+.railUnsched {
+  align-items: flex-end;
+}
+
+.railUnschedLabel {
+  font-size: var(--t-10);
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Day × row cell (the droppable slot) ────────────────────────────── */
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 62px;
+  padding: 4px;
+  min-width: 0;
+  border-radius: var(--r-md);
+  transition:
+    background 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+/* Empty cell — a faint dashed drop affordance (only visible while dragging via
+   the "Drop here" ghost text below). */
+.cellEmpty {
+  border: 1px dashed transparent;
+}
+
+/* Drop-target highlight — inset 2px brand ring + 13% brand wash. --brand-500 is
+   the subject-neutral functional indigo (a slot carries no single subject). */
+.cellTarget {
+  background: color-mix(in oklab, var(--brand-500) 13%, transparent);
+  box-shadow: inset 0 0 0 2px
+    color-mix(in oklab, var(--brand-500) 55%, transparent);
+}
+
+.dropGhost {
+  align-self: center;
+  margin: auto;
+  font-size: var(--t-10);
+  font-weight: 600;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* ── Lesson tile ────────────────────────────────────────────────────── */
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--paper);
+  border: 1px solid var(--ink-150);
+  /* Fork stripe — solid subject color at the inline-start edge. */
+  border-left: 4px solid var(--c);
+  border-radius: var(--r-md);
+  box-shadow:
+    0 14px 36px -22px rgba(28, 27, 46, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  overflow: hidden;
+}
+
+/* Personally modified → DASHED fork stripe (three-tier cue, CLAUDE.md §2). */
+.tileModified {
+  border-left-style: dashed;
+}
+
+.tileSelected {
+  border-color: var(--c);
+  box-shadow:
+    0 0 0 1.5px var(--c),
+    0 14px 36px -22px rgba(28, 27, 46, 0.28);
+}
+
+/* Done recedes but stays readable (matches the weekly card's fade recipe). */
+.tileDone {
+  opacity: 0.66;
+  filter: saturate(72%);
+}
+
+/* Header strip — subject-tinted band with deep-ink text (AA on the tint). */
+.tileHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: color-mix(in oklab, var(--c) 24%, var(--paper));
+  color: var(--cd);
+  cursor: pointer;
+  min-height: 30px;
+}
+
+.grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-12);
+  color: var(--cd);
+  opacity: 0.7;
+  touch-action: none;
+}
+
+.grip:hover {
+  opacity: 1;
+}
+
+.tileSubject {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-12);
+  font-weight: 700;
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tileTime {
+  flex: 0 0 auto;
+  font-size: var(--t-10);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--cd);
+  opacity: 0.85;
+}
+
+/* ── Fork cues (moved arrow + Modified pill) ────────────────────────── */
+.tileCues {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 0;
+}
+
+.movedArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--paper);
+  background: var(--c);
+  border-radius: var(--r-pill);
+}
+
+/* ── Tile body (title + actions + expand) ───────────────────────────── */
+.tileBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px 8px;
+}
+
+.tileTitle {
+  font-size: var(--t-13);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink-900);
+  cursor: text;
+  /* Two-line clamp keeps tiles a predictable height. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.titleInput {
+  width: 100%;
+  font-size: var(--t-13);
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: var(--ink-900);
+  background: var(--surface);
+  border: 1px solid var(--c);
+  border-radius: var(--r-12);
+  padding: 3px 6px;
+}
+
+.tileActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* Doubled class: the `.cp-root button` reset (0,1,1) would otherwise strip the
+   Button primitive's padding/background; doubling wins the cascade. */
+.tileBtn.tileBtn {
+  font-size: var(--t-10);
+  padding: 3px 10px;
+  min-height: 28px;
+}
+
+/* ── Expanded read-only body ────────────────────────────────────────── */
+.tileExpand {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--ink-150);
+}
+
+.tileObjective {
+  font-size: var(--t-12);
+  font-style: italic;
+  color: var(--ink-700);
+  line-height: 1.35;
+}
+
+.tileUnit {
+  font-size: var(--t-10);
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* ── DragOverlay ghost — subject-tinted rotated pill ────────────────── */
+.ghost {
+  max-width: 240px;
+  padding: 8px 12px;
+  font-size: var(--t-12);
+  font-weight: 700;
+  color: var(--cd);
+  background: color-mix(in oklab, var(--c) 30%, var(--paper));
+  border: 1px solid var(--c);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
+  transform: rotate(-1.2deg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+/* ── Screen-reader only ─────────────────────────────────────────────── */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Touch targets (CLAUDE.md §4: ≥44px on phone/tablet) ─────────────────
+   On coarse pointers the drag grip, the header strip, and the tile action
+   buttons all get ≥44px hit areas; the compact desktop sizes stay for
+   mouse/trackpad, where small precise targets are fine. The grip's negative
+   vertical margin keeps the header strip visually compact while its hit box
+   spans the full 44px. */
+@media (pointer: coarse) {
+  .grip {
+    width: 44px;
+    height: 44px;
+    margin: -7px -8px -7px -8px;
+  }
+
+  .tileHead {
+    min-height: 44px;
+  }
+
+  .tileBtn.tileBtn {
+    min-height: 44px;
+  }
+}
+
+/* ── Reduced motion — the FLIP glide is JS-gated (useFlip); also drop the
+   cell transitions so nothing eases under the preference. ─────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .cell {
+    transition: none;
+  }
+}

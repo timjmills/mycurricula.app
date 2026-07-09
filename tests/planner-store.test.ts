@@ -31,6 +31,7 @@ import {
   type PlannerDoc,
 } from "@/lib/planner-store";
 import type { LessonSectionContent } from "@/lib/lesson-flow";
+import type { Lesson, SubjectId } from "@/lib/types";
 
 // ── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -299,5 +300,144 @@ describe("editSection color/tintScope patch", () => {
     state = historyReducer(state, { type: "redo" });
     expect(sectionsOf(state)[0].color).toBe("--subj-4-bright");
     expect(sectionsOf(state)[0].tintScope).toBe("header");
+  });
+});
+
+// ── moveLesson (W3.8c cross-period re-time) ──────────────────────────────
+// The reducer drives the Week edit board's drag: day/subject/week are PLACEMENT
+// (they set `moved`); `time` is a CONTENT relabel that mirrors editLesson —
+// applied verbatim, never touching `moved` or `modified`.
+
+const MLESSON_ID = "m1";
+
+function mkLesson(over: Partial<Lesson> = {}): Lesson {
+  return {
+    id: MLESSON_ID,
+    subject: "math" as SubjectId,
+    time: "8:00–8:45",
+    unit: "u1",
+    title: "Fractions",
+    objective: "",
+    preview: "",
+    directions: "",
+    notes: "",
+    resources: [],
+    standards: [],
+    week: 11,
+    day: 0,
+    isPersonal: false,
+    pendingMaster: false,
+    reasonNotDone: "",
+    modified: false,
+    moved: null,
+    status: "not_done",
+    commentCount: 0,
+    unreadComments: 0,
+    tasks: [],
+    ...over,
+  };
+}
+
+function mkLessonState(lesson: Lesson): HistoryReducerState {
+  return mkState({ lessons: [lesson], sections: {}, cellLayouts: {} });
+}
+
+function movedLesson(state: HistoryReducerState): Lesson {
+  return state.history.present.lessons[0];
+}
+
+function move(patch: {
+  day?: number;
+  subject?: SubjectId;
+  week?: number;
+  time?: string;
+}): PlannerAction {
+  return { type: "moveLesson", id: MLESSON_ID, patch };
+}
+
+describe("moveLesson", () => {
+  it("cross-day move is one history entry; undo restores the original day", () => {
+    let state = mkLessonState(mkLesson({ day: 0 }));
+    state = historyReducer(state, move({ day: 3 }));
+    expect(state.history.past).toHaveLength(1);
+    expect(movedLesson(state).day).toBe(3);
+    expect(movedLesson(state).moved).toBe("same-week");
+
+    state = historyReducer(state, { type: "undo" });
+    expect(movedLesson(state).day).toBe(0);
+    expect(movedLesson(state).moved).toBeNull();
+  });
+
+  it("a day+time patch is one entry; undo restores BOTH", () => {
+    let state = mkLessonState(mkLesson({ day: 0, time: "8:00–8:45" }));
+    state = historyReducer(state, move({ day: 2, time: "10:00–10:45" }));
+    expect(state.history.past).toHaveLength(1);
+    expect(movedLesson(state).day).toBe(2);
+    expect(movedLesson(state).time).toBe("10:00–10:45");
+    // The day change (placement) DID set moved even though time rode along.
+    expect(movedLesson(state).moved).toBe("same-week");
+
+    state = historyReducer(state, { type: "undo" });
+    expect(movedLesson(state).day).toBe(0);
+    expect(movedLesson(state).time).toBe("8:00–8:45");
+    expect(movedLesson(state).moved).toBeNull();
+  });
+
+  it("a time-only patch does NOT set moved; day sets same-week; week sets across-weeks", () => {
+    // time-only → placement unchanged → moved stays null (a content relabel).
+    let timeOnly = mkLessonState(mkLesson({ moved: null }));
+    timeOnly = historyReducer(timeOnly, move({ time: "9:00–9:45" }));
+    expect(movedLesson(timeOnly).time).toBe("9:00–9:45");
+    expect(movedLesson(timeOnly).moved).toBeNull();
+
+    // day change → same-week.
+    let dayMove = mkLessonState(mkLesson({ day: 0, week: 11 }));
+    dayMove = historyReducer(dayMove, move({ day: 4 }));
+    expect(movedLesson(dayMove).moved).toBe("same-week");
+
+    // week change → across-weeks.
+    let weekMove = mkLessonState(mkLesson({ week: 11 }));
+    weekMove = historyReducer(weekMove, move({ week: 12 }));
+    expect(movedLesson(weekMove).moved).toBe("across-weeks");
+  });
+
+  it("a same-slot patch keeps the prior moved value even with time present", () => {
+    // Lesson already carries moved="across-weeks" from an earlier move; a patch
+    // whose day/subject/week resolve to the SAME slot (only time differs) must
+    // preserve that value, not reset it.
+    let state = mkLessonState(
+      mkLesson({ day: 1, week: 11, subject: "math" as SubjectId, moved: "across-weeks" }),
+    );
+    state = historyReducer(
+      state,
+      move({ day: 1, week: 11, subject: "math", time: "11:00–11:45" }),
+    );
+    expect(movedLesson(state).time).toBe("11:00–11:45");
+    expect(movedLesson(state).moved).toBe("across-weeks");
+  });
+
+  it("mirrors editLesson's flag behavior: time applies verbatim, modified untouched", () => {
+    // editLesson spreads its patch WITHOUT setting `modified`; a moveLesson
+    // time relabel must do the same — apply the field, leave `modified` as-is.
+    const baseline = mkLesson({ modified: false, time: "8:00–8:45" });
+
+    // editLesson reference: patch a content field, modified stays false.
+    let viaEdit = mkLessonState(baseline);
+    viaEdit = historyReducer(viaEdit, {
+      type: "editLesson",
+      id: MLESSON_ID,
+      patch: { time: "1:00–1:45" },
+      coalesceKey: `lesson:${MLESSON_ID}:time`,
+      coalesceTs: 1_000,
+    });
+    expect(movedLesson(viaEdit).time).toBe("1:00–1:45");
+    expect(movedLesson(viaEdit).modified).toBe(false);
+
+    // moveLesson time relabel: identical flag outcome.
+    let viaMove = mkLessonState(baseline);
+    viaMove = historyReducer(viaMove, move({ time: "1:00–1:45" }));
+    expect(movedLesson(viaMove).time).toBe("1:00–1:45");
+    expect(movedLesson(viaMove).modified).toBe(false);
+    expect(movedLesson(viaMove).moved).toBeNull();
   });
 });

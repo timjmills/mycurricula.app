@@ -27,6 +27,7 @@ import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AppearanceControls } from "@/components/appearance/appearance-controls";
 import { Tooltip } from "@/components/ui";
+import { WeekLayoutToggle } from "./WeekLayoutToggle";
 
 // Route → display title. Only the routes that carry a ViewTitle today
 // (Day/Week/Year in the top bar; Plan in the immersbar). Home renders the
@@ -180,9 +181,10 @@ export function ViewTitle(): ReactNode {
                 style={{ left: pos.left, top: pos.top }}
               >
                 <div className="vt-menuh">Appearance</div>
-                {/* W3.8c seam: per-view extras (the Week Aligned/Stacked layout
-                    toggle) mount here, above the shared controls. Deferred with
-                    the per-view-override wave. */}
+                {/* W3.8c: per-view extras mount here, above the shared controls.
+                    WeekLayoutToggle self-gates to /weekly (renders null
+                    elsewhere), so it is safe to mount unconditionally. */}
+                <WeekLayoutToggle />
                 <AppearanceControls compact />
               </div>
             </div>,
