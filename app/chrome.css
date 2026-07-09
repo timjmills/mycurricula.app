@@ -698,6 +698,15 @@
   .views.console.compact .view .vw-word {
     font-size: clamp(14px, 1.3vw, 16px);
   }
+  /* RESPONSIVE-AUDIT polish: at phone width the FULL home console's four chips
+     compress to ~66px each and the sub-lines ("Curricular plan", "Planner hub")
+     crowd illegibly. Borrow the compact variant's answer — word only — so the
+     chips read Day / Week / Year / Plan cleanly. ≥481px the subs return. */
+  @media (max-width: 480px) {
+    .views.console:not(.compact) .view .vw-sub {
+      display: none;
+    }
+  }
 
   /* Console entries are anchors (TransitionLink) — drop the UA underline. */
   .views .view {
