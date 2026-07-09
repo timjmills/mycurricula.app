@@ -10,10 +10,13 @@
 // `.tools` by ChromeShell's non-immersive branch on /daily + /weekly only —
 // the immersive bar (Plan/Post/Teach) never hosts it (bundle-verified).
 //
-// State: a per-view UI edit-mode map persisted to the localStorage key
+// State: the per-view UI edit-mode map persisted to the localStorage key
 // `cc_editmode` — `Record<string, boolean>` keyed by view name (e.g.
 // `{ Week: true }`), mirroring the bundle's `ljson('cc_editmode',{})` /
-// `sjson`. `isEdit = !!map[view]`.
+// `sjson`. `isEdit = !!map[view]`. As of W3.8b the map lives in the SHARED
+// <EditModeProvider> (lib/edit-mode-state.tsx — see its header for the
+// provider-less-desync precedent); this component is the WRITER, consuming
+// useViewEditMode(view) so ChromeShell + the Day-edit view react in-session.
 //
 // ⚠ NAME COLLISION — this is NOT `useAppState().editMode`. That value is the
 // forking `personal | master` axis (CLAUDE.md §2: the Personal/Team toggle).
@@ -21,11 +24,11 @@
 // view (polished read vs. planning/edit) the teacher last chose. It never
 // touches app-state's editMode; the two only share an unfortunate name.
 //
-// INERT this wave (plan C5 / WAVE-3-PLAN.md:152 — "Mode defaults to View until
-// W3.8c"): clicking persists the local map, but has NO downstream effect in
-// W3.6. This file IS the mount point; the actual View/Edit rendering split is
-// wired in W3.8b/W3.8c. The persisted flag is written now so that wiring reads
-// a live value the day it lands.
+// LIVE for Day as of W3.8b: flipping to Edit swaps /daily into the two-pane
+// planning split and suppresses the bottom clock/console row (ChromeShell).
+// Day force-resets to View on Home→Day nav and on the Day nav item (bundle
+// B:11978/B:11986 — wired at the nav callsites, not here). Week's toggle
+// still persists the flag only; its real Edit rendering lands in W3.8c.
 //
 // Styling: reuses the EXISTING `.modesw modesw-icon glass` + `.modesw-ib`
 // recipe (chrome.css) verbatim — this file writes NO styles and hard-codes NO
@@ -47,40 +50,9 @@
 // pressed pair); the pill is a labelled group. Icons are aria-hidden — the
 // labels carry the names.
 
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Tooltip } from "@/components/ui";
-
-// ── Persisted per-view edit-mode map (bundle `cc_editmode`) ───────────────
-
-const STORAGE_KEY = "cc_editmode";
-
-type EditModeMap = Record<string, boolean>;
-
-function readEditModeMap(): EditModeMap {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as unknown;
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as EditModeMap;
-    }
-  } catch {
-    // Malformed JSON or storage unavailable — resting default is View.
-  }
-  return {};
-}
-
-function writeEditMode(view: string, on: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    const map = readEditModeMap();
-    map[view] = on;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-  } catch {
-    // Quota or private-mode failure — in-memory state still reflects the flip.
-  }
-}
+import { useViewEditMode, type EditModeView } from "@/lib/edit-mode-state";
 
 // ── Tooltip copy (bundle title text, verbatim) ────────────────────────────
 
@@ -129,28 +101,17 @@ function PencilIcon(): ReactNode {
 
 export interface ViewEditToggleProps {
   /**
-   * The host view name — the key into the `cc_editmode` map (e.g. "Day" |
-   * "Week"). Supplied by ChromeShell from the active route.
+   * The host view name — the key into the `cc_editmode` map ("Day" | "Week").
+   * Supplied by ChromeShell from the active route.
    */
-  view: string;
+  view: EditModeView;
 }
 
 export function ViewEditToggle({ view }: ViewEditToggleProps): ReactNode {
-  // SSR-safe: initial render assumes View (false). The persisted per-view
-  // value hydrates in the post-mount effect below so the server HTML matches
-  // the first client paint.
-  const [isEdit, setIsEdit] = useState(false);
-
-  useEffect(() => {
-    const map = readEditModeMap();
-    setIsEdit(!!map[view]);
-  }, [view]);
-
-  // INERT (W3.6): persist the local flag; no downstream effect until W3.8c.
-  const setEdit = (on: boolean): void => {
-    setIsEdit(on);
-    writeEditMode(view, on);
-  };
+  // Shared, reactive state (W3.8b): the provider owns SSR safety (server
+  // renders View; the saved map hydrates post-mount) and persistence; this
+  // component just reads/writes the one live instance every consumer shares.
+  const { isEdit, setEdit } = useViewEditMode(view);
 
   // Per-view tooltip ids so a teacher's "Turn off these tips" choice is scoped
   // to the surface they dismissed it on (e.g. "week-view-mode-view").

@@ -126,9 +126,14 @@ import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 // precedent for reading it here.
 import { useTheme } from "@/lib/theme";
 import { useDndSensors } from "@/lib/collapse-on-drag";
+// W3.8b — the per-view View↔Edit mode (builder B's lib; the cc_editmode
+// localStorage map behind the top-bar ViewEditToggle). NOT app-state's
+// forking editMode — see the name-collision note in ViewEditToggle.tsx.
+import { useViewEditMode } from "@/lib/edit-mode-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LessonDetail } from "./LessonDetail";
+import { DayEditSplit } from "./DayEditSplit";
 import { TodayDashboard } from "./TodayDashboard";
 import { IconRail } from "./IconRail";
 import {
@@ -941,6 +946,12 @@ export function DailyView({
   // the header "+" button as its sole add affordance (unchanged visuals).
   const { frame } = useTheme();
 
+  // W3.8b — the Day view's View↔Edit mode (the top-bar ViewEditToggle's
+  // persisted cc_editmode flag, capitalized "Day" — bundle-exact key
+  // casing). While isEdit, the body row's dock/list content is replaced by
+  // the two-pane <DayEditSplit>; the page header bar + schedule rail stay.
+  const { isEdit, setEdit } = useViewEditMode("Day");
+
   // ── Per-teacher row order (local + localStorage, NOT the shared doc) ──
   // Keyed by week+day. Initialised EMPTY rather than from localStorage: the
   // server has no localStorage, so seeding state from it in the initializer
@@ -1243,19 +1254,23 @@ export function DailyView({
     [setLessonStatus],
   );
 
-  // ── Planner-open seam (W3.7) ──────────────────────────────────────────
+  // ── Planner-open seam (W3.7 → W3.8b) ──────────────────────────────────
   // The ONE named entry point for "open this lesson in the daily planner":
   // dblclick / Shift+Enter on a lesson row, and both add-lesson flows after
-  // a successful create. Today "open" means the existing selection path
-  // (select + swap the narrow pane to detail) — that IS the current Day
-  // layout's planner surface.
-  // TODO(W3.8b): point at the Day-edit split pane / fill-in template when it
-  // lands (WAVE-3-PLAN W3.8b openPlan).
+  // a successful create. W3.8b LOCKED DECISION (bundle wins — openPlan on
+  // Day, ~B:11848): "open" now flips the Day view into EDIT mode AND
+  // selects the lesson, so every caller lands in the <DayEditSplit> right
+  // pane with that lesson active in the fill-in template. Selection is the
+  // SHARED selectedId (handleSelectLesson), so flipping back to View keeps
+  // the same lesson in context. The narrow-pane swap inside
+  // handleSelectLesson is inert while the edit split renders (it replaces
+  // the dock entirely) and correct again the moment the teacher exits.
   const openLessonPlanner = useCallback(
     (lessonId: string): void => {
+      setEdit(true);
       handleSelectLesson(lessonId);
     },
-    [handleSelectLesson],
+    [handleSelectLesson, setEdit],
   );
 
   // ── One-click add lesson (W3.7, bundle .vb-railadd/.vc-aadd) ─────────
@@ -1864,7 +1879,28 @@ export function DailyView({
       <div className={styles.bodyRow}>
         {/* ── Far-left: slim icon nav rail (sibling of the body) ─── */}
         <IconRail />
-        {viewMode === "list" ? (
+        {isEdit ? (
+          /* ── W3.8b Day EDIT mode ─────────────────────────────────────────
+              The two-pane agenda + fill-in-template split (bundle DayEdit,
+              ~B:11294-11355) replaces the dock/list body while the top-bar
+              View↔Edit toggle is in Edit — the smallest cut: the page
+              header bar above and the schedule rail below stay as-is.
+              Selection (selectedId) is SHARED with View mode; quick-add
+              reuses the W3.7 awaited mutator + error surface; Exit flips
+              the persisted mode back to View. */
+          <DayEditSplit
+            dayLessons={dayLessons}
+            week={week}
+            day={selectedDay}
+            dayLabel={weekdays[selectedDay]?.longLabel ?? "Day"}
+            selectedId={selectedId}
+            onSelect={handleSelectLesson}
+            onExit={() => setEdit(false)}
+            onQuickAdd={() => void handleQuickAddLesson()}
+            quickAdding={addingLesson}
+            quickAddError={quickAddError}
+          />
+        ) : viewMode === "list" ? (
           /* ── List mode body ──────────────────────────────────────────────
               DailyList occupies the list+detail area (flex:1). The right
               rail stays mounted beside it at its fixed width. This keeps

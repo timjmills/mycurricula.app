@@ -30,6 +30,7 @@
 import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
+import { useViewEditMode } from "@/lib/edit-mode-state";
 import { settlePendingNavigation } from "@/lib/view-transition";
 import { ChromeTopBar } from "./ChromeTopBar";
 import { ImmersiveBar } from "./ImmersiveBar";
@@ -51,6 +52,10 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
   const pathname = usePathname();
   const router = useRouter();
   const { editMode } = useAppState();
+  // W3.8b: Day's View↔Edit UI mode (the shared cc_editmode map — NOT the
+  // forking editMode above; same word, unrelated axis). Read here to suppress
+  // the bottom clock/console row while the teacher is editing the Day.
+  const dayEdit = useViewEditMode("Day").isEdit;
 
   // <html data-mode="team"> ↔ editMode. Set/removed (never "personal") so the
   // attribute's presence IS the team signal, matching the CSS key and keeping
@@ -72,7 +77,11 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
   );
 
   // Bundle scoping for the bottom chrome (see the render comment below).
-  const botbarRoute = pathname === "/home" || pathname === "/daily";
+  // W3.8b: the clock/console row is suppressed while Day is in EDIT mode —
+  // the real edit-mode chrome change (WAVE-3-PLAN W3.8b; the `.pb-editing`
+  // titlebar rule is vestigial). Flipping back to View restores it.
+  const botbarRoute =
+    pathname === "/home" || (pathname === "/daily" && !dayEdit);
   const quoteRoute = pathname === "/home";
   // W3.4: the compact console (the slim view-nav variant) rides atop
   // Day/Week/Year. Home renders the FULL console as its page; the immersive
@@ -86,8 +95,9 @@ export function ChromeShell({ children }: { children: ReactNode }): ReactNode {
 
   // W3.6: the View↔Edit toggle mounts in the top bar's `.tools` cluster on
   // Day + Week ONLY (bundle-verified — the immersive bar never hosts it). Its
-  // `cc_editmode` map is keyed by view name; INERT until W3.8c wires the
-  // rendering split.
+  // `cc_editmode` map is keyed by view name; LIVE for Day as of W3.8b (the
+  // two-pane edit split + the botbar suppression above); Week's real Edit
+  // rendering lands in W3.8c.
   const showViewEdit = pathname === "/daily" || pathname === "/weekly";
 
   if (immersive) {

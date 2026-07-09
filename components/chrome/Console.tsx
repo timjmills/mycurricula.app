@@ -30,6 +30,7 @@ import { usePathname } from "next/navigation";
 import { TransitionLink } from "@/lib/view-transition";
 import { Tooltip } from "@/components/ui";
 import { useAppState } from "@/lib/app-state";
+import { useViewEditMode } from "@/lib/edit-mode-state";
 import { useNowTick } from "@/lib/use-now-tick";
 
 interface ConsoleEntry {
@@ -92,6 +93,14 @@ function isActive(pathname: string, href: string): boolean {
 // and lets the chrome.css `.views.console.compact` recipe slim the padding.
 function ConsoleNav({ compact = false }: { compact?: boolean }): ReactNode {
   const pathname = usePathname();
+  // W3.8b force-reset: the Day nav item resets Day to View (bundle B:11978 —
+  // Home→Day nav; B:11986 — the compact console's Day item resets IN PLACE
+  // even when already on /daily, a "back to View" affordance). Covers BOTH
+  // mounts, since HomeConsole and CompactConsole share this row. The reset
+  // rides the CLICK itself — TransitionLink composes a caller's onClick
+  // BEFORE its push — never a post-nav effect. Deep links (?lesson=),
+  // WeeklyList/schedule jumps, the palette, and rail icons never reset.
+  const { setEdit: setDayEdit } = useViewEditMode("Day");
   return (
     <div
       className={"views console" + (compact ? " compact" : "")}
@@ -111,6 +120,7 @@ function ConsoleNav({ compact = false }: { compact?: boolean }): ReactNode {
               href={e.href}
               className={"view" + (active ? " active" : "")}
               aria-current={active ? "page" : undefined}
+              onClick={e.key === "day" ? () => setDayEdit(false) : undefined}
             >
               <span className="vw-word">{e.word}</span>
               {!compact && <span className="vw-sub">{e.sub}</span>}

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AppStateProvider } from "@/lib/app-state";
 import { CatchupProvider } from "@/lib/catchup-state";
 import { ConsequenceToastProvider } from "@/lib/consequence-toast";
+import { EditModeProvider } from "@/lib/edit-mode-state";
 import { NotebookProvider } from "@/lib/notebook-state";
 import { PlannerProvider } from "@/lib/planner-store";
 import { UndoToastProvider } from "@/lib/undo-toast";
@@ -58,33 +59,42 @@ export default function PlannerLayout({
             <UndoToastProvider>
               <UnitNotesProvider>
                 <CatchupProvider>
-                  {/* Skip-to-content (A11Y-004) — must be the first focusable element
+                  {/* EditModeProvider (W3.8b) hosts the per-view View↔Edit UI
+                      mode (the bundle's cc_editmode map — NOT app-state's
+                      forking editMode; same word, unrelated axis). It must
+                      sit ABOVE both the SideNav (a force-reset writer) and
+                      the ChromeShell subtree (the toggle writer + the botbar
+                      reader + the Day-edit view) so every consumer shares
+                      ONE live instance — the weekly-schedule-state desync
+                      lesson (lib/edit-mode-state.tsx header). */}
+                  <EditModeProvider>
+                    {/* Skip-to-content (A11Y-004) — must be the first focusable element
                   in the DOM so keyboard users reach it before the top-bar chrome. */}
-                  <a href="#main-content" className={styles.skipLink}>
-                    Skip to content
-                  </a>
-                  <div
-                    className="cp-root"
-                    style={{
-                      flex: 1,
-                      minHeight: 0,
-                      display: "flex",
-                      flexDirection: "column",
-                    }}
-                  >
-                    {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
+                    <a href="#main-content" className={styles.skipLink}>
+                      Skip to content
+                    </a>
+                    <div
+                      className="cp-root"
+                      style={{
+                        flex: 1,
+                        minHeight: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
+                    >
+                      {/* Global keyboard shortcuts, ⌘K palette, and ? overlay.
                     Mounted as a client leaf so the layout stays a Server Component. */}
-                    <GlobalShortcuts />
-                    {/* Remembers the active planner route so the Settings X /
+                      <GlobalShortcuts />
+                      {/* Remembers the active planner route so the Settings X /
                     Escape can return the teacher exactly where they left. */}
-                    <LastRouteRecorder />
-                    {/* Roadmap-02 undo-toast bridge: a render-nothing client
+                      <LastRouteRecorder />
+                      {/* Roadmap-02 undo-toast bridge: a render-nothing client
                     leaf that watches the planner store's lastChange and fires
                     the undo toast for every undoable gesture (move /
                     completion / first fork / revert). Must sit inside BOTH
                     PlannerProvider and UndoToastProvider. */}
-                    <UndoToastBridge />
-                    {/* W3.3 shell: the v2 corner-grammar chrome (ChromeShell —
+                      <UndoToastBridge />
+                      {/* W3.3 shell: the v2 corner-grammar chrome (ChromeShell —
                     Framework §3 overlay grid: ChromeTopBar with brand +
                     Personal/Team icon toggle + bell · routed content in the
                     middle row · ctx BL + clock BR + quote bottom-center; with
@@ -101,41 +111,42 @@ export default function PlannerLayout({
                     is position:relative so the absolute .overlay grid fills
                     exactly the area right of the SideNav. Teach remains a
                     separate route group with its own chrome. */}
-                    <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-                      <SideNav />
-                      <div
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          minHeight: 0,
-                          position: "relative",
-                        }}
-                      >
-                        <ChromeShell>
-                          <div
-                            style={{
-                              flex: 1,
-                              minHeight: 0,
-                              display: "flex",
-                            }}
-                          >
-                            <main
-                              id="main-content"
+                      <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+                        <SideNav />
+                        <div
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            minHeight: 0,
+                            position: "relative",
+                          }}
+                        >
+                          <ChromeShell>
+                            <div
                               style={{
                                 flex: 1,
-                                minWidth: 0,
                                 minHeight: 0,
-                                overflow: "auto",
+                                display: "flex",
                               }}
                             >
-                              {children}
-                            </main>
-                            <RightPanel />
-                          </div>
-                        </ChromeShell>
+                              <main
+                                id="main-content"
+                                style={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                  minHeight: 0,
+                                  overflow: "auto",
+                                }}
+                              >
+                                {children}
+                              </main>
+                              <RightPanel />
+                            </div>
+                          </ChromeShell>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </EditModeProvider>
                 </CatchupProvider>
               </UnitNotesProvider>
             </UndoToastProvider>
