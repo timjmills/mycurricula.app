@@ -48,3 +48,13 @@
     transition: none;
   }
 }
+
+/* RESPONSIVE-AUDIT F5: on phone/tablet the 40×36 chip sits under the 44px
+   touch floor. Grow the tappable button (the wrapped ThemeChip miniature stays
+   its own size, centered); desktop keeps the tighter secondary-control chrome. */
+@media (max-width: 900px) {
+  .chipBtn {
+    width: 44px;
+    height: 44px;
+  }
+}
