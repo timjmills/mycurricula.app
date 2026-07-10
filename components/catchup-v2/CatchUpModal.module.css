@@ -1,0 +1,420 @@
+/* CatchUpModal.module.css — the v2 Catch-Up triage modal (Wave 10).
+ *
+ * A light, frosted, single-job overlay: scope chips across the top, uncovered
+ * lesson rows (or standards-gap rows) below. Tokens only — no hex literals, no
+ * px font sizes outside the --t-* scale. Tone-aware by construction: the frosted
+ * fill mixes from var(--panel-bg) (white on light themes, deep violet on Night)
+ * so it never washes to raw white, and text rides the --ink scale so it flips
+ * with data-tone. Never branch on the theme (CLAUDE.md §4 legibility contract).
+ *
+ * The root carries the GLOBAL `cu-modal` class and the scrim `cu-scrim` — both
+ * enrolled in app/themes.css §5 (surface-theming contract), so the active
+ * theme's faint accent wash reaches them above the z-90 theme tint. Those two
+ * class names are load-bearing; renaming them silently drops the wash.
+ *
+ * Button-class rules are DOUBLED (`.chip.chip`) so they outgun the
+ * `.cp-root button` reset (0,1,1) — the modal portals into `.cp-root`, whose
+ * reset would otherwise strip padding / border / background. Same for every
+ * other <button> here (.close / .action / .gapNone).
+ */
+
+/* ── Scrim ──────────────────────────────────────────────────────────────── */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  background: rgba(12, 11, 20, 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  animation: cuFade 0.18s ease;
+}
+@keyframes cuFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Modal card — frosted, tone-aware ───────────────────────────────────── */
+.modal {
+  width: min(720px, 96vw);
+  /* 100% resolves to the padded scrim cell (viewport − 2×24px) so the modal
+     never overflows the scrim margin on phones. */
+  max-width: 100%;
+  max-height: 88vh;
+  min-width: min(340px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--r-2xl, 32px);
+  /* Frosted, not flat: mix from --panel-bg (per-theme, per-tone) toward
+     transparent + a heavy blur so the photo/wash behind reads through. */
+  background: color-mix(in srgb, var(--panel-bg, var(--surface)) 86%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+  color: var(--ink, #1c1b2e);
+  border: 1px solid color-mix(in srgb, var(--ink-500) 16%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 40px 100px -30px rgba(8, 8, 18, 0.55);
+  animation: cuPop 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@keyframes cuPop {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .modal {
+    animation: none;
+  }
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  flex: 0 0 auto;
+}
+.titleWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.title {
+  font-family: var(--font-display-sm, inherit);
+  font-weight: 800;
+  font-size: var(--t-20, 20px);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  color: var(--ink, #1c1b2e);
+}
+/* Count badge — flame-red status token, NEVER a subject hue. Mixed 84% toward
+   black under the fill so white count text clears WCAG AA (raw --catchup #e0431a
+   with white sits at ~3.9:1; the mix lifts it above 4.5:1). */
+.badge {
+  flex: 0 0 auto;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--r-pill, 999px);
+  background: color-mix(in oklab, var(--catchup) 84%, #000);
+  color: #fff;
+  font-size: var(--t-12, 12px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.subline {
+  margin-top: 3px;
+  font-size: var(--t-12, 12px);
+  font-weight: 600;
+  color: var(--ink-500, #57566b);
+}
+.headText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.close.close {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill, 999px);
+  border: 1px solid color-mix(in srgb, var(--ink-500) 26%, transparent);
+  background: color-mix(in srgb, var(--ink-500) 8%, transparent);
+  color: var(--ink, #1c1b2e);
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.close.close:hover {
+  background: color-mix(in srgb, var(--ink-500) 16%, transparent);
+}
+.close.close:focus-visible {
+  outline: 2px solid var(--accent, var(--chrome-accent));
+  outline-offset: 2px;
+}
+.close svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* ── Scope chips ─────────────────────────────────────────────────────────── */
+.scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 0 20px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink-500) 14%, transparent);
+  flex: 0 0 auto;
+}
+.chip.chip {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r-pill, 999px);
+  padding: 7px 14px;
+  font-weight: 700;
+  font-size: var(--t-12, 12.5px);
+  color: var(--ink-700, #3a3950);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.14s,
+    color 0.14s,
+    border-color 0.14s;
+}
+.chip.chip:hover {
+  border-color: color-mix(in srgb, var(--chrome-accent) 50%, var(--border));
+}
+.chipOn.chipOn {
+  background: var(--chrome-accent);
+  color: var(--accent-ink, #fff);
+  border-color: transparent;
+}
+.chip.chip:focus-visible {
+  outline: 2px solid var(--accent, var(--chrome-accent));
+  outline-offset: 2px;
+}
+
+/* ── Body — internal scroll ─────────────────────────────────────────────── */
+.body {
+  padding: 12px 16px 18px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Group ───────────────────────────────────────────────────────────────── */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+}
+.groupStripe {
+  width: 4px;
+  height: 14px;
+  border-radius: var(--r-pill, 999px);
+  flex: 0 0 auto;
+}
+.groupLabel {
+  font-size: var(--t-13, 13px);
+  font-weight: 800;
+  color: var(--ink, #1c1b2e);
+}
+.groupCount {
+  font-size: var(--t-12, 12px);
+  font-weight: 600;
+  color: var(--ink-500, #57566b);
+}
+
+/* ── Lesson row ──────────────────────────────────────────────────────────── */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--r-md, 14px);
+  background: color-mix(in srgb, var(--ink-500) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink-500) 10%, transparent);
+  border-left: 4px solid var(--c, var(--ink-400));
+}
+.rowMain {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rowTitle {
+  font-size: var(--t-14, 14px);
+  font-weight: 700;
+  color: var(--ink, #1c1b2e);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rowSub {
+  margin-top: 2px;
+  font-size: var(--t-12, 12px);
+  font-weight: 500;
+  color: var(--ink-500, #57566b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+.action.action {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: var(--r-pill, 999px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-700, #3a3950);
+  font-size: var(--t-12, 12px);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.13s,
+    color 0.13s,
+    border-color 0.13s;
+}
+.action.action:hover {
+  border-color: color-mix(in srgb, var(--chrome-accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--chrome-accent) 8%, var(--surface));
+}
+.action.action:focus-visible {
+  outline: 2px solid var(--accent, var(--chrome-accent));
+  outline-offset: 1px;
+}
+/* Mark taught — the affirmative commit gets the green done token. */
+.actionDone.actionDone:hover {
+  border-color: color-mix(in srgb, var(--done) 55%, var(--border));
+  background: color-mix(in srgb, var(--done) 12%, var(--surface));
+  color: color-mix(in oklab, var(--done) 72%, var(--ink));
+}
+.action svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+/* On narrow rows the action labels collapse to icons (still tooltip'd). */
+.actionLabel {
+  display: inline;
+}
+
+/* ── Standards-gap row ───────────────────────────────────────────────────── */
+.gapRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md, 14px);
+  border: 1px dashed var(--warn);
+  background: color-mix(in srgb, var(--warn) 6%, transparent);
+}
+.gapCode {
+  flex: 0 0 auto;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--t-11, 11px);
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--r-8, 8px);
+  background: var(--warn-tint);
+  color: color-mix(in oklab, var(--warn) 62%, var(--ink));
+  white-space: nowrap;
+}
+.gapText {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-13, 13px);
+  font-weight: 500;
+  color: var(--ink-700, #3a3950);
+  line-height: 1.35;
+}
+.gapText b {
+  font-weight: 800;
+  color: var(--ink, #1c1b2e);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+}
+.emptyIcon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill, 999px);
+  background: color-mix(in srgb, var(--done) 16%, transparent);
+  color: var(--done);
+}
+.emptyIcon svg {
+  width: 24px;
+  height: 24px;
+}
+.emptyText {
+  font-size: var(--t-14, 14px);
+  font-weight: 700;
+  color: var(--ink-700, #3a3950);
+}
+
+/* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
+@media (pointer: coarse), (max-width: 900px) {
+  .close.close {
+    width: 44px;
+    height: 44px;
+  }
+  .chip.chip {
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
+  .action.action {
+    height: 44px;
+    padding: 0 12px;
+  }
+}
+
+/* ── Phone — stack actions under the row so nothing overflows ────────────── */
+@media (max-width: 560px) {
+  .modal {
+    border-radius: var(--r-xl, 24px);
+    max-height: 92vh;
+  }
+  .row {
+    flex-wrap: wrap;
+  }
+  .rowActions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  /* Icon-only actions on phone keep the row compact; the tooltip + aria-label
+     still name each one. */
+  .actionLabel {
+    display: none;
+  }
+  .action.action {
+    padding: 0;
+    width: 44px;
+    justify-content: center;
+  }
+}
