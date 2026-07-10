@@ -1029,7 +1029,11 @@ const ssrCookieResults = [];
   await ssrCheck(
     "SSR hostile cookie falls to defaults",
     'v1."><script>.dark.photo.clear.normal.vivid.highlight',
-    [/data-frame="glass"/],
+    // dayHead anchor (same as the no-cookie check): the root layout emits
+    // data-frame="glass" on /login HTML too, so without an authed-weekly
+    // marker a broken session would false-pass this WITHOUT exercising the
+    // cookie parser (Codex §4a re-run finding).
+    [/data-frame="glass"/, /WeeklyGrid_dayHead/],
     [],
   );
 }
