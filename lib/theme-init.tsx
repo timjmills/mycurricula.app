@@ -34,15 +34,21 @@
 // correct on the very first frame.
 //
 // COUPLING — ALLOWLIST LOCKSTEP (READ BEFORE EDITING): the literal arrays below
-// MUST mirror the exported guard arrays in lib/theme.tsx (FRAME_VALUES,
-// GLASS_VALUES, BG_VALUES, THEME_VALUES + the "system" sentinel, DIM_VALUES), the
-// SQL CHECK constraints, the SSR attributes in app/layout.tsx, and the probe. The
-// boot script cannot import the guards (it runs before any module loads), so this
-// is a hand-kept literal copy. If it drifts, a value one surface accepts and
-// another rejects breaks SILENTLY. This script also performs the one-time v1→v2
-// localStorage migration (paper|cloud → clear; seed theme-frame from theme-style)
-// so the very first boot already persists v2 keys; lib/theme.tsx repeats the same
-// remap defensively on read.
+// MUST mirror the canonical value arrays in lib/theme-values.ts (FRAME_VALUES,
+// GLASS_VALUES, BG_VALUES, THEME_VALUES + the "system" sentinel, DIM_VALUES —
+// the ORIGIN; lib/theme.tsx re-exports them), the SQL CHECK constraints, the
+// SSR attributes in app/layout.tsx (now cookie-fed via the same theme-values
+// guards), and the probe. The boot script cannot import the guards (it runs
+// before any module loads), so this is a hand-kept literal copy. If it drifts,
+// a value one surface accepts and another rejects breaks SILENTLY. This script
+// also performs the one-time v1→v2 localStorage migration (paper|cloud →
+// clear; seed theme-frame from theme-style) so the very first boot already
+// persists v2 keys; lib/theme.tsx repeats the same remap defensively on read.
+//
+// SSR NOTE (FRAME-FLASH-SSR-DESIGN.md): the server now pre-paints these same
+// attributes from the mc-theme-axes cookie, so in the common case this
+// script's repaint is an idempotent no-op. It REMAINS load-bearing: it is the
+// localStorage-over-stale-cookie self-heal and the only "system" resolver.
 
 import type { ReactNode } from "react";
 
