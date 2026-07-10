@@ -1,38 +1,26 @@
 "use client";
 
-// UnitExplorer.tsx — the Wave-6 Year drill-down modal (v2 "The Year").
+// UnitExplorer.tsx — the Year drill-down modal's UNIT mode (v2 "The Year").
 //
-// Opened from a unit chip / node on the YearA / YearC frames (Builder B wires
-// the open path). A centered, frosted dialog scoped to ONE unit, showing five
-// tabs — Overview · Lessons · Standards · Resources · Notes — each bound to
-// REAL store data only (usePlanner catalog + lib/year-unit-aggregate +
-// lib/unit-notes). The 7.2.26 bundle's Explorer fabricates pace / projected-
-// finish / vs-last-year / assessment stats; NONE of that is built here (locked
-// scope) — no dead placeholders.
+// Opened from a unit chip / node on the YearA / YearC frames. A centered,
+// frosted dialog scoped to ONE unit, showing five tabs — Overview · Lessons ·
+// Standards · Resources · Notes — each bound to REAL store data only
+// (usePlanner catalog + lib/year-unit-aggregate + lib/unit-notes). The 7.2.26
+// bundle's Explorer fabricates pace / projected-finish / vs-last-year /
+// assessment stats; NONE of that is built here (locked scope) — no dead
+// placeholders.
+//
+// WAVE 7: the modal chrome (scrim, portal, gradient header, tablist, focus
+// trap, Escape/scrim close) moved to <ExplorerShell>, which this file now
+// consumes. UnitExplorer additionally owns the bundle's two-mode switch: the
+// Unit Planner (this file) and the Lesson Planner
+// (components/lesson-plan-v2/PlanPage), which render the SAME shell. Opening a
+// lesson's plan is an IN-MODAL mode switch, not the old cross-route bounce to
+// `/daily?lesson=…` (that deep link still works from everywhere else).
 //
 // DATA IDENTITY: `unit` is the unit-id SLUG as it sits on `Lesson.unit`
 // (e.g. "u-m3"). The display name / week span / "Unit n of N" resolve from the
 // catalog (usePlanner().unitById + .units) via lib/year-v2-data helpers.
-//
-// THEMING: the modal root carries the GLOBAL `ue-modal` class and the scrim
-// `ue-scrim` — both already enrolled in app/themes.css §5 (surface theming
-// contract), so the active theme's accent wash reaches them above the z-90
-// theme tint. Mirrors how components/lesson-editor/LessonModal registers
-// `lm-modal`/`lm-scrim`; no themes.css edit is needed. Subject color arrives
-// through the `cp-subj <subject.cls>` cascade on the root (var(--c) etc.),
-// never a hex; every derived accent mixes toward tokens (not raw white) so
-// Night stays legible.
-//
-// PORTAL: into `.cp-root` (fallback document.body) — the planner-v2 atoms
-// (FinishPill / StatusDot / ForkCues) and the ui/Button primitive rely on the
-// `.cp-root button` resets + font cascade; a raw-body portal would strip them.
-// The §5 wash is a descendant selector under :root[data-theme], so it matches
-// either host.
-//
-// MECHANICS: role="dialog" aria-modal; scrim-click + ✕ + Escape all close;
-// focus moves into the dialog on open and restores to the invoker on close;
-// Tab is trapped inside the panel; the tablist is arrow-key navigable; the
-// body scrolls internally within max-height 92vh.
 
 import {
   useCallback,
@@ -41,23 +29,23 @@ import {
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Lesson, SubjectId } from "@/lib/types";
 import type { DayStatus } from "@/lib/day-status";
 import { usePlanner } from "@/lib/planner-store";
 import { unitResources, unitStandards } from "@/lib/year-unit-aggregate";
 import { useUnitNote, useSetUnitNote } from "@/lib/unit-notes";
-import { SubjGlyph, StatusDot, ForkCues, FinishPill } from "@/components/planner-v2";
+import { StatusDot, ForkCues, FinishPill } from "@/components/planner-v2";
 import { StandardPill, Tooltip } from "@/components/ui";
+import { PlanPage } from "@/components/lesson-plan-v2";
 import {
   unitLessons,
   unitProgress,
   resolveUnitHeader,
 } from "@/lib/year-v2-data";
+import { ExplorerShell, type ExplorerMode } from "./ExplorerShell";
 import styles from "./UnitExplorer.module.css";
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -83,7 +71,10 @@ function dayShort(day: number): string {
 function splitUnitName(name: string): { prefix: string; rest: string } {
   const idx = name.indexOf("·");
   if (idx === -1) return { prefix: "", rest: name.trim() };
-  return { prefix: name.slice(0, idx).trim(), rest: name.slice(idx + 1).trim() };
+  return {
+    prefix: name.slice(0, idx).trim(),
+    rest: name.slice(idx + 1).trim(),
+  };
 }
 
 /** Safe href guard — a resource URL can come from free text / imported rows, so
@@ -114,27 +105,6 @@ const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
   { key: "resources", label: "Resources" },
   { key: "notes", label: "Notes" },
 ];
-
-// All keyboard-reachable elements inside the panel — the focus-trap query.
-//
-// Every clause excludes `[tabindex="-1"]`, which LessonModal's otherwise-identical
-// query applies only to its `[tabindex]` clause. That matters HERE because this
-// modal's tablist uses ROVING tabindex: the four inactive tabs are enabled,
-// non-disabled <button>s that Tab cannot reach. Without the exclusion they'd
-// match `button:not([disabled])`, so the trap's first/last boundary could land on
-// an unreachable tab and Shift+Tab from the first element would wrap to a dead
-// stop. Disabled form controls are excluded for the same reason (unfocusable).
-const FOCUSABLE = [
-  "a[href]",
-  "button:not([disabled])",
-  "textarea:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  '[contenteditable="true"]',
-  "[tabindex]",
-]
-  .map((clause) => `${clause}:not([tabindex="-1"])`)
-  .join(", ");
 
 // ── Progress ring ─────────────────────────────────────────────────────────
 
@@ -201,12 +171,22 @@ export function UnitExplorer({
   unit,
   onClose,
 }: UnitExplorerProps): ReactNode {
-  const { lessons: allLessons, subjectById, units, setLessonStatus } =
-    usePlanner();
+  const {
+    lessons: allLessons,
+    subjectById,
+    units,
+    setLessonStatus,
+  } = usePlanner();
   const router = useRouter();
-  const titleId = useId();
 
   const [tab, setTab] = useState<TabKey>("overview");
+  const [mode, setMode] = useState<ExplorerMode>("unit");
+  const [planLessonId, setPlanLessonId] = useState<string | null>(null);
+
+  // A mode switch REMOUNTS the shell (a different component owns it per mode).
+  // Once the dialog has been opened, no later mount is a real open, so the
+  // entry animation must not replay — see ExplorerShell's `animateIn`.
+  const switchedRef = useRef(false);
 
   // Catalog resolution, guarded: `null` means the SUBJECT vanished from the
   // catalog (notebook / catalog swap while the modal is open). Everything below
@@ -226,106 +206,15 @@ export function UnitExplorer({
   const resources = useMemo(() => unitResources(lessons), [lessons]);
   const standards = useMemo(() => unitStandards(lessons), [lessons]);
 
-  // ── Modal lifecycle: focus in on open, restore on close, lock body scroll ──
-  const panelRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    previousFocusRef.current = document.activeElement as HTMLElement | null;
-
-    // Focus the close button on open — the safe default (never a control that
-    // starts an edit). Double-rAF lets the portal subtree paint first.
-    let cancelled = false;
-    let frame2 = 0;
-    const frame1 = requestAnimationFrame(() => {
-      frame2 = requestAnimationFrame(() => {
-        if (cancelled) return;
-        const panel = panelRef.current;
-        if (!panel || panel.contains(document.activeElement)) return;
-        panel.querySelector<HTMLElement>("[data-ue-close]")?.focus();
-      });
-    });
-
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(frame1);
-      cancelAnimationFrame(frame2);
-      document.body.style.overflow = prevOverflow;
-      const prev = previousFocusRef.current;
-      if (prev && typeof prev.focus === "function" && document.contains(prev)) {
-        prev.focus();
-      }
-    };
-  }, []);
-
-  // ── Escape closes (window bubble phase, defaultPrevented-aware) ───────────
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
-      e.preventDefault();
-      onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  // ── Focus trap — Tab / Shift-Tab cycle inside the panel ───────────────────
-  const handleKeyDown = useCallback(
-    (e: ReactKeyboardEvent<HTMLDivElement>): void => {
-      if (e.key !== "Tab") return;
-      const panel = panelRef.current;
-      if (!panel) return;
-      const focusable = Array.from(
-        panel.querySelectorAll<HTMLElement>(FOCUSABLE),
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    },
-    [],
-  );
-
-  // ── Tablist arrow-key roving (WAI-ARIA tablist) ───────────────────────────
-  const onTabKeyDown = useCallback(
-    (e: ReactKeyboardEvent<HTMLDivElement>): void => {
-      const idx = TABS.findIndex((t) => t.key === tab);
-      let next = idx;
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") next = idx + 1;
-      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = idx - 1;
-      else if (e.key === "Home") next = 0;
-      else if (e.key === "End") next = TABS.length - 1;
-      else return;
-      e.preventDefault();
-      const wrapped = (next + TABS.length) % TABS.length;
-      setTab(TABS[wrapped].key);
-      // Move focus to the newly-selected tab so the roving pattern is complete.
-      const panel = panelRef.current;
-      panel
-        ?.querySelector<HTMLElement>(`[data-ue-tab="${TABS[wrapped].key}"]`)
-        ?.focus();
-    },
-    [tab],
-  );
-
   // ── Row actions ──────────────────────────────────────────────────────────
-  const openPlan = useCallback(
-    (id: string): void => {
-      onClose();
-      router.push(`/daily?lesson=${encodeURIComponent(id)}`);
-    },
-    [onClose, router],
-  );
+  // Plan is an IN-MODAL mode switch to the Lesson Planner for that lesson —
+  // no route change, no modal teardown (Wave 7). Teach still leaves for the
+  // teaching board, which is a genuinely different surface.
+  const openPlan = useCallback((id: string): void => {
+    switchedRef.current = true;
+    setPlanLessonId(id);
+    setMode("lesson");
+  }, []);
   const openTeach = useCallback(
     (id: string): void => {
       onClose();
@@ -333,6 +222,27 @@ export function UnitExplorer({
     },
     [onClose, router],
   );
+
+  // The lesson the mode switch lands on when no row was clicked: the first
+  // not-yet-taught lesson, else the first. `null` for an empty unit — the mode
+  // switch is then withheld rather than rendered as a dead control.
+  const fallbackLessonId = useMemo(() => {
+    const next = lessons.find((l) => l.status !== "done") ?? lessons[0];
+    return next?.id ?? null;
+  }, [lessons]);
+
+  const onModeChange = useCallback((next: ExplorerMode): void => {
+    switchedRef.current = true;
+    setTab("overview");
+    setMode(next);
+    // Returning to the unit DROPS the pinned lesson. PlanPage bounces back here
+    // when its lesson vanishes from the store (archived elsewhere, catalog
+    // swap); keeping the dead id pinned would make the Lesson Planner
+    // permanently unreachable — every subsequent switch would re-mount on the
+    // same missing lesson and bounce straight back. Clearing it lets the next
+    // switch land on `fallbackLessonId`, which is always live.
+    if (next === "unit") setPlanLessonId(null);
+  }, []);
 
   // ── Subject-vanished-while-open guard ───────────────────────────────────
   // If the catalog / active notebook swaps and this subject disappears, every
@@ -345,7 +255,20 @@ export function UnitExplorer({
     if (header === null) onClose();
   }, [header, onClose]);
 
-  if (header === null || typeof document === "undefined") return null;
+  if (header === null) return null;
+
+  // ── Lesson mode — the Lesson Planner over the same shell ─────────────────
+  const planLesson = planLessonId ?? fallbackLessonId;
+  if (mode === "lesson" && planLesson !== null) {
+    return (
+      <PlanPage
+        lessonId={planLesson}
+        onClose={onClose}
+        onModeChange={onModeChange}
+        animateIn={!switchedRef.current}
+      />
+    );
+  }
 
   // Name / span / ordinal already degraded gracefully in resolveUnitHeader:
   // a unit missing from the catalog falls back to its raw slug and drops the
@@ -353,106 +276,46 @@ export function UnitExplorer({
   const { subject, name: rawName, spanLabel, ordinalLabel } = header;
   const { prefix, rest } = splitUnitName(rawName);
   const pct = progress.total > 0 ? progress.taught / progress.total : 0;
-  const activeTabLabel = TABS.find((t) => t.key === tab)?.label ?? "Overview";
 
-  return createPortal(
-    <div
-      className={`${styles.scrim} ue-scrim`}
-      onClick={(e) => {
-        // Scrim click closes — but only a click that both starts and lands on
-        // the scrim itself (never a click that bubbled up from the panel).
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        title={`Unit explorer — everything planned for this unit. Close with the ✕ or Esc.`}
-        className={`${styles.modal} ue-modal cp-subj ${subject.cls}`}
-        onKeyDown={handleKeyDown}
-      >
-        {/* ── Header — subject gradient ──────────────────────────────────── */}
-        <div className={styles.head}>
-          <SubjGlyph subject={subject} size={40} radius={13} />
-          <div className={styles.htext}>
-            <div id={titleId} className={styles.htitle}>
-              {prefix ? (
-                <>
-                  <b>{prefix}</b>&nbsp;{rest}
-                </>
-              ) : (
-                <b>{rest}</b>
-              )}
-            </div>
-            <div className={styles.hsub}>
-              {subject.name}
-              {ordinalLabel ? <> · {ordinalLabel}</> : null}
-              {spanLabel ? <> · {spanLabel}</> : null}
-            </div>
-          </div>
-          <ProgressRing
-            pct={pct}
-            trackClass={styles.ringTrackOnHead}
-            valueClass={styles.ringValueOnHead}
-            label={`${progress.taught} of ${progress.total} lessons taught`}
-          />
-          <button
-            type="button"
-            data-ue-close
-            className={styles.close}
-            onClick={onClose}
-            aria-label="Close unit explorer"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        </div>
-
-        {/* ── Tabs ───────────────────────────────────────────────────────── */}
-        <div
-          className={styles.tabs}
-          role="tablist"
-          aria-label="Unit details"
-          onKeyDown={onTabKeyDown}
-        >
-          {TABS.map(({ key, label }) => {
-            const active = key === tab;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                data-ue-tab={key}
-                id={`ue-tab-${key}`}
-                aria-selected={active}
-                aria-controls="ue-tabpanel"
-                tabIndex={active ? 0 : -1}
-                className={`${styles.tab} ${active ? styles.tabActive : ""}`}
-                onClick={() => setTab(key)}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ── Body ───────────────────────────────────────────────────────── */}
-        <div
-          className={styles.body}
-          role="tabpanel"
-          id="ue-tabpanel"
-          aria-label={activeTabLabel}
-        >
+  return (
+    <ExplorerShell
+      subject={subject}
+      animateIn={!switchedRef.current}
+      dialogTitle="Unit explorer — everything planned for this unit. Close with the ✕ or Esc."
+      closeLabel="Close unit explorer"
+      title={
+        prefix ? (
+          <>
+            <b>{prefix}</b>&nbsp;{rest}
+          </>
+        ) : (
+          <b>{rest}</b>
+        )
+      }
+      subtitle={
+        <>
+          {subject.name}
+          {ordinalLabel ? <> · {ordinalLabel}</> : null}
+          {spanLabel ? <> · {spanLabel}</> : null}
+        </>
+      }
+      headerRight={
+        <ProgressRing
+          pct={pct}
+          trackClass={styles.ringTrackOnHead}
+          valueClass={styles.ringValueOnHead}
+          label={`${progress.taught} of ${progress.total} lessons taught`}
+        />
+      }
+      tabs={TABS}
+      activeTab={tab}
+      onTabChange={setTab}
+      tablistLabel="Unit details"
+      mode={fallbackLessonId ? "unit" : undefined}
+      onModeChange={fallbackLessonId ? onModeChange : undefined}
+      onClose={onClose}
+      body={
+        <>
           {tab === "overview" && (
             <OverviewTab
               lessons={lessons}
@@ -472,10 +335,9 @@ export function UnitExplorer({
           {tab === "standards" && <StandardsTab standards={standards} />}
           {tab === "resources" && <ResourcesTab resources={resources} />}
           {tab === "notes" && <NotesTab unitId={unit} />}
-        </div>
-      </div>
-    </div>,
-    document.querySelector(".cp-root") ?? document.body,
+        </>
+      }
+    />
   );
 }
 
@@ -518,7 +380,9 @@ function OverviewTab({
       </div>
 
       {lessons.length === 0 ? (
-        <div className={styles.empty}>No lessons planned for this unit yet.</div>
+        <div className={styles.empty}>
+          No lessons planned for this unit yet.
+        </div>
       ) : (
         <>
           <div className={styles.progressBar} aria-hidden="true">
@@ -623,7 +487,7 @@ function LessonsTab({
                 }
               />
               <Tooltip
-                content="Open this lesson in the daily planner to build it out."
+                content="Open this lesson in the Lesson Planner to build it out."
                 tooltipId="ue-lesson-plan"
                 side="top"
               >

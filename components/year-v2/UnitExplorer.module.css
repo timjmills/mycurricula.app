@@ -1,122 +1,20 @@
-/* UnitExplorer.module.css — the Wave-6 Year drill-down modal.
+/* UnitExplorer.module.css — the UNIT-mode body of the Year drill-down modal.
+ *
+ * The dialog chrome (scrim, modal card, gradient header, tablist, footer) lives
+ * in ExplorerShell.module.css since Wave 7. What remains here is the unit body:
+ * the progress ring, the Overview roll-up, the lesson list, the aggregate
+ * standards/resources lists, and the unit note.
  *
  * Subject color arrives through the `.cp-subj <subject>` cascade on the modal
  * root (lib/palette.tsx bridge): --c bright accent, --cl soft tint, --cd deep
- * text. Every derived accent mixes toward var(--surface) (never #fff) so the
- * modal re-tints on Night → dark instead of blowing out. Tokens only — no hex
- * literals, no px font sizes outside the token scale.
- *
- * The root carries the GLOBAL `ue-modal` class and the scrim `ue-scrim`, both
- * enrolled in app/themes.css §5, which layers the active theme's accent wash on
- * top of these backgrounds (see the component header). */
+ * text. The `--ue-tint-soft` / `--ue-tint-hover` / `--ue-accent-border` /
+ * `--ue-hairline` accents are declared on the shell's `.modal` root and INHERIT
+ * down here. Every derived accent mixes toward var(--surface) (never #fff) so
+ * the modal re-tints on Night → dark instead of blowing out. Tokens only — no
+ * hex literals, no px font sizes outside the token scale. */
 
-/* Subject-derived accents, scoped to the modal root. */
-.modal {
-  --ue-tint-soft: color-mix(in srgb, var(--c) 10%, var(--surface));
-  --ue-tint-hover: color-mix(in srgb, var(--c) 16%, var(--surface));
-  --ue-accent-border: color-mix(in srgb, var(--c) 42%, transparent);
-  --ue-hairline: color-mix(in srgb, var(--ink-500) 14%, transparent);
-}
-
-/* ── Scrim ──────────────────────────────────────────────────────────────── */
-.scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 600;
-  background: rgba(14, 13, 24, 0.46);
-  -webkit-backdrop-filter: blur(9px) saturate(1.1);
-  backdrop-filter: blur(9px) saturate(1.1);
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  animation: ueFade 0.18s ease;
-}
-@keyframes ueFade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-:global(:root[data-tone="light"]) .scrim,
-:global(.home[data-tone="light"]) .scrim {
-  background: rgba(238, 241, 247, 0.5);
-}
-
-/* ── Modal card ─────────────────────────────────────────────────────────── */
-.modal {
-  /* 100% resolves to the scrim's PADDED grid cell (viewport − 2×24px), so the
-     modal never overflows the 24px scrim margin on phones — the "9px clip at
-     375" trap that a flat 96vw hits (LessonModal's proven fix). The 820px cap
-     still wins on wide viewports. */
-  width: min(820px, 100%);
-  max-height: 92vh;
-  min-width: min(360px, calc(100vw - 48px));
-  border-radius: var(--r-2xl, 32px);
-  background: var(--surface, #fff);
-  color: var(--ink, #1c1b2e);
-  box-shadow: 0 40px 100px -30px rgba(8, 8, 18, 0.6);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: uepop 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-@keyframes uepop {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .scrim,
-  .modal {
-    animation: none;
-  }
-}
-
-/* ── Header — subject gradient ──────────────────────────────────────────── */
-.head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px 20px;
-  color: #fff;
-  background: linear-gradient(
-    135deg,
-    var(--c),
-    color-mix(in srgb, var(--c) 78%, #000)
-  );
-  flex: 0 0 auto;
-}
-.htext {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.htitle {
-  font-family: var(--font-display-sm);
-  font-weight: 700;
-  font-size: var(--t-20, 20px);
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  overflow-wrap: anywhere;
-}
-.htitle b {
-  font-weight: 800;
-}
-.hsub {
-  margin-top: 3px;
-  font-size: var(--t-12, 12px);
-  font-weight: 600;
-  opacity: 0.92;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
-}
-
-/* Progress ring on the gradient header — white track + value. */
+/* ── Progress rings ─────────────────────────────────────────────────────── */
+/* On the gradient header — white track + value. */
 .ringTrackOnHead {
   stroke: rgba(255, 255, 255, 0.28);
 }
@@ -129,81 +27,6 @@
   .ringValue {
     transition: none;
   }
-}
-
-.close.close {
-  flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-pill, 999px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
-  cursor: pointer;
-  transition: background 0.14s;
-}
-.close.close:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-.close.close:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.85);
-  outline-offset: 2px;
-}
-.close svg {
-  width: 18px;
-  height: 18px;
-}
-
-/* ── Tabs — active underline ────────────────────────────────────────────── */
-.tabs {
-  display: flex;
-  gap: 2px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--ue-hairline);
-  background: var(--ue-tint-soft);
-  flex: 0 0 auto;
-  overflow-x: auto;
-}
-/* Button-class rules are DOUBLED (`.tab.tab`, 0,2,0) so they outgun the
-   `.cp-root button` reset (0,1,1) — the modal portals into `.cp-root`, whose
-   reset would otherwise strip padding / border / background (and the active-tab
-   underline). Same treatment on `.close` and `.rowBtn` below. */
-.tab.tab {
-  appearance: none;
-  border: none;
-  background: none;
-  padding: 12px 14px;
-  font-size: var(--t-13, 13px);
-  font-weight: 700;
-  color: var(--ink-500, #6e6c82);
-  cursor: pointer;
-  white-space: nowrap;
-  border-bottom: 2.5px solid transparent;
-  margin-bottom: -1px;
-  transition:
-    color 0.14s,
-    border-color 0.14s;
-}
-.tab.tab:hover {
-  color: var(--cd, var(--ink, #1c1b2e));
-}
-.tabActive.tabActive {
-  color: var(--cd, var(--ink, #1c1b2e));
-  border-bottom-color: var(--c);
-}
-.tab.tab:focus-visible {
-  outline: 2px solid var(--ue-accent-border);
-  outline-offset: -2px;
-  border-radius: var(--r-8, 7px);
-}
-
-/* ── Body — internal scroll ─────────────────────────────────────────────── */
-.body {
-  padding: 18px 20px 22px;
-  overflow-y: auto;
-  flex: 1 1 auto;
 }
 
 /* ── Empty state ────────────────────────────────────────────────────────── */
@@ -355,6 +178,9 @@
   gap: 6px;
   flex: 0 0 auto;
 }
+/* Button-class rules are DOUBLED (`.rowBtn.rowBtn`, 0,2,0) so they outgun the
+   `.cp-root button` reset (0,1,1) — the modal portals into `.cp-root`, whose
+   reset would otherwise strip padding / border / background. */
 .rowBtn.rowBtn {
   appearance: none;
   border: 1px solid var(--ue-accent-border);
@@ -454,27 +280,15 @@
 
 /* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
 @media (pointer: coarse), (max-width: 900px) {
-  /* Doubled to match the doubled bases above (a single-class @media override
-     would lose to `.tab.tab` / `.close.close` / `.rowBtn.rowBtn`). */
-  .close.close {
-    width: 44px;
-    height: 44px;
-  }
+  /* Doubled to match the doubled base above (a single-class @media override
+     would lose to `.rowBtn.rowBtn`). */
   .rowBtn.rowBtn {
     min-height: 44px;
-  }
-  .tab.tab {
-    padding-top: 15px;
-    padding-bottom: 15px;
   }
 }
 
 /* ── Phone ──────────────────────────────────────────────────────────────── */
 @media (max-width: 560px) {
-  .modal {
-    border-radius: var(--r-xl, 24px);
-    max-height: 94vh;
-  }
   .lessonRow {
     flex-wrap: wrap;
   }

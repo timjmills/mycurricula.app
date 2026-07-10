@@ -1,0 +1,204 @@
+/* plan-page.module.css — the Lesson Planner (Wave 7).
+ *
+ * PlanPage renders inside <ExplorerShell> (modal mode) or chromeless inside a
+ * host pane (`embedded`). The shell's `.modal` root declares the `--ue-*`
+ * accents and they inherit down; the `.embed` root below redeclares the same
+ * four so the embedded variant is self-sufficient outside the modal.
+ *
+ * Subject color arrives through the `.cp-subj <subject>` cascade — never a hex.
+ * Tokens only; every derived accent mixes toward var(--surface) so Night stays
+ * legible. */
+
+/* ── Header title — the lesson picker ───────────────────────────────────── */
+/* Sits on the shell's subject-gradient band, so it is white-on-gradient. */
+.lessonSel {
+  appearance: none;
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-radius: var(--r-lg, 14px);
+  padding: 6px 30px 6px 10px;
+  font-family: var(--font-display-sm);
+  font-weight: 700;
+  font-size: var(--t-16, 16px);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  /* Chevron drawn with a token-free gradient pair (currentColor is white here);
+     no background-image URL so the CSP stays clean. */
+  background-image:
+    linear-gradient(45deg, transparent 50%, #fff 50%),
+    linear-gradient(135deg, #fff 50%, transparent 50%);
+  background-position:
+    right 14px center,
+    right 9px center;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+}
+.lessonSel:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+/* The popup list paints in the OS/UA surface, not the gradient — restore ink. */
+.lessonSel option {
+  color: var(--ink, #1c1b2e);
+  background: var(--surface, #fff);
+}
+
+/* The unit crumb in the subtitle — a real button back to the Unit Planner. */
+.unitLink.unitLink {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.unitLink.unitLink:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+  border-radius: var(--r-8, 7px);
+}
+
+/* Taught / Planned tag in the header's right cluster. */
+.tag {
+  flex: 0 0 auto;
+  border-radius: var(--r-pill, 999px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  padding: 5px 12px;
+  font-size: var(--t-12, 12px);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tagDone {
+  background: rgba(255, 255, 255, 0.34);
+}
+
+/* ── Stat strip — REAL values only ──────────────────────────────────────── */
+/* The bundle's "planned time" (summed from a hard-coded flow array) and
+   "resources: 5" (a literal) are fabricated; neither is rendered. */
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.statValue {
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  font-size: var(--t-16, 16px);
+  line-height: 1.1;
+  color: var(--cd, var(--ink, #1c1b2e));
+  overflow-wrap: anywhere;
+}
+.statLabel {
+  font-size: var(--t-11, 11.5px);
+  font-weight: 600;
+  color: var(--ink-500, #6e6c82);
+  white-space: nowrap;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.footActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+/* ── Embedded variant — chromeless, for an in-page host pane ─────────────── */
+.embed {
+  --ue-tint-soft: color-mix(in srgb, var(--c) 10%, var(--surface));
+  --ue-tint-hover: color-mix(in srgb, var(--c) 16%, var(--surface));
+  --ue-accent-border: color-mix(in srgb, var(--c) 42%, transparent);
+  --ue-hairline: color-mix(in srgb, var(--ink-500) 14%, transparent);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.embedTabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--ue-hairline);
+  flex: 0 0 auto;
+  overflow-x: auto;
+}
+/* Doubled (0,2,0) to outgun the `.cp-root button` reset (0,1,1). */
+.embedTab.embedTab {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 11px 12px;
+  font-size: var(--t-13, 13px);
+  font-weight: 700;
+  color: var(--ink-500, #6e6c82);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -1px;
+  transition:
+    color 0.14s,
+    border-color 0.14s;
+}
+.embedTab.embedTab:hover {
+  color: var(--cd, var(--ink, #1c1b2e));
+}
+.embedTabOn.embedTabOn {
+  color: var(--cd, var(--ink, #1c1b2e));
+  border-bottom-color: var(--c);
+}
+.embedTab.embedTab:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: -2px;
+  border-radius: var(--r-8, 7px);
+}
+.embedBody {
+  padding: 14px 0 4px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ── Empty state (lesson deleted while the planner is open) ─────────────── */
+.empty {
+  padding: 28px 12px;
+  text-align: center;
+  color: var(--ink-500, #6e6c82);
+  font-size: var(--t-13, 13px);
+  font-weight: 600;
+}
+
+/* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
+@media (pointer: coarse), (max-width: 900px) {
+  /* Doubled to match the doubled bases above. */
+  .embedTab.embedTab {
+    padding-top: 15px;
+    padding-bottom: 15px;
+  }
+  .lessonSel {
+    min-height: 44px;
+  }
+}
+
+/* ── Phone ──────────────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .footActions {
+    justify-content: stretch;
+  }
+  .footActions > * {
+    flex: 1 1 auto;
+  }
+}
