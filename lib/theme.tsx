@@ -208,10 +208,11 @@ const DIM_KEY = "mycurricula:user:theme-dim";
 // v1 keys — kept for the one-time migration shim + deprecated compat persistence.
 const STYLE_KEY = "mycurricula:user:theme-style";
 const PALETTE_KEY = "mycurricula:user:theme-palette";
-// Last LOCAL write stamp for the SYNCED v1 triple (epoch ms as a string). NOT an
+// Last LOCAL write stamp for the SYNCED axes (epoch ms as a string; W3.1b
+// widened the synced set to the full persisted snapshot). NOT an
 // axis key — never validated, not part of the SQL/boot lockstep. It is the local
 // half of the last-writer-wins gate on the remote pull (W3.1): written whenever
-// a persist actually CHANGES one of theme/style/palette, compared against the
+// a persist actually CHANGES one of the synced axes, compared against the
 // remote row's updated_at before remote values are applied. Any test/probe that
 // seeds the axis keys directly must seed this too, or the remote row will
 // out-time the seed exactly like the pre-fix clobber.
@@ -472,7 +473,16 @@ export function ThemeProvider({
             : savedStyle === "vivid"
               ? "color"
               : null;
-    if (seededFrame !== null) setFrame(seededFrame);
+    if (seededFrame !== null) {
+      setFrame(seededFrame);
+      // Persist the shim result IMMEDIATELY (W3.1b §4a Codex High): the boot
+      // script normally persists this same seed pre-paint, but if its setItem
+      // failed (quota/private mode) the mirror effect would read prev===null,
+      // classify the MIGRATION as a local edit, stamp, and heal-push the
+      // inferred frame over a newer remote row. A migration is not an edit —
+      // writing the key here makes the mirror read prev === value (no stamp).
+      if (savedFrameRaw === null) writeKey(FRAME_KEY, seededFrame);
+    }
 
     const savedGlass = readValidated(GLASS_KEY, isThemeGlass);
     if (savedGlass !== null) setGlass(savedGlass);
@@ -502,6 +512,15 @@ export function ThemeProvider({
     const rawThemeAtMount = readRaw(THEME_KEY);
     const rawStyleAtMount = readRaw(STYLE_KEY);
     const rawPaletteAtMount = readRaw(PALETTE_KEY);
+    // W3.1b: raw-at-mount captures for the four widened axes. Taken BEFORE the
+    // cookie→storage back-seed below, so a back-seeded key reads as "touched"
+    // and blocks a same-load remote apply for that axis — the rare
+    // storage-cleared+cookie-kept+remote-fresher overlap self-heals on the
+    // NEXT load (storage then holds a value, untouched() passes).
+    const rawFrameAtMount = readRaw(FRAME_KEY);
+    const rawGlassAtMount = readRaw(GLASS_KEY);
+    const rawBgAtMount = readRaw(BG_KEY);
+    const rawDimAtMount = readRaw(DIM_KEY);
     const savedTheme = readThemeMigrated();
     if (savedTheme !== null) setTheme(savedTheme);
 
@@ -529,9 +548,20 @@ export function ThemeProvider({
     if (savedPalette !== null) setPalette(savedPalette);
 
     // Cross-device sync (best-effort, OFF unless NEXT_PUBLIC_THEME_SYNC=1).
-    // theme-sync still carries the v1 triple (theme/style/palette) — it is a
-    // SEPARATE later stage to widen it to the v2 axes, so we keep it intact and
-    // only reconcile the compat axes from it here.
+    // W3.1b: widened to the FULL persisted snapshot — the five v2 axes
+    // (frame/glass/bg/theme/dim) plus the deprecated v1 compat pair
+    // (style/palette). Derived tone/canvas and the per-view local UI keys
+    // (cc_editmode/cc_pblayout/cc_deLeftW) are excluded by design (plan C5).
+    // Reads the CURRENT local look for the heal-push / empty-seed paths.
+    const readLocalSnapshot = () => ({
+      frame: readValidated(FRAME_KEY, isThemeFrame) ?? DEFAULT_FRAME,
+      glass: readValidated(GLASS_KEY, isThemeGlass) ?? DEFAULT_GLASS,
+      bg: readValidated(BG_KEY, isThemeBg) ?? DEFAULT_BG,
+      theme: readThemeMigrated() ?? DEFAULT_THEME,
+      dim: readValidated(DIM_KEY, isThemeDim) ?? DEFAULT_DIM,
+      style: readValidated(STYLE_KEY, isThemeStyle) ?? DEFAULT_STYLE,
+      palette: readValidated(PALETTE_KEY, isThemePalette) ?? DEFAULT_PALETTE,
+    });
     void loadRemotePrefs().then((remote) => {
       remoteSettledRef.current = true;
       if (!active) return;
@@ -563,69 +593,120 @@ export function ThemeProvider({
             ? Number(rawStamp)
             : Number.NEGATIVE_INFINITY;
         if (localAt >= remote.updatedAt) {
-          const localTheme = readThemeMigrated();
-          const localStyle = readValidated(STYLE_KEY, isThemeStyle);
-          const localPalette = readValidated(PALETTE_KEY, isThemePalette);
-          const diverges =
-            (remote.prefs.theme !== undefined &&
-              remote.prefs.theme !== (localTheme ?? DEFAULT_THEME)) ||
-            (remote.prefs.style !== undefined &&
-              remote.prefs.style !== (localStyle ?? DEFAULT_STYLE)) ||
-            (remote.prefs.palette !== undefined &&
-              remote.prefs.palette !== (localPalette ?? DEFAULT_PALETTE));
+          const local = readLocalSnapshot();
+          const diverges = (
+            ["frame", "glass", "bg", "theme", "dim", "style", "palette"] as const
+          ).some((k) => remote.prefs[k] !== undefined && remote.prefs[k] !== local[k]);
           if (diverges) {
-            void saveRemotePrefs({
-              theme: localTheme ?? DEFAULT_THEME,
-              style: localStyle ?? DEFAULT_STYLE,
-              palette: localPalette ?? DEFAULT_PALETTE,
-            });
+            void saveRemotePrefs(local);
           }
           return;
         }
-        const untouched = (key: string, atMount: string | null): boolean => {
+        // "Untouched since mount" — with one deliberate widening (W3.1b §4a
+        // Codex Medium): a key that was ABSENT at mount but now holds the
+        // DEFAULT also counts as untouched. On a fresh store, any state
+        // change in the fetch window (canvas, tone sample) re-runs the mirror
+        // effect, which persists the DEFAULTS — that mirror write is not a
+        // user edit and must not block the first-load remote apply.
+        // ACCEPTED GAP (independent §4a review F1): a user who explicitly
+        // picks the DEFAULT value on a fresh store inside the sub-second
+        // fetch window is indistinguishable from the mirror write — an
+        // edit-to-default does NOT bump the stamp (syncedEdited(null, dflt,
+        // dflt) is false by the fresh-store rule), so a divergent remote
+        // value would override that pick this once. Fresh-store-only,
+        // default-pick-only, sub-second window, self-heals on the next
+        // edit/reload; accepted over blocking every fresh device's first
+        // remote apply.
+        const untouched = (
+          key: string,
+          atMount: string | null,
+          dflt: string,
+        ): boolean => {
           try {
-            return window.localStorage.getItem(key) === atMount;
+            const cur = window.localStorage.getItem(key);
+            return cur === atMount || (atMount === null && cur === dflt);
           } catch {
             return true;
           }
         };
-        if (
-          remote.prefs.theme !== undefined &&
-          remote.prefs.theme !== savedTheme &&
-          untouched(THEME_KEY, rawThemeAtMount)
-        ) {
-          setTheme(remote.prefs.theme);
-        }
-        if (
-          remote.prefs.style !== undefined &&
-          remote.prefs.style !== savedStyle &&
-          untouched(STYLE_KEY, rawStyleAtMount)
-        ) {
-          setStyle(remote.prefs.style);
-        }
-        if (
-          remote.prefs.palette !== undefined &&
-          remote.prefs.palette !== savedPalette &&
-          untouched(PALETTE_KEY, rawPaletteAtMount)
-        ) {
-          setPalette(remote.prefs.palette);
-        }
+        // Apply each remote axis (guarded), and ECHO-SUPPRESS (plan C5
+        // follow-up): write the applied value into storage IMMEDIATELY, so the
+        // mirror effect's edited-gate reads prev === value and neither
+        // re-stamps nor re-pushes an echo of what the server just told us.
+        // Applying is not a local edit.
+        const apply = <T extends string>(
+          value: T | undefined,
+          saved: T | null,
+          key: string,
+          atMount: string | null,
+          dflt: string,
+          setX: (v: T) => void,
+        ): void => {
+          if (value === undefined) return;
+          if (value === saved) return;
+          if (!untouched(key, atMount, dflt)) return;
+          setX(value);
+          writeKey(key, value);
+        };
+        apply(
+          remote.prefs.frame,
+          seededFrame,
+          FRAME_KEY,
+          rawFrameAtMount,
+          DEFAULT_FRAME,
+          setFrame,
+        );
+        apply(
+          remote.prefs.glass,
+          savedGlass,
+          GLASS_KEY,
+          rawGlassAtMount,
+          DEFAULT_GLASS,
+          setGlass,
+        );
+        apply(remote.prefs.bg, savedBg, BG_KEY, rawBgAtMount, DEFAULT_BG, setBg);
+        apply(
+          remote.prefs.theme,
+          savedTheme,
+          THEME_KEY,
+          rawThemeAtMount,
+          DEFAULT_THEME,
+          setTheme,
+        );
+        apply(remote.prefs.dim, savedDim, DIM_KEY, rawDimAtMount, DEFAULT_DIM, setDim);
+        apply(
+          remote.prefs.style,
+          savedStyle,
+          STYLE_KEY,
+          rawStyleAtMount,
+          DEFAULT_STYLE,
+          setStyle,
+        );
+        apply(
+          remote.prefs.palette,
+          savedPalette,
+          PALETTE_KEY,
+          rawPaletteAtMount,
+          DEFAULT_PALETTE,
+          setPalette,
+        );
         return;
       }
 
       if (remote.kind === "empty") {
         // Seed the row from local values so an existing teacher's look reaches
-        // their other devices (see the long rationale in theme-sync.ts). Only
-        // the v1 triple is synced this stage.
-        const localTheme = readThemeMigrated();
-        const localStyle = readValidated(STYLE_KEY, isThemeStyle);
-        const localPalette = readValidated(PALETTE_KEY, isThemePalette);
-        if (localTheme !== null || localStyle !== null || localPalette !== null) {
-          void saveRemotePrefs({
-            theme: localTheme ?? DEFAULT_THEME,
-            style: localStyle ?? DEFAULT_STYLE,
-            palette: localPalette ?? DEFAULT_PALETTE,
-          });
+        // their other devices (see the long rationale in theme-sync.ts). Seed
+        // whenever ANY axis has a locally-stored value (W3.1b: full snapshot).
+        const anyStored =
+          rawFrameAtMount !== null ||
+          rawGlassAtMount !== null ||
+          rawBgAtMount !== null ||
+          rawThemeAtMount !== null ||
+          rawDimAtMount !== null ||
+          rawStyleAtMount !== null ||
+          rawPaletteAtMount !== null;
+        if (anyStored) {
+          void saveRemotePrefs(readLocalSnapshot());
         }
       }
       // kind === "unavailable": sync off / no session / read error — do nothing.
@@ -678,6 +759,11 @@ export function ThemeProvider({
       if (unsubscribeScheme) unsubscribeScheme();
       window.removeEventListener("storage", onStorage);
     };
+    // Mount-only BY DESIGN: the frame/glass/bg/theme/dim reads above are the
+    // INITIAL (cookie-derived prop) values via the mount closure — exactly
+    // what the cookie→storage back-seed must compare (a later state change
+    // re-running this load/seed/subscribe effect would be a bug).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Cookie RENEWAL (FRAME-FLASH-SSR-DESIGN.md §3b, review must-change #2): the
@@ -817,7 +903,7 @@ export function ThemeProvider({
 
     // Persist. Theme persists the SETTING (may be "system"). canvas/tone are NOT
     // persisted (tone is derived; canvas is runtime presentation state).
-    // Stamp the last local write that CHANGES the SYNCED triple (the
+    // Stamp the last local write that CHANGES a SYNCED axis (the
     // theme-sync last-writer-wins gate) — read-before-write, so the hydration
     // re-write of identical values never re-stamps. Three loads must NOT read
     // as fresh local edits, or the stamp would block — and via the heal-push,
@@ -841,28 +927,47 @@ export function ThemeProvider({
       v !== null && isThemeStyle(v) ? v : null;
     const normPalette = (v: string | null): string | null =>
       v !== null && isThemePalette(v) ? v : null;
+    // W3.1b: the four widened axes normalize with their plain guards (no v1
+    // remap exists for them; an unrecognized stored value degrades to the
+    // fresh-store rule, same as style/palette).
+    const normFrame = (v: string | null): string | null =>
+      v !== null && isThemeFrame(v) ? v : null;
+    const normGlass = (v: string | null): string | null =>
+      v !== null && isThemeGlass(v) ? v : null;
+    const normBg = (v: string | null): string | null =>
+      v !== null && isThemeBg(v) ? v : null;
+    const normDim = (v: string | null): string | null =>
+      v !== null && isThemeDim(v) ? v : null;
     const syncedEdited = (
       prev: string | null,
       value: string,
       dflt: string,
     ): boolean => (prev === null ? value !== dflt : prev !== value);
-    // Did the SYNCED triple (theme/style/palette) actually change this run?
-    // The local stamp AND the remote push must key off the SAME condition.
-    // This mirror effect also fires for non-synced axes (frame/glass/bg/dim);
-    // a push triggered by one of those would write a fresh server updated_at
-    // WITHOUT bumping this device's stamp, so it would out-time (clobber) a
-    // genuine theme edit made on another device that this one hasn't pulled
-    // yet. Computed from the raw stored values BEFORE the writeKey calls below
-    // update them, so it reads "changed since last persisted". (Wave-3 audit.)
-    const tripleEdited =
+    // Did any SYNCED axis actually change this run? W3.1b widened the synced
+    // set from the v1 triple to the FULL persisted snapshot (frame/glass/bg/
+    // theme/dim + the deprecated style/palette). The local stamp AND the
+    // remote push key off the SAME condition. Derived tone and runtime canvas
+    // are in this effect's dep array but NOT here — a push keyed on them
+    // would write a fresh server updated_at without a matching local edit and
+    // out-time (clobber) a genuine edit from another device (Wave-3 audit;
+    // the original reason frame/glass/bg/dim were once excluded). Computed
+    // from the raw stored values BEFORE the writeKey calls below update them,
+    // so it reads "changed since last persisted". Remote-apply writes storage
+    // in the apply() path first, so an applied value reads prev === value
+    // here — no stamp, no echo push.
+    const syncedAxisEdited =
+      syncedEdited(normFrame(readKeyRaw(FRAME_KEY)), frame, DEFAULT_FRAME) ||
+      syncedEdited(normGlass(readKeyRaw(GLASS_KEY)), glass, DEFAULT_GLASS) ||
+      syncedEdited(normBg(readKeyRaw(BG_KEY)), bg, DEFAULT_BG) ||
       syncedEdited(normTheme(readKeyRaw(THEME_KEY)), theme, DEFAULT_THEME) ||
+      syncedEdited(normDim(readKeyRaw(DIM_KEY)), dim, DEFAULT_DIM) ||
       syncedEdited(normStyle(readKeyRaw(STYLE_KEY)), style, DEFAULT_STYLE) ||
       syncedEdited(
         normPalette(readKeyRaw(PALETTE_KEY)),
         palette,
         DEFAULT_PALETTE,
       );
-    if (tripleEdited) {
+    if (syncedAxisEdited) {
       writeKey(THEME_STAMP_KEY, String(Date.now()));
     }
     writeKey(FRAME_KEY, frame);
@@ -881,13 +986,14 @@ export function ThemeProvider({
     writeAxesCookie({ frame, glass, bg, theme, dim, style, palette });
 
     // Best-effort cross-device push (no-op unless NEXT_PUBLIC_THEME_SYNC=1).
-    // Gated on `tripleEdited` so every server write carries a matching local
-    // stamp (see the clobber note above) — never re-push an unchanged triple.
-    // Still the v1 triple this stage (widening theme-sync is a later stage).
-    if (remoteSettledRef.current && tripleEdited) {
+    // Gated on `syncedAxisEdited` so every server write carries a matching
+    // local stamp (see the clobber note above) — never re-push an unchanged
+    // snapshot. W3.1b: pushes the FULL persisted snapshot (5 v2 axes + the
+    // deprecated compat pair).
+    if (remoteSettledRef.current && syncedAxisEdited) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
-        void saveRemotePrefs({ theme, style, palette });
+        void saveRemotePrefs({ frame, glass, bg, theme, dim, style, palette });
         saveTimerRef.current = null;
       }, REMOTE_SAVE_DEBOUNCE_MS);
     }
