@@ -68,17 +68,19 @@ export const V2: boolean = process.env.NEXT_PUBLIC_V2 !== "0";
  *
  * The flag has two halves. The CHROME half is implemented
  * (`app/(planner)/layout.tsx`). The ROUTER half — which canvas mounts per route
- * (`components/daily/DailyView.tsx`, `components/weekly/WeeklyShell.tsx`,
- * `app/(planner)/year/page.tsx`) — is not.
+ * — is now ALSO implemented (branch `claude/v2-router-gate`):
+ *   • `app/(planner)/daily/page.tsx`  → V2 ? <DailyView>   : <DailyViewV1>
+ *   • `app/(planner)/weekly/page.tsx` → V2 ? <WeeklyShell> : <WeeklyShellV1>
+ *   • `app/(planner)/year/page.tsx`   → V2 ? <YearShell>   : <TimelineYear>
+ * where the `*V1` shells are verbatim copies of master's live-on-prod views.
  *
- * ⚠ While this is `false`, `NEXT_PUBLIC_V2=0` yields **v1 chrome around v2
- * canvases** (and the v2 `.stage`/`.theme-tint` still paint). That is a
- * CHROME-ONLY DEV HARNESS. It is *not* a v1 rollback, and it does *not* yet
- * satisfy the plan's Wave-13 "flag-OFF v1 regression" gate — an earlier version
- * of this comment claimed it did; that claim was wrong and is retracted.
+ * With BOTH halves gated, `NEXT_PUBLIC_V2=0` is now a genuine v1 rollback: v1
+ * chrome AND the v1 route canvases (no v2 `.stage`/`.theme-tint`). This is what
+ * the plan's Wave-13 "flag-OFF v1 regression" gate needs.
  *
- * `scripts/check-v2-flag.mjs` reads this constant and refuses to BUILD a
- * flag-OFF production artifact while it is `false`. Flip it to `true` in the
- * same change that lands the router gates.
+ * `scripts/check-v2-flag.mjs` reads this constant. Now that it is `true`, a
+ * flag-OFF production artifact (`NEXT_PUBLIC_V2=0 npm run build`) is permitted —
+ * i.e. the rollback build is legal. Keep it `true` unless the router gates are
+ * ever removed.
  */
-export const V2_ROUTER_GATED = false;
+export const V2_ROUTER_GATED = true;
