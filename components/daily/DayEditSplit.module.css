@@ -28,10 +28,19 @@
 
    ≤820px (mock B:5177-5186): CSS-only collapse — column layout, the list
    becomes a horizontal x-scroll strip (items flex:0 0 auto, 2-col grid,
-   dot hidden), the divider hides, the right pane goes full-width. */
+   dot hidden), the divider hides, the right pane goes full-width.
+
+   >820px: the panes sit in a row, and the agenda's width is the persisted
+   drag state — clamped in JS to [220,520] px, which is blind to how wide
+   the split actually is. `--de-right-reserve` on the root is the
+   container-relative floor that px clamp can't express (see .deLeft). */
 
 /* ── Split root ─────────────────────────────────────────────────────────── */
 .deSplit {
+  /* Floor the editor pane keeps in the two-pane row layout: the 15px
+     divider corridor + the width below which <LessonEditor> stops being a
+     usable fill-in template (~300px, the agenda's own default width). */
+  --de-right-reserve: 315px;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
@@ -44,8 +53,19 @@
 }
 
 /* ── Left: agenda column ────────────────────────────────────────────────── */
+/* The inline width comes from the persisted drag state, whose clamp
+   ([220,520]) is ABSOLUTE — it knows nothing about how much room the split
+   actually has. Just above the ≤820px collapse the row layout can't afford
+   a 520px agenda: at a 821px viewport the split is 658px wide, so a stale
+   persisted 520 leaves the editor pane 95px and the header title breaks one
+   character per line. The reserve below is the container-relative guard the
+   px clamp can't express: the agenda never takes so much that fewer than
+   --de-right-reserve remain for the editor. Chosen so the desktop tier is
+   untouched — at ≥~1045px viewport, 100% - reserve already exceeds the 520
+   max, so a dragged/persisted width renders exactly as stored. */
 .deLeft {
   flex: 0 0 auto; /* inline width from state — never grows/shrinks */
+  max-width: max(220px, 100% - var(--de-right-reserve));
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -254,8 +274,16 @@
 /* var(--c) arrives through the `cp-subj <subject>` class on the card root
    (lib/palette.tsx bridge) — the subject hue is never hard-coded. White
    text on the colored band is the LessonModal .mhead precedent. */
+/* WRAPS when the band can't seat title + cluster side by side. The right
+   cluster's pills are nowrap and `flex: 0 0 auto`, so on a narrow pane they
+   used to hold their full ~154px and starve .deTheadLeft (min-width:0) down
+   to ZERO width — .deTitle's overflow-wrap:anywhere then broke the lesson
+   title one character per line (F6). Now the title carries a flex-basis wide
+   enough for the 22px display face, and the cluster drops to its own line
+   below instead of squeezing it. */
 .deThead {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
@@ -264,7 +292,12 @@
   background: var(--c);
 }
 
+/* flex-basis 12rem = the narrowest the display-face title stays readable at.
+   Below `12rem + gap + cluster` of band width the line breaks and the title
+   gets the full band. min-width:0 still lets it shrink under that basis when
+   it is ALONE on the line (the 375px case: ~149px of band). */
 .deTheadLeft {
+  flex: 1 1 12rem;
   min-width: 0;
 }
 
@@ -310,12 +343,19 @@
 
 /* Right cluster — team pill / Push to Team, then Exit. flex-wrap per the
    mock's .de-theadr so the cluster stacks instead of clipping when the
-   pane is dragged narrow. */
+   pane is dragged narrow. SHRINKABLE (0 1 auto, not the mock's 0 0 auto):
+   once it wraps onto its own line under the title, a line narrower than its
+   ~154px max-content would otherwise overflow the card and clip the Exit
+   button (.deTemplate is overflow:hidden). Shrinking lets its own flex-wrap
+   stack the pills instead. margin-left:auto keeps it right-aligned on the
+   wrapped line, where space-between has nothing to push against. */
 .deTheadr {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -469,8 +509,10 @@
 
 /* ── Touch targets (CLAUDE.md §4 — ≥44px on coarse pointers) ────────────── */
 /* Agenda items sit ~43px with mouse metrics; guarantee the floor on touch.
-   The band's pill buttons get the same floor (LessonModal precedent). */
-@media (pointer: coarse) {
+   The band's pill buttons get the same floor (LessonModal precedent). The
+   max-width arm is the house pattern (Dock / planning-tabs / day-v2): a
+   phone-width window is treated as touch even under a fine pointer. */
+@media (pointer: coarse), (max-width: 900px) {
   .deItem.deItem {
     min-height: 44px;
   }
@@ -500,6 +542,10 @@
   }
   .deLeft {
     width: auto !important; /* beat the inline drag width (mock recipe) */
+    /* The row-layout reserve is meaningless once the panes stack — without
+       this reset it would clamp the full-width agenda strip (e.g. to 268px
+       at a 768px viewport). */
+    max-width: none;
     flex: 0 0 auto;
     padding-right: 0;
     padding-bottom: 6px;
@@ -515,6 +561,12 @@
     flex: 0 0 auto;
     grid-template-columns: auto auto;
     gap: 8px;
+    /* The base rule's width:100% would make every strip item a full screen
+       wide, so the x-scroll showed exactly ONE lesson at a time. Content-
+       sized instead, capped so a long title ellipsizes (.deName) and the
+       next item peeks in to advertise the scroll. */
+    width: auto;
+    max-width: min(14rem, 70%);
   }
   .deItem .deDot {
     display: none;
@@ -528,11 +580,37 @@
     margin-top: 0;
     white-space: nowrap;
   }
+  /* display:none also drops the separator out of the tab order and the a11y
+     tree, so the drag handle can never be a keyboard trap where it cannot
+     do anything (its inline tabIndex is inert while it is not rendered). */
   .deDivider.deDivider {
     display: none;
   }
   .deRight {
     flex: 1 1 auto;
     padding-top: 8px;
+  }
+}
+
+/* ── ≤480px phone compaction ────────────────────────────────────────────── */
+/* At phone widths the app chrome (icon rail + overlay gutters) already keeps
+   ~150px of a 375px viewport, leaving the split ~223px. The stack above then
+   hands all of that to the editor, but the card's own desktop gutters take
+   another ~60px of it. Tighten them — every px here is a px of fill-in
+   template — and step the display-face title down one token so it wraps at
+   words rather than fighting for room. */
+@media (max-width: 480px) {
+  .deSplit {
+    padding: 6px 8px 10px;
+  }
+  .deThead {
+    padding: 14px 12px;
+    gap: 10px;
+  }
+  .deTitle {
+    font-size: var(--t-18, 18px);
+  }
+  .deTbody {
+    padding: 14px 12px 20px;
   }
 }
