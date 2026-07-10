@@ -117,6 +117,8 @@ nearly every feature — respect it everywhere.
 | Auth (later)  | Supabase Auth — Google SSO, restricted to the school domain        |
 | Files (later) | Cloudflare R2 for resources; Supabase Storage for exports          |
 | PDF / Excel   | `@react-pdf/renderer` / SheetJS, client-side                       |
+| Motion (opt-in) | `gsap` for complex timeline/scroll-driven motion (see §6 allowance) |
+| 3D / WebGL (opt-in) | `three` + `@react-three/fiber` v9 (React 19) — see §6 allowance |
 | Hosting       | Cloudflare Pages                                                   |
 
 **Current state of the repo:** a **frontend-complete Phase 1A prototype** deployed to
@@ -198,7 +200,18 @@ The visual system has three independent axes, all set as `<html>` data attribute
 - Accessibility: WCAG AA contrast minimum, full keyboard navigation, ≥44px touch
   targets on primary actions.
 - Motion is allowed where it clarifies (card expand ~200ms, slide-outs ~250ms,
-  drag ghosting). No bounce, parallax, or confetti.
+  drag ghosting). No bounce or confetti. Parallax is allowed **only** on
+  marketing/landing surfaces (e.g. `/home`, a future public site) via GSAP
+  ScrollTrigger — never inside the planner surfaces (Weekly/Daily/Year/etc.),
+  where motion must stay functional and calm.
+- **GSAP and 3D are opt-in, surface-scoped tools, not defaults.** `gsap`,
+  `three`, and `@react-three/fiber` are approved dependencies (see §6), but a
+  plain CSS transition or the View Transition API is still the default for
+  ordinary UI motion. Reach for GSAP only for genuinely complex,
+  timeline-sequenced, or scroll-driven motion; reach for three / R3F only on a
+  surface whose job is a visual/marketing experience. Everything they produce
+  still obeys `prefers-reduced-motion`, WCAG AA, and the token system — a 3D or
+  animated surface may not hard-code colors or bypass the design tokens.
 - **Responsive is a hard requirement, not a polish pass.** Every page, view, and
   feature must lay out and remain usable at **three viewport tiers**:
   - **Phone** — 360–480px
@@ -630,6 +643,13 @@ planning_document.md` has a screen-by-screen section (§5) and the data model (�
   customizable and may rotate on A/B (or longer) cycles independent of the week.
 - **Do not introduce new dependencies** without a clear need; prefer the existing
   stack. No component/UI kits — components are bespoke against the token system.
+  **Explicitly approved additions (2026-07-10):** `gsap` (animation),
+  `three`, and `@react-three/fiber` (3D/WebGL, R3F v9 for React 19). These are
+  in `package.json` and may be imported without further sign-off, subject to the
+  §4 motion rules (opt-in, surface-scoped, reduced-motion + token-compliant).
+  This carve-out does **not** reopen the door to UI-component kits (shadcn/ui,
+  Radix, MUI, …) — those remain banned; components stay bespoke against the
+  tokens. Anything beyond these three still needs a clear, stated need.
 - **Do not commit or push** unless explicitly asked. Branch off `main` first if you do.
 
 ---
