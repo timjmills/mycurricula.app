@@ -10,12 +10,72 @@ import { UnitNotesProvider } from "@/lib/unit-notes";
 import {
   GlobalShortcuts,
   LastRouteRecorder,
+  MasterBanner,
   RightPanel,
   SideNav,
+  TopBar,
   UndoToastBridge,
 } from "@/components/shell";
 import { ChromeShell } from "@/components/chrome";
+import { V2 } from "@/lib/v2-flag";
 import styles from "./layout.module.css";
+
+/**
+ * The planner CHROME seam (plan §0.1 — `NEXT_PUBLIC_V2` gates the shell/router).
+ *
+ * Flag ON  → the v2 corner-grammar chrome (`ChromeShell`).
+ * Flag OFF → the v1.3 chrome it replaced: the red `MasterBanner` + `TopBar`.
+ *
+ * This is the CHROME half of the gate. The ROUTER half — which canvas mounts
+ * per route — lives in the view surfaces (`components/daily/DailyView.tsx`,
+ * `components/weekly/WeeklyShell.tsx`, `app/(planner)/year/page.tsx`) and is
+ * owned by the view-surfaces session; each gates with the same `V2` const.
+ *
+ * ⚠ WHAT FLAG-OFF ACTUALLY IS TODAY (§4a High H2 — an earlier claim retracted):
+ * a CHROME-ONLY DEV HARNESS. With the router half missing, `NEXT_PUBLIC_V2=0`
+ * renders v1 chrome around still-mounted v2 canvases, and the v2
+ * `.stage`/`.theme-tint` still paint. It is NOT a v1 rollback and it does NOT
+ * yet satisfy the plan's Wave-13 flag-OFF regression gate. Two known artifacts
+ * of that half-gated state, both resolved by the router half:
+ *   • `/planner` (and the other immersive routes) lose `ImmersiveBar`, so the
+ *     Back affordance disappears — those routes are v2-only and would not exist
+ *     under a true v1 build. (§4a M2)
+ *   • `ChromeShell` is the sole writer of `<html data-mode="team">`, so the v2
+ *     canvases lose the pink team-glow signal. The v1 `MasterBanner` mounted
+ *     below restores the *v1* team signal, not the glow. (§4a M3)
+ * `scripts/check-v2-flag.mjs` refuses to BUILD a flag-OFF production artifact
+ * while `V2_ROUTER_GATED` is false, so this state cannot ship.
+ *
+ * `V2` is build-time inlined, so this branch is identical on the server and the
+ * client — no hydration tear. Both branches render the same `children` subtree,
+ * so nothing below the chrome is aware of the flag.
+ *
+ * STRUCTURAL CONTRACT (§4a): `ChromeShell` renders `<div class="overlay">` —
+ * `position:absolute; inset:var(--frame-inset); display:grid;
+ * grid-template-rows:auto 1fr auto`, plus `.overlay > * { min-width: 0 }` —
+ * which is the containing block for `children`. Dropping it for a bare fragment
+ * would strand the child `flex:1` row inside the merely-`position:relative`
+ * parent and break the `<main id="main-content">` overflow contract. The OFF
+ * branch therefore keeps an equivalent fill wrapper (absolute inset:0, column
+ * flex), minus the v2 frame inset that v1 never had. The `min-width: 0` that
+ * `.overlay > *` supplied (it exists for `/daily`'s 457px h-scroll) is applied
+ * directly to the shared content row below, so BOTH branches carry it.
+ */
+function PlannerChrome({ children }: { children: ReactNode }): ReactNode {
+  if (!V2) {
+    // `.v1-shell` (app/chrome.css) mirrors `.overlay`'s fill + its
+    // `> * { min-width: 0 }` contract across ALL three children — not just the
+    // content row, which an inline style could only reach. (§4a Codex Medium.)
+    return (
+      <div className="v1-shell">
+        <MasterBanner />
+        <TopBar />
+        {children}
+      </div>
+    );
+  }
+  return <ChromeShell>{children}</ChromeShell>;
+}
 
 // Planner shell — the chrome shared by every primary view (Weekly, Daily,
 // Subject, …). Routing picks which view renders in the canvas; this layout
@@ -121,10 +181,16 @@ export default function PlannerLayout({
                             position: "relative",
                           }}
                         >
-                          <ChromeShell>
+                          <PlannerChrome>
+                            {/* minWidth:0 replicates `.overlay > * { min-width: 0 }`
+                                (app/chrome.css) so the flag-OFF branch, which has
+                                no `.overlay` ancestor, keeps /daily's h-scroll
+                                containment. Harmless and identical under flag-ON.
+                                (§4a M1) */}
                             <div
                               style={{
                                 flex: 1,
+                                minWidth: 0,
                                 minHeight: 0,
                                 display: "flex",
                               }}
@@ -142,7 +208,7 @@ export default function PlannerLayout({
                               </main>
                               <RightPanel />
                             </div>
-                          </ChromeShell>
+                          </PlannerChrome>
                         </div>
                       </div>
                     </div>
