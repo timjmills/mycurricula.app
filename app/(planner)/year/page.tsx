@@ -1,20 +1,19 @@
-"use client";
-
-// Year view — curriculum timeline (Timeline / Curriculy design).
+// Year view — the frame-routed curriculum surface (Wave 6).
 //
-// Mounts the single, fully-responsive <TimelineYear> component. It renders one
-// row per subject with the year's units laid across it; opening a unit expands
-// its weeks under the row, opening a week reveals its daily lessons, and
-// clicking a day opens the app's shared lesson-detail panel via
-// setSelectedLessonId. A live StatStrip sits at the top; there is no filter UI.
+// Mounts <YearShell>, a thin router on the v2 appearance frame:
+//   • glass → <YearA/>          — subject lanes under a month scale.
+//   • paper → <TimelineYear/>   — the existing merged drill view (sidebar,
+//                                 lesson pane, standards coverage, ?subject=
+//                                 drill), rendered untouched.
+//   • color → <YearC/>          — the subject constellation of unit-progress
+//                                 discs; a disc opens the Unit Explorer modal.
 //
-// The previous desktop/phone split (<YearView> + <YearMobile>) is retired —
-// TimelineYear handles all three viewport tiers itself (it scrolls its wide
-// grid internally so the document never scrolls sideways). Those components
-// remain in components/year for any consumer that still imports them.
+// The glass + color frames honor `?subject=<id>` by scrolling that subject's
+// lane / cluster into view (the retired /subject/[slug] redirect stays
+// meaningful on every frame). The /year/print route is untouched.
 
-import { TimelineYear } from "@/components/year";
+import { YearShell } from "@/components/year-v2";
 
 export default function YearPage() {
-  return <TimelineYear />;
+  return <YearShell />;
 }
