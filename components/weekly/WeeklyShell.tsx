@@ -1339,9 +1339,17 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           {/* Far-left slim icon nav strip — shared with Daily. */}
           <IconRail />
 
-          {/* The reorderable + resizable body. The grid template is computed
-            from columnOrder + effectiveRailWidth above so it re-evaluates
-            when the teacher reorders or resizes a panel. */}
+          {/* Week EDIT — the board is a dedicated FULL-WIDTH canvas (bundle:
+            WeekEdit mounts alone in the viewbody; no resources rail). The
+            reorderable grid+rail body below is View-mode chrome; suppressing
+            it here mirrors how Day edit takes over /daily. Rail state
+            (width, order, collapsed panels) is untouched and returns intact
+            when the teacher flips back to View. */}
+          {isEdit ? (
+            <div className={styles.body} style={{ gridTemplateColumns: "1fr" }}>
+              <div className={styles.gridSlot}>{renderGridPanel(null)}</div>
+            </div>
+          ) : (
           <div
             ref={bodyRef}
             className={styles.body}
@@ -1396,6 +1404,7 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
               </DragOverlay>
             </DndContext>
           </div>
+          )}
         </div>
 
         {/* ── W3-C3 — narrow-viewport overlay drawer ──────────────────────
