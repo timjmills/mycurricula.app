@@ -191,6 +191,12 @@
   .lessonSel {
     min-height: 44px;
   }
+  /* Footer actions (Duplicate / Mark taught / Teach) are primary controls, so
+     they owe the 44px floor on phone/tablet too — they measured 32px (QA W7
+     finding 2). The children are the only content of .footActions. */
+  .footActions > * {
+    min-height: 44px;
+  }
 }
 
 /* ── Phone ──────────────────────────────────────────────────────────────── */

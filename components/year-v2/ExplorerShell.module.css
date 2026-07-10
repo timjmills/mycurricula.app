@@ -138,10 +138,16 @@
   gap: 14px;
   padding: 18px 20px;
   color: #fff;
+  /* Both stops mix toward black so white header text clears WCAG AA even on
+     the LIGHTEST subject (Math gold): the old light stop was raw `var(--c)`,
+     giving white-on-gold ~1.82:1 (QA W7 finding 1). These are the DayC-hero
+     anchors (Wave 4) — 58%/40% subject-over-black in oklab — QA-measured at
+     white ≥6.5:1 worst case. `#000` is a FIXED dark mix target (safe on any
+     tone; it is not an ink token that would invert on dark). */
   background: linear-gradient(
     135deg,
-    var(--c),
-    color-mix(in srgb, var(--c) 78%, #000)
+    color-mix(in oklab, var(--c) 58%, #000),
+    color-mix(in oklab, var(--c) 40%, #000)
   );
   flex: 0 0 auto;
 }
