@@ -63,13 +63,14 @@ import { useAppState } from "@/lib/app-state";
 import { usePlanner } from "@/lib/planner-store";
 import { useOrderedWeekdays } from "@/lib/week-order";
 import { WEEKDAY_INDEX } from "@/lib/use-school-week";
-import { getDayBlocks, formatBlockTime } from "@/lib/schedule-data";
+import { getDayBlocks } from "@/lib/schedule-data";
 import { lessonTime } from "@/lib/mock/schedule";
 import { usePbLayout } from "@/lib/pblayout-state";
 import { OpenLessonEditorContext } from "./weekly-lesson-card";
 import {
   deriveWeekPeriods,
   assignLessonPeriod,
+  periodForDay,
   retimeLabel,
   UNSCHEDULED,
   type WeekPeriod,
@@ -257,15 +258,12 @@ export function WeekEditBoard({ grip }: WeekEditBoardProps): ReactNode {
     return { map, anyUnscheduled };
   }, [weekdays, byDay, periods, dayBlocks]);
 
-  // ── STACKED placement: rows 0..maxDepth (+1 drop tail) ────────────────────
-  const stackDepth = useMemo(() => {
-    let max = 0;
-    for (const day of weekdays) {
-      max = Math.max(max, (byDay[day.index] ?? []).length);
-    }
-    // +1 tail row so a teacher always has an empty slot to drop into.
-    return max + 1;
-  }, [weekdays, byDay]);
+  // ── STACKED placement: ONE row; each day cell stacks its lessons flush ────
+  // (User pointer-pass feedback, 7.10.26: the original shared index-row grid
+  // padded short days with empty 62px slots between/below tiles — "too many
+  // gaps". A single contiguous stack per day reads one-after-the-other, and
+  // BoardCell already renders multi-lesson cells, so the whole day is one
+  // droppable: a drop appends to the day, same as before.)
 
   // Effective time label for a lesson (own time, else subject default).
   const effectiveLabel = useCallback(
@@ -413,19 +411,22 @@ export function WeekEditBoard({ grip }: WeekEditBoardProps): ReactNode {
     const periodChanged = target.rowKey !== sourcePeriodKey;
 
     if (periodChanged && targetPeriod) {
-      // Cross-period → re-time. Preserve the lesson's duration; fall back to its
-      // subject's default label, then the period length. ONE moveLesson call:
-      // include `day` only when it actually changed.
+      // Cross-period → re-time. The cluster row is resolved to the TARGET
+      // day's actual block timing first (periodForDay — a merged "1:00" row
+      // starts 13:10 on a day whose block does), then the lesson's duration
+      // is preserved with subject-label / period-length fallbacks. ONE
+      // moveLesson call: include `day` only when it actually changed.
+      const dayPeriod = periodForDay(targetPeriod, dayBlocks[target.day] ?? []);
       const newTime = retimeLabel(
         source.time,
-        targetPeriod,
+        dayPeriod,
         lessonTime({ subject: source.subject }),
       );
       moveLesson(id, {
         ...(dayChanged ? { day: target.day } : {}),
         time: newTime,
       });
-      setLiveAnnouncement(`Moved to ${dayName} at ${targetPeriod.label}.`);
+      setLiveAnnouncement(`Moved to ${dayName} at ${dayPeriod.label}.`);
       return;
     }
 
@@ -476,7 +477,8 @@ export function WeekEditBoard({ grip }: WeekEditBoardProps): ReactNode {
     ? (lessons.find((l) => l.id === activeId) ?? null)
     : null;
 
-  // Row descriptors for the active (effective) layout.
+  // Row descriptors for the active (effective) layout. Stacked is ONE row —
+  // each day cell stacks its whole day flush (no empty index slots).
   const rows: Array<{ key: string; period: WeekPeriod | null; label: string }> =
     effectiveLayout === "aligned"
       ? [
@@ -485,11 +487,7 @@ export function WeekEditBoard({ grip }: WeekEditBoardProps): ReactNode {
             ? [{ key: UNSCHEDULED, period: null, label: "Unscheduled" }]
             : []),
         ]
-      : Array.from({ length: stackDepth }, (_, i) => ({
-          key: `row-${i}`,
-          period: null,
-          label: "",
-        }));
+      : [{ key: "stack", period: null, label: "" }];
 
   return (
     <div
@@ -541,9 +539,10 @@ export function WeekEditBoard({ grip }: WeekEditBoardProps): ReactNode {
               </div>
             ))}
 
-            {rows.map((row) => (
+            {rows.map((row, rowIdx) => (
                 <React.Fragment key={row.key}>
-                  {/* Rail cell — period time (aligned) / empty (stacked). */}
+                  {/* Rail cell — "Period N" + start time (aligned, per the
+                      design mock) / empty (stacked). */}
                   {effectiveLayout === "aligned" ? (
                     <div
                       className={`${styles.railCell} va-ph ${
@@ -553,10 +552,10 @@ export function WeekEditBoard({ grip }: WeekEditBoardProps): ReactNode {
                       {row.period ? (
                         <>
                           <span className={styles.railTime}>
-                            {row.period.label}
+                            Period {rowIdx + 1}
                           </span>
                           <span className={styles.railEnd}>
-                            {formatBlockTime(row.period.endMin)}
+                            {row.period.label}
                           </span>
                         </>
                       ) : (
@@ -577,11 +576,7 @@ export function WeekEditBoard({ grip }: WeekEditBoardProps): ReactNode {
                     const cellLessons =
                       effectiveLayout === "aligned"
                         ? (alignedCells.map.get(`${day}:${row.key}`) ?? [])
-                        : (() => {
-                            const idx = Number(row.key.slice("row-".length));
-                            const l = (byDay[day] ?? [])[idx];
-                            return l ? [l] : [];
-                          })();
+                        : (byDay[day] ?? []);
                     const isTarget =
                       overCell !== null &&
                       overCell.day === day &&

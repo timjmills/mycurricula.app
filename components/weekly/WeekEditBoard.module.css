@@ -99,7 +99,7 @@
   position: sticky;
   left: 0;
   z-index: 4;
-  min-height: 62px;
+  min-height: 40px;
   padding: 6px 6px 6px 2px;
   color: var(--ink-500);
   background: var(--ink-50);
@@ -120,7 +120,7 @@
 }
 
 .railEmpty {
-  min-height: 62px;
+  min-height: 40px;
   background: transparent;
 }
 
@@ -137,11 +137,14 @@
 }
 
 /* ── Day × row cell (the droppable slot) ────────────────────────────── */
+/* Tighter than the bundle's 62px floor: with clustered period rows the cells
+   are mostly FILLED, so the floor only governs empty drop targets — 40px keeps
+   them hittable without reading as holes (user feedback, 7.10.26). */
 .cell {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  min-height: 62px;
+  min-height: 40px;
   padding: 4px;
   min-width: 0;
   border-radius: var(--r-md);

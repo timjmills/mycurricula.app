@@ -49,39 +49,81 @@ export interface PeriodLesson {
 
 // ── 1. Period derivation ────────────────────────────────────────────────────
 
+/** Starts within this many minutes of a cluster's first start merge into ONE
+ *  period row. Real timetables stagger the "same" period across days (the
+ *  fixture's block-4 starts 13:00 / 13:10 / 13:15 by day); without clustering
+ *  each stagger minted its own sparse row and the board read as mostly holes
+ *  (user pointer-pass feedback, 7.10.26 — the design mock has ~6 shared
+ *  periods, not one row per distinct minute). */
+const CLUSTER_TOLERANCE_MIN = 30;
+
 /**
  * Derive the shared period rows for a set of school days. Collects every
- * ACADEMIC block across `dayIndices`, groups them by start-of-day minute, and
- * returns the distinct start times as sorted rows. When two days start a block
- * at the same minute but run to different ends, the row spans the LONGEST of
- * them (deterministic, and the widest band is the most useful for the retime
- * fallback below). Non-academic blocks (recess, lunch, specials) never form a
- * period — the board plans academic lessons only.
+ * ACADEMIC block across `dayIndices`, then sweep-clusters the sorted start
+ * minutes: a start within CLUSTER_TOLERANCE_MIN of the current cluster's
+ * FIRST start joins that cluster (row start = earliest member, row end =
+ * latest member end). This folds cross-day staggers of the same period into
+ * one row, so day columns fill flush like the design mock instead of
+ * scattering across near-duplicate rows. Non-academic blocks (recess, lunch,
+ * specials) never form a period — the board plans academic lessons only.
  */
 export function deriveWeekPeriods(dayIndices: number[]): WeekPeriod[] {
-  const byStart = new Map<number, { startMin: number; endMin: number }>();
+  const starts = new Map<number, number>(); // startMin -> max endMin
   for (const day of dayIndices) {
     for (const block of getDayBlocks(day)) {
       if (block.type !== "academic") continue;
-      const existing = byStart.get(block.startMin);
-      if (existing === undefined) {
-        byStart.set(block.startMin, {
-          startMin: block.startMin,
-          endMin: block.endMin,
-        });
-      } else if (block.endMin > existing.endMin) {
-        existing.endMin = block.endMin;
+      const end = starts.get(block.startMin);
+      if (end === undefined || block.endMin > end) {
+        starts.set(block.startMin, block.endMin);
       }
     }
   }
-  return [...byStart.values()]
-    .sort((a, b) => a.startMin - b.startMin)
-    .map((p) => ({
-      key: `p-${p.startMin}`,
-      startMin: p.startMin,
-      endMin: p.endMin,
-      label: formatBlockTime(p.startMin),
-    }));
+
+  const sorted = [...starts.entries()].sort((a, b) => a[0] - b[0]);
+  const clusters: Array<{ startMin: number; endMin: number }> = [];
+  for (const [startMin, endMin] of sorted) {
+    const current = clusters[clusters.length - 1];
+    if (current && startMin - current.startMin <= CLUSTER_TOLERANCE_MIN) {
+      current.endMin = Math.max(current.endMin, endMin);
+    } else {
+      clusters.push({ startMin, endMin });
+    }
+  }
+
+  return clusters.map((p) => ({
+    key: `p-${p.startMin}`,
+    startMin: p.startMin,
+    endMin: p.endMin,
+    label: formatBlockTime(p.startMin),
+  }));
+}
+
+/**
+ * Resolve a clustered period row to the DESTINATION DAY's actual timing: the
+ * day's academic block whose start falls inside the cluster band
+ * [startMin, startMin + CLUSTER_TOLERANCE_MIN]. A cluster key identifies a
+ * visual row shared across days, not a valid per-day start — dropping onto
+ * the "1:00" row must write Sunday's real 13:10 when that is where Sunday's
+ * block in the band begins (Codex gate on the clustering batch). Falls back
+ * to the cluster's own timing when the day has no block in the band.
+ */
+export function periodForDay(
+  period: WeekPeriod,
+  dayBlocks: readonly TimelineBlock[],
+): WeekPeriod {
+  const block = dayBlocks.find(
+    (b) =>
+      b.type === "academic" &&
+      b.startMin >= period.startMin &&
+      b.startMin - period.startMin <= CLUSTER_TOLERANCE_MIN,
+  );
+  if (block === undefined) return period;
+  return {
+    key: period.key,
+    startMin: block.startMin,
+    endMin: block.endMin,
+    label: formatBlockTime(block.startMin),
+  };
 }
 
 // ── 2. Time-label parsing ───────────────────────────────────────────────────

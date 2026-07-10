@@ -4,6 +4,7 @@ import {
   deriveWeekPeriods,
   parseTimeLabel,
   assignLessonPeriod,
+  periodForDay,
   retimeLabel,
   UNSCHEDULED,
   type WeekPeriod,
@@ -20,11 +21,14 @@ import { getDayBlocks } from "@/lib/schedule-data";
 //   Thu:     8:00 9:00 10:40
 
 describe("deriveWeekPeriods", () => {
-  it("collects distinct academic start times across the week, sorted", () => {
+  it("sweep-clusters staggered starts into shared period rows, sorted", () => {
     const periods = deriveWeekPeriods([0, 1, 2, 3, 4]);
-    // 10 distinct academic start minutes across the five days.
+    // 10 distinct academic start minutes across the five days fold into 6
+    // rows: starts within 30min of a cluster's first start merge (620+640,
+    // 780+790+795, 850+855) — the design mock's ~6 shared periods, so day
+    // columns fill flush instead of scattering across near-duplicate rows.
     expect(periods.map((p) => p.startMin)).toEqual([
-      480, 540, 620, 640, 740, 780, 790, 795, 850, 855,
+      480, 540, 620, 740, 780, 850,
     ]);
     // First row is the 8:00 band; labels are 12h with no am/pm marker.
     expect(periods[0]).toMatchObject({
@@ -32,6 +36,9 @@ describe("deriveWeekPeriods", () => {
       startMin: 480,
       label: "8:00",
     });
+    // A cluster's end spans its LATEST member end (620 row absorbs the 640
+    // block ending 680).
+    expect(periods.find((p) => p.startMin === 620)?.endMin).toBe(680);
   });
 
   it("spans a shared start to the LONGEST end when days differ", () => {
@@ -62,11 +69,12 @@ describe("deriveWeekPeriods", () => {
     // A Tue+Wed school week passes keys [2,3] (WEEKDAY_INDEX), never
     // positions [0,1] — the results differ: Sun/Mon carry 13:10 (790) and
     // 14:10 (850) starts that Tue/Wed do not, while Tue/Wed carry 13:00
-    // (780), 13:15 (795), and 14:15 (855). The board maps tokens through
-    // WEEKDAY_INDEX before calling this (Codex gate R3 — a Mon–Fri school
-    // must pull Monday's blocks for its first column, not Sunday's).
+    // (780, absorbing 13:15/795 into its cluster) and 14:15 (855). The board
+    // maps tokens through WEEKDAY_INDEX before calling this (Codex gate R3 —
+    // a Mon–Fri school must pull Monday's blocks for its first column, not
+    // Sunday's).
     expect(deriveWeekPeriods([2, 3]).map((p) => p.startMin)).toEqual([
-      480, 540, 620, 740, 780, 795, 855,
+      480, 540, 620, 740, 780, 855,
     ]);
     expect(deriveWeekPeriods([0, 1]).map((p) => p.startMin)).toEqual([
       480, 540, 620, 740, 790, 850,
@@ -250,14 +258,16 @@ describe("overlapping-band assignment (nearest-start)", () => {
     }
   });
 
-  it("a 1:10 lesson lands in the 1:10 row, not the stretched 12:20 band", () => {
-    // start 790 is CONTAINED by p-740[740,795]; nearest start is p-790 (0).
+  it("a 1:10 lesson lands in the 1:00 cluster row, not the 12:20 band", () => {
+    // start 790: nearest cluster start is p-780 (Δ10), never p-740 (Δ50) —
+    // even though the stretched 12:20 band CONTAINS 790 (containing-first
+    // was the shadowing bug).
     const key = assignLessonPeriod(
       { subject: "math", time: "1:10–1:40" },
       periods,
       [],
     );
-    expect(key).toBe("p-790");
+    expect(key).toBe("p-780");
   });
 
   it("a re-time drop is idempotent: the new label re-resolves to the dropped-on row", () => {
@@ -273,12 +283,66 @@ describe("overlapping-band assignment (nearest-start)", () => {
   });
 
   it("ties between equidistant starts go to the earlier period", () => {
-    // 10:30 (630) sits exactly between p-620 and p-640 → earlier wins.
+    // 8:30 (510) sits exactly between p-480 and p-540 → earlier wins.
     const key = assignLessonPeriod(
-      { subject: "math", time: "10:30–11:00" },
+      { subject: "math", time: "8:30–9:00" },
       periods,
       [],
     );
-    expect(key).toBe("p-620");
+    expect(key).toBe("p-480");
+  });
+
+  it("every merged-away fixture start still assigns to its own cluster", () => {
+    // The clusters absorb 640→620, 790/795→780, 855→850; a lesson whose
+    // label carries the absorbed start must land in the absorbing row.
+    const cases: Array<[string, string]> = [
+      ["10:40–11:20", "p-620"],
+      ["1:10–1:40", "p-780"],
+      ["1:15–1:45", "p-780"],
+      ["2:15–3:00", "p-850"],
+    ];
+    for (const [label, expected] of cases) {
+      expect(
+        assignLessonPeriod({ subject: "math", time: label }, periods, []),
+      ).toBe(expected);
+    }
+  });
+});
+
+// ── Cluster → destination-day resolution (Codex, clustering batch) ─────────
+// A cluster key identifies a VISUAL row; the re-time on a drop must write the
+// destination day's actual block start within the band, not the cluster's
+// earliest member.
+describe("periodForDay + cross-day retime", () => {
+  const periods = deriveWeekPeriods([0, 1, 2, 3, 4]);
+  const p780 = periods.find((p) => p.key === "p-780")!;
+
+  it("resolves the merged 1:00 row to Sunday's real 13:10 block", () => {
+    const sunday = periodForDay(p780, getDayBlocks(0));
+    expect(sunday.startMin).toBe(790);
+    expect(sunday.label).toBe("1:10");
+    expect(sunday.key).toBe("p-780"); // the row identity is unchanged
+  });
+
+  it("resolves the same row to Tuesday's real 13:00 block", () => {
+    const tuesday = periodForDay(p780, getDayBlocks(2));
+    expect(tuesday.startMin).toBe(780);
+  });
+
+  it("falls back to the cluster's own timing when the day has no block in the band", () => {
+    // Thursday has no academic block in the 13:00 band.
+    const thursday = periodForDay(p780, getDayBlocks(4));
+    expect(thursday.startMin).toBe(p780.startMin);
+  });
+
+  it("cross-day retime writes the day-resolved start, keeps duration, and re-resolves to the same row", () => {
+    const sunday = periodForDay(p780, getDayBlocks(0));
+    // A 45-minute 13:00 lesson dropped on Sunday's row → 13:10 start.
+    const label = retimeLabel("1:00–1:45", sunday, undefined);
+    expect(label).toBe("1:10–1:55");
+    // The written label re-resolves to the SAME visual cluster (idempotent).
+    expect(
+      assignLessonPeriod({ subject: "math", time: label }, periods, []),
+    ).toBe("p-780");
   });
 });
