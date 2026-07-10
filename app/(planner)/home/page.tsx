@@ -13,7 +13,14 @@
 
 import type { ReactNode } from "react";
 import { HomeConsole } from "@/components/chrome";
+import { HomeV1 } from "@/components/home";
+import { V2 } from "@/lib/v2-flag";
 
 export default function HomePage(): ReactNode {
-  return <HomeConsole />;
+  // ── NEXT_PUBLIC_V2 router gate (Wave-13 rollback half) ──────────────────
+  // Flag ON → the v2 <HomeConsole> (corner-grammar landing console). Flag OFF →
+  // <HomeV1>, a verbatim copy of master's live-on-prod "Quiet Dawn" home. V2 is
+  // build-inlined → exactly one mounts per build. /home has a real v1 form on
+  // master, so gating it keeps the flag-OFF rollback a faithful v1 restore.
+  return V2 ? <HomeConsole /> : <HomeV1 />;
 }
