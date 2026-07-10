@@ -53,6 +53,30 @@
   .overlay > * {
     min-width: 0;
   }
+  /* ── v1 shell (NEXT_PUBLIC_V2=0) ──────────────────────────────────────────
+     The flag-OFF chrome branch in app/(planner)/layout.tsx replaces `.overlay`
+     (the v2 containing block) with this fill wrapper: same absolute fill + the
+     same `> * { min-width: 0 }` contract, minus the v2 frame inset that v1
+     never had. Mirroring the child rule matters — the OFF branch has THREE
+     direct children (MasterBanner, TopBar, the content row), and giving only
+     the row `min-width: 0` would still let an intrinsically-wide chrome bar
+     force document h-scroll (§4a Codex Medium). Dev-harness only: a flag-OFF
+     production artifact is refused by scripts/check-v2-flag.mjs. */
+  .v1-shell {
+    position: absolute;
+    inset: 0;
+    /* z-index parity with `.overlay` (§4a L5): both are absolutely positioned
+       fills over the same `position:relative` content column, so the v1 shell
+       must claim the same stacking level or a later-painted sibling could
+       cover it. */
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .v1-shell > * {
+    min-width: 0;
+  }
   .home .frame.fullbleed ~ .overlay {
     --frame-inset: 0px;
   }
