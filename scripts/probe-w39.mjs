@@ -845,12 +845,26 @@ for (const c of EDIT_CASES) {
   let detail = "";
   try {
     await gotoAuthed(page, "/weekly");
-    // The gear is a client control — wait for it, then open the popover and wait
-    // for the portaled .vt-menu to mount.
+    // The gear is a client control: it renders (visible) before React attaches
+    // its onClick, so a single early click can land in the pre-hydration window
+    // and silently no-op — the menu never opens (menuExists=false). Settle for
+    // the same window hydratedNavClick uses, then retry the open until the
+    // portaled .vt-menu mounts; hydration on a busy dev server (a concurrent
+    // session compiling another route) can lag several seconds past the cog
+    // becoming visible. Each no-op click does nothing and each real click opens,
+    // so we break the instant .vt-menu attaches — never double-clicking a
+    // successful open shut.
     await page.waitForSelector(".vt-cogbtn", { state: "visible", timeout: 30000 });
-    await page.waitForTimeout(1000); // hydration settle so the onClick is live
-    await page.click(".vt-cogbtn");
-    await page.waitForSelector(".vt-menu", { state: "attached", timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(4000); // hydration settle so the onClick is live
+    for (let i = 0; i < 5; i++) {
+      await page.click(".vt-cogbtn");
+      const opened = await page
+        .waitForSelector(".vt-menu", { state: "attached", timeout: 3000 })
+        .then(() => true)
+        .catch(() => false);
+      if (opened) break;
+      await page.waitForTimeout(1000);
+    }
     const z = await page.evaluate(() => {
       const tint = document.querySelector(".theme-tint");
       const menu = document.querySelector(".vt-menu");

@@ -1,0 +1,988 @@
+/* day-v2.module.css — the three v2 Day frames (DayA glass / DayB paper / DayC
+ * color). Ported faithfully from the design bundle (views-shared/a/b/c CSS,
+ * B:718-1000) but:
+ *   • Tokens only — every color/space/shadow is a var(--…). Subject color comes
+ *     through the `.cp-subj.<cls>` cascade (var(--c)/--cl/--cd), never a hex.
+ *   • Tone is TOKEN-DRIVEN, never theme-branched: the app's neutrals redefine
+ *     under :root[data-tone="dark"], and tone is DERIVED from photo dimness
+ *     (dim→dark, bright→light), so a single token set stays legible across all
+ *     six themes AND over a photo without per-element flips (CLAUDE.md §4).
+ *   • Buttons are double-classed (`.x.x`) so the `.cp-root button` reset can't
+ *     strip their padding/border/background.
+ *   • Grid frames (DayB/DayC) collapse to a single column ≤880px — rail/agenda
+ *     stack above the focus/hero; only internal scroll, never document h-scroll.
+ */
+
+/* ── View body + shared header ──────────────────────────────────────────── */
+.viewbody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 2px;
+  animation: vfade 0.35s ease;
+}
+@keyframes vfade {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.vhead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 2px 4px 16px;
+}
+.wknav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wkarrow.wkarrow {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--ink-soft);
+  display: grid;
+  place-items: center;
+  transition:
+    transform 0.14s,
+    background 0.18s;
+}
+.wkarrow.wkarrow:hover {
+  transform: translateY(-1px);
+  background: var(--surface);
+}
+.wkarrow svg {
+  width: 17px;
+  height: 17px;
+}
+.vheadTitle {
+  font-family: var(--head-font, var(--font-display));
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-size: clamp(22px, 2.6vw, 32px);
+  margin: 0;
+  line-height: 1;
+  color: var(--ink);
+}
+.vsub {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.72;
+  text-align: right;
+  color: var(--ink);
+}
+
+.holiday {
+  margin: 0 4px 14px;
+}
+.emptyDay {
+  margin: 24px auto;
+  max-width: 860px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── Shared atoms ───────────────────────────────────────────────────────── */
+.subjGlyph {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display-sm);
+  font-weight: 800;
+  flex: 0 0 auto;
+  background: var(--c);
+  color: #fff;
+  box-shadow: 0 5px 12px -5px rgba(0, 0, 0, 0.4);
+}
+
+.statusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+.dotDone {
+  background: var(--done);
+}
+.dotNow {
+  background: var(--brand-500);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand-500) 30%, transparent);
+}
+.dotUpcoming {
+  background: var(--honey-500);
+}
+.dotIdle {
+  background: var(--idle);
+}
+
+.forkCues {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+}
+.movedArrow {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--honey-500) 18%, transparent);
+  color: var(--honey-600);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: default;
+}
+
+/* ============================================================
+   FRAME A — Calm Recede (glass timeline)
+   ============================================================ */
+.vaDay {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  max-width: 860px;
+  margin: 0 auto;
+}
+.vaRow {
+  display: grid;
+  grid-template-columns: 62px 40px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: var(--r-xl);
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--c);
+  box-shadow: var(--sh-md);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.22s ease;
+}
+.vaRow:hover {
+  transform: translateY(-2px);
+}
+.vaRow.stripeModified {
+  border-left-style: dashed;
+}
+.vaRowNow {
+  box-shadow:
+    0 0 0 1.5px var(--brand-400),
+    var(--sh-md);
+}
+.vaRowSelected {
+  box-shadow: 0 0 0 2px var(--brand-500);
+}
+.vaRowDone .vaTitle {
+  opacity: 0.62;
+}
+.vaRowDone .vaTime {
+  opacity: 0.5;
+}
+.vaTime {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 12.5px;
+  opacity: 0.78;
+  line-height: 1.3;
+}
+.vaBody {
+  min-width: 0;
+}
+.vaTitle {
+  font-family: var(--head-font, var(--font-display-sm));
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.vaUnit {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.66;
+  margin-top: 3px;
+}
+.vaEnd {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.vaFinish.vaFinish {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  background: none;
+  border-radius: var(--r-pill);
+  padding: 8px 14px;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+}
+.vaFinish.vaFinish:hover {
+  border-color: var(--done);
+  color: var(--done);
+}
+.vaFinishOn.vaFinishOn {
+  background: var(--done-tint);
+  border-color: transparent;
+  color: var(--done);
+}
+.vaFinish svg {
+  width: 15px;
+  height: 15px;
+}
+.vaFdot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--idle);
+}
+.vaFdotNow {
+  background: var(--brand-500);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand-500) 30%, transparent);
+  animation: vaPulse 1.6s ease-in-out infinite;
+}
+@keyframes vaPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand-500) 30%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--brand-500) 12%, transparent);
+  }
+}
+
+.vaPillsplit {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.vaPillBtn.vaPillBtn {
+  border: 0;
+  background: var(--surface);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  padding: 8px 13px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.vaPillBtn.vaPillBtn:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+.vaPillBtn.vaPillBtn:hover {
+  background: var(--brand-500);
+  color: #fff;
+}
+
+.vaDayAddWrap {
+  position: relative;
+  max-width: 860px;
+  margin: 4px auto 0;
+  width: 100%;
+}
+.vaDayAdd.vaDayAdd {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border: 1px dashed var(--border);
+  background: none;
+  border-radius: var(--r-lg);
+  padding: 14px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--body);
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.vaDayAdd.vaDayAdd:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--brand-500) 8%, transparent);
+  border-style: solid;
+  color: var(--brand-600);
+}
+.vaDayAdd.vaDayAdd:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.vaDayAdd svg {
+  width: 16px;
+  height: 16px;
+}
+.vaDayAddMenu {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: 6px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-lg);
+}
+.addRowNew.addRowNew,
+.addRowEvent.addRowEvent {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  width: 100%;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 11px 12px;
+  border-radius: var(--r-md);
+}
+.addRowEvent.addRowEvent {
+  margin-top: 4px;
+}
+.addRowNew.addRowNew:hover,
+.addRowEvent.addRowEvent:hover {
+  background: color-mix(in oklab, var(--brand-500) 8%, transparent);
+}
+.addIc {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  background: var(--brand-50);
+  color: var(--brand-600);
+}
+.addRowEvent .addIc {
+  background: var(--honey-100);
+  color: var(--honey-600);
+}
+.addTx {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.addTx b {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.addTx span {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.vaError {
+  margin: 8px 2px 0;
+  color: var(--danger, #c0392b);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ============================================================
+   FRAME B — Bright Workspace (rail + focus)
+   ============================================================ */
+.vbDay {
+  display: grid;
+  grid-template-columns: 236px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+.vbRail {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.vbRailItem {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 13px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s;
+}
+.vbRailItem:hover {
+  background: color-mix(in oklab, var(--ink) 4%, transparent);
+}
+.vbRailItemSel {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--sh-sm);
+}
+.rbar {
+  justify-self: center;
+  width: 0;
+  height: 30px;
+  border-left: 4px solid var(--c);
+  border-radius: 3px;
+}
+.rbar.stripeModified {
+  border-left-style: dashed;
+}
+.rtext {
+  min-width: 0;
+}
+.rt {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.rs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.vbRailAdd.vbRailAdd,
+.vcAadd.vcAadd {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: 1.5px dashed var(--border);
+  background: none;
+  border-radius: var(--r-md);
+  padding: 10px 13px;
+  margin-top: 3px;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 12.5px;
+  transition:
+    background 0.16s,
+    border-color 0.16s,
+    color 0.16s;
+}
+.vbRailAdd.vbRailAdd:hover:not(:disabled),
+.vcAadd.vcAadd:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--brand-500) 9%, transparent);
+  border-style: solid;
+  border-color: var(--brand-500);
+  color: var(--brand-600);
+}
+.vbRailAdd.vbRailAdd:disabled,
+.vcAadd.vcAadd:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.rplus {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--brand-500) 14%, transparent);
+  color: var(--brand-600);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.vbFocus {
+  border-radius: var(--r-2xl);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-lg);
+  max-height: 100%;
+}
+.vbFocusBand {
+  height: 8px;
+  background: var(--c);
+}
+.vbFocusBand.stripeModified {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--c) 0 10px,
+    transparent 10px 16px
+  );
+}
+.vbFocusIn {
+  padding: clamp(16px, 2vw, 26px);
+}
+.ey {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.eyName {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cd);
+}
+.focusTitle {
+  font-family: var(--head-font, var(--font-display));
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-size: clamp(22px, 2.4vw, 30px);
+  margin: 0 0 5px;
+  color: var(--ink);
+  line-height: 1.05;
+}
+.un {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--body);
+  margin-bottom: 14px;
+}
+.vbObj {
+  font-size: clamp(14px, 1.3vw, 17px);
+  font-weight: 600;
+  color: var(--ink-soft);
+  line-height: 1.45;
+  border-left: 3px solid var(--c);
+  padding-left: 14px;
+  margin-bottom: 16px;
+}
+.vbMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 26px;
+  margin-bottom: 16px;
+}
+.mi {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mk {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mv {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.vbActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.vbBtn.vbBtn {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: var(--r-pill);
+  padding: 12px 22px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+  box-shadow: var(--sh-xs);
+  transition: transform 0.14s;
+}
+.vbBtnPri.vbBtnPri {
+  background: var(--brand-500);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: var(--sh-brand);
+}
+.vbBtn.vbBtn:hover {
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+   FRAME C — Color-forward (agenda + hero)
+   ============================================================ */
+.vcDay {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.vcAgenda {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 10px 8px;
+  box-shadow: var(--sh-sm);
+}
+.vcAitem {
+  display: grid;
+  grid-template-columns: 54px 16px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 10px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.vcAitem:hover {
+  background: color-mix(in oklab, var(--ink) 5%, transparent);
+}
+.vcAitemSel {
+  background: color-mix(in oklab, var(--ink) 8%, transparent);
+}
+.at {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.ad {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--c);
+  border: 3px solid var(--surface);
+  box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--ink) 12%, transparent);
+}
+.ad.stripeModified {
+  border-style: dashed;
+}
+.vcAtext {
+  min-width: 0;
+}
+.an {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.au {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cd);
+}
+
+.vcDetail {
+  border-radius: var(--r-2xl);
+  overflow: visible;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.4vw, 16px);
+  padding: clamp(18px, 2.2vw, 30px);
+  box-shadow: var(--sh-lg);
+  position: relative;
+  min-height: 0;
+  /* Subject color as the hero — a DEEP saturated panel, dark enough that the
+     always-white hero text clears WCAG AA on every subject (M3). The WHOLE
+     gradient is darkened toward `black`: start 58%, end 40% of the subject
+     color in OKLab. Worst case is the lightest subject (Math gold, normal
+     palette #DCC674) at the START: white-on-start = 6.52:1 (> 4.5 body floor);
+     every other subject in both palettes, and the darker end, land higher. The
+     anchor is `black`, NOT var(--ink-900): that token INVERTS to near-white on
+     dark tone, which would lighten the gradient and break the white text on
+     Night — this hero is a fixed white-on-color surface in every theme, so it
+     needs a tone-stable dark anchor. Numbers verified in OKLab (the space
+     color-mix interpolates in). */
+  background: linear-gradient(
+    150deg,
+    color-mix(in oklab, var(--c) 58%, black),
+    color-mix(in oklab, var(--c) 40%, black)
+  );
+}
+.vcDetailModified {
+  outline: 2px dashed rgba(255, 255, 255, 0.55);
+  outline-offset: -7px;
+}
+.dcTop {
+  flex: 0 0 auto;
+}
+.dcTopHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dcTopHead .forkCues {
+  margin-top: 0;
+}
+.dcTopHead .movedArrow {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.dlab {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.detailTitle {
+  font-family: var(--head-font, var(--font-display));
+  font-weight: 600;
+  font-size: clamp(23px, 2.7vw, 34px);
+  letter-spacing: -0.025em;
+  margin: 7px 0 5px;
+  line-height: 1.05;
+}
+.dun {
+  font-size: 15px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+.dcTarget {
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
+}
+.dcTl {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.82;
+  margin-bottom: 6px;
+}
+.dobj {
+  font-size: clamp(14px, 1.3vw, 17px);
+  font-weight: 600;
+  line-height: 1.4;
+  max-width: 60ch;
+  opacity: 0.98;
+}
+.dcFlow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dcStep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 13px 7px 8px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.dcStep b {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+.dfoot {
+  margin-top: auto;
+  padding-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.dchip {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.dfootPlan.dfootPlan {
+  margin-left: auto;
+}
+/* Completion pill sitting on the colored hero — recolor to read on the
+   subject gradient (white text / translucent border; solid on the done state). */
+.vaFinish.dfootFinish {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+.vaFinish.dfootFinish:hover {
+  border-color: #fff;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+.vaFinishOn.dfootFinish {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--done);
+  border-color: transparent;
+}
+
+/* ── Shared add affordance + empty focus/hero areas ─────────────────────── */
+.addWrap {
+  position: relative;
+  width: 100%;
+}
+/* Rail / agenda menus open left-aligned (bundle .va-dayaddmenu.wk); the DayA
+   full-width row keeps the centered default. */
+.menuStart {
+  left: 0;
+  transform: none;
+}
+/* When a day has no lessons, the focus/hero column shows the holiday node or
+   the empty note instead of collapsing (so the add rail stays usable). */
+.focusEmpty,
+.heroEmpty {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  border-radius: var(--r-2xl);
+  border: 1px dashed var(--border);
+  background: var(--panel-bg);
+  padding: 24px;
+}
+
+/* ── Title-text select button — the accessible/keyboard selection control
+   (M2, Codex R2). A real <button> reset to look exactly like the title text
+   it wraps; the typography lives on its inner <span> (so the `.cp-root button`
+   font-size:inherit reset can't flatten it). Double-classed for cp-root
+   immunity. */
+.selectTitle.selectTitle {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.selectTitle.selectTitle:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Responsive — collapse the two-column frames ≤880px ─────────────────── */
+@media (max-width: 880px) {
+  .vbDay,
+  .vcDay {
+    grid-template-columns: 1fr;
+  }
+  .vbFocus {
+    max-height: none;
+  }
+}
+@media (max-width: 560px) {
+  .vaRow {
+    grid-template-columns: 52px 34px 1fr;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  /* The action cluster wraps to a full-width second row on phones. */
+  .vaEnd {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+
+/* Phone: the header's right meta (date / progress) no longer fits beside the
+   ◀ Day ▶ nav — wrap it to its own full-width line instead of clipping. */
+@media (max-width: 480px) {
+  .vhead {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .vsub {
+    flex: 1 0 100%;
+    text-align: left;
+  }
+}
+
+/* ── Touch targets — ≥44px on coarse pointers AND the phone/tablet width
+      tiers (CLAUDE.md §4 makes the floor viewport-tier based, not
+      pointer-type based — a 375px window with a mouse still owes 44px). ── */
+@media (pointer: coarse), (max-width: 900px) {
+  .wkarrow.wkarrow {
+    width: 44px;
+    height: 44px;
+  }
+  .vaFinish.vaFinish,
+  .vaPillBtn.vaPillBtn,
+  .vaDayAdd.vaDayAdd,
+  .vbRailAdd.vbRailAdd,
+  .vcAadd.vcAadd,
+  .vbBtn.vbBtn,
+  .vbRailItem,
+  .vcAitem,
+  .addRowNew.addRowNew,
+  .addRowEvent.addRowEvent {
+    min-height: 44px;
+  }
+}
+
+/* ── Reduced motion — drop the fade + the "now" pulse ──────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .viewbody {
+    animation: none;
+  }
+  .vaFdotNow {
+    animation: none;
+  }
+  .vaRow,
+  .wkarrow.wkarrow,
+  .vbBtn.vbBtn {
+    transition: none;
+  }
+}
