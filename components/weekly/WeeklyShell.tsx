@@ -143,6 +143,7 @@ import { useDndSensors } from "@/lib/collapse-on-drag";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 import { useTheme } from "@/lib/theme";
 import { useViewEditMode } from "@/lib/edit-mode-state";
+import { usePhoneViewport } from "@/lib/use-phone-viewport";
 import { buildWeeklyLink, type WeeklyLink } from "@/lib/deep-links";
 import { CURRENT_WEEK } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
@@ -595,7 +596,14 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // force-reset rule resets Day, never Week), so the board persists as the
   // teacher moves between views. Drives the highest-precedence branch in
   // renderGridPanel below.
-  const { isEdit } = useViewEditMode("Week");
+  // Phones are VIEW-ONLY (product decision 2026-07-10 — editing is a
+  // tablet+/desktop affordance). The chrome hides the View/Edit toggle on
+  // phones; this render-layer guard forces the view canvas so a persisted Week
+  // edit flag (Week edit persists across nav, unlike Day) can't strand a phone
+  // user in the board with no toggle to leave.
+  const { isEdit: rawIsEdit } = useViewEditMode("Week");
+  const isPhoneViewport = usePhoneViewport();
+  const isEdit = rawIsEdit && !isPhoneViewport;
 
   // Inline schedule-mode state (Subject↔Schedule + Lessons-only↔All). Lives
   // in localStorage so a teacher's choice survives across sessions. The

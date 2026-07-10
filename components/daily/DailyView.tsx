@@ -46,6 +46,7 @@ import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
 // localStorage map behind the top-bar ViewEditToggle). NOT app-state's
 // forking editMode — see the name-collision note in ViewEditToggle.tsx.
 import { useViewEditMode } from "@/lib/edit-mode-state";
+import { usePhoneViewport } from "@/lib/use-phone-viewport";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DayEditSplit } from "./DayEditSplit";
@@ -203,7 +204,15 @@ export function DailyView({
   // W3.8b — the Day view's View↔Edit mode (the top-bar ViewEditToggle's
   // persisted cc_editmode flag, capitalized "Day" — bundle-exact key
   // casing). While isEdit, the body renders <DayEditSplit>; else <DayViewV2>.
-  const { isEdit, setEdit } = useViewEditMode("Day");
+  //
+  // Phones are VIEW-ONLY (product decision 2026-07-10 — editing is a
+  // tablet+/desktop affordance). The chrome hides the View/Edit toggle on
+  // phones; this is the render-layer safety net so a persisted edit flag
+  // (carried over from a tablet session) can't strand a phone user in the
+  // editor with no toggle to leave. `setEdit` still works for tablet+.
+  const { isEdit: rawIsEdit, setEdit } = useViewEditMode("Day");
+  const isPhone = usePhoneViewport();
+  const isEdit = rawIsEdit && !isPhone;
 
   // ── Per-teacher row order (local + localStorage, NOT the shared doc) ──
   // Keyed by week+day. Initialised EMPTY rather than from localStorage: the
