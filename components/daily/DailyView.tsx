@@ -738,6 +738,7 @@ export function DailyView({
         open={addEventOpen}
         onClose={() => setAddEventOpen(false)}
         day={selectedDay}
+        dayLabel={dayLabel}
       />
     </div>
   );

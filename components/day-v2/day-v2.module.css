@@ -96,59 +96,14 @@
   font-weight: 600;
 }
 
-/* ── Shared atoms ───────────────────────────────────────────────────────── */
-.subjGlyph {
-  display: grid;
-  place-items: center;
-  font-family: var(--font-display-sm);
-  font-weight: 800;
-  flex: 0 0 auto;
-  background: var(--c);
-  color: #fff;
-  box-shadow: 0 5px 12px -5px rgba(0, 0, 0, 0.4);
-}
-
-.statusDot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  display: inline-block;
-  flex: 0 0 auto;
-}
-.dotDone {
-  background: var(--done);
-}
-.dotNow {
-  background: var(--brand-500);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand-500) 30%, transparent);
-}
-.dotUpcoming {
-  background: var(--honey-500);
-}
-.dotIdle {
-  background: var(--idle);
-}
-
-.forkCues {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 5px;
-}
-.movedArrow {
-  display: inline-grid;
-  place-items: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: var(--r-pill);
-  background: color-mix(in oklab, var(--honey-500) 18%, transparent);
-  color: var(--honey-600);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1;
-  cursor: default;
-}
+/* ── Shared atoms ─────────────────────────────────────────────────────────
+   SubjGlyph / StatusDot / ForkCues / .movedArrow / the Finish pill / the
+   add-menu / .selectTitle now live in components/planner-v2/atoms.module.css
+   (lifted in Wave 5 so the Week frames reuse the exact same atoms). Only the
+   FRAME-CONTEXTUAL overrides of those atoms remain in this module — see the
+   DayC `.dcTopHead` moved-arrow + `.dfootFinish` recolours below, which
+   re-anchor on this module's own container class + a stable structural/ARIA
+   hook (the atom base class is no longer in THIS module to compound against). */
 
 /* ============================================================
    FRAME A — Calm Recede (glass timeline)
@@ -226,59 +181,9 @@
   gap: 18px;
 }
 
-.vaFinish.vaFinish {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--border);
-  background: none;
-  border-radius: var(--r-pill);
-  padding: 8px 14px;
-  font-family: var(--font-sans);
-  font-weight: 700;
-  font-size: 12.5px;
-  color: var(--ink);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    border-color 0.15s,
-    color 0.15s,
-    background 0.15s;
-}
-.vaFinish.vaFinish:hover {
-  border-color: var(--done);
-  color: var(--done);
-}
-.vaFinishOn.vaFinishOn {
-  background: var(--done-tint);
-  border-color: transparent;
-  color: var(--done);
-}
-.vaFinish svg {
-  width: 15px;
-  height: 15px;
-}
-.vaFdot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-  background: var(--idle);
-}
-.vaFdotNow {
-  background: var(--brand-500);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand-500) 30%, transparent);
-  animation: vaPulse 1.6s ease-in-out infinite;
-}
-@keyframes vaPulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand-500) 30%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 6px color-mix(in oklab, var(--brand-500) 12%, transparent);
-  }
-}
+/* The Finish pill (.vaFinish / .vaFinishOn / .vaFdot / .vaFdotNow) lives in
+   planner-v2/atoms.module.css now. DayC's dark-hero recolour of it is the
+   `.dfootFinish` block further down. */
 
 .vaPillsplit {
   display: inline-flex;
@@ -346,81 +251,10 @@
   width: 16px;
   height: 16px;
 }
-.vaDayAddMenu {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(100% + 8px);
-  z-index: 30;
-  width: 300px;
-  max-width: calc(100vw - 32px);
-  padding: 6px;
-  border-radius: var(--r-lg);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--sh-lg);
-}
-.addRowNew.addRowNew,
-.addRowEvent.addRowEvent {
-  display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  width: 100%;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  text-align: left;
-  padding: 11px 12px;
-  border-radius: var(--r-md);
-}
-.addRowEvent.addRowEvent {
-  margin-top: 4px;
-}
-.addRowNew.addRowNew:hover,
-.addRowEvent.addRowEvent:hover {
-  background: color-mix(in oklab, var(--brand-500) 8%, transparent);
-}
-.addIc {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 1;
-  background: var(--brand-50);
-  color: var(--brand-600);
-}
-.addRowEvent .addIc {
-  background: var(--honey-100);
-  color: var(--honey-600);
-}
-.addTx {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.addTx b {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--ink);
-}
-.addTx span {
-  font-size: 11.5px;
-  color: var(--muted);
-  line-height: 1.35;
-}
-
-.vaError {
-  margin: 8px 2px 0;
-  color: var(--danger, #c0392b);
-  font-size: 12px;
-  font-weight: 600;
-  text-align: center;
-}
+/* The add-lesson MENU (.vaDayAddMenu / .addRowNew / .addRowEvent / .addIc /
+   .addTx / .vaError) lives in planner-v2/atoms.module.css now. The frame's
+   TRIGGER class (.vaDayAdd above) stays here — it is passed in as
+   triggerClassName, so each frame styles its own trigger. */
 
 /* ============================================================
    FRAME B — Bright Workspace (rail + focus)
@@ -754,10 +588,19 @@
   justify-content: space-between;
   gap: 12px;
 }
-.dcTopHead .forkCues {
+/* DayC hero ForkCues recolour. The atom base classes (.forkCues / .movedArrow)
+   moved to planner-v2/atoms.module.css, so these overrides can no longer
+   compound against them from THIS module. They re-anchor on the day-v2-owned
+   `.dcTopHead` container plus a stable structural / ARIA hook instead:
+     • the ForkCues wrapper is the only direct <span> child of .dcTopHead
+       (`.dlab` is a div) → zero its default top margin in the centered header;
+     • the moved arrow carries aria-label="Moved …" (the "Modified" Badge does
+       not) → recolour ONLY the arrow to read white-on-dark, leaving the warn
+       Badge its own colours, exactly as the old compound selector did. */
+.dcTopHead > span {
   margin-top: 0;
 }
-.dcTopHead .movedArrow {
+.dcTopHead span[aria-label^="Moved"] {
   background: rgba(255, 255, 255, 0.22);
   color: #fff;
 }
@@ -849,34 +692,38 @@
 .dfootPlan.dfootPlan {
   margin-left: auto;
 }
-/* Completion pill sitting on the colored hero — recolor to read on the
-   subject gradient (white text / translucent border; solid on the done state). */
-.vaFinish.dfootFinish {
+/* Completion pill sitting on the colored hero — recolor to read on the subject
+   gradient (white text / translucent border; solid on the done state).
+   The atom base (.vaFinish / .vaFinishOn) moved to planner-v2/atoms.module.css,
+   so this frame-contextual recolour re-anchors on the day-v2-owned `.dfootFinish`
+   class the frame passes in, and reads the DONE state off the FinishPill's own
+   `aria-pressed` attribute (set from isDone) rather than the now-out-of-module
+   `.vaFinishOn` class. The class is TRIPLED so every rule is ORDER-INDEPENDENT
+   vs the lifted atom base (which lives in a different stylesheet):
+     • resting `.dfootFinish×3` = (0,3,0) > base `.vaFinish.vaFinish` (0,2,0)
+     • hover   `.dfootFinish×3:hover` = (0,4,0) > base hover (0,3,0)
+     • done    `.dfootFinish×3[aria-pressed="true"]` = (0,4,0) > base done (0,2,0)
+   so a future CSS-module extraction-order change can't silently flip the pill
+   back to the base look (reviewer LOW — the doubled form only won by load order). */
+.dfootFinish.dfootFinish.dfootFinish {
   color: #fff;
   border-color: rgba(255, 255, 255, 0.45);
 }
-.vaFinish.dfootFinish:hover {
+.dfootFinish.dfootFinish.dfootFinish:hover {
   border-color: #fff;
   color: #fff;
   background: rgba(255, 255, 255, 0.14);
 }
-.vaFinishOn.dfootFinish {
+/* Done state last so it wins on a done pill even while hovered (both (0,4,0)). */
+.dfootFinish.dfootFinish.dfootFinish[aria-pressed="true"] {
   background: rgba(255, 255, 255, 0.92);
   color: var(--done);
   border-color: transparent;
 }
 
-/* ── Shared add affordance + empty focus/hero areas ─────────────────────── */
-.addWrap {
-  position: relative;
-  width: 100%;
-}
-/* Rail / agenda menus open left-aligned (bundle .va-dayaddmenu.wk); the DayA
-   full-width row keeps the centered default. */
-.menuStart {
-  left: 0;
-  transform: none;
-}
+/* ── Empty focus/hero areas ─────────────────────────────────────────────── */
+/* The shared add affordance (.addWrap / .menuStart) moved to
+   planner-v2/atoms.module.css with the AddLessonMenu atom. */
 /* When a day has no lessons, the focus/hero column shows the holiday node or
    the empty note instead of collapsing (so the add rail stays usable). */
 .focusEmpty,
@@ -890,27 +737,8 @@
   padding: 24px;
 }
 
-/* ── Title-text select button — the accessible/keyboard selection control
-   (M2, Codex R2). A real <button> reset to look exactly like the title text
-   it wraps; the typography lives on its inner <span> (so the `.cp-root button`
-   font-size:inherit reset can't flatten it). Double-classed for cp-root
-   immunity. */
-.selectTitle.selectTitle {
-  display: block;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.selectTitle.selectTitle:focus-visible {
-  outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
+/* The title-text select button (.selectTitle) moved to
+   planner-v2/atoms.module.css with the SelectTitle atom. */
 
 /* ── Responsive — collapse the two-column frames ≤880px ─────────────────── */
 @media (max-width: 880px) {
@@ -953,31 +781,30 @@
 /* ── Touch targets — ≥44px on coarse pointers AND the phone/tablet width
       tiers (CLAUDE.md §4 makes the floor viewport-tier based, not
       pointer-type based — a 375px window with a mouse still owes 44px). ── */
+/* The atom touch targets (.vaFinish / .addRowNew / .addRowEvent) get their
+   44px floor in planner-v2/atoms.module.css; the FRAME controls keep theirs
+   here. */
 @media (pointer: coarse), (max-width: 900px) {
   .wkarrow.wkarrow {
     width: 44px;
     height: 44px;
   }
-  .vaFinish.vaFinish,
   .vaPillBtn.vaPillBtn,
   .vaDayAdd.vaDayAdd,
   .vbRailAdd.vbRailAdd,
   .vcAadd.vcAadd,
   .vbBtn.vbBtn,
   .vbRailItem,
-  .vcAitem,
-  .addRowNew.addRowNew,
-  .addRowEvent.addRowEvent {
+  .vcAitem {
     min-height: 44px;
   }
 }
 
 /* ── Reduced motion — drop the fade + the "now" pulse ──────────────────── */
+/* The atom "now" pulse (.vaFdotNow) is silenced under reduced motion in
+   planner-v2/atoms.module.css. */
 @media (prefers-reduced-motion: reduce) {
   .viewbody {
-    animation: none;
-  }
-  .vaFdotNow {
     animation: none;
   }
   .vaRow,

@@ -20,6 +20,11 @@
   top: 50%;
   transform: translateY(-50%);
   width: 280px;
+  /* The anchored-position clamp uses a fixed height ESTIMATE, so the real
+     rendered form (notice shown, large text/zoom) must never outgrow the
+     viewport — it scrolls internally instead (Codex W5 R2). */
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -174,6 +179,21 @@
   font-size: var(--t-11);
   color: var(--catchup);
   margin: 0;
+}
+
+/* Honest "not wired yet" notice shown on submit — the schedule store has no
+   addBlock action in this prototype phase, so an event can't persist. Visible
+   (not sr-only) + informational, not an error color. */
+.notWired {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: var(--t-11);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--ink-soft);
+  background: var(--surface-warm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
 }
 
 /* ── Action row ───────────────────────────────────────────────────────── */

@@ -116,12 +116,18 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
 import { IconRail, PaneSplitter, RightRail } from "@/components/daily";
-import { WeeklyGrid, WeekNavigator } from "@/components/grid";
+import { WeekNavigator } from "@/components/grid";
 import { WeeklyList } from "@/components/list";
 import { ScheduleTimeline } from "@/components/schedule";
 import { WeeklyViewControls } from "./WeeklyViewControls";
 import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
 import { WeekColumns } from "./WeekColumns";
+// W5 — the three Week VIEW frames: WeekA (glass, read-only period×day grid),
+// WeekColumns (paper, day columns), and WeekC (color, subject lanes). Edit
+// mode uses WeekEditBoard, schedule uses ScheduleTimeline, and narrow/list uses
+// WeeklyList — so the v1 WeeklyGrid is no longer rendered from this shell at
+// all (see renderGridPanel).
+import { WeekA, WeekC } from "@/components/week-v2";
 import { WeekEditBoard } from "./WeekEditBoard";
 // W3.8 — the lesson-editor popup + the context that carries its opener down
 // to every WeeklyLessonCard (grid, columns, and board parents alike — see
@@ -1192,7 +1198,8 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
     //      timeline replaces the grid in the same 1fr slot; splitter +
     //      rail math is unaffected because the slot still spans 1fr.
     //   3. viewMode === "list" → WeeklyList. Same as before.
-    //   4. Default → WeeklyGrid.
+    //   4. Default → the frame-picked Week VIEW canvas: paper → WeekColumns,
+    //      glass → WeekA, color → WeekC (all self-contained, no props).
     //
     // The drag grip stays so the teacher can still reorder the panel at
     // any width or mode. The pills bar sits above whatever renders below.
@@ -1222,13 +1229,17 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
              traversal. Narrow/schedule/list precedence above is untouched:
              ≤900px still falls to WeeklyList regardless of frame. */
           <WeekColumns />
+        ) : frame === "glass" ? (
+          /* W5 — Frame A (glass): the read-only period×day grid. */
+          <WeekA />
         ) : (
-          /* Frames A (glass) + C (color): the subject×day matrix. WeeklyGrid
-             renders untouched in the center slot; its card shell already
-             re-skins per frame (commit 2). The outer slot wrapper already
-             carries min-width: 0 so the grid can shrink gracefully when the
-             rail grows. */
-          <WeeklyGrid />
+          /* W5 — Frame C (color): subject lanes of color-forward tiles. Both
+             new frames are self-contained (no props), reading the planner +
+             app-state stores directly exactly like WeekColumns/WeeklyGrid, so
+             selection flows through the shared selectedLessonId the shell's
+             URL-sync + RightRail already consume. The v1 WeeklyGrid is no
+             longer reachable from the plain color/glass VIEW frame. */
+          <WeekC />
         )}
       </div>
     );
