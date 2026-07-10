@@ -59,7 +59,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { PaletteProvider } from "./palette";
-import type { PaletteType, SubjectMapping } from "./palette";
+import type { SubjectMapping } from "./palette";
 import {
   getCachedLuminance,
   luminanceToTone,
@@ -67,93 +67,89 @@ import {
 } from "./photo-luminance";
 import { loadRemotePrefs, saveRemotePrefs } from "./theme-sync";
 
-// ── v2 axis types ─────────────────────────────────────────────────────────
+// ── v2 axis types + frozen value matrix ────────────────────────────────────
+//
+// MOVED to lib/theme-values.ts — the dependency-free leaf the SERVER layout
+// imports for cookie validation + SSR tone derivation without dragging this
+// file's theme-sync → supabase/client graph into the server bundle. That file
+// is now the canonical ALLOWLIST LOCKSTEP origin; everything is re-exported
+// here so existing call sites are untouched.
+import {
+  APP_THEMES,
+  DEFAULT_FRAME,
+  DEFAULT_GLASS,
+  DEFAULT_BG,
+  DEFAULT_THEME,
+  DEFAULT_DIM,
+  DEFAULT_CANVAS,
+  DEFAULT_STYLE,
+  DEFAULT_PALETTE,
+  TONE_VALUES,
+  isThemeFrame,
+  isThemeGlass,
+  isThemeBg,
+  isThemeDim,
+  isThemeSetting,
+  isThemeStyle,
+  isThemePalette,
+  deriveTone,
+  encodeThemeAxesCookie,
+  THEME_AXES_COOKIE,
+  THEME_AXES_COOKIE_MAX_AGE,
+} from "./theme-values";
+import type {
+  ThemeFrame,
+  ThemeGlass,
+  ThemeBg,
+  ThemeDim,
+  ThemeTone,
+  ThemeCanvas,
+  AppTheme,
+  ThemeSetting,
+  ThemeStyle,
+  ThemePalette,
+} from "./theme-values";
 
-/** Layout character + material + emphasis. */
-export type ThemeFrame = "glass" | "paper" | "color";
-/** The two frosted registers of Frame A. */
-export type ThemeGlass = "dark" | "light";
-/** What lives behind the glass. */
-export type ThemeBg = "photo" | "wash";
-/** Photo prominence + text treatment (Photo only). `normal` is auto. */
-export type ThemeDim = "dim" | "normal" | "bright";
-/** DERIVED — never chosen or persisted. */
-export type ThemeTone = "light" | "dark";
-/** The home center panel only. Presentation state, not a teacher preference. */
-export type ThemeCanvas = "glass-dim" | "glass-light";
-
-/** App-wide color theme — the concrete, paintable v2 values. */
-export type AppTheme =
-  | "clear"
-  | "night"
-  | "honey"
-  | "blossom"
-  | "mint"
-  | "sky"
-  | "off";
-
-/** The stored theme choice — an AppTheme, or "system" (resolved at runtime). */
-export type ThemeSetting = AppTheme | "system";
-
-// ── Deprecated v1 compat types (kept for flag-OFF rollback) ────────────────
-
-/** @deprecated v1 card-style axis. Kept for v1 rollback; dropped from v2 DOM. */
-export type ThemeStyle = "quiet" | "calm" | "vivid";
-/** @deprecated v1 saturation axis — alias of the palette type. */
-export type ThemePalette = PaletteType;
-
-// ── Frozen value matrix (THE origin of the five-surface lockstep) ──────────
-
-/** The seven concrete themes, in picker order. */
-export const APP_THEMES: readonly AppTheme[] = [
-  "clear",
-  "night",
-  "honey",
-  "blossom",
-  "mint",
-  "sky",
-  "off",
-];
-
-/** Frame values — LOCKSTEP. */
-export const FRAME_VALUES: readonly ThemeFrame[] = ["glass", "paper", "color"];
-/** Glass-register values — LOCKSTEP. */
-export const GLASS_VALUES: readonly ThemeGlass[] = ["dark", "light"];
-/** Background values — LOCKSTEP. */
-export const BG_VALUES: readonly ThemeBg[] = ["photo", "wash"];
-/** Theme values — LOCKSTEP (the "system" sentinel is handled separately). */
-export const THEME_VALUES: readonly AppTheme[] = APP_THEMES;
-/** Photo-brightness values — LOCKSTEP. */
-export const DIM_VALUES: readonly ThemeDim[] = ["dim", "normal", "bright"];
-/** Derived tone values — DERIVED, never persisted (not part of the SQL CHECK). */
-export const TONE_VALUES: readonly ThemeTone[] = ["light", "dark"];
-/** Canvas values — runtime presentation state, not persisted. */
-export const CANVAS_VALUES: readonly ThemeCanvas[] = ["glass-dim", "glass-light"];
-
-/** @deprecated v1 card-style values — kept for v1 rollback. */
-export const STYLE_VALUES: readonly ThemeStyle[] = ["quiet", "calm", "vivid"];
-/** @deprecated v1 palette values — kept for v1 rollback. */
-export const PALETTE_VALUES: readonly ThemePalette[] = ["normal", "highlight"];
-
-// ── Defaults (must match the SSR root attributes in app/layout.tsx) ────────
-
-/** Default frame — Frame A (Calm Glass). */
-export const DEFAULT_FRAME: ThemeFrame = "glass";
-/** Default glass register — dark frosted. */
-export const DEFAULT_GLASS: ThemeGlass = "dark";
-/** Default background — frosted glass over the classroom photo. */
-export const DEFAULT_BG: ThemeBg = "photo";
-/** Default theme — Clear, the resting theme. */
-export const DEFAULT_THEME: ThemeSetting = "clear";
-/** Default photo brightness — auto (samples luminance in a later stage). */
-export const DEFAULT_DIM: ThemeDim = "normal";
-/** Default canvas — the dark-frosted home center panel. */
-export const DEFAULT_CANVAS: ThemeCanvas = "glass-dim";
-
-/** @deprecated v1 default card style. */
-export const DEFAULT_STYLE: ThemeStyle = "vivid";
-/** @deprecated v1 default palette. */
-export const DEFAULT_PALETTE: ThemePalette = "highlight";
+export {
+  APP_THEMES,
+  FRAME_VALUES,
+  GLASS_VALUES,
+  BG_VALUES,
+  THEME_VALUES,
+  DIM_VALUES,
+  TONE_VALUES,
+  CANVAS_VALUES,
+  STYLE_VALUES,
+  PALETTE_VALUES,
+  DEFAULT_FRAME,
+  DEFAULT_GLASS,
+  DEFAULT_BG,
+  DEFAULT_THEME,
+  DEFAULT_DIM,
+  DEFAULT_CANVAS,
+  DEFAULT_STYLE,
+  DEFAULT_PALETTE,
+  isThemeFrame,
+  isThemeGlass,
+  isThemeBg,
+  isThemeDim,
+  isThemeCanvas,
+  isThemeSetting,
+  isThemeStyle,
+  isThemePalette,
+} from "./theme-values";
+export type {
+  ThemeFrame,
+  ThemeGlass,
+  ThemeBg,
+  ThemeDim,
+  ThemeTone,
+  ThemeCanvas,
+  AppTheme,
+  ThemeSetting,
+  ThemeStyle,
+  ThemePalette,
+} from "./theme-values";
 
 interface ThemeContextValue {
   // v2 axes
@@ -233,35 +229,17 @@ const photoToneKey = (url: string): string => `${PHOTO_TONE_KEY_PREFIX}${url}`;
 
 // ── Allowlist guards ───────────────────────────────────────────────────────
 //
-// Exported so lib/theme-sync.ts (and any future consumer) validates against
-// THIS file's lists instead of keeping duplicates. The two copies that MUST
-// stay literal (they run before any module loads / live in SQL) are the inline
-// boot script in lib/theme-init.tsx and the migration's CHECK constraints.
+// MOVED to lib/theme-values.ts (imported + re-exported above) so the server
+// layout validates the mc-theme-axes cookie against the same single origin.
+// The two copies that MUST stay literal (they run before any module loads /
+// live in SQL) are the inline boot script in lib/theme-init.tsx and the
+// migration's CHECK constraints.
 
-export function isThemeFrame(v: unknown): v is ThemeFrame {
-  return FRAME_VALUES.includes(v as ThemeFrame);
-}
-export function isThemeGlass(v: unknown): v is ThemeGlass {
-  return GLASS_VALUES.includes(v as ThemeGlass);
-}
-export function isThemeBg(v: unknown): v is ThemeBg {
-  return BG_VALUES.includes(v as ThemeBg);
-}
-export function isThemeDim(v: unknown): v is ThemeDim {
-  return DIM_VALUES.includes(v as ThemeDim);
-}
-export function isThemeCanvas(v: unknown): v is ThemeCanvas {
-  return CANVAS_VALUES.includes(v as ThemeCanvas);
-}
 // NOTE: NOT a lockstep axis guard. Tone is DERIVED, never persisted as an axis;
 // this only validates the separate per-URL `photo-tone:<url>` presentation cache
 // (the AUTO seed) so a stale/hand-edited value can never seed an invalid tone.
 function isThemeTone(v: unknown): v is ThemeTone {
   return TONE_VALUES.includes(v as ThemeTone);
-}
-/** Accepts the v2 theme set AND the "system" sentinel. */
-export function isThemeSetting(v: unknown): v is ThemeSetting {
-  return v === "system" || APP_THEMES.includes(v as AppTheme);
 }
 
 // v1 theme values accepted ONLY on read for the one-time remap (paper|cloud →
@@ -271,14 +249,7 @@ const V1_THEME_REMAP: Record<string, ThemeSetting> = {
   cloud: "clear",
 };
 
-/** @deprecated v1 guard — kept for theme-sync + the compat axis. */
-export function isThemeStyle(v: unknown): v is ThemeStyle {
-  return STYLE_VALUES.includes(v as ThemeStyle);
-}
-/** @deprecated v1 guard — kept for theme-sync + the compat axis. */
-export function isThemePalette(v: unknown): v is ThemePalette {
-  return PALETTE_VALUES.includes(v as ThemePalette);
-}
+// (isThemeStyle / isThemePalette moved to lib/theme-values.ts; re-exported above.)
 
 /** Read + validate a single key. Returns null when absent/invalid/unavailable. */
 function readValidated<T>(
@@ -319,6 +290,34 @@ function writeKey(key: string, value: string): void {
     window.localStorage.setItem(key, value);
   } catch {
     // Swallow — quota or disabled-storage errors are non-fatal.
+  }
+}
+
+/**
+ * Mirror the persisted axes into the mc-theme-axes cookie — the SSR no-flash
+ * hint (FRAME-FLASH-SSR-DESIGN.md). Value is the theme-values codec's packed
+ * form (frozen-set members only, so no encoding is needed); attributes follow
+ * the design: 1-year Max-Age (renewed on every load by the mount effect),
+ * Lax, path-wide, Secure on https. NOT HttpOnly by necessity — this client
+ * code writes it. Carries zero secrets (presentation prefs only).
+ */
+function writeAxesCookie(axes: {
+  frame: ThemeFrame;
+  glass: ThemeGlass;
+  bg: ThemeBg;
+  theme: ThemeSetting;
+  dim: ThemeDim;
+  style: ThemeStyle;
+  palette: ThemePalette;
+}): void {
+  if (typeof document === "undefined") return;
+  try {
+    const secure = window.location.protocol === "https:" ? "; Secure" : "";
+    document.cookie =
+      `${THEME_AXES_COOKIE}=${encodeThemeAxesCookie(axes)}` +
+      `; Path=/; Max-Age=${THEME_AXES_COOKIE_MAX_AGE}; SameSite=Lax${secure}`;
+  } catch {
+    // Swallow — cookie-disabled environments just keep today's boot-heal path.
   }
 }
 
@@ -365,45 +364,9 @@ function getActivePhotoUrl(): string | null {
   return url && url.length > 0 ? url : null;
 }
 
-/**
- * DERIVE the tone from the persisted axes (see WAVE-2-VALUE-MATRIX.md §4).
- * Evaluated top-to-bottom; first match wins:
- *   1. theme === "night"  → dark   (the only dark theme, app-wide)
- *   2. glass === "light"  → light  (White-frosted register = a light surface)
- *   3. bg === "wash"      → light  (Night + White-frosted already handled)
- *   4. bg === "photo":
- *        dim === "dim"     → dark   (manual override — scrim, white text)
- *        dim === "bright"  → light  (manual override — ink on white frosted)
- *        dim === "normal"  → AUTO. Resolve the photo-luminance-derived `autoTone`
- *                            when one is available; until then (the common case,
- *                            and ALWAYS this wave — no active-photo URL is wired)
- *                            default to dark (the safe white-text-on-scrim state).
- *
- * Pure: the auto result is passed IN as `autoTone` (computed by the effect from
- * the luminance sample), so this stays a plain function of its arguments.
- */
-function deriveTone(
-  resolved: AppTheme,
-  glass: ThemeGlass,
-  bg: ThemeBg,
-  dim: ThemeDim,
-  autoTone: ThemeTone | null,
-): ThemeTone {
-  if (resolved === "night") return "dark";
-  // The White-frosted register IS a light surface (translucent-white panels +
-  // dark ink), so it forces light tone app-wide — this is what makes the
-  // legibility contract self-consistent instead of relying on a per-element
-  // re-flip allowlist (Wave-2 re-audit MAJOR; Night still wins above). It sets
-  // the surface/text register, NOT the background, so "glass must never wash the
-  // background" still holds.
-  if (glass === "light") return "light";
-  if (bg === "wash") return "light";
-  // bg === "photo"
-  if (dim === "dim") return "dark";
-  if (dim === "bright") return "light";
-  // dim === "normal" — AUTO: the luminance-derived tone when sampled, else dark.
-  return autoTone ?? "dark";
-}
+// deriveTone MOVED to lib/theme-values.ts (imported above) so the SSR layout,
+// this provider, and the boot script's replica share ONE derivation. The
+// glass=light rationale (Wave-2 re-audit MAJOR) travels with it.
 
 interface ThemeProviderProps {
   /** Initial frame. */
@@ -541,6 +504,24 @@ export function ThemeProvider({
     const rawPaletteAtMount = readRaw(PALETTE_KEY);
     const savedTheme = readThemeMigrated();
     if (savedTheme !== null) setTheme(savedTheme);
+
+    // Cookie→storage back-seed (§4a review Low #1): if localStorage is
+    // readable but EMPTY for an axis while the cookie-derived initial state is
+    // non-default (privacy tooling cleared storage but kept cookies), the boot
+    // script painted defaults this load and — with nothing to seed — no state
+    // change would ever repaint or re-persist, leaving SSR/tree and attrs
+    // durably split. Writing the initial (cookie) value back into storage
+    // heals the NEXT load's boot paint; this load's mixed frame is a one-off.
+    // Closure state here IS the initial-prop (cookie) value — the seeding
+    // setStates above only take effect next render.
+    if (savedFrameRaw === null && seededFrame === null && frame !== DEFAULT_FRAME)
+      writeKey(FRAME_KEY, frame);
+    if (savedGlass === null && glass !== DEFAULT_GLASS)
+      writeKey(GLASS_KEY, glass);
+    if (savedBg === null && bg !== DEFAULT_BG) writeKey(BG_KEY, bg);
+    if (savedDim === null && dim !== DEFAULT_DIM) writeKey(DIM_KEY, dim);
+    if (savedTheme === null && theme !== DEFAULT_THEME)
+      writeKey(THEME_KEY, theme);
 
     // ── Deprecated v1 compat axes (still loaded so a rollback finds them) ──
     if (savedStyle !== null) setStyle(savedStyle);
@@ -697,6 +678,22 @@ export function ThemeProvider({
       if (unsubscribeScheme) unsubscribeScheme();
       window.removeEventListener("storage", onStorage);
     };
+  }, []);
+
+  // Cookie RENEWAL (FRAME-FLASH-SSR-DESIGN.md §3b, review must-change #2): the
+  // mirror effect's write is change-gated (first-run skip + setX(same) no-ops),
+  // so a teacher whose look never changes would let the cookie lapse at
+  // Max-Age and the flash would silently return a year later. Re-write it once
+  // per load, unconditionally, from the CURRENT state refs. Runs AFTER the
+  // load effect above (declaration order), and idempotently repeats whatever
+  // the mirror effect writes in the changed case. StrictMode double-run safe.
+  const axesRef = useRef({ frame, glass, bg, theme, dim, style, palette });
+  axesRef.current = { frame, glass, bg, theme, dim, style, palette };
+  useEffect(() => {
+    // Defer past this commit so the load effect's seeding setStates (if any)
+    // land first and the renewal serializes the RECONCILED axes.
+    const t = setTimeout(() => writeAxesCookie(axesRef.current), 0);
+    return () => clearTimeout(t);
   }, []);
 
   const resolvedTheme = useMemo<AppTheme>(
@@ -876,6 +873,12 @@ export function ThemeProvider({
     // Deprecated compat persistence (so a v1 rollback finds the values).
     writeKey(STYLE_KEY, style);
     writeKey(PALETTE_KEY, palette);
+    // SSR no-flash mirror (FRAME-FLASH-SSR-DESIGN.md §3b): pack the same axes
+    // into the mc-theme-axes cookie so the server layout's NEXT render seeds
+    // true attrs + provider initials. Sits inside this effect so it inherits
+    // the first-run skip and every writer path (seeding, cross-tab, remote
+    // apply) converges through it. localStorage stays the source of truth.
+    writeAxesCookie({ frame, glass, bg, theme, dim, style, palette });
 
     // Best-effort cross-device push (no-op unless NEXT_PUBLIC_THEME_SYNC=1).
     // Gated on `tripleEdited` so every server write carries a matching local

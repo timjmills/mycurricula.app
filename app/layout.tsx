@@ -9,15 +9,13 @@ import {
   Caveat,
 } from "next/font/google";
 import "./globals.css";
+import { cookies } from "next/headers";
+import { ThemeProvider } from "@/lib/theme";
 import {
-  ThemeProvider,
-  DEFAULT_FRAME,
-  DEFAULT_GLASS,
-  DEFAULT_BG,
-  DEFAULT_THEME,
-  DEFAULT_DIM,
-  DEFAULT_PALETTE,
-} from "@/lib/theme";
+  THEME_AXES_COOKIE,
+  decodeThemeAxesCookie,
+  deriveTone,
+} from "@/lib/theme-values";
 import { ThemeInit } from "@/lib/theme-init";
 import { RouteTransitionPulse } from "@/lib/view-transition";
 import { DEFAULT_STAGE_PHOTO } from "@/lib/stage-photo";
@@ -76,29 +74,42 @@ export const metadata: Metadata = {
   description: "Curriculum planning tool for teaching teams.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // The v2 appearance axes (data-frame / data-glass / data-bg / data-theme /
-  // data-dim) plus the DERIVED data-tone are rendered on the server with the app
-  // defaults so token CSS is correct before hydration (LOCKSTEP surface #4 — the
-  // literals below mirror the DEFAULT_* exports + theme.tsx guards). The boot
-  // script (ThemeInit, first child of <body>) then overwrites them pre-paint with
-  // the teacher's PERSISTED choices to avoid a flash; ThemeProvider owns
-  // subsequent changes. data-theme is always a RESOLVED value (never the "system"
-  // sentinel) — DEFAULT_THEME is "clear" (concrete), so the attribute below stays
-  // correct; the boot script resolves a stored "system" to night/clear before it
-  // ever paints. data-tone is DERIVED: its server value equals
-  // deriveTone("clear", DEFAULT_GLASS, DEFAULT_BG, DEFAULT_DIM, null) === "dark"
-  // (DEFAULT_GLASS is "dark", so the glass=light→light branch does not affect the
-  // default render) (matrix §4
-  // pre-sample default for Photo+normal) and matches the boot script, so server
-  // HTML == boot == first client paint; the provider reconciles the true derived
-  // tone (incl. the normal→auto luminance upgrade) post-mount. data-palette is the
-  // deprecated v1 compat axis, kept for the PaletteProvider bridge + v1 surfaces;
-  // data-style is intentionally NOT emitted on the v2 DOM path.
+  // ── SSR no-flash axes (FRAME-FLASH-SSR-DESIGN.md) ────────────────────────
+  // The mc-theme-axes cookie mirrors the teacher's persisted appearance axes.
+  // Decode + allowlist-validate it (theme-values.ts codec — every emitted
+  // value is a member of the frozen sets, so no unvalidated byte can reach an
+  // HTML attribute) and render BOTH the <html data-*> attributes AND the
+  // ThemeProvider initial props from it. Server HTML, the boot paint, and the
+  // first client render then all agree on the teacher's real look — no
+  // component-tree flash (WeekColumns/YearConstellation/card materials render
+  // right on frame one). No/invalid cookie ⇒ the DEFAULT_* values, exactly
+  // today's behavior; localStorage remains the client source of truth and the
+  // boot script still repaints attrs from it (the stale-cookie self-heal).
+  //
+  // ⚠ CACHE-ISOLATION INVARIANT (design §3e): reading cookies() makes every
+  // HTML response vary on this cookie AND opts the whole tree into dynamic
+  // rendering. SSR HTML must NEVER enter a shared cache — no Cache Everything
+  // rules, no `revalidate`/`force-static` anywhere under this layout — or one
+  // teacher's frame would be served to another.
+  const jar = await cookies();
+  const axes = decodeThemeAxesCookie(jar.get(THEME_AXES_COOKIE)?.value);
+  // data-theme must be a CONCRETE value. A stored "system" cannot be resolved
+  // server-side (no OS-scheme signal) — fall back to "clear" exactly like the
+  // pre-cookie default; the boot script's matchMedia resolves it pre-paint and
+  // the provider receives the raw setting via initialTheme.
+  const ssrTheme = axes.theme === "system" ? "clear" : axes.theme;
+  // data-tone is DERIVED server-side with the SAME derivation the boot script
+  // replicates and the provider applies (theme-values.ts deriveTone, autoTone
+  // null — the async luminance upgrade reconciles post-mount).
+  const ssrTone = deriveTone(ssrTheme, axes.glass, axes.bg, axes.dim, null);
+  // (LOCKSTEP surface #4 — the attributes below carry theme-values.ts members
+  // only. The boot script still overwrites them pre-paint from localStorage;
+  // ThemeProvider owns subsequent changes.)
   return (
     <html
       lang="en"
@@ -110,13 +121,13 @@ export default function RootLayout({
       // hydration, producing a benign attribute diff on <html>/<body>. This is
       // the standard Next.js theme-provider mitigation.
       suppressHydrationWarning
-      data-frame={DEFAULT_FRAME}
-      data-glass={DEFAULT_GLASS}
-      data-bg={DEFAULT_BG}
-      data-theme="clear"
-      data-dim={DEFAULT_DIM}
-      data-tone="dark"
-      data-palette={DEFAULT_PALETTE}
+      data-frame={axes.frame}
+      data-glass={axes.glass}
+      data-bg={axes.bg}
+      data-theme={ssrTheme}
+      data-dim={axes.dim}
+      data-tone={ssrTone}
+      data-palette={axes.palette}
       // The active stage photo (W2-4): feed the bundled, same-origin default so
       // (a) getActivePhotoUrl() in lib/theme.tsx reads it from
       // dataset.stagePhoto post-mount → the dim==="normal" AUTO tone samples the
@@ -165,7 +176,15 @@ export default function RootLayout({
             route's DOM commits (pathname change). Render-null client leaf;
             mounted ONCE here so soft swaps work across every route group. */}
         <RouteTransitionPulse />
-        <ThemeProvider initialTheme={DEFAULT_THEME}>
+        <ThemeProvider
+          initialFrame={axes.frame}
+          initialGlass={axes.glass}
+          initialBg={axes.bg}
+          initialTheme={axes.theme}
+          initialDim={axes.dim}
+          initialStyle={axes.style}
+          initialPalette={axes.palette}
+        >
           {/* LabelsProvider hosts the renameable Subject/Unit/Lesson/Section
               captions. Mounted near the root so every surface — Settings,
               the ResourceComposer's routing pickers, future breadcrumbs —

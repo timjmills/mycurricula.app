@@ -972,15 +972,83 @@ for (const p of paintResults) {
   );
 }
 
+// ── SSR-COOKIE gate (FRAME-FLASH-SSR-DESIGN.md §6) ─────────────────────────
+// The mc-theme-axes cookie must make the RAW server HTML (a plain fetch,
+// pre-JS — NOT a post-hydration DOM read) carry the teacher's axes; seeding
+// localStorage alone exercises only the cookie-absent heal path and would
+// miss an SSR regression. LOCKSTEP: the packed values below mirror the
+// lib/theme-values.ts codec (order: frame.glass.bg.theme.dim.style.palette).
+const ssrCookieResults = [];
+{
+  const authCookieHeader = cookies
+    .map((c) => `${c.name}=${c.value}`)
+    .join("; ");
+  const ssrCheck = async (label, themeCookie, mustMatch, mustNotMatch) => {
+    try {
+      const res = await fetch(`${BASE}/weekly`, {
+        headers: {
+          Cookie: themeCookie
+            ? `${authCookieHeader}; mc-theme-axes=${themeCookie}`
+            : authCookieHeader,
+        },
+        redirect: "follow",
+      });
+      const html = await res.text();
+      for (const re of mustMatch) {
+        ssrCookieResults.push({ ok: re.test(html), detail: `${label}: expected ${re}` });
+      }
+      for (const re of mustNotMatch) {
+        ssrCookieResults.push({ ok: !re.test(html), detail: `${label}: must NOT match ${re}` });
+      }
+      // Cache-isolation invariant (design §3e): the cookie-varied HTML must
+      // never be shared-cacheable.
+      const cc = res.headers.get("cache-control") ?? "";
+      ssrCookieResults.push({
+        ok: /no-store|private/i.test(cc),
+        detail: `${label}: Cache-Control not shared-cacheable (got "${cc}")`,
+      });
+    } catch (e) {
+      ssrCookieResults.push({ ok: false, detail: `${label}: fetch failed ${e.message}` });
+    }
+  };
+  await ssrCheck(
+    "SSR paper cookie",
+    "v1.paper.dark.photo.clear.normal.vivid.highlight",
+    [/data-frame="paper"/, /WeekColumns/],
+    [/WeeklyGrid_dayHead/],
+  );
+  // The dayHead must-match anchors this check on the REAL authed weekly grid —
+  // bare data-frame="glass" alone would pass vacuously on /login HTML (the
+  // root layout renders attrs on every route).
+  await ssrCheck(
+    "SSR no cookie (defaults)",
+    null,
+    [/data-frame="glass"/, /WeeklyGrid_dayHead/],
+    [],
+  );
+  await ssrCheck(
+    "SSR hostile cookie falls to defaults",
+    'v1."><script>.dark.photo.clear.normal.vivid.highlight',
+    [/data-frame="glass"/],
+    [],
+  );
+}
+console.log("\nSSR-cookie gate (raw HTML, pre-JS):");
+for (const s of ssrCookieResults) {
+  console.log(`${s.ok ? "  ok  " : "  FAIL"} ${s.detail}`);
+}
+
 const routeFails = results.filter((r) => !r.ok).length;
 const toneFails = toneResults.filter((t) => !t.ok).length;
 const cornerFails = cornerResults.filter((c) => !c.ok).length;
 const paintFails = paintResults.filter((p) => !p.ok).length;
+const ssrCookieFails = ssrCookieResults.filter((s) => !s.ok).length;
 console.log(`\ncontrast failures: ${fails}`);
 console.log(`route checks failed: ${routeFails}`);
 console.log(`tone-derivation checks failed: ${toneFails}`);
 console.log(`corner checks failed: ${cornerFails}`);
 console.log(`render-paint gate checks failed: ${paintFails}`);
+console.log(`SSR-cookie gate checks failed: ${ssrCookieFails}`);
 if (paintFails > 0) {
   console.log("\nrender-paint FAILURES (axis @ width/route/bg):");
   for (const p of paintResults.filter((x) => !x.ok)) {
@@ -988,7 +1056,8 @@ if (paintFails > 0) {
   }
 }
 
-// Exit nonzero on any real failure (contrast / route / tone / corner / paint)
-// so CI + the live-QA pass treat a regression as a hard failure.
-const totalFails = fails + routeFails + toneFails + cornerFails + paintFails;
+// Exit nonzero on any real failure (contrast / route / tone / corner / paint /
+// SSR-cookie) so CI + the live-QA pass treat a regression as a hard failure.
+const totalFails =
+  fails + routeFails + toneFails + cornerFails + paintFails + ssrCookieFails;
 if (totalFails > 0) process.exitCode = 1;
