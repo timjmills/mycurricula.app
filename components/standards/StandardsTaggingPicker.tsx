@@ -33,6 +33,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { Badge, Button, Tooltip } from "@/components/ui";
 import { formatStandardCode } from "@/lib/mock/standards";
 import type { FrameworkSummary } from "@/lib/standards/queries";
@@ -91,6 +92,9 @@ export interface StandardsTaggingPickerProps {
 interface FrameworksPayload {
   frameworks: FrameworkSummary[];
   effectiveIds: string[];
+  /** True when the caller configured nothing and `effectiveIds` is the featured
+   *  fallback — the picker then nudges them to narrow it in Settings. */
+  usingDefault?: boolean;
 }
 
 interface FacetsPayload {
@@ -116,6 +120,7 @@ export function StandardsTaggingPicker({
   // ── Framework catalog (effective set) — loaded once on first open ────────
   const [frameworks, setFrameworks] = useState<FrameworkSummary[] | null>(null);
   const [effectiveIds, setEffectiveIds] = useState<string[]>([]);
+  const [usingDefault, setUsingDefault] = useState(false);
   const [catalogError, setCatalogError] = useState(false);
 
   // ── Filters ─────────────────────────────────────────────────────────────
@@ -190,6 +195,7 @@ export function StandardsTaggingPicker({
         if (!alive) return;
         setFrameworks(Array.isArray(d.frameworks) ? d.frameworks : []);
         setEffectiveIds(Array.isArray(d.effectiveIds) ? d.effectiveIds : []);
+        setUsingDefault(d.usingDefault === true);
       })
       .catch(() => {
         if (alive) {
@@ -433,9 +439,33 @@ export function StandardsTaggingPicker({
                 ? "We couldn’t load your frameworks right now. Try again, or set them in Settings → Standards."
                 : "Choose the curriculum frameworks you teach in Settings → Standards, then come back to tag lessons."}
             </p>
+            <Link
+              href="/settings/standards"
+              className={`${styles.emptyAction} cp-focusable`}
+              onClick={onClose}
+            >
+              Choose your frameworks
+            </Link>
           </div>
         ) : (
           <>
+            {/* Fallback nudge: shown only when the teacher has configured nothing
+                and is searching the major frameworks by default, so they know they
+                can narrow the scope to just what they teach. */}
+            {usingDefault && (
+              <p className={styles.defaultHint}>
+                Showing the major frameworks.{" "}
+                <Link
+                  href="/settings/standards"
+                  className={styles.defaultHintLink}
+                  onClick={onClose}
+                >
+                  Pick the ones you teach
+                </Link>{" "}
+                in Settings to narrow these.
+              </p>
+            )}
+
             {/* Filters */}
             <div className={styles.filters}>
               <div className={styles.filterRow}>
