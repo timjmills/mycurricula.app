@@ -182,6 +182,17 @@ export interface BoardEditorProps {
   /** Open the full widget library ("More widgets…" in the add-widget popover).
    *  Omitted → the row is hidden and only the core six are offered. */
   onBrowseAll?: () => void;
+  /** Chromeless mode: render ONLY the canvas/stage — the host shell supplies the
+   *  toolbar/filmstrip/present/share chrome (used by the v2 Teach shell, which
+   *  wraps the editor in its own header + slide filmstrip + writing bar).
+   *  Defaults to false, so the shipped V1 surface is unchanged. */
+  embedded?: boolean;
+  /** An overlay rendered as the TOP child of the scaled paper (`.canvasInner`),
+   *  so it shares the paper's exact rect + fit-scale + scroll offset. The v2
+   *  shell mounts its annotation "projector glass" here, so ink normalizes
+   *  against the paper the teacher sees (not the outer container) and stays
+   *  aligned at every width/zoom. Omitted → nothing extra renders (V1). */
+  overlay?: ReactNode;
 }
 
 // ── Local optimistic geometry overlay ───────────────────────────────────────
@@ -846,6 +857,8 @@ export function BoardEditor({
   addableTypes = DEFAULT_ADDABLE,
   resources = SAMPLE_RESOURCES,
   onBrowseAll,
+  embedded = false,
+  overlay,
 }: BoardEditorProps): ReactNode {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -1196,6 +1209,7 @@ export function BoardEditor({
   return (
     <div className={`cp-root ${styles.shell}`}>
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      {!embedded && (
       <div className={styles.toolbar}>
         <button
           type="button"
@@ -1267,9 +1281,10 @@ export function BoardEditor({
           />
         </div>
       </div>
+      )}
 
       {/* ── Page filmstrip ──────────────────────────────────────────────── */}
-      {!present && (
+      {!present && !embedded && (
         <PageFilmstrip
           pages={pages}
           activePage={activePage}
@@ -1380,6 +1395,9 @@ export function BoardEditor({
                 }}
               />
             ))}
+            {/* Host overlay (v2 annotation glass) — TOP child of the scaled
+                paper, so it shares the paper's rect/scale/offset exactly. */}
+            {overlay}
           </div>
           </div>
         </div>

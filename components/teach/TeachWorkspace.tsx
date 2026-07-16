@@ -26,7 +26,6 @@ import {
 } from "react";
 import {
   DndContext,
-  DragOverlay,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -70,34 +69,14 @@ import type {
   WidgetType,
 } from "@/lib/types";
 
-import {
-  PresentBar,
-  TeachFooter,
-  TeachHelpOverlay,
-  TeachSubBar,
-  TeachTopBar,
-  TEACH_CENTER_PANEL_ID,
-} from "./chrome";
-import { TeachLeftPanel, TeachLeftRail } from "./left";
-import { TeachRightPanel, TeachRightRail } from "./right";
-import { BoardSettingsPopover } from "./board";
-import {
-  BoardEditor,
-  type BoardEditorIntent,
-  type ResourceItem,
-} from "./board/editor";
+import { type BoardEditorIntent, type ResourceItem } from "./board/editor";
 import { BoardFullscreen } from "./board/fullscreen";
-import { BoardLibraryModule, WidgetLibrary } from "./library";
-import { TeachIcon, widgetMeta } from "@/components/teach/widgets";
-import { Button } from "@/components/ui";
-import { BoardCanvasResource, ResourceViewerToolbar } from "./canvas";
-import {
-  AnnotationLayer,
-  ANNOTATION_SWATCHES,
-  BoardToolbar,
-  type AnnotationSwatch,
-} from "./annotation";
-import styles from "./TeachWorkspace.module.css";
+import { widgetMeta } from "@/components/teach/widgets";
+import { ANNOTATION_SWATCHES } from "./annotation";
+import { V2 } from "@/lib/v2-flag";
+import { TeachV1Zones } from "./TeachV1Zones";
+import { TeachV2Shell } from "@/components/teach-v2";
+import type { TeachZonesProps } from "./zones-contract";
 
 // ── Props (deep-link seeds from the server page) ────────────────────────────
 
@@ -1304,6 +1283,93 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
     );
   }
 
+  // ── Zones contract (W11 presentation seam) ─────────────────────────────────
+  // Everything the shell body renders, handed to whichever skin mounts. Every
+  // field is a state slice, a derived value, a ref, or a callback computed
+  // above — no logic lives past this point. TeachV1Zones (and Builder B's
+  // TeachV2Shell) consume this object; the reducer/effects/DnD/deep-link all
+  // stay in this component.
+  const zonesProps: TeachZonesProps = {
+    state,
+    dispatch,
+    rootRef,
+    resourceContainerRef,
+    openingBoardRef,
+    viewport,
+    boards,
+    activeBoard,
+    activeLessonId,
+    activeResource,
+    standaloneBoard,
+    subject,
+    subjClass,
+    boardIndex,
+    boardCount,
+    pages,
+    resolvedPageId,
+    widgets,
+    editorResources,
+    rightOrder,
+    ownerId,
+    boardsGradeLevelId: boardGradeId(activeBoard),
+    canCreateBoard,
+    annotations,
+    resolvedColor,
+    colorId,
+    onColorChange: (swatch) => setColorId(swatch.id),
+    strokeWidth,
+    onStrokeWidthChange: setStrokeWidth,
+    leftWidth,
+    rightWidth,
+    avatarInitials,
+    teacherName: currentUser.name,
+    gradeLabel: currentUser.curriculumLabel,
+    chatUnread,
+    week,
+    day: selectedDay,
+    leftActiveModule,
+    setLeftActiveModule,
+    rightActiveModule,
+    setRightActiveModule,
+    helpOpen,
+    setHelpOpen,
+    boardSettingsOpen,
+    setBoardSettingsOpen,
+    libraryOverlay,
+    setLibraryOverlay,
+    activeDrag,
+    openLeftPanel,
+    openRightPanel,
+    openBoardsPanel,
+    togglePanels,
+    toggleRightCollapsed: workspace.toggleRightCollapsed,
+    toggleFullscreen,
+    exitFullscreen,
+    onEditorIntent: handleEditorIntent,
+    onEmbedResource: handleEmbedResource,
+    reloadBoards,
+    handleUseTemplate,
+    showConsequence,
+    // Prebuilt chrome handlers — the state owner bakes in each control's gating
+    // so both skins wire identical behaviour (the v1 JSX built these inline).
+    onOpenWidgetLibrary: activeBoard
+      ? () => setLibraryOverlay("widgets")
+      : undefined,
+    onOpenBoardLibrary: () => setLibraryOverlay("boards"),
+    // Sub-bar Add Board — no lesson to add to in the standalone single-board
+    // scope, so it's undefined there (handleAddBoard routes sandbox/lesson).
+    onAddBoard:
+      standaloneBoard == null ? () => void handleAddBoard() : undefined,
+    // Empty-state "Start blank" — gated on a creatable target (lesson/sandbox +
+    // resolved owner/grade) rather than the standalone check.
+    onStartBlankBoard: canCreateBoard
+      ? () => void handleAddBoard()
+      : undefined,
+    onBoardSettings: activeBoard
+      ? () => setBoardSettingsOpen(true)
+      : undefined,
+  };
+
   return (
     <DndContext
       // Stable id keeps dnd-kit's internal `DndDescribedBy-<id>` (the
@@ -1311,476 +1377,26 @@ export function TeachWorkspace(props: TeachWorkspaceProps): ReactNode {
       // server and client. Without it, dnd-kit falls back to a module-level
       // counter (`useUniqueId`) whose value differs between SSR and hydration,
       // producing a React hydration mismatch on every draggable on this surface.
+      // The ONE DndContext wraps whichever skin renders (W11 seam) so drag ids
+      // stay stable across a flag flip.
       id="teach-surface-dnd"
       sensors={sensors}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div
-        ref={rootRef}
-        className={`${styles.root} ${subjClass ?? ""} ${
-          state.present ? styles.present : ""
-        }`}
-        data-sandbox={state.sandbox ? "true" : undefined}
-        title="The live teaching workspace — boards, resources, and class context for delivering a lesson"
-      >
-        {/* ── Chrome: present strip OR top + sub bars ───────────────────── */}
-        {state.present ? (
-          <div className={styles.presentStrip}>
-            <PresentBar
-              dispatch={dispatch}
-              boardName={activeBoard?.title ?? "Board"}
-              subject={subject}
-              slideIndex={boardIndex}
-              slideCount={boardCount}
-              onPrev={() => {
-                const prev = boards[boardIndex - 2];
-                if (prev) dispatch({ type: "selectBoard", boardId: prev.id });
-              }}
-              onNext={() => {
-                const nextBoard = boards[boardIndex];
-                if (nextBoard)
-                  dispatch({ type: "selectBoard", boardId: nextBoard.id });
-              }}
-            />
-          </div>
-        ) : (
-          <>
-            <header className={styles.topBarSlot}>
-              <TeachTopBar
-                // Multi-grade by design (CLAUDE.md §1): the curriculum/grade
-                // label is FREE TEXT sourced from the signed-in teacher's
-                // context — the same source the shell top-bar uses
-                // (currentUser.curriculumLabel). Never hard-code "Grade 5".
-                // When the label is absent the suffix simply disappears.
-                gradeLabel={currentUser.curriculumLabel}
-                avatarInitials={avatarInitials}
-                teacherName={currentUser.name}
-                onOpenHelp={() => setHelpOpen(true)}
-              />
-            </header>
-            <div className={styles.subBarSlot}>
-              <TeachSubBar
-                state={state}
-                dispatch={dispatch}
-                boards={boards}
-                subject={subject}
-                // Standalone single-board scope has no lesson to add to — hide
-                // Add Board there (it would be a no-op). Lessons + sandbox keep
-                // it (handleAddBoard routes sandbox through the sentinel).
-                onAddBoard={
-                  standaloneBoard == null
-                    ? () => void handleAddBoard()
-                    : undefined
-                }
-                onBoardSettings={
-                  activeBoard ? () => setBoardSettingsOpen(true) : undefined
-                }
-                onToggleFullscreen={toggleFullscreen}
-                onOpenBoardLibrary={() => setLibraryOverlay("boards")}
-                onOpenWidgetLibrary={
-                  activeBoard ? () => setLibraryOverlay("widgets") : undefined
-                }
-              />
-            </div>
-          </>
-        )}
-
-        {/* ── Body row ─────────────────────────────────────────────────── */}
-        <div className={styles.body}>
-          {/* Left icon rail */}
-          {!state.present ? (
-            <TeachLeftRail
-              activeModuleId={state.leftCollapsed ? null : leftActiveModule}
-              onSelectModule={(id) => {
-                setLeftActiveModule(id);
-                openLeftPanel();
-              }}
-            />
-          ) : null}
-
-          {/* Left panel */}
-          {!state.present && !state.leftCollapsed ? (
-            <TeachLeftPanel
-              state={state}
-              dispatch={dispatch}
-              activeModuleId={leftActiveModule}
-              onActiveModuleChange={setLeftActiveModule}
-              width={leftWidth}
-              // Single source of truth (audit A1-left): the Boards module reads
-              // TeachWorkspace.boards + reloadBoards, never its own fetch, so the
-              // sub-bar pills, footer count, and center board stay in lockstep.
-              boards={boards}
-              boardsGradeLevelId={boardGradeId(activeBoard)}
-              reloadBoards={reloadBoards}
-              onOpenWidgetLibrary={
-                activeBoard ? () => setLibraryOverlay("widgets") : undefined
-              }
-              // Finding 3 fix: thread the flag-aware owner id so BoardsModule
-              // never uses the hard-coded `ME.id` slug under the live flag.
-              ownerId={ownerId}
-            />
-          ) : null}
-
-          {/* Center — board grid OR full-bleed resource canvas. This is the
-              panel the sub-bar board-tab strip controls (audit A4): it carries
-              the shared TEACH_CENTER_PANEL_ID + role="tabpanel", labelled by
-              the active board's tab. */}
-          <main
-            className={styles.center}
-            id={TEACH_CENTER_PANEL_ID}
-            role="tabpanel"
-            aria-labelledby={
-              activeBoard ? `teach-board-tab-${activeBoard.id}` : undefined
-            }
-          >
-            {state.centerMode === "resource" && activeResource ? (
-              <div ref={resourceContainerRef} className={styles.resourceStage}>
-                <ResourceViewerToolbar
-                  state={state}
-                  dispatch={dispatch}
-                  resource={activeResource}
-                  onToggleFullscreen={() => toggleFullscreen(!state.fullscreen)}
-                />
-                <div className={styles.resourceCanvasWrap}>
-                  <BoardCanvasResource
-                    resource={activeResource}
-                    className={styles.resourceCanvas}
-                  />
-                  <div className={styles.annotationOverlay}>
-                    <AnnotationLayer
-                      annotations={annotations}
-                      tool={state.activeTool}
-                      color={resolvedColor}
-                      width={strokeWidth}
-                    />
-                  </div>
-                  {/* Wave 1 declutter: the floating `ToolDock` (a strict subset
-                      of the BoardToolbar below — select/pen/text + dead "Soon"
-                      tiles) was removed. The single `BoardToolbar` is the one
-                      drawing toolbar for the resource surface. */}
-                </div>
-                <BoardToolbar
-                  state={state}
-                  dispatch={dispatch}
-                  annotations={annotations}
-                  colorId={colorId}
-                  onColorChange={(swatch: AnnotationSwatch) =>
-                    setColorId(swatch.id)
-                  }
-                  width={strokeWidth}
-                  onWidthChange={setStrokeWidth}
-                />
-              </div>
-            ) : activeBoard && resolvedPageId ? (
-              <BoardEditor
-                board={activeBoard}
-                pages={pages}
-                activePageId={resolvedPageId}
-                onChange={handleEditorIntent}
-                subjectId={subject}
-                resources={editorResources}
-                onBrowseAll={() => setLibraryOverlay("widgets")}
-              />
-            ) : (
-              // Clean empty state (Wave 1, #10) — no board open yet. The board
-              // surface opens CLEAR: no widgets, no grid, no auto-seeded set.
-              // A board exists only on an explicit action, so we offer the three
-              // explicit creation paths.
-              <TeachBoardEmptyState
-                onStartBlank={
-                  canCreateBoard ? () => void handleAddBoard() : undefined
-                }
-                onOpenBoards={openBoardsPanel}
-              />
-            )}
-          </main>
-
-          {/* Right panel */}
-          {!state.present && !state.rightCollapsed ? (
-            <TeachRightPanel
-              order={rightOrder}
-              activeModuleId={rightActiveModule}
-              onActivateModule={setRightActiveModule}
-              collapsed={state.rightCollapsed}
-              onCollapse={workspace.toggleRightCollapsed}
-              width={rightWidth}
-              activeLessonId={activeLessonId}
-              boards={boards}
-              onMagnifyResource={(resource) =>
-                dispatch({ type: "openResource", resource })
-              }
-              onEmbedResource={handleEmbedResource}
-              onOpenBoard={(boardId) =>
-                dispatch({ type: "selectBoard", boardId })
-              }
-              week={week}
-              day={selectedDay}
-              onOpenWidgetLibrary={
-                activeBoard ? () => setLibraryOverlay("widgets") : undefined
-              }
-            />
-          ) : null}
-
-          {/* Right icon rail */}
-          {!state.present ? (
-            <TeachRightRail
-              order={rightOrder}
-              activeModuleId={state.rightCollapsed ? null : rightActiveModule}
-              onActivateModule={(id) => {
-                setRightActiveModule(id);
-                openRightPanel();
-              }}
-              badges={{ chat: chatUnread }}
-            />
-          ) : null}
-
-          {/* Tap-to-dismiss scrim — only on small screens (≤900px) when a panel
-              drawer is open. Sits BELOW the drawer (scrim z-index 40 < drawer
-              z-index 45) and above the board/rails; tapping anywhere outside the
-              drawer collapses whichever drawer(s) are open. Keyboard users get
-              Esc (the effect above) and the scrim is itself a focusable
-              <button> (Enter/Space activate it). */}
-          {!state.present &&
-          viewport.isSmall &&
-          (!state.leftCollapsed || !state.rightCollapsed) ? (
-            <button
-              type="button"
-              className={styles.drawerScrim}
-              aria-label="Close panel"
-              onClick={() => {
-                if (!state.rightCollapsed)
-                  dispatch({ type: "setRightCollapsed", collapsed: true });
-                if (!state.leftCollapsed)
-                  dispatch({ type: "setLeftCollapsed", collapsed: true });
-              }}
-            />
-          ) : null}
-        </div>
-
-        {/* ── Footer ───────────────────────────────────────────────────── */}
-        {!state.present ? (
-          <footer className={styles.footerSlot}>
-            <TeachFooter
-              panelsCollapsed={state.leftCollapsed && state.rightCollapsed}
-              onTogglePanels={togglePanels}
-            />
-          </footer>
-        ) : null}
-
-        {/* Board-settings popover (audit G1) — rename / reorder hint / reset.
-            (The CSS-grid `TeachingBoard`'s WidgetPicker + per-widget
-            WidgetSettingsPopover were removed in the Wave 1 declutter — widget
-            add/settings now flow through the BoardEditor's typed intents.) */}
-        {boardSettingsOpen && activeBoard ? (
-          <BoardSettingsPopover
-            board={activeBoard}
-            onClose={() => setBoardSettingsOpen(false)}
-            reloadBoards={reloadBoards}
-          />
-        ) : null}
-
-        {/* Help + shortcuts overlay (audit B2) — opened by the top-bar Help. */}
-        <TeachHelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
-
-        {/* Board / Widget Library overlays (5.31) — opened from the sub-bar. */}
-        {libraryOverlay ? (
-          <div
-            className={styles.libraryOverlay}
-            role="dialog"
-            aria-modal="true"
-            aria-label={
-              libraryOverlay === "boards" ? "Board library" : "Widget library"
-            }
-          >
-            <div className={styles.libraryPanel}>
-              <div className={styles.libraryHead}>
-                <h2 className={styles.libraryTitle}>
-                  {libraryOverlay === "boards"
-                    ? "Board Library"
-                    : "Widget Library"}
-                </h2>
-                <button
-                  type="button"
-                  className={styles.libraryClose}
-                  onClick={() => setLibraryOverlay(null)}
-                  aria-label="Close library"
-                >
-                  <TeachIcon name="x" size={20} />
-                </button>
-              </div>
-              <div className={styles.libraryBody}>
-                {libraryOverlay === "boards" ? (
-                  <BoardLibraryModule
-                    gradeLevelId={boardGradeId(activeBoard)}
-                    onOpenBoard={(board) => {
-                      // Ignore re-entrant clicks while a pull-copy is in flight so a
-                      // double-click can't pull two copies / consume two cap slots
-                      // (review Low). The overlay stays OPEN until the work succeeds
-                      // (or a failure is surfaced) so a cap/RLS/network error is not
-                      // swallowed (audit M9).
-                      if (openingBoardRef.current) return;
-                      openingBoardRef.current = true;
-                      void (async () => {
-                        try {
-                          // A board already attached to a lesson (a My Board for a
-                          // lesson) → just navigate to it.
-                          if (board.masterLessonId != null) {
-                            dispatch({
-                              type: "selectLesson",
-                              lessonId: board.masterLessonId,
-                            });
-                            dispatch({
-                              type: "selectBoard",
-                              boardId: board.id,
-                            });
-                            setLibraryOverlay(null);
-                            return;
-                          }
-                          // Lesson-DETACHED library board (Team Library / a detached
-                          // My Board): PULL A COPY INTO THE CURRENT LESSON (audit
-                          // F11). selectLesson(null) would clear the workspace, so
-                          // add a personal copy to the lesson in view + select it.
-                          // Guarded on !sandbox: in the sandbox there is no real
-                          // lesson to attach to (reloadBoards reads the sandbox
-                          // scope), so a sandbox open falls through to the My Boards
-                          // pull below (review Low: latent sandbox+lesson mismatch).
-                          if (
-                            activeLessonId != null &&
-                            !state.sandbox &&
-                            ownerId != null
-                          ) {
-                            const copy = await teach.copyBoardToLesson(
-                              board.id,
-                              activeLessonId,
-                              ownerId,
-                            );
-                            await reloadBoards();
-                            dispatch({ type: "selectBoard", boardId: copy.id });
-                            setLibraryOverlay(null);
-                            return;
-                          }
-                          // No lesson in view (e.g. sandbox) → fall back to pulling a
-                          // detached copy into My Boards so the action still succeeds.
-                          if (ownerId != null) {
-                            await teach.copyTeamBoardToMine(board.id, ownerId);
-                            setLibraryOverlay(null);
-                          }
-                        } catch (err) {
-                          // Surface the failure (e.g. the board-cap limit) instead of
-                          // a silent unhandled rejection; keep the overlay OPEN so the
-                          // teacher can delete a board / pick another and retry
-                          // (audit M9).
-                          showConsequence({
-                            message:
-                              err instanceof Error &&
-                              err.name === "BoardCapError"
-                                ? err.message
-                                : "Couldn't add that board just now — please try again.",
-                          });
-                        } finally {
-                          openingBoardRef.current = false;
-                        }
-                      })();
-                    }}
-                    // Template-use creates ONE lesson-attached board + selects it
-                    // directly (bypasses onOpenBoard's detach→copy branch, which
-                    // would otherwise make a duplicate board).
-                    onUseTemplate={handleUseTemplate}
-                    // Finding 3 fix: thread the flag-aware owner id so library
-                    // operations never use the hard-coded `ME.id` slug under
-                    // the live flag.
-                    ownerId={ownerId}
-                  />
-                ) : (
-                  <WidgetLibrary
-                    addedTypes={widgets.map((w) => w.type)}
-                    onAddWidget={(type) => {
-                      if (resolvedPageId) {
-                        handleEditorIntent({
-                          type: "addWidget",
-                          pageId: resolvedPageId,
-                          widgetType: type,
-                          canvas: { x: 64, y: 64, w: 320 },
-                        });
-                      }
-                      setLibraryOverlay(null);
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      {/* DragOverlay ghost — a lightweight label for the active payload. */}
-      <DragOverlay>
-        {activeDrag ? (
-          <div className={styles.dragGhost}>
-            {activeDrag.kind === "resource"
-              ? activeDrag.resource.label
-              : activeDrag.kind === "rail-icon"
-                ? activeDrag.moduleId
-                : "Widget"}
-          </div>
-        ) : null}
-      </DragOverlay>
+      {V2 ? (
+        // W11: the v2 re-skin. Same zones contract, same state — a flag flip
+        // swaps chrome/layout without touching behaviour.
+        <TeachV2Shell {...zonesProps} />
+      ) : (
+        <TeachV1Zones {...zonesProps} />
+      )}
+      {/* The shared overlay layer (TeachOverlays: settings / help / libraries)
+          renders INSIDE each skin's rootRef subtree — NOT here — because
+          toggleFullscreen makes rootRef the browser fullscreen element, and
+          position:fixed nodes OUTSIDE document.fullscreenElement do not paint
+          while fullscreen is engaged (independent review W11 M1). Exactly one
+          skin mounts, so the layer still renders once. */}
     </DndContext>
-  );
-}
-
-// ── Board empty state (Wave 1, #10) ──────────────────────────────────────────
-// Shown in the center when no board is open. The board surface opens CLEAN —
-// no widgets, no grid — and offers the explicit creation paths (a board exists
-// only on an explicit action). "Start blank" is hidden when a board can't be
-// created yet (no lesson/owner/grade) rather than rendering a dead button.
-
-interface TeachBoardEmptyStateProps {
-  /** Create a blank board for the active lesson / sandbox. Omitted → hidden. */
-  onStartBlank?: () => void;
-  /** Open the Boards panel (browse + reuse boards). */
-  onOpenBoards: () => void;
-}
-
-function TeachBoardEmptyState({
-  onStartBlank,
-  onOpenBoards,
-}: TeachBoardEmptyStateProps): ReactNode {
-  return (
-    <div
-      className={styles.emptyState}
-      role="region"
-      aria-label="No board open"
-    >
-      <div className={styles.emptyIcon} aria-hidden="true">
-        <TeachIcon name="grid" size={30} />
-      </div>
-      <h2 className={styles.emptyTitle}>No board open yet</h2>
-      <p className={styles.emptyBody}>
-        Start a blank board, open one from a resource, or pick from the Boards
-        page.
-      </p>
-      <div className={styles.emptyActions}>
-        {onStartBlank ? (
-          <Button
-            variant="primary"
-            leadingIcon={<TeachIcon name="plus" size={16} />}
-            onClick={onStartBlank}
-            tooltip="Create a fresh blank board for this lesson"
-          >
-            Start blank
-          </Button>
-        ) : null}
-        <Button
-          variant="secondary"
-          leadingIcon={<TeachIcon name="grid" size={16} />}
-          onClick={onOpenBoards}
-          tooltip="Browse your boards and the team's, and open one here"
-        >
-          Browse boards
-        </Button>
-      </div>
-    </div>
   );
 }

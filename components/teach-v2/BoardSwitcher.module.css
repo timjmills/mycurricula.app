@@ -1,0 +1,132 @@
+/* BoardSwitcher.module.css — v2 board-set switcher. Tokens only (CLAUDE.md §4). */
+
+.switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 160px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pill:hover {
+  border-color: var(--chrome-accent);
+}
+
+.pillOn {
+  background: var(--chrome-accent);
+  border-color: var(--chrome-accent);
+  color: var(--on-solid);
+}
+
+.pillLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--on-solid) 22%, transparent);
+  font-size: var(--t-11);
+  font-weight: 700;
+}
+
+.dropdownWrap {
+  position: relative;
+}
+
+.dropdownTrigger {
+  gap: 4px;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--panel-bg);
+  box-shadow: var(--sh-lg);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--ink-700);
+  font-size: var(--t-14);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--chrome-accent-soft);
+  color: var(--ink-900);
+}
+
+.menuItemOn {
+  background: var(--chrome-accent-soft);
+  color: var(--chrome-accent-deep);
+  font-weight: 600;
+}
+
+.iconPill {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-600);
+  cursor: pointer;
+}
+
+.iconPill:hover {
+  border-color: var(--chrome-accent);
+  color: var(--chrome-accent-deep);
+}
+
+/* Touch targets ≥44px on phone/tablet (L1 — hard responsive contract). */
+@media (pointer: coarse), (max-width: 900px) {
+  .pill,
+  .iconPill {
+    min-height: 44px;
+  }
+  .iconPill {
+    width: 44px;
+  }
+  .menuItem {
+    min-height: 44px;
+  }
+}
