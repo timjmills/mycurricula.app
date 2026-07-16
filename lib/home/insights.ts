@@ -8,13 +8,19 @@
 // ~320 records). The full 4,088-quote bank lives in insights.data.json (the data
 // artifact / deliverable) and is intentionally NOT imported here to keep the
 // /home client bundle small.
+//
+// PERF SPLIT: the hero records' `expand` prose (~280 kB, ~2/3 of the old
+// payload) lives in a SIBLING file, insights.expand.json, and is NOT imported
+// statically — it renders only after a click ("Read more" / the quote-context
+// popover), so it loads via dynamic import the first time an expansion opens
+// (webpack code-splits it into an async chunk; see loadInsightExpand below).
+// Records carry `hasExpand: true` so the UI can gate the affordance without
+// the prose. scripts/quote-mining/finalize-bank.mjs emits BOTH files — keep
+// the split when regenerating.
 import data from "./insights.hero.json";
 
 export type InsightCategory =
-  | "classroom culture"
-  | "learning"
-  | "teaching"
-  | "leading";
+  "classroom culture" | "learning" | "teaching" | "leading";
 
 export interface Insight {
   id: string;
@@ -24,8 +30,31 @@ export interface Insight {
   work: string | null;
   url: string | null;
   category: InsightCategory;
-  /** A short surrounding paragraph for the "Read more" expansion. */
-  expand?: string | null;
+  /** True when a "Read more" expansion paragraph exists for this insight.
+   *  The prose itself lives in insights.expand.json — fetch it with
+   *  loadInsightExpand(id) when the reader opens the expansion. */
+  hasExpand?: boolean;
+}
+
+/**
+ * Load one insight's "Read more" expansion paragraph.
+ *
+ * The expand map is code-split into an async chunk (dynamic import) because
+ * it is ~2/3 of the insight bank's bytes and renders only after a click.
+ * The import is cached by the module system, so every call after the first
+ * resolves from memory. Returns null when the id has no expansion (or the
+ * chunk fails to load — the UI simply shows no paragraph, matching the
+ * pre-split behavior for records without `expand`).
+ */
+export async function loadInsightExpand(id: string): Promise<string | null> {
+  try {
+    const mod = await import("./insights.expand.json");
+    const map = mod.default as Record<string, string>;
+    return map[id] ?? null;
+  } catch {
+    // Chunk fetch failed (offline, deploy skew) — degrade to "no expansion".
+    return null;
+  }
 }
 
 export const INSIGHT_CATEGORIES: readonly InsightCategory[] = [

@@ -21,7 +21,9 @@
 // teacher's own library), NOT the mockup's inline TEACH_QUOTES sample
 // array. Field mapping onto the bundle's shape:
 //   quote.short → Insight.quote · author → Insight.author ·
-//   context → Insight.expand (optional) · source/url → Insight.source/url.
+//   context → the lazy expand prose (Insight.hasExpand gates it; the text
+//   loads via loadInsightExpand when the popup opens) ·
+//   source/url → Insight.source/url.
 //
 // ── The "daily" pick ─────────────────────────────────────────────────────
 // One quote per calendar day, deterministic: the index is a hash of the
@@ -53,7 +55,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { heroInsights, type Insight } from "@/lib/home/insights";
+import {
+  heroInsights,
+  loadInsightExpand,
+  type Insight,
+} from "@/lib/home/insights";
 import { Tooltip } from "@/components/ui";
 
 // The balanced hero pool — pure over static module data, so computing it
@@ -226,6 +232,24 @@ function QuotePopup({
   onClose,
   onHideForToday,
 }: QuotePopupProps): ReactNode {
+  // The context paragraph (the old inline `expand` field) is code-split into
+  // an async chunk (lib/home/insights.expand.json) — it's ~2/3 of the insight
+  // bank's bytes and renders only inside this popup. The popup mounts exactly
+  // when it opens, so load on mount; the async-chunk import is cached, so
+  // re-opens resolve from memory. The cancelled guard drops a stale resolve
+  // if the popup closes mid-fetch.
+  const [expandText, setExpandText] = useState<string | null>(null);
+  useEffect(() => {
+    if (insight.hasExpand !== true) return;
+    let cancelled = false;
+    void loadInsightExpand(insight.id).then((text) => {
+      if (!cancelled) setExpandText(text);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [insight]);
+
   // Escape closes (bundle behavior). Scoped to the popup's lifetime.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -269,11 +293,12 @@ function QuotePopup({
         </span>
         <p className="qpop-quote">{insight.quote}</p>
         {insight.author !== null && <p className="qpop-by">{insight.author}</p>}
-        {/* Context paragraph — the Insight bank's optional `expand` field
-            (the mockup's `context`). Simply absent when the record has
-            none; never padded with generated filler. */}
-        {insight.expand != null && insight.expand !== "" && (
-          <p className="qpop-context">{insight.expand}</p>
+        {/* Context paragraph — the Insight bank's optional expansion prose
+            (the mockup's `context`), lazy-loaded from the code-split expand
+            chunk when the popover opens. Simply absent while loading or when
+            the record has none; never padded with generated filler. */}
+        {expandText !== null && expandText !== "" && (
+          <p className="qpop-context">{expandText}</p>
         )}
 
         {/* Footer row: source link (bundle) + the W3.3 "Hide for today"
