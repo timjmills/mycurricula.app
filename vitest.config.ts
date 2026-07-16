@@ -12,16 +12,6 @@ import { defineConfig } from "vitest/config";
 // own linkedom-backed DOM, so we don't need vitest's jsdom environment. The `@/` path alias is
 // resolved here so test imports match the app's tsconfig paths.
 export default defineConfig({
-  // The app's tsconfig sets `jsx: "preserve"` (Next.js transforms JSX
-  // itself), which vitest's transform honors — leaving raw JSX in any
-  // imported .tsx module and breaking import analysis. Tests that import
-  // pure helpers exported from a component file (e.g. the floating bar's
-  // placement geometry in components/lesson-editor/FloatingBar.tsx) need
-  // the JSX compiled. Vitest 4 bundles rolldown-vite, whose Oxc transform
-  // reads the tsconfig directly — the `oxc.jsx` option is the override that
-  // wins (the legacy `esbuild.jsx` / `esbuild.tsconfigRaw` forms are
-  // converted but lose to the tsconfig read; verified empirically).
-  oxc: { jsx: { runtime: "automatic" } },
   resolve: {
     alias: {
       "@": new URL(".", import.meta.url).pathname,

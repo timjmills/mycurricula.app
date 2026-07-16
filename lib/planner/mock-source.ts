@@ -104,10 +104,7 @@ function cloneLesson(l: Lesson): Lesson {
 }
 
 /** Deep-clone a section list (and its resources) so callers can't mutate the
- *  store through a returned array. The object spread carries EVERY section
- *  field verbatim — including the W3.8 appearance pair (`color` /
- *  `tintScope`), so the mock round-trips them exactly like the Supabase
- *  source's lesson_sections columns. */
+ *  store through a returned array. */
 function cloneSections(
   sections: LessonSectionContent[],
 ): LessonSectionContent[] {
@@ -319,7 +316,6 @@ export const plannerMockSource: PlannerDataSource = {
       week: number;
       day: number;
       title: string;
-      objective?: string;
     },
     _ownerId: string,
     _gradeLevelId?: string,
@@ -336,9 +332,7 @@ export const plannerMockSource: PlannerDataSource = {
       subject: input.subject,
       unit: input.unit,
       title: input.title,
-      // W3.7 audit #5 — objective rides in the create (no post-create edit
-      // tee); the one-click flow passes none → "".
-      objective: input.objective ?? "",
+      objective: "",
       preview: "",
       directions: "",
       notes: "",

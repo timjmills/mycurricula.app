@@ -63,15 +63,6 @@ export function TeamModeIntro(): ReactNode {
       return;
     }
     if (hasBeenIntroduced()) return;
-    // W3.8 — skip (don't consume) the intro while the lesson-editor modal
-    // is open: its scrim sits at z-index 600, so this z-50 popover would
-    // paint invisibly underneath it AND its Escape listener would eat the
-    // key the teacher meant for the modal. The intro is not marked
-    // introduced, so it still fires on the next master-mode entry once no
-    // modal is up. DOM probe rather than shared state on purpose — the
-    // smallest possible seam between shell chrome and the editor overlay
-    // (gate finding #5).
-    if (document.querySelector(".lm-scrim") !== null) return;
     setOpen(true);
   }, [editMode]);
 

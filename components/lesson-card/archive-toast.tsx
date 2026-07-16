@@ -44,10 +44,6 @@ export function ArchiveToast({
   const [visible, setVisible] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The deferred exit timer (fires onDismiss after the slide-out). Held in a
-  // ref so unmount can clear it — otherwise a superseded toast's exit timer
-  // fires onDismiss and nulls the NEW toast's state in the parent (toast race).
-  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Detect prefers-reduced-motion ────────────────────────────────────────
   useEffect(() => {
@@ -73,12 +69,6 @@ export function ArchiveToast({
       if (dismissTimerRef.current !== null) {
         clearTimeout(dismissTimerRef.current);
       }
-      // Also clear the deferred exit timer: when this instance is superseded
-      // (key remount) mid-slide-out, its pending onDismiss must NOT fire after
-      // unmount — it would clear the replacement toast's parent state.
-      if (exitTimerRef.current !== null) {
-        clearTimeout(exitTimerRef.current);
-      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -90,11 +80,9 @@ export function ArchiveToast({
     }
     setVisible(false);
     // Wait for the exit animation before calling onDismiss so the caller
-    // can unmount the toast only after it has slid/faded out. The timer is
-    // held in exitTimerRef so unmount (supersession) can cancel it.
+    // can unmount the toast only after it has slid/faded out.
     const exitDuration = reducedMotion ? 150 : 260;
-    if (exitTimerRef.current !== null) clearTimeout(exitTimerRef.current);
-    exitTimerRef.current = setTimeout(onDismiss, exitDuration);
+    setTimeout(onDismiss, exitDuration);
   }, [onDismiss, reducedMotion]);
 
   const handleUndo = useCallback(() => {

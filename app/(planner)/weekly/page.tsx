@@ -18,9 +18,8 @@
 // WeeklyShell as `initialLink`, so a shared URL restores week + subject
 // filter + open lesson detail on first paint. A missing/invalid `week`
 // nulls the whole link (parseWeeklyParams) and the shell opens normally.
-import { WeeklyShell, WeeklyShellV1 } from "@/components/weekly";
+import { WeeklyShell } from "@/components/weekly";
 import { parseWeeklyParams } from "@/lib/deep-links";
-import { V2 } from "@/lib/v2-flag";
 
 export default async function WeeklyPage({
   searchParams,
@@ -37,15 +36,5 @@ export default async function WeeklyPage({
     if (typeof first === "string") sp.set(key, first);
   }
   const initialLink = parseWeeklyParams(sp);
-  // ── NEXT_PUBLIC_V2 router gate (Wave-13 rollback half) ──────────────────
-  // Flag ON → the v2 <WeeklyShell> (frame-branched week canvases). Flag OFF →
-  // <WeeklyShellV1>, a verbatim copy of master's live-on-prod Week (icon rail
-  // + WeeklyGrid + right rail). Both accept the same `initialLink` deep-link
-  // seed, so a shared `/weekly?week=…&subject=…&lesson=…` URL restores the
-  // same state on either side of the flag. V2 is build-inlined → one ships.
-  return V2 ? (
-    <WeeklyShell initialLink={initialLink ?? undefined} />
-  ) : (
-    <WeeklyShellV1 initialLink={initialLink ?? undefined} />
-  );
+  return <WeeklyShell initialLink={initialLink ?? undefined} />;
 }

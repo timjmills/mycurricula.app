@@ -21,12 +21,7 @@
 // no new dependencies; reduced-motion respected.
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import type {
-  ReactNode,
-  KeyboardEvent,
-  FormEvent,
-  CSSProperties,
-} from "react";
+import type { ReactNode, KeyboardEvent, FormEvent } from "react";
 import { WEEK_DAYS } from "@/lib/mock";
 import { Button, Tooltip } from "@/components/ui";
 import styles from "./AddEventForm.module.css";
@@ -38,17 +33,6 @@ export interface AddEventFormProps {
   onClose: () => void;
   /** 0-based day index for the currently-selected day — shown in the header. */
   day: number;
-  /** Configured weekday label ("Sunday") for the header. Falls back to the
-   *  Sun–Thu WEEK_DAYS mock BY POSITIONAL INDEX when omitted — which is wrong
-   *  for any other configured school week, so planner callers should pass the
-   *  real label from their ordered-week source. */
-  dayLabel?: string;
-  /** Optional viewport point (px) to anchor the popover near. Used by the
-   *  weekly frames so the dialog opens beside the triggering cell instead of
-   *  the Daily icon-rail default (left:64px, which overlaps the weekly
-   *  sidebar). Null/undefined keeps the default CSS positioning — so /daily is
-   *  unaffected. */
-  anchor?: { x: number; y: number } | null;
 }
 
 // ── Focusable element selector for the focus trap ─────────────────────────
@@ -84,8 +68,6 @@ export function AddEventForm({
   open,
   onClose,
   day,
-  dayLabel,
-  anchor,
 }: AddEventFormProps): ReactNode {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -95,28 +77,7 @@ export function AddEventForm({
   const [label, setLabel] = useState("");
   const [start, setStart] = useState(defaultStart);
   const [end, setEnd] = useState(defaultEnd);
-  // Honest prototype notice: the schedule store has no addBlock action yet, so
-  // an event can't actually be saved. On submit we surface this VISIBLY rather
-  // than announcing a phantom success and closing (the old behavior).
-  const [notWiredNotice, setNotWiredNotice] = useState(false);
-
-  // Viewport size, tracked live while open: the anchored clamp below must
-  // recompute when the viewport shrinks mid-open (device rotation,
-  // split-screen, virtual keyboard) or the dialog can extend below the NEW
-  // viewport bottom (Codex W5 R4). A bare re-render tick would do, but
-  // holding the size in state keeps the clamp math readable. NOT a
-  // close-on-resize — the mobile virtual keyboard fires resize while typing.
-  const [viewport, setViewport] = useState<{ w: number; h: number } | null>(
-    null,
-  );
-  useEffect(() => {
-    if (!open) return;
-    const update = (): void =>
-      setViewport({ w: window.innerWidth, h: window.innerHeight });
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, [open]);
+  const [submitted, setSubmitted] = useState(false);
 
   // Reset on open; keep start/end as sensible "current time + 30m" defaults.
   useEffect(() => {
@@ -125,7 +86,7 @@ export function AddEventForm({
       setLabel("");
       setStart(s);
       setEnd(addMinutes(s, 30));
-      setNotWiredNotice(false);
+      setSubmitted(false);
     }
   }, [open]);
 
@@ -134,7 +95,6 @@ export function AddEventForm({
   const handleStartChange = useCallback(
     (next: string) => {
       setStart(next);
-      setNotWiredNotice(false);
       if (next >= end) {
         setEnd(addMinutes(next, 30));
       }
@@ -182,51 +142,21 @@ export function AddEventForm({
       if (start >= end) return;
 
       // ── Prototype limitation ─────────────────────────────────────────
-      // The schedule store has no addBlock action yet, so this cannot persist.
-      // Surface that HONESTLY (a visible notice) instead of announcing a
-      // phantom "Event added." and silently closing. The fields + validation
-      // are left intact so the Phase-1B wiring drops straight in here:
-      //   dispatch { type: "non_academic", label: trimmed, start, end }
-      //   onto the day's schedule for `week` / `day`.
-      setNotWiredNotice(true);
+      // The schedule store has no addBlock action yet. When the backend
+      // action lands, dispatch it here with:
+      //   { type: "non_academic", label: trimmed, start, end }
+      // onto the day's schedule for `week` / `day`.
+      //
+      setSubmitted(true);
+      onClose();
     },
-    [label, start, end],
+    [label, start, end, onClose],
   );
 
   if (!open) return null;
 
-  const resolvedDayLabel = dayLabel ?? WEEK_DAYS[day] ?? "Today";
+  const dayLabel = WEEK_DAYS[day] ?? "Today";
   const timeError = start >= end ? "End must be after start" : null;
-
-  // When a caller supplies an anchor point, position the fixed dialog beside it
-  // (clamped fully on-screen), overriding the CSS icon-rail default. The
-  // Daily callsite passes no anchor, so its left:64px behavior is unchanged.
-  const anchoredStyle: CSSProperties | undefined = anchor
-    ? (() => {
-        const DIALOG_W = 280; // matches .dialog width
-        const DIALOG_H = 360; // generous height estimate for the clamp
-        const vw =
-          viewport?.w ??
-          (typeof window !== "undefined" ? window.innerWidth : 1280);
-        const vh =
-          viewport?.h ??
-          (typeof window !== "undefined" ? window.innerHeight : 800);
-        const top = Math.max(12, Math.min(anchor.y, vh - DIALOG_H));
-        return {
-          left: Math.max(12, Math.min(anchor.x, vw - DIALOG_W - 12)),
-          top,
-          // DIALOG_H is only an ESTIMATE — a taller real form (notice shown,
-          // large text/zoom) must not extend past the viewport bottom, so cap
-          // the height from the CLAMPED top and let overflow-y scroll
-          // internally (Codex W5 R3).
-          maxHeight: vh - top - 12,
-          // Cancel the CSS vertical-centering transform + slide animation, which
-          // assume the default centered position and would fight the anchor.
-          transform: "none",
-          animation: "none",
-        };
-      })()
-    : undefined;
 
   return (
     /* Backdrop — click outside to close. */
@@ -239,7 +169,6 @@ export function AddEventForm({
         aria-modal="true"
         title="Add a non-academic event (assembly, field trip, specialist) to this day's timeline"
         className={styles.dialog}
-        style={anchoredStyle}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
@@ -252,7 +181,7 @@ export function AddEventForm({
               Add an event
             </h2>
           </Tooltip>
-          <span className={styles.dayBadge}>{resolvedDayLabel}</span>
+          <span className={styles.dayBadge}>{dayLabel}</span>
           <Button
             variant="icon"
             iconAriaLabel="Close add-event form"
@@ -295,10 +224,7 @@ export function AddEventForm({
               className={styles.input}
               placeholder="Assembly, field trip…"
               value={label}
-              onChange={(e) => {
-                setLabel(e.target.value);
-                setNotWiredNotice(false);
-              }}
+              onChange={(e) => setLabel(e.target.value)}
               maxLength={80}
             />
           </div>
@@ -328,10 +254,7 @@ export function AddEventForm({
                 required
                 className={`${styles.input} ${timeError ? styles.inputError : ""}`}
                 value={end}
-                onChange={(e) => {
-                  setEnd(e.target.value);
-                  setNotWiredNotice(false);
-                }}
+                onChange={(e) => setEnd(e.target.value)}
                 aria-describedby={
                   timeError ? "add-event-time-error" : undefined
                 }
@@ -371,9 +294,9 @@ export function AddEventForm({
             </Button>
           </div>
 
-          {notWiredNotice && (
-            <p role="status" className={styles.notWired}>
-              Events can’t be saved yet — coming with editable schedules.
+          {submitted && (
+            <p role="status" className={styles.srOnly}>
+              Event added.
             </p>
           )}
         </form>

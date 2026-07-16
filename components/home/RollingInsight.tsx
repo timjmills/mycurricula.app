@@ -14,10 +14,7 @@
 
 import { useEffect, useState } from "react";
 import type { Insight } from "@/lib/home/insights";
-import {
-  INSIGHT_CATEGORY_LABELS,
-  loadInsightExpand,
-} from "@/lib/home/insights";
+import { INSIGHT_CATEGORY_LABELS } from "@/lib/home/insights";
 import styles from "./home.module.css";
 
 // Fisher–Yates shuffle (returns a new array). Client-only: never runs during
@@ -62,10 +59,6 @@ export function RollingInsight({
   const [order, setOrder] = useState<Insight[]>(insights);
   const [i, setI] = useState(0);
   const [showMore, setShowMore] = useState(false);
-  // The "Read more" prose is code-split (lib/home/insights.expand.json — ~2/3
-  // of the bank's bytes, click-only) and lazy-loaded when the reader expands;
-  // null until loaded and for quotes without prose.
-  const [expandText, setExpandText] = useState<string | null>(null);
   // "off" while auto-rotating (ambient — don't interrupt AT users); raised to
   // "polite" only when the user presses prev/next.
   const [live, setLive] = useState<"off" | "polite">("off");
@@ -80,30 +73,6 @@ export function RollingInsight({
 
   // Collapse the "Read more" paragraph whenever the quote changes.
   useEffect(() => setShowMore(false), [i]);
-
-  // A new quote invalidates any previously loaded expansion prose.
-  useEffect(() => {
-    setExpandText(null);
-  }, [i, order]);
-
-  // Fetch the expansion prose when the reader opens "Read more". The async-
-  // chunk import is cached, so later opens resolve from memory; the cancelled
-  // guard drops a stale resolve if the quote rotates mid-fetch. (Derived
-  // in-effect from order/i because `cur` is computed after the early return
-  // below — hooks must stay above it.)
-  useEffect(() => {
-    if (!showMore || order.length === 0) return;
-    const count = order.length;
-    const current = order[((i % count) + count) % count];
-    if (current?.hasExpand !== true) return;
-    let cancelled = false;
-    void loadInsightExpand(current.id).then((text) => {
-      if (!cancelled) setExpandText(text);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [showMore, i, order]);
 
   useEffect(() => {
     if (typeof window === "undefined" || order.length <= 1) return;
@@ -132,12 +101,8 @@ export function RollingInsight({
         {`“${cur.quote}”`}
       </blockquote>
       <figcaption className={styles.insightCite}>
-        {cur.author && (
-          <span className={styles.insightAuthor}>{cur.author}</span>
-        )}
-        {cur.work && (
-          <span className={styles.insightWork}>,&nbsp;{cur.work}</span>
-        )}
+        {cur.author && <span className={styles.insightAuthor}>{cur.author}</span>}
+        {cur.work && <span className={styles.insightWork}>,&nbsp;{cur.work}</span>}
         {cur.url && /^https?:\/\//i.test(cur.url) && (
           <a
             className={styles.insightLink}
@@ -149,7 +114,7 @@ export function RollingInsight({
           </a>
         )}
       </figcaption>
-      {cur.hasExpand && (
+      {cur.expand && (
         <div className={styles.insightExpandWrap}>
           <button
             type="button"
@@ -159,9 +124,7 @@ export function RollingInsight({
           >
             {showMore ? "Show less" : "Read more"}
           </button>
-          {showMore && expandText && (
-            <p className={styles.insightExpand}>{expandText}</p>
-          )}
+          {showMore && <p className={styles.insightExpand}>{cur.expand}</p>}
         </div>
       )}
       {n > 1 && (

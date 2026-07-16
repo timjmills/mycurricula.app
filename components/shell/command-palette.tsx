@@ -99,19 +99,17 @@ interface ThemeActionDef {
   keywords: string[];
 }
 
-// v2 theme set (lockstep with lib/theme.tsx APP_THEMES).
 const THEME_ACTIONS: readonly ThemeActionDef[] = [
-  { theme: "clear", label: "Theme: Clear", keywords: ["light", "resting", "default"] },
+  { theme: "paper", label: "Theme: Paper", keywords: ["cream", "light"] },
+  { theme: "cloud", label: "Theme: Cloud", keywords: ["white", "light"] },
   {
     theme: "night",
     label: "Theme: Night",
     keywords: ["dark", "dark mode", "low light"],
   },
-  { theme: "honey", label: "Theme: Honey", keywords: ["gold", "amber", "warm"] },
-  { theme: "blossom", label: "Theme: Blossom", keywords: ["pink"] },
   { theme: "mint", label: "Theme: Mint", keywords: ["green"] },
   { theme: "sky", label: "Theme: Sky", keywords: ["blue"] },
-  { theme: "off", label: "Theme: Off (Photo)", keywords: ["photo", "ungraded", "original"] },
+  { theme: "blossom", label: "Theme: Blossom", keywords: ["pink"] },
   {
     theme: "system",
     label: "Theme: Follow system",

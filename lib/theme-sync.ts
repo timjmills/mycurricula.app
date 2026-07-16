@@ -1,4 +1,4 @@
-// theme-sync.ts — best-effort cross-device sync for the persisted appearance axes.
+// theme-sync.ts — best-effort cross-device sync for the three theme axes.
 //
 // WHAT THIS IS: a thin, OPTIONAL bridge between lib/theme.tsx's local state and
 // the `public.teacher_preferences` table (migration
@@ -35,54 +35,20 @@
 // an unrecognized value is dropped, never applied.
 
 import { createClient } from "@/lib/supabase/client";
-import type {
-  ThemeFrame,
-  ThemeGlass,
-  ThemeBg,
-  ThemeDim,
-  ThemeSetting,
-  ThemeStyle,
-  ThemePalette,
-} from "./theme-values";
-import {
-  isThemeFrame,
-  isThemeGlass,
-  isThemeBg,
-  isThemeDim,
-  isThemeSetting,
-  isThemeStyle,
-  isThemePalette,
-} from "./theme-values";
+import type { ThemeSetting, ThemeStyle, ThemePalette } from "./theme";
+import { isThemeSetting, isThemeStyle, isThemePalette } from "./theme";
 
-/**
- * The synced axes, in the shape the provider consumes — the FULL persisted
- * snapshot (W3.1b widening): the five v2 axes plus the deprecated v1 compat
- * pair (kept so a v1 rollback finds its values cross-device, and so the row
- * mirrors lib/theme-values.ts ThemeAxesSnapshot / the mc-theme-axes cookie
- * exactly). Derived/runtime state (tone, canvas) and the per-view local UI
- * keys (cc_editmode / cc_pblayout / cc_deLeftW) are EXCLUDED by design
- * (WAVE-3-PLAN C5).
- */
+/** The three synced axes, in the shape the provider consumes. */
 export interface RemoteThemePrefs {
-  frame: ThemeFrame;
-  glass: ThemeGlass;
-  bg: ThemeBg;
   theme: ThemeSetting;
-  dim: ThemeDim;
-  /** @deprecated v1 compat axis — synced for rollback fidelity. */
   style: ThemeStyle;
-  /** @deprecated v1 compat axis — synced for rollback fidelity. */
   palette: ThemePalette;
 }
 
 /**
  * Outcome of a remote-preferences read, DISCRIMINATED so the caller can tell
  * three states apart that a bare `null` would conflate:
- *   • `loaded`      — a row exists; apply its (validated) axes. Carries the
- *                     row's `updated_at` as epoch ms (`0` if absent/unparsable)
- *                     so the provider can LAST-WRITER-WINS against the local
- *                     write stamp — a stale row must never clobber a fresher
- *                     local change (the W3.1 ordering fix).
+ *   • `loaded`      — a row exists; apply its (validated) axes.
  *   • `empty`       — the query SUCCEEDED and the teacher has no row yet. Safe to
  *                     SEED the row from local values (their pre-sync look).
  *   • `unavailable` — sync is off, there is no session, or the read FAILED. The
@@ -93,7 +59,7 @@ export interface RemoteThemePrefs {
  * "empty" (not an "unavailable") may trigger a seeding write.
  */
 export type LoadRemoteResult =
-  | { kind: "loaded"; prefs: Partial<RemoteThemePrefs>; updatedAt: number }
+  | { kind: "loaded"; prefs: Partial<RemoteThemePrefs> }
   | { kind: "empty" }
   | { kind: "unavailable" };
 
@@ -132,15 +98,9 @@ export async function loadRemotePrefs(): Promise<LoadRemoteResult> {
     } = await supabase.auth.getUser();
     if (!user) return { kind: "unavailable" };
 
-    // NOTE (deploy sequencing, W3-HANDOFF task #13): the frame/glass/bg/dim
-    // columns land on prod only with the launch migration
-    // (20260624120000_v2_theme_axes.sql). Against a pre-migration database this
-    // SELECT errors ("column does not exist") → `unavailable` → sync no-ops,
-    // which is today's expected dev-vs-prod behavior; it heals itself the
-    // moment the migration applies. Never seed/write around that state.
     const { data, error } = await supabase
       .from("teacher_preferences")
-      .select("frame, glass, bg, theme, dim, theme_style, theme_palette, updated_at")
+      .select("theme, theme_style, theme_palette")
       .eq("teacher_id", user.id)
       .maybeSingle();
 
@@ -154,23 +114,10 @@ export async function loadRemotePrefs(): Promise<LoadRemoteResult> {
     if (!data) return { kind: "empty" }; // query OK, no saved row yet
 
     const prefs: Partial<RemoteThemePrefs> = {};
-    if (isThemeFrame(data.frame)) prefs.frame = data.frame;
-    if (isThemeGlass(data.glass)) prefs.glass = data.glass;
-    if (isThemeBg(data.bg)) prefs.bg = data.bg;
     if (isThemeSetting(data.theme)) prefs.theme = data.theme;
-    if (isThemeDim(data.dim)) prefs.dim = data.dim;
     if (isThemeStyle(data.theme_style)) prefs.style = data.theme_style;
     if (isThemePalette(data.theme_palette)) prefs.palette = data.theme_palette;
-    // updated_at is trigger-maintained so it is always present in practice; an
-    // absent/unparsable value degrades to 0 (epoch) — still newer than a device
-    // that has never written locally, still older than any real local stamp.
-    const updatedAtMs =
-      typeof data.updated_at === "string" ? Date.parse(data.updated_at) : NaN;
-    return {
-      kind: "loaded",
-      prefs,
-      updatedAt: Number.isFinite(updatedAtMs) ? updatedAtMs : 0,
-    };
+    return { kind: "loaded", prefs };
   } catch (err) {
     // Network / client-construction / unexpected shape — sync is best-effort.
     console.debug("theme-sync: load error", err);
@@ -187,7 +134,7 @@ export async function loadRemotePrefs(): Promise<LoadRemoteResult> {
  * later saves update it (updated_at is maintained by the DB trigger). The
  * teacher_id is taken from the LIVE session, never from the caller, so the write
  * targets the caller's own row by construction and the owner RLS policy can
- * never reject a well-formed call. The full snapshot is written each time
+ * never reject a well-formed call. The full triple is written each time
  * (debounced upstream), keeping the row a complete snapshot of the current look.
  */
 export async function saveRemotePrefs(prefs: RemoteThemePrefs): Promise<void> {
@@ -202,11 +149,7 @@ export async function saveRemotePrefs(prefs: RemoteThemePrefs): Promise<void> {
     const { error } = await supabase.from("teacher_preferences").upsert(
       {
         teacher_id: user.id,
-        frame: prefs.frame,
-        glass: prefs.glass,
-        bg: prefs.bg,
         theme: prefs.theme,
-        dim: prefs.dim,
         theme_style: prefs.style,
         theme_palette: prefs.palette,
       },

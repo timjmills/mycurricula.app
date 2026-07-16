@@ -86,9 +86,8 @@ import { detectFirstFork } from "@/lib/undo-toast-messages";
 /** Maximum number of undo steps retained. */
 export const HISTORY_LIMIT = 50;
 
-/** Milliseconds within which same-key text edits are coalesced into one step.
- *  Exported for the unit tests (tests/planner-store.test.ts). */
-export const COALESCE_WINDOW_MS = 700;
+/** Milliseconds within which same-key text edits are coalesced into one step. */
+const COALESCE_WINDOW_MS = 700;
 
 // ── Document model ─────────────────────────────────────────────────────────
 
@@ -204,10 +203,7 @@ interface CoalesceFields {
 type MoveLessonAction = {
   type: "moveLesson";
   id: string;
-  // `time` (W3.8c) re-labels the lesson's time slot as part of a cross-period
-  // move on the Week edit board. It is a CONTENT relabel, not a placement
-  // change, so — unlike day/subject/week — it never sets the `moved` flag.
-  patch: { day?: number; subject?: SubjectId; week?: number; time?: string };
+  patch: { day?: number; subject?: SubjectId; week?: number };
 };
 
 type SetLessonStatusAction = {
@@ -406,11 +402,7 @@ type PersistableSectionAction =
   | EditSectionAction
   | MoveSectionResourceAction
   | AddSectionResourceAction
-  | RemoveSectionResourceAction
-  // Edits to an EXISTING section resource persist too (audit: this one was
-  // missed when the tee was introduced — the UI updated but the change was
-  // lost on reload).
-  | EditSectionResourceAction;
+  | RemoveSectionResourceAction;
 
 // ── History control actions ──────────────────────────────────────────────
 
@@ -447,19 +439,8 @@ type SetCatalogAction = { type: "setCatalog"; catalog: PlannerCatalog };
  *  only ever ADDS keys (existing descriptions win, so a hydrate never loses to
  *  a stale merge). */
 type MergeStandardsAction = { type: "mergeStandards"; map: StandardsMap };
-/** Insert a freshly-created lesson into the document (W3.7). The payload is
- *  the FULL Lesson RETURNED by the data source's createLesson — carrying the
- *  source-minted id — never an optimistic reducer-side uid. That ordering is
- *  the whole point: the duplicateLesson tee corrupted rows precisely because
- *  the backend minted an id ≠ the reducer's optimistic one (see the addLesson
- *  mutator below). Handled as a NON-HISTORY branch in historyReducer — the
- *  row already exists at the source when this dispatches, so an undo that
- *  removed it from the doc would silently desync from the backend. */
-type AddLessonAction = { type: "addLesson"; lesson: Lesson };
 
-/** Exported for the unit tests (tests/planner-store.test.ts) — runtime
- *  dispatch still flows only through the provider's mutator callbacks. */
-export type PlannerAction =
+type PlannerAction =
   | MoveLessonAction
   | SetLessonStatusAction
   | EditLessonAction
@@ -489,8 +470,7 @@ export type PlannerAction =
   | HydrateAction
   | SetHydrationAction
   | SetCatalogAction
-  | MergeStandardsAction
-  | AddLessonAction;
+  | MergeStandardsAction;
 
 // ── Human labels for undo/redo tooltips ──────────────────────────────────
 
@@ -544,11 +524,6 @@ function labelFor(action: PlannerAction): string {
       return "Move resource";
     case "toggleSectionWebsite":
       return "Toggle website";
-    case "addLesson":
-      // Unreachable today — addLesson early-returns in historyReducer as a
-      // non-history action (W3.7) — kept so the label exists if the action
-      // ever joins the undo stack.
-      return "Add lesson";
     default:
       return "Edit";
   }
@@ -760,11 +735,6 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
         const nextDay = action.patch.day ?? l.day;
         const nextSubject = action.patch.subject ?? l.subject;
         const nextWeek = action.patch.week ?? l.week;
-        // `time` (W3.8c cross-period re-time) is a content relabel applied
-        // verbatim — mirroring editLesson's reducer, which spreads its patch
-        // WITHOUT touching any flag. So `sameSlot` (and thus `moved`) stays
-        // day/subject/week-based only: a time-only patch never sets `moved`.
-        const nextTime = action.patch.time ?? l.time;
         const sameSlot =
           nextDay === l.day && nextSubject === l.subject && nextWeek === l.week;
         return {
@@ -772,7 +742,6 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
           day: nextDay,
           subject: nextSubject,
           week: nextWeek,
-          time: nextTime,
           moved: sameSlot
             ? l.moved
             : nextWeek !== l.week
@@ -859,30 +828,6 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
         ...doc,
         lessons,
         sections: { ...doc.sections, [copy.id]: copiedSections },
-      };
-    }
-
-    case "addLesson": {
-      // W3.7 — append the SOURCE-CREATED lesson (its id is already the real,
-      // source-minted one; see AddLessonAction). Lessons live in a flat array
-      // and every view filters/sorts by week/day, so appending places the
-      // lesson correctly for its slot — mirroring how duplicateWeek's copies
-      // land. Idempotence guard: a double dispatch (re-entry, StrictMode
-      // replay) must not insert the same id twice.
-      if (doc.lessons.some((l) => l.id === action.lesson.id)) return doc;
-      return {
-        ...doc,
-        lessons: [...doc.lessons, action.lesson],
-        // Seed the default-template sections from the lesson's own (empty)
-        // resources — the same shape the mock source seeds and the reducer
-        // uses for lazily-added lessons (ensureSections).
-        sections: {
-          ...doc.sections,
-          [action.lesson.id]: buildInitialSections(
-            action.lesson.id,
-            action.lesson.resources,
-          ),
-        },
       };
     }
 
@@ -1199,11 +1144,6 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
       const copy: LessonSectionContent = {
         ...source,
         id: uid("lsec"),
-        // " copy" suffix (W3.8 gate fix, mock parity): an identical heading
-        // would give two sections the same accessible name — ambiguous for
-        // AT users on both this editor's banners and /daily's phase rows.
-        // Appended as a trailing TEXT node, safe after any rich-HTML heading.
-        heading: `${source.heading} copy`,
         resources: source.resources.map((r) => {
           counter += 1;
           return { ...r, id: `res-${ts}-${counter}` };
@@ -1320,9 +1260,7 @@ function applyDocAction(doc: PlannerDoc, action: PlannerAction): PlannerDoc {
 // ── History reducer ────────────────────────────────────────────────────────
 // Wraps applyDocAction with undo/redo and coalescing logic.
 
-/** Exported (with `historyReducer`) for the unit tests — the reducer is a
- *  pure function, so tests drive it directly without mounting the provider. */
-export interface HistoryReducerState {
+interface HistoryReducerState {
   history: HistoryState;
   /** The coalesceKey of the last dispatched action (for burst detection). */
   lastCoalesceKey: string | null;
@@ -1357,10 +1295,7 @@ const INITIAL_REDUCER_STATE: HistoryReducerState = {
   catalog: pickInitialCatalog(),
 };
 
-// Exported for the unit tests (tests/planner-store.test.ts): the reducer is
-// pure (no mutation, no side effects), so coalescing / history-limit /
-// section-guard behavior is testable without mounting the provider.
-export function historyReducer(
+function historyReducer(
   state: HistoryReducerState,
   action: PlannerAction,
 ): HistoryReducerState {
@@ -1475,50 +1410,6 @@ export function historyReducer(
     }
     if (!added) return state;
     return { ...state, catalog: { ...state.catalog, standards: merged } };
-  }
-
-  // ── Add lesson (W3.7 — NON-HISTORY content change) ───────────────────
-  // Insert the source-created lesson into the present doc WITHOUT pushing an
-  // undo entry. DECISION (locked for this wave): adding a lesson is not
-  // undoable — the row already exists at the data source when this action
-  // dispatches (the source call IS the persistence), so an undo that removed
-  // it from the doc would desync from the backend (the lesson would
-  // resurrect on reload). Both history stacks need care (W3.7 audit #2 +
-  // re-pass):
-  //   • `future` MUST clear — like every content mutation, a new add
-  //     invalidates the redo snapshots; they are full-doc captures that
-  //     predate the source-created lesson, so redoing one would silently
-  //     hide a row that still exists at the backend (audit repro: undo →
-  //     add → redo made the fresh lesson vanish).
-  //   • `past` MUST be RECONCILED, not left stale — the same action is
-  //     applied to every past snapshot so any undo destination still
-  //     contains the persisted lesson (mirror repro: add → undo hid it).
-  //     The lesson exists at the backend regardless of undo position, so
-  //     snapshots must stay truthful to persistence. Safe: applyDocAction's
-  //     addLesson id-idempotence guard returns the same doc ref when the
-  //     lesson is already present, and no undo entry is pushed (labels are
-  //     action metadata, not doc-derived — nothing else in HistoryEntry
-  //     needs syncing).
-  if (action.type === "addLesson") {
-    const nextDoc = applyDocAction(state.history.present, action);
-    if (nextDoc === state.history.present) return state; // idempotence no-op
-    return {
-      ...state,
-      history: {
-        ...state.history,
-        past: state.history.past.map((entry) => ({
-          ...entry,
-          doc: applyDocAction(entry.doc, action),
-        })),
-        present: nextDoc,
-        future: [],
-      },
-      lastCoalesceKey: null,
-      lastCoalesceTs: 0,
-      // lastChange drives scrollPlannerItemIntoView in the views, so the
-      // fresh row scrolls into view exactly like any other mutation.
-      lastChange: { kind: "addLesson", lessonIds: [action.lesson.id] },
-    };
   }
 
   // ── Content mutations ────────────────────────────────────────────────
@@ -1715,14 +1606,10 @@ export interface PlannerValue {
    * Move a lesson to a new day, subject, or week.
    * Sets `moved` to "same-week" or "across-weeks" as appropriate.
    * Also prunes the source cell's CellLayout when the lesson leaves a cell.
-   * `time` (W3.8c) re-labels the lesson's time slot for a cross-period move on
-   * the Week edit board — a CONTENT relabel that never sets `moved`. It applies
-   * reducer-locally ONLY (no persist tee: `time` is unmodelled in the DB and a
-   * time-only updateLesson call would spuriously fork — see the mutator body).
    */
   moveLesson: (
     id: string,
-    patch: { day?: number; subject?: SubjectId; week?: number; time?: string },
+    patch: { day?: number; subject?: SubjectId; week?: number },
   ) => void;
   /**
    * Set a lesson's completion status (not_done / done / carried / skipped / partial).
@@ -1749,30 +1636,6 @@ export interface PlannerValue {
    * Fully undoable (one undo step labelled "Duplicate week N").
    */
   duplicateWeek: (sourceWeek: number, targetWeek: number) => void;
-  /**
-   * Create a brand-new PERSONAL lesson on a week/day slot (W3.7 — the store's
-   * first real create; the daily add-lesson affordances call this).
-   * AWAIT-THEN-DISPATCH, the REVERSE of the optimistic mutators above, and
-   * deliberately so: it awaits the data source's createLesson (mock resolves
-   * instantly; Supabase inserts a personal_authored_lessons row) and then
-   * dispatches the RETURNED lesson with its source-minted id. No optimistic
-   * uid, no persist() tee — the source call IS the persistence. (The
-   * optimistic-uid + fire-and-forget pattern is FORBIDDEN here: it corrupted
-   * rows for duplicateLesson — see that mutator's finding #10 note.)
-   * Defaults: title "New lesson", no unit, empty objective. `objective`
-   * rides INSIDE the create (W3.7 audit #5) — it reaches the source's
-   * createLesson atomically instead of a fire-and-forget editLesson tee
-   * that could silently drop it. Resolves to the created lesson so
-   * callers can select/open it, or null on failure (never throws into the
-   * UI). NOT undoable this wave — see the reducer's addLesson branch.
-   */
-  addLesson: (input: {
-    subject: Lesson["subject"];
-    week: number;
-    day: number;
-    title?: string;
-    objective?: string;
-  }) => Promise<Lesson | null>;
   /**
    * Record whether a save was targeting personal or core.
    * "personal" sets modified=true and isPersonal=true (lazy fork).
@@ -2335,111 +2198,22 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [],
   );
 
-  // ── Serialized (latest-wins) section persistence ────────────────────────
-  // W3.8 gate fix (Codex HIGH — persistence ordering race): the lesson editor
-  // autosaves per keystroke, and EVERY section persist is a FULL
-  // `replace_lesson_sections` swap. Firing those through the fire-and-forget
-  // `persist()` tee makes them UNORDERED on the wire — a slow early request
-  // ("a") can commit AFTER a later one ("abc"), leaving the DB stale relative
-  // to the UI with no error surfaced.
-  //
-  // Fix: per-lesson LATEST-WINS serialization. Each lessonId keeps at most
-  //   • ONE in-flight RPC, and
-  //   • ONE pending "latest snapshot" slot.
-  // While a write is in flight, newer snapshots simply OVERWRITE the pending
-  // slot (each payload is the complete resolved section list, so intermediate
-  // states are safely skippable); when the in-flight settles — success OR
-  // failure — the pending snapshot (if any) is sent next. At most one RPC per
-  // lesson is ever outstanding, so commits land in send order and the final
-  // DB state always equals the last UI state. No timers: a trailing debounce
-  // would merely reduce write volume; the serialization IS the correctness
-  // fix (and a debounce alone would NOT fix ordering).
-  //
-  // Identity (ownerId / saveTarget) is captured INTO the snapshot at enqueue
-  // time, so a mid-flight sign-out or a Personal↔Team toggle flip never
-  // retargets an already-authored snapshot.
-  const sectionWriteQueueRef = useRef(
-    new Map<
-      string,
-      {
-        inFlight: boolean;
-        pending: {
-          sections: LessonSectionContent[];
-          ownerId: string;
-          saveTarget: "personal" | "core";
-        } | null;
-      }
-    >(),
-  );
-
-  const persistSectionsSerialized = useCallback(
-    (lessonId: string, sections: LessonSectionContent[]): void => {
-      // Same gating as persist(): flag OFF / no session → no-op (prototype
-      // mode is reducer-local, byte-identical to the pre-seam behavior).
-      if (!isPlannerSupabaseConfigured()) return;
-      if (!ownerIdRef.current) return;
-
-      let entry = sectionWriteQueueRef.current.get(lessonId);
-      if (!entry) {
-        entry = { inFlight: false, pending: null };
-        sectionWriteQueueRef.current.set(lessonId, entry);
-      }
-      const queued = entry;
-      // Latest wins: overwrite (never queue behind) the pending snapshot.
-      queued.pending = {
-        sections,
-        ownerId: ownerIdRef.current,
-        saveTarget: saveTargetRef.current,
-      };
-      if (queued.inFlight) return; // the settle handler drains the slot
-
-      const sendNext = (): void => {
-        const next = queued.pending;
-        if (!next) {
-          queued.inFlight = false;
-          // Settled with nothing pending — drop the map entry so a long
-          // editing session doesn't retain one slot per touched lesson
-          // (audit re-pass Low); a later write simply re-creates it.
-          sectionWriteQueueRef.current.delete(lessonId);
-          return;
-        }
-        queued.pending = null;
-        queued.inFlight = true;
-        void plannerClient
-          .setSections(lessonId, next.sections, next.ownerId, next.saveTarget)
-          .catch((err: unknown) => {
-            // Mirror persist()'s error contract: reducer state stands and the
-            // dropped write is surfaced without blocking the UI. A newer
-            // pending snapshot (drained below) supersedes the failed payload.
-            console.error("[planner] persist 'setSections' failed", err);
-          })
-          .then(() => {
-            queued.inFlight = false;
-            sendNext();
-          });
-      };
-      sendNext();
-    },
-    [],
-  );
-
   // ── Granular section-mutator persistence ───────────────────────────────
   // Several section reducer actions (reorder / add / remove / duplicate section,
   // move resource) mutate `present.sections[lessonId]` but had NO dedicated
   // persist verb — so the edit was lost on reload. This helper re-applies the
   // SAME pure transform the reducer runs (applyDocAction) to the CURRENT
-  // document, then tees the RESULTING section list through the serialized
-  // setSections queue above so the whole new arrangement is durable AND
-  // ordered. The payload is exactly the reducer's resulting
-  // `present.sections[lessonId]` (via ensureSections on the next doc), so the
-  // persisted set matches what the UI shows.
+  // document, then tees the RESULTING section list through `setSections` so the
+  // whole new arrangement is durable. The payload is exactly the reducer's
+  // resulting `present.sections[lessonId]` (via ensureSections on the next doc),
+  // so the persisted set matches what the UI shows.
   //
-  // FORKING (#14): the serialized queue captures `saveTargetRef.current` — the
-  // live Personal | Team-Curriculum toggle — so a Team/Master-mode section edit
+  // FORKING (#14): the persist passes `saveTargetRef.current` — the live
+  // Personal | Team-Curriculum toggle — so a Team/Master-mode section edit
   // writes the SHARED team section rows (RLS-gated, throws on denial) instead of
   // being forced into a personal fork. This mirrors updateLesson/moveLesson and
   // is the regression the stale Codex branch introduced by dropping saveTarget.
-  // With the Supabase flag OFF the queue is a no-op, so this is reducer-local.
+  // With the Supabase flag OFF `persist` is a no-op, so this is reducer-local.
   const persistSectionAction = useCallback(
     (action: PersistableSectionAction): void => {
       const nextDoc = applyDocAction(presentRef.current, action);
@@ -2451,12 +2225,15 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       // than re-reading the stale pre-render doc and clobbering this change. The
       // next render resets presentRef to the committed reducer state.
       presentRef.current = nextDoc;
-      persistSectionsSerialized(
+      persist(
+        "setSections",
         action.lessonId,
         ensureSections(nextDoc.sections, action.lessonId),
+        ownerIdRef.current ?? "",
+        saveTargetRef.current,
       );
     },
-    [persistSectionsSerialized],
+    [persist],
   );
 
   // ── Mutation callbacks ────────────────────────────────────────────────
@@ -2464,20 +2241,9 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const moveLesson = useCallback(
     (
       id: string,
-      patch: { day?: number; subject?: SubjectId; week?: number; time?: string },
+      patch: { day?: number; subject?: SubjectId; week?: number },
     ) => {
       dispatchRef.current({ type: "moveLesson", id, patch });
-      // W3.8c — a `time` relabel applies REDUCER-LOCALLY ONLY (the dispatch
-      // above; still one action = one undo step). It is deliberately NOT teed
-      // to persistence: `time` is unmodelled in the DB — every
-      // supabase-source updateLesson write branch skips it ("derived/
-      // unmodelled"), yet `time` sits in that source's contentKeys, so a
-      // time-only updateLesson call would take the fork path with an EMPTY
-      // patch — spuriously forking the lesson while persisting nothing
-      // (Codex gate, round 2). Until a lesson time/period column lands
-      // (Phase 1B, with the per-school timetable), a cross-period re-time is
-      // durable in mock mode and session-local when the Supabase planner
-      // flag is on; the day move below persists either way.
       if (patch.week != null || patch.day != null) {
         // Persist the lesson's RESOLVED final slot, not the bare patch. Call
         // sites (e.g. the weekly board) pass only { day }; sending that raw lets
@@ -2570,87 +2336,6 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
     [],
   );
 
-  const addLesson = useCallback(
-    async (input: {
-      subject: Lesson["subject"];
-      week: number;
-      day: number;
-      title?: string;
-      objective?: string;
-    }): Promise<Lesson | null> => {
-      // W3.7 — AWAIT-THEN-DISPATCH. The duplicate* mutators above document
-      // why the usual optimistic tee is FORBIDDEN for creates: the backend
-      // mints its own id, so an optimistic reducer uid writes a corrupt/
-      // orphaned row. Here the source resolves FIRST and the reducer receives
-      // the REAL lesson; there is no persist() tee because the createLesson
-      // call is itself the persistence (mock: instant in-memory append).
-      //
-      // Identity plumbing mirrors persist(): ownerId from ownerIdRef (the
-      // live auth uid), grade from gradeLevelIdRef (captured during hydrate).
-      // In backend mode both must be resolved before a row can be keyed —
-      // bail to null instead of writing a mis-keyed row (persist()'s "no
-      // session → never send null/slug" guard, extended to the grade).
-      if (isPlannerSupabaseConfigured()) {
-        if (!ownerIdRef.current || !gradeLevelIdRef.current) {
-          console.debug(
-            "[planner] addLesson skipped — owner/grade not resolved yet",
-          );
-          return null;
-        }
-      }
-      // W3.7 audit #1 — capture identity BEFORE the await. The refs are
-      // live: the owner can sign out/switch and the grade can re-hydrate
-      // while createLesson is in flight, and dispatching the resolved row
-      // into the NEW identity's doc would graft another owner's lesson into
-      // it. Snapshot both now; re-check after the await and drop the
-      // dispatch on any mismatch (the row is keyed to the captured identity
-      // and will surface on that identity's next hydrate).
-      const capturedOwnerId = ownerIdRef.current;
-      const capturedGradeLevelId = gradeLevelIdRef.current;
-      try {
-        const lesson = await plannerClient.createLesson(
-          {
-            gradeLevelId: capturedGradeLevelId ?? "",
-            subject: input.subject,
-            // No unit yet — a fresh lesson starts unfiled. The Supabase
-            // source maps "" → null unit_id (nullable FK); the mock stores
-            // it verbatim.
-            unit: "",
-            week: input.week,
-            day: input.day,
-            title: input.title ?? "New lesson",
-            objective: input.objective,
-          },
-          capturedOwnerId ?? "",
-          capturedGradeLevelId ?? undefined,
-        );
-        // W3.7 audit #1 — stale-identity guard. Same null contract as the
-        // bail above: callers already branch on null, so a skipped dispatch
-        // reads as "create didn't land here" (it landed for the captured
-        // identity, not this one).
-        if (
-          ownerIdRef.current !== capturedOwnerId ||
-          gradeLevelIdRef.current !== capturedGradeLevelId
-        ) {
-          console.debug(
-            "[planner] addLesson resolved after owner/grade changed — dispatch skipped",
-          );
-          return null;
-        }
-        dispatchRef.current({ type: "addLesson", lesson });
-        return lesson;
-      } catch (err) {
-        // Never throw into the UI — callers branch on null. console.debug
-        // (not error): the persist tee's console.error convention is for
-        // writes whose optimistic state already renders; here nothing
-        // rendered, so the caller owns the user-facing signal.
-        console.debug("[planner] addLesson failed", err);
-        return null;
-      }
-    },
-    [],
-  );
-
   const setSaveTarget = useCallback(
     (id: string, target: "personal" | "core") => {
       dispatchRef.current({ type: "setSaveTarget", id, target });
@@ -2731,14 +2416,17 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
   const setSections = useCallback(
     (lessonId: string, next: LessonSectionContent[]) => {
       dispatchRef.current({ type: "setSections", lessonId, next });
-      // Routed through the SAME serialized per-lesson queue as the granular
-      // section mutators (a direct persist() here could interleave with the
-      // queued keystroke writes and re-introduce the ordering race). The
-      // queue captures the live saveTarget: "core" writes the shared team
-      // section rows (#14, RLS-gated), else a personal fork.
-      persistSectionsSerialized(lessonId, next);
+      // saveTarget threads the Personal | Team-Curriculum mode: "core" writes
+      // the shared team section rows (#14, RLS-gated), else a personal fork.
+      persist(
+        "setSections",
+        lessonId,
+        next,
+        ownerIdRef.current ?? "",
+        saveTargetRef.current,
+      );
     },
-    [persistSectionsSerialized],
+    [persist],
   );
 
   const reorderSections = useCallback(
@@ -2853,7 +2541,7 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       resourceId: string,
       patch: Partial<SectionResource>,
     ) => {
-      const action = {
+      dispatchRef.current({
         type: "editSectionResource",
         lessonId,
         sectionId,
@@ -2861,11 +2549,9 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
         patch,
         coalesceKey: `editResource:${lessonId}:${sectionId}:${resourceId}`,
         coalesceTs: Date.now(),
-      } as const;
-      dispatchRef.current(action);
-      persistSectionAction(action);
+      });
     },
-    [persistSectionAction],
+    [],
   );
 
   const removeSectionResource = useCallback(
@@ -3028,7 +2714,6 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       editLesson,
       duplicateLesson,
       duplicateWeek,
-      addLesson,
       setSaveTarget,
       setCellLayout,
       bumpLesson,
@@ -3078,7 +2763,6 @@ export function PlannerProvider({ children }: PlannerProviderProps): ReactNode {
       editLesson,
       duplicateLesson,
       duplicateWeek,
-      addLesson,
       setSaveTarget,
       setCellLayout,
       bumpLesson,

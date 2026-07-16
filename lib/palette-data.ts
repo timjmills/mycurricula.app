@@ -133,16 +133,10 @@ export const PALETTE_BY_ID: Record<string, PaletteSwatch> = Object.fromEntries(
 /** Subject → swatch id mapping. */
 export type SubjectMapping = Record<SubjectId, string>;
 
-// Default subject → swatch assignment (v1.3 — the FLAG-OFF v1 map). The 8 locked
-// subjects map onto the muted 15-slot brand scale per the design kit's data.js:
+// Default subject → swatch assignment (v1.3). The 8 locked subjects map onto
+// the muted 15-slot brand scale per the design kit's data.js:
 //   math→1  reading→10  writing→2  grammar→7  spelling→5  ufli→3
 //   explorers→13  sel→9
-//
-// This is the v1 mapping used by the context-driven `useSubjectColor` hook and
-// the global PaletteCssBridge `.cp-subj` rules. It MUST stay intact — changing
-// it would recolor flag-OFF v1. It mirrors the named-subject aliases baked into
-// app/tokens.css `:root` (--writing→subj-2, --spelling→subj-5, --ufli→subj-3,
-// --sel→subj-9, …), which are likewise the v1 static fallback.
 export const DEFAULT_SUBJECT_MAPPING: SubjectMapping = {
   math: "subj-1",
   reading: "subj-10",
@@ -154,35 +148,6 @@ export const DEFAULT_SUBJECT_MAPPING: SubjectMapping = {
   sel: "subj-9",
 };
 
-// ── The v2 subject → slot map (V2 Framework §4 — locked decision D1) ──────────
-// The v2 appearance engine remaps four subjects relative to the v1 map above:
-//   writing  subj-2 → subj-5  (pink)
-//   spelling subj-5 → subj-9  (periwinkle)
-//   ufli     subj-3 → subj-2  (apricot)
-//   sel      subj-9 → subj-12 (teal)
-// math / reading / grammar / explorers are unchanged.
-//
-// STAGING NOTE — this map is DEFINED here but not yet wired to any live
-// callsite. No surface in this wave reads it: every current resolveSubjectColor
-// call resolves the v1 DEFAULT_SUBJECT_MAPPING (see palette.tsx). The map is
-// applied when a v2 subject-color read path lands in a LATER stage; that path
-// MUST resolve it through the PURE `resolveSubjectColor(subjectId, type,
-// V2_SUBJECT_SLOTS)` and assign the result to inline `--sc/--sct/--sci` on each
-// card/lane. It must NEVER be fed into PaletteContext or a second
-// PaletteProvider — doing so would re-emit global `.cp-subj` rules with the v2
-// hues and recolor flag-OFF v1. Color remains a derived slug (subjects.color
-// stores e.g. "writing"); no lesson-row data is migrated by this map.
-export const V2_SUBJECT_SLOTS: SubjectMapping = {
-  math: "subj-1",
-  ufli: "subj-2",
-  writing: "subj-5",
-  grammar: "subj-7",
-  spelling: "subj-9",
-  reading: "subj-10",
-  sel: "subj-12",
-  explorers: "subj-13",
-};
-
 /** v1.3 brand-scale slot ids look like `subj-7`; legacy 20-pool ids are
  *  named hues (`ocean`, `coral`, …). Slots carry a matching `--subj-N-*`
  *  token family in app/tokens.css, which the dark (night) theme overrides. */
@@ -190,14 +155,8 @@ const SLOT_ID = /^subj-\d+$/;
 
 /**
  * Resolve a subject's color tokens for a given palette type and mapping.
- * Pure — usable on the server or outside React, and it NEVER reads
- * PaletteContext: the mapping is always an explicit argument. The flag-OFF v1
- * path reaches it via the `useSubjectColor` hook in `palette.tsx`, which wraps
- * it with the active PaletteContext (the v1 `DEFAULT_SUBJECT_MAPPING`). A future
- * v2 read path will call it DIRECTLY with the v2 map —
- * `resolveSubjectColor(subjectId, type, V2_SUBJECT_SLOTS)` — and assign the
- * result to inline `--sc/--sct/--sci`, so the v2 remap never touches context
- * and cannot recolor v1. (No such callsite exists yet — see V2_SUBJECT_SLOTS.)
+ * Pure — usable on the server or outside React. The `useSubjectColor`
+ * hook in `palette.tsx` wraps this with the active PaletteContext.
  *
  * The returned values are CSS color EXPRESSIONS — `var(--token)` references
  * (for v1.3 slot swatches, so the night theme's token overrides flow through)

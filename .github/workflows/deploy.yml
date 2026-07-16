@@ -91,15 +91,6 @@ jobs:
           NEXT_PUBLIC_TEACH_USE_SUPABASE: ${{ secrets.NEXT_PUBLIC_TEACH_USE_SUPABASE }}
           NEXT_PUBLIC_PLANNER_USE_SUPABASE: ${{ secrets.NEXT_PUBLIC_PLANNER_USE_SUPABASE }}
           NEXT_PUBLIC_THEME_SYNC: ${{ secrets.NEXT_PUBLIC_THEME_SYNC }}
-          # v2 redesign shell/router gate (plan §0.1). INLINED into the artifact
-          # by `next build`, so a rollback is a REBUILD — a Worker env change has
-          # no effect. Sourced from a repository variable so a flip is "change the
-          # variable + re-run this workflow" (a redeploy), NOT a code commit
-          # (§4a M2). Defaults to "1" if the variable is unset. Note "0" is
-          # currently rejected by scripts/check-v2-flag.mjs until the router
-          # gates land — the deploy will fail loudly rather than ship the
-          # half-gated state.
-          NEXT_PUBLIC_V2: ${{ vars.NEXT_PUBLIC_V2 || '1' }}
 
       - name: Summary
         if: always()

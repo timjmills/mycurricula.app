@@ -55,12 +55,6 @@ export function useSubjectColor(subjectId: SubjectId): SubjectColor {
  * Inject CSS variables so the existing `.cp-subj.math { --c: … }` classes
  * follow the chosen palette type. Mount once near the app root; renders a
  * single <style> element.
- *
- * Dual-emits both the v1 trio (`--c/--cl/--cd`) and the v2 trio
- * (`--sc/--sct/--sci`, consumed by v2 modes.css). Both trios derive from the
- * SAME context mapping, so this global rule remains the flag-OFF v1 path; the
- * v2 subject remap (V2_SUBJECT_SLOTS) is applied only at v2 callsites as inline
- * `--sc/--sct/--sci` via the pure resolveSubjectColor, never here.
  */
 export function PaletteCssBridge(): ReactNode {
   const { type, mapping } = useContext(PaletteContext);
@@ -77,22 +71,12 @@ export function PaletteCssBridge(): ReactNode {
       // per-slot overrides in tokens.css cascade through. Legacy swatches have
       // no token family, so they keep their hexes — with the tint fallback
       // mixing toward var(--tint-base) (white on light, dark surface on night).
-      // ADDITIVE v2 emission: alongside the v1 `--c/--cl/--cd` trio, also emit
-      // the v2 `--sc/--sct/--sci` trio (subject-color / subject-tint /
-      // subject-ink) that v2 modes.css consumes. v2 markup normally sets these
-      // inline per card via the pure resolveSubjectColor(_, _, V2_SUBJECT_SLOTS);
-      // this `.cp-subj` emission is a class-based fallback. It mirrors the SAME
-      // context mapping as the `--c/--cl/--cd` trio (not the v2 remap), so this
-      // global rule stays the flag-OFF path and never recolors v1 — the v2
-      // remap lives exclusively at the inline v2 callsites.
       if (/^subj-\d+$/.test(swatch.id)) {
         const c =
           type === "highlight"
             ? `var(--${swatch.id}-bright)`
             : `var(--${swatch.id})`;
-        const cl = `var(--${swatch.id}-tint)`;
-        const cd = `var(--${swatch.id}-ink)`;
-        return `.cp-subj.${s.id} { --c: ${c}; --cl: ${cl}; --cd: ${cd}; --sc: ${c}; --sct: ${cl}; --sci: ${cd}; }`;
+        return `.cp-subj.${s.id} { --c: ${c}; --cl: var(--${swatch.id}-tint); --cd: var(--${swatch.id}-ink); }`;
       }
       const tint =
         swatch.tint ??
@@ -102,7 +86,7 @@ export function PaletteCssBridge(): ReactNode {
           ? (swatch.bright ?? swatch.highlight)
           : swatch.normal;
       const cd = swatch.deep;
-      return `.cp-subj.${s.id} { --c: ${c}; --cl: ${tint}; --cd: ${cd}; --sc: ${c}; --sct: ${tint}; --sci: ${cd}; }`;
+      return `.cp-subj.${s.id} { --c: ${c}; --cl: ${tint}; --cd: ${cd}; }`;
     }).join("\n");
   }, [type, mapping]);
   return <style>{css}</style>;

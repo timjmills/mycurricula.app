@@ -10,13 +10,3 @@ export type { SaveTargetDialogProps } from "./save-target-dialog";
 // the existing <WeeklyGrid> unchanged in the center slot and reuses the
 // Daily-view IconRail + RightRail + PaneSplitter.
 export { WeeklyShell, DRAWER_MQ } from "./WeeklyShell";
-// v1 fallback shell (the pre-v2 3-panel Week: icon rail + WeeklyGrid + right
-// rail) — mounted by the weekly route when NEXT_PUBLIC_V2 is OFF. Verbatim copy
-// of master's WeeklyShell (live-on-prod v1), styled by WeeklyShellV1.module.css.
-export { WeeklyShellV1 } from "./WeeklyShellV1";
-// The Frame-B day-column traversal of the Week view — one column per school
-// day, each a vertical stack of that day's lessons across all subjects.
-export { WeekColumns } from "./WeekColumns";
-// The W3.8c period × day EDIT board — replaces the weekly canvas while Week is
-// in Edit mode; period-aligned or stacked, cross-day/cross-period drag.
-export { WeekEditBoard } from "./WeekEditBoard";

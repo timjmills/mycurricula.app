@@ -13,15 +13,10 @@
 // here now (removed from the top bar).
 
 import type { ReactNode } from "react";
-// W3.2 (D4): every SideNav navigation is an in-app route swap, so all four
-// anchors upgrade to the soft view-transition swap via the drop-in alias —
-// plain-Link semantics (new tab, modified clicks) are preserved by
-// TransitionLink itself.
-import { TransitionLink as Link } from "@/lib/view-transition";
+import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
-import { useViewEditMode } from "@/lib/edit-mode-state";
 import { NotebookSwitcher } from "@/components/nav";
 import styles from "./SideNav.module.css";
 
@@ -56,12 +51,7 @@ const SECTIONS: NavSection[] = [
       { label: "Catch-up", href: "/catch-up", icon: <FlagIcon /> },
       { label: "Schedule", href: "/schedule", icon: <ClockIcon /> },
       { label: "Archive", href: "/archive", icon: <ArchiveIcon /> },
-      {
-        label: "Teach",
-        href: "/boards",
-        icon: <BoardsIcon />,
-        match: "/boards",
-      },
+      { label: "Teach", href: "/boards", icon: <BoardsIcon />, match: "/boards" },
     ],
   },
 ];
@@ -69,10 +59,6 @@ const SECTIONS: NavSection[] = [
 export function SideNav(): ReactNode {
   const pathname = usePathname();
   const { currentUser } = useAppState();
-  // W3.8b force-reset: the Daily nav item resets Day's View↔Edit mode to
-  // View on the click (bundle B:11978/B:11986 — the Day nav item is a
-  // "back to View" affordance; deep links and content jumps never reset).
-  const { setEdit: setDayEdit } = useViewEditMode("Day");
 
   const isActive = (item: NavItem) => {
     const base = item.match ?? item.href;
@@ -122,11 +108,6 @@ export function SideNav(): ReactNode {
                 className={`${styles.item} ${active ? styles.itemActive : ""}`}
                 aria-current={active ? "page" : undefined}
                 title={item.label}
-                // Day force-reset (W3.8b, B:11978/B:11986): fires on the
-                // click, before TransitionLink's push — see hook note above.
-                onClick={
-                  item.href === "/daily" ? () => setDayEdit(false) : undefined
-                }
               >
                 {item.icon}
                 <span className={styles.label}>{item.label}</span>

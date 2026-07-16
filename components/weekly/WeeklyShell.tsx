@@ -116,24 +116,11 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
 import { IconRail, PaneSplitter, RightRail } from "@/components/daily";
-import { WeekNavigator } from "@/components/grid";
+import { WeeklyGrid, WeekNavigator } from "@/components/grid";
 import { WeeklyList } from "@/components/list";
 import { ScheduleTimeline } from "@/components/schedule";
 import { WeeklyViewControls } from "./WeeklyViewControls";
 import { WeeklyRailDrawer } from "./WeeklyRailDrawer";
-import { WeekColumns } from "./WeekColumns";
-// W5 — the three Week VIEW frames: WeekA (glass, read-only period×day grid),
-// WeekColumns (paper, day columns), and WeekC (color, subject lanes). Edit
-// mode uses WeekEditBoard, schedule uses ScheduleTimeline, and narrow/list uses
-// WeeklyList — so the v1 WeeklyGrid is no longer rendered from this shell at
-// all (see renderGridPanel).
-import { WeekA, WeekC } from "@/components/week-v2";
-import { WeekEditBoard } from "./WeekEditBoard";
-// W3.8 — the lesson-editor popup + the context that carries its opener down
-// to every WeeklyLessonCard (grid, columns, and board parents alike — see
-// the seam note in weekly-lesson-card.tsx).
-import { LessonModal } from "@/components/lesson-editor";
-import { OpenLessonEditorContext } from "./weekly-lesson-card";
 import { useAppState } from "@/lib/app-state";
 import {
   WeeklyScheduleProvider,
@@ -141,9 +128,6 @@ import {
 } from "@/lib/weekly-schedule-state";
 import { useDndSensors } from "@/lib/collapse-on-drag";
 import { usePlanner, scrollPlannerItemIntoView } from "@/lib/planner-store";
-import { useTheme } from "@/lib/theme";
-import { useViewEditMode } from "@/lib/edit-mode-state";
-import { usePhoneViewport } from "@/lib/use-phone-viewport";
 import { buildWeeklyLink, type WeeklyLink } from "@/lib/deep-links";
 import { CURRENT_WEEK } from "@/lib/mock";
 import type { Lesson } from "@/lib/types";
@@ -571,39 +555,7 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
     toggleCommentsPanel,
   } = useAppState();
   const { lessons, activeGradeId } = usePlanner();
-
-  // ── W3.8 — lesson-editor modal state ─────────────────────────────────
-  // The shell owns which lesson (if any) is open in the full-editor popup.
-  // The opener travels DOWN via <OpenLessonEditorContext> (provided around
-  // the whole body below) so every WeeklyLessonCard — under WeeklyGrid,
-  // WeekColumns, or the board — reaches it without per-parent prop
-  // threading. The modal renders ONCE, inside this shell root, so
-  // PlannerProvider / useAppState are in scope for its store calls.
-  const [modalLessonId, setModalLessonId] = useState<string | null>(null);
-  const openLessonEditor = useCallback((id: string): void => {
-    setModalLessonId(id);
-  }, []);
-  const closeLessonEditor = useCallback((): void => {
-    setModalLessonId(null);
-  }, []);
   const router = useRouter();
-  // W3.6 — the v2 frame axis picks the Week GRID traversal (see
-  // renderGridPanel): Frame B (paper) reads the week as day columns
-  // (WeekColumns, the bundle's "WeekB"); glass/color keep the subject×day
-  // matrix (WeeklyGrid), whose card shell already re-skins per frame.
-  const { frame } = useTheme();
-  // W3.8c — Week EDIT mode. Shared across nav by design (edit-mode-state's
-  // force-reset rule resets Day, never Week), so the board persists as the
-  // teacher moves between views. Drives the highest-precedence branch in
-  // renderGridPanel below.
-  // Phones are VIEW-ONLY (product decision 2026-07-10 — editing is a
-  // tablet+/desktop affordance). The chrome hides the View/Edit toggle on
-  // phones; this render-layer guard forces the view canvas so a persisted Week
-  // edit flag (Week edit persists across nav, unlike Day) can't strand a phone
-  // user in the board with no toggle to leave.
-  const { isEdit: rawIsEdit } = useViewEditMode("Week");
-  const isPhoneViewport = usePhoneViewport();
-  const isEdit = rawIsEdit && !isPhoneViewport;
 
   // Inline schedule-mode state (Subject↔Schedule + Lessons-only↔All). Lives
   // in localStorage so a teacher's choice survives across sessions. The
@@ -669,12 +621,8 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // Filter once per (lessons, week) change so the right rail's
   // ResourcesPanel sees a stable array identity until something actually
   // moves into / out of the week.
-  // Archived lessons are excluded: WeekColumns hides them from the lanes, so
-  // they must also vanish from every shell surface fed by this list (right
-  // rail, selected-lesson lookup, drawer, deep-link scroll) — otherwise a
-  // lesson archived while selected lingers in the rail/URL (audit Medium).
   const weekLessons = useMemo<Lesson[]>(
-    () => lessons.filter((l) => l.week === week && l.archived !== true),
+    () => lessons.filter((l) => l.week === week),
     [lessons, week],
   );
 
@@ -706,41 +654,6 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
         : null,
     [selectedLessonId, weekLessons],
   );
-
-  // A selection that BECOMES archived is cleared. weekLessons now excludes
-  // archived lessons, so selectedLesson resolves null — but the drawer opens
-  // on `selectedLessonId !== null` (below), which would hold it open on a
-  // lesson no visible weekly surface still shows (audit Medium). Two scopes:
-  //  • archived only (checked against the FULL store list) — a selection that
-  //    merely left the visible week (cross-week navigation) is untouched;
-  //  • TRANSITION only (false→true while selected) — WeeklyList deliberately
-  //    shows archived rows, and its row click sets the selection then pushes
-  //    /daily; clearing an already-archived selection in that same flush
-  //    would strand the /daily handoff without its focused lesson (review
-  //    Low #1). Mirrors WeekColumns' archived-transition watcher.
-  const prevSelectedArchivedRef = useRef<{
-    id: string;
-    archived: boolean;
-  } | null>(null);
-  useEffect(() => {
-    const prev = prevSelectedArchivedRef.current;
-    if (selectedLessonId === null) {
-      prevSelectedArchivedRef.current = null;
-      return;
-    }
-    const sel = lessons.find((l) => l.id === selectedLessonId);
-    const archived = sel?.archived === true;
-    prevSelectedArchivedRef.current = { id: selectedLessonId, archived };
-    if (
-      archived &&
-      prev !== null &&
-      prev.id === selectedLessonId &&
-      !prev.archived
-    ) {
-      setSelectedLessonId(null);
-      prevSelectedArchivedRef.current = null;
-    }
-  }, [selectedLessonId, lessons, setSelectedLessonId]);
 
   // ── Deep link READ — apply `initialLink` once on mount ────────────────
   // The lesson card to container-scroll once the target week's grid has
@@ -948,24 +861,15 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   // ── Esc key — clear the lesson selection so the Resources panel reverts
   //    to the week aggregate. Listens on the document so it fires even when
   //    focus is inside the grid or the rail.
-  //
-  //    W3.8 innermost-first guard: while the lesson-editor modal is open,
-  //    Esc belongs to the modal (its window-level listener closes it) —
-  //    this document listener runs FIRST (document before window) and used
-  //    to ALSO deselect on the same keypress, collapsing the expanded card
-  //    and unmounting the "Open in editor" opener before the modal's
-  //    focus-restore could target it (the gate's Esc-falls-to-body bug).
-  //    Skipping while the modal is open keeps one Esc = one close.
   useEffect(() => {
     const handleKeyDown = (e: globalThis.KeyboardEvent): void => {
-      if (modalLessonId !== null) return;
       if (e.key === "Escape" && selectedLessonId !== null) {
         setSelectedLessonId(null);
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [modalLessonId, selectedLessonId, setSelectedLessonId]);
+  }, [selectedLessonId, setSelectedLessonId]);
 
   // ── Column drag handlers ──────────────────────────────────────────────
   const handleColumnDragStart = useCallback((e: DragStartEvent): void => {
@@ -1189,13 +1093,6 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
 
   function renderGridPanel(grip: ReactNode): ReactNode {
     // Render selection, in precedence order:
-    //   0. isEdit (Week EDIT mode) → WeekEditBoard. Edit WINS over every other
-    //      branch, INCLUDING the ≤900px narrow-forced-List gate below: the
-    //      board scrolls internally and stays usable at phone widths, so the
-    //      teacher keeps a single editing surface at every tier (decision
-    //      locked by the orchestrator, W3.8c). The board owns its own
-    //      grip placement + `data-pane="grid"` wrapper, so it is returned
-    //      directly (grip is threaded in, not rendered as a sibling here).
     //   1. isNarrow (≤900px) → WeeklyList. The narrow-viewport gate WINS
     //      over schedule mode because a 5-column timeline at 360–900px is
     //      unusable; the dedicated /schedule route is the phone/tablet
@@ -1206,14 +1103,10 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
     //      timeline replaces the grid in the same 1fr slot; splitter +
     //      rail math is unaffected because the slot still spans 1fr.
     //   3. viewMode === "list" → WeeklyList. Same as before.
-    //   4. Default → the frame-picked Week VIEW canvas: paper → WeekColumns,
-    //      glass → WeekA, color → WeekC (all self-contained, no props).
+    //   4. Default → WeeklyGrid.
     //
     // The drag grip stays so the teacher can still reorder the panel at
     // any width or mode. The pills bar sits above whatever renders below.
-    if (isEdit) {
-      return <WeekEditBoard grip={grip} />;
-    }
     const showList = isNarrow || viewMode === "list";
     const showSchedule = !isNarrow && scheduleMode;
     return (
@@ -1230,24 +1123,11 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           // WeeklyList replaces the grid but occupies the same 1fr slot
           // so the splitter and rail math are unaffected.
           <WeeklyList />
-        ) : frame === "paper" ? (
-          /* W3.6 — Frame B (paper) reads the week as DAY COLUMNS (the
-             bundle's "WeekB"). Same planner data, same rich card (so the
-             material register + forking cue carry over), different
-             traversal. Narrow/schedule/list precedence above is untouched:
-             ≤900px still falls to WeeklyList regardless of frame. */
-          <WeekColumns />
-        ) : frame === "glass" ? (
-          /* W5 — Frame A (glass): the read-only period×day grid. */
-          <WeekA />
         ) : (
-          /* W5 — Frame C (color): subject lanes of color-forward tiles. Both
-             new frames are self-contained (no props), reading the planner +
-             app-state stores directly exactly like WeekColumns/WeeklyGrid, so
-             selection flows through the shared selectedLessonId the shell's
-             URL-sync + RightRail already consume. The v1 WeeklyGrid is no
-             longer reachable from the plain color/glass VIEW frame. */
-          <WeekC />
+          /* WeeklyGrid renders untouched in the center slot. The outer slot
+             wrapper already carries min-width: 0 so the grid can shrink
+             gracefully when the rail grows. */
+          <WeeklyGrid />
         )}
       </div>
     );
@@ -1314,26 +1194,23 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
   };
 
   return (
-    /* W3.8 — the provider sits at the very top of the shell tree so every
-       card parent (grid slot, columns, drawer) can reach the opener. */
-    <OpenLessonEditorContext.Provider value={openLessonEditor}>
-      <div className={styles.page}>
-        {/* ── aria-live region: column reorder announcements ───────────────
+    <div className={styles.page}>
+      {/* ── aria-live region: column reorder announcements ───────────────
           A visually hidden polite live region — when a panel moves
           (mouse, touch, or keyboard) we write the new order into it so
           screen-readers hear the change. Always in DOM so the live
           attribute is observed from the start. */}
-        <div
-          id={columnAnnounceRegionId}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          className={styles.srOnly}
-        >
-          {columnAnnouncement}
-        </div>
+      <div
+        id={columnAnnounceRegionId}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className={styles.srOnly}
+      >
+        {columnAnnouncement}
+      </div>
 
-        {/* ── Single shared week row ──────────────────────────────────────
+      {/* ── Single shared week row ──────────────────────────────────────
           The Weekly view's only header chrome. The former "Weekly View"
           title band was removed; this <WeekNavigator> is lifted here (out
           of the per-canvas renders) so exactly ONE instance exists and it
@@ -1343,90 +1220,81 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           toggle stays reachable in every mode — the schedule timeline has
           no navigator of its own, so a per-canvas toggle would vanish in
           schedule mode and trap the teacher there. */}
-        <WeekNavigator
-          week={week}
-          currentWeek={CURRENT_WEEK}
-          minWeek={minWeek}
-          maxWeek={maxWeek}
-          onChange={setWeek}
-          headingLevel="h1"
-          actions={<WeeklyViewControls isNarrow={isNarrow} />}
-        />
+      <WeekNavigator
+        week={week}
+        currentWeek={CURRENT_WEEK}
+        minWeek={minWeek}
+        maxWeek={maxWeek}
+        onChange={setWeek}
+        headingLevel="h1"
+        actions={<WeeklyViewControls isNarrow={isNarrow} />}
+      />
 
-        {/* ── Body row: icon rail (fixed) + reorderable grid/rail body ───── */}
-        <div className={styles.bodyRow}>
-          {/* Far-left slim icon nav strip — shared with Daily. */}
-          <IconRail />
+      {/* ── Body row: icon rail (fixed) + reorderable grid/rail body ───── */}
+      <div className={styles.bodyRow}>
+        {/* Far-left slim icon nav strip — shared with Daily. */}
+        <IconRail />
 
-          {/* Week EDIT — the board is a dedicated FULL-WIDTH canvas (bundle:
-            WeekEdit mounts alone in the viewbody; no resources rail). The
-            reorderable grid+rail body below is View-mode chrome; suppressing
-            it here mirrors how Day edit takes over /daily. Rail state
-            (width, order, collapsed panels) is untouched and returns intact
-            when the teacher flips back to View. */}
-          {isEdit ? (
-            <div className={styles.body} style={{ gridTemplateColumns: "1fr" }}>
-              <div className={styles.gridSlot}>{renderGridPanel(null)}</div>
-            </div>
-          ) : (
-          <div
-            ref={bodyRef}
-            className={styles.body}
-            style={{ gridTemplateColumns: gridTemplate }}
+        {/* The reorderable + resizable body. The grid template is computed
+            from columnOrder + effectiveRailWidth above so it re-evaluates
+            when the teacher reorders or resizes a panel. */}
+        <div
+          ref={bodyRef}
+          className={styles.body}
+          style={{ gridTemplateColumns: gridTemplate }}
+        >
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleColumnDragStart}
+            onDragEnd={handleColumnDragEnd}
+            onDragCancel={handleColumnDragCancel}
           >
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleColumnDragStart}
-              onDragEnd={handleColumnDragEnd}
-              onDragCancel={handleColumnDragCancel}
+            <SortableContext
+              items={columnOrder}
+              strategy={horizontalListSortingStrategy}
             >
-              <SortableContext
-                items={columnOrder}
-                strategy={horizontalListSortingStrategy}
-              >
-                {columnOrder.map((id, i) => {
-                  const render = PANEL_RENDERERS[id];
-                  // Build a unique CSS class per panel id so its inner
-                  // chrome keeps its existing look regardless of position.
-                  const slotClass =
-                    id === "rail" ? styles.railSlot : styles.gridSlot;
-                  return (
-                    <Fragment key={id}>
-                      <SortablePanel id={id} className={slotClass}>
-                        {(grip) => render(grip)}
-                      </SortablePanel>
-                      {/* Splitter sits between this panel and the next; the
+              {columnOrder.map((id, i) => {
+                const render = PANEL_RENDERERS[id];
+                // Build a unique CSS class per panel id so its inner
+                // chrome keeps its existing look regardless of position.
+                const slotClass =
+                  id === "rail" ? styles.railSlot : styles.gridSlot;
+                return (
+                  <Fragment key={id}>
+                    <SortablePanel id={id} className={slotClass}>
+                      {(grip) => render(grip)}
+                    </SortablePanel>
+                    {/* Splitter sits between this panel and the next; the
                         last panel has no trailing splitter. When the rail
                         is hidden we suppress the splitter so the teacher
                         uses the toggle button to re-expand. */}
-                      {i < columnOrder.length - 1 && !railHidden && (
-                        <PaneSplitter
-                          width={Math.round(rightWidth)}
-                          min={bounds.min}
-                          max={bounds.max}
-                          onDrag={handleSplitterDrag}
-                          onStep={handleSplitterStep}
-                          label="Resize resources rail"
-                        />
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </SortableContext>
+                    {i < columnOrder.length - 1 && !railHidden && (
+                      <PaneSplitter
+                        width={Math.round(rightWidth)}
+                        min={bounds.min}
+                        max={bounds.max}
+                        onDrag={handleSplitterDrag}
+                        onStep={handleSplitterStep}
+                        label="Resize resources rail"
+                      />
+                    )}
+                  </Fragment>
+                );
+              })}
+            </SortableContext>
 
-              {/* Floating ghost of the dragged panel — a small chip with
+            {/* Floating ghost of the dragged panel — a small chip with
                 the panel's label, reusing the right-rail panel-ghost
                 visual vocabulary (paper card + hairline + soft lift). */}
-              <DragOverlay>
-                {draggingColumnId && <ColumnDragGhost id={draggingColumnId} />}
-              </DragOverlay>
-            </DndContext>
-          </div>
-          )}
+            <DragOverlay>
+              {draggingColumnId && <ColumnDragGhost id={draggingColumnId} />}
+            </DragOverlay>
+          </DndContext>
         </div>
+      </div>
 
-        {/* ── W3-C3 — narrow-viewport overlay drawer ──────────────────────
+      {/* ── W3-C3 — narrow-viewport overlay drawer ──────────────────────
           At ≤1280px the inline rail is `display: none` (see
           WeeklyShell.module.css RES-CRIT-001) so the WeeklyGrid has
           breathing room. The drawer brings the same <RightRail> content
@@ -1437,31 +1305,19 @@ function WeeklyShellInner({ initialLink }: WeeklyShellProps = {}): ReactNode {
           the icons' aria-pressed stays accurate). The inline rail
           render above is untouched; the drawer is a parallel surface
           that only mounts when `drawerMode` is true. */}
-        <WeeklyRailDrawer
-          open={drawerOpen}
-          onClose={handleDrawerClose}
-          selectedLesson={selectedLesson}
-          week={week}
-          selectedDay={selectedDay}
-          railMode={railMode}
-          weekLessons={weekLessons}
-          onClearLesson={
-            selectedLesson !== null
-              ? () => setSelectedLessonId(null)
-              : undefined
-          }
-        />
-
-        {/* ── W3.8 — lesson-editor popup ──────────────────────────────────
-          Rendered once, host-owned. Closes ONLY via its Exit button or
-          Esc (the scrim deliberately has no click-to-close — locked
-          scope). Conditional mount keeps its focus-capture/restore
-          lifecycle tied to open/close. */}
-        {modalLessonId !== null && (
-          <LessonModal lessonId={modalLessonId} onClose={closeLessonEditor} />
-        )}
-      </div>
-    </OpenLessonEditorContext.Provider>
+      <WeeklyRailDrawer
+        open={drawerOpen}
+        onClose={handleDrawerClose}
+        selectedLesson={selectedLesson}
+        week={week}
+        selectedDay={selectedDay}
+        railMode={railMode}
+        weekLessons={weekLessons}
+        onClearLesson={
+          selectedLesson !== null ? () => setSelectedLessonId(null) : undefined
+        }
+      />
+    </div>
   );
 }
 

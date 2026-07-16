@@ -108,20 +108,14 @@
   color: var(--muted);
 }
 
-/* ── Phone / tablet ───────────────────────────────────────────────────── */
+/* ── Phone ────────────────────────────────────────────────────────────── */
 
 @media (max-width: 600px) {
   .root {
     width: min(220px, 100%);
   }
-}
 
-/* RESPONSIVE-AUDIT F5: 44px touch floor on phone AND tablet. Doubled class —
-   the base rule is `.input.input` (the cp-root cascade guard), so a single
-   `.input` override is out-specified and silently never applies (the old ≤600
-   `min-height: 40px` rule had exactly that bug). */
-@media (max-width: 900px) {
-  .input.input {
-    min-height: 44px;
+  .input {
+    min-height: 40px; /* comfortable touch target inside the 52px header */
   }
 }

@@ -260,27 +260,6 @@
   border-color: var(--done);
 }
 
-/* ── Phone: stop the title colliding with the CCSS pill ──────────────────
-   At ≤480px the fixed metadata columns (time, CCSS pill, resource count,
-   checkbox) squeeze the flexible title box to near-zero and its text overflows
-   under the CCSS pill. Let the row wrap and give the title its own full-width
-   line; the metadata chips wrap to a line below it. flex-wrap makes overlap
-   impossible however the chips pack. (The new week frames force this List as
-   the ≤900px fallback, so this row must hold at phone widths.) */
-@media (max-width: 480px) {
-  .row {
-    flex-wrap: wrap;
-    row-gap: 6px;
-  }
-  .body {
-    flex-basis: 100%;
-  }
-  /* Right-align the completion checkbox on the wrapped metadata line. */
-  .checkbox {
-    margin-left: auto;
-  }
-}
-
 /* Reduced motion — strip transitions */
 @media (prefers-reduced-motion: reduce) {
   .row,

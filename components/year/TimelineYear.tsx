@@ -33,7 +33,6 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
-import { useTheme } from "@/lib/theme";
 import { usePlanner } from "@/lib/planner-store";
 import { CURRENT_WEEK } from "@/lib/mock";
 import { useAcademicYear } from "@/lib/use-academic-year";
@@ -50,10 +49,6 @@ import { YearSubjectsSidebar } from "./YearSubjectsSidebar";
 import { YearBreadcrumb } from "./YearBreadcrumb";
 import { YearLessonPane } from "./YearLessonPane";
 import { YearDayCards } from "./YearDayCards";
-import {
-  YearConstellation,
-  type ConstellationCluster,
-} from "./YearConstellation";
 import { StandardsCoveragePanel } from "./StandardsCoveragePanel";
 import {
   YearFiltersPopover,
@@ -256,13 +251,6 @@ export function TimelineYear(): ReactNode {
   const { lessons, subjects, units: allUnits } = usePlanner();
   const { viewMode, setViewMode, filters, updateFilters } = useAppState();
   const router = useRouter();
-  // W3.7 — the v2 frame axis picks the ALL-scope center (see the `center`
-  // selection below): Frame C (color) reads the year as a per-subject
-  // constellation of unit-progress discs (YearConstellation, the bundle's
-  // "YearC"); glass/paper keep the subject-rows timeline. Deeper scopes
-  // (subject/unit/week) keep the existing UI on every frame — same seam
-  // pattern as WeeklyShell.renderGridPanel (frame is the LAST gate).
-  const { frame } = useTheme();
 
   // Global standards filter (shared with Weekly via app-state). Active when any
   // code is selected; narrows the lessons SHOWN (timeline units, week cards, day
@@ -610,54 +598,6 @@ export function TimelineYear(): ReactNode {
     </div>
   );
 
-  // ── Frame-C constellation data (W3.7, bundle ~6336) ─────────────────────
-  // One cluster per subject in subjectGroups order; nodes are the SAME unit
-  // groups the timeline rows render, narrowed by the SAME filters (subject
-  // chips, status, standards) — keep these predicates in lockstep with
-  // rowsContent above. Per-unit progress = done lessons / all lessons.
-  const showConstellation = frame === "color" && scope.level === "all";
-  const constellationClusters = useMemo<ConstellationCluster[]>(() => {
-    if (frame !== "color") return [];
-    return subjectGroups
-      .filter(
-        ({ subject }) =>
-          filterSubjects.length === 0 || filterSubjects.includes(subject.id),
-      )
-      .map(({ subject, groups }) => ({
-        subject,
-        hadUnits: groups.length > 0,
-        units: groups
-          .filter(
-            (g) =>
-              unitMatchesStatuses(g, filterStatuses) &&
-              (!standardsActive ||
-                g.weeks.some((w) => w.lessons.some(lessonMatchesStandards))),
-          )
-          .map((g) => {
-            const done = g.weeks.reduce(
-              (acc, w) =>
-                acc + w.lessons.filter((l) => l.status === "done").length,
-              0,
-            );
-            const { rest } = splitUnitName(g.unit.name);
-            return {
-              id: g.unit.id,
-              label: rest || g.unit.name,
-              fullName: g.unit.name,
-              done,
-              total: g.total,
-            };
-          }),
-      }));
-  }, [
-    frame,
-    subjectGroups,
-    filterSubjects,
-    filterStatuses,
-    standardsActive,
-    lessonMatchesStandards,
-  ]);
-
   const allCenter = isGrid ? (
     <div className={styles.tl}>
       <div className={styles.tlhead}>
@@ -696,9 +636,7 @@ export function TimelineYear(): ReactNode {
   );
   const subjectCenter =
     focusedSubject != null ? (
-      <div
-        className={`${styles.focus} ${styles.tlVars} cp-subj ${focusedSubject.cls}`}
-      >
+      <div className={`${styles.focus} ${styles.tlVars} cp-subj ${focusedSubject.cls}`}>
         <h2 className={styles.focusTitle}>
           <span className={styles.si} aria-hidden="true">
             {focusedSubject.icon}
@@ -729,14 +667,13 @@ export function TimelineYear(): ReactNode {
   const unitWeeks =
     focusedUnit != null
       ? focusedUnit.weeks.filter(
-          (w) => !standardsActive || w.lessons.some(lessonMatchesStandards),
+          (w) =>
+            !standardsActive || w.lessons.some(lessonMatchesStandards),
         )
       : [];
   const unitCenter =
     focusedSubject != null && focusedUnit != null ? (
-      <div
-        className={`${styles.focus} ${styles.tlVars} cp-subj ${focusedSubject.cls}`}
-      >
+      <div className={`${styles.focus} ${styles.tlVars} cp-subj ${focusedSubject.cls}`}>
         <h2 className={styles.focusTitle}>
           {splitUnitName(focusedUnit.unit.name).rest || focusedUnit.unit.name}
           <span className={styles.focusSub}>
@@ -745,9 +682,7 @@ export function TimelineYear(): ReactNode {
           </span>
         </h2>
         {focusedUnit.weeks.length === 0 ? (
-          <div className={styles.norow}>
-            No weeks planned for this unit yet.
-          </div>
+          <div className={styles.norow}>No weeks planned for this unit yet.</div>
         ) : unitWeeks.length === 0 ? (
           <div className={styles.norow}>
             No weeks match the current standards filter.
@@ -759,9 +694,7 @@ export function TimelineYear(): ReactNode {
                 key={w.week}
                 type="button"
                 className={styles.wkCard}
-                onClick={() =>
-                  goWeek(focusedSubject.id, focusedUnit.unit.id, w.week)
-                }
+                onClick={() => goWeek(focusedSubject.id, focusedUnit.unit.id, w.week)}
               >
                 <span className={styles.wkHead}>
                   Week {w.week}
@@ -788,9 +721,7 @@ export function TimelineYear(): ReactNode {
   // ── Week scope: that week's day cards (rich — pills + status dots) ────────
   const weekCenter =
     focusedSubject != null && focusedUnit != null && focusedWeek != null ? (
-      <div
-        className={`${styles.focus} ${styles.tlVars} cp-subj ${focusedSubject.cls}`}
-      >
+      <div className={`${styles.focus} ${styles.tlVars} cp-subj ${focusedSubject.cls}`}>
         <h2 className={styles.focusTitle}>
           Week {focusedWeek.week}
           <span className={styles.focusSub}>
@@ -813,15 +744,7 @@ export function TimelineYear(): ReactNode {
       </div>
     ) : null;
 
-  // W3.7 frame seam — Frame C swaps the ALL-scope center for the
-  // constellation (replacing BOTH the grid timeline and its list fallback:
-  // the cluster grid stacks to one column at narrow widths, so it stays the
-  // canonical Frame-C read on phone too). Deeper scopes are frame-agnostic.
-  let center: ReactNode = showConstellation ? (
-    <YearConstellation clusters={constellationClusters} onOpenUnit={goUnit} />
-  ) : (
-    allCenter
-  );
+  let center: ReactNode = allCenter;
   if (scope.level === "subject") center = subjectCenter;
   else if (scope.level === "unit") center = unitCenter;
   else if (scope.level === "week") center = weekCenter;
@@ -849,8 +772,8 @@ export function TimelineYear(): ReactNode {
           <div className={styles.eyebrow}>Plan</div>
           <h1>Yearly View</h1>
           <div className={styles.sub}>
-            The whole year at a glance — open a subject to plan its units,
-            weeks, and daily lessons.
+            The whole year at a glance — open a subject to plan its units, weeks,
+            and daily lessons.
           </div>
         </div>
 
@@ -878,10 +801,7 @@ export function TimelineYear(): ReactNode {
           </Button>
 
           <YearFiltersPopover
-            // Grid/List only governs the all-subjects TIMELINE; on Frame C
-            // the constellation replaces both variants, so the toggle would
-            // be inert — hide it rather than let it click dead (W3.7).
-            showViewToggle={scope.level === "all" && !showConstellation}
+            showViewToggle={scope.level === "all"}
             value={{
               view: storedHier,
               subjects: filterSubjects,
@@ -937,17 +857,11 @@ export function TimelineYear(): ReactNode {
           />
           {center}
 
-          {/* Legend (only meaningful on the all-subjects timeline — the
-              Frame-C constellation's node states are subject-colored and
-              self-labelled via tooltips, so the timeline's status-dot legend
-              would mislead there) */}
-          {scope.level === "all" && !showConstellation ? (
+          {/* Legend (only meaningful on the all-subjects timeline) */}
+          {scope.level === "all" ? (
             <div className={styles.leg}>
               <span className={styles.lg}>
-                <span
-                  className={styles.d}
-                  style={{ background: "var(--done)" }}
-                />
+                <span className={styles.d} style={{ background: "var(--done)" }} />
                 Completed
               </span>
               <span className={styles.lg}>
@@ -958,10 +872,7 @@ export function TimelineYear(): ReactNode {
                 In progress
               </span>
               <span className={styles.lg}>
-                <span
-                  className={styles.d}
-                  style={{ background: "var(--faint)" }}
-                />
+                <span className={styles.d} style={{ background: "var(--faint)" }} />
                 Not started
               </span>
               <span className={styles.lg}>

@@ -61,6 +61,3 @@ cloudflare-env.d.ts
 # regenerated locally; the app bundles only insights.hero.json).
 scripts/quote-mining/output/
 lib/home/insights.data.json
-
-# QA working artifacts (§4b Live QA Audit Gate output — per-pass, never committed)
-QA-REPORT.md

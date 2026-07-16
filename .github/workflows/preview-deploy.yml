@@ -60,8 +60,6 @@ jobs:
           NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
           NEXT_PUBLIC_TEACH_USE_SUPABASE: ${{ secrets.NEXT_PUBLIC_TEACH_USE_SUPABASE }}
           NEXT_PUBLIC_PLANNER_USE_SUPABASE: ${{ secrets.NEXT_PUBLIC_PLANNER_USE_SUPABASE }}
-          # v2 redesign shell/router gate — inlined at build; see deploy.yml.
-          NEXT_PUBLIC_V2: ${{ vars.NEXT_PUBLIC_V2 || '1' }}
 
       # Upload as a non-active version. Captures the Preview URL from wrangler's
       # output and writes it to the job summary. Does NOT promote to production

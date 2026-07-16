@@ -5,12 +5,6 @@
 export { TopBar } from "./top-bar";
 export { SideNav } from "./SideNav";
 export { MasterBanner } from "./master-banner";
-export { NotificationBell } from "./NotificationBell";
-export { TeamModeIntro } from "./team-mode-intro";
-export {
-  PALETTE_TOGGLE_EVENT,
-  SHORTCUTS_TOGGLE_EVENT,
-} from "./global-shortcuts";
 export { LeftFilterPanel } from "./left-filter-panel";
 export { RightPanel } from "./right-panel";
 export { GlobalRail } from "./GlobalRail";
