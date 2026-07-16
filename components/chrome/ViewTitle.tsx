@@ -39,6 +39,10 @@ const VIEW_TITLES: readonly { match: string; title: string }[] = [
   { match: "/weekly", title: "The Week" },
   { match: "/year", title: "The Year" },
   { match: "/planner", title: "Planner hub" },
+  // W9a enrollment (the "Post/Teach enroll with their surfaces" seam above):
+  // /post is IMMERSIVE_PREFIXES-listed, so its name lives in the immersbar
+  // slot — the wall renders no title of its own.
+  { match: "/post", title: "Resource Wall" },
 ];
 
 // The bundle's settings-cog glyph, inlined (24×24, currentColor).
