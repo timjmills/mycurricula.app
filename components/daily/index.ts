@@ -2,6 +2,11 @@
 // Consumers import from "@/components/daily"; never from a deep path.
 
 export { DailyView } from "./DailyView";
+// v1 fallback shell (the pre-v2 two-pane Daily) — mounted by the daily route
+// when the NEXT_PUBLIC_V2 flag is OFF. See lib/v2-flag.ts + the route gate in
+// app/(planner)/daily/page.tsx. It is a verbatim copy of master's DailyView
+// (the live-on-prod v1), styled by DailyViewV1.module.css.
+export { DailyViewV1 } from "./DailyViewV1";
 export { LessonDetail } from "./LessonDetail";
 export { TodayDashboard } from "./TodayDashboard";
 // Right rail (3-column restructure): the resources / to-dos / shoutbox

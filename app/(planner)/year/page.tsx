@@ -13,7 +13,15 @@
 // meaningful on every frame). The /year/print route is untouched.
 
 import { YearShell } from "@/components/year-v2";
+import { TimelineYear } from "@/components/year";
+import { V2 } from "@/lib/v2-flag";
 
 export default function YearPage() {
-  return <YearShell />;
+  // ── NEXT_PUBLIC_V2 router gate (Wave-13 rollback half) ──────────────────
+  // Flag ON → <YearShell> (frame-routed v2 Year: YearA/TimelineYear/YearC).
+  // Flag OFF → <TimelineYear> directly — the pre-v2, live-on-prod Year (the
+  // exact mount master's year/page.tsx used). YearShell already renders
+  // TimelineYear on its paper frame, so the v1 path is a proven subset.
+  // V2 is build-inlined → exactly one mounts per build.
+  return V2 ? <YearShell /> : <TimelineYear />;
 }
