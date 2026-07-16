@@ -69,10 +69,20 @@ export const V2: boolean = process.env.NEXT_PUBLIC_V2 !== "0";
  * The flag has two halves. The CHROME half is implemented
  * (`app/(planner)/layout.tsx`). The ROUTER half — which canvas mounts per route
  * — is now ALSO implemented (branch `claude/v2-router-gate`):
- *   • `app/(planner)/daily/page.tsx`  → V2 ? <DailyView>   : <DailyViewV1>
- *   • `app/(planner)/weekly/page.tsx` → V2 ? <WeeklyShell> : <WeeklyShellV1>
- *   • `app/(planner)/year/page.tsx`   → V2 ? <YearShell>   : <TimelineYear>
+ *   • `app/(planner)/daily/page.tsx`    → V2 ? <DailyView>      : <DailyViewV1>
+ *   • `app/(planner)/weekly/page.tsx`   → V2 ? <WeeklyShell>    : <WeeklyShellV1>
+ *   • `app/(planner)/year/page.tsx`     → V2 ? <YearShell>      : <TimelineYear>
+ *   • `app/(planner)/home/page.tsx`     → V2 ? <HomeConsole>    : <HomeV1>
+ *   • `app/(planner)/catch-up/page.tsx` → V2 ? <CatchUpRouteV2> : <CatchupScreen>
  * where the `*V1` shells are verbatim copies of master's live-on-prod views.
+ * KEEP THIS ROSTER CURRENT — it is the readable record of what the router half
+ * covers. If you v2-swap another route's mount, gate it and add it here.
+ *
+ * KNOWN, INTENTIONAL EXCEPTION: `app/(planner)/planner/page.tsx` (the v2 Hub) is
+ * NOT gated and must not be — `/planner` does not exist on master, so there is no
+ * live-on-prod v1 behaviour to restore. Wave-13's flag-OFF regression should
+ * treat it as a known deviation, not a miss. (`app/(planner)/layout.tsx` already
+ * documents the related immersive-chrome residual.)
  *
  * With BOTH halves gated, `NEXT_PUBLIC_V2=0` is now a genuine v1 rollback: v1
  * chrome AND the v1 route canvases (no v2 `.stage`/`.theme-tint`). This is what
