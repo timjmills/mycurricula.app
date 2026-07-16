@@ -410,6 +410,51 @@
   line-height: 1.5;
 }
 
+/* CTA link out of the empty state (an <a>, so the .cp-root button reset doesn't
+   apply — no class-doubling needed). Soft accent pill, AA across all six themes
+   (--chrome-accent-deep flips dark-on-light / light-on-dark). */
+.emptyAction {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  background: var(--chrome-accent-soft);
+  border: 1px solid var(--chrome-accent-soft-edge);
+  border-radius: var(--r-pill);
+  color: var(--chrome-accent-deep);
+  font-size: var(--t-13);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.emptyAction:hover {
+  background: var(--chrome-accent-soft-edge);
+}
+
+/* ── Fallback nudge (searching the major frameworks by default) ─────────── */
+
+.defaultHint {
+  margin: 0;
+  padding: 10px 24px;
+  font-size: var(--t-12);
+  line-height: 1.45;
+  color: var(--ink-700);
+  background: var(--chrome-accent-soft);
+  border-bottom: 1px solid var(--chrome-accent-soft-edge);
+}
+
+.defaultHintLink {
+  color: var(--chrome-accent-deep);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.defaultHintLink:hover {
+  text-decoration: none;
+}
+
 /* ── Actions ───────────────────────────────────────────────────────────── */
 
 .actions {

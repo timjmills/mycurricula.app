@@ -200,6 +200,14 @@
      fixed 1082px (132 + 5×190) for the Sun–Thu default and scales with the
      configured day count. */
   min-width: calc(132px + var(--day-count, 5) * 190px);
+  /* Containing block for the .todayColumn / .holidayColumn overlays. They are
+     absolutely-positioned GRID CHILDREN: their inline gridColumn/gridRow still
+     define the grid area they cover, but — being out of flow — they no longer
+     OCCUPY those cells. When they were in-flow (position: relative), the grid
+     auto-placement algorithm treated their cells as taken and routed every
+     auto-placed cell AROUND them, displacing each subject row one column
+     further right whenever the today wash (or a holiday band) rendered. */
+  position: relative;
 }
 
 /* ── Day header row ─────────────────────────────────────────────────── */
@@ -262,11 +270,18 @@
 }
 
 .todayColumn {
-  /* Placed by inline style: gridRow "2 / -1", gridColumn todayIdx+2 —
+  /* Placed by inline style: gridRow "2 / …", gridColumn todayIdx+2 —
      same placement trick as .holidayColumn below. Sits above the cell
      background but below the lesson cards, so the warm tint reads as a
-     column wash without muting the cards themselves. */
-  position: relative;
+     column wash without muting the cards themselves.
+     MUST be absolute (out of flow): an in-flow grid-placed item OCCUPIES
+     its cells, and every auto-placed cell after it skips the occupied
+     column and wraps — each subject row drifted one column right and
+     lesson cards rendered under the WRONG DAY whenever the wash was up.
+     For an abspos grid child the placement props define its containing
+     block, so inset: 0 fills exactly the same column band as before. */
+  position: absolute;
+  inset: 0;
   z-index: 1;
   pointer-events: none;
   /* Faint warm wash — --surface-warm at partial strength so the subject
@@ -346,11 +361,18 @@
 }
 
 .holidayColumn {
-  /* Placed by inline style: gridRow "2 / -1", gridColumn dayIdx+2.
+  /* Placed by inline style: gridRow "2 / …", gridColumn dayIdx+2.
      z-index sits below the lesson cards (which are inside cells with
      their own positioning) but above the cell background so the wash
-     reads. */
-  position: relative;
+     reads.
+     MUST be absolute (out of flow) for the same reason as .todayColumn
+     above: in-flow it occupies its cells and the auto-placed grid cells
+     route around it, drifting every subject row one column right. The
+     inline grid placement still defines the containing block; inset: 0
+     fills the band and the 2px/1px margins keep adjacent holiday bands
+     reading as discrete stripes. */
+  position: absolute;
+  inset: 0;
   z-index: 1;
   pointer-events: none;
   /* Diagonal stripe recipe lifted from components/year/UnitBar.module.css
