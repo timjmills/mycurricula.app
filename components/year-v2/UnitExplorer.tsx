@@ -334,7 +334,7 @@ export function UnitExplorer({
           )}
           {tab === "standards" && <StandardsTab standards={standards} />}
           {tab === "resources" && <ResourcesTab resources={resources} />}
-          {tab === "notes" && <NotesTab unitId={unit} />}
+          {tab === "notes" && <NotesTab subjectId={subjectId} unitId={unit} />}
         </>
       }
     />
@@ -606,8 +606,17 @@ function ResourcesTab({
 
 // ── Notes tab ─────────────────────────────────────────────────────────────────
 
-function NotesTab({ unitId }: { unitId: string }): ReactNode {
-  const note = useUnitNote(unitId);
+function NotesTab({
+  subjectId,
+  unitId,
+}: {
+  subjectId: SubjectId;
+  unitId: string;
+}): ReactNode {
+  // Notes key on subject + unit — unit slugs are unique only within a
+  // subject, so a bare-slug key would share one note across two subjects'
+  // same-named units (see lib/unit-notes.tsx "Keying").
+  const note = useUnitNote(subjectId, unitId);
   const setNote = useSetUnitNote();
   const fieldId = useId();
   return (
@@ -620,7 +629,7 @@ function NotesTab({ unitId }: { unitId: string }): ReactNode {
         className={styles.notesArea}
         value={note}
         placeholder="The one move not to forget in this unit…"
-        onChange={(e) => setNote(unitId, e.target.value)}
+        onChange={(e) => setNote(subjectId, unitId, e.target.value)}
         rows={5}
       />
     </div>
