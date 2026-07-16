@@ -1,0 +1,1834 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   chrome.css — the v2 CORNER-GRAMMAR chrome layer (Wave 3 · W3.3/W3.4/W3.5)
+
+   Faithful port of the bundled mockup's foreground-overlay recipes
+   (`mockup/New v2 Site Design.bundled.html`, the handoff's look/behavior
+   authority; V2 Framework.md §3 "the spatial model" + §9 "the console"). The
+   fixed grammar: wordmark top-left · Personal/Team + Tools + bell + hub
+   top-right · school/grade/unit/week context bottom-left · live now/next
+   clock bottom-right · dismissible quote bottom-center · the segmented
+   console in the home center with a compact variant atop every view.
+
+   SCOPING. The mockup keys tone overrides on `.home[data-tone]` (its home
+   surface owns the axes). App-wide chrome reads the SAME axes from <html>,
+   so every tone override here is emitted in BOTH forms —
+   `:root[data-tone="…"]` for the app-wide chrome host and `.home[…]` for the
+   home surface — matching the dual-scoping convention themes.css already
+   uses. The `.home`-scoped theme integrations that predate this file
+   (themes.css §off-theme, §light-canvas) target this same class vocabulary.
+
+   HOST CONTRACT (the W3.3 components). `.overlay` fills its positioning
+   context (the mockup's `.home` is fixed full-viewport; the app-wide host
+   supplies the equivalent). The overlay itself never intercepts input —
+   only the corner controls do (pointer-events dance below), so the quote and
+   content stay hoverable through the botbar's empty center.
+
+   Values are byte-faithful to the mockup by design-fidelity rule (§4a):
+   this file is theme-layer CSS like themes.css — literal rgba/px values ARE
+   the handoff's tokens here, not component hard-coding. The mockup's
+   `.app-tip` styled-tooltip system is intentionally NOT ported — the app's
+   Tooltip primitive (components/ui/Tooltip, the onboarding-dismissal system)
+   is the mandated mechanism and the mockup titles map onto it.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@media screen {
+  /* ── Foreground overlay grid: top corners / center / bottom corners ────── */
+  .overlay {
+    position: absolute;
+    z-index: 3;
+    inset: var(--frame-inset, 30px);
+    transition: inset 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: clamp(18px, 2.4vw, 34px);
+  }
+  /* Grid items default to min-width:auto, so a row whose content is
+     intrinsically wide (the Daily dock's rail/panel row measures ~1600px
+     min-content) refuses to shrink to the track and — because .overlay is
+     absolutely positioned — widens the DOCUMENT instead (457px of page
+     h-scroll at 1440 on /daily; W3.6 close-out audit). min-width:0 lets
+     every row shrink to the overlay's width so the view's own internal
+     scrollers do their job. Covers both the corner grid and
+     .overlay.immersive, whose routed children are direct grid items too. */
+  .overlay > * {
+    min-width: 0;
+  }
+  /* ── v1 shell (NEXT_PUBLIC_V2=0) ──────────────────────────────────────────
+     The flag-OFF chrome branch in app/(planner)/layout.tsx replaces `.overlay`
+     (the v2 containing block) with this fill wrapper: same absolute fill + the
+     same `> * { min-width: 0 }` contract, minus the v2 frame inset that v1
+     never had. Mirroring the child rule matters — the OFF branch has THREE
+     direct children (MasterBanner, TopBar, the content row), and giving only
+     the row `min-width: 0` would still let an intrinsically-wide chrome bar
+     force document h-scroll (§4a Codex Medium). Dev-harness only: a flag-OFF
+     production artifact is refused by scripts/check-v2-flag.mjs. */
+  .v1-shell {
+    position: absolute;
+    inset: 0;
+    /* z-index parity with `.overlay` (§4a L5): both are absolutely positioned
+       fills over the same `position:relative` content column, so the v1 shell
+       must claim the same stacking level or a later-painted sibling could
+       cover it. */
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .v1-shell > * {
+    min-width: 0;
+  }
+  .home .frame.fullbleed ~ .overlay {
+    --frame-inset: 0px;
+  }
+
+  /* corners */
+  .topbar,
+  .botbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .topbar {
+    align-items: center;
+  }
+  .botbar {
+    align-items: flex-end;
+    pointer-events: none;
+  }
+  /* corner controls sit above the centered quote (z-index:6) and stay
+     interactive, while the botbar's empty center lets quote hovers through */
+  .botbar .ctx,
+  .botbar .clock {
+    pointer-events: auto;
+    position: relative;
+    z-index: 7;
+  }
+
+  /* ── Glass chip base (the chrome material) ─────────────────────────────── */
+  .glass {
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    backdrop-filter: blur(18px) saturate(1.3);
+    box-shadow:
+      0 10px 30px -16px rgba(12, 11, 20, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+  :root[data-tone="dark"] .glass,
+  .home[data-tone="dark"] .glass {
+    color: #fff;
+  }
+  :root[data-tone="light"] .glass,
+  .home[data-tone="light"] .glass {
+    background: rgba(255, 255, 255, 0.66);
+    border-color: rgba(255, 255, 255, 0.8);
+    color: var(--ink);
+  }
+
+  /* ── Back button (compact view chrome) ─────────────────────────────────── */
+  .backbtn {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    color: #fff;
+    margin-right: 2px;
+    animation: backin 0.2s ease;
+  }
+  @keyframes backin {
+    from {
+      opacity: 0;
+      transform: translateX(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  :root[data-tone="light"] .backbtn,
+  .home[data-tone="light"] .backbtn {
+    color: var(--ink-soft);
+  }
+  .backbtn svg {
+    width: 20px;
+    height: 20px;
+  }
+  .backbtn:hover {
+    transform: translateX(-1px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .backbtn {
+      animation: none;
+    }
+  }
+
+  /* ── Wordmark (top-left) ───────────────────────────────────────────────── */
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 15px 9px 11px;
+    border-radius: var(--r-pill);
+  }
+  .brand .glyph {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    background: var(--grad-honey);
+    display: grid;
+    place-items: center;
+    box-shadow: var(--sh-honey);
+    flex: 0 0 auto;
+  }
+  .brand .glyph svg {
+    width: 18px;
+    height: 18px;
+  }
+  .brand .wm {
+    font-family: var(--font-logo);
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    color: inherit;
+    white-space: nowrap;
+  }
+  .brand .wm .tld {
+    opacity: 0.62;
+  }
+  :root[data-tone="dark"] .brand .wm,
+  .home[data-tone="dark"] .brand .wm {
+    color: #fff;
+  }
+
+  /* ── Top-right control cluster ─────────────────────────────────────────── */
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .iconbtn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    background: rgba(255, 255, 255, 0.16);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    backdrop-filter: blur(18px) saturate(1.3);
+    color: #fff;
+    transition:
+      transform 0.15s ease,
+      background 0.2s ease;
+    box-shadow:
+      0 10px 26px -16px rgba(12, 11, 20, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+  :root[data-tone="light"] .iconbtn,
+  .home[data-tone="light"] .iconbtn {
+    background: rgba(255, 255, 255, 0.66);
+    border-color: rgba(255, 255, 255, 0.8);
+    color: var(--ink-soft);
+  }
+  .iconbtn:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.3);
+  }
+  :root[data-tone="light"] .iconbtn:hover,
+  .home[data-tone="light"] .iconbtn:hover {
+    background: rgba(255, 255, 255, 0.85);
+  }
+  .iconbtn svg {
+    width: 19px;
+    height: 19px;
+  }
+  .iconbtn-planner svg {
+    width: 26px;
+    height: 26px;
+    stroke-width: 1.7;
+  }
+
+  /* Tools launcher — pill that expands into a segmented bar */
+  .toolswrap {
+    position: relative;
+  }
+  /* The top-bar's "More tools" overflow instance is PHONE-ONLY: above 480px
+     the To-dos / Shoutbox iconbtns render inline, so the trigger would be a
+     duplicate. The ≤480 task-#12 block (below, later in the cascade — same
+     0,2,0 specificity, order wins) flips it to display:block. */
+  .tools .toolswrap {
+    display: none;
+  }
+  .toolsbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 42px;
+    padding: 0 16px;
+    border-radius: var(--r-pill);
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 13.5px;
+    letter-spacing: -0.01em;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    background: rgba(255, 255, 255, 0.16);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    backdrop-filter: blur(18px) saturate(1.3);
+    box-shadow:
+      0 10px 26px -16px rgba(12, 11, 20, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transition:
+      transform 0.15s ease,
+      background 0.2s ease;
+  }
+  :root[data-tone="light"] .toolsbtn,
+  .home[data-tone="light"] .toolsbtn {
+    background: rgba(255, 255, 255, 0.66);
+    border-color: rgba(255, 255, 255, 0.8);
+    color: var(--ink-soft);
+  }
+  .toolsbtn svg {
+    width: 17px;
+    height: 17px;
+  }
+  .toolsbtn-circle {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+  }
+  .toolsbtn-circle svg {
+    width: 27px;
+    height: 27px;
+  }
+  .toolsbtn:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.3);
+  }
+  :root[data-tone="light"] .toolsbtn:hover,
+  .home[data-tone="light"] .toolsbtn:hover {
+    background: rgba(255, 255, 255, 0.85);
+  }
+  .toolsbtn.open {
+    background: rgba(255, 255, 255, 0.3);
+  }
+  :root[data-tone="light"] .toolsbtn.open,
+  .home[data-tone="light"] .toolsbtn.open {
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  .toolspop {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    z-index: 30;
+    display: flex;
+    align-items: stretch;
+    border-radius: var(--r-xl);
+    overflow: hidden;
+    background: rgba(18, 17, 30, 0.46);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    backdrop-filter: blur(24px) saturate(1.3);
+    box-shadow:
+      0 26px 60px -26px rgba(12, 11, 20, 0.75),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    transform-origin: top right;
+    animation: toolsin 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  :root[data-tone="light"] .toolspop,
+  .home[data-tone="light"] .toolspop {
+    background: rgba(255, 255, 255, 0.78);
+    border-color: rgba(255, 255, 255, 0.85);
+    box-shadow:
+      0 26px 60px -28px rgba(28, 27, 46, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+  @keyframes toolsin {
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toolspop {
+      animation: none;
+    }
+  }
+  .toolspop .tool {
+    appearance: none;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    padding: 15px 20px;
+    min-width: 88px;
+    color: #fff;
+    border-right: 1px solid rgba(255, 255, 255, 0.16);
+    transition: background 0.16s ease;
+  }
+  :root[data-tone="light"] .toolspop .tool,
+  .home[data-tone="light"] .toolspop .tool {
+    color: var(--ink-soft);
+    border-right-color: rgba(28, 27, 46, 0.1);
+  }
+  .toolspop .tool:last-child {
+    border-right: 0;
+  }
+  .toolspop .tool:hover {
+    background: rgba(255, 255, 255, 0.22);
+  }
+  :root[data-tone="light"] .toolspop .tool:hover,
+  .home[data-tone="light"] .toolspop .tool:hover {
+    background: rgba(255, 255, 255, 0.6);
+  }
+  .toolspop .tool svg {
+    width: 21px;
+    height: 21px;
+  }
+  .toolspop .tool span {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1;
+  }
+
+  /* ── Mode toggle (Personal / Team) — text + icon variants ──────────────── */
+  .modesw {
+    display: inline-flex;
+    border-radius: var(--r-pill);
+    padding: 3px;
+    gap: 2px;
+  }
+  .modesw button {
+    border: 0;
+    background: none;
+    color: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 7px 15px;
+    border-radius: var(--r-pill);
+    opacity: 0.72;
+    transition: all 0.18s ease;
+  }
+  .modesw button.active {
+    opacity: 1;
+  }
+  :root[data-tone="dark"] .modesw button.active,
+  .home[data-tone="dark"] .modesw button.active {
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--ink);
+  }
+  :root[data-tone="light"] .modesw button.active,
+  .home[data-tone="light"] .modesw button.active {
+    background: #fff;
+    color: var(--ink);
+    box-shadow: var(--sh-xs);
+  }
+  .modesw button.team.active {
+    color: var(--danger);
+  }
+  .modesw-icon {
+    padding: 3px;
+    gap: 2px;
+  }
+  .modesw-ib {
+    width: 42px;
+    height: 34px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    color: var(--muted);
+    border-radius: var(--r-pill);
+    transition:
+      background 0.15s,
+      color 0.15s;
+  }
+  .modesw-ib svg {
+    width: 22.5px;
+    height: 22.5px;
+  }
+  .modesw-icon .modesw-ib {
+    padding: 0;
+    width: 42px;
+    height: 34px;
+  }
+  .modesw-ib:hover {
+    color: var(--ink-soft);
+  }
+  .modesw-ib.active {
+    background: #fff;
+    color: var(--ink);
+    box-shadow: var(--sh-xs);
+  }
+  .modesw-ib.team.active {
+    color: var(--brand-600);
+    background: #fff;
+  }
+  :root[data-tone="dark"] .modesw-ib.active,
+  .home[data-tone="dark"] .modesw-ib.active {
+    background: rgba(255, 255, 255, 0.92);
+    color: #1a1c2a;
+  }
+  :root[data-tone="dark"] .modesw-ib.team.active,
+  .home[data-tone="dark"] .modesw-ib.team.active {
+    color: var(--brand-600);
+  }
+
+  /* ── Center canvas: greeting + console ─────────────────────────────────── */
+  .center {
+    align-self: center;
+    justify-self: center;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(20px, 2.6vw, 34px);
+    max-width: min(92%, 920px);
+  }
+  .canvas {
+    border-radius: var(--r-2xl);
+    padding: clamp(30px, 4vw, 56px) clamp(26px, 5vw, 72px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(22px, 2.8vw, 34px);
+  }
+  .canvas.glass-dim {
+    background: rgba(18, 17, 30, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    -webkit-backdrop-filter: blur(26px) saturate(1.25);
+    backdrop-filter: blur(26px) saturate(1.25);
+    box-shadow:
+      0 40px 90px -40px rgba(12, 11, 20, 0.7),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+  .canvas.glass-light {
+    background: rgba(255, 255, 255, 0.58);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    -webkit-backdrop-filter: blur(28px) saturate(1.3);
+    backdrop-filter: blur(28px) saturate(1.3);
+    box-shadow:
+      0 40px 90px -42px rgba(28, 27, 46, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+  .canvas.min {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: clamp(10px, 2vw, 24px) 0;
+  }
+
+  .eyebrow {
+    font-family: var(--font-sans);
+    font-weight: 800;
+    font-size: clamp(11px, 1vw, 13px);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .greeting {
+    font-family: var(--head-font, var(--font-display));
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    font-size: clamp(30px, 5.2vw, 62px);
+    line-height: 1.02;
+    margin: 0;
+  }
+  :root[data-tone="dark"] .eyebrow,
+  .home[data-tone="dark"] .eyebrow {
+    color: rgba(255, 255, 255, 0.74);
+  }
+  :root[data-tone="dark"] .greeting,
+  .home[data-tone="dark"] .greeting {
+    color: #fff;
+    text-shadow: 0 2px 30px rgba(12, 11, 20, 0.35);
+  }
+  :root[data-tone="light"] .eyebrow,
+  .home[data-tone="light"] .eyebrow {
+    color: var(--brand-600);
+  }
+  :root[data-tone="light"] .greeting,
+  .home[data-tone="light"] .greeting {
+    color: var(--ink);
+  }
+
+  /* ── View switchers: the console (+ light/dark pill treatments) ────────── */
+  .views {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+  .views.console {
+    gap: 0;
+    border-radius: var(--r-xl);
+    overflow: hidden;
+    flex-wrap: nowrap;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 16px 40px -22px rgba(12, 11, 20, 0.6);
+  }
+  :root[data-tone="light"] .views.console,
+  .home[data-tone="light"] .views.console {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.85);
+  }
+  .view {
+    appearance: none;
+    border: 0;
+    background: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    flex: 1 1 0;
+    padding: clamp(15px, 1.5vw, 20px) clamp(20px, 2.4vw, 34px);
+    border-radius: var(--r-lg);
+    transition:
+      transform 0.16s ease,
+      background 0.22s ease,
+      box-shadow 0.22s ease,
+      color 0.2s ease;
+    min-width: 96px;
+  }
+  .view .vw-word {
+    position: relative;
+    font-family: var(--head-font, var(--font-display-sm));
+    font-weight: 700;
+    font-size: clamp(17px, 1.7vw, 22px);
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+  .view .vw-sub {
+    font-size: clamp(10px, 0.92vw, 12px);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    opacity: 0.7;
+    line-height: 1.25;
+    white-space: pre;
+    text-align: center;
+  }
+  .view:hover {
+    transform: translateY(-2px);
+  }
+  .view:active {
+    transform: translateY(0);
+  }
+  .views.light {
+    gap: 10px;
+  }
+  .views.light .view {
+    background: rgba(255, 255, 255, 0.82);
+    color: var(--ink);
+    border-radius: var(--r-lg);
+    box-shadow: 0 12px 30px -18px rgba(12, 11, 20, 0.5);
+  }
+  .views.light .view .vw-sub {
+    color: var(--body);
+  }
+  .views.light .view:hover {
+    transform: translateY(-2px);
+    background: #fff;
+  }
+  .views.dark {
+    gap: 10px;
+  }
+  .views.dark .view {
+    background: rgba(20, 20, 26, 0.72);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--r-lg);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 14px 32px -20px rgba(12, 11, 20, 0.7);
+  }
+  .views.dark .view:hover {
+    transform: translateY(-2px);
+    background: rgba(20, 20, 26, 0.82);
+  }
+  .views.console .view {
+    border-radius: 0;
+    min-width: 0;
+    flex: 1 1 0;
+    color: #fff;
+    border-right: 1px solid rgba(255, 255, 255, 0.18);
+  }
+  :root[data-tone="light"] .views.console .view,
+  .home[data-tone="light"] .views.console .view {
+    color: var(--ink-soft);
+    border-right-color: rgba(28, 27, 46, 0.1);
+  }
+  .views.console .view:last-child {
+    border-right: 0;
+  }
+  .views.console .view:hover {
+    transform: none;
+    background: rgba(255, 255, 255, 0.22);
+  }
+  :root[data-tone="light"] .views.console .view:hover,
+  .home[data-tone="light"] .views.console .view:hover {
+    background: rgba(255, 255, 255, 0.7);
+  }
+  .console-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .console-row .homecog {
+    top: 0;
+    margin-left: 0;
+    margin-bottom: 8px;
+  }
+
+  /* ── W3.4: console mounts + variants (additive; no appearance axis) ─────── */
+  /* The app mounts the console inside the .overlay grid's MIDDLE row (via the
+     routed <main>), not as a direct grid child, so `.center`'s grid
+     self-alignment can't reach it. This wrapper re-centers the home console
+     over the stage; the <main> above it owns the scroll. */
+  .cp-home-console {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(16px, 4vh, 48px) clamp(12px, 4vw, 40px);
+  }
+
+  /* The compact console — the slim view-nav variant riding atop Day/Week/Year
+     (same `.views.console` vocabulary, tightened). */
+  .cp-compact-console {
+    display: flex;
+    justify-content: center;
+    padding: clamp(10px, 1.6vw, 18px) 12px clamp(4px, 1vw, 10px);
+  }
+  .views.console.compact .view {
+    padding: clamp(9px, 1vw, 12px) clamp(16px, 2.2vw, 28px);
+    flex: 0 1 auto;
+  }
+  .views.console.compact .view .vw-word {
+    font-size: clamp(14px, 1.3vw, 16px);
+  }
+  /* RESPONSIVE-AUDIT polish: at phone width the FULL home console's four chips
+     compress to ~66px each and the sub-lines ("Curricular plan", "Planner hub")
+     crowd illegibly. Borrow the compact variant's answer — word only — so the
+     chips read Day / Week / Year / Plan cleanly. ≥481px the subs return. */
+  @media (max-width: 480px) {
+    .views.console:not(.compact) .view .vw-sub {
+      display: none;
+    }
+  }
+
+  /* Console entries are anchors (TransitionLink) — drop the UA underline. */
+  .views .view {
+    text-decoration: none;
+  }
+
+  /* Active-view cue — carried by the compact console (home never marks one;
+     home isn't a NAV destination). Reads clearly against the dark stage AND
+     stays distinct from the :hover wash (rgba .22) via a stronger fill + an
+     inset ring, not a 0.04-alpha nudge (§4a W3.4 finding #3). */
+  .views.console .view.active {
+    background: rgba(255, 255, 255, 0.34);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  }
+  :root[data-tone="light"] .views.console .view.active,
+  .home[data-tone="light"] .views.console .view.active {
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: inset 0 0 0 1px rgba(28, 27, 46, 0.12);
+  }
+
+  /* ── W3.4: /planner immersive Planning-Hub seam stub ───────────────────── */
+  .cp-planner-stub {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Top padding clears the absolutely-positioned .immersbar (z-40). */
+    padding: clamp(72px, 12vh, 120px) clamp(20px, 6vw, 64px)
+      clamp(24px, 6vh, 64px);
+    text-align: center;
+  }
+  .cp-planner-seam {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    max-width: 520px;
+  }
+  .cp-planner-glyph {
+    display: inline-grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: var(--r-xl);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+  }
+  .cp-planner-glyph svg {
+    width: 34px;
+    height: 34px;
+  }
+  .cp-planner-title {
+    font-family: var(--head-font, var(--font-display));
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-size: clamp(26px, 3.4vw, 40px);
+    line-height: 1.05;
+    margin: 0;
+  }
+  .cp-planner-lede {
+    font-size: clamp(15px, 1.5vw, 18px);
+    line-height: 1.5;
+    margin: 0;
+    opacity: 0.86;
+  }
+  .cp-planner-note {
+    font-size: clamp(13px, 1.2vw, 14px);
+    line-height: 1.5;
+    margin: 0;
+    opacity: 0.62;
+  }
+  :root[data-tone="dark"] .cp-planner-stub {
+    color: #fff;
+  }
+  :root[data-tone="dark"] .cp-planner-title {
+    text-shadow: 0 2px 24px rgba(12, 11, 20, 0.4);
+  }
+  :root[data-tone="light"] .cp-planner-stub {
+    color: var(--ink);
+  }
+  :root[data-tone="light"] .cp-planner-glyph {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.8);
+  }
+
+  /* ── Inspirational quote (bottom-center) + context popup ───────────────── */
+  .hero-quote {
+    position: absolute;
+    left: 50%;
+    bottom: clamp(14px, 3vh, 30px);
+    transform: translateX(-50%);
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    max-width: min(74%, 640px);
+    border: 0;
+    background: none;
+    cursor: pointer;
+    padding: 8px 14px;
+    text-align: center;
+    animation: quotefade 1.4s ease both;
+  }
+  @keyframes quotefade {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-quote {
+      animation: none;
+    }
+  }
+  .hero-quote-rule {
+    width: 34px;
+    height: 1px;
+    border-radius: 1px;
+    background: currentColor;
+    opacity: 0.28;
+  }
+  .hero-quote-text {
+    font-family: var(--head-font, var(--font-display-sm));
+    font-weight: 300;
+    font-size: clamp(16px, 1.7vw, 21px);
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hero-quote-by {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.5;
+    color: var(--accent-600);
+  }
+  .hero-quote:hover .hero-quote-text {
+    opacity: 0.9;
+  }
+  .hero-quote:hover .hero-quote-by {
+    opacity: 0.7;
+  }
+  :root[data-tone="dark"] .hero-quote,
+  .home[data-tone="dark"] .hero-quote {
+    color: #fff;
+  }
+  :root[data-tone="dark"] .hero-quote-text,
+  .home[data-tone="dark"] .hero-quote-text {
+    color: rgba(255, 255, 255, 0.82);
+    text-shadow: 0 1px 16px rgba(12, 11, 20, 0.4);
+  }
+  :root[data-tone="light"] .hero-quote,
+  .home[data-tone="light"] .hero-quote {
+    color: var(--ink);
+  }
+  :root[data-tone="light"] .hero-quote-text,
+  .home[data-tone="light"] .hero-quote-text {
+    color: var(--ink-soft);
+    opacity: 0.72;
+  }
+  .home[data-bg="ambient"] .hero-quote {
+    color: var(--ink);
+  }
+  .home[data-bg="ambient"] .hero-quote-text {
+    color: var(--ink-soft);
+    opacity: 0.72;
+  }
+
+  .qpop-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 170;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(18, 17, 30, 0.34);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    animation: setfade 0.25s ease;
+  }
+  .qpop {
+    position: relative;
+    width: min(440px, 92vw);
+    border-radius: var(--r-2xl);
+    padding: 30px 30px 26px;
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    -webkit-backdrop-filter: blur(34px) saturate(1.4);
+    backdrop-filter: blur(34px) saturate(1.4);
+    box-shadow:
+      0 40px 100px -36px rgba(28, 27, 46, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    color: var(--ink);
+    animation: qpopin 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes qpopin {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .qpop-scrim,
+    .qpop {
+      animation: none;
+    }
+  }
+  :root[data-tone="dark"] .qpop,
+  .home[data-tone="dark"] .qpop {
+    background: rgba(26, 28, 42, 0.78);
+    border-color: rgba(255, 255, 255, 0.16);
+    color: #fff;
+  }
+  .qpop-mark {
+    position: absolute;
+    top: 6px;
+    left: 18px;
+    font-family: var(--font-display);
+    font-size: 90px;
+    line-height: 1;
+    opacity: 0.1;
+    pointer-events: none;
+  }
+  .qpop-quote {
+    margin: 0 0 14px;
+    font-family: var(--head-font, var(--font-display));
+    font-weight: 400;
+    font-size: 21px;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    position: relative;
+  }
+  .qpop-by {
+    margin: 0 0 18px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-600);
+  }
+  :root[data-tone="dark"] .qpop-by,
+  .home[data-tone="dark"] .qpop-by {
+    color: var(--accent);
+  }
+  .qpop-context {
+    margin: 0 0 20px;
+    font-size: 14.5px;
+    line-height: 1.6;
+    opacity: 0.8;
+  }
+  .qpop-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent-600);
+    text-decoration: none;
+  }
+  :root[data-tone="dark"] .qpop-link,
+  .home[data-tone="dark"] .qpop-link {
+    color: var(--accent);
+  }
+  .qpop-link:hover {
+    text-decoration: underline;
+  }
+
+  /* ── Clock / now-next (bottom-right) ───────────────────────────────────── */
+  .clock {
+    padding: 14px 18px;
+    border-radius: var(--r-xl);
+    min-width: 248px;
+    text-align: left;
+  }
+  .clock .now-time {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .clock .tt {
+    font-family: var(--head-font, var(--font-display-sm));
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .clock .dd {
+    font-size: 12.5px;
+    font-weight: 700;
+    opacity: 0.82;
+    letter-spacing: 0.01em;
+  }
+  .clock .hr {
+    height: 1px;
+    background: currentColor;
+    opacity: 0.16;
+    margin: 0 0 11px;
+  }
+  .clock .per {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 5px 0;
+  }
+  .clock .per + .per {
+    margin-top: 4px;
+  }
+  .clock .pdot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+  }
+  .clock .pmeta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .clock .plabel {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    opacity: 0.6;
+    line-height: 1;
+  }
+  .clock .psub {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .clock .pname {
+    font-size: 14.5px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .clock .ptime {
+    font-size: 11.5px;
+    font-weight: 600;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Context label (bottom-left) ───────────────────────────────────────── */
+  .ctx {
+    padding: 10px 16px;
+    border-radius: var(--r-pill);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .ctx .cdot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--g5);
+  }
+  .ctx .ctop {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+  }
+  .ctx .csub {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.68;
+    line-height: 1.1;
+  }
+  .ctx .cstack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  /* ── Per-heading style cog (W3.5 host) ─────────────────────────────────── */
+  .homecog {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    margin-left: 0.55em;
+    position: relative;
+    top: -0.12em;
+  }
+  .eyebrow-cogrow {
+    display: block;
+  }
+  .eyebrow-cogrow .homecog {
+    margin-left: 0;
+  }
+  .homecog-btn {
+    border: 0;
+    background: none;
+    padding: 3px;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.6;
+    display: inline-grid;
+    place-items: center;
+    line-height: 0;
+    transition:
+      opacity 0.16s,
+      transform 0.2s;
+  }
+  .homecog-btn:hover {
+    opacity: 1;
+    transform: rotate(40deg);
+  }
+  .homecog-btn svg {
+    width: 1.25em;
+    height: 1.25em;
+  }
+
+  /* ══ 7.2.26 DELTA (W3.3b) — top-bar title host + immersive chrome ════════
+     Ported from the 7.2.26 BUNDLE's home.css section (the modular
+     source/home.css is STALE for the shell — WAVE-3-PLAN header caveat) +
+     the source/resource-wall.css immersbar override (one of the five
+     re-extracted files). Inert like the rest of this file: `.topbar-left`,
+     `.overlay.immersive`, `.immersbar*`, `.ib-exit`, and the `.viewwrap`/
+     `.view-titlebar`/`.vt-cogbtn` classes they reference have no markup
+     until W3.3/W3.5–W3.7 mount them. Dual-emit convention as above:
+     `[data-tone]` overrides carry both the app-root (`:root`) and the
+     mockup-host (`.home`) forms; structural `.home` rules port verbatim. */
+
+  /* View title parked next to the logo (the title + style gear no longer
+     live in the view body — Framework §3 update). */
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+  .topbar-left .view-titlebar {
+    margin: 0;
+    gap: 7px;
+    min-width: 0;
+  }
+  .topbar-left .view-title {
+    font-size: 23px !important;
+    line-height: 1;
+    padding-bottom: 0 !important;
+    border-bottom: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar-left .vt-cogbtn {
+    padding: 3px;
+  }
+  .topbar-left .vt-cogbtn svg {
+    width: 17px;
+    height: 17px;
+  }
+  /* VESTIGIAL in 7.2 (ported for bundle parity): the ViewTitle renders in
+     .topbar-left OUTSIDE .viewwrap, so this hides nothing — the real
+     edit-mode chrome change is bottom-row suppression (wired in W3.8b). */
+  .viewwrap.pb-editing .view-titlebar {
+    display: none;
+  }
+  /* Bundle-exact breakpoints for the in-bar title (720/480 — distinct from
+     the 760/420 blocks below; do not fold). Note `.brand .wm{display:none}`
+     is a 7.2 change to the EXISTING brand recipe: the wordmark yields to the
+     title on phone. */
+  /* Wordmark yields to the title so the top bar fits. Raised from the bundle's
+     ≤720 to ≤900: the app's right-side tools cluster (Personal/Team + search +
+     to-do + shoutbox + bell) is wider than the bundle's, so brand-wordmark +
+     ViewTitle + tools overflow the bar across the whole tablet range — this was
+     a 21px document horizontal-scroll at 768 (W3.5 audit BUG-1, §4 hard rule).
+     Hiding the wordmark reclaims ~140px; the glyph + title still identify the
+     bar. Raised again ≤900 → ≤1100 in W3.6: the View/Edit pill widened the
+     tools cluster on Day/Week, pushing the wordmark-in bar to ~1058px — a 34px
+     document horizontal-scroll at the 1024 tier boundary (W3.6 terminal audit,
+     §4 hard rule). Above 1100 there is ample room and the wordmark returns. */
+  @media (max-width: 1100px) {
+    .brand .wm {
+      display: none;
+    }
+  }
+  @media (max-width: 720px) {
+    .topbar-left .view-title {
+      font-size: 18px !important;
+      max-width: 38vw;
+    }
+  }
+  @media (max-width: 480px) {
+    .topbar-left {
+      gap: 8px;
+    }
+    .topbar-left .view-title {
+      max-width: 32vw;
+    }
+    /* Task #12 (RESPONSIVE-AUDIT F1): collapse the right `.tools` cluster to fit
+       the phone viewport. It measured 408px on Day/Week (with the View/Edit pill)
+       and 304px on Home against a ~320px budget, forcing a 147px / 43px document
+       horizontal-scroll (§4 hard rule) on /home, /weekly (all frames), and
+       /daily's shared chrome. Shed by VALUE — every essential and safety control
+       stays: Search (⌘K palette), the Personal/Team ModeSwitch (`.modesw-fork`,
+       the #E8179B caution control), and the NotificationBell. Dropped at ≤480:
+       the INERT View/Edit toggle (`.modesw-icon`, non-functional until W3.8b) and
+       the two secondary panel toggles (To-dos, Team Shoutbox). All three return
+       ≥481px; a future `.toolspop` overflow menu can restore the panels on phone
+       if wanted. NOTE: the Personal/Team ModeSwitch shares `.modesw-icon` (its
+       class is `modesw modesw-fork modesw-icon`), so the View/Edit toggle is
+       targeted as `.modesw-icon:not(.modesw-fork)` — the safety `.modesw-fork`
+       control is deliberately kept. The To-dos / Shoutbox buttons are matched by
+       a stable `data-tool` hook (NOT their `aria-label`) so a copy change to the
+       accessible name can't silently reintroduce the overflow. */
+    .tools .modesw-icon:not(.modesw-fork),
+    .tools .iconbtn[data-tool="todos"],
+    .tools .iconbtn[data-tool="team-shoutbox"] {
+      display: none;
+    }
+    /* …and the "More tools" overflow menu (the bundle's .toolswrap popover
+       vocabulary, first consumer) restores those two panels behind a single
+       trigger — so phones lose nothing (closes the option-A tradeoff). The
+       trigger meets the 44px touch floor (base .toolsbtn-circle is 42). */
+    .tools .toolswrap {
+      display: block;
+    }
+    .tools .toolswrap .toolsbtn-circle {
+      width: 44px;
+      height: 44px;
+    }
+    /* With the 44px trigger the cluster (fork 94 + search 44 + more 44 +
+       bell 44) ran 378px at gap:10 — 3px past a 375 viewport. gap:8 lands it
+       at 372; controls themselves stay ≥44. */
+    .tools {
+      gap: 8px;
+    }
+  }
+
+  /* Task #12 (cont.): the 481–540px band. Above the ≤480 phone rule the full
+     cluster is restored but still overflows by up to ~49px until it fits at
+     540 — the unnamed gap between the phone (≤480) and tablet (≥600) tiers
+     (real phone-landscape / small-tablet widths). Reclaim just the INERT
+     View/Edit pill (~104px) here — enough to clear the band — while To-dos and
+     Team Shoutbox stay reachable at these widths. */
+  @media (min-width: 481px) and (max-width: 540px) {
+    .tools .modesw-icon:not(.modesw-fork) {
+      display: none;
+    }
+  }
+
+  /* ══ W3.5 — the per-view title + style gear (ViewTitle) ═══════════════════
+     Base recipe for the title row, the gear button, and the pop-open
+     appearance menu. The `.topbar-left`/`.immersbar` SCOPED overrides above
+     (and below) size the title + gear per bar; these BASE rules supply the
+     button chrome + the menu the bundle references but never shipped CSS for
+     (`.vt-menu`/`.vt-menu-full`/`.vt-menuh`). No `.vt-scope`: the This-page/
+     Whole-site scope + per-view override is deferred to its own wave — this
+     menu writes WHOLE-SITE appearance only. Values are bundle-faithful. */
+  .view-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .view-title {
+    font-family: var(--head-font, var(--font-display));
+    font-weight: 700;
+    font-size: 23px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .vt-cog {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  .vt-cogbtn {
+    border: 0;
+    background: none;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.5;
+    padding: 4px;
+    display: inline-grid;
+    place-items: center;
+    line-height: 0;
+    transition:
+      opacity 0.15s,
+      transform 0.2s;
+  }
+  .vt-cogbtn:hover {
+    opacity: 1;
+    transform: rotate(40deg);
+  }
+  .vt-cogbtn svg {
+    width: 20px;
+    height: 20px;
+  }
+  :root[data-tone="dark"] .vt-cogbtn,
+  .home[data-tone="dark"] .vt-cogbtn {
+    color: #fff;
+  }
+  :root[data-tone="light"] .vt-cogbtn,
+  .home[data-tone="light"] .vt-cogbtn {
+    color: var(--ink-soft);
+  }
+
+  /* Immersbar variant — white title (+ shadow) over the frame on dark tone. */
+  .immersbar .view-titlebar {
+    gap: 8px;
+  }
+  .immersbar .view-title {
+    font-size: 23px !important;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #fff;
+    text-shadow: 0 1px 16px rgba(0, 0, 0, 0.4);
+  }
+  :root[data-tone="light"] .immersbar .view-title,
+  .home[data-tone="light"] .immersbar .view-title {
+    color: var(--ink);
+    text-shadow: none;
+  }
+  .immersbar .vt-cogbtn {
+    padding: 4px;
+    color: #fff;
+  }
+  :root[data-tone="light"] .immersbar .vt-cogbtn,
+  .home[data-tone="light"] .immersbar .vt-cogbtn {
+    color: var(--ink-soft);
+  }
+  .immersbar .vt-cogbtn svg {
+    width: 18px;
+    height: 18px;
+  }
+  @media (max-width: 720px) {
+    .immersbar .view-title {
+      font-size: 18px !important;
+      max-width: 46vw;
+    }
+  }
+
+  /* The pop-open appearance menu — portal to <body>, positioned fixed from the
+     cog's rect (ViewTitle sets left/top inline). `.vt-menuwrap` is the
+     full-screen click-catcher shell; `.vt-menu` is the glass panel. */
+  .vt-menuwrap {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    pointer-events: none;
+  }
+  .vt-menu {
+    pointer-events: auto;
+    position: fixed;
+    width: 248px;
+    padding: 14px;
+    border-radius: var(--r-xl);
+    background: rgba(255, 255, 255, 0.92);
+    -webkit-backdrop-filter: blur(30px) saturate(1.3);
+    backdrop-filter: blur(30px) saturate(1.3);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 30px 70px -30px rgba(12, 11, 20, 0.6);
+    color: var(--ink);
+    animation: hubpop 0.18s ease;
+  }
+  .vt-menu-full {
+    /* Cap to the viewport so the panel never overflows a tiny phone even if
+       the anchor clamp is generous (§4a W3.5 finding #4). */
+    width: min(332px, calc(100vw - 16px));
+    max-height: min(78vh, 560px);
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .vt-menu-full::-webkit-scrollbar {
+    display: none;
+  }
+  :root[data-tone="dark"] .vt-menu,
+  .home[data-tone="dark"] .vt-menu {
+    background: rgba(26, 25, 38, 0.94);
+    border-color: rgba(255, 255, 255, 0.14);
+    color: #fff;
+  }
+  .vt-menuh {
+    font-family: var(--font-display-sm);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    margin-bottom: 11px;
+  }
+  /* The bundle references `hubpop` but never defines it; supply a soft pop. */
+  @keyframes hubpop {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .vt-menu {
+      animation: none;
+    }
+  }
+
+  /* ── Immersive chrome (Plan · Post · Teach) — content fills the whole
+     frame card; a single slim bar floats over the top (Framework §9b). ── */
+  .overlay.immersive {
+    padding: 0;
+    grid-template-rows: 1fr;
+    border-radius: var(--frame-radius, 30px);
+    overflow: hidden;
+  }
+  .home .frame.fullbleed ~ .overlay.immersive {
+    border-radius: 0;
+  }
+  .immersbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px clamp(16px, 2.2vw, 26px) 22px;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(8, 8, 16, 0.42) 0%,
+      rgba(8, 8, 16, 0.16) 52%,
+      transparent 100%
+    );
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
+  }
+  .immersbar > * {
+    pointer-events: auto;
+  }
+  :root[data-tone="light"] .immersbar,
+  .home[data-tone="light"] .immersbar {
+    background: linear-gradient(
+      to bottom,
+      rgba(248, 249, 252, 0.62) 0%,
+      rgba(248, 249, 252, 0.2) 52%,
+      transparent 100%
+    );
+  }
+  /* Bundle uses `.hidden`; renamed to dodge Tailwind's display:none utility
+     (§4a finding #10 — recorded parity deviation, see ImmersiveBar.tsx). */
+  .immersbar.immersbar-hidden {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  .immersbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .immersbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+  .ib-exit {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    background: rgba(255, 255, 255, 0.18);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    transition:
+      transform 0.15s,
+      background 0.15s;
+  }
+  :root[data-tone="light"] .ib-exit,
+  .home[data-tone="light"] .ib-exit {
+    color: var(--ink);
+    border-color: var(--border);
+    background: rgba(255, 255, 255, 0.66);
+  }
+  .ib-exit svg {
+    width: 21px;
+    height: 21px;
+  }
+  .ib-exit:hover {
+    transform: translateX(-2px);
+    background: rgba(255, 255, 255, 0.3);
+  }
+  /* Resource-wall immersbar scrim override (source/resource-wall.css:296) —
+     ported LAST to mirror the bundle's cascade, where this bare, equal-
+     specificity rule loads after the base above and therefore wins
+     EVERYWHERE the bundle shows an immersbar. Possible design accident
+     (wall-only intent?) — flagged in the plan; if design confirms wall-only,
+     W3.3's component pass scopes it to the wall surface. */
+  .immersbar {
+    background: linear-gradient(
+      to bottom,
+      rgba(12, 11, 20, 0.5) 0%,
+      rgba(12, 11, 20, 0.16) 54%,
+      transparent 100%
+    );
+  }
+  :root[data-tone="light"] .immersbar,
+  .home[data-tone="light"] .immersbar {
+    background: linear-gradient(
+      to bottom,
+      rgba(248, 249, 252, 0.8) 0%,
+      rgba(248, 249, 252, 0.34) 54%,
+      transparent 100%
+    );
+  }
+
+  /* ── W3.3 additive follow-ups the W3.3a/b passes missed (bundle-exact):
+     the ctx avatar dot, the ctx gear buttons, and the clock's done/empty
+     states — flagged by the component build; pure recipe additions. ──────── */
+  .ctx .cdot-av {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    overflow: hidden;
+    flex: 0 0 auto;
+    background: linear-gradient(
+      135deg,
+      var(--accent, var(--brand-500)),
+      color-mix(in oklab, var(--accent, var(--brand-500)) 55%, #1c1b2e)
+    );
+    color: #fff;
+    font-family: var(--font-display-sm);
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .ctx-gear {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.7;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    margin-left: 4px;
+  }
+  .ctx-gear:hover {
+    opacity: 1;
+    background: rgba(127, 127, 150, 0.16);
+    transform: rotate(40deg);
+    transition: transform 0.25s;
+  }
+  .ctx-gear svg {
+    width: 18px;
+    height: 18px;
+  }
+  .clock-done {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.62;
+    margin: 0 0 9px;
+  }
+  .clock-empty {
+    font-size: 12.5px;
+    opacity: 0.6;
+    padding: 4px 0;
+  }
+
+  /* ══ Team-mode caution glow (W3.3) — replaces the red MasterBanner ═══════
+     CLAUDE.md §2 + the bundle's own recipe (mockup CSS 268-282, ported
+     BYTE-FAITHFUL per the §4a design-fidelity rule; rgba(232,23,155,…) is
+     --subj-5-bright): a persistent pink edge-glow + a pulsing entry
+     (`teamflash` opacity dip ×2, motion-gated so reduced-motion renders it
+     SOLID), a pink ring on the mode-switch pill, and the Team segment
+     reading pink. ChromeShell mirrors editMode==="master" onto
+     <html data-mode="team">. MAPPING NOTE (recorded deviation): the bundle
+     draws the edge-glow on `.frame::after`; the app has no `.frame` element
+     — `.overlay` spans the same inset window, so the ::after lives there
+     (z-8, above the corner chips at z-7, pointer-events:none). Second
+     deviation for the §4b comparer: in the bundle the glow paints BENEATH
+     the overlay content (frame < overlay); here the 60px wash paints OVER
+     content — purely cosmetic (pointer-events:none), resolve if §4b flags
+     the read. */
+  .overlay::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--frame-radius, 30px);
+    pointer-events: none;
+    z-index: 8;
+    box-shadow:
+      inset 0 0 0 2px rgba(232, 23, 155, 0.62),
+      inset 0 0 60px rgba(232, 23, 155, 0.22);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  :root[data-mode="team"] .overlay::after {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :root[data-mode="team"] .overlay::after {
+      animation: teamflash 1s ease 2;
+    }
+  }
+  @keyframes teamflash {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
+  }
+  /* Mode switch glows pink + the Team segment reads pink when active.
+     SCOPED to `.modesw-fork` (the Personal/Team toggle) on purpose: the W3.6
+     View↔Edit toggle reuses the base `.modesw` recipe but must NOT glow — the
+     pink caution glow is the team-edit safety signal, not decoration (CLAUDE.md
+     §2/§6). Do not relax this back to a bare `.modesw` selector. */
+  :root[data-mode="team"] .modesw.modesw-fork {
+    box-shadow:
+      0 0 0 1.5px rgba(232, 23, 155, 0.5),
+      0 0 24px -6px rgba(232, 23, 155, 0.65),
+      0 10px 30px -16px rgba(12, 11, 20, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+  :root[data-mode="team"] .modesw-ib.team.active {
+    color: #e8179b;
+    text-shadow: 0 0 16px rgba(232, 23, 155, 0.55);
+  }
+
+  /* ── Responsive (mockup breakpoints; §4 three-tier contract) ───────────── */
+  @media (max-width: 760px) {
+    .overlay {
+      padding: 14px;
+    }
+    .clock {
+      min-width: 0;
+      width: 100%;
+    }
+    .botbar {
+      flex-direction: column-reverse;
+      align-items: stretch;
+      gap: 12px;
+    }
+    .ctx {
+      align-self: flex-start;
+    }
+    .views {
+      gap: 8px;
+    }
+    .view {
+      min-width: 0;
+      flex: 1 1 0;
+      padding: 13px 12px;
+    }
+    .greeting {
+      font-size: 30px;
+    }
+    .tools .label-hide {
+      display: none;
+    }
+  }
+  @media (max-width: 420px) {
+    .views {
+      flex-wrap: nowrap;
+    }
+  }
+
+  /* ≥44px touch targets (CLAUDE.md §4 hard rule) on TOUCH pointers. The corner
+     controls render compact for a mouse (42×42 icon buttons, 42×34 mode
+     segments, 30×30 gears) but must meet the hit-area minimum on phone/tablet.
+     Scoped to `pointer: coarse` rather than a width cutoff so it (a) leaves the
+     desktop mouse look untouched and (b) also covers 768–900px tablets a
+     max-width:760px block would miss. min-width/height override the fixed
+     width/height (used size clamps up to the minimum) while place-items:center
+     keeps each glyph centered. The high-consequence Personal/Team toggle
+     (.modesw button, .modesw-ib) is included. (Wave-3 audit.) */
+  @media (pointer: coarse) {
+    .iconbtn,
+    .toolsbtn-circle,
+    .modesw-ib,
+    .ib-exit,
+    .backbtn,
+    .ctx-gear,
+    .homecog-btn,
+    .topbar-left .vt-cogbtn,
+    .immersbar .vt-cogbtn {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .modesw button {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      /* justify-content too: this rule (`.modesw button`, higher specificity
+         than the base `.modesw-ib`) also matches the icon-variant Personal/Team
+         buttons and flips them from grid to flex, so it must re-center on the
+         main axis or the icon shifts to the start edge. (Wave-3 re-audit.) */
+      justify-content: center;
+    }
+  }
+
+  /* ── W3.6 · `.va-ph` period-rail legibility (inert-ready) ───────────────────
+     The period/time rail (leftmost gutter of the Frame-A period×day grid) that
+     CONSUMES these rules lands in W3.8c (the "period-aligned column board" the
+     plan already scopes for Week EDIT). Per W3.6's "ADD `.va-ph` legibility"
+     directive, the recipe is staged now and stays a set of dead selectors until
+     that grid renders — the same inert-CSS pattern used elsewhere this wave
+     (plan §W3.3b / line 94). Ported from the 7.2.26 bundle (base :880, overrides
+     :4285-4290), DUAL-SCOPED `:root` (app-wide chrome host) + `.home` (mockup
+     home scope) per this file's header convention, and branching only on the
+     existing derived/appearance axes (`data-tone` / `data-bg` / `data-dim`) — so
+     it touches nothing on the 5-surface appearance allowlist (lockstep-safe). */
+  .va-ph {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    opacity: 0.6;
+    font-variant-numeric: tabular-nums;
+    padding-right: 6px;
+    text-align: right;
+  }
+  /* Dark tone → near-white (legibility contract: branch on tone, never theme). */
+  :root[data-tone="dark"] .va-ph,
+  .home[data-tone="dark"] .va-ph {
+    color: rgba(255, 255, 255, 0.86);
+    opacity: 0.96;
+  }
+  /* Over a photo that is NOT brightened → pure white + dark glow for contrast. */
+  :root[data-bg="photo"]:not([data-dim="bright"]) .va-ph,
+  .home[data-bg="photo"]:not([data-dim="bright"]) .va-ph {
+    color: #fff;
+    opacity: 1;
+    text-shadow: 0 1px 9px rgba(0, 0, 0, 0.7);
+  }
+  /* Brightened photo → soft ink + light glow (overrides the pure-white above). */
+  :root[data-bg="photo"][data-dim="bright"] .va-ph,
+  .home[data-bg="photo"][data-dim="bright"] .va-ph {
+    color: var(--ink-soft);
+    opacity: 0.92;
+    text-shadow: 0 1px 8px rgba(255, 255, 255, 0.7);
+  }
+}
+
+/* ── Print (§4a finding #6) — outside the @media screen wrapper above, so it
+   actually applies on paper: the corner chrome is navigation/ambient UI and
+   must never reach print output (globals.css's print rules only suppress
+   header/aside; the botbar/quote/immersbar/glow would otherwise degrade to
+   stray in-flow text over the print templates). */
+@media print {
+  .topbar,
+  .botbar,
+  .hero-quote,
+  .immersbar,
+  /* The console (home landing + compact view-nav) is screen navigation —
+     its `.views`/`.view` styling lives in @media screen, so without this it
+     would degrade to bare "Day Week Year Plan" link text on paper (§4a
+     W3.4 finding #2). */
+  .cp-home-console,
+  .cp-compact-console,
+  .overlay::after {
+    display: none !important;
+  }
+}

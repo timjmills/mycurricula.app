@@ -161,7 +161,10 @@ export interface PlannerDataSource {
   /** Create a teacher's own (personal) lesson in a slot. `gradeLevelId` is the
    *  RESOLVED grade uuid the row is keyed on (the Supabase source needs a real
    *  uuid for `personal_authored_lessons.grade_level_id`); it defaults to
-   *  `input.gradeLevelId` when omitted so existing callers keep working. */
+   *  `input.gradeLevelId` when omitted so existing callers keep working.
+   *  `objective` (W3.7 audit #5) rides in the create itself so the row lands
+   *  atomically — the prior post-create editLesson tee could fail silently
+   *  and strand a lesson without its objective. Omitted → "". */
   createLesson(
     input: {
       gradeLevelId: string;
@@ -170,6 +173,7 @@ export interface PlannerDataSource {
       week: number;
       day: number;
       title: string;
+      objective?: string;
     },
     ownerId: string,
     gradeLevelId?: string,

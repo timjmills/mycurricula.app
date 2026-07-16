@@ -8,7 +8,7 @@ Read it before editing code, then read the authoritative docs it points to.
 When docs disagree, use this hierarchy:
 
 1. `CLAUDE.md` - current project truth: product rules, phase gates, shipped vs. pending status, architecture, and "do not" constraints.
-2. `BUILD_STANDARD.md` - current visual, structural, responsive, and component contract.
+2. The **v2 visual contract**: the **v2 mockup + `V2 Framework.md`** (under `Documents/Claude Design/.../design-system/`) is the canonical visual reference for the v2 rebuild, alongside `BUILD_STANDARD.md` (the structural, responsive, and component contract). The handoff **wins for look and behavior** — when code and the handoff disagree, fix the code. Recreate it faithfully in idiomatic React; cite the handoff as the origin. The older `/weekly` is no longer the canonical visual reference.
 3. `Documents/Project Files/5.16.26 planning_document.md` - master product spec, data model, screen-by-screen intent, and historical roadmap context.
 4. `docs/5.24.26 claude-access.md` - operational auth-bypass instructions. Read before changing auth, middleware, service-role access, or the Claude bypass.
 5. `docs/*audit*.md`, `docs/research-*.md`, and `docs/historical/*` - dated snapshots or historical reference. Verify against current code before treating any finding as open or binding.
@@ -22,22 +22,32 @@ Every primary view currently uses `lib/mock/` fixtures. Supabase persistence,
 auth rows, realtime, holidays-on-weekly/daily, schedule rotation cycles, and
 unit import are Phase 1B work.
 
-Shipped Phase 1A surfaces:
+The v2 console spine is **Day · Week · Year · Lesson Plan · Teach**, plus the
+Planner Hub and Resource Wall. Surfaces:
 
-- `/weekly`
-- `/daily`
-- `/year`
-- `/subject`
+- `/daily` (Day — "what now?")
+- `/weekly` (Week)
+- `/year` (Year — the v2 "Curricular plan"; `/subject` is a legacy redirect to `/year`, already retired on master)
+- Lesson Plan (the unit/lesson planner)
+- Teach (the projection board)
+- `/planner` — **Planner Hub** (v2 planning hub surface; the **default landing route is `/weekly`, not `/planner`**)
+- `/post` — **Resource Wall** (v2 resource board: per-card colors, per-section photos)
 - `/schedule` as a deep-link and side-panel via GlobalRail
 - `/catch-up`
 - `/settings/*`
 - Onboarding wizard
 - Master/Personal visual and local state model
-- Vivid style as the default
 - Claude auth bypass
 
-Do not treat old roadmap text that places Vivid, Schedule, or visual forking
-in Phase 2 as current.
+New v2 surfaces / capabilities also include a **Tools dock**, **3-layer
+notifications** (toasts · bell + notification center · inline badges), a
+**per-heading style cog** (set a surface's Background + Frame, this-page vs
+whole-site), and **share-links** (signed tokens).
+
+**v2 redesign is in progress behind `NEXT_PUBLIC_V2`** — a build-time flag with
+per-wave reveal; rollback is redeploy-gated. **Default appearance:** Frame A
+(Calm Glass) · Photo background · Theme Clear · auto tone (luminance-sampled from
+the active photo). **Hosting:** Cloudflare Workers via OpenNext + R2.
 
 ## Non-Negotiable Product Rules
 
@@ -45,7 +55,7 @@ in Phase 2 as current.
 - The app is multi-grade by design. Never assume Grade 5 in data shapes, queries, or reusable UI.
 - The school week is configurable. Never hard-code a five-day week, Sun-Thu, or Mon-Fri outside sample/mock data.
 - Timetables are configurable and may rotate on cycles independent of calendar weeks. Never assume a single fixed daily schedule or a weekly-only cycle.
-- Master/Personal forking is core. Personal edits lazily fork; completion never forks; Master edits require the explicit Personal/Master toggle and banner. Do not add confirm dialogs for entering Master mode.
+- Master/Personal forking is core, and **unchanged in value space**: internal `editMode ∈ personal | master`, `SaveTarget ∈ personal | core`. Only the **UI label** changes — Master is surfaced to teachers as **"Team Curriculum."** Personal edits lazily fork; completion never forks; Team edits require the explicit **Personal / Team Curriculum** toggle plus a **pink caution glow** (`#E8179B`) firing on `[data-mode="team"]` (frame edge-glow + toggle + planning header), persistent, with a brief two-pulse; **solid under reduced-motion**, **NEVER a confirm dialog** — the glow IS the safety mechanism. The three-tier lesson cues are **preserved**: solid subject stripe (from Team/Master) · dashed stripe + "Modified" pill (personally edited) · move-arrow (personally moved).
 - Color carries information. Do not use color as decoration or invent subject colors.
 
 ## Build Standards
@@ -54,14 +64,69 @@ Use the existing stack and patterns:
 
 - Next.js App Router, React 19, TypeScript.
 - Tailwind only for layout and spacing utilities.
-- CSS custom-property tokens in `app/tokens.css` for color, type, spacing, radius, shadow, and z-index.
+- Fonts: **Poppins** (display/H1) · **DM Sans** (headings/wordmark) · **Plus Jakarta Sans** (UI/body/data), delivered via `next/font` — do **not** switch to a Google Fonts `@import`.
+- CSS custom-property tokens in `app/tokens.css` for color, type, spacing, radius, shadow, and z-index. **Token migration is ADDITIVE:** v2 names are added and ~6 shared collisions re-pointed, but **all v1-only tiers are preserved** (`--chrome-accent-*`, `--rail-bg` / `--panel-bg`, `--logo-*`, `--wf-*` / `--teach-*`, `--tag-*`, `--hl-*`, scrims, the z-scale). Do not delete a v1 tier just because v2 doesn't reference it.
 - Subject colors only through `.cp-subj.<subjectId>` or `useSubjectColor(subjectId)`.
 - Import public component surfaces from folder barrels where they exist; avoid deep imports when a component family exposes `index.ts`.
 - Never import app code from `Documents/`; that folder is reference material only.
 
+### The v2 appearance engine — attribute vocabulary
+
+The visual system is a set of independent axes, all set as `<html>` / app-root
+data attributes by `lib/theme.tsx`. **This replaces the v1 3-axis model**
+(`data-style ∈ quiet|calm|vivid`, `data-palette ∈ normal|highlight`,
+`data-theme ∈ paper|cloud|night|mint|sky|blossom`): `data-style` and
+`data-palette` are **dropped**; `paper` + `cloud` **fold to `clear`**; Night is a `data-theme`
+value (the only dark theme) that forces derived `data-tone="dark"`; dark
+rendering branches on `data-tone`.
+
+- `data-frame` ∈ `glass | paper | color` — layout character + material + emphasis. The working build also carries the equivalent `data-version ∈ A|B|C` on the app root (A=Glass, B=Bright/paper, C=Color-forward) — **treat them as the same axis.** A frame changes layout/material, never the global tone.
+- `data-glass` ∈ `dark | light` — the two frosted **registers** of Frame A (dark frosted = translucent dark panels + white text; white frosted = translucent white panels + dark ink). Surface-only — flips a panel's fill **and** its text together; must never wash the background.
+- `data-bg` ∈ `photo | wash` — what lives behind the glass. **Frosted glass over Photo, Liquid glass ("Liquid v5") over Wash.**
+- `data-theme` ∈ `clear | night | honey | blossom | mint | sky | off` — the seven themes (below). (`off` = Photo, the true ungraded photo.)
+- `data-dim` ∈ `dim | normal | bright` — Photo prominence + text treatment (Photo only); `normal` is an **auto** mode (samples photo luminance to derive tone).
+- `data-tone` ∈ `light | dark` — **DERIVED**, not chosen: Night forces dark; Photo Dim/Normal → dark; Wash / Photo-Bright / any light theme → light. **Every surface branches on `data-tone`, never on the theme.**
+- Plus the supporting axes `data-canvas` (home center panel), `data-veil` (readability layer), and `data-zoom` (ambient drift on/off).
+
+**The 7 themes** (a theme washes the whole app — ambient palette, soft-light tint,
+and the `--accent`/glow; subject + status colors never move):
+
+| Theme | Role |
+|---|---|
+| **Clear** | the resting theme (formerly Normal/paper); balanced brand mesh, white/clear swatch |
+| **Night** | the dark theme — the dark **tone** |
+| **Honey** | warm gold/amber/coral |
+| **Blossom** | pink/violet/periwinkle multi-hue |
+| **Mint** | blue-green |
+| **Sky** | cool blues |
+| **Off (Photo)** | no wash/grade — the true original photo |
+
+**Material + glass.** **GLASS is the signature material** — frosted over photo,
+"Liquid v5" over wash, in a dark or white register. Glass always carries an inner
+top highlight (`inset 0 1px 0` white line, the lit-edge read); over dark it tints
+darker, over light it stays bright; never replace floating-chrome glass with a
+flat opaque card. **RULE #1 — NO SHARP CORNERS, EVER**: every panel, card, tab,
+chip, button, image, preview tile, and input is rounded. **Color is information,
+never decoration**; **gradients are atmosphere, not surfaces**. The legibility
+contract = **branch on `data-tone`, never the theme**.
+
+**The §4 subject→slot map** (locked **team-wide** — not a teacher preference; color
+carries team-wide meaning). The token scale is wider than the named subjects
+(`--subj-1 … --subj-15`, each with `-tint` / `-ink` / `-bright` companions):
+
+| Subject | Slot | | Subject | Slot |
+|---|---|---|---|---|
+| math | `--subj-1` (gold) | | reading | `--subj-10` (blue) |
+| ufli | `--subj-2` (apricot) | | sel | `--subj-12` (teal) |
+| writing | `--subj-5` (pink) | | explorers | `--subj-13` (green) |
+| grammar | `--subj-7` (purple) | | | |
+| spelling | `--subj-9` (periwinkle) | | | |
+
+(The pink Team caution glow `#E8179B` is `--subj-5-bright`.)
+
 For UI work:
 
-- Match `/weekly` as the canonical visual reference.
+- The canonical visual reference is the **v2 mockup + `V2 Framework.md`**, not `/weekly`.
 - Reuse canonical primitives and established component families before creating anything new.
 - Do not recreate buttons, cards, list rows, headers, badges, chips, toggle groups, or tooltips inline.
 - Use the 4/8/12/16/24/32 spacing rhythm.
@@ -111,6 +176,18 @@ For changes that affect logic, security, data handling, or public interfaces,
 run an adversarial review before declaring the task complete or asking for user
 review. Trivial comments, formatting, and copy-only edits do not require this
 gate.
+
+**MANDATORY — design-fidelity verification (every wave, every visual surface).**
+Any change touching a design/visual surface (tokens, the appearance engine,
+chrome, a screen, a component's look/behavior) MUST be verified against the
+**FULL v2 design handoff, not just the markdown** — open the actual files under
+`Documents/Claude Design/.../6.24.26 design_handoff_v2_site/` and check every
+value/recipe/axis/label the change touches. **Authority chain (handoff
+README):** the runnable **bundled mockup** (`mockup/New v2 Site
+Design.bundled.html`) wins for look + behavior > **`design-system/V2
+Framework.md`** for rules > the **design-system CSS** for tokens > the plan for
+sequencing. This runs in the code-review gate (against the diff) and again in
+the Live QA gate (against the rendered result, at every device width).
 
 **Precondition — stage every in-scope file first.** The review prompt reads
 `git diff` (working tree vs index) and `git diff --cached` (index vs HEAD),
@@ -190,6 +267,13 @@ not performed through the headless review command: whichever agent has
 browser tooling runs it (in Claude Code, the user-scope `playwright` /
 `chrome-devtools` MCP servers; otherwise a local Playwright script with
 `channel: "chrome"`).
+
+**MANDATORY — compare the rendered result to the design handoff,** not just to
+a mental model: open the runnable **bundled mockup** + the
+**`design-system/*.html`** galleries in the browser alongside the running app
+and compare behavior + exact values at **every device width (phone 375–414 ·
+tablet 768–834 · desktop 1280–1440)**. Same authority chain as the code-review
+gate. A surface that works but diverges from the handoff is a finding.
 
 Breadth scales with the build — an app-wide wave gets the full template
 below; a focused change gets every surface it touches plus a browser-console
@@ -277,16 +361,20 @@ sandboxed alternative when one exists.
 
 Current routes differ from some older docs:
 
-| Older/planning name | Current route | Tab label |
+| Older/planning name | Current route | v2 console / tab label |
 | --- | --- | --- |
-| `/curriculum` | `/subject` and `/subject/<id>` | Curriculum |
-| `/yearly` | `/year` | Yearly |
+| `/curriculum`, `/subject` (→ `/subject/<id>`) | `/year` (`/subject` is a legacy redirect to `/year`) | Year (the v2 "Curricular plan") |
+| `/yearly` | `/year` | Year |
+| (the unit/lesson planner) | Lesson Plan | Lesson Plan |
+| (the projection board) | Teach | Teach |
+| (new in v2) | `/planner` | Planner Hub |
+| (new in v2 — resource board) | `/post` | Resource Wall |
 
 Use current routes in code and implementation notes.
 
 ## When To Read Extra Docs
 
-- New screen or major UI change: read `BUILD_STANDARD.md`, `CLAUDE.md`, the relevant planning-doc section, and the matching design handoff under `Documents/Claude Design/` if one exists.
+- New screen or major UI change: read the **v2 mockup + `V2 Framework.md`** (the canonical v2 visual contract, under `Documents/Claude Design/.../design-system/`), `BUILD_STANDARD.md`, `CLAUDE.md`, and the relevant planning-doc section. The handoff wins for look/behavior.
 - Auth, middleware, Cloudflare bypass, service-role, or audit-log work: read `docs/5.24.26 claude-access.md` and `docs/claude-bypass.sql`.
 - Lesson-flow resources or daily detail work: check `docs/historical/5.20.26 Plugin Directions - Daily View Lesson Panel.md`.
 - Drag/drop behavior: check `docs/historical/5.18.26 collapse_on_drag_pattern.md`.

@@ -15,8 +15,9 @@
 // `lesson` is still read INDEPENDENTLY of parseDailyParams because the
 // existing Subject→Daily jump links carry a lesson with NO date, and
 // parseDailyParams nulls the whole link when its required `date` is absent.
-import { DailyView } from "@/components/daily";
+import { DailyView, DailyViewV1 } from "@/components/daily";
 import { parseDailyParams } from "@/lib/deep-links";
+import { V2 } from "@/lib/v2-flag";
 
 export default async function DailyPage({
   searchParams,
@@ -33,7 +34,15 @@ export default async function DailyPage({
   }
   const link = parseDailyParams(sp);
   const initialLessonId = sp.get("lesson") ?? undefined;
-  return (
+  // ── NEXT_PUBLIC_V2 router gate (Wave-13 rollback half) ──────────────────
+  // V2 is inlined by `next build` and constant-folded, so exactly one shell
+  // ships per build. Flag ON → the v2 <DailyView> host (day-v2 canvas). Flag
+  // OFF → <DailyViewV1>, a verbatim copy of master's live-on-prod Daily. Both
+  // accept the same deep-link seed props, so the `/daily?lesson=` and
+  // `?date=` hand-offs behave identically on either side of the flag.
+  return V2 ? (
     <DailyView initialLessonId={initialLessonId} initialDate={link?.date} />
+  ) : (
+    <DailyViewV1 initialLessonId={initialLessonId} initialDate={link?.date} />
   );
 }

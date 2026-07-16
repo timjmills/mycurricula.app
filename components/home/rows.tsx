@@ -16,6 +16,7 @@ import {
   todayNotes,
 } from "@/lib/home/today";
 import { TIPS } from "@/lib/home/tips";
+import { useViewEditMode } from "@/lib/edit-mode-state";
 import { TEACHER_BY_ID } from "@/lib/mock/teachers";
 import type { HomeRowId } from "@/lib/home/use-home-layout";
 import styles from "./rows.module.css";
@@ -52,7 +53,10 @@ export function TodayScheduleRow() {
       {blocks.length ? (
         <ul className={styles.schedule}>
           {blocks.map((b) => (
-            <li key={b.id} className={`cp-subj ${b.subject ?? ""} ${styles.block}`}>
+            <li
+              key={b.id}
+              className={`cp-subj ${b.subject ?? ""} ${styles.block}`}
+            >
               <span className={styles.blockTime}>{b.startLabel}</span>
               <span className={styles.blockDot} aria-hidden />
               <span className={styles.blockName}>
@@ -108,12 +112,19 @@ export function TodoRow() {
 
 export function TodayLessonsRow() {
   const lessons = todayLessons();
+  // W3.8b force-reset: Home→Day nav resets Day to View (bundle B:11978) —
+  // fired on the click itself; deep links / content jumps never reset.
+  const { setEdit: setDayEdit } = useViewEditMode("Day");
   return (
     <Row
       label="Today's lessons"
       size="tall"
       action={
-        <Link href="/daily" className={styles.rowLink}>
+        <Link
+          href="/daily"
+          className={styles.rowLink}
+          onClick={() => setDayEdit(false)}
+        >
           Open Daily
         </Link>
       }
@@ -125,7 +136,9 @@ export function TodayLessonsRow() {
               <span className={styles.lessonStripe} aria-hidden />
               <div className={styles.lessonText}>
                 <span className={styles.lessonTitle}>{l.title}</span>
-                {l.objective && <span className={styles.lessonObj}>{l.objective}</span>}
+                {l.objective && (
+                  <span className={styles.lessonObj}>{l.objective}</span>
+                )}
               </div>
               {l.status === "done" && (
                 <span className={styles.doneTick} aria-label="done">
@@ -165,7 +178,10 @@ export function ShoutboxRow() {
   return (
     <Row label="Team shoutbox & notes">
       {notes.map((n, i) => (
-        <div key={`note-${i}`} className={`${styles.note} ${styles[n.priority] ?? ""}`}>
+        <div
+          key={`note-${i}`}
+          className={`${styles.note} ${styles[n.priority] ?? ""}`}
+        >
           <span className={styles.noteBadge}>{n.priority}</span>
           <span>{n.body}</span>
         </div>
@@ -190,11 +206,19 @@ export function QuickLinksRow() {
     ["/year", "Year"],
     ["/subject", "Curriculum"],
   ];
+  // W3.8b force-reset: only the Daily jump card resets Day to View on the
+  // click (bundle B:11978 — Home→Day nav; other destinations never reset).
+  const { setEdit: setDayEdit } = useViewEditMode("Day");
   return (
     <Row label="Jump back in">
       <div className={styles.links}>
         {links.map(([href, label]) => (
-          <Link key={href} href={href} className={styles.jumpCard}>
+          <Link
+            key={href}
+            href={href}
+            className={styles.jumpCard}
+            onClick={href === "/daily" ? () => setDayEdit(false) : undefined}
+          >
             {label}
           </Link>
         ))}

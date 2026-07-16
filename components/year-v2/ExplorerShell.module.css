@@ -1,0 +1,298 @@
+/* ExplorerShell.module.css — chrome for the Year drill-down dialog (Wave 7).
+ *
+ * Extracted verbatim from UnitExplorer.module.css so the Unit Planner and the
+ * Lesson Planner share one dialog. Subject color arrives through the
+ * `.cp-subj <subject>` cascade on the modal root (lib/palette.tsx bridge):
+ * --c bright accent, --cl soft tint, --cd deep text. Every derived accent
+ * mixes toward var(--surface) (never #fff) so the modal re-tints on Night →
+ * dark instead of blowing out. Tokens only — no hex literals, no px font sizes
+ * outside the token scale.
+ *
+ * The root carries the GLOBAL `ue-modal` class and the scrim `ue-scrim`, both
+ * enrolled in app/themes.css §5, which layers the active theme's accent wash on
+ * top of these backgrounds (see the component header).
+ *
+ * The `--ue-*` accents are declared on `.modal` and INHERIT into every body
+ * slot, so UnitExplorer.module.css and plan-page.module.css can consume them
+ * without redeclaring. */
+
+/* Subject-derived accents, scoped to the modal root. */
+.modal {
+  --ue-tint-soft: color-mix(in srgb, var(--c) 10%, var(--surface));
+  --ue-tint-hover: color-mix(in srgb, var(--c) 16%, var(--surface));
+  --ue-accent-border: color-mix(in srgb, var(--c) 42%, transparent);
+  --ue-hairline: color-mix(in srgb, var(--ink-500) 14%, transparent);
+}
+
+/* ── Scrim ──────────────────────────────────────────────────────────────── */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  background: rgba(14, 13, 24, 0.46);
+  -webkit-backdrop-filter: blur(9px) saturate(1.1);
+  backdrop-filter: blur(9px) saturate(1.1);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  animation: ueFade 0.18s ease;
+}
+@keyframes ueFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+:global(:root[data-tone="light"]) .scrim,
+:global(.home[data-tone="light"]) .scrim {
+  background: rgba(238, 241, 247, 0.5);
+}
+
+/* ── Modal card ─────────────────────────────────────────────────────────── */
+.modal {
+  /* 100% resolves to the scrim's PADDED grid cell (viewport − 2×24px), so the
+     modal never overflows the 24px scrim margin on phones — the "9px clip at
+     375" trap that a flat 96vw hits (LessonModal's proven fix). The 820px cap
+     still wins on wide viewports. */
+  width: min(820px, 100%);
+  max-height: 92vh;
+  min-width: min(360px, calc(100vw - 48px));
+  border-radius: var(--r-2xl, 32px);
+  background: var(--surface, #fff);
+  color: var(--ink, #1c1b2e);
+  box-shadow: 0 40px 100px -30px rgba(8, 8, 18, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: uepop 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@keyframes uepop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .modal {
+    animation: none;
+  }
+}
+
+/* A mode-switch remount is not a real open — replaying the scrim fade would
+   flash the page behind the dialog. */
+.noAnim {
+  animation: none;
+}
+
+/* ── Mode switch — Unit Planner | Lesson Planner ─────────────────────────── */
+.modeSwitch {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px 0;
+  background: var(--ue-tint-soft);
+  flex: 0 0 auto;
+}
+/* Button-class rules are DOUBLED (0,2,0) so they outgun the `.cp-root button`
+   reset (0,1,1) — the modal portals into `.cp-root`, whose reset would
+   otherwise strip padding / border / background. Same for `.close` / `.tab`. */
+.modeBtn.modeBtn {
+  appearance: none;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: var(--r-pill, 999px);
+  padding: 7px 14px;
+  font-size: var(--t-12, 12px);
+  font-weight: 700;
+  color: var(--ink-500, #6e6c82);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.14s,
+    color 0.14s;
+}
+.modeBtn.modeBtn:hover {
+  color: var(--cd, var(--ink, #1c1b2e));
+  background: var(--ue-tint-hover);
+}
+.modeBtnOn.modeBtnOn {
+  color: var(--cd, var(--ink, #1c1b2e));
+  background: var(--surface, #fff);
+  border-color: var(--ue-accent-border);
+}
+.modeBtn.modeBtn:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: 2px;
+}
+
+/* ── Header — subject gradient ──────────────────────────────────────────── */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  color: #fff;
+  /* Both stops mix toward black so white header text clears WCAG AA even on
+     the LIGHTEST subject (Math gold): the old light stop was raw `var(--c)`,
+     giving white-on-gold ~1.82:1 (QA W7 finding 1). These are the DayC-hero
+     anchors (Wave 4) — 58%/40% subject-over-black in oklab — QA-measured at
+     white ≥6.5:1 worst case. `#000` is a FIXED dark mix target (safe on any
+     tone; it is not an ink token that would invert on dark). */
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--c) 58%, #000),
+    color-mix(in oklab, var(--c) 40%, #000)
+  );
+  flex: 0 0 auto;
+}
+.htext {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.htitle {
+  font-family: var(--font-display-sm);
+  font-weight: 700;
+  font-size: var(--t-20, 20px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.htitle b {
+  font-weight: 800;
+}
+.hsub {
+  margin-top: 3px;
+  font-size: var(--t-12, 12px);
+  font-weight: 600;
+  opacity: 0.92;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+}
+
+.close.close {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill, 999px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.close.close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+.close.close:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+.close svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ── Stat strip ─────────────────────────────────────────────────────────── */
+.statStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  padding: 12px 20px;
+  background: var(--ue-tint-soft);
+  border-bottom: 1px solid var(--ue-hairline);
+  flex: 0 0 auto;
+}
+
+/* ── Tabs — active underline ────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--ue-hairline);
+  background: var(--ue-tint-soft);
+  flex: 0 0 auto;
+  overflow-x: auto;
+}
+.tab.tab {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 12px 14px;
+  font-size: var(--t-13, 13px);
+  font-weight: 700;
+  color: var(--ink-500, #6e6c82);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -1px;
+  transition:
+    color 0.14s,
+    border-color 0.14s;
+}
+.tab.tab:hover {
+  color: var(--cd, var(--ink, #1c1b2e));
+}
+.tabActive.tabActive {
+  color: var(--cd, var(--ink, #1c1b2e));
+  border-bottom-color: var(--c);
+}
+.tab.tab:focus-visible {
+  outline: 2px solid var(--ue-accent-border);
+  outline-offset: -2px;
+  border-radius: var(--r-8, 7px);
+}
+
+/* ── Body — internal scroll ─────────────────────────────────────────────── */
+.body {
+  padding: 18px 20px 22px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--ue-hairline);
+  background: var(--ue-tint-soft);
+  flex: 0 0 auto;
+}
+
+/* ── Touch tiers — ≥44px primary targets ────────────────────────────────── */
+@media (pointer: coarse), (max-width: 900px) {
+  /* Doubled to match the doubled bases above (a single-class @media override
+     would lose to `.tab.tab` / `.close.close` / `.modeBtn.modeBtn`). */
+  .close.close {
+    width: 44px;
+    height: 44px;
+  }
+  .tab.tab {
+    padding-top: 15px;
+    padding-bottom: 15px;
+  }
+  .modeBtn.modeBtn {
+    min-height: 44px;
+  }
+}
+
+/* ── Phone ──────────────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .modal {
+    border-radius: var(--r-xl, 24px);
+    max-height: 94vh;
+  }
+  .foot {
+    justify-content: stretch;
+  }
+}

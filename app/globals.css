@@ -12,42 +12,47 @@
  * loading them before `@tailwind base` is correct.
  */
 @import "./tokens.css";
+/* v2 appearance engine — frame/theme/material (consumes tokens.css vars; keyed
+   on the v2 axis attributes so v1 screens are unaffected flag-OFF). Imported
+   after tokens.css so the per-theme --accent overrides land after the :root
+   token defaults. All of themes.css lives inside @media screen → print stays
+   light (no stage/photo/glass float/glow on paper). */
+@import "./themes.css";
+/* v2 corner-grammar chrome (Wave 3) — the mockup's foreground-overlay recipes
+   (brand/tools/console/clock/ctx/quote/cog). New class vocabulary only: no
+   existing markup matches these selectors, so the layer is live-but-inert
+   until the W3.3/W3.4 chrome components mount (same landing pattern as
+   themes.css in Wave 2). Inside @media screen → print unaffected. */
+@import "./chrome.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html,
-body {
+/* `html` keeps the opaque --canvas as the ultimate base fallback (no white
+   FOUC before the .stage paints); `body` is transparent so the fixed,
+   negative-z `.stage` shows through. The v2 stage reproduces the ambient look
+   itself ([data-bg="wash"] .stage::before paints --amb-1..4 over --canvas;
+   [data-bg="photo"] .stage::before paints --stage-photo), so the old opaque
+   body mesh is redundant and would occlude the stage. */
+html {
   background: var(--canvas);
+}
+body {
   color: var(--ink);
 }
 
-/* v1.3 page-level atmospheric mesh — three very low-opacity radial glows
-   (honey top-left, violet top-right, green bottom-right) over the warm cream
-   canvas. Painted as the body's own fixed background (not a pseudo-element)
-   so it sits behind all content with no stacking/z-index fragility across the
-   app's many internal scroll containers, and stays put while content scrolls.
-   Solid surfaces (cards, panels, the Teach board) paint over it; the mesh
-   shows through in canvas gutters. Barely-there, never busy. */
+/* Body type + smoothing. The v1.3 page-level atmospheric mesh that used to
+   paint here was removed in the v2 cutover: the .stage now owns the ambient
+   background (wash recipe / photo duotone), so an opaque body background would
+   occlude it. Body stays transparent; the .stage shows through, html provides
+   the --canvas fallback. (Reduced-motion no longer needs a body rule here —
+   the .stage owns all background motion now.) */
 body {
   font-family: var(--font-sans);
   font-size: var(--t-13);
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
-  background:
-    radial-gradient(38% 30% at 10% 2%, var(--mesh-a), transparent 60%),
-    radial-gradient(34% 26% at 94% 6%, var(--mesh-b), transparent 60%),
-    radial-gradient(40% 34% at 90% 98%, var(--mesh-c), transparent 60%),
-    var(--canvas);
-  background-attachment: fixed;
-}
-
-/* Reduced-data / print: drop the mesh so paper output stays clean (the
-   @media print block below also forces a white body). */
-@media (prefers-reduced-motion: reduce) {
-  body {
-    background-attachment: scroll;
-  }
+  background: transparent;
 }
 
 /* ── BIG-3: Print-view shell suppression ──────────────────────────────────
@@ -103,6 +108,13 @@ body:has([data-teach-view]) nav:has([data-rail-side]) {
        print on the Paper (:root) values, so a night-theme teacher's printout
        is light — this is the belt-and-suspenders text guarantee. */
     color: #1c1b2e;
+  }
+
+  /* The fixed background stage and the whole-app theme-tint wash must not bleed
+     into printed output (paper stays clean white per the rule above). */
+  .stage,
+  .theme-tint {
+    display: none !important;
   }
 
   #main-content {

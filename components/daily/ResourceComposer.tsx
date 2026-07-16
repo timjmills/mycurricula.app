@@ -311,6 +311,74 @@ function formatBytes(n: number): string {
   return `${n} B`;
 }
 
+/** Validate candidate captured items against the spec caps (mime allowlist,
+ *  size cap, per-lesson count cap), running the count against `existing` +
+ *  the accepted-so-far merge. Pure — extracted from `addItems` (W3.8 gate
+ *  fix, Codex): the open-effect's `initialItems` seeding used to bypass
+ *  these checks entirely, so a caller handing pre-captured files (the
+ *  lesson editor's file picker, the Resources-panel drag-drop) could seed
+ *  out-of-spec uploads past the caps (browser `accept=` is advisory).
+ *  Both `addItems` and the seeding path now share this single validator. */
+function validateCapturedItems(
+  candidates: CapturedItem[],
+  existing: CapturedItem[],
+): { accepted: CapturedItem[]; reasons: string[] } {
+  const accepted: CapturedItem[] = [];
+  const reasons: string[] = [];
+  const merged: CapturedItem[] = [...existing];
+  for (const item of candidates) {
+    // Validate file metadata (mime + size) before the count check so a
+    // teacher sees the actual reason — "wrong type" beats "limit reached"
+    // when both could apply.
+    if (item.isFile) {
+      if (item.mimeType && !ALLOWED_MIMES.has(item.mimeType)) {
+        reasons.push(
+          `Skipped "${item.label}" — ${item.mimeType || "this file type"} isn't supported. ` +
+            `Use PDF, DOCX, RTF, or PNG/JPG/WebP/GIF.`,
+        );
+        continue;
+      }
+      const sizeCap =
+        item.provider === "image" ? MAX_IMAGE_BYTES : MAX_FILE_BYTES;
+      const sizeLabel = item.provider === "image" ? "5 MB" : "25 MB";
+      if (typeof item.sizeBytes === "number" && item.sizeBytes > sizeCap) {
+        reasons.push(
+          `Skipped "${item.label}" — ${item.provider === "image" ? "images" : "files"} must be ≤ ${sizeLabel} ` +
+            `(yours: ${formatBytes(item.sizeBytes)}).`,
+        );
+        continue;
+      }
+    }
+
+    // Per-lesson count cap — re-computed against the running merge so the
+    // message reflects the exact threshold the user hit.
+    const fileCount = merged.filter(
+      (c) => c.isFile && c.provider !== "image",
+    ).length;
+    const imageCount = merged.filter(
+      (c) => c.isFile && c.provider === "image",
+    ).length;
+    if (item.isFile && item.provider === "image") {
+      if (imageCount >= MAX_IMAGES_PER_LESSON) {
+        reasons.push(
+          `Skipped "${item.label}" — limit reached (${MAX_IMAGES_PER_LESSON} images per lesson).`,
+        );
+        continue;
+      }
+    } else if (item.isFile) {
+      if (fileCount >= MAX_FILES_PER_LESSON) {
+        reasons.push(
+          `Skipped "${item.label}" — limit reached (${MAX_FILES_PER_LESSON} files per lesson).`,
+        );
+        continue;
+      }
+    }
+    merged.push(item);
+    accepted.push(item);
+  }
+  return { accepted, reasons };
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /** Tiny unique id (strip keys + nothing else). */
@@ -562,9 +630,18 @@ export function ResourceComposer({
           existing: g,
         }))
       : [];
-    setItems([...seeded, ...(initialItems ?? [])]);
+    // W3.8 gate fix (Codex): `initialItems` used to seed the strip
+    // UNVALIDATED — a caller's pre-captured files (lesson-editor picker,
+    // panel drag-drop) bypassed the mime/size/count caps that every
+    // in-dialog capture path enforces via addItems. Route the seed through
+    // the same shared validator; rejections surface as the usual inline
+    // rejection message.
+    const seedCheck = validateCapturedItems(initialItems ?? [], seeded);
+    setItems([...seeded, ...seedCheck.accepted]);
     setPastedStatus(null);
-    setRejectionStatus(null);
+    setRejectionStatus(
+      seedCheck.reasons.length > 0 ? seedCheck.reasons.join(" · ") : null,
+    );
     setUploading(false);
     setUploadError(null);
     setSubjectId(lesson.subject);
@@ -794,57 +871,15 @@ export function ResourceComposer({
     if (next.length === 0) return;
     const reasons: string[] = [];
     setItems((prev) => {
-      const merged: CapturedItem[] = [...prev];
-      for (const item of next) {
-        // Validate file metadata (mime + size) before the count check so
-        // a teacher sees the actual reason — "wrong type" beats "limit
-        // reached" when both could apply.
-        if (item.isFile) {
-          if (item.mimeType && !ALLOWED_MIMES.has(item.mimeType)) {
-            reasons.push(
-              `Skipped "${item.label}" — ${item.mimeType || "this file type"} isn't supported. ` +
-                `Use PDF, DOCX, RTF, or PNG/JPG/WebP/GIF.`,
-            );
-            continue;
-          }
-          const sizeCap =
-            item.provider === "image" ? MAX_IMAGE_BYTES : MAX_FILE_BYTES;
-          const sizeLabel = item.provider === "image" ? "5 MB" : "25 MB";
-          if (typeof item.sizeBytes === "number" && item.sizeBytes > sizeCap) {
-            reasons.push(
-              `Skipped "${item.label}" — ${item.provider === "image" ? "images" : "files"} must be ≤ ${sizeLabel} ` +
-                `(yours: ${formatBytes(item.sizeBytes)}).`,
-            );
-            continue;
-          }
-        }
-
-        // Per-lesson count cap — re-compute against the running merge so
-        // the message reflects the exact threshold the user hit.
-        const fileCount = merged.filter(
-          (c) => c.isFile && c.provider !== "image",
-        ).length;
-        const imageCount = merged.filter(
-          (c) => c.isFile && c.provider === "image",
-        ).length;
-        if (item.isFile && item.provider === "image") {
-          if (imageCount >= MAX_IMAGES_PER_LESSON) {
-            reasons.push(
-              `Skipped "${item.label}" — limit reached (${MAX_IMAGES_PER_LESSON} images per lesson).`,
-            );
-            continue;
-          }
-        } else if (item.isFile) {
-          if (fileCount >= MAX_FILES_PER_LESSON) {
-            reasons.push(
-              `Skipped "${item.label}" — limit reached (${MAX_FILES_PER_LESSON} files per lesson).`,
-            );
-            continue;
-          }
-        }
-        merged.push(item);
-      }
-      return merged;
+      // Delegates to the shared pure validator (see validateCapturedItems)
+      // so this path and the open-effect's initialItems seeding can never
+      // drift apart (W3.8 gate fix). Reasons are collected through the
+      // updater exactly as before; the guard clear keeps a StrictMode
+      // double-invoke from doubling the messages.
+      const checked = validateCapturedItems(next, prev);
+      reasons.length = 0;
+      reasons.push(...checked.reasons);
+      return [...prev, ...checked.accepted];
     });
     if (reasons.length > 0) {
       // Join with " · " when there are multiple — keeps the message a

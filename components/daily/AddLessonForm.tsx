@@ -4,11 +4,14 @@
 // icon rail (DAILY-ADD-LESSON-001).
 //
 // ── Scope ──────────────────────────────────────────────────────────────────
-// The planner store (lib/planner-store.tsx) has no addLesson action in this
-// prototype phase — new lessons are ephemeral, stored in local state only.
-// The form still validates the required fields and exposes the full Lesson
-// shape so the integration can be wired when the backend action lands.
-// (See DAILY-ADD-LESSON-001 in the audit report for follow-up work.)
+// W3.7 — submit is REAL: it awaits the planner store's addLesson mutator
+// (which awaits the data source's createLesson — mock or Supabase — and
+// dispatches the returned lesson with its source-minted id), then closes and
+// hands the new id to `onCreated` so the caller can select/open it. The
+// optional objective rides INSIDE the create input (W3.7 audit #5) — the
+// prior post-create editLesson tee could fail silently and strand the lesson
+// without its objective. The prior documented no-op (DAILY-ADD-LESSON-001)
+// is gone.
 //
 // ── Layout ─────────────────────────────────────────────────────────────────
 // The popover is position:fixed, anchored to the right of the icon rail
@@ -28,7 +31,7 @@
 // • No new dependencies — styled entirely through the CSS module.
 // • Reduced motion respected (no transitions under prefers-reduced-motion).
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useLayoutEffect, useRef, useCallback, useState } from "react";
 import type { ReactNode, KeyboardEvent, FormEvent } from "react";
 import type { SubjectId } from "@/lib/types";
 import { WEEK_DAYS } from "@/lib/mock";
@@ -45,6 +48,10 @@ export interface AddLessonFormProps {
   week: number;
   /** 0-based day index for the currently-selected day — pre-fills the day. */
   day: number;
+  /** W3.7 — called with the CREATED lesson's source-minted id after a
+   *  successful submit (fires just before onClose). DailyView routes it to
+   *  the openLessonPlanner seam so the new lesson opens immediately. */
+  onCreated?: (lessonId: string) => void;
 }
 
 // ── Focusable element selector for the focus trap ─────────────────────────
@@ -57,16 +64,18 @@ const FOCUSABLE =
 export function AddLessonForm({
   open,
   onClose,
-  // `week` is accepted so callers can future-proof their call sites; the
-  // store addLesson action will consume it when it lands (prototype gap).
+  week,
   day,
+  onCreated,
 }: AddLessonFormProps): ReactNode {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Subject picker options come from the planner store's catalog (frozen
   // API), not lib/mock — safe here, AddLessonForm is rendered by DailyView
   // (and DailyList) under the (planner) /daily route (PlannerProvider).
-  const { subjects } = usePlanner();
+  // addLesson is the W3.7 real create; the optional objective rides in its
+  // input (audit #5), so no post-create edit tee is needed.
+  const { subjects, addLesson } = usePlanner();
 
   // Form field state — controlled inputs, all as strings so the native form
   // element values are always predictable.
@@ -74,13 +83,51 @@ export function AddLessonForm({
   const [subject, setSubject] = useState<SubjectId>("math");
   const [objective, setObjective] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  // In-flight guard — true from submit until the source resolves. Blocks a
+  // double Enter/click from creating two lessons. Drives the disabled/label
+  // presentation only; the AUTHORITATIVE guard is inFlightRef below.
+  const [busy, setBusy] = useState(false);
+  // W3.7 audit #4 — ref twin of `busy`. State resets when the popover
+  // closes/reopens mid-create (the `open` effect below), which would let a
+  // second submit through while the first round-trip is still in flight →
+  // two lessons. The ref survives the open/close cycle and is checked at
+  // the top of handleSubmit; it clears only when the create settles.
+  const inFlightRef = useRef(false);
+  // W3.7 audit #3 — create-failure message (addLesson → null). Cleared on
+  // open and on the next submit attempt; rendered as the form's inline
+  // role="alert" line (AddEventForm's errorMsg pattern).
+  const [createError, setCreateError] = useState<string | null>(null);
+  // W3.7 audit re-pass — submit GENERATION token. A create can outlive the
+  // form session that started it (submit A, close mid-flight, reopen, type
+  // draft B): when A settles, the stale completion must not touch the NEW
+  // session's state — setCreateError would pin A's error on B's draft, and
+  // onCreated + onClose would close and discard B. Every open/close
+  // transition bumps the counter; each submit captures it and skips ALL
+  // form-state effects on mismatch. The store-level dispatch already
+  // happened inside addLesson, so a successful stale create still lands in
+  // the day list (correct); only the form stays hands-off.
+  const submitGenRef = useRef(0);
 
-  // Reset fields when the form opens.
-  useEffect(() => {
+  // Reset fields when the form opens. Deliberately does NOT touch
+  // inFlightRef (audit #4) — a create still in flight from a previous
+  // open must keep blocking submits.
+  //
+  // useLayoutEffect, not useEffect (audit re-pass confirmation finding): the
+  // generation bump must be SYNCHRONOUS with the open/close commit. A passive
+  // effect runs after paint, leaving a window where an awaited create resolves
+  // against the old token and mutates the new session anyway; layout effects
+  // flush before the browser yields to the event loop, so no awaited
+  // continuation can interleave.
+  useLayoutEffect(() => {
+    // BOTH transitions (open and close) invalidate any in-flight submit's
+    // claim on the form state — bump before the open-gated reset.
+    submitGenRef.current += 1;
     if (open) {
       setTitle("");
       setObjective("");
       setSubmitted(false);
+      setBusy(false);
+      setCreateError(null);
       // Subject keeps its last value as a convenience (teacher usually adds
       // several lessons to the same subject in one session).
     }
@@ -122,22 +169,54 @@ export function AddLessonForm({
     (e: FormEvent) => {
       e.preventDefault();
       const trimmed = title.trim();
-      if (!trimmed) return;
+      // inFlightRef, not `busy`, is the double-create gate (audit #4):
+      // `busy` resets on close/reopen while a create can still be pending.
+      if (!trimmed || inFlightRef.current) return;
 
-      // ── Prototype limitation ─────────────────────────────────────────
-      // The planner store has no addLesson action yet.  When the backend
-      // action lands, dispatch it here with the collected fields.  For now
-      // we optimistically close the form and surface a toast in a future
-      // increment.
-      //
-      // Collected shape (ready for the action):
-      //   { title: trimmed, subject, day, week, objective: objective.trim(),
-      //     isPersonal: true, status: "not_done", ... }
-      //
-      setSubmitted(true);
-      onClose();
+      // ── W3.7 — the real create ───────────────────────────────────────
+      // Await the store's addLesson (which awaits the data source and
+      // dispatches the RETURNED lesson — no optimistic id, see
+      // planner-store). The optional objective rides in the create input
+      // (audit #5) so it lands atomically with the row. On failure (null)
+      // the form stays open with the draft intact AND shows an inline
+      // error (audit #3) — the store already console.debug'd the cause.
+      inFlightRef.current = true;
+      // Capture this submit's generation (audit re-pass) — if the popover
+      // closes/reopens before the create settles, the ref moves on and the
+      // completion below goes hands-off on the form.
+      const gen = submitGenRef.current;
+      setBusy(true);
+      setCreateError(null); // a fresh attempt clears the previous failure
+      void (async () => {
+        try {
+          const lesson = await addLesson({
+            subject,
+            week,
+            day,
+            title: trimmed,
+            objective: objective.trim() || undefined,
+          });
+          // Stale-session guard (audit re-pass): skip ALL form-state
+          // effects — no error on the wrong draft, no onCreated/onClose
+          // discarding it. A successful create is already in the day list
+          // via the store dispatch; inFlightRef still clears in finally.
+          if (gen !== submitGenRef.current) return;
+          if (!lesson) {
+            setBusy(false);
+            setCreateError(
+              "Couldn’t add the lesson — check your connection and try again.",
+            );
+            return;
+          }
+          setSubmitted(true);
+          onCreated?.(lesson.id);
+          onClose();
+        } finally {
+          inFlightRef.current = false;
+        }
+      })();
     },
-    [title, onClose],
+    [title, subject, week, day, objective, addLesson, onCreated, onClose],
   );
 
   if (!open) return null;
@@ -251,6 +330,17 @@ export function AddLessonForm({
             />
           </div>
 
+          {/* Create-failure line (W3.7 audit #3) — addLesson resolved null
+              (source rejected/failed); the draft stays intact above so the
+              teacher can retry. Cleared on the next submit attempt.
+              role="alert" so screen readers announce the failure
+              (AddEventForm's inline errorMsg pattern). */}
+          {createError && (
+            <p className={styles.errorMsg} role="alert">
+              {createError}
+            </p>
+          )}
+
           {/* Action row. */}
           <div className={styles.actions}>
             <Button
@@ -267,10 +357,13 @@ export function AddLessonForm({
               size="sm"
               type="submit"
               className={styles.btnSave}
-              disabled={!title.trim()}
+              // Disabled while empty AND while the create round-trip is in
+              // flight (W3.7) — a double Enter must not mint two lessons.
+              disabled={!title.trim() || busy}
+              aria-busy={busy}
               tooltip="Add the lesson to the selected day in your personal copy — you can move it to the Team Curriculum later"
             >
-              Add lesson
+              {busy ? "Adding…" : "Add lesson"}
             </Button>
           </div>
 

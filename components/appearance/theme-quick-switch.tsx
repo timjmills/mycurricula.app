@@ -38,12 +38,13 @@ const NAV_KEYS = new Set([
 // Labels only — the full picker carries the long descriptions + tooltips;
 // here each chip explains itself via aria-label/title.
 const QUICK_OPTIONS: readonly { id: ThemeSetting; label: string }[] = [
-  { id: "paper", label: "Paper" },
-  { id: "cloud", label: "Cloud" },
+  { id: "clear", label: "Clear" },
   { id: "night", label: "Night" },
+  { id: "honey", label: "Honey" },
+  { id: "blossom", label: "Blossom" },
   { id: "mint", label: "Mint" },
   { id: "sky", label: "Sky" },
-  { id: "blossom", label: "Blossom" },
+  { id: "off", label: "Off (Photo)" },
   { id: "system", label: "Follow system" },
 ];
 

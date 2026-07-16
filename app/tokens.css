@@ -48,6 +48,56 @@
   --t-11: 11px; /* standards codes */
   --t-10: 10px; /* micro labels */
 
+  /* ── v2 TYPE ROLE TOKENS (6.24.26 design handoff — ADDED) ───────────────
+     The v2 semantic type roles (display / h1–h3 / bodyL / body / small /
+     label), each a family + weight + size + line-height + tracking set. The
+     family slots reference the SAME next/font var indirection the app already
+     uses (var(--font-display) etc.) — NOT the handoff's hardcoded
+     'Poppins'/'DM Sans' literals or its Google-Fonts @import. The .ds-* role
+     classes below consume these. ADDITIVE: the v1 --t-* size scale stays the
+     source for existing components. Values verbatim from colors_and_type.css
+     §3 (sizes/weights/lines/tracking). */
+  --display-font: var(--font-display);
+  --display-weight: 700;
+  --display-size: 44px;
+  --display-line: 1.02;
+  --display-track: -0.02em;
+  --h1-font: var(--font-display);
+  --h1-weight: 700;
+  --h1-size: 28px;
+  --h1-line: 1.1;
+  --h1-track: -0.02em;
+  --h2-font: var(--font-display-sm);
+  --h2-weight: 700;
+  --h2-size: 22px;
+  --h2-line: 1.2;
+  --h2-track: -0.02em;
+  --h3-font: var(--font-display-sm);
+  --h3-weight: 700;
+  --h3-size: 18px;
+  --h3-line: 1.3;
+  --h3-track: -0.01em;
+  --bodyL-font: var(--font-sans);
+  --bodyL-weight: 400;
+  --bodyL-size: 16px;
+  --bodyL-line: 1.6;
+  --bodyL-track: 0;
+  --body-font: var(--font-sans);
+  --body-weight: 400;
+  --body-size: 14px;
+  --body-line: 1.5;
+  --body-track: 0;
+  --small-font: var(--font-sans);
+  --small-weight: 500;
+  --small-size: 13px;
+  --small-line: 1.4;
+  --small-track: 0;
+  --label-font: var(--font-sans);
+  --label-weight: 700;
+  --label-size: 11px;
+  --label-line: 1.2;
+  --label-track: 0.09em;
+
   /* ── Surface neutrals (v1.3 warm register) ────────────────────────────
      Remapped to the Curricula warm neutrals: ink is a near-black violet
      (#1C1B2E), light surfaces warm toward the cream canvas. Names are kept
@@ -249,8 +299,15 @@
   --done-tint: #e4f6ee;
   --progress: #3b6cf6; /* brand blue */
   --progress-tint: #eef3ff;
-  --idle: #b6b5c6; /* not started */
-  --idle-tint: #f1f0f4;
+  /* --idle / --idle-tint — KNOWN v1↔v2 DRIFT. v1 = #b6b5c6 / #f1f0f4 (the
+     resting flag-OFF values, kept verbatim here so v1 does not silently
+     darken). v2's colors_and_type.css darkens these to #6e6c82 / #ecebf1.
+     The v2 shift is NOT applied at :root (that would re-tint flag-OFF v1);
+     the v2 --idle-tint (#2a2940) is instead carried on the [data-tone="dark"]
+     path below, and the v2 light --idle/--idle-tint can be scoped to the v2
+     path in a later engine stage. Do not blindly overwrite this v1 value. */
+  --idle: #b6b5c6; /* not started (v1; v2 light = #6e6c82) */
+  --idle-tint: #f1f0f4; /* v1; v2 light = #ecebf1 */
   --warn: #e9a526; /* needs review — honey */
   --warn-tint: #fff8e7;
   --danger: #ef5a5a;
@@ -752,6 +809,39 @@
   --grad-honey: linear-gradient(135deg, #f8cc5c 0%, #f4b740 100%);
   --grad-dawn: linear-gradient(135deg, #ffd8a8 0%, #ffb3c7 50%, #c9b6ff 100%);
   --grad-mint: linear-gradient(135deg, #bff0dc 0%, #a8e3ff 100%);
+  /* v2 (6.24.26) — blossom atmosphere gradient (ADDED; colors_and_type.css
+     ships hero/brand/honey/dawn/mint above; blossom is the v2 companion). */
+  --grad-blossom: linear-gradient(135deg, #ffd8e8 0%, #f4cdff 100%);
+
+  /* ── v2 SPACING SCALE (6.24.26 design handoff — ADDED) ──────────────────
+     The v2 4px-base semantic space scale (--s1…--s16). ADDITIVE: it sits
+     alongside the v1 layout/spacing utilities (Tailwind owns those); v2
+     surfaces reach for var(--s4) etc. directly. Values verbatim from
+     colors_and_type.css §2. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s8: 32px;
+  --s10: 40px;
+  --s12: 48px;
+  --s16: 64px;
+
+  /* ── v2 ACCENT TOKENS (6.24.26 — ADDED) ─────────────────────────────────
+     The v2 engine's per-theme accent contract. themes.css sets --accent /
+     --accent-600 / --accent-50 per [data-theme] and derives --accent-deep /
+     --accent-light from the active accent; these :root defaults are the Clear
+     (resting) accent so a surface that reads var(--accent) before the engine
+     mounts still resolves. NOT a v1 collision — v1 chrome uses --chrome-accent-*
+     (preserved untouched). -soft/-ink are the v2 names for the soft fill +
+     ink-on-accent pair. */
+  --accent: var(--brand-500);
+  --accent-soft: var(--brand-50);
+  --accent-ink: #ffffff; /* ink on a saturated accent fill (= --on-solid) */
+  --accent-deep: color-mix(in oklab, var(--accent) 64%, #140f22);
+  --accent-light: color-mix(in oklab, var(--accent) 72%, #ffffff);
 
   /* ── Chrome geometry + stacking ───────────────────────────────────────
      Shared layout constants for the app chrome. `--topbar-h` is the sticky
@@ -905,6 +995,94 @@
   --swatch-blossom-surface: #ffffff;
   --swatch-blossom-accent: #e84e93;
   --swatch-blossom-ink: #1c1b2e;
+  /* v2 theme swatches — clear (the default), honey, off. APP_THEMES renamed
+     paper/cloud → clear and added honey/off in lib/theme.tsx, but this swatch
+     family was not migrated, so the picker chips for these three rendered
+     blank (var(--swatch-clear|honey|off-*) was undefined). clear folds the
+     resting light canvas + the live clear accent (#3b6cf6, themes.css);
+     honey uses the warm honey canvas + the live honey accent (#e59a12);
+     off (true ungraded Photo) uses a neutral placeholder. */
+  --swatch-clear-canvas: #fcfaf6;
+  --swatch-clear-surface: #ffffff;
+  --swatch-clear-accent: #3b6cf6;
+  --swatch-clear-ink: #1c1b2e;
+  --swatch-honey-canvas: #fdf4e3;
+  --swatch-honey-surface: #ffffff;
+  --swatch-honey-accent: #e59a12;
+  --swatch-honey-ink: #1c1b2e;
+  --swatch-off-canvas: #e9e6e1;
+  --swatch-off-surface: #ffffff;
+  --swatch-off-accent: #6e6c82;
+  --swatch-off-ink: #1c1b2e;
+}
+
+/* ── v2 SEMANTIC TYPE CLASSES (6.24.26 design handoff — ADDED) ────────────
+   Use these directly for v2 type roles, or copy the declarations. Headings
+   default to --ink; body roles to --body. They consume the --*-font/-weight/
+   -size/-line/-track role tokens added in :root above (which keep the
+   next/font var indirection). ADDITIVE — they sit alongside the existing
+   .cp-* type system. Ported from colors_and_type.css §4. */
+.ds-display {
+  font-family: var(--display-font);
+  font-weight: var(--display-weight);
+  font-size: var(--display-size);
+  line-height: var(--display-line);
+  letter-spacing: var(--display-track);
+  color: var(--ink);
+}
+.ds-h1 {
+  font-family: var(--h1-font);
+  font-weight: var(--h1-weight);
+  font-size: var(--h1-size);
+  line-height: var(--h1-line);
+  letter-spacing: var(--h1-track);
+  color: var(--ink);
+}
+.ds-h2 {
+  font-family: var(--h2-font);
+  font-weight: var(--h2-weight);
+  font-size: var(--h2-size);
+  line-height: var(--h2-line);
+  letter-spacing: var(--h2-track);
+  color: var(--ink);
+}
+.ds-h3 {
+  font-family: var(--h3-font);
+  font-weight: var(--h3-weight);
+  font-size: var(--h3-size);
+  line-height: var(--h3-line);
+  letter-spacing: var(--h3-track);
+  color: var(--ink);
+}
+.ds-body-l {
+  font-family: var(--bodyL-font);
+  font-weight: var(--bodyL-weight);
+  font-size: var(--bodyL-size);
+  line-height: var(--bodyL-line);
+  color: var(--body);
+}
+.ds-body {
+  font-family: var(--body-font);
+  font-weight: var(--body-weight);
+  font-size: var(--body-size);
+  line-height: var(--body-line);
+  color: var(--body);
+}
+.ds-small {
+  font-family: var(--small-font);
+  font-weight: var(--small-weight);
+  font-size: var(--small-size);
+  line-height: var(--small-line);
+  color: var(--body);
+}
+.ds-label {
+  font-family: var(--label-font);
+  font-weight: var(--label-weight);
+  font-size: var(--label-size);
+  line-height: var(--label-line);
+  letter-spacing: var(--label-track);
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 /* ── Base resets scoped to components ─────────────────────────────────── */
@@ -1231,9 +1409,16 @@
    unchanged; the canvas/hairline/border steps, selection, mesh, logo, picker
    accent, and the three ambient card shadows (re-hued to the theme; the
    --sh-* elevation ladder and drag shadows deliberately keep Paper's neutral
-   cast — imperceptible at those alphas) move. Night is a full dark inversion
-   and carries the heavy lifting (its own ink ramp, shadows, scrims, and tint
-   recipes).
+   cast — imperceptible at those alphas) move.
+
+   v2 DECOMPOSE (6.24.26): the dark mode is split into two blocks at the end:
+     • :root[data-tone="dark"]  — ALL the dark NEUTRALS + subject/status/tag/hl
+       dark recipes. Keyed off the DERIVED tone, so dark is correct under ANY
+       accent theme, not just Night. (The night theme selector is unioned in so
+       a flag-OFF v1 DOM emitting only data-theme="night" still goes fully dark.)
+     • :root[data-theme="night"] — only Night's ACCENT (logo, theme-accent,
+       chrome-accent, rail/panel furniture, --accent). Night theme = this accent
+       + the engine forcing data-tone="dark".
    ════════════════════════════════════════════════════════════════════════ */
 @media screen {
   /* ── Cloud — cool neutral paper (the "greyscale" light theme) ──────────── */
@@ -1409,13 +1594,33 @@
     --mesh-c: rgba(244, 183, 64, 0.06);
   }
 
-  /* ── Night — full dark inversion ───────────────────────────────────────────
-     The only dark theme. Owns its own ink ramp (inverted: ink-900 is now the
+  /* ════════════════════════════════════════════════════════════════════════
+     DARK TONE — data-tone="dark" (v2 decompose, 6.24.26)
+     ════════════════════════════════════════════════════════════════════════
+     The full dark inversion, RE-KEYED off the Night THEME and onto the derived
+     TONE so dark mode is correct under ANY accent theme, not just Night. The
+     v2 engine derives data-tone="dark" (Night forces it; Photo-Dim/Normal can
+     too) and every surface branches on tone, never theme — this block is what
+     makes that contract hold. It owns the inverted ink ramp (ink-900 is now the
      LIGHTEST text), dark surfaces, recolored shadows/scrims, and — because
-     color-mix toward white would blow out on a dark surface — its own subject /
+     color-mix toward white would blow out on a dark surface — the subject /
      status / tag / highlighter TINT recipes that mix toward --surface instead.
-     Subject solids, brand, honey, tag mid-tones, and highlighter pens stay at
-     their :root values (see "NOT THEMED" note above). */
+     The ACCENT (logo, theme-accent, chrome-accent, --accent) is NOT here — it
+     stays on the theme below, so a dark Honey or dark Sky keeps its own accent
+     over this neutral base.
+
+     v2 cross-check (modes.css [data-tone="dark"]): canvas #14131F · surface
+     #1E1D2C · ink #F3F2FA · body #A9A8BC · muted #7E7D92 · faint #56556A ·
+     border #2E2D3F · idle-tint #2A2940. We keep the existing, more complete v1
+     dark ramp values below (the whole --ink-* scale + alias set the app's
+     ~4k references consume) — they are within a hair of the v2 values and were
+     already AA-verified. Subject solids, brand, honey, tag mid-tones, and
+     highlighter pens stay at their :root values (hue carries fixed meaning).
+
+     LEGACY COMPAT: :root[data-theme="night"] below ALSO applies these via the
+     selector list, so a flag-OFF v1 DOM that still emits only data-theme="night"
+     (without data-tone) stays fully dark. */
+  :root[data-tone="dark"],
   :root[data-theme="night"] {
     color-scheme: dark;
 
@@ -1449,6 +1654,11 @@
     --border: #34324a;
     --border-cool: #323852;
     --hairline: #282737;
+
+    /* --idle / --idle-tint dark recipe. v1 mixed --idle-tint toward --surface
+       (kept below in the status group). The v2 dark --idle-tint anchor is
+       #2a2940 (modes.css) — the v2 path can adopt it directly; the v1 mix is
+       retained here so flag-OFF Night is unchanged. */
 
     /* Mesh + selection */
     --mesh-a: rgba(139, 92, 246, 0.14);
@@ -1498,27 +1708,6 @@
     --honey-50: color-mix(in srgb, #e9a526 14%, #1e1d2c);
     --honey-100: color-mix(in srgb, #e9a526 26%, #1e1d2c);
     --honey-600: color-mix(in srgb, #e9a526 60%, white);
-
-    /* Logo + picker accent */
-    --logo-tile-grad: linear-gradient(135deg, #8b7fc0 0%, #564d99 100%);
-    --logo-tile-shadow: 0 12px 26px -10px rgba(139, 127, 192, 0.45);
-    --logo-book-b: #221d4a; /* --logo-book-a stays #fff via :root */
-    --logo-tld: var(--honey-400);
-    --theme-accent: #8b7fc0;
-    --theme-accent-soft: #2a2940;
-    /* Chrome — Night's chrome goes violet like its logo. The solid is
-       deepened so white chip text holds ≥4.5:1; -deep lightens for text on
-       the dark soft tint. The rail takes its own step between canvas and
-       surface so the nav reads as distinct furniture. */
-    --chrome-accent: #6f61a8;
-    --chrome-accent-strong: #5b4f91;
-    --chrome-accent-soft: #2a2940;
-    --chrome-accent-soft-edge: #3a3754;
-    --chrome-accent-deep: color-mix(in srgb, #8b7fc0 55%, white);
-    --chrome-accent-mid: #564d80;
-    --rail-bg: #191826;
-    --panel-bg: #1c1b2a;
-    --panel-header-bg: #242336;
 
     /* Subject tint/ink recipes — mix toward the dark surface so fills sit on
        night without glowing, and lift ink toward white for AA on the dark
@@ -1587,18 +1776,13 @@
     /* Atmosphere gradients — hero + brand wash re-tuned for dark (these are
        backdrops, not buttons). --grad-honey / --grad-mint are button identity
        → left at :root. */
-    --grad-hero: linear-gradient(
-      118deg,
-      #2a2440 0%,
-      #232036 45%,
-      #1d2a38 100%
-    );
+    --grad-hero: linear-gradient(118deg, #2a2440 0%, #232036 45%, #1d2a38 100%);
     --grad-brand: linear-gradient(135deg, #232a44 0%, #2a2344 100%);
 
     /* Avatar dawn gradient — the user-avatar circles paint white initials over
        var(--grad-dawn). The Paper pastels (#ffd8a8 / #ffb3c7 / #c9b6ff) are
        already borderline for white text on light themes (~1.3–1.8:1) and would
-       be worse here, so Night gets a deepened DUSK variant of the same
+       be worse here, so the dark tone gets a deepened DUSK variant of the same
        amber→rose→violet hues. Tuned so white (#fff) clears WCAG 3:1 against
        EVERY stop (per-stop relative luminance / 1.05:(L+0.05)):
          #b07c4a ≈ 3.6:1 · #c2607e ≈ 4.0:1 · #7e6bc9 ≈ 4.3:1.
@@ -1622,5 +1806,39 @@
     --hlp-violet: color-mix(in srgb, var(--hl-violet) 30%, var(--surface));
     --hlp-red: color-mix(in srgb, var(--hl-red) 30%, var(--surface));
     --hlp-cheese: color-mix(in srgb, var(--hl-cheese) 30%, var(--surface));
+  }
+
+  /* ── Night — the dark ACCENT (theme = accent only; tone owns neutrals) ───
+     After the decompose, Night theme = data-theme="night" (this accent block)
+     + the engine forcing data-tone="dark" (the neutral block above). Only the
+     accent-bearing tokens live here: the logo lockup, picker theme-accent, the
+     chrome-accent tier, and the v2 --accent contract. Night's accent is its
+     signature violet. (rail-bg/panel-bg are chrome SURFACES that step off the
+     dark canvas → they belong with the accent furniture, kept here.) */
+  :root[data-theme="night"] {
+    /* Logo + picker accent */
+    --logo-tile-grad: linear-gradient(135deg, #8b7fc0 0%, #564d99 100%);
+    --logo-tile-shadow: 0 12px 26px -10px rgba(139, 127, 192, 0.45);
+    --logo-book-b: #221d4a; /* --logo-book-a stays #fff via :root */
+    --logo-tld: var(--honey-400);
+    --theme-accent: #8b7fc0;
+    --theme-accent-soft: #2a2940;
+    /* Chrome — Night's chrome goes violet like its logo. The solid is
+       deepened so white chip text holds ≥4.5:1; -deep lightens for text on
+       the dark soft tint. The rail takes its own step between canvas and
+       surface so the nav reads as distinct furniture. */
+    --chrome-accent: #6f61a8;
+    --chrome-accent-strong: #5b4f91;
+    --chrome-accent-soft: #2a2940;
+    --chrome-accent-soft-edge: #3a3754;
+    --chrome-accent-deep: color-mix(in srgb, #8b7fc0 55%, white);
+    --chrome-accent-mid: #564d80;
+    --rail-bg: #191826;
+    --panel-bg: #1c1b2a;
+    --panel-header-bg: #242336;
+    /* v2 accent contract — Night's accent (matches themes.css night accent). */
+    --accent: #8fa8ff;
+    --accent-soft: rgba(143, 168, 255, 0.16);
+    --accent-ink: #ffffff;
   }
 }

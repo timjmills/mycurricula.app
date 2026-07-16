@@ -51,3 +51,11 @@ export type {
 } from "./YearFiltersPopover";
 export type { YearScope } from "./year-scope";
 export { scopeSubjectId } from "./year-scope";
+
+// W3.7 — Frame-C ALL-scope constellation (per-subject unit-progress clusters).
+export { YearConstellation } from "./YearConstellation";
+export type {
+  YearConstellationProps,
+  ConstellationCluster,
+  ConstellationUnit,
+} from "./YearConstellation";
