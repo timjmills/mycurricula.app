@@ -1,0 +1,115 @@
+name: DIAG — cutover 404 breakdown (read-only)
+
+# TEMPORARY DIAGNOSTIC, lives only on `test/v2-incident-repro`.
+#
+# The 2026-07-16 v2 cutover failed with `TypeError: Failed to fetch` on every
+# planner hydrate, while the Worker logged 449 successes / 0 errors and the edge
+# logged ZERO 5xx — but 21 × 404. The hypothesis is that the hydrate SERVER
+# ACTION POST 404'd at the edge (21 × 404 ≈ 21 hydrate attempts across the
+# verification sweeps). Proving it needs the 404s broken down by PATH + METHOD,
+# which requires Cloudflare analytics access that no local machine has.
+#
+# This job asks Cloudflare's GraphQL analytics API for exactly that, using the
+# CLOUDFLARE_API_TOKEN secret that already exists for deploys. It is READ-ONLY —
+# no deploy, no mutation, nothing touched. Delete the branch when done.
+#
+# NOTE ON PERMISSIONS: the deploy token is documented as Workers Scripts:Edit +
+# Account:Read + R2:Edit. Zone analytics normally needs `Zone → Analytics →
+# Read`, and Workers analytics needs `Account → Account Analytics → Read`. If
+# this run prints a permission error, that error names the exact scope to add to
+# the EXISTING token (Cloudflare → My Profile → API Tokens → edit) — cheaper
+# than minting a new one.
+
+on:
+  push:
+    branches: [test/v2-incident-repro]
+  workflow_dispatch:
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query Cloudflare analytics for the incident window
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set +e
+          API=https://api.cloudflare.com/client/v4
+          FROM="2026-07-16T22:20:00Z"
+          TO="2026-07-16T23:10:00Z"
+
+          echo "=============================================================="
+          echo "0. Token sanity (does it work at all?)"
+          echo "=============================================================="
+          curl -s "$API/user/tokens/verify" \
+            -H "Authorization: Bearer $CF_TOKEN" | head -c 400; echo
+
+          echo
+          echo "=============================================================="
+          echo "1. Resolve the zone id for mycurricula.app"
+          echo "=============================================================="
+          ZONE_JSON=$(curl -s "$API/zones?name=mycurricula.app" \
+            -H "Authorization: Bearer $CF_TOKEN")
+          echo "$ZONE_JSON" | head -c 500; echo
+          ZONE=$(echo "$ZONE_JSON" | python3 -c "import sys,json;d=json.load(sys.stdin);print((d.get('result') or [{}])[0].get('id',''))" 2>/dev/null)
+          if [ -z "$ZONE" ]; then
+            echo "!! Could not resolve zone id (likely missing Zone:Read on the token)."
+          else
+            echo "zone id resolved (len ${#ZONE})"
+          fi
+
+          echo
+          echo "=============================================================="
+          echo "2. THE QUESTION: 404s in the window, by PATH + METHOD"
+          echo "=============================================================="
+          if [ -n "$ZONE" ]; then
+            read -r -d '' Q <<QUERY
+          { "query":
+            "query { viewer { zones(filter: {zoneTag: \\"$ZONE\\"}) { httpRequestsAdaptiveGroups(filter: {datetime_geq: \\"$FROM\\", datetime_leq: \\"$TO\\", edgeResponseStatus: 404}, limit: 100, orderBy: [count_DESC]) { count dimensions { clientRequestPath clientRequestHTTPMethodName edgeResponseStatus } } } } }"
+          }
+          QUERY
+            curl -s "$API/graphql" \
+              -H "Authorization: Bearer $CF_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data "$Q" | python3 -m json.tool 2>/dev/null || echo "(raw response above / parse failed)"
+          else
+            echo "skipped — no zone id"
+          fi
+
+          echo
+          echo "=============================================================="
+          echo "3. Context: ALL statuses in the window, by method (for ratios)"
+          echo "=============================================================="
+          if [ -n "$ZONE" ]; then
+            read -r -d '' Q2 <<QUERY2
+          { "query":
+            "query { viewer { zones(filter: {zoneTag: \\"$ZONE\\"}) { httpRequestsAdaptiveGroups(filter: {datetime_geq: \\"$FROM\\", datetime_leq: \\"$TO\\"}, limit: 100, orderBy: [count_DESC]) { count dimensions { edgeResponseStatus clientRequestHTTPMethodName } } } } }"
+          }
+          QUERY2
+            curl -s "$API/graphql" \
+              -H "Authorization: Bearer $CF_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data "$Q2" | python3 -m json.tool 2>/dev/null || echo "(parse failed)"
+          fi
+
+          echo
+          echo "=============================================================="
+          echo "4. Also: the 3 x 307 paths (a redirected POST loses its body)"
+          echo "=============================================================="
+          if [ -n "$ZONE" ]; then
+            read -r -d '' Q3 <<QUERY3
+          { "query":
+            "query { viewer { zones(filter: {zoneTag: \\"$ZONE\\"}) { httpRequestsAdaptiveGroups(filter: {datetime_geq: \\"$FROM\\", datetime_leq: \\"$TO\\", edgeResponseStatus: 307}, limit: 20, orderBy: [count_DESC]) { count dimensions { clientRequestPath clientRequestHTTPMethodName } } } } }"
+          }
+          QUERY3
+            curl -s "$API/graphql" \
+              -H "Authorization: Bearer $CF_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data "$Q3" | python3 -m json.tool 2>/dev/null || echo "(parse failed)"
+          fi
+
+          echo
+          echo "DONE — read section 2 first. POSTs to page paths (/weekly,"
+          echo "/daily, /year, ...) confirm the server-action-404 hypothesis."
+          exit 0
