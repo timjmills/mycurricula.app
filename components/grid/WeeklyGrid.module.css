@@ -27,6 +27,15 @@
 .navbar {
   display: flex;
   align-items: center;
+  /* RESPONSIVE-AUDIT F3: wrap the header row on narrow tiers. The title +
+     Grid/List/Schedule toggle + prev/next/today nav are a single flex row; when
+     the weekly canvas is only ~227px wide (phone, beside the rails) a nowrap row
+     pushed the toggle and week-nav off into the grid's internal horizontal
+     scroll, so they were reachable only by sideways-scrolling. Wrapping stacks
+     them onto extra lines so every control stays on-screen. Only wraps when the
+     row can't fit; no effect at desktop width. Mirrors `.controls` (the
+     view-controls toggle) which already wraps. */
+  flex-wrap: wrap;
   gap: 14px;
   padding: 14px 22px;
   background: var(--paper);
@@ -983,7 +992,9 @@
    context-menu or long-press handler remains here.)
 
    Strategy (additive only — desktop ≥1280px is unchanged):
-     ≤768px  tighten navbar padding; hide the "Today" button + its separator.
+     ≤768px  tighten navbar padding; hide the orphan .navSep divider (the
+             "Today" button STAYS — the wrapping .navbar flows it to the
+             next line instead of overflowing).
      ≤540px  collapse the .navEyebrow so only the week title remains.
    All rules live inside @media blocks; no base rule is touched. */
 
@@ -994,14 +1005,28 @@
     padding: 10px 14px;
     gap: 8px;
   }
-  /* The navToday "This week" / "Today" button shows only at larger widths;
-     hide it here so the prev / next arrows keep their 44px footprint. */
-  .navToday {
-    display: none;
-  }
-  /* navSep loses its paired control on the left — hide the orphan line. */
+  /* RESPONSIVE-AUDIT follow-up: the navToday "This week" / "Today" jump used
+     to be hidden here so the prev/next arrows kept their 44px footprint in the
+     nowrap navbar. The navbar now wraps (F3, flex-wrap on .navbar), so the
+     pill simply flows to the next line instead of overflowing — keep it, and
+     phone/tablet teachers get the jump-to-current-week affordance back. The
+     .navSep divider stays hidden: on a wrapped row the 1px orphan line reads
+     as noise, and it carries no meaning the layout doesn't. */
   .navSep {
     display: none;
+  }
+  /* Touch floor (§4). The base .navToday/.navArrow 44px rules are INERT —
+     these render through the <Button size="sm"> primitive whose stacked
+     `.btn(.icon).sm` recipe (up to 0,3,0) out-specifies a single module class,
+     so the pills have always shipped 32px. min-* clamps win over the
+     primitive's width/height regardless of specificity — no selector war.
+     Touch tiers only; desktop keeps the compact 32px mouse-target look. */
+  .navToday.navToday {
+    min-height: 44px;
+  }
+  .navArrow.navArrow {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 

@@ -23,12 +23,21 @@
 /* ── Scrim ──────────────────────────────────────────────────────────────── */
 /* A soft backdrop blur + low-opacity ink wash — NOT a flat black scrim.
    The blur lets the rest of the UI stay visible as a ghost behind the
-   dialog so the teacher's spatial context is preserved. */
+   dialog so the teacher's spatial context is preserved.
+
+   z-index 1000 — the "nested dialog" tier, matching StandardsTaggingPicker.
+   The composer can be opened from INSIDE the W3.8 LessonModal (scrim
+   z 600, via the lesson editor's "+ Add resource" menu), so it must sit
+   above that modal; at the old 500 it mounted invisible behind the
+   modal scrim. Still below UndoToast (1200), Tooltip (9000), and the
+   rich-text toolbar (9999). On /daily nothing renders between 500 and
+   1000 that the composer must stay under, so this raise is safe there
+   — it only ever needed to be above the surfaces it already covered. */
 
 .scrim {
   position: fixed;
   inset: 0;
-  z-index: 500;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;

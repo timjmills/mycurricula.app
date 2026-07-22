@@ -73,7 +73,6 @@ import { galleryCount, isNotecard, notecardPoster } from "@/lib/notecards";
 import { isSafeImgSrc } from "@/lib/resource-embed";
 import { dedupeLessonResources, resourceIdentity } from "@/lib/resources-dedup";
 import { usePlanner } from "@/lib/planner-store";
-import { useAppState } from "@/lib/app-state";
 import { lessonResourceRefs } from "@/lib/lesson-resources";
 import { useLessonBoards } from "@/lib/teach/use-lesson-boards";
 import {
@@ -2037,13 +2036,10 @@ export function ResourcesDrawer({
   const panelRef = useRef<HTMLDivElement>(null);
 
   // §4a Low 6 — in Team-Curriculum ("master") mode the sticky MasterBanner
-  // sits ABOVE the top bar in flow and pushes it down, so the fixed trigger
-  // at its usual top would overlap the bar. The banner exposes no height
-  // variable (it is sticky/in-flow chrome; the rails ride below it
-  // naturally), so the cleanest hook is the same state the banner itself
-  // renders from: editMode. While it's "master" the trigger drops below the
-  // tallest banner phase (see .drawerTriggerBelowBanner).
-  const { editMode } = useAppState();
+  // (W3.3: the MasterBanner retired in favor of the [data-mode="team"] pink
+  // glow, which adds no vertical chrome — the old editMode-keyed
+  // .drawerTriggerBelowBanner offset would now float the trigger mid-content
+  // for no reason, so the hook is gone; §4a W3.3 finding #12.)
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2119,9 +2115,7 @@ export function ResourcesDrawer({
       >
         <button
           type="button"
-          className={`${styles.drawerTrigger} ${
-            editMode === "master" ? styles.drawerTriggerBelowBanner : ""
-          }`}
+          className={styles.drawerTrigger}
           aria-label="Open resources drawer"
           aria-haspopup="dialog"
           aria-expanded={open}

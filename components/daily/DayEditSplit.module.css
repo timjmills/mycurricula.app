@@ -1,0 +1,616 @@
+/* DayEditSplit.module.css — the W3.8b Day EDIT two-pane split.
+   Port of the bundle's `.de-split` family (New v2 Site Design.bundled.html
+   CSS ~B:5137-5186; JSX ~B:11294-11355), tokens-only per CLAUDE.md §4:
+     • layout/spacing values are byte-faithful to the mock;
+     • every mock hex/ink-alpha is ported to a token or a color-mix on a
+       token (light tone); the DARK-tone block keeps the bundle's literal
+       white-alpha values, byte-faithful, dual-scoped on
+       :root[data-tone="dark"] (app chrome host) AND .home[data-tone="dark"]
+       (the /home mock host) — the DailyView.module.css / LessonModal
+       convention ("Literal white-alpha values are byte-faithful to the
+       bundle's dark recipe; they intentionally sit outside the token set").
+
+   Anatomy (left → right):
+     .deSplit    — flex row filling the bodyRow (in place of the dock).
+     .deLeft     — fixed-width agenda column (inline width from state):
+                   .deListhead (day name) + .deList of .deItem buttons +
+                   the dashed add row (classes reused from
+                   DailyView.module.css .addLessonRow).
+     .deDivider  — className passed to <PaneSplitter> (base .splitter look
+                   from DailyView.module.css; widened + accent-hover here
+                   per the mock's .de-divider).
+     .deRight    — scrolling pane hosting .deTemplate (the fill-in card,
+                   keyed by lesson id so switching re-runs deSlide).
+
+   MOCK DEFECT #6 FIX (defect ledger): the mock's .de-list was
+   overflow:hidden, clipping tall agendas. Ours scrolls (.deList
+   overflow-y:auto).
+
+   ≤820px (mock B:5177-5186): CSS-only collapse — column layout, the list
+   becomes a horizontal x-scroll strip (items flex:0 0 auto, 2-col grid,
+   dot hidden), the divider hides, the right pane goes full-width.
+
+   >820px: the panes sit in a row, and the agenda's width is the persisted
+   drag state — clamped in JS to [220,520] px, which is blind to how wide
+   the split actually is. `--de-right-reserve` on the root is the
+   container-relative floor that px clamp can't express (see .deLeft). */
+
+/* ── Split root ─────────────────────────────────────────────────────────── */
+.deSplit {
+  /* Floor the editor pane keeps in the two-pane row layout: the 15px
+     divider corridor + the width below which <LessonEditor> stops being a
+     usable fill-in template (~300px, the agenda's own default width). */
+  --de-right-reserve: 315px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  /* The dock the split replaces carried its own gutter chrome; a modest
+     page padding keeps the card off the icon rail / viewport edge. */
+  padding: 12px 16px 16px 12px;
+}
+
+/* ── Left: agenda column ────────────────────────────────────────────────── */
+/* The inline width comes from the persisted drag state, whose clamp
+   ([220,520]) is ABSOLUTE — it knows nothing about how much room the split
+   actually has. Just above the ≤820px collapse the row layout can't afford
+   a 520px agenda: at a 821px viewport the split is 658px wide, so a stale
+   persisted 520 leaves the editor pane 95px and the header title breaks one
+   character per line. The reserve below is the container-relative guard the
+   px clamp can't express: the agenda never takes so much that fewer than
+   --de-right-reserve remain for the editor. Chosen so the desktop tier is
+   untouched — at ≥~1045px viewport, 100% - reserve already exceeds the 520
+   max, so a dragged/persisted width renders exactly as stored. */
+.deLeft {
+  flex: 0 0 auto; /* inline width from state — never grows/shrinks */
+  max-width: max(220px, 100% - var(--de-right-reserve));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding-right: 4px;
+}
+
+/* Day-name header (mock .de-listhead). */
+.deListhead {
+  font-size: var(--t-12, 12px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 6px 12px;
+  flex: 0 0 auto;
+}
+
+/* Agenda list — SCROLLS when tall (mock defect #6: overflow:hidden). */
+.deList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Agenda item (mock .de-item) ────────────────────────────────────────── */
+/* time · 12px subject dot · title-over-subject. Class DOUBLED so the
+   `.cp-root button` (0,1,1) reset can't strip padding/border/background
+   from a single-class module rule (the tokens.css button-reset trap). */
+.deItem.deItem {
+  display: grid;
+  grid-template-columns: auto 12px 1fr;
+  gap: 11px;
+  align-items: center;
+  text-align: left;
+  width: 100%;
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  padding: 10px 11px;
+  border-radius: var(--r-md);
+  transition:
+    background 0.14s,
+    box-shadow 0.14s;
+}
+
+/* Hover — the mock's rgba(28,27,46,.05) ink wash, ported to the token. */
+.deItem.deItem:hover {
+  background: color-mix(in oklab, var(--ink) 5%, transparent);
+}
+
+.deItem.deItem:focus-visible {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: -1px;
+}
+
+/* Selected — elevated card (mock: #fff + --sh-sm + border). */
+.deItemSel.deItemSel {
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  border-color: var(--border);
+}
+
+/* Time label — tabular so the column of times aligns. */
+.deTime {
+  font-size: var(--t-11, 11.5px);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Subject dot — var(--c) arrives via the `cp-subj <subject>` class on the
+   item (lib/palette.tsx bridge); the 3px soft halo is the mock's
+   rgba(28,27,46,.08) ring, ported to the token. */
+.deDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--c, var(--ink-400));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ink) 8%, transparent);
+}
+
+/* Title-over-subject text stack. */
+.deTx {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.deName {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deSubj {
+  font-size: var(--t-11, 11px);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--muted);
+}
+
+/* ── Dashed add row ─────────────────────────────────────────────────────── */
+/* The W3.7 idiom classes (.addLessonRow / .addLessonRowPlus /
+   .addLessonRowError) are REUSED from DailyView.module.css — this class
+   only carries the strip-mode overrides below (tripled to outgun the
+   doubled base rule regardless of stylesheet order). */
+
+/* ── Divider (passed to <PaneSplitter> as className) ────────────────────── */
+/* Widens the base .splitter (DailyView.module.css) to the mock's 15px
+   corridor and gives the grip the mock's accent hover (74px tall bar).
+   ACCENT = the chrome tier's --chrome-accent — never raw --brand-*
+   (CLAUDE.md §4). Selectors are class-doubled so they outgun the base
+   .splitter / .splitter:hover .splitterGrip rules. */
+.deDivider.deDivider {
+  width: 15px;
+  margin: 0;
+  flex: 0 0 auto;
+  align-self: stretch;
+}
+
+.deDivider.deDivider > span {
+  width: 4px;
+  height: 48px;
+  border-radius: 3px;
+}
+
+.deDivider.deDivider:hover > span,
+.deDivider.deDivider:focus-visible > span {
+  background: var(--chrome-accent);
+  height: 74px;
+}
+
+/* ── Right: scrolling template pane ─────────────────────────────────────── */
+.deRight {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 2px 24px;
+}
+
+/* Styled 9px scrollbar (mock: rgba(127,127,150,.3) thumb → --muted mix). */
+.deRight::-webkit-scrollbar {
+  width: 9px;
+}
+.deRight::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--muted) 35%, transparent);
+  border-radius: 5px;
+}
+
+/* ── Template card ──────────────────────────────────────────────────────── */
+/* Keyed by the selected lesson id in the JSX, so switching lessons remounts
+   the card and re-runs the deSlide entry (declared ONLY inside the
+   no-preference media block — reduced motion gets an instant paint). */
+.deTemplate {
+  border-radius: var(--r-2xl);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-lg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .deTemplate {
+    animation: deSlide 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@keyframes deSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Empty-day card — the same surface treatment, hosting <EmptyState>. */
+.deEmpty {
+  border-radius: var(--r-2xl);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-lg);
+  padding: 28px 18px;
+  display: grid;
+  place-items: center;
+}
+
+/* ── Template header band — solid subject color ─────────────────────────── */
+/* var(--c) arrives through the `cp-subj <subject>` class on the card root
+   (lib/palette.tsx bridge) — the subject hue is never hard-coded. White
+   text on the colored band is the LessonModal .mhead precedent. */
+/* WRAPS when the band can't seat title + cluster side by side. The right
+   cluster's pills are nowrap and `flex: 0 0 auto`, so on a narrow pane they
+   used to hold their full ~154px and starve .deTheadLeft (min-width:0) down
+   to ZERO width — .deTitle's overflow-wrap:anywhere then broke the lesson
+   title one character per line (F6). Now the title carries a flex-basis wide
+   enough for the 22px display face, and the cluster drops to its own line
+   below instead of squeezing it. */
+.deThead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  color: #fff;
+  background: var(--c);
+}
+
+/* flex-basis 12rem = the narrowest the display-face title stays readable at.
+   Below `12rem + gap + cluster` of band width the line breaks and the title
+   gets the full band. min-width:0 still lets it shrink under that basis when
+   it is ALONE on the line (the 375px case: ~149px of band). */
+.deTheadLeft {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+/* Eyebrow — "SUBJECT · 8:10–9:10". */
+.deTsubj {
+  font-size: var(--t-11, 11px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.92;
+  margin-bottom: 7px;
+}
+
+/* Lesson title — the LessonModal .mtitle recipe (same double-click /
+   Enter / F2 editing idiom in the JSX). */
+.deTitle {
+  font-family: var(--font-display-sm);
+  font-weight: 700;
+  font-size: var(--t-22, 22px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  border-radius: var(--r-8, 7px);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.titleText {
+  display: inline-block;
+  cursor: text;
+  border-radius: var(--r-8, 7px);
+  outline-offset: 2px;
+}
+.titleText:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+}
+
+/* While the RichTextEditor is live, keep the title metrics so the band
+   never jumps height between static ↔ editing states (LessonModal). */
+.titleEditor {
+  min-width: 160px;
+}
+
+/* Right cluster — team pill / Push to Team, then Exit. flex-wrap per the
+   mock's .de-theadr so the cluster stacks instead of clipping when the
+   pane is dragged narrow. SHRINKABLE (0 1 auto, not the mock's 0 0 auto):
+   once it wraps onto its own line under the title, a line narrower than its
+   ~154px max-content would otherwise overflow the card and clip the Exit
+   button (.deTemplate is overflow:hidden). Shrinking lets its own flex-wrap
+   stack the pills instead. margin-left:auto keeps it right-aligned on the
+   wrapped line, where space-between has nothing to push against. */
+.deTheadr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* White-outline pill buttons on the colored band — the LessonModal
+   .headBtn recipe verbatim (class doubled: cp-root-button-reset trap). */
+.headBtn.headBtn {
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-radius: var(--r-pill, 999px);
+  padding: 7px 13px;
+  font-size: var(--t-11, 11.5px);
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: none;
+  transition: background 0.14s;
+}
+.headBtn.headBtn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+.headBtn.headBtn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+/* "✓ Marked for team push" confirmation — inverts to a solid white pill. */
+.headBtnDone.headBtnDone {
+  background: #fff;
+  color: var(--ink, #1c1b2e);
+  border-color: #fff;
+}
+.headBtnDone.headBtnDone:hover {
+  background: #fff;
+  color: var(--ink, #1c1b2e);
+}
+
+/* Team-mode pill — states the mode; the top-bar toggle changes it
+   (LessonModal .teamPill recipe). */
+.teamPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--t-11, 11px);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(224, 86, 107, 0.92);
+  padding: 6px 11px;
+  border-radius: var(--r-pill, 999px);
+  white-space: nowrap;
+}
+
+/* Team-mode warning banner — striped pink over an opaque backing
+   (LessonModal .teamBanner; CLAUDE.md §2 friction-not-confirm-dialogs). */
+.teamBanner {
+  background-color: var(--surface);
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(224, 86, 107, 0.14),
+    rgba(224, 86, 107, 0.14) 12px,
+    rgba(224, 86, 107, 0.22) 12px,
+    rgba(224, 86, 107, 0.22) 24px
+  );
+  color: var(--danger, #e0566b);
+  font-size: var(--t-12, 12px);
+  font-weight: 700;
+  padding: 9px 20px;
+  text-align: center;
+}
+
+/* ── Template body — meta chips + <LessonEditor host="day-pane"> ────────── */
+.deTbody {
+  padding: 16px 18px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Meta chip row — Standard · subject · unit (LessonModal .mmeta). */
+.deMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--t-11, 11.5px);
+  font-weight: 700;
+  color: var(--muted, #6e6c82);
+}
+.deMeta span {
+  background: rgba(127, 127, 150, 0.1);
+  padding: 4px 10px;
+  border-radius: var(--r-pill, 999px);
+}
+
+/* ── Dark tone ──────────────────────────────────────────────────────────── */
+/* The mock's night block (B:5169-5175) maps to the tone axis. Dual-scoped;
+   white-alpha literals byte-faithful (see header note). Surface-glass
+   variants carry the LessonModal :not([data-glass="light"]) qualifier. */
+:global(:root[data-tone="dark"]) .deItem.deItem:hover,
+:global(.home[data-tone="dark"]) .deItem.deItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+:global(:root[data-tone="dark"]) .deItemSel.deItemSel,
+:global(.home[data-tone="dark"]) .deItemSel.deItemSel {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: none;
+}
+:global(:root[data-tone="dark"]) .deName,
+:global(.home[data-tone="dark"]) .deName {
+  color: #fff;
+}
+:global(:root[data-tone="dark"]) .deTime,
+:global(.home[data-tone="dark"]) .deTime,
+:global(:root[data-tone="dark"]) .deSubj,
+:global(.home[data-tone="dark"]) .deSubj,
+:global(:root[data-tone="dark"]) .deListhead,
+:global(.home[data-tone="dark"]) .deListhead {
+  color: rgba(255, 255, 255, 0.72);
+}
+:global(:root[data-tone="dark"]:not([data-glass="light"])) .deTemplate,
+:global(.home[data-tone="dark"]:not([data-glass="light"])) .deTemplate,
+:global(:root[data-tone="dark"]:not([data-glass="light"])) .deEmpty,
+:global(.home[data-tone="dark"]:not([data-glass="light"])) .deEmpty {
+  background: rgba(30, 30, 46, 0.62);
+  border-color: rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(22px) saturate(1.4);
+}
+:global(:root[data-tone="dark"]) .deDivider.deDivider > span,
+:global(.home[data-tone="dark"]) .deDivider.deDivider > span {
+  background: rgba(255, 255, 255, 0.24);
+}
+:global(:root[data-tone="dark"]) .deDivider.deDivider:hover > span,
+:global(.home[data-tone="dark"]) .deDivider.deDivider:hover > span,
+:global(:root[data-tone="dark"]) .deDivider.deDivider:focus-visible > span,
+:global(.home[data-tone="dark"]) .deDivider.deDivider:focus-visible > span {
+  background: var(--chrome-accent);
+}
+:global(:root[data-tone="dark"]:not([data-glass="light"])) .teamBanner,
+:global(.home[data-tone="dark"]:not([data-glass="light"])) .teamBanner {
+  background-color: rgb(30, 30, 48);
+}
+:global(:root[data-tone="dark"]:not([data-glass="light"])) .deMeta span,
+:global(.home[data-tone="dark"]:not([data-glass="light"])) .deMeta span {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* ── Touch targets (CLAUDE.md §4 — ≥44px on coarse pointers) ────────────── */
+/* Agenda items sit ~43px with mouse metrics; guarantee the floor on touch.
+   The band's pill buttons get the same floor (LessonModal precedent). The
+   max-width arm is the house pattern (Dock / planning-tabs / day-v2): a
+   phone-width window is treated as touch even under a fine pointer. */
+@media (pointer: coarse), (max-width: 900px) {
+  .deItem.deItem {
+    min-height: 44px;
+  }
+  .headBtn.headBtn {
+    min-height: 44px;
+  }
+}
+
+/* ── Reduced motion — hover recolors are decorative; snap them ──────────── */
+@media (prefers-reduced-motion: reduce) {
+  .deItem.deItem,
+  .headBtn.headBtn {
+    transition: none;
+  }
+}
+
+/* ── ≤820px collapse (mock B:5177-5186) ─────────────────────────────────── */
+/* Column layout: the agenda becomes a horizontal x-scroll strip on top
+   (items 2-col — time · text, dot hidden), the divider hides (the inline
+   width needs !important to beat the style attribute, exactly as the mock
+   does), and the template pane takes the full width below. CSS-only — no
+   JS breakpoint state. */
+@media (max-width: 820px) {
+  .deSplit {
+    flex-direction: column;
+    padding: 10px 12px 12px;
+  }
+  .deLeft {
+    width: auto !important; /* beat the inline drag width (mock recipe) */
+    /* The row-layout reserve is meaningless once the panes stack — without
+       this reset it would clamp the full-width agenda strip (e.g. to 268px
+       at a 768px viewport). */
+    max-width: none;
+    flex: 0 0 auto;
+    padding-right: 0;
+    padding-bottom: 6px;
+  }
+  .deList {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 6px;
+    padding-bottom: 4px;
+  }
+  .deItem.deItem {
+    flex: 0 0 auto;
+    grid-template-columns: auto auto;
+    gap: 8px;
+    /* The base rule's width:100% would make every strip item a full screen
+       wide, so the x-scroll showed exactly ONE lesson at a time. Content-
+       sized instead, capped so a long title ellipsizes (.deName) and the
+       next item peeks in to advertise the scroll. */
+    width: auto;
+    max-width: min(14rem, 70%);
+  }
+  .deItem .deDot {
+    display: none;
+  }
+  /* The dashed add row rides the strip — compact, never full-width.
+     Tripled to outgun DailyView.module.css's doubled .addLessonRow rule
+     regardless of module injection order. */
+  .deAdd.deAdd.deAdd {
+    width: auto;
+    flex: 0 0 auto;
+    margin-top: 0;
+    white-space: nowrap;
+  }
+  /* display:none also drops the separator out of the tab order and the a11y
+     tree, so the drag handle can never be a keyboard trap where it cannot
+     do anything (its inline tabIndex is inert while it is not rendered). */
+  .deDivider.deDivider {
+    display: none;
+  }
+  .deRight {
+    flex: 1 1 auto;
+    padding-top: 8px;
+  }
+}
+
+/* ── ≤480px phone compaction ────────────────────────────────────────────── */
+/* At phone widths the app chrome (icon rail + overlay gutters) already keeps
+   ~150px of a 375px viewport, leaving the split ~223px. The stack above then
+   hands all of that to the editor, but the card's own desktop gutters take
+   another ~60px of it. Tighten them — every px here is a px of fill-in
+   template — and step the display-face title down one token so it wraps at
+   words rather than fighting for room. */
+@media (max-width: 480px) {
+  .deSplit {
+    padding: 6px 8px 10px;
+  }
+  .deThead {
+    padding: 14px 12px;
+    gap: 10px;
+  }
+  .deTitle {
+    font-size: var(--t-18, 18px);
+  }
+  .deTbody {
+    padding: 14px 12px 20px;
+  }
+}

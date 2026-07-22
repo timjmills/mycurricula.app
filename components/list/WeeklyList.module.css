@@ -59,6 +59,25 @@
   white-space: nowrap;
 }
 
+/* ── Phone: stack the heading so "Week N" doesn't collide with the subtitle ──
+   The baseline flex row overlaps at ≤480px (the new week frames force this List
+   as the narrow fallback). Stack kicker → heading → hint and let the hint wrap. */
+@media (max-width: 480px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .headingRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .hint {
+    white-space: normal;
+  }
+}
+
 /* ── Day section ─────────────────────────────────────────────────────── */
 
 .daySection {

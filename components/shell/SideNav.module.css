@@ -220,17 +220,22 @@
   }
   .item {
     justify-content: center;
+    /* RESPONSIVE-AUDIT F2: the collapsed icon-rail item was ~38px tall — below
+       the 44px touch-target floor on phone/tablet. min-height lifts the whole
+       tappable box to 44px (the 18px glyph stays centered via align-items). */
+    min-height: 44px;
     padding: 10px 0;
     gap: 0;
   }
   .user {
     justify-content: center;
+    min-height: 44px;
     padding: 10px 0 0;
   }
 }
 
-@media (max-width: 480px) {
-  .sidenav {
-    width: 54px;
-  }
-}
+/* RESPONSIVE-AUDIT F2: the former ≤480 override narrowed the rail to 54px, which
+   left the item tap box ~38px wide (< 44px). Dropping the override keeps the rail
+   at the ≤900 icon-rail width (64px → ~47px-wide items ≥ the 44px touch floor)
+   down to the smallest phone, at ≈17% of a 375 viewport — the content beside it
+   scrolls internally, so the extra 10px is a non-issue. */

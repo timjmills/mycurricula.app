@@ -34,12 +34,18 @@ function rec(r, sourceType) {
 }
 
 // Articles (accurate, article-level categories)
-const arts = JSON.parse(fs.readFileSync(path.join(OUT, "articles-categorized.json"), "utf8"));
+const arts = JSON.parse(
+  fs.readFileSync(path.join(OUT, "articles-categorized.json"), "utf8"),
+);
 
 // Books — merge every books-cc-*.json / books-quotes*.json the agents produced
 const bookFiles = fs
   .readdirSync(OUT)
-  .filter((f) => /^books-(cc|learning|teaching|leading|quotes)/i.test(f) && f.endsWith(".json"));
+  .filter(
+    (f) =>
+      /^books-(cc|learning|teaching|leading|quotes)/i.test(f) &&
+      f.endsWith(".json"),
+  );
 let books = [];
 for (const f of bookFiles) {
   try {
@@ -51,7 +57,8 @@ for (const f of bookFiles) {
 }
 
 const all = [];
-for (const a of arts) if (CATS.includes(a.category)) all.push(rec(a, "article"));
+for (const a of arts)
+  if (CATS.includes(a.category)) all.push(rec(a, "article"));
 for (const b of books) if (CATS.includes(b.category)) all.push(rec(b, "book"));
 
 // Off-topic / controversial filter (reproducible + reversible). The 13-agent
@@ -67,7 +74,8 @@ let removedKeys = new Set();
 for (const file of ["removed-quotes.json", "removed-extra.json"]) {
   try {
     const rem = JSON.parse(fs.readFileSync(path.join(QM, file), "utf8"));
-    if (Array.isArray(rem)) for (const r of rem) removedKeys.add(norm(r.quote).toLowerCase());
+    if (Array.isArray(rem))
+      for (const r of rem) removedKeys.add(norm(r.quote).toLowerCase());
   } catch {
     /* file absent — skip */
   }
@@ -78,14 +86,21 @@ const removedCount = removedKeys.size;
 const seen = new Set();
 const deduped = all.filter((r) => {
   const k = r.quote.toLowerCase();
-  if (!r.quote || k.length < 20 || k.length > 340 || seen.has(k) || removedKeys.has(k))
+  if (
+    !r.quote ||
+    k.length < 20 ||
+    k.length > 340 ||
+    seen.has(k) ||
+    removedKeys.has(k)
+  )
     return false;
   seen.add(k);
   return true;
 });
 
 // Per-category per-source cap (Linsin exempt in classroom culture)
-const isLinsin = (r) => /linsin|smart classroom manag/i.test(`${r.work || ""} ${r.author || ""}`);
+const isLinsin = (r) =>
+  /linsin|smart classroom manag/i.test(`${r.work || ""} ${r.author || ""}`);
 const tally = {};
 const bank = [];
 for (const r of deduped) {
@@ -96,7 +111,10 @@ for (const r of deduped) {
   bank.push(r);
 }
 
-fs.writeFileSync(path.join(LIB, "insights.data.json"), JSON.stringify(bank, null, 2));
+fs.writeFileSync(
+  path.join(LIB, "insights.data.json"),
+  JSON.stringify(bank, null, 2),
+);
 
 // Trimmed, source-diverse HERO POOL for the client bundle (the full bank above
 // is the data artifact, NOT imported by the app — it's 6.5 MB). Round-robin
@@ -160,18 +178,52 @@ function heroPool(rows) {
   return picked;
 }
 const hero = heroPool(bank);
-fs.writeFileSync(path.join(LIB, "insights.hero.json"), JSON.stringify(hero, null, 2));
-console.log(`Hero pool (client-bundled): ${hero.length}`);
+// The hero pool is split into TWO files (perf — see lib/home/insights.ts):
+//   insights.hero.json   — the eagerly-bundled records, WITHOUT the `expand`
+//                          prose (it was ~2/3 of the payload and renders only
+//                          after a click). Records that have prose carry
+//                          `hasExpand: true` so the UI can gate the affordance.
+//   insights.expand.json — { [id]: expand } — loaded via dynamic import the
+//                          first time a reader opens a "Read more"/context
+//                          expansion, so it code-splits into an async chunk.
+// Keep this split in place when regenerating — writing `expand` back inline
+// silently re-adds ~280 kB to the /home first-load bundle.
+const expandById = {};
+let expandCount = 0;
+const heroSlim = hero.map((r) => {
+  const { expand, ...rest } = r;
+  if (typeof expand === "string" && expand.trim() !== "") {
+    expandById[r.id] = expand;
+    expandCount += 1;
+    return { ...rest, hasExpand: true };
+  }
+  return rest;
+});
+fs.writeFileSync(
+  path.join(LIB, "insights.hero.json"),
+  JSON.stringify(heroSlim, null, 2),
+);
+fs.writeFileSync(
+  path.join(LIB, "insights.expand.json"),
+  JSON.stringify(expandById, null, 2),
+);
+console.log(
+  `Hero pool (client-bundled): ${heroSlim.length} (+${expandCount} lazy expand entries)`,
+);
 
 // Report
 const byCat = {};
 for (const r of bank) (byCat[r.category] ||= []).push(r);
-console.log(`Final bank: ${bank.length} insights (from ${deduped.length} deduped; ${bookFiles.length} book files merged)`);
+console.log(
+  `Final bank: ${bank.length} insights (from ${deduped.length} deduped; ${bookFiles.length} book files merged)`,
+);
 for (const c of CATS) {
   const arr = byCat[c] || [];
   const works = new Set(arr.map((r) => r.work || "?"));
   const bookN = arr.filter((r) => r.sourceType === "book").length;
-  console.log(`  ${String(arr.length).padStart(5)}  ${c.padEnd(18)} · ${works.size} works · ${bookN} from books / ${arr.length - bookN} from articles`);
+  console.log(
+    `  ${String(arr.length).padStart(5)}  ${c.padEnd(18)} · ${works.size} works · ${bookN} from books / ${arr.length - bookN} from articles`,
+  );
 }
 
 // ── Source ledger (QUOTE-SOURCES.md) ──────────────────────────────────────
@@ -230,6 +282,13 @@ for (const c of CATS) {
     md += `| ${v.count} | ${v.sourceType} | ${esc(work)} | ${esc(v.byline)} |\n`;
   }
 }
-const ledgerPath = path.join(ROOT, "scripts", "quote-mining", "QUOTE-SOURCES.md");
+const ledgerPath = path.join(
+  ROOT,
+  "scripts",
+  "quote-mining",
+  "QUOTE-SOURCES.md",
+);
 fs.writeFileSync(ledgerPath, md);
-console.log(`Wrote source ledger: scripts/quote-mining/QUOTE-SOURCES.md (${allWorks} works)`);
+console.log(
+  `Wrote source ledger: scripts/quote-mining/QUOTE-SOURCES.md (${allWorks} works)`,
+);

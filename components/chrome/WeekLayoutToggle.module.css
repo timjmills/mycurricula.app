@@ -1,0 +1,36 @@
+/* WeekLayoutToggle.module.css — the Week edit board's Aligned/Stacked layout
+   toggle, as it sits inside the ViewTitle appearance popover (app/chrome.css
+   `.vt-menu`). Only owns the labeled-section chrome around the shared
+   <ToggleGroup> primitive — the segmented pill visuals come from
+   components/ui/ToggleGroup, not from here.
+
+   All color / type / spacing via var(--token) — no hex (CLAUDE.md §4). */
+
+/* Sits above the shared AppearanceControls inside the popover; a hairline rule
+   + bottom margin separate the two so "Board layout" reads as its own group. */
+.section {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.eyebrow {
+  display: block;
+  font-size: var(--t-11);
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hint {
+  margin: 4px 0 0;
+  font-size: var(--t-12);
+  color: var(--muted);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.control {
+  margin-top: 10px;
+}
