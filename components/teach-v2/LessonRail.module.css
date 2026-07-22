@@ -1,0 +1,162 @@
+/* LessonRail.module.css — v2 lesson pane + minimized rail. Tokens only. */
+
+/* ── Minimized 64px vertical rail ─────────────────────────────────────────── */
+
+.rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 64px;
+  height: 100%;
+  padding: 10px 0;
+  border-right: 1px solid var(--hairline);
+  background: var(--rail-bg);
+  overflow: hidden;
+}
+
+.railBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--rail-subj);
+}
+
+.railGlyph {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-top: 6px;
+  border-radius: var(--r-10);
+  background: color-mix(in srgb, var(--rail-subj) 18%, var(--surface));
+  color: var(--rail-subj);
+  font-size: var(--t-13);
+  font-weight: 700;
+}
+
+.railName {
+  margin-top: auto;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: var(--ink-600);
+  font-size: var(--t-12);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* ── Expanded lesson pane ─────────────────────────────────────────────────── */
+
+.pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  border-right: 1px solid var(--hairline);
+  background: var(--panel-bg);
+  overflow: hidden;
+}
+
+.paneStripe {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: var(--rail-subj);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+}
+
+.tab {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-600);
+  font-size: var(--t-13);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabOn {
+  background: var(--chrome-accent);
+  color: var(--on-solid);
+}
+
+.headActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pinOn {
+  color: var(--chrome-accent-deep);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 10px 10px 14px;
+}
+
+.classStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.classToggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  align-self: flex-start;
+}
+
+.subTab {
+  min-height: 30px;
+  padding: 4px 14px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-600);
+  font-size: var(--t-13);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.subTabOn {
+  background: var(--chrome-accent);
+  color: var(--on-solid);
+}
+
+/* Touch targets ≥44px on phone/tablet (L1 — hard responsive contract). */
+@media (pointer: coarse), (max-width: 900px) {
+  .tab,
+  .subTab {
+    min-height: 44px;
+  }
+}

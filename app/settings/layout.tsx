@@ -63,6 +63,9 @@ import {
   SettingsHeader,
   SettingsSearch,
 } from "@/components/settings";
+import { SECTION_ICONS } from "@/components/settings/section-icons";
+import { Button } from "@/components/ui";
+import { V2 } from "@/lib/v2-flag";
 import styles from "./layout.module.css";
 
 // ── Sub-page registry ──────────────────────────────────────────────────────
@@ -361,6 +364,7 @@ export default function SettingsLayout({
               backdrop itself) prompts when dirty, else exits. */}
           <div
             className={styles.backdrop}
+            data-v2={V2 ? "" : undefined}
             onPointerDown={onBackdropPointerDown}
             onPointerUp={onBackdropPointerUp}
             onPointerCancel={onBackdropPointerCancel}
@@ -372,6 +376,7 @@ export default function SettingsLayout({
             <div
               ref={dialogRef}
               className={styles.dialog}
+              data-v2={V2 ? "" : undefined}
               role="dialog"
               aria-modal="true"
               aria-label="Settings"
@@ -427,6 +432,17 @@ export default function SettingsLayout({
                                       : `${tab.label} — changes only affect your view`
                                   }
                                 >
+                                  {/* v2 ConfigPage skin: a section glyph leads
+                                      each row and becomes the sole label when
+                                      the nav collapses icon-only at ≤680px.
+                                      Gated so the v1 sidebar stays glyph-free
+                                      (its comment explains why the 220px rail
+                                      reads cleaner without it). */}
+                                  {V2 && SECTION_ICONS[tab.slug] ? (
+                                    <span className={styles.tabIcon} aria-hidden>
+                                      {SECTION_ICONS[tab.slug]({ size: 18 })}
+                                    </span>
+                                  ) : null}
                                   <span className={styles.tabLabel}>
                                     {tab.label}
                                   </span>
@@ -462,6 +478,25 @@ export default function SettingsLayout({
                       <span className={styles.sidebarThemeLabel}>Theme</span>
                       <ThemeQuickSwitch />
                     </div>
+
+                    {/* v2 ConfigPage skin: a "Done" button anchors the nav
+                        foot, echoing the artboard's second exit alongside the
+                        header ✕. Both call the same exit (return to the
+                        planner route). "Done" is a self-evident label, so per
+                        CLAUDE.md §4 it carries no onboarding tooltip. Hidden
+                        when the nav collapses icon-only (the ✕ still exits). */}
+                    {V2 ? (
+                      <div className={styles.sidebarDone}>
+                        <Button
+                          variant="secondary"
+                          size="md"
+                          onClick={exitSettings}
+                          aria-label="Done — back to your planner"
+                        >
+                          Done
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 </nav>
 

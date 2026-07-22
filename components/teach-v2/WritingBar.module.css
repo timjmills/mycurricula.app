@@ -1,0 +1,214 @@
+/* WritingBar.module.css — v2 board writing bar. Tokens only (CLAUDE.md §4). */
+
+.bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: none;
+  padding: 8px 12px;
+  border-top: 1px solid var(--hairline);
+  background: var(--panel-bg);
+}
+
+.toolScroll {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 2px;
+  background: var(--hairline);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+
+.swatch:hover {
+  transform: scale(1.08);
+}
+
+.swatchOn {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--chrome-accent);
+}
+
+/* ── Popovers (Resource / Background) ─────────────────────────────────────── */
+
+.popWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--panel-bg);
+  box-shadow: var(--sh-lg);
+}
+
+.popEmpty {
+  margin: 0;
+  padding: 8px;
+  color: var(--muted);
+  font-size: var(--t-13);
+}
+
+.popRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--ink-800);
+  font-size: var(--t-14);
+  text-align: left;
+  cursor: pointer;
+}
+
+.popRow:hover {
+  background: var(--chrome-accent-soft);
+}
+
+.popKind {
+  flex: none;
+  padding: 2px 6px;
+  border-radius: var(--r-4);
+  background: var(--chrome-accent-soft);
+  color: var(--chrome-accent-deep);
+  font-size: var(--t-10);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.popLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bgPop {
+  min-width: 260px;
+}
+
+.bgTabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.bgTab {
+  flex: 1;
+  min-height: 30px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-600);
+  font-size: var(--t-12);
+  cursor: pointer;
+}
+
+.bgTabOn {
+  background: var(--chrome-accent-soft);
+  border-color: var(--chrome-accent);
+  color: var(--chrome-accent-deep);
+  font-weight: 600;
+}
+
+.bgSwatches {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.bgSwatch {
+  aspect-ratio: 1 / 1;
+  min-height: 40px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  cursor: pointer;
+}
+
+.bgSwatch:hover {
+  border-color: var(--chrome-accent);
+  transform: scale(1.05);
+}
+
+.bgClear {
+  margin-top: 6px;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-700);
+  font-size: var(--t-13);
+  cursor: pointer;
+}
+
+.bgClear:hover {
+  background: var(--chrome-accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swatch:hover,
+  .bgSwatch:hover {
+    transform: none;
+  }
+}
+
+/* Phone/tablet: 44px touch floor for the writing-bar + popover controls
+   (Codex R2 #1). */
+@media (pointer: coarse), (max-width: 900px) {
+  .swatch {
+    width: 44px;
+    height: 44px;
+  }
+  .bgTab,
+  .bgClear,
+  .popRow,
+  .bgSwatch {
+    min-height: 44px;
+  }
+}

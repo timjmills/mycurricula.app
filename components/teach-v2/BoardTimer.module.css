@@ -1,0 +1,83 @@
+/* BoardTimer.module.css — board-header countdown. Tokens only (CLAUDE.md §4). */
+
+.timer {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.readout {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink-900);
+  cursor: pointer;
+}
+
+.readout:hover {
+  border-color: var(--chrome-accent);
+}
+
+.readoutTime {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: var(--t-16);
+  letter-spacing: 0.02em;
+}
+
+.readoutDone .readoutTime {
+  color: var(--urgent);
+}
+
+.picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--panel-bg);
+  box-shadow: var(--sh-lg);
+}
+
+.pickerItem {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--ink-700);
+  font-size: var(--t-14);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pickerItem:hover {
+  background: var(--chrome-accent-soft);
+  color: var(--ink-900);
+}
+
+.pickerItemActive {
+  background: var(--chrome-accent-soft);
+  color: var(--chrome-accent-deep);
+  font-weight: 600;
+}
+
+/* Phone/tablet: 44px touch floor (Codex R2 #1). */
+@media (pointer: coarse), (max-width: 900px) {
+  .readout,
+  .pickerItem {
+    min-height: 44px;
+  }
+}
