@@ -22,11 +22,16 @@ Padlet resource boards, a week-by-week lesson doc, a weekly-focus doc, a CCSS st
 doc, and per-teacher personal copies — into **one filterable, editable curriculum
 operating system**.
 
-### Current build status (2026-05-27)
+### Current build status (2026-07-23)
 
-Phase 1A is **shipped to a live beta-ready prototype** at the Cloudflare custom domain
-`mycurricula.app`. Every primary view renders against `lib/mock/` fixtures; the
-Supabase backend is the Phase 1B wave. The honest map:
+**v2 is LIVE in production, default-ON**, at the Cloudflare custom domain
+`mycurricula.app` (`lib/v2-flag.ts`: `NEXT_PUBLIC_V2 !== "0"`, router-gated —
+flag-OFF is a genuine v1 rollback on `/daily` `/weekly` `/year` `/home`
+`/catch-up`). The **Supabase backend is wired and live** for the planner and
+Teach (prod flags ON since June 2026); `lib/mock/` remains only as the
+flag-OFF/dev fallback, it no longer "drives every view". The canonical
+shipped-vs-remaining map is **`docs/7.23.26-unified-v2-plan.md`** §1/§5. The
+per-surface map:
 
 | Route / feature | Status |
 | --- | --- |
@@ -44,22 +49,27 @@ Supabase backend is the Phase 1B wave. The honest map:
 | Onboarding wizard | Shipped Phase 1A (`Documents/Claude Design/.../onboarding_wizard` is the spec) |
 | Cloudflare deploy (custom domain `mycurricula.app`) | Live |
 | Claude auth bypass (Bearer + URL + cookie) | Live — all three flows working |
-| Supabase backend (auth + DB rows + realtime) | **Not yet wired** — Phase 1B gate. Mock data in `lib/mock/` drives every view today. |
+| Supabase backend (auth + DB rows + planner/teach persistence) | **Wired + LIVE on prod** — planner flag ON since 2026-06-12 (1,069 lessons loaded), Teach since 2026-06-14, standards catalog + theme sync live. `lib/mock/` is the flag-OFF/dev fallback only. |
 
 > `/subject` is a legacy redirect to `/year` (already retired on master). The
 > v2 console spine is **Day · Week · Year · Lesson Plan · Teach**, plus the
 > Planner Hub (`/planner`) and the Resource Wall (`/post`); the older
 > per-subject curriculum view folded into Year.
 >
-> **v2 redesign in progress behind `NEXT_PUBLIC_V2`** (per-wave reveal,
-> rollback is redeploy-gated).
+> **v2 SHIPPED 2026-07-22** (cutover executed, briefly reverted on a
+> measurement artifact, re-cut + verified live). `NEXT_PUBLIC_V2=0` is the
+> staged rollback lever (repo variable + redeploy).
 >
 > **Default appearance:** Frame A (Calm Glass) · Photo background · Theme Clear ·
 > auto tone (luminance-sampled from the active photo).
 
-Phase 1B is the **Supabase + multi-school config wave**: wiring the backend so the
-forking model persists, holidays render on weekly/daily, schedule rotation cycles work
-end-to-end, and unit-import lands. Phase 2+ brings annotation, admin, and AI.
+The Phase 1B backend wave has **largely landed** (planner + Teach persistence, the
+forking model writes through, standards catalog, theme sync). The remaining open
+tracks — the full Settings/Setup ConfigPage, 12b-2 multi-workspace, the onboarding
+activation gate, and the 7.21 Unified Unit/Lesson Workspace (a data-layer wave) — are
+sequenced in `docs/7.23.26-unified-v2-plan.md` §5. Deferred within 1B: schedule
+rotation cycles, unit-import, holidays on weekly/daily. Phase 3+ brings annotation,
+admin, and AI.
 
 - **Users:** teachers only. No student, parent, or admin-facing product in scope.
 - **Core job:** "What are we teaching this week, and where am I in the plan?"
