@@ -6,12 +6,27 @@
 // Team Model.md §6). The workspace maps to the `schools` row — it is otherwise
 // invisible except for a quiet label here.
 //
-// Phase 1B seam: today (Phase 1A) the list is MOCK data so the switcher renders
-// against a realistic multi-notebook scenario without a Supabase backend. When
-// Phase 1B lands, replace MOCK_NOTEBOOKS with a server-driven data prop (e.g. a
-// React Server Component that calls `lib/admin/queries.ts listWorkspaceNotebooks()`
-// and passes the result into NotebookProvider as a prop). The context's shape and
-// the localStorage persistence key are stable across that migration.
+// Multi-workspace seam (Wave 12b-2): the workspace IDENTITY (name, admin flag,
+// notebook list) is flag-gated on `MULTI_WORKSPACE` (lib/multi-workspace-flag.ts,
+// DEFAULT OFF — the backing migration 20260724120000_multi_workspace.sql is not
+// yet applied to prod).
+//   • OFF (today): the list + name + admin flag come from the MOCK constants
+//     below, so the switcher renders against a realistic multi-notebook scenario
+//     without a backend. This path is BYTE-IDENTICAL to before the seam landed
+//     (the flag is a build-inlined `false`, so every ON branch dead-code-
+//     eliminates and every derived value collapses to its original expression).
+//   • ON: a post-mount fetch (in <WorkspaceIdentitySync>, mounted only when the
+//     flag is on) sources the REAL active workspace via the lib/workspaces/* seam's
+//     ATOMIC getActiveWorkspaceContext — identity + notebook list in ONE request,
+//     notebooks scoped to the resolved workspace id (from lib/admin/queries
+//     listWorkspaceNotebooks) so a concurrent switch can't tear a cross-tenant
+//     read. Until it resolves (and on failure / no active workspace) the ON path
+//     FAILS CLOSED to an empty/loading identity with isWorkspaceAdmin=false —
+//     never the mock. The context's shape and the localStorage persistence key
+//     are stable across the flip.
+// The `notebooks` / `workspaceName` PROPS remain injection points (an RSC may
+// still pass server data), and the settings overlay layers over WHICHEVER base
+// the flag selects.
 //
 // Settings overrides (Workspace & Team settings — lib/use-workspace-settings.ts):
 //   The provider LAYERS three localStorage-backed overrides over the injected
@@ -37,9 +52,11 @@
 //   then to the first active notebook.
 //
 // Workspace admin detection:
-//   In Phase 1A the founding teacher (first in the TEACHERS mock list) is treated
-//   as workspace admin. Phase 1B: derive from the `school_admins` table via the
-//   AppState currentUser.id (not built here yet — documented seam).
+//   OFF (Phase 1A): the founding teacher (first in the TEACHERS mock list, role
+//   "lead") is treated as workspace admin. ON (MULTI_WORKSPACE): derived from the
+//   real active workspace's role (owner/admin) — list_my_workspaces resolves
+//   is_school_admin server-side, so this reflects the actual `school_admins`
+//   grant for the active tenant.
 
 import {
   createContext,
@@ -59,6 +76,8 @@ import {
   subscribeToWorkspaceSettings,
   type WorkspaceNotebookOverride,
 } from "@/lib/use-workspace-settings";
+import { MULTI_WORKSPACE } from "@/lib/multi-workspace-flag";
+import { workspacesClient, isWorkspaceAdminRole } from "@/lib/workspaces";
 
 // ── Mock notebook definitions ────────────────────────────────────────────────
 // Beta school has a single active notebook ("Grade 5 — My Class").
@@ -80,6 +99,13 @@ const MOCK_NOTEBOOKS: readonly NotebookEntry[] = [
 
 // ── Mock workspace metadata ─────────────────────────────────────────────────
 const MOCK_WORKSPACE_NAME = "Al-Noor School";
+
+// Stable empty notebook list for the multi-workspace ON path BEFORE its fetch
+// resolves (and on failure / no active workspace). A module-level constant so its
+// reference is stable across renders — keeps the mergedNotebooks memo from
+// churning during the loading window. Only ever used on the ON path; the OFF path
+// still uses the injected `notebooks` (default MOCK_NOTEBOOKS) unchanged.
+const EMPTY_NOTEBOOKS: readonly NotebookEntry[] = [];
 
 // ── localStorage persistence ─────────────────────────────────────────────────
 // USER-scoped: active notebook is a per-teacher view choice.
@@ -119,8 +145,9 @@ export interface NotebookStateValue {
   setActiveNotebookId: (id: string) => void;
   /**
    * True when the signed-in teacher is a workspace admin.
-   * Phase 1A: derived from the mock lead-teacher identity (ME.id === "lh").
-   * Phase 1B seam: replace with `currentUser.id → school_admins` lookup.
+   * OFF (Phase 1A): derived from the mock lead-teacher identity (ME.role "lead").
+   * ON (MULTI_WORKSPACE): the real active workspace's owner/admin role, resolved
+   * server-side by list_my_workspaces (is_school_admin).
    */
   isWorkspaceAdmin: boolean;
 }
@@ -134,6 +161,73 @@ export function useNotebookState(): NotebookStateValue {
     throw new Error("useNotebookState must be used within a <NotebookProvider>");
   }
   return ctx;
+}
+
+/** The real active-workspace identity the ON path layers over the mock. */
+interface RemoteIdentity {
+  name: string;
+  isAdmin: boolean;
+  notebooks: NotebookEntry[];
+}
+
+/**
+ * ON-path ONLY. The <NotebookProvider> renders this exclusively when
+ * MULTI_WORKSPACE is on, so when the flag is OFF this component — and therefore
+ * its effect — NEVER mount: the provider keeps the exact hook/effect topology it
+ * had before the seam landed (Codex R1: any added effect on the OFF path is a
+ * regression). Renders nothing; its sole job is the post-mount fetch.
+ *
+ * It resolves the active workspace identity + notebooks ATOMICALLY via ONE server
+ * request (workspacesClient.getActiveWorkspaceContext) — reading them as two
+ * separate requests would let a concurrent switch produce a torn cross-tenant
+ * read. It reports up ONLY when a non-null active workspace resolves; a null
+ * active workspace (seam off at runtime / no membership) or a fetch error leaves
+ * `remote` null, and the provider then FAILS CLOSED to an empty/loading identity
+ * (isWorkspaceAdmin=false) rather than a mock-fallback identity that could wrongly
+ * confer admin.
+ *
+ * RE-SOURCING AFTER A SWITCH/CREATE is intentionally OUT OF SCOPE here: this unit
+ * ships no switcher/create UI (a separate unit), so nothing calls
+ * setActiveWorkspace/createWorkspace yet and there is no live workspace change to
+ * invalidate. When that UI lands it owns triggering a re-source after its
+ * mutation — the standard pattern is `router.refresh()` (or remounting this
+ * provider), which re-runs this mount fetch. The fetch runs once per mount by
+ * design.
+ */
+function WorkspaceIdentitySync({
+  onResolved,
+}: {
+  onResolved: (identity: RemoteIdentity) => void;
+}): null {
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { workspace, notebooks } =
+          await workspacesClient.getActiveWorkspaceContext();
+        // No active workspace → don't report; `remote` stays null and the
+        // provider FAILS CLOSED (empty identity, isWorkspaceAdmin=false).
+        if (cancelled || !workspace) return;
+        onResolved({
+          name: workspace.name,
+          isAdmin: isWorkspaceAdminRole(workspace.role),
+          notebooks: notebooks.map((nb) => ({
+            gradeLevelId: nb.gradeLevelId,
+            name: nb.name,
+            isActive: nb.isActive,
+          })),
+        });
+      } catch {
+        // Seam error → leave `remote` null; the provider fails closed (never
+        // reports a mock identity on an ON build).
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // onResolved is the stable useState setter; runs once on mount.
+  }, [onResolved]);
+  return null;
 }
 
 interface NotebookProviderProps {
@@ -175,17 +269,57 @@ export function NotebookProvider({
     return subscribeToWorkspaceSettings(sync); // stays live; returns cleanup
   }, []);
 
-  // Merge the overlay over the injected base list (matching id replaces the
-  // base entry; new ids append). WorkspaceNotebookOverride is structurally
-  // identical to NotebookEntry, so the merged array satisfies the existing
-  // NotebookEntry-typed context API unchanged.
-  const mergedNotebooks = useMemo<NotebookEntry[]>(
-    () => mergeNotebookOverlay(notebooks, overrides.overlay),
-    [notebooks, overrides.overlay],
+  // ── Multi-workspace ON-path identity (flag-gated; OFF path is inert) ──────
+  // DEFAULT OFF: the backing migration (20260724120000_multi_workspace.sql) is
+  // NOT yet applied to prod. When OFF, this state is NEVER written — the fetch
+  // lives in <WorkspaceIdentitySync>, which the return below renders ONLY when
+  // MULTI_WORKSPACE is on. So the OFF build mounts NO extra effect (the flagged
+  // Codex R1 finding), and this useState stays null forever; every derived value
+  // then collapses to the exact Phase-1A mock expression it always used, leaving
+  // the provider behaviorally identical to today. When ON, the child resolves the
+  // REAL active workspace identity + notebook list ATOMICALLY (one request → no
+  // torn cross-tenant read) and reports it here.
+  const [remote, setRemote] = useState<RemoteIdentity | null>(null);
+
+  // Base identity, split cleanly by the flag so the OFF branch is verbatim:
+  //   • OFF (MULTI_WORKSPACE build-inlined false): the injected mock — exactly
+  //     `notebooks` / `workspaceName`, byte-identical to before the seam landed.
+  //   • ON, resolved: the REAL active workspace (remote.*).
+  //   • ON, UNRESOLVED (pre-fetch, fetch failed, or no active workspace): a
+  //     NEUTRAL empty/loading state — NEVER the mock. Falling back to the mock on
+  //     an ON build would surface mock data to a real user and (via isWorkspace-
+  //     Admin below) flash the mock lead's admin capability to a non-admin. The
+  //     ON path therefore FAILS CLOSED (Codex R2 High); server-side RLS/RPCs are
+  //     the real gate regardless.
+  const baseNotebooks: readonly NotebookEntry[] = MULTI_WORKSPACE
+    ? remote
+      ? remote.notebooks
+      : EMPTY_NOTEBOOKS
+    : notebooks;
+  const baseWorkspaceName = MULTI_WORKSPACE
+    ? (remote?.name ?? "")
+    : workspaceName;
+
+  // Settings overrides (workspace name + notebook overlay) are LEGACY, GLOBAL,
+  // localStorage-backed keys from the single-workspace (mock) era. They apply
+  // ONLY on the OFF path. On the ON path the base identity is workspace-SPECIFIC
+  // (per active workspace), so a global override saved while in workspace A must
+  // NOT bleed into workspace B after switching (Codex R3 High — cross-workspace
+  // UI projection). Per-workspace override scoping (or migrating these writes to
+  // the server) belongs to the Settings unit; until then the ON path shows real
+  // workspace data only. The OFF branch is byte-identical to today:
+  // mergeNotebookOverlay(notebooks, overlay) and overrides.name ?? workspaceName.
+  const mergedNotebooks = useMemo<readonly NotebookEntry[]>(
+    () =>
+      MULTI_WORKSPACE
+        ? baseNotebooks
+        : mergeNotebookOverlay(baseNotebooks, overrides.overlay),
+    [baseNotebooks, overrides.overlay],
   );
 
-  // Workspace name: the settings override wins; the prop stays the default.
-  const effectiveWorkspaceName = overrides.name ?? workspaceName;
+  const effectiveWorkspaceName = MULTI_WORKSPACE
+    ? baseWorkspaceName
+    : (overrides.name ?? baseWorkspaceName);
 
   const activeNotebooks = useMemo(
     () => mergedNotebooks.filter((nb) => nb.isActive),
@@ -228,9 +362,15 @@ export function NotebookProvider({
     [activeNotebooks],
   );
 
-  // Phase 1A: the mock founding teacher (ME, id="lh") is the workspace admin.
-  // Phase 1B seam: derive from currentUser.id vs. school_admins table.
-  const isWorkspaceAdmin = ME.role === "lead";
+  // OFF (Phase 1A): the mock founding teacher (ME, id="lh", role "lead") is the
+  // workspace admin. ON (MULTI_WORKSPACE): the real active workspace's role —
+  // owner or admin, from list_my_workspaces (is_school_admin server-side) — and
+  // FAIL CLOSED to `false` until it resolves (never the mock lead's admin, so a
+  // non-admin can't be flashed admin affordances during the load / on failure).
+  // The `MULTI_WORKSPACE ?` split keeps the OFF expression verbatim.
+  const isWorkspaceAdmin = MULTI_WORKSPACE
+    ? Boolean(remote?.isAdmin)
+    : ME.role === "lead";
 
   const value = useMemo<NotebookStateValue>(
     () => ({
@@ -253,6 +393,12 @@ export function NotebookProvider({
 
   return (
     <NotebookStateContext.Provider value={value}>
+      {/* ON-path fetch. `MULTI_WORKSPACE` is a build-inlined `false` when the
+          flag is off, so this renders `null` and the sync component — and its
+          effect — never mount: the OFF build's render is unchanged. */}
+      {MULTI_WORKSPACE ? (
+        <WorkspaceIdentitySync onResolved={setRemote} />
+      ) : null}
       {children}
     </NotebookStateContext.Provider>
   );
